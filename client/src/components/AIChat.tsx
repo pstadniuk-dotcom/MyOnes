@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Send, Upload, Bot, User, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'wouter';
 
 interface Message {
   id: string;
@@ -34,189 +35,43 @@ export default function AIChat() {
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const handleSendMessage = useCallback(async () => {
     if (!inputValue.trim()) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: inputValue,
-      sender: 'user',
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    const currentMessage = inputValue;
-    setInputValue('');
-    setIsTyping(true);
-    
-    // Create abort controller for request cancellation
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 120000); // 2 minute timeout
-
+    // Save message to localStorage and redirect to signup
     try {
-      // Enhanced fetch with proper error handling
-      const response = await fetch('/api/chat/stream', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: currentMessage,
-          sessionId,
-          userId: 'demo-user' // In production, get from auth context
-        }),
-        signal: abortController.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      if (!response.body) {
-        throw new Error('No response body received');
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+      localStorage.setItem('preAuthMessage', inputValue);
       
-      let aiMessageId = (Date.now() + 1).toString();
-      let currentAiMessage: Message = {
-        id: aiMessageId,
-        content: '',
-        sender: 'ai',
+      // Show user message in UI
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        content: inputValue,
+        sender: 'user',
         timestamp: new Date()
       };
+      setMessages(prev => [...prev, userMessage]);
+      setInputValue('');
 
-      // Add empty AI message that will be filled as we stream
-      setMessages(prev => [...prev, currentAiMessage]);
+      // Show brief loading state to indicate message was received
+      setIsTyping(true);
       
-      let buffer = '';
-      let connected = false;
-      let completed = false;
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            if (!completed) {
-              console.warn('Stream ended without completion signal');
-              setIsTyping(false);
-            }
-            break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          
-          // Keep the last line in buffer (might be incomplete)
-          buffer = lines.pop() || '';
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const jsonStr = line.slice(6).trim();
-                if (jsonStr === '') continue; // Skip empty data lines
-                
-                const data = JSON.parse(jsonStr);
-                
-                if (data.type === 'connected') {
-                  connected = true;
-                  console.log('Stream connected');
-                } else if (data.type === 'chunk') {
-                  // Update the current AI message with new content
-                  setMessages(prev => prev.map(msg => 
-                    msg.id === aiMessageId 
-                      ? { ...msg, content: msg.content + data.content }
-                      : msg
-                  ));
-                  
-                  // Set session ID if provided
-                  if (data.sessionId && !sessionId) {
-                    setSessionId(data.sessionId);
-                  }
-                } else if (data.type === 'complete') {
-                  completed = true;
-                  // Add formula data if extracted
-                  if (data.formula) {
-                    setMessages(prev => prev.map(msg => 
-                      msg.id === aiMessageId 
-                        ? { ...msg, formula: data.formula }
-                        : msg
-                    ));
-                  }
-                  setIsTyping(false);
-                  
-                  if (data.formulaId) {
-                    console.log('Formula saved with ID:', data.formulaId);
-                  }
-                } else if (data.type === 'formula_error') {
-                  toast({
-                    title: "Formula Validation Error",
-                    description: data.error,
-                    variant: "destructive"
-                  });
-                  console.error('Formula validation errors:', data.validationErrors);
-                } else if (data.type === 'error') {
-                  toast({
-                    title: "AI Response Error",
-                    description: data.error,
-                    variant: "destructive"
-                  });
-                  setIsTyping(false);
-                  completed = true;
-                }
-              } catch (parseError) {
-                console.error('Error parsing SSE data:', parseError, 'Line:', line);
-              }
-            }
-          }
-        }
-      } catch (streamError) {
-        console.error('Streaming error:', streamError);
-        setIsTyping(false);
-      } finally {
-        // Clean up reader
-        try {
-          reader.releaseLock();
-        } catch (e) {
-          console.warn('Could not release reader lock:', e);
-        }
-      }
+      // Brief delay to show the message was received, then redirect
+      setTimeout(() => {
+        setLocation('/signup');
+      }, 500);
 
     } catch (error) {
-      console.error('Error sending message:', error);
-      
-      if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          toast({
-            title: "Request Timeout",
-            description: "The request took too long. Please try again.",
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Connection Error",
-            description: error.message || "Failed to send message. Please try again.",
-            variant: "destructive"
-          });
-        }
-      } else {
-        toast({
-          title: "Unknown Error",
-          description: "An unexpected error occurred. Please try again.",
-          variant: "destructive"
-        });
-      }
-      
-      setIsTyping(false);
-    } finally {
-      clearTimeout(timeoutId);
+      console.error('Error saving message to localStorage:', error);
+      toast({
+        title: "Storage Error",
+        description: "Unable to save your message. Please try again.",
+        variant: "destructive"
+      });
     }
-  }, [inputValue, sessionId, toast]);
+  }, [inputValue, toast, setLocation]);
 
   const handleFileUpload = () => {
     fileInputRef.current?.click();
