@@ -5,9 +5,52 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { createInsertSchema } from "drizzle-zod";
 import type { InsertMessage, InsertChatSession } from "@shared/schema";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import type { SignupData, LoginData, AuthResponse } from "@shared/schema";
+import { signupSchema, loginSchema } from "@shared/schema";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// JWT Configuration
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is required for security');
+  process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = '7d'; // 7 days
+
+// JWT Utilities
+function generateToken(userId: string): string {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+function verifyToken(token: string): { userId: string } | null {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    return decoded;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Auth middleware for protected routes
+function requireAuth(req: any, res: any, next: any) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  req.userId = decoded.userId;
+  next();
+}
 
 // Canonical dose mapping for all supplement bases and additions
 const CANONICAL_DOSES_MG = {
@@ -807,8 +850,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: 'ok' });
   });
 
+  // Authentication routes
+  app.post('/api/auth/signup', async (req, res) => {
+    try {
+      // Rate limiting for signup (3 attempts per 15 minutes per IP)
+      const clientIP = getClientIP(req);
+      const rateLimit = checkRateLimit(`signup-${clientIP}`, 3, 15 * 60 * 1000);
+      if (!rateLimit.allowed) {
+        return res.status(429).json({ 
+          error: 'Too many signup attempts. Please try again later.', 
+          retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
+        });
+      }
+
+      // Validate request body
+      const validatedData = signupSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(validatedData.email);
+      if (existingUser) {
+        return res.status(409).json({ error: 'User with this email already exists' });
+      }
+
+      // Hash password
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(validatedData.password, saltRounds);
+
+      // Create user
+      const userData = {
+        name: validatedData.name,
+        email: validatedData.email,
+        phone: validatedData.phone || null,
+        password: hashedPassword
+      };
+
+      const user = await storage.createUser(userData);
+      
+      // Generate JWT token
+      const token = generateToken(user.id);
+
+      // Return user data without password
+      const authResponse: AuthResponse = {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          createdAt: user.createdAt.toISOString()
+        },
+        token
+      };
+
+      res.status(201).json(authResponse);
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          error: 'Validation failed', 
+          details: error.errors 
+        });
+      }
+      
+      res.status(500).json({ error: 'Failed to create account' });
+    }
+  });
+
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      // Rate limiting for login (5 attempts per 15 minutes per IP)
+      const clientIP = getClientIP(req);
+      const rateLimit = checkRateLimit(`login-${clientIP}`, 5, 15 * 60 * 1000);
+      if (!rateLimit.allowed) {
+        return res.status(429).json({ 
+          error: 'Too many login attempts. Please try again later.', 
+          retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
+        });
+      }
+
+      // Validate request body
+      const validatedData = loginSchema.parse(req.body);
+      
+      // Find user by email
+      const user = await storage.getUserByEmail(validatedData.email);
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+
+      // Verify password
+      const isValidPassword = await bcrypt.compare(validatedData.password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+
+      // Generate JWT token
+      const token = generateToken(user.id);
+
+      // Return user data without password
+      const authResponse: AuthResponse = {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          createdAt: user.createdAt.toISOString()
+        },
+        token
+      };
+
+      res.json(authResponse);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          error: 'Validation failed', 
+          details: error.errors 
+        });
+      }
+      
+      res.status(500).json({ error: 'Login failed' });
+    }
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    // With JWT tokens, logout is primarily handled client-side by removing the token
+    // We could maintain a blacklist for extra security, but for this MVP we'll keep it simple
+    res.json({ message: 'Logged out successfully' });
+  });
+
+  app.get('/api/auth/me', requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Return user data without password
+      const userData = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        createdAt: user.createdAt.toISOString()
+      };
+
+      res.json({ user: userData });
+    } catch (error) {
+      console.error('Get user error:', error);
+      res.status(500).json({ error: 'Failed to fetch user data' });
+    }
+  });
+
   // Streaming chat endpoint with enhanced security
-  app.post('/api/chat/stream', async (req, res) => {
+  app.post('/api/chat/stream', requireAuth, async (req, res) => {
     let streamStarted = false;
     const clientIP = getClientIP(req);
     
@@ -836,7 +1031,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const { message, sessionId, userId } = req.body;
+      const { message, sessionId } = req.body;
+      const userId = req.userId; // Use authenticated user ID from middleware
       
       // Enhanced input validation
       if (!message || typeof message !== 'string' || message.trim().length === 0) {
@@ -847,9 +1043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Message too long (max 2000 characters)' });
       }
       
-      if (userId && typeof userId !== 'string') {
-        return res.status(400).json({ error: 'Invalid user ID format' });
-      }
+      // userId is guaranteed to be a valid string from authentication middleware
       
       if (sessionId && typeof sessionId !== 'string') {
         return res.status(400).json({ error: 'Invalid session ID format' });
@@ -890,7 +1084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         chatSession = await storage.getChatSession(sessionId);
       }
       
-      if (!chatSession && userId) {
+      if (!chatSession) {
         chatSession = await storage.createChatSession({ userId, status: 'active' });
       }
 
@@ -1204,13 +1398,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get chat session
-  app.get('/api/chat/:sessionId', async (req, res) => {
+  app.get('/api/chat/:sessionId', requireAuth, async (req, res) => {
     try {
       const { sessionId } = req.params;
+      const userId = req.userId; // Get authenticated user ID
       const session = await storage.getChatSession(sessionId);
       
       if (!session) {
         return res.status(404).json({ error: 'Session not found' });
+      }
+
+      // Ensure the session belongs to the authenticated user
+      if (session.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied' });
       }
 
       const messages = await storage.listMessagesBySession(sessionId);
@@ -1226,13 +1426,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new chat session
-  app.post('/api/chat/sessions', async (req, res) => {
+  app.post('/api/chat/sessions', requireAuth, async (req, res) => {
     try {
-      const { userId } = req.body;
-      
-      if (!userId) {
-        return res.status(400).json({ error: 'User ID is required' });
-      }
+      const userId = req.userId; // Use authenticated user ID
 
       const session = await storage.createChatSession({ 
         userId, 
@@ -1247,9 +1443,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // List user's chat sessions
-  app.get('/api/users/:userId/sessions', async (req, res) => {
+  app.get('/api/users/me/sessions', requireAuth, async (req, res) => {
     try {
-      const { userId } = req.params;
+      const userId = req.userId; // Use authenticated user ID instead of URL param
       const sessions = await storage.listChatSessionsByUser(userId);
       
       res.json(sessions);

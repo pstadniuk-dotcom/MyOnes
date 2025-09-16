@@ -22,12 +22,13 @@ export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant', 'sys
 export const addressTypeEnum = pgEnum('address_type', ['shipping', 'billing']);
 export const fileTypeEnum = pgEnum('file_type', ['lab_report', 'medical_document', 'prescription', 'other']);
 
-// Users table - updated with name, email, phone
+// Users table - updated with name, email, phone, password
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   phone: text("phone"),
+  password: text("password").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -244,3 +245,31 @@ export type FileUpload = typeof fileUploads.$inferSelect;
 
 export type InsertNotificationPref = z.infer<typeof insertNotificationPrefSchema>;
 export type NotificationPref = typeof notificationPrefs.$inferSelect;
+
+// Auth-specific schemas
+export const signupSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters long'),
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters long'),
+  phone: z.string().optional(),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+export const authResponseSchema = z.object({
+  user: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+    phone: z.string().nullable(),
+    createdAt: z.string(),
+  }),
+  token: z.string(),
+});
+
+export type SignupData = z.infer<typeof signupSchema>;
+export type LoginData = z.infer<typeof loginSchema>;
+export type AuthResponse = z.infer<typeof authResponseSchema>;
