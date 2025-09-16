@@ -1,20 +1,20 @@
 import { Card } from '@/components/ui/card';
-import { Pill, Search, HelpCircle } from 'lucide-react';
+import { Boxes, Users, Eye } from 'lucide-react';
 
 export default function ProblemSection() {
   const problems = [
     {
-      icon: Pill,
+      icon: Boxes,
       title: "10-15 bottles with overlapping ingredients",
       description: "Your medicine cabinet is overflowing with supplements that may be working against each other or duplicating effects."
     },
     {
-      icon: Search,
+      icon: Users,
       title: "Generic formulas ignoring your unique biology", 
       description: "One-size-fits-all supplements ignore your genetics, lifestyle, blood work, and individual health goals."
     },
     {
-      icon: HelpCircle,
+      icon: Eye,
       title: "No idea what's actually working",
       description: "Without proper tracking and personalization, you're flying blind on which supplements are helping or hurting."
     }
