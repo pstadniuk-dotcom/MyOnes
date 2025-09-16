@@ -64,7 +64,6 @@ export default function PricingSection() {
     "Free shipping nationwide",
     "Cancel or pause anytime",
     "30-day money-back guarantee",
-    "FDA-registered facility",
     "Third-party tested ingredients"
   ];
 
