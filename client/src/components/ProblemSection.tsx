@@ -80,7 +80,7 @@ export default function ProblemSection() {
               ></div>
             ))}
             <span className="text-2xl mx-4">→</span>
-            <div className="w-8 h-16 bg-gradient-to-b from-green-400 to-green-600 rounded-full shadow-md"></div>
+            <div className="w-8 h-16 bg-gradient-to-b from-green-700 to-green-900 rounded-full shadow-md"></div>
           </div>
           <p className="text-sm text-muted-foreground mt-4">From chaos to precision</p>
         </div>
