@@ -75,8 +75,8 @@ export default function ProblemSection() {
             {Array.from({length: 8}).map((_, i) => (
               <div 
                 key={i} 
-                className="w-8 h-12 bg-gradient-to-b from-amber-400 to-amber-600 rounded-sm opacity-70"
-                style={{ transform: `rotate(${(i - 4) * 3}deg)` }}
+                className="w-6 h-14 bg-gradient-to-b from-green-400 to-green-600 rounded-full opacity-75 shadow-sm"
+                style={{ transform: `rotate(${(i - 4) * 4}deg)` }}
               ></div>
             ))}
             <span className="text-2xl mx-4">→</span>
