@@ -1,0 +1,187 @@
+Here's the essential UI functionality and menu structure for the ONES MVP backend:
+MVP User Dashboard Structure
+1. Main Navigation Menu
+🏠 Dashboard
+💬 AI Consultation  
+💊 My Formula
+📦 Orders
+👤 Profile
+❓ Support
+2. Dashboard (Homepage)
+javascript// Key Components:
+- Current Formula Summary Card
+  - Active ingredients list
+  - Next refill date
+  - "Update Formula" button
+
+- Quick Actions
+  - "Start New Consultation"
+  - "Upload Blood Test"
+  - "View Formula Details"
+
+- Health Snapshot
+  - Last consultation date
+  - Formula version (e.g., "Version 3")
+  - Days until next evolution
+3. AI Consultation Page
+javascript// Features:
+- Chat Interface (main focus)
+- File Upload Button (blood tests)
+- Consultation History (collapsible)
+- "Save Progress" indicator
+- "Complete Consultation" button
+
+// Side Panel:
+- Progress Indicator (steps 1-4)
+- Current Recommendations
+- Detected Health Concerns
+4. My Formula Page
+javascript// Sections:
+- Current Formula
+  - Formula Base(s) with dosages
+  - Individual Ingredients
+  - Total mg count (e.g., 750/800mg)
+  
+- Ingredient Details (expandable cards)
+  - What it does
+  - Why it's included
+  - Dosage explanation
+
+- Formula History
+  - Previous versions
+  - What changed and why
+
+- Actions:
+  - "Update Formula" → AI Chat
+  - "Order Refill"
+  - "Download PDF"
+5. Orders Page
+javascript// Display:
+- Active Subscription
+  - Plan type (Reset/Optimize/Transform)
+  - Next shipment date
+  - "Manage Subscription"
+
+- Order History
+  - Order date
+  - Formula version
+  - Status/Tracking
+  - Invoice download
+
+- Quick Actions:
+  - "Pause Subscription"
+  - "Update Shipping"
+  - "Change Plan"
+6. Profile Page
+javascript// Sections:
+- Personal Information
+  - Name, email, phone
+  - Shipping address
+  - Billing information
+
+- Health Profile
+  - Age, gender, weight
+  - Medications (critical!)
+  - Allergies
+  - Health conditions
+
+- Connected Data (Phase 2)
+  - Wearables (coming soon)
+  - Lab accounts (coming soon)
+
+- Preferences
+  - Email notifications
+  - Formula update reminders
+  - Consultation frequency
+Critical MVP Features:
+Must Have:
+
+AI Chat that saves context between sessions
+Formula display with clear explanations
+Medication/allergy input (safety critical)
+Order management (place, track, manage)
+Basic health profile (age, gender, meds)
+
+Nice to Have (but can wait):
+
+Wearable integrations
+Advanced analytics
+Community features
+Educational content
+Referral system
+
+Simple Information Architecture:
+ONES Dashboard
+├── Current Formula Widget
+├── Next Steps CTA
+└── Recent Activity
+
+AI Consultation
+├── Chat Interface (80% of screen)
+├── Progress Sidebar
+└── File Upload Area
+
+My Formula
+├── Active Formula Card
+├── Ingredients List
+├── Why These? (explanations)
+└── Order Button
+
+Orders
+├── Subscription Status
+├── Order History
+└── Manage Subscription
+
+Profile
+├── Personal Info
+├── Health Info (critical)
+├── Account Settings
+└── Logout
+Mobile-First Considerations:
+css/* MVP should be fully responsive */
+- Collapsible navigation
+- Touch-friendly buttons (min 44px)
+- Simplified mobile formula view
+- Swipeable order history
+- Bottom nav on mobile
+Key UI Elements:
+Formula Card Design:
+javascript<FormulaCard>
+  <Badge>Version 3</Badge>
+  <Title>Your Personalized Formula</Title>
+  
+  <Section>
+    <Label>Base Formula</Label>
+    <Item>Adrenal Support - 400mg</Item>
+  </Section>
+  
+  <Section>
+    <Label>Added Ingredients</Label>
+    <Item>Magnesium - 200mg</Item>
+    <Item>B12 - 100mg</Item>
+  </Section>
+  
+  <Progress>750mg / 800mg used</Progress>
+  
+  <Actions>
+    <Button primary>Order Refill</Button>
+    <Button secondary>Update Formula</Button>
+  </Actions>
+</FormulaCard>
+Empty States:
+javascript// No formula yet:
+"Start your health journey with a quick AI consultation"
+[Begin Consultation]
+
+// No orders:
+"Once you complete your consultation, your first order will appear here"
+
+// Incomplete profile:
+"Add your health information for better recommendations"
+[Complete Profile]
+This MVP structure gives users everything they need to:
+
+Complete consultations
+Understand their formula
+Manage orders
+Update health info
