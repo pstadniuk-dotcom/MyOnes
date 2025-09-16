@@ -5,10 +5,21 @@ import heroImage from '@assets/generated_images/Diverse_wellness_lifestyle_hero_
 export default function HeroSection() {
   const handleStartConsultation = () => {
     console.log('Start consultation clicked from hero');
+    // Scroll to the AI Chat component on the right side
+    const aiChatElement = document.querySelector('[data-testid="card-ai-chat"]') as HTMLElement;
+    if (aiChatElement) {
+      aiChatElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Add a subtle highlight effect
+      aiChatElement.style.transform = 'scale(1.05)';
+      aiChatElement.style.transition = 'transform 0.3s ease';
+      setTimeout(() => {
+        aiChatElement.style.transform = 'scale(1)';
+      }, 600);
+    }
   };
 
   return (
-    <section className="min-h-screen bg-earthy-gradient dark:bg-earthy-gradient-dark relative overflow-hidden">
+    <section className="min-h-screen bg-premium-gradient relative overflow-hidden">
       {/* Background Gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/20 dark:from-primary/20 dark:via-background dark:to-accent/30"></div>
 
@@ -32,7 +43,7 @@ export default function HeroSection() {
               <Button 
                 size="lg" 
                 onClick={handleStartConsultation}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg micro-bounce micro-glow transition-all duration-300"
                 data-testid="button-hero-start-consultation"
               >
                 Start Your Free Consultation

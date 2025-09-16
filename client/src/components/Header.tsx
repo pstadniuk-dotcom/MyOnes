@@ -54,7 +54,21 @@ export default function Header() {
           {/* CTA Button */}
           <div className="hidden md:flex">
             <Button 
-              onClick={() => console.log('Start consultation clicked')}
+              onClick={() => {
+                console.log('Start consultation clicked');
+                // Scroll to the AI Chat component
+                const aiChatElement = document.querySelector('[data-testid="card-ai-chat"]') as HTMLElement;
+                if (aiChatElement) {
+                  aiChatElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  // Add a subtle highlight effect
+                  aiChatElement.style.transform = 'scale(1.05)';
+                  aiChatElement.style.transition = 'transform 0.3s ease';
+                  setTimeout(() => {
+                    aiChatElement.style.transform = 'scale(1)';
+                  }, 600);
+                }
+              }}
+              className="micro-bounce micro-glow transition-all duration-300"
               data-testid="button-start-consultation"
             >
               Start Consultation

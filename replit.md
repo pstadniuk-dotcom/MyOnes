@@ -1,0 +1,83 @@
+# ONES - Personalized AI Supplement Platform
+
+## Overview
+
+ONES is a personalized AI supplement platform that creates custom supplement formulas based on individual health profiles. The platform features a conversational AI interface that guides users through health assessments, analyzes blood test data, and provides personalized supplement recommendations delivered as single capsules. The system is designed as a full-stack web application with a modern, health-focused user interface that emphasizes trust, scientific backing, and user-friendly interactions.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+- **Framework**: React 18 with TypeScript for type safety and modern development practices
+- **Routing**: Wouter for lightweight client-side routing
+- **Styling**: Tailwind CSS with custom design system optimized for health/wellness aesthetics
+- **Component Library**: Custom components built on Radix UI primitives following design guidelines
+- **State Management**: TanStack Query (React Query) for server state management and caching
+- **Build Tool**: Vite for fast development and optimized production builds
+
+### Backend Architecture
+- **Runtime**: Node.js with Express.js framework for REST API development
+- **Language**: TypeScript with ES modules for modern JavaScript features
+- **Database**: PostgreSQL with Drizzle ORM for type-safe database operations
+- **Session Management**: Connect-pg-simple for PostgreSQL-backed sessions
+- **Development**: Hot module replacement with Vite integration for seamless development
+
+### UI Design System
+- **Color Palette**: Earthy, health-focused theme with deep teal primary (#168 76% 42%) and warm accent colors
+- **Typography**: Inter for body text and Playfair Display for headlines, emphasizing medical-grade readability
+- **Component Patterns**: Shadcn/ui components with health-tech inspired styling (Headspace/Calm aesthetic)
+- **Responsive Design**: Mobile-first approach with consistent spacing using Tailwind utilities
+- **Accessibility**: Built on Radix UI primitives ensuring WCAG compliance
+
+### Data Layer
+- **Database**: PostgreSQL for reliable data persistence
+- **ORM**: Drizzle for type-safe database queries and migrations
+- **Schema Management**: Centralized schema definitions with automated type generation
+- **Database Hosting**: Neon Database for serverless PostgreSQL with connection pooling
+
+### Core Features Architecture
+- **AI Chat Interface**: Conversational UI for health assessments with file upload capabilities for blood tests
+- **Personalization Engine**: Algorithm that processes user health data to create custom supplement formulas
+- **Formula Management**: System for combining base formulas with individual ingredients (400+ premium ingredients)
+- **Progress Tracking**: User journey monitoring with iterative formula optimization
+- **Subscription Management**: Automated refill system with periodic health reassessments
+
+## External Dependencies
+
+### Database & Infrastructure
+- **Neon Database**: Serverless PostgreSQL hosting with connection pooling
+- **Drizzle Kit**: Database migration and schema management tools
+- **Connect-pg-simple**: PostgreSQL session store for user authentication
+
+### Development Tools
+- **Vite**: Build tool with TypeScript support and hot module replacement
+- **ESBuild**: Fast bundling for production builds
+- **Tailwind CSS**: Utility-first CSS framework with custom configuration
+
+### UI Component Libraries
+- **Radix UI**: Headless UI primitives for accessibility and functionality
+- **Lucide React**: Icon library for consistent visual elements
+- **Class Variance Authority**: Utility for creating type-safe component variants
+- **Embla Carousel**: Touch-friendly carousel for mobile interactions
+
+### Styling & Animation
+- **PostCSS**: CSS processing with Autoprefixer
+- **Clsx & Tailwind Merge**: Conditional class name utilities
+- **Framer Motion**: Animation library for micro-interactions and transitions
+
+### Data Management
+- **TanStack Query**: Server state management, caching, and synchronization
+- **React Hook Form**: Form state management with validation
+- **Hookform Resolvers**: Integration between form validation and schema validation
+- **Date-fns**: Date manipulation utilities
+
+### File Handling
+- **File Upload Support**: PDF and image processing for blood test analysis
+- **Asset Management**: Vite-based asset optimization and serving
+
+### Font & Typography
+- **Google Fonts**: Inter and Playfair Display for professional health-tech aesthetic
+- **Custom Font Loading**: Optimized web font delivery with preconnect optimization

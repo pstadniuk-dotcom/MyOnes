@@ -92,7 +92,7 @@ export default function AIChat() {
   };
 
   return (
-    <Card className="w-full max-w-md h-[500px] flex flex-col" data-testid="card-ai-chat">
+    <Card className="w-full max-w-md h-[500px] flex flex-col glass shadow-premium-lg border-none" data-testid="card-ai-chat">
       {/* Chat Header */}
       <div className="p-4 border-b border-card-border">
         <div className="flex items-center space-x-2">
@@ -165,6 +165,7 @@ export default function AIChat() {
             variant="outline"
             size="icon"
             onClick={handleFileUpload}
+            className="micro-bounce transition-all duration-300"
             data-testid="button-upload-file"
           >
             <Upload className="w-4 h-4" />
@@ -173,6 +174,7 @@ export default function AIChat() {
             onClick={handleSendMessage}
             size="icon"
             disabled={!inputValue.trim()}
+            className="micro-bounce micro-glow transition-all duration-300"
             data-testid="button-send-message"
           >
             <Send className="w-4 h-4" />
