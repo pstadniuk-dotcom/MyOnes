@@ -1,46 +1,32 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Loader2, Bot, ArrowLeft } from 'lucide-react';
 import { Link } from 'wouter';
+import { loginSchema, type LoginData } from '@shared/schema';
 import { useAuth } from '@/contexts/AuthContext';
-import { signupSchema } from '@shared/schema';
 
-// Extended form validation schema to include password confirmation
-const extendedSignupSchema = signupSchema.extend({
-  confirmPassword: z.string()
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+export default function LoginPage() {
+  const { login, isLoading } = useAuth();
 
-type SignupForm = z.infer<typeof extendedSignupSchema>;
-
-export default function SignupPage() {
-  const { signup, isLoading } = useAuth();
-
-  const form = useForm<SignupForm>({
-    resolver: zodResolver(extendedSignupSchema),
+  const form = useForm<LoginData>({
+    resolver: zodResolver(loginSchema),
     defaultValues: {
-      name: '',
       email: '',
-      password: '',
-      confirmPassword: ''
+      password: ''
     }
   });
 
-  const onSubmit = async (data: SignupForm) => {
+  const onSubmit = async (data: LoginData) => {
     try {
-      // Extract signup data without confirmPassword
-      const { confirmPassword, ...signupData } = data;
-      await signup(signupData);
-    } catch (error) {
-      // Error handling is managed by AuthContext
-      console.error('Signup error:', error);
+      await login(data);
+      // AuthContext handles success toast, localStorage, and redirect
+    } catch (error: any) {
+      // AuthContext handles error toast
+      console.error('Login error:', error);
     }
   };
 
@@ -59,37 +45,19 @@ export default function SignupPage() {
             </div>
             <h1 className="text-2xl font-bold">ONES</h1>
           </div>
-          <p className="text-muted-foreground">Start your personalized health journey</p>
+          <p className="text-muted-foreground">Welcome back to your health journey</p>
         </div>
 
-        <Card className="glass border-none shadow-premium-lg" data-testid="card-signup-form">
+        <Card className="glass border-none shadow-premium-lg" data-testid="card-login-form">
           <CardHeader className="text-center">
-            <CardTitle>Create Your Account</CardTitle>
+            <CardTitle>Sign In</CardTitle>
             <CardDescription>
-              Get started with your personalized supplement consultation
+              Continue your personalized supplement journey
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="Enter your full name"
-                          {...field}
-                          data-testid="input-name"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <FormField
                   control={form.control}
                   name="email"
@@ -118,28 +86,9 @@ export default function SignupPage() {
                       <FormControl>
                         <Input 
                           type="password" 
-                          placeholder="Create a secure password"
+                          placeholder="Enter your password"
                           {...field}
                           data-testid="input-password"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm Password</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="password" 
-                          placeholder="Confirm your password"
-                          {...field}
-                          data-testid="input-confirm-password"
                         />
                       </FormControl>
                       <FormMessage />
@@ -151,15 +100,15 @@ export default function SignupPage() {
                   type="submit"
                   className="w-full"
                   disabled={isLoading}
-                  data-testid="button-signup"
+                  data-testid="button-login"
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating Account...
+                      Signing In...
                     </>
                   ) : (
-                    'Create Account'
+                    'Sign In'
                   )}
                 </Button>
               </form>
@@ -170,9 +119,9 @@ export default function SignupPage() {
         {/* Footer */}
         <div className="text-center text-sm text-muted-foreground">
           <p>
-            Already have an account?{' '}
-            <Link href="/login" className="text-primary hover:underline" data-testid="link-login">
-              Sign in
+            Don't have an account?{' '}
+            <Link href="/signup" className="text-primary hover:underline" data-testid="link-signup">
+              Create one
             </Link>
           </p>
         </div>
