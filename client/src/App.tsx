@@ -8,7 +8,16 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
 import SignupPage from "@/pages/SignupPage";
 import LoginPage from "@/pages/LoginPage";
-import ChatPage from "@/pages/ChatPage";
+import { ThemeProvider } from "next-themes";
+
+// Import dashboard components
+import { DashboardLayout } from "@/components/DashboardLayout";
+import DashboardPage from "@/pages/DashboardPage";
+import ConsultationPage from "@/pages/ConsultationPage";
+import FormulaPage from "@/pages/FormulaPage";
+import OrdersPage from "@/pages/OrdersPage";
+import ProfilePage from "@/pages/ProfilePage";
+import SupportPage from "@/pages/SupportPage";
 
 // Import all landing page components
 import Header from "@/components/Header";
@@ -41,17 +50,45 @@ function HomePage() {
   );
 }
 
+// Dashboard Router - handles all dashboard routes
+function DashboardRouter() {
+  return (
+    <DashboardLayout>
+      <Switch>
+        <Route path="/dashboard" component={DashboardPage} />
+        <Route path="/dashboard/consultation" component={ConsultationPage} />
+        <Route path="/dashboard/formula" component={FormulaPage} />
+        <Route path="/dashboard/orders" component={OrdersPage} />
+        <Route path="/dashboard/profile" component={ProfilePage} />
+        <Route path="/dashboard/support" component={SupportPage} />
+        <Route component={NotFound} />
+      </Switch>
+    </DashboardLayout>
+  );
+}
+
+// Main Router
 function Router() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/signup" component={SignupPage} />
       <Route path="/login" component={LoginPage} />
-      <Route path="/chat">
+      
+      {/* Protected Dashboard Routes */}
+      <Route path="/dashboard" nest>
         <ProtectedRoute>
-          <ChatPage />
+          <DashboardRouter />
         </ProtectedRoute>
       </Route>
+      
+      {/* Legacy /chat redirect to dashboard consultation */}
+      <Route path="/chat">
+        <ProtectedRoute>
+          <ConsultationPage />
+        </ProtectedRoute>
+      </Route>
+      
       <Route component={NotFound} />
     </Switch>
   );
@@ -60,12 +97,19 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </AuthProvider>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
