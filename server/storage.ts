@@ -98,6 +98,109 @@ export class MemStorage implements IStorage {
   private fileUploads: Map<string, FileUpload> = new Map();
   private notificationPrefs: Map<string, NotificationPref> = new Map(); // keyed by userId
 
+  constructor() {
+    // Initialize with mock data for development testing
+    this.initializeMockData();
+  }
+
+  private initializeMockData() {
+    // Create a test user
+    const testUser: User = {
+      id: 'test-user-123',
+      name: 'John Doe',
+      email: 'john@example.com',
+      phone: '+1-555-0123',
+      password: 'hashed-password',
+      createdAt: new Date('2024-07-01')
+    };
+    this.users.set(testUser.id, testUser);
+
+    // Create sample formulas with version history - all under 800mg safety limit
+    const formula1: Formula = {
+      id: 'formula-v1',
+      userId: testUser.id,
+      version: 1,
+      bases: [
+        { ingredient: 'MULTI VITAMIN', amount: 400, unit: 'mg' },
+        { ingredient: 'IMMUNE', amount: 200, unit: 'mg' }
+      ],
+      additions: [
+        { ingredient: 'Vitamin D3', amount: 1, unit: 'mg' }
+      ],
+      totalMg: 601,
+      notes: 'Initial formula focusing on foundational nutrition and immune support',
+      createdAt: new Date('2024-07-20')
+    };
+
+    const formula2: Formula = {
+      id: 'formula-v2',
+      userId: testUser.id,
+      version: 2,
+      bases: [
+        { ingredient: 'MULTI VITAMIN', amount: 400, unit: 'mg' },
+        { ingredient: 'BRAIN HEALTH', amount: 250, unit: 'mg' }
+      ],
+      additions: [
+        { ingredient: 'Vitamin D3', amount: 1, unit: 'mg' },
+        { ingredient: 'Omega-3', amount: 50, unit: 'mg' }
+      ],
+      totalMg: 701,
+      notes: 'Added brain health support and omega-3 for cognitive enhancement',
+      createdAt: new Date('2024-08-15')
+    };
+
+    const currentFormula: Formula = {
+      id: 'formula-v3',
+      userId: testUser.id,
+      version: 3,
+      bases: [
+        { ingredient: 'MULTI VITAMIN', amount: 400, unit: 'mg' },
+        { ingredient: 'ADRENAL SUPPORT', amount: 300, unit: 'mg' }
+      ],
+      additions: [
+        { ingredient: 'Vitamin D3', amount: 1, unit: 'mg' },
+        { ingredient: 'Magnesium', amount: 50, unit: 'mg' }
+      ],
+      totalMg: 751,
+      notes: 'Optimized for stress management with adrenal support, improved safety profile',
+      createdAt: new Date('2024-09-15')
+    };
+
+    // Store formulas
+    this.formulas.set(formula1.id, formula1);
+    this.formulas.set(formula2.id, formula2);
+    this.formulas.set(currentFormula.id, currentFormula);
+
+    // Create version change records
+    const change1: FormulaVersionChange = {
+      id: 'change-v1',
+      formulaId: formula1.id,
+      summary: 'Initial formula created',
+      rationale: 'Created foundational supplement formula based on initial health assessment and user goals',
+      createdAt: new Date('2024-07-20')
+    };
+
+    const change2: FormulaVersionChange = {
+      id: 'change-v2',
+      formulaId: formula2.id,
+      summary: 'Added cognitive support',
+      rationale: 'User requested brain health optimization. Added brain health base and omega-3 for cognitive enhancement.',
+      createdAt: new Date('2024-08-15')
+    };
+
+    const change3: FormulaVersionChange = {
+      id: 'change-v3',
+      formulaId: currentFormula.id,
+      summary: 'Optimized for stress management',
+      rationale: 'User reported high stress levels and energy issues. Replaced immune support with adrenal support for better stress management. Maintained safe dosage profile under 800mg limit.',
+      createdAt: new Date('2024-09-15')
+    };
+
+    this.formulaVersionChanges.set(change1.id, change1);
+    this.formulaVersionChanges.set(change2.id, change2);
+    this.formulaVersionChanges.set(change3.id, change3);
+  }
+
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     return this.users.get(id);
