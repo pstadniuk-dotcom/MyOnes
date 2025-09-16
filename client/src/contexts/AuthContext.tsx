@@ -149,8 +149,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         variant: "default"
       });
 
-      // Redirect to chat page
-      setLocation('/chat');
+      // Redirect to dashboard
+      setLocation('/dashboard');
 
     } catch (error: any) {
       console.error('Signup error:', error);
@@ -195,8 +195,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         variant: "default"
       });
 
-      // Redirect to chat page
-      setLocation('/chat');
+      // Redirect to dashboard
+      setLocation('/dashboard');
 
     } catch (error: any) {
       console.error('Login error:', error);
