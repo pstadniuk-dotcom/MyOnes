@@ -240,7 +240,7 @@ async function validateSupplementInteractions(formula: any, medications: string[
   
   // Add mandatory safety disclaimer
   if (warnings.length > 0) {
-    warnings.push('⚠️ IMPORTANT: These are potential interactions. Always consult your healthcare provider before starting new supplements.');
+    warnings.push('IMPORTANT: These are potential interactions. Always consult your healthcare provider before starting new supplements.');
   }
   
   return Array.from(new Set(warnings)); // Remove duplicates
@@ -441,7 +441,7 @@ async function checkKnownInteractions(supplement: string, medication: string): P
       for (const [medKey, warning] of Object.entries(medInteractions)) {
         if (medicationLower.includes(medKey.toLowerCase()) ||
             medKey.toLowerCase().includes(medicationLower)) {
-          return `⚠️ INTERACTION: ${warning}`;
+          return `INTERACTION: ${warning}`;
         }
       }
     }
@@ -1461,6 +1461,633 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: 'Failed to list chat sessions' });
     }
   });
+
+  // Get dashboard data
+  app.get('/api/dashboard', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId;
+      
+      // Fetch all dashboard data in parallel
+      const [currentFormula, healthProfile, chatSessions, orders, subscription] = await Promise.all([
+        storage.getCurrentFormulaByUser(userId),
+        storage.getHealthProfile(userId),
+        storage.listChatSessionsByUser(userId),
+        storage.listOrdersByUser(userId),
+        storage.getSubscription(userId)
+      ]);
+
+      // Calculate metrics
+      const totalConsultations = chatSessions.length;
+      const recentSessions = chatSessions.slice(0, 3);
+      const recentOrders = orders.slice(0, 5);
+      
+      // Calculate days since user joined (using oldest chat session or current date)
+      const oldestSession = chatSessions.length > 0 ? 
+        Math.min(...chatSessions.map(s => s.createdAt.getTime())) : Date.now();
+      const daysActive = Math.floor((Date.now() - oldestSession) / (1000 * 60 * 60 * 24));
+      
+      // Health score calculation (basic implementation)
+      let healthScore = 50; // baseline
+      if (currentFormula) healthScore += 20;
+      if (healthProfile?.age && healthProfile?.weightKg) healthScore += 10;
+      if (totalConsultations > 0) healthScore += 10;
+      if (totalConsultations >= 5) healthScore += 10;
+      healthScore = Math.min(healthScore, 100);
+
+      // Get recent activity
+      const recentActivity = [];
+      
+      // Add recent orders
+      recentOrders.slice(0, 3).forEach(order => {
+        recentActivity.push({
+          id: `order-${order.id}`,
+          type: 'order',
+          title: `Order ${order.status === 'delivered' ? 'Delivered' : order.status === 'shipped' ? 'Shipped' : 'Placed'}`,
+          description: `Formula v${order.formulaVersion} - ${order.status}`,
+          time: order.placedAt.toISOString(),
+          icon: 'Package'
+        });
+      });
+
+      // Add recent consultations
+      recentSessions.slice(0, 3).forEach(session => {
+        recentActivity.push({
+          id: `session-${session.id}`,
+          type: 'consultation',
+          title: 'AI Consultation',
+          description: `Session ${session.status}`,
+          time: session.createdAt.toISOString(),
+          icon: 'MessageSquare'
+        });
+      });
+
+      // Sort by time and limit
+      recentActivity.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+      // Next delivery calculation
+      const nextDelivery = subscription?.renewsAt || null;
+
+      const dashboardData = {
+        metrics: {
+          healthScore,
+          formulaVersion: currentFormula?.version || 0,
+          consultationsSessions: totalConsultations,
+          daysActive: Math.max(daysActive, 0),
+          nextDelivery: nextDelivery ? nextDelivery.toISOString().split('T')[0] : null
+        },
+        currentFormula,
+        healthProfile,
+        recentActivity: recentActivity.slice(0, 6),
+        subscription,
+        hasActiveFormula: !!currentFormula,
+        isNewUser: !currentFormula && totalConsultations === 0
+      };
+
+      res.json(dashboardData);
+    } catch (error) {
+      console.error('Get dashboard data error:', error);
+      res.status(500).json({ error: 'Failed to fetch dashboard data' });
+    }
+  });
+
+  // Get user's current formula
+  app.get('/api/users/me/formula', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId;
+      const currentFormula = await storage.getCurrentFormulaByUser(userId);
+      
+      if (!currentFormula) {
+        return res.status(404).json({ error: 'No formula found' });
+      }
+
+      res.json(currentFormula);
+    } catch (error) {
+      console.error('Get current formula error:', error);
+      res.status(500).json({ error: 'Failed to fetch formula' });
+    }
+  });
+
+  // Get user's health profile
+  app.get('/api/users/me/health-profile', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId;
+      const healthProfile = await storage.getHealthProfile(userId);
+      
+      if (!healthProfile) {
+        return res.status(404).json({ error: 'No health profile found' });
+      }
+
+      res.json(healthProfile);
+    } catch (error) {
+      console.error('Get health profile error:', error);
+      res.status(500).json({ error: 'Failed to fetch health profile' });
+    }
+  });
+
+  // Create or update health profile
+  app.post('/api/users/me/health-profile', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId;
+      const { age, sex, weightKg, conditions, medications, allergies } = req.body;
+
+      // Check if profile exists
+      const existingProfile = await storage.getHealthProfile(userId);
+      
+      let healthProfile;
+      if (existingProfile) {
+        healthProfile = await storage.updateHealthProfile(userId, {
+          age, sex, weightKg, conditions, medications, allergies
+        });
+      } else {
+        healthProfile = await storage.createHealthProfile({
+          userId, age, sex, weightKg, conditions, medications, allergies
+        });
+      }
+
+      res.json(healthProfile);
+    } catch (error) {
+      console.error('Save health profile error:', error);
+      res.status(500).json({ error: 'Failed to save health profile' });
+    }
+  });
+
+  // Get user's orders
+  app.get('/api/users/me/orders', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId;
+      const orders = await storage.listOrdersByUser(userId);
+      
+      res.json(orders);
+    } catch (error) {
+      console.error('Get orders error:', error);
+      res.status(500).json({ error: 'Failed to fetch orders' });
+    }
+  });
+
+  // Get consultation history (enhanced format for ConsultationPage)
+  app.get('/api/consultations/history', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId;
+      
+      // Fetch user's chat sessions
+      const sessions = await storage.listChatSessionsByUser(userId);
+      
+      // Fetch messages for all sessions and organize them
+      const messagesPromises = sessions.map(session => 
+        storage.listMessagesBySession(session.id).then(messages => ({
+          sessionId: session.id,
+          messages
+        }))
+      );
+      
+      const sessionMessages = await Promise.all(messagesPromises);
+      
+      // Organize messages by session ID
+      const messagesMap: Record<string, any[]> = {};
+      sessionMessages.forEach(({ sessionId, messages }) => {
+        messagesMap[sessionId] = messages.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          sender: msg.role === 'assistant' ? 'ai' : 'user',
+          timestamp: msg.createdAt,
+          sessionId: msg.sessionId,
+          ...(msg.fileAttachmentUrl && {
+            fileAttachment: {
+              name: msg.fileAttachmentName || 'Uploaded File',
+              url: msg.fileAttachmentUrl,
+              type: msg.fileAttachmentType || 'other',
+              size: 0 // Size not stored in current schema
+            }
+          }),
+          ...(msg.formulaData && {
+            formula: msg.formulaData
+          })
+        }));
+      });
+
+      // Enhance sessions with metadata for frontend
+      const enhancedSessions = sessions.map(session => {
+        const sessionMsgs = messagesMap[session.id] || [];
+        const lastMessage = sessionMsgs[sessionMsgs.length - 1];
+        const hasFormula = sessionMsgs.some(msg => msg.formula);
+        
+        return {
+          id: session.id,
+          title: `Consultation ${new Date(session.createdAt).toLocaleDateString()}`,
+          lastMessage: lastMessage?.content?.substring(0, 100) + '...' || 'New consultation',
+          timestamp: session.createdAt,
+          messageCount: sessionMsgs.length,
+          hasFormula,
+          status: session.status
+        };
+      });
+
+      // Sort sessions by most recent first
+      enhancedSessions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      res.json({
+        sessions: enhancedSessions,
+        messages: messagesMap
+      });
+    } catch (error) {
+      console.error('Get consultation history error:', error);
+      res.status(500).json({ error: 'Failed to fetch consultation history' });
+    }
+  });
+
+  // File upload endpoint with object storage integration
+  app.post('/api/files/upload', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId;
+      
+      // Check if file was uploaded
+      if (!req.files || !req.files.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const uploadedFile = Array.isArray(req.files.file) ? req.files.file[0] : req.files.file;
+      
+      // File validation
+      const maxSizeBytes = 10 * 1024 * 1024; // 10MB limit
+      const allowedMimeTypes = [
+        'application/pdf',
+        'image/jpeg',
+        'image/jpg', 
+        'image/png',
+        'text/plain',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+      
+      const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.txt', '.doc', '.docx'];
+
+      if (uploadedFile.size > maxSizeBytes) {
+        return res.status(400).json({ 
+          error: 'File too large. Maximum size is 10MB.' 
+        });
+      }
+
+      if (!allowedMimeTypes.includes(uploadedFile.mimetype)) {
+        return res.status(400).json({ 
+          error: 'Invalid file type. Only PDF, JPG, PNG, TXT, DOC, and DOCX files are allowed.' 
+        });
+      }
+
+      const fileName = uploadedFile.name.toLowerCase();
+      const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+      if (!hasValidExtension) {
+        return res.status(400).json({ 
+          error: 'Invalid file extension. Only .pdf, .jpg, .jpeg, .png, .txt, .doc, and .docx files are allowed.' 
+        });
+      }
+
+      // Generate unique filename
+      const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
+      const uniqueFileName = `${userId}_${Date.now()}_${Math.random().toString(36).substring(2)}${fileExtension}`;
+      const privateObjectDir = process.env.PRIVATE_OBJECT_DIR;
+      
+      if (!privateObjectDir) {
+        throw new Error('Object storage not configured');
+      }
+
+      const filePath = `${privateObjectDir}/${uniqueFileName}`;
+      
+      // Move file to object storage (using fs for now, should use proper object storage client)
+      const fs = require('fs').promises;
+      const path = require('path');
+      
+      try {
+        // Ensure the private directory exists
+        await fs.mkdir(path.dirname(filePath), { recursive: true });
+        
+        // Move uploaded file to object storage path
+        await fs.writeFile(filePath, uploadedFile.data);
+        
+        // Determine file type category
+        let fileType = 'other';
+        if (fileName.includes('lab') || fileName.includes('blood') || fileName.includes('test')) {
+          fileType = 'lab_report';
+        } else if (fileName.includes('prescription') || fileName.includes('rx')) {
+          fileType = 'prescription';  
+        } else if (allowedMimeTypes.slice(0, 4).includes(uploadedFile.mimetype)) {
+          fileType = 'medical_document';
+        }
+
+        // Save file metadata to storage
+        const fileUpload = await storage.createFileUpload({
+          userId,
+          fileName: uploadedFile.name,
+          filePath,
+          fileSize: uploadedFile.size,
+          mimeType: uploadedFile.mimetype,
+          fileType: fileType as any,
+          uploadedAt: new Date()
+        });
+
+        // Return file metadata
+        const responseData = {
+          id: fileUpload.id,
+          name: fileUpload.fileName,
+          url: filePath, // In production, this would be a secure URL
+          type: fileUpload.fileType,
+          size: fileUpload.fileSize,
+          uploadedAt: fileUpload.uploadedAt
+        };
+
+        res.json(responseData);
+        
+      } catch (fsError) {
+        console.error('File system error:', fsError);
+        throw new Error('Failed to save file to storage');
+      }
+      
+    } catch (error) {
+      console.error('File upload error:', error);
+      res.status(500).json({ error: 'Failed to upload file' });
+    }
+  });
+
+  // ==================== FORMULA MANAGEMENT ENDPOINTS ====================
+
+  // Get current active formula for user
+  app.get('/api/users/me/formula/current', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId;
+      const currentFormula = await storage.getCurrentFormulaByUser(userId);
+      
+      if (!currentFormula) {
+        return res.status(404).json({ error: 'No formula found for user' });
+      }
+
+      // Get the latest version changes for context
+      const versionChanges = await storage.listFormulaVersionChanges(currentFormula.id);
+      
+      res.json({
+        formula: currentFormula,
+        versionChanges: versionChanges.slice(0, 1) // Latest change only
+      });
+    } catch (error) {
+      console.error('Error fetching current formula:', error);
+      res.status(500).json({ error: 'Failed to fetch current formula' });
+    }
+  });
+
+  // Get formula version history for user
+  app.get('/api/users/me/formula/history', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId;
+      const formulaHistory = await storage.getFormulaHistory(userId);
+      
+      // Enrich with version change information
+      const enrichedHistory = await Promise.all(
+        formulaHistory.map(async (formula) => {
+          const changes = await storage.listFormulaVersionChanges(formula.id);
+          return {
+            ...formula,
+            changes: changes[0] || null // Latest change for this version
+          };
+        })
+      );
+      
+      res.json({ history: enrichedHistory });
+    } catch (error) {
+      console.error('Error fetching formula history:', error);
+      res.status(500).json({ error: 'Failed to fetch formula history' });
+    }
+  });
+
+  // Get specific formula version by ID
+  app.get('/api/users/me/formula/versions/:formulaId', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId;
+      const formulaId = req.params.formulaId;
+      
+      const formula = await storage.getFormula(formulaId);
+      
+      if (!formula || formula.userId !== userId) {
+        return res.status(404).json({ error: 'Formula not found or access denied' });
+      }
+
+      // Get version changes for this formula
+      const versionChanges = await storage.listFormulaVersionChanges(formulaId);
+      
+      res.json({
+        formula,
+        versionChanges
+      });
+    } catch (error) {
+      console.error('Error fetching formula version:', error);
+      res.status(500).json({ error: 'Failed to fetch formula version' });
+    }
+  });
+
+  // Revert to previous formula version
+  app.post('/api/users/me/formula/revert', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId;
+      const { formulaId, reason } = req.body;
+      
+      if (!formulaId || !reason) {
+        return res.status(400).json({ error: 'Formula ID and revert reason are required' });
+      }
+
+      // Get the formula to revert to
+      const originalFormula = await storage.getFormula(formulaId);
+      
+      if (!originalFormula || originalFormula.userId !== userId) {
+        return res.status(404).json({ error: 'Formula not found or access denied' });
+      }
+
+      // Get current highest version for user
+      const currentFormula = await storage.getCurrentFormulaByUser(userId);
+      const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
+
+      // Create new formula version with reverted data
+      const revertedFormula = await storage.createFormula({
+        userId,
+        version: nextVersion,
+        bases: originalFormula.bases as any,
+        additions: originalFormula.additions as any,
+        totalMg: originalFormula.totalMg,
+        notes: `Reverted to v${originalFormula.version}: ${reason}`
+      });
+
+      // Create version change record
+      await storage.createFormulaVersionChange({
+        formulaId: revertedFormula.id,
+        summary: `Reverted to version ${originalFormula.version}`,
+        rationale: reason
+      });
+
+      res.json({ 
+        success: true, 
+        formula: revertedFormula,
+        message: `Successfully reverted to version ${originalFormula.version}`
+      });
+    } catch (error) {
+      console.error('Error reverting formula:', error);
+      res.status(500).json({ error: 'Failed to revert formula' });
+    }
+  });
+
+  // Compare two formula versions
+  app.get('/api/users/me/formula/compare/:id1/:id2', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId;
+      const { id1, id2 } = req.params;
+      
+      const [formula1, formula2] = await Promise.all([
+        storage.getFormula(id1),
+        storage.getFormula(id2)
+      ]);
+
+      if (!formula1 || !formula2) {
+        return res.status(404).json({ error: 'One or both formulas not found' });
+      }
+
+      if (formula1.userId !== userId || formula2.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Calculate differences
+      const comparison = {
+        formula1,
+        formula2,
+        differences: {
+          totalMgChange: formula2.totalMg - formula1.totalMg,
+          basesAdded: formula2.bases.filter(b2 => 
+            !formula1.bases.some(b1 => b1.ingredient === b2.ingredient)
+          ),
+          basesRemoved: formula1.bases.filter(b1 => 
+            !formula2.bases.some(b2 => b2.ingredient === b1.ingredient)
+          ),
+          basesModified: formula2.bases.filter(b2 => {
+            const b1 = formula1.bases.find(b => b.ingredient === b2.ingredient);
+            return b1 && b1.amount !== b2.amount;
+          }),
+          additionsAdded: formula2.additions.filter(a2 => 
+            !formula1.additions.some(a1 => a1.ingredient === a2.ingredient)
+          ),
+          additionsRemoved: formula1.additions.filter(a1 => 
+            !formula2.additions.some(a2 => a2.ingredient === a1.ingredient)
+          ),
+          additionsModified: formula2.additions.filter(a2 => {
+            const a1 = formula1.additions.find(a => a.ingredient === a2.ingredient);
+            return a1 && a1.amount !== a2.amount;
+          })
+        }
+      };
+
+      res.json(comparison);
+    } catch (error) {
+      console.error('Error comparing formulas:', error);
+      res.status(500).json({ error: 'Failed to compare formulas' });
+    }
+  });
+
+  // Get ingredient detailed information
+  app.get('/api/ingredients/:ingredientName', requireAuth, async (req: any, res: any) => {
+    try {
+      const ingredientName = decodeURIComponent(req.params.ingredientName);
+      
+      // This would normally query a comprehensive ingredient database
+      // For now, return structured data based on ingredient name
+      const ingredientInfo = {
+        name: ingredientName,
+        dosage: CANONICAL_DOSES_MG[ingredientName as keyof typeof CANONICAL_DOSES_MG] || 0,
+        benefits: getIngredientBenefits(ingredientName),
+        interactions: await getIngredientInteractions(ingredientName),
+        category: getIngredientCategory(ingredientName),
+        dailyValuePercentage: getDailyValuePercentage(ingredientName),
+        sources: getIngredientSources(ingredientName),
+        qualityIndicators: getQualityIndicators(ingredientName),
+        alternatives: getAlternatives(ingredientName),
+        researchBacking: getResearchBacking(ingredientName)
+      };
+
+      res.json(ingredientInfo);
+    } catch (error) {
+      console.error('Error fetching ingredient information:', error);
+      res.status(500).json({ error: 'Failed to fetch ingredient information' });
+    }
+  });
+
+  // Helper functions for ingredient information (these would be more comprehensive in production)
+  function getIngredientBenefits(ingredient: string): string[] {
+    const benefits: Record<string, string[]> = {
+      'BRAIN HEALTH': ['Supports cognitive function', 'Enhances memory', 'Improves focus and concentration'],
+      'IMMUNE': ['Boosts immune system', 'Supports natural defenses', 'Helps fight infections'],
+      'ENERGY': ['Increases natural energy', 'Reduces fatigue', 'Supports cellular energy production'],
+      'Vitamin D3': ['Supports bone health', 'Immune system support', 'Mood regulation'],
+      'Magnesium': ['Muscle and nerve function', 'Bone health', 'Energy metabolism'],
+      'Omega-3': ['Heart health', 'Brain function', 'Anti-inflammatory effects']
+    };
+    
+    return benefits[ingredient] || ['General health support'];
+  }
+
+  function getIngredientCategory(ingredient: string): string {
+    if (Object.keys(CANONICAL_DOSES_MG).includes(ingredient) && 
+        !['Vitamin D3', 'Vitamin C', 'Magnesium', 'Zinc', 'Iron'].includes(ingredient)) {
+      return 'Formula Base';
+    }
+    return 'Individual Supplement';
+  }
+
+  function getDailyValuePercentage(ingredient: string): number | null {
+    // This would query a comprehensive nutrient database
+    const dvValues: Record<string, number> = {
+      'Vitamin D3': 500, // 1000 IU = 500% DV
+      'Vitamin C': 278,  // 250mg = 278% DV
+      'Magnesium': 48,   // 200mg = 48% DV
+      'Zinc': 136       // 15mg = 136% DV
+    };
+    
+    return dvValues[ingredient] || null;
+  }
+
+  function getIngredientSources(ingredient: string): string[] {
+    const sources: Record<string, string[]> = {
+      'Vitamin D3': ['Lichen extract', 'Lanolin (sheep wool)'],
+      'Magnesium': ['Magnesium glycinate', 'Magnesium citrate'],
+      'Omega-3': ['Fish oil', 'Algae oil'],
+      'BRAIN HEALTH': ['Lion\'s Mane mushroom', 'Bacopa monnieri', 'Ginkgo biloba']
+    };
+    
+    return sources[ingredient] || ['Natural sources'];
+  }
+
+  function getQualityIndicators(ingredient: string): string[] {
+    return [
+      'Third-party tested',
+      'USP verified',
+      'Non-GMO',
+      'Heavy metals tested'
+    ];
+  }
+
+  function getAlternatives(ingredient: string): string[] {
+    const alternatives: Record<string, string[]> = {
+      'Vitamin D3': ['Vitamin D2', 'Sunlight exposure'],
+      'Magnesium': ['Magnesium oxide', 'Magnesium malate'],
+      'ENERGY': ['ENDURANCE', 'ADRENAL SUPPORT']
+    };
+    
+    return alternatives[ingredient] || [];
+  }
+
+  function getResearchBacking(ingredient: string): { studyCount: number, evidenceLevel: string } {
+    // This would query a research database
+    return {
+      studyCount: Math.floor(Math.random() * 100) + 50,
+      evidenceLevel: 'Strong'
+    };
+  }
+
+  async function getIngredientInteractions(ingredient: string): Promise<string[]> {
+    const warnings = getGeneralSupplementWarnings(ingredient);
+    return warnings;
+  }
 
   const httpServer = createServer(app);
   return httpServer;

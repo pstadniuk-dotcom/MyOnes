@@ -14,7 +14,7 @@ import { ThemeProvider } from "next-themes";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import DashboardPage from "@/pages/DashboardPage";
 import ConsultationPage from "@/pages/ConsultationPage";
-import FormulaPage from "@/pages/FormulaPage";
+import MyFormulaPage from "@/pages/MyFormulaPage";
 import OrdersPage from "@/pages/OrdersPage";
 import ProfilePage from "@/pages/ProfilePage";
 import SupportPage from "@/pages/SupportPage";
@@ -57,7 +57,7 @@ function DashboardRouter() {
       <Switch>
         <Route path="/dashboard" component={DashboardPage} />
         <Route path="/dashboard/consultation" component={ConsultationPage} />
-        <Route path="/dashboard/formula" component={FormulaPage} />
+        <Route path="/dashboard/formula" component={MyFormulaPage} />
         <Route path="/dashboard/orders" component={OrdersPage} />
         <Route path="/dashboard/profile" component={ProfilePage} />
         <Route path="/dashboard/support" component={SupportPage} />

@@ -1,17 +1,37 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Send, Upload, Bot, User, AlertTriangle, CheckCircle, Sparkles, FileText } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  Send, Upload, Bot, User, AlertTriangle, CheckCircle, Sparkles, FileText,
+  History, Download, Search, Plus, RotateCcw, Copy, Share2, Mic, 
+  Loader2, FlaskConical, Clock, ArrowUp, Settings2, Zap,
+  Shield, Trash2, Calendar, Eye, EyeOff, X, ChevronDown, ChevronUp
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 
 interface Message {
   id: string;
   content: string;
   sender: 'user' | 'ai';
   timestamp: Date;
+  sessionId?: string;
+  fileAttachment?: {
+    name: string;
+    url: string;
+    type: 'lab_report' | 'medical_document' | 'prescription' | 'other';
+    size: number;
+  };
   formula?: {
     bases: { name: string; dose: string; purpose: string }[];
     additions: { name: string; dose: string; purpose: string }[];
@@ -19,36 +39,162 @@ interface Message {
     warnings: string[];
     rationale: string;
     disclaimers: string[];
+    isIncomplete?: boolean;
+    buildingProgress?: number;
   };
+  isTyping?: boolean;
+  isError?: boolean;
+  errorMessage?: string;
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  lastMessage: string;
+  timestamp: Date;
+  messageCount: number;
+  hasFormula: boolean;
+  status: 'active' | 'completed' | 'archived';
+}
+
+interface UploadedFile {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  uploadedAt: Date;
+}
+
+interface SuggestedPrompt {
+  id: string;
+  text: string;
+  category: 'health' | 'formula' | 'lifestyle' | 'symptoms';
+  icon: any;
 }
 
 export default function ConsultationPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: "Hello! I'm ONES AI, your personalized supplement consultant. I'm here to help you optimize your health through personalized supplement formulations based on your unique biochemistry and health goals.\n\nHow can I assist you today? You can:\n• Ask about your current formula\n• Upload new lab results for analysis\n• Discuss health concerns or goals\n• Get recommendations for formula adjustments",
-      sender: 'ai',
-      timestamp: new Date()
-    }
-  ]);
+  // Core state management
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [sessionHistory, setSessionHistory] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isNewSession, setIsNewSession] = useState(true);
+  
+  // Input and interaction state
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  // UI state
+  const [showHistory, setShowHistory] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedFormula, setSelectedFormula] = useState<any>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  
+  // Refs and hooks
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
+  // Suggested prompts data
+  const suggestedPrompts: SuggestedPrompt[] = useMemo(() => [
+    {
+      id: '1',
+      text: 'I want to optimize my energy levels and focus',
+      category: 'health',
+      icon: Zap
+    },
+    {
+      id: '2', 
+      text: 'Please review my current supplement formula',
+      category: 'formula',
+      icon: FlaskConical
+    },
+    {
+      id: '3',
+      text: 'I have new blood test results to analyze',
+      category: 'health',
+      icon: Upload
+    },
+    {
+      id: '4',
+      text: 'Help me with sleep and recovery issues',
+      category: 'symptoms',
+      icon: Shield
+    },
+    {
+      id: '5',
+      text: 'I want to discuss my fitness and nutrition goals',
+      category: 'lifestyle',
+      icon: Plus
+    }
+  ], []);
+
+  // Query to fetch consultation history
+  const { data: historyData, isLoading: isLoadingHistory } = useQuery({
+    queryKey: ['consultation-history', user?.id],
+    queryFn: async () => {
+      const response = await fetch('/api/consultations/history', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch consultation history');
+      }
+      
+      return response.json() as { sessions: ChatSession[], messages: Record<string, Message[]> };
+    },
+    enabled: !!user?.id
+  });
+  
+  // Initialize welcome message and history on component mount
+  useEffect(() => {
+    if (!isNewSession || messages.length > 0) return;
+    
+    const welcomeMessage: Message = {
+      id: 'welcome-' + Date.now(),
+      content: `Hello ${user?.name?.split(' ')[0] || 'there'}! I'm ONES AI, your personalized supplement consultant. I'm here to help you optimize your health through personalized supplement formulations based on your unique biochemistry and health goals.\n\nHow can I assist you today? You can:\n• Ask about your current formula\n• Upload new lab results for analysis\n• Discuss health concerns or goals\n• Get recommendations for formula adjustments`,
+      sender: 'ai',
+      timestamp: new Date()
+    };
+    
+    setMessages([welcomeMessage]);
+    setShowSuggestions(true);
+    
+    // Load history data
+    if (historyData) {
+      setSessionHistory(historyData.sessions);
+    }
+    
+    // Check for preserved message
+    const preservedMessage = localStorage.getItem('preAuthMessage');
+    if (preservedMessage) {
+      localStorage.removeItem('preAuthMessage');
+      setInputValue(preservedMessage);
+      setShowSuggestions(false);
+      
+      setTimeout(() => {
+        handleSendMessage(preservedMessage);
+      }, 1000);
+    }
+  }, [user?.name, historyData, isNewSession, messages.length]);
+  
   // Auto-scroll to bottom when new messages arrive
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, scrollToBottom]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -59,48 +205,56 @@ export default function ConsultationPage() {
     }
   }, [inputValue]);
 
-  // Check for preserved message on component mount
-  useEffect(() => {
-    const preservedMessage = localStorage.getItem('preAuthMessage');
-    if (preservedMessage) {
-      localStorage.removeItem('preAuthMessage');
-      setInputValue(preservedMessage);
-      
-      setTimeout(() => {
-        handleSendMessage(preservedMessage);
-      }, 1000);
-    }
-  }, []);
-
-  const handleSendMessage = useCallback(async (messageText?: string) => {
+  // Enhanced message sending with file support
+  const handleSendMessage = useCallback(async (messageText?: string, attachedFiles?: UploadedFile[]) => {
     const currentMessage = messageText || inputValue;
-    if (!currentMessage.trim()) return;
+    if (!currentMessage.trim() && !attachedFiles?.length) return;
+
+    // Hide suggestions after first message
+    setShowSuggestions(false);
+    setIsNewSession(false);
 
     const userMessage: Message = {
       id: Date.now().toString(),
       content: currentMessage,
       sender: 'user',
-      timestamp: new Date()
+      timestamp: new Date(),
+      sessionId: currentSessionId,
+      fileAttachment: attachedFiles?.[0] ? {
+        name: attachedFiles[0].name,
+        url: attachedFiles[0].url,
+        type: attachedFiles[0].type as any,
+        size: attachedFiles[0].size
+      } : undefined
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsTyping(true);
+    setUploadedFiles([]);
     
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), 120000);
 
     try {
+      const requestBody = {
+        message: currentMessage,
+        sessionId: currentSessionId,
+        files: attachedFiles?.map(file => ({
+          name: file.name,
+          url: file.url,
+          type: file.type,
+          size: file.size
+        })) || []
+      };
+      
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
-        body: JSON.stringify({
-          message: currentMessage,
-          sessionId,
-          userId: user?.id || 'authenticated-user'
-        }),
+        body: JSON.stringify(requestBody),
         signal: abortController.signal
       });
 
@@ -164,8 +318,8 @@ export default function ConsultationPage() {
                       : msg
                   ));
                   
-                  if (data.sessionId && !sessionId) {
-                    setSessionId(data.sessionId);
+                  if (data.sessionId && !currentSessionId) {
+                    setCurrentSessionId(data.sessionId);
                   }
                 } else if (data.type === 'complete') {
                   completed = true;
@@ -240,244 +394,860 @@ export default function ConsultationPage() {
     } finally {
       clearTimeout(timeoutId);
     }
-  }, [inputValue, sessionId, toast, user?.id]);
+  }, [inputValue, currentSessionId, toast, user?.id]);
 
-  const handleFileUpload = () => {
+  // Enhanced file upload with object storage
+  const handleFileUpload = useCallback(async () => {
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const fileMessage: Message = {
-        id: Date.now().toString(),
-        content: `📄 Uploaded: ${file.name}`,
-        sender: 'user',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, fileMessage]);
-      
-      setInputValue(`I've uploaded my lab results: ${file.name}. Please analyze them and provide insights for optimizing my supplement formula.`);
-      
+  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    setIsUploading(true);
+    const newUploadedFiles: UploadedFile[] = [];
+
+    try {
+      for (const file of files) {
+        // Validate file
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        
+        if (file.size > maxSize) {
+          toast({
+            title: "File Too Large",
+            description: `${file.name} exceeds the 10MB limit.`,
+            variant: "destructive"
+          });
+          continue;
+        }
+        
+        if (!allowedTypes.includes(file.type)) {
+          toast({
+            title: "File Type Not Supported",
+            description: `${file.name} format not supported. Please use PDF, JPG, or PNG.`,
+            variant: "destructive"
+          });
+          continue;
+        }
+
+        // Upload to object storage
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', 'lab_report');
+        formData.append('userId', user?.id || '');
+
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: formData
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload failed for ${file.name}`);
+        }
+
+        const uploadResult = await uploadResponse.json();
+        
+        const uploadedFile: UploadedFile = {
+          id: uploadResult.id || Date.now().toString(),
+          name: file.name,
+          url: uploadResult.url,
+          type: file.type,
+          size: file.size,
+          uploadedAt: new Date()
+        };
+        
+        newUploadedFiles.push(uploadedFile);
+      }
+
+      if (newUploadedFiles.length > 0) {
+        setUploadedFiles(prev => [...prev, ...newUploadedFiles]);
+        setInputValue(`I've uploaded my lab results (${newUploadedFiles.map(f => f.name).join(', ')}). Please analyze them and provide insights for optimizing my supplement formula.`);
+        
+        toast({
+          title: "Files Uploaded Successfully",
+          description: `${newUploadedFiles.length} file(s) ready for analysis. Click send to have ONES AI analyze your results.`,
+          variant: "default"
+        });
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
       toast({
-        title: "File Uploaded",
-        description: `${file.name} ready for analysis. Click send to have ONES AI analyze your results.`,
+        title: "Upload Failed",
+        description: "Failed to upload files. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  }, [user?.id, toast]);
+
+  // Handle suggested prompt selection
+  const handlePromptSelect = useCallback((prompt: SuggestedPrompt) => {
+    setInputValue(prompt.text);
+    setShowSuggestions(false);
+    
+    setTimeout(() => {
+      handleSendMessage(prompt.text);
+    }, 100);
+  }, [handleSendMessage]);
+  
+  // Start new consultation session
+  const handleNewSession = useCallback(() => {
+    setMessages([]);
+    setCurrentSessionId(null);
+    setIsNewSession(true);
+    setUploadedFiles([]);
+    setInputValue('');
+    setShowSuggestions(true);
+    
+    toast({
+      title: "New Consultation Started",
+      description: "Ready to discuss your health goals with ONES AI.",
+      variant: "default"
+    });
+  }, [toast]);
+  
+  // Load previous session
+  const handleLoadSession = useCallback((session: ChatSession) => {
+    if (historyData && historyData.messages[session.id]) {
+      setMessages(historyData.messages[session.id]);
+      setCurrentSessionId(session.id);
+      setIsNewSession(false);
+      setShowHistory(false);
+      setShowSuggestions(false);
+    }
+  }, [historyData]);
+  
+  // Copy message content
+  const handleCopyMessage = useCallback((content: string) => {
+    navigator.clipboard.writeText(content).then(() => {
+      toast({
+        title: "Copied to Clipboard",
+        description: "Message content copied successfully.",
         variant: "default"
       });
-    }
-  };
+    }).catch(() => {
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy message content.",
+        variant: "destructive"
+      });
+    });
+  }, [toast]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  // Share message content
+  const handleShareMessage = useCallback(async (content: string, formula?: any) => {
+    const shareData = {
+      title: 'ONES AI Consultation',
+      text: formula 
+        ? `Check out my personalized supplement formula from ONES AI:\n\n${content}\n\nTotal: ${formula.totalMg}mg formula with ${formula.bases.length} base formulas and ${formula.additions?.length || 0} additions.`
+        : `ONES AI Health Consultation:\n\n${content}`,
+      url: window.location.origin
+    };
+
+    try {
+      if (navigator.share && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        await navigator.share(shareData);
+        toast({
+          title: "Shared Successfully",
+          description: "Content shared via native sharing.",
+          variant: "default"
+        });
+      } else {
+        // Fallback: copy to clipboard with formatted text
+        await navigator.clipboard.writeText(`${shareData.text}\n\nLearn more at: ${shareData.url}`);
+        toast({
+          title: "Ready to Share",
+          description: "Formatted content copied to clipboard for sharing.",
+          variant: "default"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Share Failed",
+        description: "Unable to share content. Content copied to clipboard instead.",
+        variant: "destructive"
+      });
+      // Fallback to copy
+      try {
+        await navigator.clipboard.writeText(content);
+      } catch {
+        // Silent fail for copy fallback
+      }
+    }
+  }, [toast]);
+  
+  // Export consultation
+  const handleExportConsultation = useCallback(() => {
+    const exportData = {
+      session: currentSessionId,
+      timestamp: new Date().toISOString(),
+      messages: messages.map(msg => ({
+        sender: msg.sender,
+        content: msg.content,
+        timestamp: msg.timestamp.toISOString(),
+        formula: msg.formula
+      }))
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `consultation-${currentSessionId || 'current'}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Consultation Exported",
+      description: "Your consultation has been downloaded as JSON.",
+      variant: "default"
+    });
+  }, [messages, currentSessionId, toast]);
+
+  // Enhanced keyboard handling
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      if (!inputValue.trim() && uploadedFiles.length === 0) return;
+      handleSendMessage(inputValue, uploadedFiles);
     }
-  };
+    // Add keyboard shortcuts
+    if (e.ctrlKey || e.metaKey) {
+      switch (e.key) {
+        case 'n':
+          e.preventDefault();
+          handleNewSession();
+          break;
+        case 'e':
+          e.preventDefault();
+          handleExportConsultation();
+          break;
+        case 'h':
+          e.preventDefault();
+          setShowHistory(!showHistory);
+          break;
+      }
+    }
+  }, [inputValue, uploadedFiles, handleSendMessage, handleNewSession, handleExportConsultation, showHistory]);
+  
+  // Remove uploaded file
+  const handleRemoveFile = useCallback((fileId: string) => {
+    setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+  }, []);
+  
+  // Voice input handling
+  const handleVoiceInput = useCallback(async () => {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      toast({
+        title: "Voice Input Not Supported",
+        description: "Your browser doesn't support voice recognition.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      const recognition = new SpeechRecognition();
+      
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      
+      setIsRecording(true);
+      
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInputValue(prev => prev + (prev ? ' ' : '') + transcript);
+        setIsRecording(false);
+        
+        toast({
+          title: "Voice Captured",
+          description: `Added: "${transcript}"`,
+          variant: "default"
+        });
+      };
+      
+      recognition.onerror = () => {
+        setIsRecording(false);
+        toast({
+          title: "Voice Recognition Error",
+          description: "Failed to capture voice input. Please try again.",
+          variant: "destructive"
+        });
+      };
+      
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+      
+      recognition.start();
+    } catch (error) {
+      setIsRecording(false);
+      toast({
+        title: "Voice Input Error",
+        description: "Unable to start voice recognition.",
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
+
+  // Format file size
+  const formatFileSize = useCallback((bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }, []);
+  
+  // Filter messages for search
+  const filteredMessages = useMemo(() => {
+    if (!searchTerm.trim()) return messages;
+    return messages.filter(msg => 
+      msg.content.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [messages, searchTerm]);
 
   return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-8rem)]" data-testid="page-consultation">
-      {/* Header */}
-      <Card className="rounded-b-none border-b">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                <Bot className="w-5 h-5 text-primary-foreground" />
+    <div className="flex h-full max-h-[calc(100vh-4rem)]" data-testid="page-consultation">
+      {/* History Sidebar */}
+      {showHistory && (
+        <Card className="w-80 rounded-r-none border-r flex flex-col">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Consultation History</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 p-0">
+            <ScrollArea className="h-full px-4">
+              <div className="space-y-2 pb-4">
+                {isLoadingHistory ? (
+                  <div className="space-y-2">
+                    {Array.from({length: 5}).map((_, i) => (
+                      <Skeleton key={i} className="h-16 w-full" />
+                    ))}
+                  </div>
+                ) : sessionHistory.length > 0 ? (
+                  sessionHistory.map((session) => (
+                    <div
+                      key={session.id}
+                      className="p-3 border rounded-lg hover-elevate cursor-pointer group"
+                      onClick={() => handleLoadSession(session)}
+                      data-testid={`session-${session.id}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{session.title}</p>
+                          <p className="text-xs text-muted-foreground truncate mt-1">
+                            {session.lastMessage}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="outline" className="text-xs">
+                              {session.messageCount} messages
+                            </Badge>
+                            {session.hasFormula && (
+                              <Badge variant="secondary" className="text-xs">
+                                <FlaskConical className="w-3 h-3 mr-1" />
+                                Formula
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(session.timestamp).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center text-muted-foreground text-sm py-8">
+                    <History className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    No previous consultations
+                  </div>
+                )}
               </div>
-              <div>
-                <CardTitle className="text-xl flex items-center gap-2" data-testid="text-consultation-title">
-                  ONES AI Consultation
-                  <Badge variant="secondary" className="text-xs">
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    AI-Powered
-                  </Badge>
-                </CardTitle>
-                <CardDescription className="flex items-center gap-2">
-                  Your personalized supplement consultant
-                  {isConnected && <Badge variant="outline" className="text-xs text-green-600 border-green-200">Connected</Badge>}
-                  {sessionId && <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">Session Active</Badge>}
-                </CardDescription>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Main Chat Interface */}
+      <div className="flex-1 flex flex-col">
+        {/* Enhanced Header */}
+        <Card className={`rounded-b-none border-b ${showHistory ? 'rounded-l-none' : ''}`}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src="" alt="ONES AI" />
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    <Bot className="w-5 h-5" />
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <CardTitle className="text-xl flex items-center gap-2" data-testid="text-consultation-title">
+                    ONES AI Consultation
+                    <Badge variant="secondary" className="text-xs">
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      AI-Powered
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-2">
+                    Your personalized supplement consultant
+                    {isConnected && (
+                      <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
+                        Connected
+                      </Badge>
+                    )}
+                    {currentSessionId && (
+                      <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
+                        Session Active
+                      </Badge>
+                    )}
+                  </CardDescription>
+                </div>
+              </div>
+              
+              {/* Header Actions */}
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowHistory(!showHistory)}
+                  data-testid="button-toggle-history"
+                >
+                  <History className="w-4 h-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleNewSession}
+                  data-testid="button-new-session"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleExportConsultation}
+                  disabled={messages.length === 0}
+                  data-testid="button-export"
+                >
+                  <Download className="w-4 h-4" />
+                </Button>
               </div>
             </div>
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-muted/20" data-testid="container-chat-messages">
-        {messages.map((message, index) => (
-          <div
-            key={message.id}
-            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-            data-testid={`message-${message.sender}-${message.id}`}
-          >
-            <div
-              className={`max-w-[85%] rounded-lg p-4 space-y-3 ${
-                message.sender === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background text-foreground border shadow-sm'
-              }`}
-            >
-              <div className="flex items-start space-x-3">
-                {message.sender === 'ai' && (
-                  <Bot className="w-5 h-5 mt-0.5 flex-shrink-0 text-primary" />
-                )}
-                {message.sender === 'user' && (
-                  <User className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                )}
-                <div className="flex-1">
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                  
-                  {/* Enhanced formula visualization */}
-                  {message.formula && (
-                    <div className="mt-4 p-4 bg-background rounded-lg border">
-                      <h4 className="font-semibold text-base mb-3 flex items-center gap-2 text-primary">
-                        <CheckCircle className="w-5 h-5 text-green-500" />
-                        Your Personalized Formula ({message.formula.totalMg}mg)
-                      </h4>
-                      
-                      {message.formula.bases.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-muted-foreground mb-2">Base Formulas:</p>
-                          <div className="grid gap-2">
-                            {message.formula.bases.map((base, idx) => (
-                              <div key={idx} className="flex items-center justify-between p-2 bg-muted/50 rounded border">
-                                <div className="flex-1">
-                                  <span className="font-medium text-sm">{base.name}</span>
-                                  <p className="text-xs text-muted-foreground">{base.purpose}</p>
-                                </div>
-                                <Badge variant="secondary" className="text-xs">{base.dose}</Badge>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {message.formula.additions.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-muted-foreground mb-2">Additional Ingredients:</p>
-                          <div className="grid gap-2">
-                            {message.formula.additions.map((addition, idx) => (
-                              <div key={idx} className="flex items-center justify-between p-2 bg-muted/30 rounded border-dashed border">
-                                <div className="flex-1">
-                                  <span className="font-medium text-sm">{addition.name}</span>
-                                  <p className="text-xs text-muted-foreground">{addition.purpose}</p>
-                                </div>
-                                <Badge variant="outline" className="text-xs">{addition.dose}</Badge>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {message.formula.rationale && (
-                        <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded border-l-4 border-blue-400">
-                          <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1">Why This Formula:</p>
-                          <p className="text-sm text-blue-700 dark:text-blue-400">{message.formula.rationale}</p>
-                        </div>
-                      )}
-                      
-                      {message.formula.warnings.length > 0 && (
-                        <div className="mb-3">
-                          <p className="text-sm font-medium text-amber-600 mb-2 flex items-center gap-1">
-                            <AlertTriangle className="w-4 h-4" />
-                            Important Warnings:
-                          </p>
-                          <ul className="space-y-1">
-                            {message.formula.warnings.map((warning, idx) => (
-                              <li key={idx} className="flex items-start gap-2 p-2 bg-amber-50 dark:bg-amber-950/30 rounded text-amber-800 dark:text-amber-300">
-                                <span className="text-amber-600 mt-0.5 font-bold">•</span>
-                                <span className="text-sm">{warning}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      
-                      {message.formula.disclaimers.length > 0 && (
-                        <div className="text-xs text-muted-foreground border-t pt-3 space-y-1">
-                          {message.formula.disclaimers.map((disclaimer, idx) => (
-                            <p key={idx}>• {disclaimer}</p>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+            
+            {/* Search Bar (when enabled) */}
+            {searchTerm && (
+              <div className="mt-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search messages..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-search-messages"
+                  />
+                  {searchTerm && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
                   )}
                 </div>
               </div>
-            </div>
-          </div>
-        ))}
-        
-        {isTyping && (
-          <div className="flex justify-start" data-testid="indicator-typing">
-            <div className="bg-background rounded-lg p-4 max-w-[85%] border shadow-sm">
-              <div className="flex items-center space-x-3">
-                <Bot className="w-5 h-5 text-primary" />
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">ONES AI is analyzing...</p>
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            )}
+          </CardHeader>
+        </Card>
+
+        {/* Messages Area */}
+        <ScrollArea className="flex-1" data-testid="container-chat-messages">
+          <div className="p-6 space-y-6">
+            {/* Suggested Prompts */}
+            {showSuggestions && isNewSession && (
+              <div className="space-y-4 mb-8">
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-primary mb-2">How can I help you today?</h3>
+                  <p className="text-muted-foreground text-sm mb-4">Click a suggestion below or type your own question</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {suggestedPrompts.map((prompt) => {
+                    const IconComponent = prompt.icon;
+                    return (
+                      <Button
+                        key={prompt.id}
+                        variant="outline"
+                        className="p-4 h-auto text-left justify-start hover-elevate"
+                        onClick={() => handlePromptSelect(prompt)}
+                        data-testid={`prompt-${prompt.id}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-md bg-primary/10">
+                            <IconComponent className="w-4 h-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{prompt.text}</p>
+                            <Badge variant="secondary" className="mt-1 text-xs capitalize">
+                              {prompt.category}
+                            </Badge>
+                          </div>
+                        </div>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {filteredMessages.map((message, index) => (
+              <div
+                key={message.id}
+                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                data-testid={`message-${message.sender}-${message.id}`}
+              >
+                <div
+                  className={`max-w-[85%] rounded-lg p-4 space-y-3 ${
+                    message.sender === 'user'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-foreground border shadow-sm'
+                  }`}
+                >
+                  <div className="flex items-start space-x-3">
+                    {message.sender === 'ai' && (
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-primary/10">
+                          <Bot className="w-4 h-4 text-primary" />
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    {message.sender === 'user' && (
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-primary text-primary-foreground">
+                          <User className="w-4 h-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs text-muted-foreground">
+                          {message.timestamp.toLocaleTimeString()}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopyMessage(message.content)}
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid={`button-copy-message-${message.id}`}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleShareMessage(message.content, message.formula)}
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid={`button-share-message-${message.id}`}
+                        >
+                          <Share2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      
+                      {/* File Attachment Display */}
+                      {message.fileAttachment && (
+                        <div className="mt-3 p-3 bg-muted/30 rounded border-dashed border">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-primary" />
+                            <div>
+                              <p className="text-sm font-medium">{message.fileAttachment.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(message.fileAttachment.size)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Enhanced formula visualization with animations */}
+                      {message.formula && (
+                        <div className="mt-4 p-4 bg-card rounded-lg border animate-in fade-in-50 duration-500">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-semibold text-base flex items-center gap-2 text-primary">
+                              <CheckCircle className="w-5 h-5 text-green-500 animate-in zoom-in-50 duration-700" />
+                              Your Personalized Formula
+                            </h4>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {message.formula.totalMg}mg total
+                              </Badge>
+                              <Progress 
+                                value={(message.formula.totalMg / 800) * 100} 
+                                className="w-20 h-2"
+                              />
+                            </div>
+                          </div>
+                          
+                          {message.formula.bases.length > 0 && (
+                            <div className="mb-4 space-y-2">
+                              <p className="text-sm font-medium text-muted-foreground">Base Formulas:</p>
+                              <div className="grid gap-2">
+                                {message.formula.bases.map((base, idx) => (
+                                  <div 
+                                    key={idx} 
+                                    className="flex items-center justify-between p-3 bg-muted/50 rounded border hover-elevate cursor-pointer group"
+                                    style={{ animationDelay: `${idx * 100}ms` }}
+                                  >
+                                    <div className="flex-1">
+                                      <span className="font-medium text-sm">{base.name}</span>
+                                      <p className="text-xs text-muted-foreground mt-1">{base.purpose}</p>
+                                    </div>
+                                    <Badge variant="secondary" className="text-xs">{base.dose}</Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {message.formula.additions.length > 0 && (
+                            <div className="mb-4 space-y-2">
+                              <p className="text-sm font-medium text-muted-foreground">Additional Ingredients:</p>
+                              <div className="grid gap-2">
+                                {message.formula.additions.map((addition, idx) => (
+                                  <div 
+                                    key={idx} 
+                                    className="flex items-center justify-between p-3 bg-muted/30 rounded border-dashed border hover-elevate cursor-pointer"
+                                    style={{ animationDelay: `${(message.formula.bases.length + idx) * 100}ms` }}
+                                  >
+                                    <div className="flex-1">
+                                      <span className="font-medium text-sm">{addition.name}</span>
+                                      <p className="text-xs text-muted-foreground mt-1">{addition.purpose}</p>
+                                    </div>
+                                    <Badge variant="outline" className="text-xs">{addition.dose}</Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {message.formula.rationale && (
+                            <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded border-l-4 border-blue-400">
+                              <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1">Why This Formula:</p>
+                              <p className="text-sm text-blue-700 dark:text-blue-400">{message.formula.rationale}</p>
+                            </div>
+                          )}
+                          
+                          {message.formula.warnings && message.formula.warnings.length > 0 && (
+                            <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-950/30 rounded border-l-4 border-amber-400">
+                              <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-1">
+                                <AlertTriangle className="w-4 h-4" />
+                                Important Warnings:
+                              </p>
+                              <ul className="space-y-1">
+                                {message.formula.warnings.map((warning, idx) => (
+                                  <li key={idx} className="flex items-start gap-2 text-amber-800 dark:text-amber-300">
+                                    <span className="text-amber-600 mt-0.5 font-bold">•</span>
+                                    <span className="text-sm">{warning}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          
+                          {message.formula.disclaimers && message.formula.disclaimers.length > 0 && (
+                            <div className="text-xs text-muted-foreground border-t pt-3 space-y-1">
+                              {message.formula.disclaimers.map((disclaimer, idx) => (
+                                <p key={idx}>• {disclaimer}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ))}
+            
+            {/* Enhanced Typing Indicator */}
+            {isTyping && (
+              <div className="flex justify-start" data-testid="indicator-typing">
+                <div className="bg-background rounded-lg p-4 max-w-[85%] border shadow-sm">
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-primary/10">
+                        <Bot className="w-4 h-4 text-primary" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        ONES AI is analyzing your request...
+                      </p>
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        )}
-        <div ref={messagesEndRef} />
+        </ScrollArea>
+        
+        {/* Enhanced Input Area */}
+        <Card className="rounded-t-none border-t">
+          <CardContent className="p-4 space-y-4">
+            {/* Uploaded Files Preview */}
+            {uploadedFiles.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Uploaded Files:</p>
+                <div className="flex flex-wrap gap-2">
+                  {uploadedFiles.map((file) => (
+                    <div
+                      key={file.id}
+                      className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg border"
+                      data-testid={`uploaded-file-${file.id}`}
+                    >
+                      <FileText className="w-4 h-4 text-primary" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveFile(file.id)}
+                        className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Input Area */}
+            <div className="flex space-x-3 items-end">
+              <div className="flex-1 space-y-2">
+                <Textarea
+                  ref={textareaRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  placeholder="Ask about your supplement formula, health goals, or upload lab results..."
+                  className="min-h-[44px] max-h-[120px] resize-none"
+                  rows={1}
+                  disabled={isTyping}
+                  data-testid="input-consultation-message"
+                />
+                {/* Quick Actions */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <FileText className="w-3 h-3" />
+                    <span>Upload files or type your question</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span>Ctrl+N: New</span>
+                    <span>•</span>
+                    <span>Ctrl+E: Export</span>
+                    <span>•</span>
+                    <span>Enter: Send</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleFileUpload}
+                  disabled={isUploading}
+                  className="flex-shrink-0 hover-elevate"
+                  data-testid="button-upload-file"
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleVoiceInput}
+                  disabled={isRecording || isTyping}
+                  className={`flex-shrink-0 hover-elevate ${isRecording ? 'bg-red-50 border-red-200' : ''}`}
+                  data-testid="button-voice-input"
+                >
+                  {isRecording ? (
+                    <div className="flex items-center">
+                      <Mic className="w-4 h-4 text-red-500 animate-pulse" />
+                    </div>
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
+                </Button>
+                
+                <Button
+                  onClick={() => handleSendMessage(inputValue, uploadedFiles)}
+                  size="icon"
+                  disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isTyping}
+                  className="flex-shrink-0 hover-elevate"
+                  data-testid="button-send-message"
+                >
+                  {isTyping ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            
+            {/* File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleFileChange}
+              multiple
+              className="hidden"
+              data-testid="input-file-upload"
+            />
+          </CardContent>
+        </Card>
       </div>
-
-      {/* Input Area */}
-      <Card className="rounded-t-none border-t">
-        <CardContent className="p-4">
-          <div className="flex space-x-3 items-end">
-            <div className="flex-1">
-              <Textarea
-                ref={textareaRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Ask about your supplement formula, health goals, or upload lab results..."
-                className="min-h-[44px] max-h-[120px] resize-none"
-                rows={1}
-                data-testid="input-consultation-message"
-              />
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleFileUpload}
-              className="flex-shrink-0 hover-elevate transition-all duration-300"
-              data-testid="button-upload-file"
-            >
-              <Upload className="w-4 h-4" />
-            </Button>
-            <Button
-              onClick={() => handleSendMessage()}
-              size="icon"
-              disabled={!inputValue.trim() || isTyping}
-              className="flex-shrink-0 hover-elevate transition-all duration-300"
-              data-testid="button-send-message"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
-            onChange={handleFileChange}
-            className="hidden"
-            data-testid="input-file-upload"
-          />
-          <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-            <FileText className="w-3 h-3" />
-            Upload blood tests, medical reports, or continue your health consultation
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }

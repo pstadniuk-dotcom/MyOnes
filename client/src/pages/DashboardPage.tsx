@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   MessageSquare, 
   FlaskConical, 
@@ -15,73 +16,320 @@ import {
   CheckCircle,
   Clock,
   Zap,
-  Heart
+  Heart,
+  Upload,
+  User,
+  HelpCircle,
+  AlertCircle,
+  Shield,
+  Target,
+  Sparkles,
+  PlayCircle,
+  FileText
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 
-// Mock data - in production this would come from APIs
-const mockMetrics = {
-  formulaVersion: 3,
-  consultationsSessions: 8,
-  daysOnFormula: 24,
-  nextDelivery: '2024-10-15',
-  healthScore: 85,
-};
+// Types for dashboard data
+interface DashboardMetrics {
+  healthScore: number;
+  formulaVersion: number;
+  consultationsSessions: number;
+  daysActive: number;
+  nextDelivery: string | null;
+}
 
-const mockRecentActivity = [
-  {
-    id: '1',
-    type: 'formula_update',
-    title: 'Formula Updated',
-    description: 'Added Vitamin D3 based on recent lab results',
-    time: '2 hours ago',
-    icon: FlaskConical,
-  },
-  {
-    id: '2',
-    type: 'consultation',
-    title: 'AI Consultation',
-    description: 'Discussed energy levels and sleep quality',
-    time: '1 day ago',
-    icon: MessageSquare,
-  },
-  {
-    id: '3',
-    type: 'order',
-    title: 'Order Shipped',
-    description: 'Monthly supplement supply is on its way',
-    time: '3 days ago',
-    icon: Package,
-  },
-];
+interface Formula {
+  id: string;
+  version: number;
+  bases: Array<{ingredient: string, amount: number, unit: string}>;
+  additions: Array<{ingredient: string, amount: number, unit: string}>;
+  totalMg: number;
+  notes: string | null;
+  createdAt: string;
+}
 
-const quickActions = [
-  {
-    title: 'Start AI Consultation',
-    description: 'Chat with ONES AI about your health goals',
-    href: '/dashboard/consultation',
-    icon: MessageSquare,
-    variant: 'primary' as const,
-  },
-  {
-    title: 'View My Formula',
-    description: 'See your current personalized supplement formula',
-    href: '/dashboard/formula',
-    icon: FlaskConical,
-    variant: 'secondary' as const,
-  },
-  {
-    title: 'Upload Lab Results',
-    description: 'Add new blood work for formula optimization',
-    href: '/dashboard/profile?tab=reports',
-    icon: Activity,
-    variant: 'outline' as const,
-  },
-];
+interface ActivityItem {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  time: string;
+  icon: string;
+}
+
+interface DashboardData {
+  metrics: DashboardMetrics;
+  currentFormula: Formula | null;
+  recentActivity: ActivityItem[];
+  hasActiveFormula: boolean;
+  isNewUser: boolean;
+}
+
+// Component for displaying loading state
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-12 w-12 rounded-full" />
+          <div className="space-y-1">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+        </div>
+      </div>
+      
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {Array.from({length: 4}).map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="space-y-0 pb-2">
+              <Skeleton className="h-4 w-24" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-16 mb-2" />
+              <Skeleton className="h-3 w-32" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {Array.from({length: 3}).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {Array.from({length: 3}).map((_, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <div className="flex-1 space-y-1">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-40" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// Welcome section for new users
+function WelcomeOnboarding({ userName }: { userName: string }) {
+  return (
+    <div className="mb-8">
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="section-welcome-onboarding">
+        <CardContent className="p-6">
+          <div className="flex items-start justify-between">
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-2xl font-bold text-primary mb-2">
+                  Welcome to ONES AI, {userName}!
+                </h2>
+                <p className="text-muted-foreground">
+                  Let's create your personalized supplement formula. Our AI will analyze your health profile and goals to recommend the perfect blend just for you.
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium">
+                    1
+                  </div>
+                  <span className="text-sm">Start with an AI consultation about your health goals</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-medium">
+                    2
+                  </div>
+                  <span className="text-sm text-muted-foreground">Get your personalized formula recommendation</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-medium">
+                    3
+                  </div>
+                  <span className="text-sm text-muted-foreground">Receive your custom supplements monthly</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button asChild className="gap-2" data-testid="button-start-journey">
+                  <Link href="/dashboard/consultation">
+                    <PlayCircle className="w-4 h-4" />
+                    Start My Journey
+                  </Link>
+                </Button>
+                <Button variant="outline" asChild className="gap-2" data-testid="button-learn-more">
+                  <Link href="/science">
+                    <FileText className="w-4 h-4" />
+                    Learn More
+                  </Link>
+                </Button>
+              </div>
+            </div>
+            
+            <div className="hidden sm:block">
+              <Sparkles className="w-16 h-16 text-primary/30" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Current Formula Widget
+function CurrentFormulaWidget({ formula }: { formula: Formula }) {
+  const totalIngredients = formula.bases.length + formula.additions.length;
+  const safetyPercentage = Math.min((formula.totalMg / 800) * 100, 100);
+  const isOptimal = formula.totalMg >= 600 && formula.totalMg <= 800;
+
+  return (
+    <Card className="mb-6" data-testid="widget-current-formula">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FlaskConical className="w-5 h-5 text-primary" />
+              My Current Formula v{formula.version}
+            </CardTitle>
+            <CardDescription>
+              {totalIngredients} ingredients • {formula.totalMg}mg total
+            </CardDescription>
+          </div>
+          <Badge variant={isOptimal ? "default" : "secondary"} className="gap-1">
+            <Shield className="w-3 h-3" />
+            {isOptimal ? "Optimized" : "Active"}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {/* Safety Compliance */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Safety Limit (800mg max)</span>
+              <span className="font-medium">{formula.totalMg}mg / 800mg</span>
+            </div>
+            <Progress 
+              value={safetyPercentage} 
+              className="h-2"
+              data-testid="progress-safety-limit"
+            />
+          </div>
+
+          {/* Ingredient Breakdown */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <h4 className="font-medium text-sm mb-2">Base Formulas ({formula.bases.length})</h4>
+              <div className="space-y-1">
+                {formula.bases.slice(0, 3).map((base, index) => (
+                  <div key={index} className="flex justify-between text-xs">
+                    <span className="truncate">{base.ingredient}</span>
+                    <span className="text-muted-foreground ml-2">{base.amount}mg</span>
+                  </div>
+                ))}
+                {formula.bases.length > 3 && (
+                  <div className="text-xs text-muted-foreground">
+                    +{formula.bases.length - 3} more
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {formula.additions.length > 0 && (
+              <div>
+                <h4 className="font-medium text-sm mb-2">Additions ({formula.additions.length})</h4>
+                <div className="space-y-1">
+                  {formula.additions.slice(0, 3).map((addition, index) => (
+                    <div key={index} className="flex justify-between text-xs">
+                      <span className="truncate">{addition.ingredient}</span>
+                      <span className="text-muted-foreground ml-2">{addition.amount}mg</span>
+                    </div>
+                  ))}
+                  {formula.additions.length > 3 && (
+                    <div className="text-xs text-muted-foreground">
+                      +{formula.additions.length - 3} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-2">
+            <Button variant="default" size="sm" asChild className="flex-1" data-testid="button-view-formula">
+              <Link href="/dashboard/formula">
+                <FlaskConical className="w-4 h-4 mr-2" />
+                View Details
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild className="flex-1" data-testid="button-order-refill">
+              <Link href="/dashboard/orders">
+                <Package className="w-4 h-4 mr-2" />
+                Order Refill
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild data-testid="button-update-formula">
+              <Link href="/dashboard/consultation">
+                <MessageSquare className="w-4 h-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Format relative time
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+  
+  if (diffInHours < 1) return 'Just now';
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  if (diffInHours < 48) return '1 day ago';
+  return `${Math.floor(diffInHours / 24)} days ago`;
+}
+
+// Icon mapping
+function getActivityIcon(iconName: string) {
+  const icons: Record<string, any> = {
+    'Package': Package,
+    'MessageSquare': MessageSquare,
+    'FlaskConical': FlaskConical,
+    'Activity': Activity,
+    'User': User,
+  };
+  return icons[iconName] || Activity;
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   
   const userName = user?.name?.split(' ')[0] || 'there';
   const userInitials = user?.name
@@ -89,6 +337,111 @@ export default function DashboardPage() {
     .map(n => n[0])
     .join('')
     .toUpperCase() || 'U';
+
+  // Fetch dashboard data
+  const { data: dashboardData, isLoading, error } = useQuery<DashboardData>({
+    queryKey: ['dashboard'],
+    queryFn: async () => {
+      const response = await fetch('/api/dashboard', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
+      
+      return response.json();
+    },
+  });
+
+  // Show error message if data fetch fails
+  if (error) {
+    toast({
+      title: "Error loading dashboard",
+      description: "Please refresh the page to try again.",
+      variant: "destructive",
+    });
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  // Show error state
+  if (error || !dashboardData) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="p-6">
+          <div className="text-center space-y-3">
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
+            <h3 className="text-lg font-semibold">Failed to load dashboard</h3>
+            <p className="text-muted-foreground">Please refresh the page to try again.</p>
+            <Button onClick={() => window.location.reload()}>
+              Refresh Page
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  const { metrics, currentFormula, recentActivity, isNewUser } = dashboardData;
+
+  // Quick Actions with enhanced functionality
+  const quickActions = [
+    {
+      title: 'Start New Consultation',
+      description: 'Chat with ONES AI about your health goals',
+      href: '/dashboard/consultation',
+      icon: MessageSquare,
+      variant: 'default' as const,
+      primary: true
+    },
+    ...(currentFormula ? [{
+      title: 'View My Formula',
+      description: 'See your current personalized supplement formula',
+      href: '/dashboard/formula',
+      icon: FlaskConical,
+      variant: 'secondary' as const,
+      primary: false
+    }] : []),
+    {
+      title: 'Order Refill',
+      description: currentFormula ? 'Quick reorder your current formula' : 'Order supplements after consultation',
+      href: '/dashboard/orders',
+      icon: Package,
+      variant: 'outline' as const,
+      primary: false,
+      disabled: !currentFormula
+    },
+    {
+      title: 'Upload Blood Test',
+      description: 'Add lab results for formula optimization',
+      href: '/dashboard/profile?tab=reports',
+      icon: Upload,
+      variant: 'outline' as const,
+      primary: false
+    },
+    {
+      title: 'Update Health Profile',
+      description: 'Manage your health information and goals',
+      href: '/dashboard/profile',
+      icon: User,
+      variant: 'ghost' as const,
+      primary: false
+    },
+    {
+      title: 'Contact Support',
+      description: 'Get help with your supplement journey',
+      href: '/dashboard/support',
+      icon: HelpCircle,
+      variant: 'ghost' as const,
+      primary: false
+    },
+  ];
 
   return (
     <div className="space-y-8" data-testid="page-dashboard">
@@ -99,7 +452,10 @@ export default function DashboardPage() {
             Welcome back, {userName}!
           </h1>
           <p className="text-muted-foreground">
-            Here's an overview of your personalized supplement journey with ONES AI.
+            {isNewUser 
+              ? "Let's start your personalized supplement journey with ONES AI." 
+              : "Here's your personalized supplement journey overview."
+            }
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -114,56 +470,68 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Welcome/Onboarding for New Users */}
+      {isNewUser && <WelcomeOnboarding userName={userName} />}
+
+      {/* Current Formula Widget */}
+      {currentFormula && <CurrentFormulaWidget formula={currentFormula} />}
+
       {/* Key Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card data-testid="metric-health-score">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Health Score</CardTitle>
-            <Heart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{mockMetrics.healthScore}%</div>
-            <p className="text-xs text-muted-foreground">
-              <TrendingUp className="inline w-3 h-3 mr-1" />
-              +5% from last month
-            </p>
-            <Progress value={mockMetrics.healthScore} className="mt-2" />
-          </CardContent>
-        </Card>
+      {!isNewUser && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card data-testid="metric-health-score">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Health Score</CardTitle>
+              <Heart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{metrics.healthScore}%</div>
+              <p className="text-xs text-muted-foreground">
+                <TrendingUp className="inline w-3 h-3 mr-1" />
+                Based on your profile
+              </p>
+              <Progress value={metrics.healthScore} className="mt-2" />
+            </CardContent>
+          </Card>
 
-        <Card data-testid="metric-formula-version">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Formula Version</CardTitle>
-            <FlaskConical className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">v{mockMetrics.formulaVersion}</div>
-            <p className="text-xs text-muted-foreground">Updated 2 days ago</p>
-          </CardContent>
-        </Card>
+          <Card data-testid="metric-formula-version">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Formula Version</CardTitle>
+              <FlaskConical className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {metrics.formulaVersion > 0 ? `v${metrics.formulaVersion}` : 'None'}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {currentFormula ? 'Active formula' : 'No formula yet'}
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card data-testid="metric-consultations">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">AI Sessions</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{mockMetrics.consultationsSessions}</div>
-            <p className="text-xs text-muted-foreground">Total consultations</p>
-          </CardContent>
-        </Card>
+          <Card data-testid="metric-consultations">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">AI Sessions</CardTitle>
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{metrics.consultationsSessions}</div>
+              <p className="text-xs text-muted-foreground">Total consultations</p>
+            </CardContent>
+          </Card>
 
-        <Card data-testid="metric-days-active">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Days Active</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{mockMetrics.daysOnFormula}</div>
-            <p className="text-xs text-muted-foreground">On current formula</p>
-          </CardContent>
-        </Card>
-      </div>
+          <Card data-testid="metric-days-active">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Days Active</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{metrics.daysActive}</div>
+              <p className="text-xs text-muted-foreground">On your health journey</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Quick Actions */}
@@ -174,15 +542,24 @@ export default function DashboardPage() {
               Quick Actions
             </CardTitle>
             <CardDescription>
-              Common actions to optimize your health journey
+              {isNewUser ? "Get started with your health journey" : "Common actions to optimize your health journey"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {quickActions.map((action) => (
               <Link key={action.title} href={action.href}>
-                <div className="flex items-center justify-between p-3 rounded-lg border hover-elevate transition-colors cursor-pointer group" data-testid={`action-${action.title.toLowerCase().replace(' ', '-')}`}>
+                <div 
+                  className={`flex items-center justify-between p-3 rounded-lg border hover-elevate transition-colors cursor-pointer group ${
+                    action.disabled ? 'opacity-50 pointer-events-none' : ''
+                  } ${action.primary ? 'border-primary/20 bg-primary/5' : ''}`} 
+                  data-testid={`action-${action.title.toLowerCase().replace(/\s+/g, '-')}`}
+                >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-md bg-muted group-hover:bg-muted/80 transition-colors">
+                    <div className={`p-2 rounded-md transition-colors ${
+                      action.primary 
+                        ? 'bg-primary text-primary-foreground group-hover:bg-primary/90' 
+                        : 'bg-muted group-hover:bg-muted/80'
+                    }`}>
                       <action.icon className="w-4 h-4" />
                     </div>
                     <div>
@@ -197,76 +574,131 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
+        {/* Recent Activity / Health Snapshot */}
         <Card data-testid="section-recent-activity">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5" />
-              Recent Activity
+              {recentActivity.length > 0 ? "Recent Activity" : "Health Snapshot"}
             </CardTitle>
             <CardDescription>
-              Your latest interactions and updates
+              {recentActivity.length > 0 
+                ? "Your latest interactions and updates"
+                : "Track your health journey progress"
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {mockRecentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-start gap-3" data-testid={`activity-${activity.type}`}>
-                <div className="p-2 rounded-full bg-muted">
-                  <activity.icon className="w-3 h-3" />
+            {recentActivity.length > 0 ? (
+              // Show recent activity
+              recentActivity.map((activity) => {
+                const IconComponent = getActivityIcon(activity.icon);
+                return (
+                  <div key={activity.id} className="flex items-start gap-3" data-testid={`activity-${activity.type}`}>
+                    <div className="p-2 rounded-full bg-muted">
+                      <IconComponent className="w-3 h-3" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{activity.title}</p>
+                      <p className="text-xs text-muted-foreground">{activity.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatRelativeTime(activity.time)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              // Show health snapshot for new users
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg border">
+                  <Target className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Set Your Health Goals</p>
+                    <p className="text-xs text-muted-foreground">Define what you want to achieve</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{activity.title}</p>
-                  <p className="text-xs text-muted-foreground">{activity.description}</p>
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {activity.time}
-                  </p>
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg border">
+                  <MessageSquare className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Start AI Consultation</p>
+                    <p className="text-xs text-muted-foreground">Get personalized recommendations</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg border opacity-50">
+                  <FlaskConical className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Receive Your Formula</p>
+                    <p className="text-xs text-muted-foreground">Custom blend for your needs</p>
+                  </div>
                 </div>
               </div>
-            ))}
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Next Steps */}
-      <Card data-testid="section-next-steps">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5" />
-            Recommended Next Steps
-          </CardTitle>
-          <CardDescription>
-            Personalized recommendations to optimize your health journey
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="p-4 rounded-lg border">
-              <h4 className="font-medium mb-2">Schedule Check-in</h4>
-              <p className="text-sm text-muted-foreground mb-3">
-                It's been 2 weeks since your last consultation. Share how you're feeling.
-              </p>
-              <Button size="sm" asChild data-testid="button-schedule-checkin">
-                <Link href="/dashboard/consultation">
-                  Start Consultation
-                </Link>
-              </Button>
+      {!isNewUser && (
+        <Card data-testid="section-next-steps">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5" />
+              Recommended Next Steps
+            </CardTitle>
+            <CardDescription>
+              Personalized recommendations to optimize your health journey
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              {metrics.consultationsSessions === 0 || metrics.daysActive > 14 ? (
+                <div className="p-4 rounded-lg border">
+                  <h4 className="font-medium mb-2">Schedule Check-in</h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {metrics.consultationsSessions === 0 
+                      ? "Start with your first AI consultation to get personalized recommendations."
+                      : "It's been a while since your last consultation. Share how you're feeling."
+                    }
+                  </p>
+                  <Button size="sm" asChild data-testid="button-schedule-checkin">
+                    <Link href="/dashboard/consultation">
+                      Start Consultation
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="p-4 rounded-lg border">
+                  <h4 className="font-medium mb-2">Track Progress</h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Monitor how your current formula is working for you.
+                  </p>
+                  <Button size="sm" variant="outline" asChild data-testid="button-track-progress">
+                    <Link href="/dashboard/profile">
+                      Update Profile
+                    </Link>
+                  </Button>
+                </div>
+              )}
+              
+              <div className="p-4 rounded-lg border">
+                <h4 className="font-medium mb-2">Upload Lab Results</h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Add recent blood work to optimize your formula further.
+                </p>
+                <Button variant="outline" size="sm" asChild data-testid="button-upload-labs">
+                  <Link href="/dashboard/profile?tab=reports">
+                    Upload Reports
+                  </Link>
+                </Button>
+              </div>
             </div>
-            
-            <div className="p-4 rounded-lg border">
-              <h4 className="font-medium mb-2">Upload New Labs</h4>
-              <p className="text-sm text-muted-foreground mb-3">
-                Upload recent blood work to optimize your formula further.
-              </p>
-              <Button variant="outline" size="sm" asChild data-testid="button-upload-labs">
-                <Link href="/dashboard/profile?tab=reports">
-                  Upload Reports
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
