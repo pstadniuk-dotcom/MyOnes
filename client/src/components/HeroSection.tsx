@@ -9,15 +9,8 @@ export default function HeroSection() {
 
   return (
     <section className="min-h-screen bg-earthy-gradient dark:bg-earthy-gradient-dark relative overflow-hidden">
-      {/* Background Image with Overlay */}
-      <div className="absolute inset-0">
-        <img 
-          src={heroImage} 
-          alt="People living healthy lifestyles" 
-          className="w-full h-full object-cover opacity-20"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/80 to-background/40 dark:from-background/90 dark:to-background/60"></div>
-      </div>
+      {/* Background Gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/20 dark:from-primary/20 dark:via-background dark:to-accent/30"></div>
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center min-h-[80vh]">
