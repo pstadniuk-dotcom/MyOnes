@@ -11,8 +11,8 @@ export default function PricingSection() {
     {
       name: "Starter",
       duration: "3 months",
-      price: 349,
-      monthlyPrice: 116,
+      price: 495,
+      monthlyPrice: 165,
       description: "Perfect for getting started with personalized nutrition",
       features: [
         "AI health consultation",
@@ -24,10 +24,10 @@ export default function PricingSection() {
       cta: "Start Your Journey"
     },
     {
-      name: "Optimize",
+      name: "6 Month Supply",
       duration: "6 months",
-      price: 599,
-      monthlyPrice: 100,
+      price: 875,
+      monthlyPrice: 146,
       description: "Most popular plan for comprehensive health optimization",
       features: [
         "Everything in Starter",
@@ -39,14 +39,14 @@ export default function PricingSection() {
       ],
       cta: "Optimize My Health",
       popular: true,
-      savings: "Save $96"
+      savings: "Save $115"
     },
     {
-      name: "Transform",
+      name: "12 Month Supply",
       duration: "12 months",
-      price: 999,
-      monthlyPrice: 83,
-      description: "Complete health transformation with ongoing optimization",
+      price: 1590,
+      monthlyPrice: 133,
+      description: "Best value - Complete health transformation with ongoing optimization",
       features: [
         "Everything in Optimize",
         "Quarterly comprehensive reviews",
@@ -56,7 +56,7 @@ export default function PricingSection() {
         "Annual lab work included"
       ],
       cta: "Transform My Health",
-      savings: "Save $395"
+      savings: "Save $390"
     }
   ];
 
