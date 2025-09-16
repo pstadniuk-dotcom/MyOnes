@@ -84,8 +84,12 @@ export default {
       },
       fontFamily: {
         sans: ["Inter", "sans-serif"],
-        serif: ["Newsreader", "serif"],
+        serif: ["Playfair Display", "serif"],
         mono: ["ui-monospace", "monospace"],
+      },
+      backgroundImage: {
+        'earthy-gradient': 'linear-gradient(135deg, #EDE8E2 0%, #CCCDBB 100%)',
+        'earthy-gradient-dark': 'linear-gradient(135deg, #2A2820 0%, #1F1F1B 100%)',
       },
       keyframes: {
         "accordion-down": {
