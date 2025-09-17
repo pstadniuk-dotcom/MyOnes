@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import OpenAI from "openai";
@@ -10,11 +10,20 @@ import jwt from "jsonwebtoken";
 import type { SignupData, LoginData, AuthResponse } from "@shared/schema";
 import { signupSchema, loginSchema } from "@shared/schema";
 
+// Extend Express Request interface to include userId property
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string;
+    }
+  }
+}
+
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // JWT Configuration
-let JWT_SECRET = process.env.JWT_SECRET;
+let JWT_SECRET: string = process.env.JWT_SECRET || '';
 
 if (!JWT_SECRET) {
   if (process.env.NODE_ENV === 'production') {
@@ -26,16 +35,19 @@ if (!JWT_SECRET) {
     console.warn('WARNING: Using generated JWT_SECRET for development. Set JWT_SECRET environment variable for production.');
   }
 }
+
+// TypeScript assertion that JWT_SECRET is now definitely a string
+const JWT_SECRET_FINAL: string = JWT_SECRET;
 const JWT_EXPIRES_IN = '7d'; // 7 days
 
 // JWT Utilities
 function generateToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign({ userId }, JWT_SECRET_FINAL, { expiresIn: JWT_EXPIRES_IN });
 }
 
 function verifyToken(token: string): { userId: string } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const decoded = jwt.verify(token, JWT_SECRET_FINAL) as { userId: string };
     return decoded;
   } catch (error) {
     return null;
@@ -43,7 +55,7 @@ function verifyToken(token: string): { userId: string } | null {
 }
 
 // Auth middleware for protected routes
-function requireAuth(req: any, res: any, next: any) {
+function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authentication required' });
@@ -988,7 +1000,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/auth/me', requireAuth, async (req, res) => {
     try {
-      const user = await storage.getUser(req.userId);
+      const userId = req.userId!; // TypeScript assertion: userId is guaranteed to be set after requireAuth
+      const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -1092,6 +1105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (!chatSession) {
+        const userId = req.userId!; // TypeScript assertion: userId is guaranteed after requireAuth
         chatSession = await storage.createChatSession({ userId, status: 'active' });
       }
 
@@ -1408,7 +1422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/chat/:sessionId', requireAuth, async (req, res) => {
     try {
       const { sessionId } = req.params;
-      const userId = req.userId; // Get authenticated user ID
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const session = await storage.getChatSession(sessionId);
       
       if (!session) {
@@ -1435,7 +1449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new chat session
   app.post('/api/chat/sessions', requireAuth, async (req, res) => {
     try {
-      const userId = req.userId; // Use authenticated user ID
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
 
       const session = await storage.createChatSession({ 
         userId, 
@@ -1452,7 +1466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // List user's chat sessions
   app.get('/api/users/me/sessions', requireAuth, async (req, res) => {
     try {
-      const userId = req.userId; // Use authenticated user ID instead of URL param
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const sessions = await storage.listChatSessionsByUser(userId);
       
       res.json(sessions);
@@ -1465,7 +1479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get dashboard data
   app.get('/api/dashboard', requireAuth, async (req, res) => {
     try {
-      const userId = req.userId;
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       
       // Fetch all dashboard data in parallel
       const [currentFormula, healthProfile, chatSessions, orders, subscription] = await Promise.all([
@@ -1495,7 +1509,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       healthScore = Math.min(healthScore, 100);
 
       // Get recent activity
-      const recentActivity = [];
+      const recentActivity: Array<{
+        id: string;
+        type: string;
+        title: string;
+        description: string;
+        time: string;
+        icon: string;
+      }> = [];
       
       // Add recent orders
       recentOrders.slice(0, 3).forEach(order => {
@@ -1553,7 +1574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's current formula
   app.get('/api/users/me/formula', requireAuth, async (req, res) => {
     try {
-      const userId = req.userId;
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const currentFormula = await storage.getCurrentFormulaByUser(userId);
       
       if (!currentFormula) {
@@ -1570,7 +1591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's health profile
   app.get('/api/users/me/health-profile', requireAuth, async (req, res) => {
     try {
-      const userId = req.userId;
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const healthProfile = await storage.getHealthProfile(userId);
       
       if (!healthProfile) {
@@ -1587,7 +1608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create or update health profile
   app.post('/api/users/me/health-profile', requireAuth, async (req, res) => {
     try {
-      const userId = req.userId;
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const { age, sex, weightKg, conditions, medications, allergies } = req.body;
 
       // Check if profile exists
@@ -1614,7 +1635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's orders
   app.get('/api/users/me/orders', requireAuth, async (req, res) => {
     try {
-      const userId = req.userId;
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const orders = await storage.listOrdersByUser(userId);
       
       res.json(orders);
@@ -1627,7 +1648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get consultation history (enhanced format for ConsultationPage)
   app.get('/api/consultations/history', requireAuth, async (req, res) => {
     try {
-      const userId = req.userId;
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       
       // Fetch user's chat sessions
       const sessions = await storage.listChatSessionsByUser(userId);
@@ -1650,18 +1671,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           content: msg.content,
           sender: msg.role === 'assistant' ? 'ai' : 'user',
           timestamp: msg.createdAt,
-          sessionId: msg.sessionId,
-          ...(msg.fileAttachmentUrl && {
-            fileAttachment: {
-              name: msg.fileAttachmentName || 'Uploaded File',
-              url: msg.fileAttachmentUrl,
-              type: msg.fileAttachmentType || 'other',
-              size: 0 // Size not stored in current schema
-            }
-          }),
-          ...(msg.formulaData && {
-            formula: msg.formulaData
-          })
+          sessionId: msg.sessionId
+          // Note: file attachments and formula data not currently stored in messages schema
+          // These features can be implemented by extending the messages table in the future
         }));
       });
 
@@ -1698,7 +1710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // File upload endpoint with object storage integration
   app.post('/api/files/upload', requireAuth, async (req, res) => {
     try {
-      const userId = req.userId;
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       
       // Check if file was uploaded
       if (!req.files || !req.files.file) {
@@ -1773,24 +1785,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fileType = 'medical_document';
         }
 
-        // Save file metadata to storage
+        // Save file metadata to storage (using only available schema fields)
         const fileUpload = await storage.createFileUpload({
           userId,
-          fileName: uploadedFile.name,
-          filePath,
-          fileSize: uploadedFile.size,
-          mimeType: uploadedFile.mimetype,
-          fileType: fileType as any,
-          uploadedAt: new Date()
+          type: fileType as any,
+          url: filePath
         });
 
         // Return file metadata
         const responseData = {
           id: fileUpload.id,
-          name: fileUpload.fileName,
+          name: uploadedFile.name, // From the uploaded file, not stored in DB
           url: filePath, // In production, this would be a secure URL
-          type: fileUpload.fileType,
-          size: fileUpload.fileSize,
+          type: fileUpload.type,
+          size: uploadedFile.size, // From the uploaded file, not stored in DB
           uploadedAt: fileUpload.uploadedAt
         };
 
@@ -1812,7 +1820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get current active formula for user
   app.get('/api/users/me/formula/current', requireAuth, async (req: any, res: any) => {
     try {
-      const userId = req.userId;
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const currentFormula = await storage.getCurrentFormulaByUser(userId);
       
       if (!currentFormula) {
@@ -1835,7 +1843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get formula version history for user
   app.get('/api/users/me/formula/history', requireAuth, async (req: any, res: any) => {
     try {
-      const userId = req.userId;
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const formulaHistory = await storage.getFormulaHistory(userId);
       
       // Enrich with version change information
@@ -1859,7 +1867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get specific formula version by ID
   app.get('/api/users/me/formula/versions/:formulaId', requireAuth, async (req: any, res: any) => {
     try {
-      const userId = req.userId;
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const formulaId = req.params.formulaId;
       
       const formula = await storage.getFormula(formulaId);
@@ -1965,14 +1973,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const b1 = formula1.bases.find(b => b.ingredient === b2.ingredient);
             return b1 && b1.amount !== b2.amount;
           }),
-          additionsAdded: formula2.additions.filter(a2 => 
-            !formula1.additions.some(a1 => a1.ingredient === a2.ingredient)
+          additionsAdded: (formula2.additions || []).filter(a2 => 
+            !(formula1.additions || []).some(a1 => a1.ingredient === a2.ingredient)
           ),
-          additionsRemoved: formula1.additions.filter(a1 => 
-            !formula2.additions.some(a2 => a2.ingredient === a1.ingredient)
+          additionsRemoved: (formula1.additions || []).filter(a1 => 
+            !(formula2.additions || []).some(a2 => a2.ingredient === a1.ingredient)
           ),
-          additionsModified: formula2.additions.filter(a2 => {
-            const a1 = formula1.additions.find(a => a.ingredient === a2.ingredient);
+          additionsModified: (formula2.additions || []).filter(a2 => {
+            const a1 = (formula1.additions || []).find(a => a.ingredient === a2.ingredient);
             return a1 && a1.amount !== a2.amount;
           })
         }
