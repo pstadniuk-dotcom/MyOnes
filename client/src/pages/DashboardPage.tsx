@@ -31,6 +31,7 @@ import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
 
 // Types for dashboard data
 interface DashboardMetrics {
@@ -356,14 +357,16 @@ export default function DashboardPage() {
     },
   });
 
-  // Show error message if data fetch fails
-  if (error) {
-    toast({
-      title: "Error loading dashboard",
-      description: "Please refresh the page to try again.",
-      variant: "destructive",
-    });
-  }
+  // Show error message if data fetch fails - moved to useEffect to prevent infinite re-render
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error loading dashboard",
+        description: "Please refresh the page to try again.",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
 
   // Show loading state
   if (isLoading) {
