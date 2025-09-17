@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -52,6 +52,9 @@ function HomePage() {
 
 // Dashboard Router - handles all dashboard routes
 function DashboardRouter() {
+  const [location] = useLocation();
+  console.log('DashboardRouter current location:', location);
+  
   return (
     <DashboardLayout>
       <Switch>
