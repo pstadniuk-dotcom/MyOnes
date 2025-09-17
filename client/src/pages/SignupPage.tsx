@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Loader2, Bot, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { signupSchema } from '@shared/schema';
@@ -48,18 +48,17 @@ export default function SignupPage() {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <Link href="/" className="inline-flex items-center text-muted-foreground hover:text-primary transition-colors mb-4" data-testid="link-back-home">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Link>
-          <div className="inline-flex items-center space-x-2 mb-2">
-            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-              <Bot className="w-6 h-6 text-primary-foreground" />
-            </div>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <Link href="/" className="inline-flex items-center text-muted-foreground hover:text-primary transition-colors" data-testid="link-back-home">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Home
+            </Link>
             <h1 className="text-2xl font-bold">ONES</h1>
           </div>
-          <p className="text-muted-foreground">Start your personalized health journey</p>
+          <div className="text-center">
+            <p className="text-muted-foreground">Start your personalized health journey</p>
+          </div>
         </div>
 
         <Card className="glass border-none shadow-premium-lg" data-testid="card-signup-form">
