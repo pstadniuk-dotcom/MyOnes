@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, User } from 'lucide-react';
+import { Link } from 'wouter';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { isAuthenticated, user } = useAuth();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -51,28 +54,49 @@ export default function Header() {
             </button>
           </nav>
 
-          {/* CTA Button */}
-          <div className="hidden md:flex">
-            <Button 
-              onClick={() => {
-                console.log('Start consultation clicked');
-                // Scroll to the AI Chat component
-                const aiChatElement = document.querySelector('[data-testid="card-ai-chat"]') as HTMLElement;
-                if (aiChatElement) {
-                  aiChatElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  // Add a subtle highlight effect
-                  aiChatElement.style.transform = 'scale(1.05)';
-                  aiChatElement.style.transition = 'transform 0.3s ease';
-                  setTimeout(() => {
-                    aiChatElement.style.transform = 'scale(1)';
-                  }, 600);
-                }
-              }}
-              className="micro-bounce micro-glow transition-all duration-300"
-              data-testid="button-start-consultation"
-            >
-              Start Consultation
-            </Button>
+          {/* Auth & CTA Buttons */}
+          <div className="hidden md:flex items-center space-x-3">
+            {isAuthenticated ? (
+              <>
+                <Link href="/dashboard">
+                  <Button variant="outline" data-testid="button-dashboard">
+                    <User className="w-4 h-4 mr-2" />
+                    Dashboard
+                  </Button>
+                </Link>
+                <span className="text-sm text-muted-foreground">
+                  Welcome, {user?.name}
+                </span>
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="outline" data-testid="button-login">
+                    Login
+                  </Button>
+                </Link>
+                <Button 
+                  onClick={() => {
+                    console.log('Start consultation clicked');
+                    // Scroll to the AI Chat component
+                    const aiChatElement = document.querySelector('[data-testid="card-ai-chat"]') as HTMLElement;
+                    if (aiChatElement) {
+                      aiChatElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      // Add a subtle highlight effect
+                      aiChatElement.style.transform = 'scale(1.05)';
+                      aiChatElement.style.transition = 'transform 0.3s ease';
+                      setTimeout(() => {
+                        aiChatElement.style.transform = 'scale(1)';
+                      }, 600);
+                    }
+                  }}
+                  className="micro-bounce micro-glow transition-all duration-300"
+                  data-testid="button-start-consultation"
+                >
+                  Start Consultation
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -113,13 +137,29 @@ export default function Header() {
               >
                 Pricing
               </button>
-              <Button 
-                onClick={() => console.log('Start consultation clicked')}
-                className="w-full mt-4"
-                data-testid="button-mobile-start-consultation"
-              >
-                Start Consultation
-              </Button>
+              {isAuthenticated ? (
+                <Link href="/dashboard" className="w-full">
+                  <Button className="w-full mt-4" data-testid="button-mobile-dashboard">
+                    <User className="w-4 h-4 mr-2" />
+                    Dashboard
+                  </Button>
+                </Link>
+              ) : (
+                <>
+                  <Link href="/login" className="w-full">
+                    <Button variant="outline" className="w-full mt-4" data-testid="button-mobile-login">
+                      Login
+                    </Button>
+                  </Link>
+                  <Button 
+                    onClick={() => console.log('Start consultation clicked')}
+                    className="w-full mt-2"
+                    data-testid="button-mobile-start-consultation"
+                  >
+                    Start Consultation
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         )}
