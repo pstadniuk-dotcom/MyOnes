@@ -150,7 +150,8 @@ export default function ConsultationPage() {
         throw new Error('Failed to fetch consultation history');
       }
       
-      return response.json() as { sessions: ChatSession[], messages: Record<string, Message[]> };
+      const data = await response.json();
+      return data as { sessions: ChatSession[], messages: Record<string, Message[]> };
     },
     enabled: !!user?.id
   });
@@ -219,7 +220,7 @@ export default function ConsultationPage() {
       content: currentMessage,
       sender: 'user',
       timestamp: new Date(),
-      sessionId: currentSessionId,
+      sessionId: currentSessionId || undefined,
       fileAttachment: attachedFiles?.[0] ? {
         name: attachedFiles[0].name,
         url: attachedFiles[0].url,
@@ -1041,7 +1042,7 @@ export default function ConsultationPage() {
                                   <div 
                                     key={idx} 
                                     className="flex items-center justify-between p-3 bg-muted/30 rounded border-dashed border hover-elevate cursor-pointer"
-                                    style={{ animationDelay: `${(message.formula.bases.length + idx) * 100}ms` }}
+                                    style={{ animationDelay: `${((message.formula?.bases?.length || 0) + idx) * 100}ms` }}
                                   >
                                     <div className="flex-1">
                                       <span className="font-medium text-sm">{addition.name}</span>
