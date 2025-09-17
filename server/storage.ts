@@ -11,7 +11,10 @@ import {
   type Address, type InsertAddress,
   type PaymentMethodRef, type InsertPaymentMethodRef,
   type FileUpload, type InsertFileUpload,
-  type NotificationPref, type InsertNotificationPref
+  type NotificationPref, type InsertNotificationPref,
+  type AuditLog, type InsertAuditLog,
+  type UserConsent, type InsertUserConsent,
+  type LabAnalysis, type InsertLabAnalysis
 } from "@shared/schema";
 
 export interface IStorage {
@@ -73,10 +76,35 @@ export interface IStorage {
   listPaymentMethodsByUser(userId: string): Promise<PaymentMethodRef[]>;
   deletePaymentMethodRef(id: string): Promise<boolean>;
   
-  // File Upload operations
+  // File Upload operations (enhanced for HIPAA compliance)
   getFileUpload(id: string): Promise<FileUpload | undefined>;
   createFileUpload(fileUpload: InsertFileUpload): Promise<FileUpload>;
-  listFileUploadsByUser(userId: string, type?: 'lab_report' | 'medical_document' | 'prescription' | 'other'): Promise<FileUpload[]>;
+  updateFileUpload(id: string, updates: Partial<InsertFileUpload>): Promise<FileUpload | undefined>;
+  softDeleteFileUpload(id: string, deletedBy: string): Promise<boolean>;
+  listFileUploadsByUser(userId: string, type?: 'lab_report' | 'medical_document' | 'prescription' | 'other', includeDeleted?: boolean): Promise<FileUpload[]>;
+  
+  // Lab Report specific operations
+  getLabReportsByUser(userId: string): Promise<FileUpload[]>;
+  getLabReportById(id: string, userId: string): Promise<FileUpload | undefined>;
+  updateLabReportData(id: string, labReportData: any, userId: string): Promise<FileUpload | undefined>;
+  
+  // Audit Log operations (HIPAA compliance)
+  createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogsByFile(fileId: string): Promise<AuditLog[]>;
+  getAuditLogsByUser(userId: string, limit?: number): Promise<AuditLog[]>;
+  getAuditLogsByDateRange(startDate: Date, endDate: Date): Promise<AuditLog[]>;
+  
+  // User Consent operations (HIPAA compliance)
+  createUserConsent(consent: InsertUserConsent): Promise<UserConsent>;
+  getUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing'): Promise<UserConsent | undefined>;
+  getUserConsents(userId: string): Promise<UserConsent[]>;
+  revokeUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing'): Promise<boolean>;
+  
+  // Lab Analysis operations (AI-generated insights)
+  createLabAnalysis(analysis: InsertLabAnalysis): Promise<LabAnalysis>;
+  getLabAnalysis(fileId: string): Promise<LabAnalysis | undefined>;
+  updateLabAnalysis(id: string, updates: Partial<InsertLabAnalysis>): Promise<LabAnalysis | undefined>;
+  listLabAnalysesByUser(userId: string): Promise<LabAnalysis[]>;
   
   // Notification Preferences operations
   getNotificationPrefs(userId: string): Promise<NotificationPref | undefined>;
@@ -97,13 +125,130 @@ export class MemStorage implements IStorage {
   private paymentMethodRefs: Map<string, PaymentMethodRef> = new Map();
   private fileUploads: Map<string, FileUpload> = new Map();
   private notificationPrefs: Map<string, NotificationPref> = new Map(); // keyed by userId
+  private auditLogs: Map<string, AuditLog> = new Map();
+  private userConsents: Map<string, UserConsent> = new Map();
+  private labAnalyses: Map<string, LabAnalysis> = new Map();
 
   constructor() {
     // Initialize with mock data for development testing
     this.initializeMockData();
   }
 
+  // Initialize with HIPAA-compliant mock data
+  private initializeMockLabReports() {
+    const testUserId = 'test-user-123';
+    
+    // Create sample lab reports
+    const labReport1: FileUpload = {
+      id: 'lab-report-1',
+      userId: testUserId,
+      type: 'lab_report',
+      objectPath: '/objects/lab-reports/test-user-123/2024-01-15_comprehensive-panel.pdf',
+      originalFileName: 'comprehensive-panel.pdf',
+      fileSize: 2048576, // 2MB
+      mimeType: 'application/pdf',
+      uploadedAt: new Date('2024-01-15'),
+      hipaaCompliant: true,
+      encryptedAtRest: true,
+      retentionPolicyId: null, // Add missing field
+      labReportData: {
+        testDate: '2024-01-15',
+        testType: 'Comprehensive Metabolic Panel',
+        labName: 'Quest Diagnostics',
+        physicianName: 'Dr. Sarah Johnson',
+        analysisStatus: 'completed'
+      },
+      deletedAt: null,
+      deletedBy: null
+    };
+
+    const labReport2: FileUpload = {
+      id: 'lab-report-2', 
+      userId: testUserId,
+      type: 'lab_report',
+      objectPath: '/objects/lab-reports/test-user-123/2024-06-20_lipid-panel.pdf',
+      originalFileName: 'lipid-panel.pdf',
+      fileSize: 1536000, // 1.5MB
+      mimeType: 'application/pdf',
+      uploadedAt: new Date('2024-06-20'),
+      hipaaCompliant: true,
+      encryptedAtRest: true,
+      retentionPolicyId: null, // Add missing field
+      labReportData: {
+        testDate: '2024-06-20',
+        testType: 'Lipid Panel',
+        labName: 'LabCorp',
+        physicianName: 'Dr. Michael Chen',
+        analysisStatus: 'completed'
+      },
+      deletedAt: null,
+      deletedBy: null
+    };
+
+    this.fileUploads.set(labReport1.id, labReport1);
+    this.fileUploads.set(labReport2.id, labReport2);
+
+    // Create user consents
+    const consent1: UserConsent = {
+      id: 'consent-1',
+      userId: testUserId,
+      consentType: 'lab_data_processing',
+      granted: true,
+      grantedAt: new Date('2024-01-01'),
+      revokedAt: null,
+      consentVersion: '1.0',
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      consentText: 'I consent to the processing of my lab report data for personalized supplement recommendations.',
+      metadata: { source: 'dashboard' }
+    };
+
+    const consent2: UserConsent = {
+      id: 'consent-2',
+      userId: testUserId,
+      consentType: 'ai_analysis',
+      granted: true,
+      grantedAt: new Date('2024-01-01'),
+      revokedAt: null,
+      consentVersion: '1.0',
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      consentText: 'I consent to AI analysis of my lab reports for health insights and supplement formulation.',
+      metadata: { source: 'dashboard' }
+    };
+
+    this.userConsents.set(consent1.id, consent1);
+    this.userConsents.set(consent2.id, consent2);
+
+    // Create sample lab analysis
+    const analysis: LabAnalysis = {
+      id: 'analysis-1',
+      fileId: labReport1.id,
+      userId: testUserId,
+      analysisStatus: 'completed',
+      extractedMarkers: [
+        { name: 'Vitamin D', value: 25, unit: 'ng/mL', referenceRange: '30-100', status: 'low' },
+        { name: 'B12', value: 450, unit: 'pg/mL', referenceRange: '200-600', status: 'normal' },
+        { name: 'Iron', value: 85, unit: 'μg/dL', referenceRange: '60-170', status: 'normal' }
+      ],
+      aiInsights: {
+        summary: 'Lab results show vitamin D deficiency with normal B12 and iron levels.',
+        recommendations: ['Increase vitamin D supplementation', 'Consider outdoor activities for natural vitamin D'],
+        riskFactors: ['Vitamin D deficiency may impact bone health and immune function'],
+        nutritionalNeeds: ['Vitamin D3 supplement', 'Calcium for bone support'],
+        confidence: 0.95
+      },
+      processedAt: new Date('2024-01-16'),
+      errorMessage: null
+    };
+
+    this.labAnalyses.set(analysis.id, analysis);
+  }
+
   private initializeMockData() {
+    this.initializeMockLabReports();
+
+    // Initialize existing mock data
     // Create a test user
     const testUser: User = {
       id: 'test-user-123',
@@ -622,18 +767,226 @@ export class MemStorage implements IStorage {
     const fileUpload: FileUpload = {
       ...insertFileUpload,
       id,
-      uploadedAt: new Date()
+      uploadedAt: new Date(),
+      fileSize: insertFileUpload.fileSize ?? null,
+      mimeType: insertFileUpload.mimeType ?? null,
+      retentionPolicyId: insertFileUpload.retentionPolicyId ?? null,
+      labReportData: insertFileUpload.labReportData ? {
+        testDate: typeof insertFileUpload.labReportData.testDate === 'string' ? insertFileUpload.labReportData.testDate : undefined,
+        testType: typeof insertFileUpload.labReportData.testType === 'string' ? insertFileUpload.labReportData.testType : undefined,
+        labName: typeof insertFileUpload.labReportData.labName === 'string' ? insertFileUpload.labReportData.labName : undefined,
+        physicianName: typeof insertFileUpload.labReportData.physicianName === 'string' ? insertFileUpload.labReportData.physicianName : undefined,
+        analysisStatus: ['error', 'pending', 'processing', 'completed'].includes(insertFileUpload.labReportData.analysisStatus) ? insertFileUpload.labReportData.analysisStatus as 'error' | 'pending' | 'processing' | 'completed' : undefined,
+        extractedData: insertFileUpload.labReportData.extractedData && typeof insertFileUpload.labReportData.extractedData === 'object' ? insertFileUpload.labReportData.extractedData as Record<string, any> : undefined
+      } : null,
+      deletedAt: insertFileUpload.deletedAt ?? null,
+      deletedBy: insertFileUpload.deletedBy ?? null
     };
     this.fileUploads.set(id, fileUpload);
     return fileUpload;
   }
 
-  async listFileUploadsByUser(userId: string, type?: 'lab_report' | 'medical_document' | 'prescription' | 'other'): Promise<FileUpload[]> {
+  async listFileUploadsByUser(userId: string, type?: 'lab_report' | 'medical_document' | 'prescription' | 'other', includeDeleted?: boolean): Promise<FileUpload[]> {
     return Array.from(this.fileUploads.values()).filter(file => {
       const matchesUser = file.userId === userId;
       const matchesType = !type || file.type === type;
-      return matchesUser && matchesType;
+      const matchesDeleted = includeDeleted || !file.deletedAt;
+      return matchesUser && matchesType && matchesDeleted;
     });
+  }
+
+  async updateFileUpload(id: string, updates: Partial<InsertFileUpload>): Promise<FileUpload | undefined> {
+    const fileUpload = this.fileUploads.get(id);
+    if (!fileUpload) return undefined;
+    
+    const updatedFileUpload: FileUpload = {
+      ...fileUpload,
+      ...updates,
+      fileSize: updates.fileSize !== undefined ? updates.fileSize : fileUpload.fileSize,
+      mimeType: updates.mimeType !== undefined ? updates.mimeType : fileUpload.mimeType,
+      retentionPolicyId: updates.retentionPolicyId !== undefined ? updates.retentionPolicyId : fileUpload.retentionPolicyId,
+      labReportData: updates.labReportData !== undefined ? (updates.labReportData ? {
+        testDate: typeof updates.labReportData.testDate === 'string' ? updates.labReportData.testDate : undefined,
+        testType: typeof updates.labReportData.testType === 'string' ? updates.labReportData.testType : undefined,
+        labName: typeof updates.labReportData.labName === 'string' ? updates.labReportData.labName : undefined,
+        physicianName: typeof updates.labReportData.physicianName === 'string' ? updates.labReportData.physicianName : undefined,
+        analysisStatus: ['error', 'pending', 'processing', 'completed'].includes(updates.labReportData.analysisStatus) ? updates.labReportData.analysisStatus as 'error' | 'pending' | 'processing' | 'completed' : undefined,
+        extractedData: updates.labReportData.extractedData && typeof updates.labReportData.extractedData === 'object' ? updates.labReportData.extractedData as Record<string, any> : undefined
+      } : null) : fileUpload.labReportData,
+      deletedAt: updates.deletedAt !== undefined ? updates.deletedAt : fileUpload.deletedAt,
+      deletedBy: updates.deletedBy !== undefined ? updates.deletedBy : fileUpload.deletedBy
+    };
+    this.fileUploads.set(id, updatedFileUpload);
+    return updatedFileUpload;
+  }
+
+  async softDeleteFileUpload(id: string, deletedBy: string): Promise<boolean> {
+    const fileUpload = this.fileUploads.get(id);
+    if (!fileUpload) return false;
+    
+    const updatedFileUpload = {
+      ...fileUpload,
+      deletedAt: new Date(),
+      deletedBy
+    };
+    this.fileUploads.set(id, updatedFileUpload);
+    return true;
+  }
+
+  // Lab Report specific operations
+  async getLabReportsByUser(userId: string): Promise<FileUpload[]> {
+    return this.listFileUploadsByUser(userId, 'lab_report', false);
+  }
+
+  async getLabReportById(id: string, userId: string): Promise<FileUpload | undefined> {
+    const fileUpload = this.fileUploads.get(id);
+    if (!fileUpload || fileUpload.userId !== userId || fileUpload.type !== 'lab_report' || fileUpload.deletedAt) {
+      return undefined;
+    }
+    return fileUpload;
+  }
+
+  async updateLabReportData(id: string, labReportData: any, userId: string): Promise<FileUpload | undefined> {
+    const fileUpload = await this.getLabReportById(id, userId);
+    if (!fileUpload) return undefined;
+    
+    const updatedFileUpload = {
+      ...fileUpload,
+      labReportData: { ...fileUpload.labReportData, ...labReportData }
+    };
+    this.fileUploads.set(id, updatedFileUpload);
+    return updatedFileUpload;
+  }
+
+  // Audit Log operations (HIPAA compliance)
+  async createAuditLog(insertAuditLog: InsertAuditLog): Promise<AuditLog> {
+    const id = randomUUID();
+    const auditLog: AuditLog = {
+      ...insertAuditLog,
+      id,
+      timestamp: new Date(),
+      userId: insertAuditLog.userId ?? null,
+      fileId: insertAuditLog.fileId ?? null,
+      objectPath: insertAuditLog.objectPath ?? null,
+      ipAddress: insertAuditLog.ipAddress ?? null,
+      userAgent: insertAuditLog.userAgent ?? null,
+      errorMessage: insertAuditLog.errorMessage ?? null,
+      metadata: insertAuditLog.metadata ?? null
+    };
+    this.auditLogs.set(id, auditLog);
+    return auditLog;
+  }
+
+  async getAuditLogsByFile(fileId: string): Promise<AuditLog[]> {
+    return Array.from(this.auditLogs.values())
+      .filter(log => log.fileId === fileId)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }
+
+  async getAuditLogsByUser(userId: string, limit?: number): Promise<AuditLog[]> {
+    const logs = Array.from(this.auditLogs.values())
+      .filter(log => log.userId === userId)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    
+    return limit ? logs.slice(0, limit) : logs;
+  }
+
+  async getAuditLogsByDateRange(startDate: Date, endDate: Date): Promise<AuditLog[]> {
+    return Array.from(this.auditLogs.values())
+      .filter(log => log.timestamp >= startDate && log.timestamp <= endDate)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }
+
+  // User Consent operations (HIPAA compliance)
+  async createUserConsent(insertConsent: InsertUserConsent): Promise<UserConsent> {
+    const id = randomUUID();
+    const consent: UserConsent = {
+      ...insertConsent,
+      id,
+      grantedAt: new Date(),
+      revokedAt: insertConsent.revokedAt ?? null,
+      ipAddress: insertConsent.ipAddress ?? null,
+      userAgent: insertConsent.userAgent ?? null,
+      consentText: insertConsent.consentText ?? null,
+      metadata: insertConsent.metadata ? {
+        source: ['upload_form', 'dashboard', 'api'].includes(insertConsent.metadata.source) ? insertConsent.metadata.source as 'upload_form' | 'dashboard' | 'api' : undefined,
+        fileId: typeof insertConsent.metadata.fileId === 'string' ? insertConsent.metadata.fileId : undefined,
+        additionalInfo: insertConsent.metadata.additionalInfo && typeof insertConsent.metadata.additionalInfo === 'object' ? insertConsent.metadata.additionalInfo as Record<string, any> : undefined
+      } : null
+    };
+    this.userConsents.set(id, consent);
+    return consent;
+  }
+
+  async getUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing'): Promise<UserConsent | undefined> {
+    // Get the most recent consent for this user and type
+    const consents = Array.from(this.userConsents.values())
+      .filter(consent => consent.userId === userId && consent.consentType === consentType)
+      .sort((a, b) => b.grantedAt.getTime() - a.grantedAt.getTime());
+    
+    const latestConsent = consents[0];
+    // Return only if granted and not revoked
+    return latestConsent && latestConsent.granted && !latestConsent.revokedAt ? latestConsent : undefined;
+  }
+
+  async getUserConsents(userId: string): Promise<UserConsent[]> {
+    return Array.from(this.userConsents.values())
+      .filter(consent => consent.userId === userId)
+      .sort((a, b) => b.grantedAt.getTime() - a.grantedAt.getTime());
+  }
+
+  async revokeUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing'): Promise<boolean> {
+    // Find active consent
+    const activeConsent = await this.getUserConsent(userId, consentType);
+    if (!activeConsent) return false;
+    
+    // Create revocation record
+    const revokedConsent = {
+      ...activeConsent,
+      revokedAt: new Date()
+    };
+    this.userConsents.set(activeConsent.id, revokedConsent);
+    return true;
+  }
+
+  // Lab Analysis operations (AI-generated insights)
+  async createLabAnalysis(insertAnalysis: InsertLabAnalysis): Promise<LabAnalysis> {
+    const id = randomUUID();
+    const analysis: LabAnalysis = {
+      ...insertAnalysis,
+      id,
+      processedAt: new Date(),
+      extractedMarkers: insertAnalysis.extractedMarkers ?? null,
+      aiInsights: insertAnalysis.aiInsights ?? null,
+      errorMessage: insertAnalysis.errorMessage ?? null
+    };
+    this.labAnalyses.set(id, analysis);
+    return analysis;
+  }
+
+  async getLabAnalysis(fileId: string): Promise<LabAnalysis | undefined> {
+    return Array.from(this.labAnalyses.values()).find(analysis => analysis.fileId === fileId);
+  }
+
+  async updateLabAnalysis(id: string, updates: Partial<InsertLabAnalysis>): Promise<LabAnalysis | undefined> {
+    const analysis = this.labAnalyses.get(id);
+    if (!analysis) return undefined;
+    
+    const updatedAnalysis: LabAnalysis = {
+      ...analysis,
+      ...updates,
+      extractedMarkers: updates.extractedMarkers !== undefined ? updates.extractedMarkers : analysis.extractedMarkers,
+      aiInsights: updates.aiInsights !== undefined ? updates.aiInsights : analysis.aiInsights,
+      errorMessage: updates.errorMessage !== undefined ? updates.errorMessage : analysis.errorMessage
+    };
+    this.labAnalyses.set(id, updatedAnalysis);
+    return updatedAnalysis;
+  }
+
+  async listLabAnalysesByUser(userId: string): Promise<LabAnalysis[]> {
+    return Array.from(this.labAnalyses.values())
+      .filter(analysis => analysis.userId === userId)
+      .sort((a, b) => b.processedAt.getTime() - a.processedAt.getTime());
   }
 
   // Notification Preferences operations
