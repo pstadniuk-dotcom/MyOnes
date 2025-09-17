@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import express, { type Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import OpenAI from "openai";
@@ -827,34 +827,22 @@ setInterval(() => {
 }, 60000); // Clean up every minute
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Enhanced JSON parsing middleware with size limits
+  // Use Express built-in JSON middleware (much more reliable)
   app.use('/api', (req, res, next) => {
-    if (req.headers['content-type']?.includes('application/json')) {
-      let body = '';
-      let bodySize = 0;
-      const maxSize = 10 * 1024; // 10KB limit
-      
-      req.on('data', chunk => {
-        bodySize += chunk.length;
-        if (bodySize > maxSize) {
-          res.status(413).json({ error: 'Request too large' });
-          return;
-        }
-        body += chunk.toString();
-      });
-      
-      req.on('end', () => {
-        try {
-          req.body = JSON.parse(body);
-          next();
-        } catch (e) {
-          res.status(400).json({ error: 'Invalid JSON' });
-        }
-      });
-    } else {
-      next();
-    }
+    console.log('🔧 REQUEST MIDDLEWARE: Processing request', {
+      method: req.method,
+      url: req.url,
+      contentType: req.headers['content-type']
+    });
+    next();
   });
+
+  // JSON parsing with size limit (using express built-in)
+  app.use('/api', express.json({ 
+    limit: '10kb',
+    strict: true,
+    type: 'application/json'
+  }));
   
   // Security headers middleware
   app.use('/api', (req, res, next) => {
@@ -871,31 +859,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Authentication routes
   app.post('/api/auth/signup', async (req, res) => {
+    const startTime = Date.now();
+    console.log('🔧 SIGNUP REQUEST START:', {
+      timestamp: new Date().toISOString(),
+      clientIP: getClientIP(req),
+      body: req.body ? { email: req.body.email, name: req.body.name } : 'No body'
+    });
+
     try {
       // Rate limiting for signup (3 attempts per 15 minutes per IP)
+      console.log('📋 SIGNUP: Checking rate limit...');
       const clientIP = getClientIP(req);
       const rateLimit = checkRateLimit(`signup-${clientIP}`, 3, 15 * 60 * 1000);
       if (!rateLimit.allowed) {
+        console.log('⚠️ SIGNUP: Rate limit exceeded for IP:', clientIP);
         return res.status(429).json({ 
           error: 'Too many signup attempts. Please try again later.', 
           retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
         });
       }
+      console.log('✅ SIGNUP: Rate limit passed');
 
       // Validate request body
+      console.log('📋 SIGNUP: Validating request body...');
       const validatedData = signupSchema.parse(req.body);
+      console.log('✅ SIGNUP: Request validation passed for:', validatedData.email);
       
       // Check if user already exists
+      console.log('📋 SIGNUP: Checking if user exists...');
       const existingUser = await storage.getUserByEmail(validatedData.email);
       if (existingUser) {
+        console.log('⚠️ SIGNUP: User already exists:', validatedData.email);
         return res.status(409).json({ error: 'User with this email already exists' });
       }
+      console.log('✅ SIGNUP: User does not exist, proceeding');
 
-      // Hash password
-      const saltRounds = 12;
+      // Hash password with reduced salt rounds for better performance
+      console.log('📋 SIGNUP: Hashing password...');
+      const saltRounds = 10; // Reduced from 12 for better performance
       const hashedPassword = await bcrypt.hash(validatedData.password, saltRounds);
+      console.log('✅ SIGNUP: Password hashed successfully');
 
       // Create user
+      console.log('📋 SIGNUP: Creating user...');
       const userData = {
         name: validatedData.name,
         email: validatedData.email,
@@ -904,9 +910,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const user = await storage.createUser(userData);
+      console.log('✅ SIGNUP: User created successfully:', { id: user.id, email: user.email });
       
       // Generate JWT token
+      console.log('📋 SIGNUP: Generating JWT token...');
       const token = generateToken(user.id);
+      console.log('✅ SIGNUP: JWT token generated');
 
       // Return user data without password
       const authResponse: AuthResponse = {
@@ -920,18 +929,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         token
       };
 
-      res.status(201).json(authResponse);
+      const endTime = Date.now();
+      console.log('🎉 SIGNUP SUCCESS:', {
+        duration: `${endTime - startTime}ms`,
+        userId: user.id,
+        email: user.email,
+        timestamp: new Date().toISOString()
+      });
+
+      return res.status(201).json(authResponse);
     } catch (error: any) {
-      console.error('Signup error:', error);
+      const endTime = Date.now();
+      console.error('❌ SIGNUP ERROR:', {
+        duration: `${endTime - startTime}ms`,
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+        type: error.name
+      });
       
       if (error.name === 'ZodError') {
+        console.log('📋 SIGNUP: Zod validation error details:', error.errors);
         return res.status(400).json({ 
           error: 'Validation failed', 
           details: error.errors 
         });
       }
       
-      res.status(500).json({ error: 'Failed to create account' });
+      return res.status(500).json({ error: 'Failed to create account' });
     }
   });
 
