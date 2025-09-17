@@ -13,9 +13,7 @@ export default function ProtectedRoute({
   fallback = '/login' 
 }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth();
-  const [location, setLocation] = useLocation();
-  
-  console.log('ProtectedRoute - location:', location, 'isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     // Don't redirect while still loading authentication state
@@ -42,11 +40,9 @@ export default function ProtectedRoute({
   // Don't render children if not authenticated
   // The redirect will happen via useEffect
   if (!isAuthenticated) {
-    console.log('ProtectedRoute: User not authenticated, returning null');
     return null;
   }
 
-  console.log('ProtectedRoute: User authenticated, rendering children');
   // Render protected content
   return <>{children}</>;
 }
