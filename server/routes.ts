@@ -1164,7 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             model: 'gpt-5', // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
             messages: conversationHistory,
             stream: true,
-            max_tokens: 2000,
+            max_completion_tokens: 2000,
             temperature: 0.7,
             // Add safety parameters
             frequency_penalty: 0.1,
