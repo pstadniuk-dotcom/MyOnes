@@ -260,6 +260,17 @@ export class MemStorage implements IStorage {
     };
     this.users.set(testUser.id, testUser);
 
+    // Add user account for pstadniuk@gmail.com
+    const userAccount: User = {
+      id: 'user-pstadniuk',
+      name: 'Patrick Stadniuk',
+      email: 'pstadniuk@gmail.com',
+      phone: null,
+      password: '$2b$10$8KQp.EfA9uxJ3.Q3RfK1teb8.R2UW8YZw.TpOb9rlQ0Y8BzxZ3nAm', // bcrypt hash for "password123"
+      createdAt: new Date('2024-09-17')
+    };
+    this.users.set(userAccount.id, userAccount);
+
     // Create sample formulas with version history - all under 800mg safety limit
     const formula1: Formula = {
       id: 'formula-v1',
