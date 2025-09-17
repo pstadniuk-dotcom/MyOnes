@@ -439,10 +439,10 @@ export default function ConsultationPage() {
         formData.append('type', 'lab_report');
         formData.append('userId', user?.id || '');
 
-        const uploadResponse = await fetch('/api/upload', {
+        const uploadResponse = await fetch('/api/files/upload', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
           },
           body: formData
         });
