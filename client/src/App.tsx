@@ -52,9 +52,6 @@ function HomePage() {
 
 // Dashboard Router - handles all dashboard routes
 function DashboardRouter() {
-  const [location] = useLocation();
-  console.log('DashboardRouter current location:', location);
-  
   return (
     <DashboardLayout>
       <Switch>
