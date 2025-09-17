@@ -21,6 +21,8 @@ export const chatStatusEnum = pgEnum('chat_status', ['active', 'completed', 'arc
 export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant', 'system']);
 export const addressTypeEnum = pgEnum('address_type', ['shipping', 'billing']);
 export const fileTypeEnum = pgEnum('file_type', ['lab_report', 'medical_document', 'prescription', 'other']);
+export const auditActionEnum = pgEnum('audit_action', ['upload', 'view', 'download', 'delete', 'share', 'access_denied']);
+export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing']);
 
 // Users table - updated with name, email, phone, password
 export const users = pgTable("users", {
@@ -131,13 +133,90 @@ export const paymentMethodRefs = pgTable("payment_method_refs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// File uploads for user documents
+// Enhanced file uploads for HIPAA-compliant user documents
 export const fileUploads = pgTable("file_uploads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   type: fileTypeEnum("type").notNull(),
-  url: text("url").notNull(),
+  objectPath: text("object_path").notNull(), // Object storage path
+  originalFileName: text("original_file_name").notNull(),
+  fileSize: integer("file_size"), // File size in bytes
+  mimeType: text("mime_type"),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+  // HIPAA compliance fields
+  hipaaCompliant: boolean("hipaa_compliant").default(true).notNull(),
+  encryptedAtRest: boolean("encrypted_at_rest").default(true).notNull(),
+  retentionPolicyId: varchar("retention_policy_id"), // Future: reference to retention policies
+  // Lab report specific fields
+  labReportData: json("lab_report_data").$type<{
+    testDate?: string;
+    testType?: string;
+    labName?: string;
+    physicianName?: string;
+    analysisStatus?: 'pending' | 'processing' | 'completed' | 'error';
+    extractedData?: Record<string, any>;
+  }>(),
+  // Soft delete for compliance (never actually delete PHI)
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by").references(() => users.id),
+});
+
+// HIPAA-compliant audit log for all file operations
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  fileId: varchar("file_id").references(() => fileUploads.id, { onDelete: "cascade" }),
+  action: auditActionEnum("action").notNull(),
+  objectPath: text("object_path"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  success: boolean("success").notNull(),
+  errorMessage: text("error_message"),
+  metadata: json("metadata").$type<Record<string, any>>(),
+});
+
+// User consent tracking for HIPAA compliance
+export const userConsents = pgTable("user_consents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  consentType: consentTypeEnum("consent_type").notNull(),
+  granted: boolean("granted").notNull(),
+  grantedAt: timestamp("granted_at").defaultNow().notNull(),
+  revokedAt: timestamp("revoked_at"),
+  consentVersion: varchar("consent_version").notNull().default("1.0"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  consentText: text("consent_text"), // Full text of what user consented to
+  metadata: json("metadata").$type<{
+    source?: 'upload_form' | 'dashboard' | 'api';
+    fileId?: string;
+    additionalInfo?: Record<string, any>;
+  }>(),
+});
+
+// Lab report analysis results (AI-generated insights)
+export const labAnalyses = pgTable("lab_analyses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fileId: varchar("file_id").notNull().references(() => fileUploads.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  analysisStatus: text("analysis_status").notNull().default("pending"),
+  extractedMarkers: json("extracted_markers").$type<Array<{
+    name: string;
+    value: number;
+    unit: string;
+    referenceRange: string;
+    status: 'normal' | 'high' | 'low' | 'critical';
+  }>>().default([]),
+  aiInsights: json("ai_insights").$type<{
+    summary: string;
+    recommendations: string[];
+    riskFactors: string[];
+    nutritionalNeeds: string[];
+    confidence: number;
+  }>(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+  errorMessage: text("error_message"),
 });
 
 // User notification preferences
@@ -205,6 +284,21 @@ export const insertFileUploadSchema = createInsertSchema(fileUploads).omit({
   uploadedAt: true,
 });
 
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertUserConsentSchema = createInsertSchema(userConsents).omit({
+  id: true,
+  grantedAt: true,
+});
+
+export const insertLabAnalysisSchema = createInsertSchema(labAnalyses).omit({
+  id: true,
+  processedAt: true,
+});
+
 export const insertNotificationPrefSchema = createInsertSchema(notificationPrefs).omit({
   updatedAt: true,
 });
@@ -243,6 +337,15 @@ export type PaymentMethodRef = typeof paymentMethodRefs.$inferSelect;
 export type InsertFileUpload = z.infer<typeof insertFileUploadSchema>;
 export type FileUpload = typeof fileUploads.$inferSelect;
 
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+
+export type InsertUserConsent = z.infer<typeof insertUserConsentSchema>;
+export type UserConsent = typeof userConsents.$inferSelect;
+
+export type InsertLabAnalysis = z.infer<typeof insertLabAnalysisSchema>;
+export type LabAnalysis = typeof labAnalyses.$inferSelect;
+
 export type InsertNotificationPref = z.infer<typeof insertNotificationPrefSchema>;
 export type NotificationPref = typeof notificationPrefs.$inferSelect;
 
@@ -273,3 +376,28 @@ export const authResponseSchema = z.object({
 export type SignupData = z.infer<typeof signupSchema>;
 export type LoginData = z.infer<typeof loginSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
+
+// Lab report upload validation schema
+export const labReportUploadSchema = z.object({
+  originalFileName: z.string().min(1, 'File name is required'),
+  fileSize: z.number().positive('File size must be positive').max(50 * 1024 * 1024, 'File size cannot exceed 50MB'),
+  mimeType: z.string().refine(
+    (type) => ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'].includes(type),
+    'Only PDF and image files are allowed for lab reports'
+  ),
+  testDate: z.string().optional(),
+  testType: z.string().optional(),
+  labName: z.string().optional(),
+  physicianName: z.string().optional(),
+});
+
+// User consent validation schema
+export const userConsentSchema = z.object({
+  consentType: z.enum(['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing']),
+  granted: z.boolean(),
+  consentVersion: z.string().default('1.0'),
+  metadata: z.record(z.any()).optional(),
+});
+
+export type LabReportUploadData = z.infer<typeof labReportUploadSchema>;
+export type UserConsentData = z.infer<typeof userConsentSchema>;

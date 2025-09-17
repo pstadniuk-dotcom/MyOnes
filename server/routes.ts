@@ -8,7 +8,9 @@ import type { InsertMessage, InsertChatSession } from "@shared/schema";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import type { SignupData, LoginData, AuthResponse } from "@shared/schema";
-import { signupSchema, loginSchema } from "@shared/schema";
+import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema } from "@shared/schema";
+import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
+import { ObjectPermission } from "./objectAcl";
 
 // Extend Express Request interface to include userId property
 declare global {
@@ -1732,19 +1734,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // File upload endpoint with object storage integration
+  // HIPAA-compliant file upload endpoint with full audit logging and consent enforcement
   app.post('/api/files/upload', requireAuth, async (req, res) => {
+    const userId = req.userId!;
+    const auditInfo = {
+      ipAddress: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent']
+    };
+
     try {
-      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
-      
       // Check if file was uploaded
       if (!req.files || !req.files.file) {
+        // Log failed upload attempt
+        console.warn("HIPAA AUDIT LOG - Failed Upload Attempt:", {
+          timestamp: new Date().toISOString(),
+          userId,
+          action: 'write',
+          objectPath: 'upload-attempt',
+          ipAddress: auditInfo.ipAddress,
+          userAgent: auditInfo.userAgent,
+          success: false,
+          reason: 'No file uploaded'
+        });
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
       const uploadedFile = Array.isArray(req.files.file) ? req.files.file[0] : req.files.file;
       
-      // File validation
+      // File validation with HIPAA audit logging
       const maxSizeBytes = 10 * 1024 * 1024; // 10MB limit
       const allowedMimeTypes = [
         'application/pdf',
@@ -1759,12 +1776,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.txt', '.doc', '.docx'];
 
       if (uploadedFile.size > maxSizeBytes) {
+        console.warn("HIPAA AUDIT LOG - File Too Large:", {
+          timestamp: new Date().toISOString(),
+          userId,
+          action: 'write',
+          objectPath: uploadedFile.name,
+          ipAddress: auditInfo.ipAddress,
+          userAgent: auditInfo.userAgent,
+          success: false,
+          reason: `File too large: ${uploadedFile.size} bytes (max: ${maxSizeBytes})`
+        });
         return res.status(400).json({ 
           error: 'File too large. Maximum size is 10MB.' 
         });
       }
 
       if (!allowedMimeTypes.includes(uploadedFile.mimetype)) {
+        console.warn("HIPAA AUDIT LOG - Invalid File Type:", {
+          timestamp: new Date().toISOString(),
+          userId,
+          action: 'write',
+          objectPath: uploadedFile.name,
+          ipAddress: auditInfo.ipAddress,
+          userAgent: auditInfo.userAgent,
+          success: false,
+          reason: `Invalid MIME type: ${uploadedFile.mimetype}`
+        });
         return res.status(400).json({ 
           error: 'Invalid file type. Only PDF, JPG, PNG, TXT, DOC, and DOCX files are allowed.' 
         });
@@ -1773,68 +1810,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileName = uploadedFile.name.toLowerCase();
       const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
       if (!hasValidExtension) {
+        console.warn("HIPAA AUDIT LOG - Invalid File Extension:", {
+          timestamp: new Date().toISOString(),
+          userId,
+          action: 'write',
+          objectPath: uploadedFile.name,
+          ipAddress: auditInfo.ipAddress,
+          userAgent: auditInfo.userAgent,
+          success: false,
+          reason: `Invalid file extension for: ${fileName}`
+        });
         return res.status(400).json({ 
           error: 'Invalid file extension. Only .pdf, .jpg, .jpeg, .png, .txt, .doc, and .docx files are allowed.' 
         });
       }
 
-      // Generate unique filename
-      const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
-      const uniqueFileName = `${userId}_${Date.now()}_${Math.random().toString(36).substring(2)}${fileExtension}`;
-      const privateObjectDir = process.env.PRIVATE_OBJECT_DIR;
-      
-      if (!privateObjectDir) {
-        throw new Error('Object storage not configured');
+      // Determine file type category for HIPAA compliance
+      let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'other';
+      if (fileName.includes('lab') || fileName.includes('blood') || fileName.includes('test')) {
+        fileType = 'lab_report';
+      } else if (fileName.includes('prescription') || fileName.includes('rx')) {
+        fileType = 'prescription';  
+      } else if (allowedMimeTypes.slice(0, 4).includes(uploadedFile.mimetype)) {
+        fileType = 'medical_document';
       }
 
-      const filePath = `${privateObjectDir}/${uniqueFileName}`;
+      // Use HIPAA-compliant ObjectStorageService for secure upload
+      const objectStorageService = new ObjectStorageService();
       
-      // Move file to object storage (using fs for now, should use proper object storage client)
-      const fs = require('fs').promises;
-      const path = require('path');
-      
-      try {
-        // Ensure the private directory exists
-        await fs.mkdir(path.dirname(filePath), { recursive: true });
-        
-        // Move uploaded file to object storage path
-        await fs.writeFile(filePath, uploadedFile.data);
-        
-        // Determine file type category
-        let fileType = 'other';
-        if (fileName.includes('lab') || fileName.includes('blood') || fileName.includes('test')) {
-          fileType = 'lab_report';
-        } else if (fileName.includes('prescription') || fileName.includes('rx')) {
-          fileType = 'prescription';  
-        } else if (allowedMimeTypes.slice(0, 4).includes(uploadedFile.mimetype)) {
-          fileType = 'medical_document';
+      // Get secure upload URL with consent enforcement and audit logging
+      const uploadUrl = await objectStorageService.getLabReportUploadURL(
+        userId, 
+        uploadedFile.name,
+        auditInfo
+      );
+
+      // Upload file using the secure signed URL
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: uploadedFile.data,
+        headers: {
+          'Content-Type': uploadedFile.mimetype,
+          'Content-Length': uploadedFile.size.toString()
         }
+      });
 
-        // Save file metadata to storage (using only available schema fields)
-        const fileUpload = await storage.createFileUpload({
-          userId,
-          type: fileType as any,
-          url: filePath
-        });
-
-        // Return file metadata
-        const responseData = {
-          id: fileUpload.id,
-          name: uploadedFile.name, // From the uploaded file, not stored in DB
-          url: filePath, // In production, this would be a secure URL
-          type: fileUpload.type,
-          size: uploadedFile.size, // From the uploaded file, not stored in DB
-          uploadedAt: fileUpload.uploadedAt
-        };
-
-        res.json(responseData);
-        
-      } catch (fsError) {
-        console.error('File system error:', fsError);
-        throw new Error('Failed to save file to storage');
+      if (!response.ok) {
+        throw new Error(`Upload failed with status: ${response.status}`);
       }
+
+      // Set HIPAA-compliant ACL policy for the uploaded file
+      const normalizedPath = await objectStorageService.setLabReportAclPolicy(
+        uploadUrl,
+        userId,
+        uploadedFile.name,
+        fileType,
+        auditInfo
+      );
+
+      // Save file metadata to storage with HIPAA compliance fields
+      const fileUpload = await storage.createFileUpload({
+        userId,
+        type: fileType,
+        objectPath: normalizedPath,
+        originalFileName: uploadedFile.name,
+        fileSize: uploadedFile.size,
+        mimeType: uploadedFile.mimetype,
+        hipaaCompliant: true,
+        encryptedAtRest: true,
+        retentionPolicyId: '7_years' // Default 7-year retention for medical records
+      });
+
+      // Log successful upload
+      console.log("HIPAA AUDIT LOG - Successful Upload:", {
+        timestamp: new Date().toISOString(),
+        userId,
+        action: 'write',
+        objectPath: normalizedPath,
+        ipAddress: auditInfo.ipAddress,
+        userAgent: auditInfo.userAgent,
+        success: true,
+        reason: `Successfully uploaded ${fileType}: ${uploadedFile.name}`
+      });
+
+      // Return file metadata
+      const responseData = {
+        id: fileUpload.id,
+        name: uploadedFile.name,
+        url: normalizedPath,
+        type: fileUpload.type,
+        size: uploadedFile.size,
+        uploadedAt: fileUpload.uploadedAt,
+        hipaaCompliant: true
+      };
+
+      res.json(responseData);
       
     } catch (error) {
+      // Log failed upload with full error details
+      console.error("HIPAA AUDIT LOG - Upload Error:", {
+        timestamp: new Date().toISOString(),
+        userId,
+        action: 'write',
+        objectPath: 'upload-error',
+        ipAddress: auditInfo.ipAddress,
+        userAgent: auditInfo.userAgent,
+        success: false,
+        reason: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+
+      if (error instanceof Error && error.name === 'ConsentRequiredError') {
+        return res.status(403).json({ 
+          error: 'User consent required for file upload',
+          details: error.message
+        });
+      }
+      
       console.error('File upload error:', error);
       res.status(500).json({ error: 'Failed to upload file' });
     }
