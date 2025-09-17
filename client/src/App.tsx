@@ -55,12 +55,12 @@ function DashboardRouter() {
   return (
     <DashboardLayout>
       <Switch>
-        <Route path="/" component={DashboardPage} />
-        <Route path="/consultation" component={ConsultationPage} />
-        <Route path="/formula" component={MyFormulaPage} />
-        <Route path="/orders" component={OrdersPage} />
-        <Route path="/profile" component={ProfilePage} />
-        <Route path="/support" component={SupportPage} />
+        <Route path="/dashboard" component={DashboardPage} />
+        <Route path="/dashboard/consultation" component={ConsultationPage} />
+        <Route path="/dashboard/formula" component={MyFormulaPage} />
+        <Route path="/dashboard/orders" component={OrdersPage} />
+        <Route path="/dashboard/profile" component={ProfilePage} />
+        <Route path="/dashboard/support" component={SupportPage} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>
@@ -76,7 +76,7 @@ function Router() {
       <Route path="/login" component={LoginPage} />
       
       {/* Protected Dashboard Routes */}
-      <Route path="/dashboard" nest>
+      <Route path="/dashboard*">
         <ProtectedRoute>
           <DashboardRouter />
         </ProtectedRoute>
