@@ -83,7 +83,7 @@ export default function HeroSection() {
                 </div>
                 <div className="flex-1 h-px bg-gradient-to-r from-primary/50 to-transparent"></div>
                 <div className="flex items-center space-x-2">
-                  <div className="w-12 h-8 bg-primary rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-8 bg-primary rounded-full flex items-center justify-center">
                     <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
                   </div>
                   <span>Your capsule</span>
