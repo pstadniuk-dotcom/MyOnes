@@ -9,7 +9,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import type { SignupData, LoginData, AuthResponse } from "@shared/schema";
 import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, insertHealthProfileSchema } from "@shared/schema";
-import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
+import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError, enforceConsentRequirements } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 
 // Extend Express Request interface to include userId property
@@ -1078,7 +1078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const { message, sessionId } = req.body;
+      const { message, sessionId, files } = req.body;
       const userId = req.userId; // Use authenticated user ID from middleware
       
       // Enhanced input validation
@@ -1140,14 +1140,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const previousMessages = chatSession ? 
         (await storage.listMessagesBySession(chatSession.id)).slice(-10) : [];
 
-      // Build conversation history
+      // CRITICAL: HIPAA Compliance - Enforce consent requirements before OpenAI analysis
+      try {
+        await enforceConsentRequirements(userId!, 'ai_analysis', {
+          ipAddress: clientIP,
+          userAgent: req.headers['user-agent']
+        });
+      } catch (consentError: any) {
+        sendSSE({
+          type: 'error',
+          error: 'AI analysis consent required. Please provide consent to use AI features.',
+          code: 'CONSENT_REQUIRED',
+          sessionId: chatSession?.id
+        });
+        endStream();
+        return;
+      }
+
+      // Build conversation history with file context
+      let messageWithFileContext = message;
+      if (files && files.length > 0) {
+        const fileDescriptions = files.map((file: any) => `${file.name} (${file.type})`).join(', ');
+        messageWithFileContext = `[User has attached files: ${fileDescriptions}] ${message}`;
+      }
+
       const conversationHistory: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
         { role: 'system', content: ONES_AI_SYSTEM_PROMPT },
         ...previousMessages.map(msg => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content
         })),
-        { role: 'user', content: message }
+        { role: 'user', content: messageWithFileContext }
       ];
 
       // Enhanced OpenAI request with retry logic and circuit breaker

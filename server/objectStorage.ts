@@ -66,7 +66,7 @@ export class RetentionPolicyViolationError extends Error {
 }
 
 // HIPAA-compliant consent enforcement utility
-async function enforceConsentRequirements(
+export async function enforceConsentRequirements(
   userId: string,
   operation: 'upload' | 'download' | 'delete' | 'list' | 'ai_analysis',
   auditInfo?: { ipAddress?: string, userAgent?: string }
@@ -322,7 +322,7 @@ export class ObjectStorageService {
       const [metadata] = await file.getMetadata();
       // Get the ACL policy for the object.
       const aclPolicy = await getObjectAclPolicy(file);
-      const isPublic = aclPolicy?.visibility === "public" || false;
+      const isPublic = (aclPolicy?.visibility as string) === "public" || false;
       
       // HIPAA Audit: Log the download attempt
       if (auditInfo?.userId) {
