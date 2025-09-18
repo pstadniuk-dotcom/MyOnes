@@ -1,5 +1,10 @@
 import { randomUUID } from "crypto";
+import { eq, desc, and, isNull, gte, lte } from "drizzle-orm";
+import { db } from "./db";
 import {
+  users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
+  subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
+  notificationPrefs, auditLogs, userConsents, labAnalyses,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -110,6 +115,829 @@ export interface IStorage {
   getNotificationPrefs(userId: string): Promise<NotificationPref | undefined>;
   createNotificationPrefs(prefs: InsertNotificationPref): Promise<NotificationPref>;
   updateNotificationPrefs(userId: string, updates: Partial<InsertNotificationPref>): Promise<NotificationPref | undefined>;
+}
+
+export class DrizzleStorage implements IStorage {
+  // User operations
+  async getUser(id: string): Promise<User | undefined> {
+    try {
+      const [user] = await db.select().from(users).where(eq(users.id, id));
+      return user || undefined;
+    } catch (error) {
+      console.error('Error getting user:', error);
+      return undefined;
+    }
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    try {
+      const [user] = await db.select().from(users).where(eq(users.email, email));
+      return user || undefined;
+    } catch (error) {
+      console.error('Error getting user by email:', error);
+      return undefined;
+    }
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    try {
+      const [user] = await db.insert(users).values(insertUser).returning();
+      return user;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw new Error('Failed to create user');
+    }
+  }
+
+  async updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined> {
+    try {
+      const [user] = await db
+        .update(users)
+        .set(updates)
+        .where(eq(users.id, id))
+        .returning();
+      return user || undefined;
+    } catch (error) {
+      console.error('Error updating user:', error);
+      return undefined;
+    }
+  }
+
+  // Health Profile operations
+  async getHealthProfile(userId: string): Promise<HealthProfile | undefined> {
+    try {
+      const [profile] = await db.select().from(healthProfiles).where(eq(healthProfiles.userId, userId));
+      return profile || undefined;
+    } catch (error) {
+      console.error('Error getting health profile:', error);
+      return undefined;
+    }
+  }
+
+  async createHealthProfile(insertProfile: InsertHealthProfile): Promise<HealthProfile> {
+    try {
+      // Ensure JSON arrays are properly typed
+      const safeProfile = {
+        ...insertProfile,
+        conditions: Array.isArray(insertProfile.conditions) ? insertProfile.conditions : insertProfile.conditions ? [insertProfile.conditions as any].flat() : [],
+        medications: Array.isArray(insertProfile.medications) ? insertProfile.medications : insertProfile.medications ? [insertProfile.medications as any].flat() : [],
+        allergies: Array.isArray(insertProfile.allergies) ? insertProfile.allergies : insertProfile.allergies ? [insertProfile.allergies as any].flat() : []
+      };
+      const [profile] = await db.insert(healthProfiles).values([safeProfile]).returning();
+      return profile;
+    } catch (error) {
+      console.error('Error creating health profile:', error);
+      throw new Error('Failed to create health profile');
+    }
+  }
+
+  async updateHealthProfile(userId: string, updates: Partial<InsertHealthProfile>): Promise<HealthProfile | undefined> {
+    try {
+      // Handle JSON arrays properly
+      const safeUpdates = {
+        ...updates,
+        ...(updates.conditions !== undefined && { conditions: Array.isArray(updates.conditions) ? updates.conditions : [] }),
+        ...(updates.medications !== undefined && { medications: Array.isArray(updates.medications) ? updates.medications : [] }),
+        ...(updates.allergies !== undefined && { allergies: Array.isArray(updates.allergies) ? updates.allergies : [] })
+      };
+      const [profile] = await db
+        .update(healthProfiles)
+        .set(safeUpdates)
+        .where(eq(healthProfiles.userId, userId))
+        .returning();
+      return profile || undefined;
+    } catch (error) {
+      console.error('Error updating health profile:', error);
+      return undefined;
+    }
+  }
+
+  // Chat Session operations
+  async getChatSession(id: string): Promise<ChatSession | undefined> {
+    try {
+      const [session] = await db.select().from(chatSessions).where(eq(chatSessions.id, id));
+      return session || undefined;
+    } catch (error) {
+      console.error('Error getting chat session:', error);
+      return undefined;
+    }
+  }
+
+  async createChatSession(insertSession: InsertChatSession): Promise<ChatSession> {
+    try {
+      const [session] = await db.insert(chatSessions).values(insertSession).returning();
+      return session;
+    } catch (error) {
+      console.error('Error creating chat session:', error);
+      throw new Error('Failed to create chat session');
+    }
+  }
+
+  async listChatSessionsByUser(userId: string): Promise<ChatSession[]> {
+    try {
+      return await db.select().from(chatSessions).where(eq(chatSessions.userId, userId)).orderBy(desc(chatSessions.createdAt));
+    } catch (error) {
+      console.error('Error listing chat sessions:', error);
+      return [];
+    }
+  }
+
+  async updateChatSessionStatus(id: string, status: 'active' | 'completed' | 'archived'): Promise<ChatSession | undefined> {
+    try {
+      const [session] = await db
+        .update(chatSessions)
+        .set({ status })
+        .where(eq(chatSessions.id, id))
+        .returning();
+      return session || undefined;
+    } catch (error) {
+      console.error('Error updating chat session status:', error);
+      return undefined;
+    }
+  }
+
+  // Message operations
+  async getMessage(id: string): Promise<Message | undefined> {
+    try {
+      const [message] = await db.select().from(messages).where(eq(messages.id, id));
+      return message || undefined;
+    } catch (error) {
+      console.error('Error getting message:', error);
+      return undefined;
+    }
+  }
+
+  async createMessage(insertMessage: InsertMessage): Promise<Message> {
+    try {
+      const [message] = await db.insert(messages).values(insertMessage).returning();
+      return message;
+    } catch (error) {
+      console.error('Error creating message:', error);
+      throw new Error('Failed to create message');
+    }
+  }
+
+  async listMessagesBySession(sessionId: string): Promise<Message[]> {
+    try {
+      return await db.select().from(messages).where(eq(messages.sessionId, sessionId)).orderBy(messages.createdAt);
+    } catch (error) {
+      console.error('Error listing messages by session:', error);
+      return [];
+    }
+  }
+
+  // Formula operations
+  async getFormula(id: string): Promise<Formula | undefined> {
+    try {
+      const [formula] = await db.select().from(formulas).where(eq(formulas.id, id));
+      return formula || undefined;
+    } catch (error) {
+      console.error('Error getting formula:', error);
+      return undefined;
+    }
+  }
+
+  async createFormula(insertFormula: InsertFormula): Promise<Formula> {
+    try {
+      // Ensure bases and additions are properly typed arrays
+      const safeFormula = {
+        ...insertFormula,
+        bases: Array.isArray(insertFormula.bases) ? insertFormula.bases : insertFormula.bases ? [insertFormula.bases as any].flat() : [],
+        additions: Array.isArray(insertFormula.additions) ? insertFormula.additions : insertFormula.additions ? [insertFormula.additions as any].flat() : []
+      };
+      const [formula] = await db.insert(formulas).values([safeFormula]).returning();
+      return formula;
+    } catch (error) {
+      console.error('Error creating formula:', error);
+      throw new Error('Failed to create formula');
+    }
+  }
+
+  async getCurrentFormulaByUser(userId: string): Promise<Formula | undefined> {
+    try {
+      const [formula] = await db
+        .select()
+        .from(formulas)
+        .where(eq(formulas.userId, userId))
+        .orderBy(desc(formulas.version))
+        .limit(1);
+      return formula || undefined;
+    } catch (error) {
+      console.error('Error getting current formula:', error);
+      return undefined;
+    }
+  }
+
+  async getFormulaHistory(userId: string): Promise<Formula[]> {
+    try {
+      return await db.select().from(formulas).where(eq(formulas.userId, userId)).orderBy(desc(formulas.version));
+    } catch (error) {
+      console.error('Error getting formula history:', error);
+      return [];
+    }
+  }
+
+  async updateFormulaVersion(userId: string, updates: Partial<InsertFormula>): Promise<Formula> {
+    try {
+      // Get the current highest version for this user
+      const [currentFormula] = await db
+        .select()
+        .from(formulas)
+        .where(eq(formulas.userId, userId))
+        .orderBy(desc(formulas.version))
+        .limit(1);
+
+      const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
+      
+      const safeUpdates: any = {
+        ...updates,
+        userId,
+        version: nextVersion
+      };
+      
+      // Only set bases if it's provided and not undefined
+      if (updates.bases !== undefined) {
+        safeUpdates.bases = Array.isArray(updates.bases) ? updates.bases : updates.bases ? [updates.bases as any].flat() : [];
+      }
+      
+      // Only set additions if it's provided
+      if (updates.additions !== undefined) {
+        safeUpdates.additions = Array.isArray(updates.additions) ? updates.additions : updates.additions ? [updates.additions as any].flat() : [];
+      }
+      const [formula] = await db.insert(formulas).values([safeUpdates]).returning();
+      return formula;
+    } catch (error) {
+      console.error('Error updating formula version:', error);
+      throw new Error('Failed to update formula version');
+    }
+  }
+
+  async getFormulaByUserAndVersion(userId: string, version: number): Promise<Formula | undefined> {
+    try {
+      const [formula] = await db
+        .select()
+        .from(formulas)
+        .where(and(eq(formulas.userId, userId), eq(formulas.version, version)));
+      return formula || undefined;
+    } catch (error) {
+      console.error('Error getting formula by user and version:', error);
+      return undefined;
+    }
+  }
+
+  // Formula Version Change operations
+  async createFormulaVersionChange(insertChange: InsertFormulaVersionChange): Promise<FormulaVersionChange> {
+    try {
+      const [change] = await db.insert(formulaVersionChanges).values(insertChange).returning();
+      return change;
+    } catch (error) {
+      console.error('Error creating formula version change:', error);
+      throw new Error('Failed to create formula version change');
+    }
+  }
+
+  async listFormulaVersionChanges(formulaId: string): Promise<FormulaVersionChange[]> {
+    try {
+      return await db.select().from(formulaVersionChanges).where(eq(formulaVersionChanges.formulaId, formulaId)).orderBy(desc(formulaVersionChanges.createdAt));
+    } catch (error) {
+      console.error('Error listing formula version changes:', error);
+      return [];
+    }
+  }
+
+  // Subscription operations
+  async getSubscription(userId: string): Promise<Subscription | undefined> {
+    try {
+      const [subscription] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId));
+      return subscription || undefined;
+    } catch (error) {
+      console.error('Error getting subscription:', error);
+      return undefined;
+    }
+  }
+
+  async createSubscription(insertSubscription: InsertSubscription): Promise<Subscription> {
+    try {
+      const [subscription] = await db.insert(subscriptions).values(insertSubscription).returning();
+      return subscription;
+    } catch (error) {
+      console.error('Error creating subscription:', error);
+      throw new Error('Failed to create subscription');
+    }
+  }
+
+  async updateSubscription(userId: string, updates: Partial<InsertSubscription>): Promise<Subscription | undefined> {
+    try {
+      const [subscription] = await db
+        .update(subscriptions)
+        .set(updates)
+        .where(eq(subscriptions.userId, userId))
+        .returning();
+      return subscription || undefined;
+    } catch (error) {
+      console.error('Error updating subscription:', error);
+      return undefined;
+    }
+  }
+
+  // Order operations
+  async getOrder(id: string): Promise<Order | undefined> {
+    try {
+      const [order] = await db.select().from(orders).where(eq(orders.id, id));
+      return order || undefined;
+    } catch (error) {
+      console.error('Error getting order:', error);
+      return undefined;
+    }
+  }
+
+  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+    try {
+      const [order] = await db.insert(orders).values(insertOrder).returning();
+      return order;
+    } catch (error) {
+      console.error('Error creating order:', error);
+      throw new Error('Failed to create order');
+    }
+  }
+
+  async listOrdersByUser(userId: string): Promise<Order[]> {
+    try {
+      return await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.placedAt));
+    } catch (error) {
+      console.error('Error listing orders by user:', error);
+      return [];
+    }
+  }
+
+  async updateOrderStatus(id: string, status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled', trackingUrl?: string): Promise<Order | undefined> {
+    try {
+      const updateData: any = { status };
+      if (trackingUrl !== undefined) {
+        updateData.trackingUrl = trackingUrl;
+      }
+      if (status === 'shipped') {
+        updateData.shippedAt = new Date();
+      }
+      
+      const [order] = await db
+        .update(orders)
+        .set(updateData)
+        .where(eq(orders.id, id))
+        .returning();
+      return order || undefined;
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      return undefined;
+    }
+  }
+
+  async getOrderWithFormula(orderId: string): Promise<{order: Order, formula: Formula | undefined} | undefined> {
+    try {
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+      if (!order) return undefined;
+
+      const [formula] = await db
+        .select()
+        .from(formulas)
+        .where(and(eq(formulas.userId, order.userId), eq(formulas.version, order.formulaVersion)));
+
+      return { order, formula: formula || undefined };
+    } catch (error) {
+      console.error('Error getting order with formula:', error);
+      return undefined;
+    }
+  }
+
+  // Address operations
+  async getAddress(id: string): Promise<Address | undefined> {
+    try {
+      const [address] = await db.select().from(addresses).where(eq(addresses.id, id));
+      return address || undefined;
+    } catch (error) {
+      console.error('Error getting address:', error);
+      return undefined;
+    }
+  }
+
+  async createAddress(insertAddress: InsertAddress): Promise<Address> {
+    try {
+      const [address] = await db.insert(addresses).values(insertAddress).returning();
+      return address;
+    } catch (error) {
+      console.error('Error creating address:', error);
+      throw new Error('Failed to create address');
+    }
+  }
+
+  async updateAddress(id: string, updates: Partial<InsertAddress>): Promise<Address | undefined> {
+    try {
+      const [address] = await db
+        .update(addresses)
+        .set(updates)
+        .where(eq(addresses.id, id))
+        .returning();
+      return address || undefined;
+    } catch (error) {
+      console.error('Error updating address:', error);
+      return undefined;
+    }
+  }
+
+  async listAddressesByUser(userId: string, type?: 'shipping' | 'billing'): Promise<Address[]> {
+    try {
+      const whereClause = type 
+        ? and(eq(addresses.userId, userId), eq(addresses.type, type))
+        : eq(addresses.userId, userId);
+      
+      return await db.select().from(addresses).where(whereClause).orderBy(desc(addresses.createdAt));
+    } catch (error) {
+      console.error('Error listing addresses by user:', error);
+      return [];
+    }
+  }
+
+  // Payment Method operations
+  async getPaymentMethodRef(id: string): Promise<PaymentMethodRef | undefined> {
+    try {
+      const [paymentMethod] = await db.select().from(paymentMethodRefs).where(eq(paymentMethodRefs.id, id));
+      return paymentMethod || undefined;
+    } catch (error) {
+      console.error('Error getting payment method:', error);
+      return undefined;
+    }
+  }
+
+  async createPaymentMethodRef(insertPaymentMethod: InsertPaymentMethodRef): Promise<PaymentMethodRef> {
+    try {
+      const [paymentMethod] = await db.insert(paymentMethodRefs).values(insertPaymentMethod).returning();
+      return paymentMethod;
+    } catch (error) {
+      console.error('Error creating payment method:', error);
+      throw new Error('Failed to create payment method');
+    }
+  }
+
+  async listPaymentMethodsByUser(userId: string): Promise<PaymentMethodRef[]> {
+    try {
+      return await db.select().from(paymentMethodRefs).where(eq(paymentMethodRefs.userId, userId)).orderBy(desc(paymentMethodRefs.createdAt));
+    } catch (error) {
+      console.error('Error listing payment methods by user:', error);
+      return [];
+    }
+  }
+
+  async deletePaymentMethodRef(id: string): Promise<boolean> {
+    try {
+      const result = await db.delete(paymentMethodRefs).where(eq(paymentMethodRefs.id, id));
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error deleting payment method:', error);
+      return false;
+    }
+  }
+
+  // File Upload operations (enhanced for HIPAA compliance)
+  async getFileUpload(id: string): Promise<FileUpload | undefined> {
+    try {
+      const [fileUpload] = await db.select().from(fileUploads).where(eq(fileUploads.id, id));
+      return fileUpload || undefined;
+    } catch (error) {
+      console.error('Error getting file upload:', error);
+      return undefined;
+    }
+  }
+
+  async createFileUpload(insertFileUpload: InsertFileUpload): Promise<FileUpload> {
+    try {
+      // Handle labReportData field properly
+      const safeFileUpload = {
+        ...insertFileUpload,
+        labReportData: insertFileUpload.labReportData ? {
+          testDate: typeof insertFileUpload.labReportData.testDate === 'string' ? insertFileUpload.labReportData.testDate : undefined,
+          testType: typeof insertFileUpload.labReportData.testType === 'string' ? insertFileUpload.labReportData.testType : undefined,
+          labName: typeof insertFileUpload.labReportData.labName === 'string' ? insertFileUpload.labReportData.labName : undefined,
+          physicianName: typeof insertFileUpload.labReportData.physicianName === 'string' ? insertFileUpload.labReportData.physicianName : undefined,
+          analysisStatus: ['error', 'pending', 'processing', 'completed'].includes(insertFileUpload.labReportData.analysisStatus as string) ? insertFileUpload.labReportData.analysisStatus as 'error' | 'pending' | 'processing' | 'completed' : undefined,
+          extractedData: insertFileUpload.labReportData.extractedData && typeof insertFileUpload.labReportData.extractedData === 'object' ? insertFileUpload.labReportData.extractedData as Record<string, any> : undefined
+        } : null
+      };
+      const [fileUpload] = await db.insert(fileUploads).values([safeFileUpload]).returning();
+      return fileUpload;
+    } catch (error) {
+      console.error('Error creating file upload:', error);
+      throw new Error('Failed to create file upload');
+    }
+  }
+
+  async updateFileUpload(id: string, updates: Partial<InsertFileUpload>): Promise<FileUpload | undefined> {
+    try {
+      // Handle labReportData field properly
+      const safeUpdates = {
+        ...updates,
+        ...(updates.labReportData && {
+          labReportData: {
+            testDate: typeof updates.labReportData.testDate === 'string' ? updates.labReportData.testDate : undefined,
+            testType: typeof updates.labReportData.testType === 'string' ? updates.labReportData.testType : undefined,
+            labName: typeof updates.labReportData.labName === 'string' ? updates.labReportData.labName : undefined,
+            physicianName: typeof updates.labReportData.physicianName === 'string' ? updates.labReportData.physicianName : undefined,
+            analysisStatus: ['error', 'pending', 'processing', 'completed'].includes(updates.labReportData.analysisStatus as string) ? updates.labReportData.analysisStatus as 'error' | 'pending' | 'processing' | 'completed' : undefined,
+            extractedData: updates.labReportData.extractedData && typeof updates.labReportData.extractedData === 'object' ? updates.labReportData.extractedData as Record<string, any> : undefined
+          }
+        })
+      };
+      const [fileUpload] = await db
+        .update(fileUploads)
+        .set(safeUpdates)
+        .where(eq(fileUploads.id, id))
+        .returning();
+      return fileUpload || undefined;
+    } catch (error) {
+      console.error('Error updating file upload:', error);
+      return undefined;
+    }
+  }
+
+  async softDeleteFileUpload(id: string, deletedBy: string): Promise<boolean> {
+    try {
+      const result = await db
+        .update(fileUploads)
+        .set({ deletedAt: new Date(), deletedBy })
+        .where(eq(fileUploads.id, id));
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error soft deleting file upload:', error);
+      return false;
+    }
+  }
+
+  async listFileUploadsByUser(userId: string, type?: 'lab_report' | 'medical_document' | 'prescription' | 'other', includeDeleted?: boolean): Promise<FileUpload[]> {
+    try {
+      let whereClause: any = eq(fileUploads.userId, userId);
+      
+      if (type) {
+        whereClause = and(whereClause, eq(fileUploads.type, type));
+      }
+      
+      if (!includeDeleted) {
+        whereClause = and(whereClause, isNull(fileUploads.deletedAt));
+      }
+      
+      return await db.select().from(fileUploads).where(whereClause).orderBy(desc(fileUploads.uploadedAt));
+    } catch (error) {
+      console.error('Error listing file uploads by user:', error);
+      return [];
+    }
+  }
+
+  // Lab Report specific operations
+  async getLabReportsByUser(userId: string): Promise<FileUpload[]> {
+    return this.listFileUploadsByUser(userId, 'lab_report', false);
+  }
+
+  async getLabReportById(id: string, userId: string): Promise<FileUpload | undefined> {
+    try {
+      const [labReport] = await db
+        .select()
+        .from(fileUploads)
+        .where(and(
+          eq(fileUploads.id, id),
+          eq(fileUploads.userId, userId),
+          eq(fileUploads.type, 'lab_report'),
+          isNull(fileUploads.deletedAt)
+        ));
+      return labReport || undefined;
+    } catch (error) {
+      console.error('Error getting lab report by id:', error);
+      return undefined;
+    }
+  }
+
+  async updateLabReportData(id: string, labReportData: any, userId: string): Promise<FileUpload | undefined> {
+    try {
+      const [fileUpload] = await db
+        .update(fileUploads)
+        .set({ labReportData })
+        .where(and(eq(fileUploads.id, id), eq(fileUploads.userId, userId)))
+        .returning();
+      return fileUpload || undefined;
+    } catch (error) {
+      console.error('Error updating lab report data:', error);
+      return undefined;
+    }
+  }
+
+  // Audit Log operations (HIPAA compliance)
+  async createAuditLog(insertAuditLog: InsertAuditLog): Promise<AuditLog> {
+    try {
+      const [auditLog] = await db.insert(auditLogs).values([insertAuditLog]).returning();
+      return auditLog;
+    } catch (error) {
+      console.error('Error creating audit log:', error);
+      throw new Error('Failed to create audit log');
+    }
+  }
+
+  async getAuditLogsByFile(fileId: string): Promise<AuditLog[]> {
+    try {
+      return await db.select().from(auditLogs).where(eq(auditLogs.fileId, fileId)).orderBy(desc(auditLogs.timestamp));
+    } catch (error) {
+      console.error('Error getting audit logs by file:', error);
+      return [];
+    }
+  }
+
+  async getAuditLogsByUser(userId: string, limit?: number): Promise<AuditLog[]> {
+    try {
+      let query = db.select().from(auditLogs).where(eq(auditLogs.userId, userId)).orderBy(desc(auditLogs.timestamp));
+      if (limit) {
+        query = query.limit(limit);
+      }
+      return await query;
+    } catch (error) {
+      console.error('Error getting audit logs by user:', error);
+      return [];
+    }
+  }
+
+  async getAuditLogsByDateRange(startDate: Date, endDate: Date): Promise<AuditLog[]> {
+    try {
+      return await db
+        .select()
+        .from(auditLogs)
+        .where(and(
+          gte(auditLogs.timestamp, startDate),
+          lte(auditLogs.timestamp, endDate)
+        ))
+        .orderBy(desc(auditLogs.timestamp));
+    } catch (error) {
+      console.error('Error getting audit logs by date range:', error);
+      return [];
+    }
+  }
+
+  // User Consent operations (HIPAA compliance)
+  async createUserConsent(insertConsent: InsertUserConsent): Promise<UserConsent> {
+    try {
+      // Handle metadata field properly
+      const safeConsent = {
+        ...insertConsent,
+        metadata: insertConsent.metadata ? {
+          source: ['upload_form', 'dashboard', 'api'].includes(insertConsent.metadata.source as string) ? insertConsent.metadata.source as 'upload_form' | 'dashboard' | 'api' : undefined,
+          fileId: typeof insertConsent.metadata.fileId === 'string' ? insertConsent.metadata.fileId : undefined,
+          additionalInfo: insertConsent.metadata.additionalInfo && typeof insertConsent.metadata.additionalInfo === 'object' ? insertConsent.metadata.additionalInfo as Record<string, any> : undefined
+        } : null
+      };
+      const [consent] = await db.insert(userConsents).values([safeConsent]).returning();
+      return consent;
+    } catch (error) {
+      console.error('Error creating user consent:', error);
+      throw new Error('Failed to create user consent');
+    }
+  }
+
+  async getUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing'): Promise<UserConsent | undefined> {
+    try {
+      const [consent] = await db
+        .select()
+        .from(userConsents)
+        .where(and(
+          eq(userConsents.userId, userId),
+          eq(userConsents.consentType, consentType),
+          isNull(userConsents.revokedAt)
+        ))
+        .orderBy(desc(userConsents.grantedAt))
+        .limit(1);
+      return consent || undefined;
+    } catch (error) {
+      console.error('Error getting user consent:', error);
+      return undefined;
+    }
+  }
+
+  async getUserConsents(userId: string): Promise<UserConsent[]> {
+    try {
+      return await db.select().from(userConsents).where(eq(userConsents.userId, userId)).orderBy(desc(userConsents.grantedAt));
+    } catch (error) {
+      console.error('Error getting user consents:', error);
+      return [];
+    }
+  }
+
+  async revokeUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing'): Promise<boolean> {
+    try {
+      const result = await db
+        .update(userConsents)
+        .set({ revokedAt: new Date() })
+        .where(and(
+          eq(userConsents.userId, userId),
+          eq(userConsents.consentType, consentType),
+          isNull(userConsents.revokedAt)
+        ));
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error revoking user consent:', error);
+      return false;
+    }
+  }
+
+  // Lab Analysis operations (AI-generated insights)
+  async createLabAnalysis(insertAnalysis: InsertLabAnalysis): Promise<LabAnalysis> {
+    try {
+      // Handle extractedMarkers and aiInsights fields properly
+      const safeAnalysis = {
+        ...insertAnalysis,
+        extractedMarkers: Array.isArray(insertAnalysis.extractedMarkers) ? insertAnalysis.extractedMarkers : insertAnalysis.extractedMarkers ? [insertAnalysis.extractedMarkers as any].flat() : [],
+        aiInsights: insertAnalysis.aiInsights && typeof insertAnalysis.aiInsights === 'object' ? {
+          summary: typeof insertAnalysis.aiInsights.summary === 'string' ? insertAnalysis.aiInsights.summary : '',
+          recommendations: Array.isArray(insertAnalysis.aiInsights.recommendations) ? insertAnalysis.aiInsights.recommendations : insertAnalysis.aiInsights.recommendations ? [insertAnalysis.aiInsights.recommendations as any].flat() : [],
+          riskFactors: Array.isArray(insertAnalysis.aiInsights.riskFactors) ? insertAnalysis.aiInsights.riskFactors : insertAnalysis.aiInsights.riskFactors ? [insertAnalysis.aiInsights.riskFactors as any].flat() : [],
+          nutritionalNeeds: Array.isArray(insertAnalysis.aiInsights.nutritionalNeeds) ? insertAnalysis.aiInsights.nutritionalNeeds : insertAnalysis.aiInsights.nutritionalNeeds ? [insertAnalysis.aiInsights.nutritionalNeeds as any].flat() : [],
+          confidence: typeof insertAnalysis.aiInsights.confidence === 'number' ? insertAnalysis.aiInsights.confidence : 0
+        } : null
+      };
+      const [analysis] = await db.insert(labAnalyses).values([safeAnalysis]).returning();
+      return analysis;
+    } catch (error) {
+      console.error('Error creating lab analysis:', error);
+      throw new Error('Failed to create lab analysis');
+    }
+  }
+
+  async getLabAnalysis(fileId: string): Promise<LabAnalysis | undefined> {
+    try {
+      const [analysis] = await db.select().from(labAnalyses).where(eq(labAnalyses.fileId, fileId));
+      return analysis || undefined;
+    } catch (error) {
+      console.error('Error getting lab analysis:', error);
+      return undefined;
+    }
+  }
+
+  async updateLabAnalysis(id: string, updates: Partial<InsertLabAnalysis>): Promise<LabAnalysis | undefined> {
+    try {
+      // Handle extractedMarkers field properly
+      const safeUpdates = {
+        ...updates,
+        ...(updates.extractedMarkers !== undefined && {
+          extractedMarkers: Array.isArray(updates.extractedMarkers) ? updates.extractedMarkers : []
+        })
+      };
+      const [analysis] = await db
+        .update(labAnalyses)
+        .set(safeUpdates)
+        .where(eq(labAnalyses.id, id))
+        .returning();
+      return analysis || undefined;
+    } catch (error) {
+      console.error('Error updating lab analysis:', error);
+      return undefined;
+    }
+  }
+
+  async listLabAnalysesByUser(userId: string): Promise<LabAnalysis[]> {
+    try {
+      return await db.select().from(labAnalyses).where(eq(labAnalyses.userId, userId)).orderBy(desc(labAnalyses.processedAt));
+    } catch (error) {
+      console.error('Error listing lab analyses by user:', error);
+      return [];
+    }
+  }
+
+  // Notification Preferences operations
+  async getNotificationPrefs(userId: string): Promise<NotificationPref | undefined> {
+    try {
+      const [prefs] = await db.select().from(notificationPrefs).where(eq(notificationPrefs.userId, userId));
+      return prefs || undefined;
+    } catch (error) {
+      console.error('Error getting notification preferences:', error);
+      return undefined;
+    }
+  }
+
+  async createNotificationPrefs(insertPrefs: InsertNotificationPref): Promise<NotificationPref> {
+    try {
+      const [prefs] = await db.insert(notificationPrefs).values([insertPrefs]).returning();
+      return prefs;
+    } catch (error) {
+      console.error('Error creating notification preferences:', error);
+      throw new Error('Failed to create notification preferences');
+    }
+  }
+
+  async updateNotificationPrefs(userId: string, updates: Partial<InsertNotificationPref>): Promise<NotificationPref | undefined> {
+    try {
+      const [prefs] = await db
+        .update(notificationPrefs)
+        .set(updates)
+        .where(eq(notificationPrefs.userId, userId))
+        .returning();
+      return prefs || undefined;
+    } catch (error) {
+      console.error('Error updating notification preferences:', error);
+      return undefined;
+    }
+  }
 }
 
 export class MemStorage implements IStorage {
@@ -260,16 +1088,6 @@ export class MemStorage implements IStorage {
     };
     this.users.set(testUser.id, testUser);
 
-    // Add user account for pstadniuk@gmail.com
-    const userAccount: User = {
-      id: 'user-pstadniuk',
-      name: 'Patrick Stadniuk',
-      email: 'pstadniuk@gmail.com',
-      phone: null,
-      password: '$2b$10$8KQp.EfA9uxJ3.Q3RfK1teb8.R2UW8YZw.TpOb9rlQ0Y8BzxZ3nAm', // bcrypt hash for "password123"
-      createdAt: new Date('2024-09-17')
-    };
-    this.users.set(userAccount.id, userAccount);
 
     // Create sample formulas with version history - all under 800mg safety limit
     const formula1: Formula = {
@@ -1031,4 +1849,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DrizzleStorage();
