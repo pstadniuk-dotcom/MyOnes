@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   HelpCircle, 
   MessageCircle, 
@@ -23,82 +24,37 @@ import {
   Plus
 } from 'lucide-react';
 import { Link } from 'wouter';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useAuth } from '@/contexts/AuthContext';
+import type { FaqItem, SupportTicket, HelpArticle } from '@shared/schema';
 
-// Mock data for help articles and tickets
-const faqItems = [
-  {
-    id: 'faq-1',
-    question: 'How does ONES AI create my personalized formula?',
-    answer: 'ONES AI analyzes your health profile, lab results, symptoms, and goals using advanced algorithms. It considers nutrient interactions, bioavailability, and your unique biochemistry to create an optimized supplement formula tailored specifically for you.'
-  },
-  {
-    id: 'faq-2',
-    question: 'How often will my formula be updated?',
-    answer: 'Your formula is reviewed every 8-12 weeks or when you upload new lab results. ONES AI continuously learns from your feedback and progress to make adjustments that optimize your health outcomes.'
-  },
-  {
-    id: 'faq-3',
-    question: 'Is it safe to upload my lab results?',
-    answer: 'Yes, your health data is encrypted and stored securely. We use bank-level security protocols and never share your personal health information with third parties. You maintain full control over your data.'
-  },
-  {
-    id: 'faq-4',
-    question: 'What if I have allergies or take medications?',
-    answer: 'ONES AI factors in all allergies and medications you\'ve listed in your profile. Our AI checks for potential interactions and contraindications to ensure your formula is safe and compatible with your existing treatments.'
-  },
-  {
-    id: 'faq-5',
-    question: 'Can I pause or cancel my subscription?',
-    answer: 'Yes, you can pause or cancel your subscription at any time from your Orders & Billing page. Paused subscriptions can be resumed when you\'re ready, and cancellations take effect at the end of your current billing cycle.'
-  },
-  {
-    id: 'faq-6',
-    question: 'How long does shipping take?',
-    answer: 'Standard shipping takes 3-5 business days within the US. You\'ll receive tracking information once your order ships, and we offer expedited shipping options for faster delivery.'
-  }
-];
-
-const supportTickets = [
-  {
-    id: 'TIC-001',
-    subject: 'Question about Vitamin D dosage',
-    status: 'resolved',
-    createdAt: '2024-09-20',
-    lastUpdate: '2024-09-21',
-  },
-  {
-    id: 'TIC-002',
-    subject: 'Billing question - double charge',
-    status: 'in-progress',
-    createdAt: '2024-09-22',
-    lastUpdate: '2024-09-23',
-  }
-];
-
-const helpCategories = [
+// Help category configurations
+const helpCategoryConfigs = [
   {
     title: 'Getting Started',
     description: 'Learn the basics of using ONES AI',
     icon: Book,
-    articles: 8
+    category: 'Getting Started'
   },
   {
     title: 'Formula & Health',
     description: 'Understanding your personalized formula',
     icon: HelpCircle,
-    articles: 12
+    category: 'Formula & Health'
   },
   {
     title: 'Billing & Subscription',
     description: 'Managing your account and payments',
     icon: AlertCircle,
-    articles: 6
+    category: 'Billing & Subscription'
   },
   {
     title: 'Technical Support',
     description: 'Troubleshooting and technical issues',
     icon: MessageCircle,
-    articles: 4
+    category: 'Technical Support'
   }
 ];
 
@@ -106,8 +62,12 @@ const getStatusIcon = (status: string) => {
   switch (status) {
     case 'resolved':
       return <CheckCircle className="w-4 h-4 text-green-600" />;
-    case 'in-progress':
+    case 'in_progress':
       return <Clock className="w-4 h-4 text-yellow-600" />;
+    case 'open':
+      return <AlertCircle className="w-4 h-4 text-blue-600" />;
+    case 'closed':
+      return <CheckCircle className="w-4 h-4 text-gray-600" />;
     default:
       return <AlertCircle className="w-4 h-4 text-red-600" />;
   }
@@ -117,8 +77,12 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case 'resolved':
       return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-    case 'in-progress':
+    case 'in_progress':
       return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+    case 'open':
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+    case 'closed':
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
     default:
       return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
   }
@@ -127,19 +91,98 @@ const getStatusColor = (status: string) => {
 export default function SupportPage() {
   const [activeTab, setActiveTab] = useState('help');
   const [searchQuery, setSearchQuery] = useState('');
+  const { user } = useAuth();
+  const { toast } = useToast();
   
   // Form state for new ticket
   const [newTicket, setNewTicket] = useState({
     subject: '',
     category: '',
-    message: '',
+    description: '',
     priority: 'medium'
   });
 
+  // Fetch FAQ items
+  const { data: faqData, isLoading: faqLoading, error: faqError } = useQuery<{faqItems: FaqItem[]}>({
+    queryKey: ['/api/support/faq'],
+  });
+  
+  // Fetch help articles
+  const { data: helpData, isLoading: helpLoading } = useQuery<{articles: HelpArticle[]}>({
+    queryKey: ['/api/support/help'],
+  });
+  
+  // Fetch user support tickets
+  const { data: ticketsData, isLoading: ticketsLoading } = useQuery<{tickets: SupportTicket[]}>({
+    queryKey: ['/api/support/tickets'],
+    enabled: !!user,
+  });
+  
+  // Create support ticket mutation
+  const createTicketMutation = useMutation({
+    mutationFn: (ticketData: typeof newTicket) => 
+      apiRequest('/api/support/tickets', {
+        method: 'POST',
+        body: JSON.stringify(ticketData),
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    onSuccess: () => {
+      toast({
+        title: 'Support ticket created',
+        description: 'We\'ll get back to you within 24 hours.',
+      });
+      setNewTicket({
+        subject: '',
+        category: '',
+        description: '',
+        priority: 'medium'
+      });
+      // Invalidate tickets query to refetch
+      queryClient.invalidateQueries({ queryKey: ['/api/support/tickets'] });
+      setActiveTab('tickets');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error creating ticket',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
+    },
+  });
+  
+  const faqItems = faqData?.faqItems || [];
+  const helpArticles = helpData?.articles || [];
+  const supportTickets = ticketsData?.tickets || [];
+  
+  // Filter FAQs based on search query
   const filteredFAQs = faqItems.filter(item =>
     item.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.answer.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  
+  // Generate help categories with article counts
+  const helpCategories = helpCategoryConfigs.map(config => {
+    const articlesInCategory = helpArticles.filter(article => 
+      article.category === config.category
+    ).length;
+    return {
+      ...config,
+      articles: articlesInCategory
+    };
+  });
+  
+  const handleCreateTicket = () => {
+    if (!newTicket.subject || !newTicket.description || !newTicket.category) {
+      toast({
+        title: 'Missing information',
+        description: 'Please fill in all required fields.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    createTicketMutation.mutate(newTicket);
+  };
 
   return (
     <div className="space-y-6" data-testid="page-support">
@@ -214,28 +257,47 @@ export default function SupportPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Accordion type="single" collapsible className="w-full">
-                {filteredFAQs.map((item) => (
-                  <AccordionItem key={item.id} value={item.id} data-testid={`faq-${item.id}`}>
-                    <AccordionTrigger className="text-left">{item.question}</AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground leading-relaxed">
-                      {item.answer}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-
-              {filteredFAQs.length === 0 && searchQuery && (
-                <div className="text-center py-8">
-                  <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="font-medium mb-2">No results found</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Try different keywords or contact support for personalized help
-                  </p>
-                  <Button variant="outline" onClick={() => setActiveTab('contact')} data-testid="button-contact-support">
-                    Contact Support
-                  </Button>
+              {faqLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className="h-6 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </div>
+                  ))}
                 </div>
+              ) : faqError ? (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="font-medium mb-2">Failed to load FAQs</h3>
+                  <p className="text-sm text-muted-foreground">Please try again later.</p>
+                </div>
+              ) : (
+                <>
+                  <Accordion type="single" collapsible className="w-full">
+                    {filteredFAQs.map((item) => (
+                      <AccordionItem key={item.id} value={item.id} data-testid={`faq-${item.id}`}>
+                        <AccordionTrigger className="text-left">{item.question}</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground leading-relaxed">
+                          {item.answer}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+
+                  {filteredFAQs.length === 0 && searchQuery && (
+                    <div className="text-center py-8">
+                      <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="font-medium mb-2">No results found</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Try different keywords or contact support for personalized help
+                      </p>
+                      <Button variant="outline" onClick={() => setActiveTab('contact')} data-testid="button-contact-support">
+                        Contact Support
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -353,18 +415,19 @@ export default function SupportPage() {
                     id="ticket-message"
                     placeholder="Please provide as much detail as possible about your issue..."
                     className="min-h-[120px]"
-                    value={newTicket.message}
-                    onChange={(e) => setNewTicket({...newTicket, message: e.target.value})}
+                    value={newTicket.description}
+                    onChange={(e) => setNewTicket({...newTicket, description: e.target.value})}
                     data-testid="textarea-ticket-message"
                   />
                 </div>
 
                 <Button 
                   className="w-full" 
-                  disabled={!newTicket.subject || !newTicket.message || !newTicket.category}
+                  disabled={!newTicket.subject || !newTicket.description || !newTicket.category || createTicketMutation.isPending}
+                  onClick={handleCreateTicket}
                   data-testid="button-submit-ticket"
                 >
-                  Submit Support Ticket
+                  {createTicketMutation.isPending ? 'Creating...' : 'Submit Support Ticket'}
                 </Button>
               </CardContent>
             </Card>
@@ -452,7 +515,17 @@ export default function SupportPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {supportTickets.length > 0 ? (
+              {ticketsLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className="h-6 w-1/2" />
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-4 w-1/4" />
+                    </div>
+                  ))}
+                </div>
+              ) : supportTickets.length > 0 ? (
                 <div className="space-y-4">
                   {supportTickets.map((ticket) => (
                     <Card key={ticket.id} className="hover-elevate cursor-pointer" data-testid={`ticket-${ticket.id}`}>
@@ -461,10 +534,10 @@ export default function SupportPage() {
                           <div className="flex items-center gap-3">
                             <div className="flex items-center gap-2">
                               {getStatusIcon(ticket.status)}
-                              <span className="font-medium">{ticket.id}</span>
+                              <span className="font-medium">{ticket.id.slice(0, 8)}...</span>
                             </div>
                             <Badge className={getStatusColor(ticket.status)}>
-                              {ticket.status.replace('-', ' ')}
+                              {ticket.status.replace('_', ' ')}
                             </Badge>
                           </div>
                           <div className="text-sm text-muted-foreground">
@@ -473,7 +546,7 @@ export default function SupportPage() {
                         </div>
                         <h4 className="font-medium mb-2">{ticket.subject}</h4>
                         <div className="text-sm text-muted-foreground">
-                          Last updated: {new Date(ticket.lastUpdate).toLocaleDateString()}
+                          Last updated: {new Date(ticket.updatedAt).toLocaleDateString()}
                         </div>
                       </CardContent>
                     </Card>

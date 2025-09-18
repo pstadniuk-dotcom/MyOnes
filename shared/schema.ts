@@ -431,3 +431,94 @@ export const userConsentSchema = z.object({
 
 export type LabReportUploadData = z.infer<typeof labReportUploadSchema>;
 export type UserConsentData = z.infer<typeof userConsentSchema>;
+
+// Support system schemas
+export const supportTicketStatusEnum = pgEnum('support_ticket_status', ['open', 'in_progress', 'resolved', 'closed']);
+export const supportTicketPriorityEnum = pgEnum('support_ticket_priority', ['low', 'medium', 'high', 'urgent']);
+
+// FAQ items table
+export const faqItems = pgTable("faq_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  category: text("category").notNull(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  isPublished: boolean("is_published").default(true).notNull(),
+  displayOrder: integer("display_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Support tickets table
+export const supportTickets = pgTable("support_tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  subject: text("subject").notNull(),
+  description: text("description").notNull(),
+  status: supportTicketStatusEnum("status").default('open').notNull(),
+  priority: supportTicketPriorityEnum("priority").default('medium').notNull(),
+  category: text("category").notNull(),
+  assignedTo: text("assigned_to"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+// Support ticket responses
+export const supportTicketResponses = pgTable("support_ticket_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: varchar("ticket_id").notNull().references(() => supportTickets.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  isStaff: boolean("is_staff").default(false).notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Help articles table
+export const helpArticles = pgTable("help_articles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  category: text("category").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  isPublished: boolean("is_published").default(true).notNull(),
+  viewCount: integer("view_count").default(0).notNull(),
+  displayOrder: integer("display_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Insert schemas for support system
+export const insertFaqItemSchema = createInsertSchema(faqItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSupportTicketResponseSchema = createInsertSchema(supportTicketResponses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertHelpArticleSchema = createInsertSchema(helpArticles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types for support system
+export type InsertFaqItem = z.infer<typeof insertFaqItemSchema>;
+export type FaqItem = typeof faqItems.$inferSelect;
+
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicket = typeof supportTickets.$inferSelect;
+
+export type InsertSupportTicketResponse = z.infer<typeof insertSupportTicketResponseSchema>;
+export type SupportTicketResponse = typeof supportTicketResponses.$inferSelect;
+
+export type InsertHelpArticle = z.infer<typeof insertHelpArticleSchema>;
+export type HelpArticle = typeof helpArticles.$inferSelect;

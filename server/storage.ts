@@ -5,6 +5,7 @@ import {
   users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
   notifications, notificationPrefs, auditLogs, userConsents, labAnalyses,
+  faqItems, supportTickets, supportTicketResponses, helpArticles,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -20,7 +21,11 @@ import {
   type NotificationPref, type InsertNotificationPref,
   type AuditLog, type InsertAuditLog,
   type UserConsent, type InsertUserConsent,
-  type LabAnalysis, type InsertLabAnalysis
+  type LabAnalysis, type InsertLabAnalysis,
+  type FaqItem, type InsertFaqItem,
+  type SupportTicket, type InsertSupportTicket,
+  type SupportTicketResponse, type InsertSupportTicketResponse,
+  type HelpArticle, type InsertHelpArticle
 } from "@shared/schema";
 
 export interface IStorage {
@@ -123,6 +128,33 @@ export interface IStorage {
   listNotificationsByUser(userId: string, limit?: number): Promise<Notification[]>;
   getUnreadNotificationCount(userId: string): Promise<number>;
   markNotificationAsRead(id: string, userId: string): Promise<Notification | undefined>;
+  
+  // Support System operations
+  // FAQ operations
+  getFaqItem(id: string): Promise<FaqItem | undefined>;
+  createFaqItem(faqItem: InsertFaqItem): Promise<FaqItem>;
+  updateFaqItem(id: string, updates: Partial<InsertFaqItem>): Promise<FaqItem | undefined>;
+  listFaqItems(category?: string): Promise<FaqItem[]>;
+  deleteFaqItem(id: string): Promise<boolean>;
+  
+  // Support ticket operations
+  getSupportTicket(id: string): Promise<SupportTicket | undefined>;
+  createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket>;
+  updateSupportTicket(id: string, updates: Partial<InsertSupportTicket>): Promise<SupportTicket | undefined>;
+  listSupportTicketsByUser(userId: string): Promise<SupportTicket[]>;
+  getSupportTicketWithResponses(id: string, userId: string): Promise<{ticket: SupportTicket, responses: SupportTicketResponse[]} | undefined>;
+  
+  // Support ticket response operations
+  createSupportTicketResponse(response: InsertSupportTicketResponse): Promise<SupportTicketResponse>;
+  listSupportTicketResponses(ticketId: string): Promise<SupportTicketResponse[]>;
+  
+  // Help article operations
+  getHelpArticle(id: string): Promise<HelpArticle | undefined>;
+  createHelpArticle(article: InsertHelpArticle): Promise<HelpArticle>;
+  updateHelpArticle(id: string, updates: Partial<InsertHelpArticle>): Promise<HelpArticle | undefined>;
+  listHelpArticles(category?: string): Promise<HelpArticle[]>;
+  deleteHelpArticle(id: string): Promise<boolean>;
+  incrementHelpArticleViewCount(id: string): Promise<boolean>;
   markAllNotificationsAsRead(userId: string): Promise<boolean>;
   deleteNotification(id: string, userId: string): Promise<boolean>;
 }
@@ -1012,10 +1044,188 @@ export class MemStorage implements IStorage {
   private auditLogs: Map<string, AuditLog> = new Map();
   private userConsents: Map<string, UserConsent> = new Map();
   private labAnalyses: Map<string, LabAnalysis> = new Map();
+  // Support system storage
+  private faqItems: Map<string, FaqItem> = new Map();
+  private supportTickets: Map<string, SupportTicket> = new Map();
+  private supportTicketResponses: Map<string, SupportTicketResponse> = new Map();
+  private helpArticles: Map<string, HelpArticle> = new Map();
 
   constructor() {
     // Initialize with mock data for development testing
     this.initializeMockData();
+  }
+
+  // Initialize support system with sample data
+  private initializeSupportData() {
+    // FAQ Items
+    const faqSamples: FaqItem[] = [
+      {
+        id: 'faq-1',
+        category: 'Getting Started',
+        question: 'How does ONES AI create my personalized formula?',
+        answer: 'ONES AI analyzes your health profile, lab results, symptoms, and goals using advanced algorithms. It considers nutrient interactions, bioavailability, and your unique biochemistry to create an optimized supplement formula tailored specifically for you.',
+        isPublished: true,
+        displayOrder: 1,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'faq-2',
+        category: 'Formula & Health',
+        question: 'How often will my formula be updated?',
+        answer: 'Your formula is reviewed every 8-12 weeks or when you upload new lab results. ONES AI continuously learns from your feedback and progress to make adjustments that optimize your health outcomes.',
+        isPublished: true,
+        displayOrder: 2,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'faq-3',
+        category: 'Technical Support',
+        question: 'Is it safe to upload my lab results?',
+        answer: 'Yes, your health data is encrypted and stored securely. We use bank-level security protocols and never share your personal health information with third parties. You maintain full control over your data.',
+        isPublished: true,
+        displayOrder: 3,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'faq-4',
+        category: 'Formula & Health',
+        question: 'What if I have allergies or take medications?',
+        answer: 'ONES AI factors in all allergies and medications you\'ve listed in your profile. Our AI checks for potential interactions and contraindications to ensure your formula is safe and compatible with your existing treatments.',
+        isPublished: true,
+        displayOrder: 4,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'faq-5',
+        category: 'Billing & Subscription',
+        question: 'Can I pause or cancel my subscription?',
+        answer: 'Yes, you can pause or cancel your subscription at any time from your Orders & Billing page. Paused subscriptions can be resumed when you\'re ready, and cancellations take effect at the end of your current billing cycle.',
+        isPublished: true,
+        displayOrder: 5,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'faq-6',
+        category: 'Getting Started',
+        question: 'How long does shipping take?',
+        answer: 'Standard shipping takes 3-5 business days within the US. You\'ll receive tracking information once your order ships, and we offer expedited shipping options for faster delivery.',
+        isPublished: true,
+        displayOrder: 6,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+    
+    faqSamples.forEach(item => this.faqItems.set(item.id, item));
+    
+    // Help Articles
+    const helpArticleSamples: HelpArticle[] = [
+      {
+        id: 'help-1',
+        category: 'Getting Started',
+        title: 'Your First ONES AI Consultation',
+        content: 'Learn how to make the most of your initial consultation with ONES AI. We\'ll walk you through setting up your health profile, discussing your goals, and understanding your first formula recommendation.',
+        isPublished: true,
+        viewCount: 127,
+        displayOrder: 1,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'help-2',
+        category: 'Formula & Health',
+        title: 'Understanding Your Formula Report',
+        content: 'Your ONES AI formula report breaks down exactly why each ingredient was selected for your unique needs. Learn how to read the rationale, understand dosages, and track your progress.',
+        isPublished: true,
+        viewCount: 89,
+        displayOrder: 2,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'help-3',
+        category: 'Technical Support',
+        title: 'Uploading Lab Results Securely',
+        content: 'Step-by-step guide to uploading your lab results safely and securely. Includes information about supported file formats, privacy protections, and how ONES AI analyzes your data.',
+        isPublished: true,
+        viewCount: 156,
+        displayOrder: 3,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'help-4',
+        category: 'Billing & Subscription',
+        title: 'Managing Your Subscription',
+        content: 'Everything you need to know about managing your ONES subscription: pausing, resuming, changing delivery schedules, updating payment methods, and understanding billing cycles.',
+        isPublished: true,
+        viewCount: 203,
+        displayOrder: 4,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+    
+    helpArticleSamples.forEach(article => this.helpArticles.set(article.id, article));
+    
+    // Support Tickets (for test user)
+    const supportTicketSamples: SupportTicket[] = [
+      {
+        id: 'ticket-1',
+        userId: 'test-user-123',
+        subject: 'Question about Vitamin D dosage',
+        description: 'My recent labs show Vitamin D at 32 ng/mL. Why is the AI recommending such a high dose? Is 4000 IU daily safe long-term?',
+        status: 'resolved',
+        priority: 'medium',
+        category: 'Formula & Health',
+        assignedTo: 'Dr. Sarah Chen',
+        createdAt: new Date('2024-09-20'),
+        updatedAt: new Date('2024-09-21'),
+        resolvedAt: new Date('2024-09-21')
+      },
+      {
+        id: 'ticket-2',
+        userId: 'test-user-123',
+        subject: 'Billing question - double charge',
+        description: 'I see two charges on my card for this month. One for $89 on Sept 15th and another for $89 on Sept 16th. Can you help me understand why?',
+        status: 'in_progress',
+        priority: 'high',
+        category: 'Billing & Subscription',
+        assignedTo: 'Support Team',
+        createdAt: new Date('2024-09-22'),
+        updatedAt: new Date('2024-09-23'),
+        resolvedAt: null
+      }
+    ];
+    
+    supportTicketSamples.forEach(ticket => this.supportTickets.set(ticket.id, ticket));
+    
+    // Sample support ticket responses
+    const responseSamples: SupportTicketResponse[] = [
+      {
+        id: 'response-1',
+        ticketId: 'ticket-1',
+        userId: null,
+        isStaff: true,
+        message: 'Hi John! Great question about the Vitamin D dosage. Your level of 32 ng/mL is in the \'sufficient\' range but not optimal. The AI recommended 4000 IU to bring you into the optimal range of 40-60 ng/mL. This dose is well within safe limits (up to 10,000 IU is generally considered safe for adults). We\'ll recheck your levels in 8-12 weeks and adjust as needed.',
+        createdAt: new Date('2024-09-21')
+      },
+      {
+        id: 'response-2',
+        ticketId: 'ticket-2',
+        userId: null,
+        isStaff: true,
+        message: 'Thanks for reaching out about the billing issue. I can see both charges in our system. Let me investigate this for you and get back to you within 24 hours with a full explanation and resolution if there was an error.',
+        createdAt: new Date('2024-09-23')
+      }
+    ];
+    
+    responseSamples.forEach(response => this.supportTicketResponses.set(response.id, response));
   }
 
   // Initialize with HIPAA-compliant mock data
@@ -1131,6 +1341,7 @@ export class MemStorage implements IStorage {
 
   private initializeMockData() {
     this.initializeMockLabReports();
+    this.initializeSupportData();
 
     // Initialize existing mock data
     // Create a test user
@@ -1983,6 +2194,169 @@ export class MemStorage implements IStorage {
     if (!notification || notification.userId !== userId) return false;
     
     return this.notifications.delete(id);
+  }
+
+  // Support System operations
+  // FAQ operations
+  async getFaqItem(id: string): Promise<FaqItem | undefined> {
+    return this.faqItems.get(id);
+  }
+
+  async createFaqItem(insertFaqItem: InsertFaqItem): Promise<FaqItem> {
+    const id = randomUUID();
+    const faqItem: FaqItem = {
+      ...insertFaqItem,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.faqItems.set(id, faqItem);
+    return faqItem;
+  }
+
+  async updateFaqItem(id: string, updates: Partial<InsertFaqItem>): Promise<FaqItem | undefined> {
+    const faqItem = this.faqItems.get(id);
+    if (!faqItem) return undefined;
+    
+    const updatedFaqItem = {
+      ...faqItem,
+      ...updates,
+      updatedAt: new Date()
+    };
+    this.faqItems.set(id, updatedFaqItem);
+    return updatedFaqItem;
+  }
+
+  async listFaqItems(category?: string): Promise<FaqItem[]> {
+    const items = Array.from(this.faqItems.values())
+      .filter(item => item.isPublished && (!category || item.category === category))
+      .sort((a, b) => a.displayOrder - b.displayOrder);
+    return items;
+  }
+
+  async deleteFaqItem(id: string): Promise<boolean> {
+    return this.faqItems.delete(id);
+  }
+
+  // Support ticket operations
+  async getSupportTicket(id: string): Promise<SupportTicket | undefined> {
+    return this.supportTickets.get(id);
+  }
+
+  async createSupportTicket(insertTicket: InsertSupportTicket): Promise<SupportTicket> {
+    const id = randomUUID();
+    const ticket: SupportTicket = {
+      ...insertTicket,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      resolvedAt: insertTicket.resolvedAt ?? null,
+      assignedTo: insertTicket.assignedTo ?? null
+    };
+    this.supportTickets.set(id, ticket);
+    return ticket;
+  }
+
+  async updateSupportTicket(id: string, updates: Partial<InsertSupportTicket>): Promise<SupportTicket | undefined> {
+    const ticket = this.supportTickets.get(id);
+    if (!ticket) return undefined;
+    
+    const updatedTicket = {
+      ...ticket,
+      ...updates,
+      updatedAt: new Date()
+    };
+    this.supportTickets.set(id, updatedTicket);
+    return updatedTicket;
+  }
+
+  async listSupportTicketsByUser(userId: string): Promise<SupportTicket[]> {
+    return Array.from(this.supportTickets.values())
+      .filter(ticket => ticket.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getSupportTicketWithResponses(id: string, userId: string): Promise<{ticket: SupportTicket, responses: SupportTicketResponse[]} | undefined> {
+    const ticket = this.supportTickets.get(id);
+    if (!ticket || ticket.userId !== userId) return undefined;
+    
+    const responses = Array.from(this.supportTicketResponses.values())
+      .filter(response => response.ticketId === id)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    
+    return { ticket, responses };
+  }
+
+  // Support ticket response operations
+  async createSupportTicketResponse(insertResponse: InsertSupportTicketResponse): Promise<SupportTicketResponse> {
+    const id = randomUUID();
+    const response: SupportTicketResponse = {
+      ...insertResponse,
+      id,
+      createdAt: new Date(),
+      userId: insertResponse.userId ?? null
+    };
+    this.supportTicketResponses.set(id, response);
+    return response;
+  }
+
+  async listSupportTicketResponses(ticketId: string): Promise<SupportTicketResponse[]> {
+    return Array.from(this.supportTicketResponses.values())
+      .filter(response => response.ticketId === ticketId)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  // Help article operations
+  async getHelpArticle(id: string): Promise<HelpArticle | undefined> {
+    return this.helpArticles.get(id);
+  }
+
+  async createHelpArticle(insertArticle: InsertHelpArticle): Promise<HelpArticle> {
+    const id = randomUUID();
+    const article: HelpArticle = {
+      ...insertArticle,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.helpArticles.set(id, article);
+    return article;
+  }
+
+  async updateHelpArticle(id: string, updates: Partial<InsertHelpArticle>): Promise<HelpArticle | undefined> {
+    const article = this.helpArticles.get(id);
+    if (!article) return undefined;
+    
+    const updatedArticle = {
+      ...article,
+      ...updates,
+      updatedAt: new Date()
+    };
+    this.helpArticles.set(id, updatedArticle);
+    return updatedArticle;
+  }
+
+  async listHelpArticles(category?: string): Promise<HelpArticle[]> {
+    const articles = Array.from(this.helpArticles.values())
+      .filter(article => article.isPublished && (!category || article.category === category))
+      .sort((a, b) => a.displayOrder - b.displayOrder);
+    return articles;
+  }
+
+  async deleteHelpArticle(id: string): Promise<boolean> {
+    return this.helpArticles.delete(id);
+  }
+
+  async incrementHelpArticleViewCount(id: string): Promise<boolean> {
+    const article = this.helpArticles.get(id);
+    if (!article) return false;
+    
+    const updatedArticle = {
+      ...article,
+      viewCount: article.viewCount + 1
+    };
+    this.helpArticles.set(id, updatedArticle);
+    return true;
   }
 }
 
