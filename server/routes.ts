@@ -1683,6 +1683,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user's subscription
+  app.get('/api/users/me/subscription', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
+      const subscription = await storage.getSubscription(userId);
+      
+      if (!subscription) {
+        return res.status(404).json({ error: 'No subscription found' });
+      }
+
+      res.json(subscription);
+    } catch (error) {
+      console.error('Get subscription error:', error);
+      res.status(500).json({ error: 'Failed to fetch subscription' });
+    }
+  });
+
+  // Update user's subscription (pause, resume, cancel, change plan)
+  app.patch('/api/users/me/subscription', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
+      const { status, plan, pausedUntil } = req.body;
+      
+      // Validate allowed updates
+      const allowedUpdates: any = {};
+      if (status && ['active', 'paused', 'cancelled'].includes(status)) {
+        allowedUpdates.status = status;
+      }
+      if (plan && ['monthly', 'quarterly', 'annual'].includes(plan)) {
+        allowedUpdates.plan = plan;
+      }
+      if (pausedUntil) {
+        allowedUpdates.pausedUntil = new Date(pausedUntil);
+      }
+      
+      const updatedSubscription = await storage.updateSubscription(userId, allowedUpdates);
+      
+      if (!updatedSubscription) {
+        return res.status(404).json({ error: 'Subscription not found' });
+      }
+
+      res.json(updatedSubscription);
+    } catch (error) {
+      console.error('Update subscription error:', error);
+      res.status(500).json({ error: 'Failed to update subscription' });
+    }
+  });
+
+  // Get user's payment methods
+  app.get('/api/users/me/payment-methods', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
+      const paymentMethods = await storage.listPaymentMethodsByUser(userId);
+      
+      res.json(paymentMethods);
+    } catch (error) {
+      console.error('Get payment methods error:', error);
+      res.status(500).json({ error: 'Failed to fetch payment methods' });
+    }
+  });
+
+  // Add new payment method
+  app.post('/api/users/me/payment-methods', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
+      const { stripePaymentMethodId, brand, last4 } = req.body;
+      
+      if (!stripePaymentMethodId || !brand || !last4) {
+        return res.status(400).json({ error: 'Missing required payment method data' });
+      }
+      
+      const paymentMethod = await storage.createPaymentMethodRef({
+        userId,
+        stripePaymentMethodId,
+        brand,
+        last4
+      });
+      
+      res.json(paymentMethod);
+    } catch (error) {
+      console.error('Add payment method error:', error);
+      res.status(500).json({ error: 'Failed to add payment method' });
+    }
+  });
+
+  // Delete payment method
+  app.delete('/api/users/me/payment-methods/:id', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
+      const paymentMethodId = req.params.id;
+      
+      // Verify the payment method belongs to the user
+      const paymentMethod = await storage.getPaymentMethodRef(paymentMethodId);
+      if (!paymentMethod || paymentMethod.userId !== userId) {
+        return res.status(404).json({ error: 'Payment method not found' });
+      }
+      
+      const deleted = await storage.deletePaymentMethodRef(paymentMethodId);
+      
+      if (!deleted) {
+        return res.status(400).json({ error: 'Failed to delete payment method' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete payment method error:', error);
+      res.status(500).json({ error: 'Failed to delete payment method' });
+    }
+  });
+
+  // Get user's billing history
+  app.get('/api/users/me/billing-history', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
+      
+      // Get orders as billing history for now (can be enhanced with separate billing table later)
+      const orders = await storage.listOrdersByUser(userId);
+      
+      // Transform orders into billing format
+      const billingHistory = orders
+        .filter(order => order.status === 'delivered') // Only include completed orders
+        .map(order => ({
+          id: order.id,
+          date: order.placedAt,
+          description: `Supplement Order - Formula v${order.formulaVersion}`,
+          amount: 89.99, // TODO: Add actual price to Order schema
+          status: 'paid',
+          invoiceUrl: `/api/invoices/${order.id}` // Placeholder for future invoice generation
+        }));
+      
+      res.json(billingHistory);
+    } catch (error) {
+      console.error('Get billing history error:', error);
+      res.status(500).json({ error: 'Failed to fetch billing history' });
+    }
+  });
+
   // Get consultation history (enhanced format for ConsultationPage)
   app.get('/api/consultations/history', requireAuth, async (req, res) => {
     try {
