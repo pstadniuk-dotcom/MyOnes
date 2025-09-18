@@ -55,6 +55,12 @@ interface Formula {
 // API Response Types
 interface CurrentFormulaResponse {
   formula: Formula;
+  versionChanges?: Array<{
+    id: string;
+    summary: string;
+    rationale: string;
+    createdAt: string;
+  }>;
 }
 
 interface FormulaHistoryResponse {
