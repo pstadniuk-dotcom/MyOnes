@@ -1,198 +1,167 @@
-import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Beaker } from 'lucide-react';
-import supplementImage from '@assets/generated_images/Premium_supplement_bottle_product_2500f07c.png';
-import scienceImage from '@assets/generated_images/AI_health_data_visualization_85bb9ba3.png';
+import { Users, MessageSquare, Brain, Target, X, Check, AlertTriangle, Sparkles } from 'lucide-react';
 
 export default function ScienceSection() {
-  const [hoveredIngredient, setHoveredIngredient] = useState<number | null>(null);
-
-  const ingredients = [
-    { name: "Ashwagandha", benefit: "Stress reduction", category: "Adaptogen" },
-    { name: "Vitamin D3", benefit: "Immune support", category: "Vitamin" },
-    { name: "Magnesium", benefit: "Sleep & recovery", category: "Mineral" },
-    { name: "Omega-3", benefit: "Brain health", category: "Essential fatty acid" },
-    { name: "B-Complex", benefit: "Energy metabolism", category: "Vitamin" },
-    { name: "Turmeric", benefit: "Anti-inflammatory", category: "Herb" },
-    { name: "Probiotics", benefit: "Gut health", category: "Microbiome" },
-    { name: "CoQ10", benefit: "Cellular energy", category: "Antioxidant" }
+  const competitors = [
+    { name: "AG1", formula: "Same greens powder for everyone", color: "bg-red-50 border-red-200" },
+    { name: "Blueprint", formula: "Bryan's exact 100-pill protocol for everyone", color: "bg-red-50 border-red-200" },
+    { name: "Ritual", formula: "Same \"Essential\" whether you're 18 or 80", color: "bg-red-50 border-red-200" },
+    { name: "Huel", formula: "One formula, millions of bodies", color: "bg-red-50 border-red-200" }
   ];
 
-  const handleIngredientHover = (index: number | null) => {
-    setHoveredIngredient(index);
-    if (index !== null) {
-      console.log('Ingredient hovered:', ingredients[index].name);
-    }
-  };
+  const audienceTypes = [
+    "22-year-old athletes & 65-year-olds with diabetes",
+    "New moms & people on antidepressants", 
+    "Vegans with deficiencies & CEOs with stress",
+    "Night shift workers & retirees with arthritis"
+  ];
+
+  const competitorApproach = [
+    "What's your age?",
+    "Pick a health goal", 
+    "Here's formula #3 of 8",
+    "Same thing forever",
+    "Never asks about meds"
+  ];
+
+  const onesApproach = [
+    "Tell me about YOUR health",
+    "What medications?",
+    "Builds YOUR formula", 
+    "400+ ingredients to choose from",
+    "Evolves every refill"
+  ];
 
   return (
     <section className="py-20 bg-background" data-testid="section-science">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Main Headline */}
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-foreground mb-6" data-testid="text-science-headline">
-            The Science Behind Your Formula
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-foreground mb-6" data-testid="text-main-headline">
+            Why One Size Fits None
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto" data-testid="text-science-description">
-            We start with proven formula bases, then add targeted ingredients based on your unique health profile.
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto" data-testid="text-main-description">
+            Different bodies. Different needs. Same bottle.
           </p>
         </div>
 
-        {/* Formula Visualization */}
-        <div className="max-w-6xl mx-auto mb-16">
-          <div className="grid lg:grid-cols-3 gap-8 items-center">
-            {/* Formula Base */}
-            <div className="text-center">
-              <Card className="p-8 hover-elevate">
-                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Beaker className="w-10 h-10 text-primary" />
-                </div>
-                <h3 className="text-xl font-semibold text-foreground mb-2" data-testid="text-formula-base-title">
-                  Formula Base
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  Proven combinations for foundational health
-                </p>
-                <div className="space-y-2">
-                  <Badge variant="secondary">Multivitamin complex</Badge>
-                  <Badge variant="secondary">Essential minerals</Badge>
-                  <Badge variant="secondary">Omega fatty acids</Badge>
-                </div>
-              </Card>
-            </div>
-
-            {/* Plus Symbol */}
-            <div className="flex justify-center">
-              <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                <Plus className="w-6 h-6 text-primary-foreground" />
-              </div>
-            </div>
-
-            {/* Individual Ingredients */}
-            <div className="text-center">
-              <Card className="p-8 hover-elevate">
-                <div className="w-20 h-20 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <img 
-                    src={supplementImage} 
-                    alt="Individual ingredients" 
-                    className="w-12 h-12 object-contain"
-                  />
-                </div>
-                <h3 className="text-xl font-semibold text-foreground mb-2" data-testid="text-individual-ingredients-title">
-                  Individual Ingredients
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  Targeted additions based on your data
-                </p>
-                <div className="space-y-2">
-                  <Badge variant="outline">Blood test insights</Badge>
-                  <Badge variant="outline">Health goals</Badge>
-                  <Badge variant="outline">Lifestyle factors</Badge>
-                </div>
-              </Card>
-            </div>
-          </div>
-
-          {/* Equals Your ONES */}
-          <div className="text-center mt-8">
-            <div className="inline-flex items-center space-x-4">
-              <div className="h-px w-16 bg-muted"></div>
-              <span className="text-2xl font-bold text-primary">=</span>
-              <div className="h-px w-16 bg-muted"></div>
-            </div>
-            <div className="mt-6">
-              <Card className="inline-block p-6 bg-primary/5 border-2 border-primary/20">
-                <h3 className="text-2xl font-serif font-bold text-primary" data-testid="text-your-ones-title">
-                  Your ONES
-                </h3>
-                <p className="text-muted-foreground mt-2">Perfectly personalized for you</p>
-              </Card>
-            </div>
-          </div>
-        </div>
-
-        {/* Ingredient Grid */}
+        {/* The Same Formula Problem */}
         <div className="mb-16">
-          <h3 className="text-2xl font-serif font-bold text-center text-foreground mb-8" data-testid="text-ingredients-grid-title">
-            400+ Premium Ingredients, Infinite Combinations
+          <h3 className="text-2xl md:text-3xl font-serif font-bold text-center text-foreground mb-8" data-testid="text-problem-title">
+            The Same Formula Problem
           </h3>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-            {ingredients.map((ingredient, index) => (
-              <Card 
-                key={index}
-                className={`p-4 text-center hover-elevate cursor-pointer transition-all duration-300 ${
-                  hoveredIngredient === index ? 'ring-2 ring-primary shadow-lg scale-105' : ''
-                }`}
-                onMouseEnter={() => handleIngredientHover(index)}
-                onMouseLeave={() => handleIngredientHover(null)}
-                data-testid={`card-ingredient-${index}`}
-              >
-                <h4 className="font-semibold text-foreground text-sm mb-1" data-testid={`text-ingredient-name-${index}`}>
-                  {ingredient.name}
-                </h4>
-                <p className="text-xs text-muted-foreground mb-2" data-testid={`text-ingredient-benefit-${index}`}>
-                  {ingredient.benefit}
-                </p>
-                <Badge variant="outline" className="text-xs">
-                  {ingredient.category}
-                </Badge>
-                
-                {hoveredIngredient === index && (
-                  <div className="mt-3 pt-3 border-t border-border">
-                    <p className="text-xs text-primary font-medium">
-                      Clinically studied dosage
-                    </p>
+          <p className="text-lg text-muted-foreground text-center mb-8 max-w-3xl mx-auto">
+            Major brands give identical formulas to completely different people:
+          </p>
+
+          {/* Competitor Cards */}
+          <div className="grid md:grid-cols-2 gap-4 mb-8 max-w-4xl mx-auto">
+            {competitors.map((competitor, index) => (
+              <Card key={index} className={`p-6 ${competitor.color} hover-elevate`} data-testid={`card-competitor-${index}`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-red-500 rounded-full flex-shrink-0"></div>
+                  <div>
+                    <span className="font-bold text-foreground">{competitor.name}</span>
+                    <span className="text-muted-foreground ml-2">→ {competitor.formula}</span>
                   </div>
-                )}
+                </div>
               </Card>
             ))}
           </div>
+
+          <p className="text-center text-muted-foreground mb-6 italic">Going to:</p>
+
+          {/* Audience Types */}
+          <div className="grid md:grid-cols-2 gap-3 max-w-3xl mx-auto mb-8">
+            {audienceTypes.map((audience, index) => (
+              <div key={index} className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg" data-testid={`audience-type-${index}`}>
+                <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm text-muted-foreground">{audience}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-center">
+            <Card className="inline-block p-6 bg-destructive/5 border-2 border-destructive/20">
+              <h4 className="text-xl font-bold text-destructive mb-2" data-testid="text-same-bottle">
+                Different bodies. Different needs. Same bottle.
+              </h4>
+            </Card>
+          </div>
         </div>
 
-        {/* Scientific Background */}
-        <div className="grid lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
-          <div>
-            <img 
-              src={scienceImage} 
-              alt="AI-powered health data analysis" 
-              className="w-full h-auto rounded-lg shadow-lg"
-              data-testid="img-science-visualization"
-            />
+        {/* The ONES Difference */}
+        <div className="mb-16">
+          <h3 className="text-2xl md:text-3xl font-serif font-bold text-center text-foreground mb-12" data-testid="text-ones-difference-title">
+            The ONES Difference
+          </h3>
+
+          <div className="grid lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+            {/* Them: 5-Question Quiz */}
+            <Card className="p-8 bg-red-50 border-red-200" data-testid="card-competitor-approach">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertTriangle className="w-8 h-8 text-red-600" />
+                </div>
+                <h4 className="text-xl font-bold text-red-700 mb-2">Them: 5-Question Quiz</h4>
+              </div>
+              
+              <div className="space-y-3">
+                {competitorApproach.map((item, index) => (
+                  <div key={index} className="flex items-center gap-3" data-testid={`competitor-item-${index}`}>
+                    <X className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    <span className="text-sm text-red-700">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* ONES: AI Conversation */}
+            <Card className="p-8 bg-primary/5 border-primary/20" data-testid="card-ones-approach">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Brain className="w-8 h-8 text-primary" />
+                </div>
+                <h4 className="text-xl font-bold text-primary mb-2">ONES: AI Conversation</h4>
+              </div>
+              
+              <div className="space-y-3">
+                {onesApproach.map((item, index) => (
+                  <div key={index} className="flex items-center gap-3" data-testid={`ones-item-${index}`}>
+                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                    <span className="text-sm text-primary">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
-          
-          <div className="space-y-6">
-            <h3 className="text-2xl font-serif font-bold text-foreground" data-testid="text-scientific-approach-title">
-              Our Scientific Approach
-            </h3>
-            
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                <p className="text-muted-foreground">
-                  <strong className="text-foreground">Evidence-based:</strong> Every ingredient is backed by peer-reviewed research
-                </p>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                <p className="text-muted-foreground">
-                  <strong className="text-foreground">Bioavailable forms:</strong> We use the most absorbable versions of each nutrient
-                </p>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                <p className="text-muted-foreground">
-                  <strong className="text-foreground">Optimal timing:</strong> Ingredients are balanced to work synergistically
-                </p>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                <p className="text-muted-foreground">
-                  <strong className="text-foreground">Third-party tested:</strong> Every batch is verified for purity and potency
-                </p>
-              </div>
+        </div>
+
+        {/* Key Statistics */}
+        <div className="mb-16 text-center">
+          <Card className="inline-block p-8 bg-accent/10 border-accent/20">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <Target className="w-6 h-6 text-accent" />
+              <span className="text-2xl font-bold text-accent">42%</span>
             </div>
-          </div>
+            <p className="text-muted-foreground mb-2">
+              <strong className="text-foreground">42% of Americans take prescription meds.</strong>
+            </p>
+            <p className="text-sm text-muted-foreground">Most brands never ask.</p>
+          </Card>
+        </div>
+
+        {/* Final Quote */}
+        <div className="text-center">
+          <Card className="inline-block p-8 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20 max-w-2xl">
+            <div className="flex items-center justify-center mb-4">
+              <Sparkles className="w-8 h-8 text-primary" />
+            </div>
+            <blockquote className="text-xl md:text-2xl font-serif font-bold text-primary leading-relaxed" data-testid="text-final-quote">
+              "You wouldn't take someone else's prescription. Why take their vitamins?"
+            </blockquote>
+          </Card>
         </div>
       </div>
     </section>
