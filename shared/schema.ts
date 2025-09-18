@@ -23,6 +23,7 @@ export const addressTypeEnum = pgEnum('address_type', ['shipping', 'billing']);
 export const fileTypeEnum = pgEnum('file_type', ['lab_report', 'medical_document', 'prescription', 'other']);
 export const auditActionEnum = pgEnum('audit_action', ['upload', 'view', 'download', 'delete', 'share', 'access_denied']);
 export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing']);
+export const notificationTypeEnum = pgEnum('notification_type', ['order_update', 'formula_update', 'consultation_reminder', 'system']);
 
 // Users table - updated with name, email, phone, password
 export const users = pgTable("users", {
@@ -219,6 +220,27 @@ export const labAnalyses = pgTable("lab_analyses", {
   errorMessage: text("error_message"),
 });
 
+// Notifications for user dashboard
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: notificationTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
+  // Optional links to related entities
+  orderId: varchar("order_id").references(() => orders.id, { onDelete: "cascade" }),
+  formulaId: varchar("formula_id").references(() => formulas.id, { onDelete: "cascade" }),
+  // Optional metadata for additional information
+  metadata: json("metadata").$type<{
+    actionUrl?: string;
+    icon?: string;
+    priority?: 'low' | 'medium' | 'high';
+    additionalData?: Record<string, any>;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // User notification preferences
 export const notificationPrefs = pgTable("notification_prefs", {
   userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
@@ -299,6 +321,11 @@ export const insertLabAnalysisSchema = createInsertSchema(labAnalyses).omit({
   processedAt: true,
 });
 
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertNotificationPrefSchema = createInsertSchema(notificationPrefs).omit({
   updatedAt: true,
 });
@@ -345,6 +372,9 @@ export type UserConsent = typeof userConsents.$inferSelect;
 
 export type InsertLabAnalysis = z.infer<typeof insertLabAnalysisSchema>;
 export type LabAnalysis = typeof labAnalyses.$inferSelect;
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
 
 export type InsertNotificationPref = z.infer<typeof insertNotificationPrefSchema>;
 export type NotificationPref = typeof notificationPrefs.$inferSelect;
