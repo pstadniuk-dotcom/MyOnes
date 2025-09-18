@@ -2169,6 +2169,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return 'Individual Supplement';
   }
 
+  async function getIngredientInteractions(ingredient: string): Promise<string[]> {
+    const interactions: string[] = [];
+    
+    // Check for known interactions
+    const knownInteractions: Record<string, string[]> = {
+      'Vitamin D3': ['May enhance calcium absorption - monitor calcium levels'],
+      'Magnesium': ['May reduce absorption of some antibiotics - take separately'],
+      'Iron': ['May reduce absorption with calcium - take separately'],
+      'Omega-3': ['May enhance blood-thinning effects of warfarin'],
+      'IMMUNE': ['May enhance immune response - consult doctor if on immunosuppressants'],
+      'BRAIN HEALTH': ['May interact with cognitive medications - consult healthcare provider']
+    };
+    
+    if (knownInteractions[ingredient]) {
+      interactions.push(...knownInteractions[ingredient]);
+    }
+    
+    return interactions;
+  }
+
   function getDailyValuePercentage(ingredient: string): number | null {
     // This would query a comprehensive nutrient database
     const dvValues: Record<string, number> = {
@@ -2219,10 +2239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
-  async function getIngredientInteractions(ingredient: string): Promise<string[]> {
-    const warnings = getGeneralSupplementWarnings(ingredient);
-    return warnings;
-  }
+  // Remove duplicate function - already defined above
 
   // Notification API routes
   app.get('/api/notifications', requireAuth, async (req, res) => {
