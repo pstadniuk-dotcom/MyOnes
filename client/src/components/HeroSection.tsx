@@ -1,22 +1,10 @@
 import { Button } from '@/components/ui/button';
 import AIChat from './AIChat';
 import heroImage from '@assets/generated_images/Diverse_wellness_lifestyle_hero_a1825347.png';
+import { Link } from 'wouter';
 
 export default function HeroSection() {
-  const handleStartConsultation = () => {
-    console.log('Start consultation clicked from hero');
-    // Scroll to the AI Chat component on the right side
-    const aiChatElement = document.querySelector('[data-testid="card-ai-chat"]') as HTMLElement;
-    if (aiChatElement) {
-      aiChatElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Add a subtle highlight effect
-      aiChatElement.style.transform = 'scale(1.05)';
-      aiChatElement.style.transition = 'transform 0.3s ease';
-      setTimeout(() => {
-        aiChatElement.style.transform = 'scale(1)';
-      }, 600);
-    }
-  };
+  // Hero button now navigates to signup instead of scrolling to AIChat
 
   return (
     <section className="min-h-screen bg-premium-gradient relative overflow-hidden">
@@ -41,12 +29,14 @@ export default function HeroSection() {
 
             <div className="space-y-4">
               <Button 
+                asChild
                 size="lg" 
-                onClick={handleStartConsultation}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg micro-bounce micro-glow transition-all duration-300"
                 data-testid="button-hero-start-consultation"
               >
-                Start Your Free Consultation
+                <Link href="/signup">
+                  Start Your Free Consultation
+                </Link>
               </Button>
               
               <div className="flex items-center space-x-4 text-sm text-muted-foreground">

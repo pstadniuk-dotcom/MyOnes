@@ -2210,6 +2210,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return warnings;
   }
 
+  // Notification API routes
+  app.get('/api/notifications', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const notifications = await storage.listNotificationsByUser(userId, limit);
+      res.json({ notifications });
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+  });
+
+  app.get('/api/notifications/unread-count', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const count = await storage.getUnreadNotificationCount(userId);
+      res.json({ count });
+    } catch (error) {
+      console.error('Error getting unread notification count:', error);
+      res.status(500).json({ error: 'Failed to get unread notification count' });
+    }
+  });
+
+  app.patch('/api/notifications/:id/read', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const notificationId = req.params.id;
+      
+      const notification = await storage.markNotificationAsRead(notificationId, userId);
+      if (!notification) {
+        return res.status(404).json({ error: 'Notification not found' });
+      }
+      
+      res.json({ notification });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      res.status(500).json({ error: 'Failed to mark notification as read' });
+    }
+  });
+
+  app.patch('/api/notifications/mark-all-read', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const success = await storage.markAllNotificationsAsRead(userId);
+      
+      if (!success) {
+        return res.status(500).json({ error: 'Failed to mark all notifications as read' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      res.status(500).json({ error: 'Failed to mark all notifications as read' });
+    }
+  });
+
+  // Helper route to create sample notifications for testing
+  app.post('/api/notifications/sample', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      
+      // Create sample notifications
+      const sampleNotifications = [
+        {
+          userId,
+          type: 'order_update' as const,
+          title: 'Order Shipped',
+          content: 'Your personalized supplement formula has been shipped and is on its way.',
+          metadata: { actionUrl: '/dashboard/orders', icon: 'package', priority: 'medium' as const }
+        },
+        {
+          userId,
+          type: 'formula_update' as const,
+          title: 'New Formula Recommendation',
+          content: 'Based on your recent lab results, we have updated your formula with enhanced antioxidants.',
+          metadata: { actionUrl: '/dashboard/my-formula', icon: 'beaker', priority: 'high' as const }
+        }
+      ];
+
+      const createdNotifications = [];
+      for (const notification of sampleNotifications) {
+        const created = await storage.createNotification(notification);
+        createdNotifications.push(created);
+      }
+
+      res.json({ notifications: createdNotifications });
+    } catch (error) {
+      console.error('Error creating sample notifications:', error);
+      res.status(500).json({ error: 'Failed to create sample notifications' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

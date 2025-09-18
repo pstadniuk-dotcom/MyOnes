@@ -12,7 +12,20 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Bell, ChevronDown, Moon, Sun, User, Settings, LogOut } from 'lucide-react';
+import { NotificationsDropdown } from '@/components/NotificationsDropdown';
+import { 
+  ChevronDown, 
+  Moon, 
+  Sun, 
+  User, 
+  Settings, 
+  LogOut, 
+  Heart, 
+  CreditCard, 
+  Bell, 
+  HelpCircle,
+  Activity 
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'wouter';
 import { useTheme } from 'next-themes';
@@ -78,25 +91,68 @@ function UserDropdown() {
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
+      <DropdownMenuContent className="w-64" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.name}</p>
-            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+          <div className="flex flex-col space-y-2">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src="" alt={user.name} />
+                <AvatarFallback className="text-sm">{userInitials}</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <p className="text-sm font-medium leading-none">{user.name}</p>
+                <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs" data-testid="badge-plan">
+                Free Plan
+              </Badge>
+              <Badge variant="outline" className="text-xs" data-testid="badge-status">
+                Active
+              </Badge>
+            </div>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile" data-testid="link-profile">
+            <Link href="/dashboard/profile" data-testid="link-profile-settings">
               <User className="mr-2 h-4 w-4" />
-              <span>Profile</span>
+              <span>Profile Settings</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile?tab=settings" data-testid="link-settings">
+            <Link href="/dashboard/profile?tab=settings" data-testid="link-account-center">
               <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
+              <span>Account Center</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/dashboard/profile?tab=health" data-testid="link-health-profile">
+              <Heart className="mr-2 h-4 w-4" />
+              <span>Health Profile</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/dashboard/profile?tab=settings" data-testid="link-notifications">
+              <Bell className="mr-2 h-4 w-4" />
+              <span>Notification Settings</span>
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem asChild>
+            <Link href="/dashboard/orders?tab=billing" data-testid="link-billing">
+              <CreditCard className="mr-2 h-4 w-4" />
+              <span>Billing & Subscription</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/dashboard/support" data-testid="link-support">
+              <HelpCircle className="mr-2 h-4 w-4" />
+              <span>Help & Support</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
@@ -145,19 +201,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Notification Bell */}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="w-9 h-9 relative" 
-                  data-testid="button-notifications"
-                >
-                  <Bell className="h-4 w-4" />
-                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full text-[10px] flex items-center justify-center text-white">
-                    2
-                  </span>
-                  <span className="sr-only">Notifications</span>
-                </Button>
+                {/* Notifications Dropdown */}
+                <NotificationsDropdown />
 
                 <ThemeToggle />
                 
@@ -168,7 +213,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </header>
 
             {/* Dashboard Content */}
-            <main className="flex-1 overflow-hidden p-6 bg-muted/30">
+            <main className="flex-1 overflow-auto p-6 bg-muted/30">
               {children}
             </main>
           </div>

@@ -4,7 +4,7 @@ import { db } from "./db";
 import {
   users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
-  notificationPrefs, auditLogs, userConsents, labAnalyses,
+  notifications, notificationPrefs, auditLogs, userConsents, labAnalyses,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -16,6 +16,7 @@ import {
   type Address, type InsertAddress,
   type PaymentMethodRef, type InsertPaymentMethodRef,
   type FileUpload, type InsertFileUpload,
+  type Notification, type InsertNotification,
   type NotificationPref, type InsertNotificationPref,
   type AuditLog, type InsertAuditLog,
   type UserConsent, type InsertUserConsent,
@@ -115,6 +116,15 @@ export interface IStorage {
   getNotificationPrefs(userId: string): Promise<NotificationPref | undefined>;
   createNotificationPrefs(prefs: InsertNotificationPref): Promise<NotificationPref>;
   updateNotificationPrefs(userId: string, updates: Partial<InsertNotificationPref>): Promise<NotificationPref | undefined>;
+  
+  // Notification operations
+  getNotification(id: string): Promise<Notification | undefined>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  listNotificationsByUser(userId: string, limit?: number): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  markNotificationAsRead(id: string, userId: string): Promise<Notification | undefined>;
+  markAllNotificationsAsRead(userId: string): Promise<boolean>;
+  deleteNotification(id: string, userId: string): Promise<boolean>;
 }
 
 export class DrizzleStorage implements IStorage {
@@ -936,6 +946,89 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error updating notification preferences:', error);
       return undefined;
+    }
+  }
+
+  // Notification operations
+  async getNotification(id: string): Promise<Notification | undefined> {
+    try {
+      const [notification] = await db.select().from(notifications).where(eq(notifications.id, id));
+      return notification || undefined;
+    } catch (error) {
+      console.error('Error getting notification:', error);
+      return undefined;
+    }
+  }
+
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    try {
+      const [notification] = await db.insert(notifications).values(insertNotification).returning();
+      return notification;
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      throw new Error('Failed to create notification');
+    }
+  }
+
+  async listNotificationsByUser(userId: string, limit?: number): Promise<Notification[]> {
+    try {
+      let query = db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
+      if (limit) {
+        query = query.limit(limit);
+      }
+      return await query;
+    } catch (error) {
+      console.error('Error listing notifications by user:', error);
+      return [];
+    }
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    try {
+      const result = await db.select().from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+      return result.length;
+    } catch (error) {
+      console.error('Error getting unread notification count:', error);
+      return 0;
+    }
+  }
+
+  async markNotificationAsRead(id: string, userId: string): Promise<Notification | undefined> {
+    try {
+      const [notification] = await db
+        .update(notifications)
+        .set({ isRead: true })
+        .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
+        .returning();
+      return notification || undefined;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      return undefined;
+    }
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<boolean> {
+    try {
+      await db
+        .update(notifications)
+        .set({ isRead: true })
+        .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+      return true;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      return false;
+    }
+  }
+
+  async deleteNotification(id: string, userId: string): Promise<boolean> {
+    try {
+      const result = await db
+        .delete(notifications)
+        .where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
+      return true;
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      return false;
     }
   }
 }

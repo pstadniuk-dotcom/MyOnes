@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Shield, Award, MapPin } from 'lucide-react';
+import { Link } from 'wouter';
 
 export default function CTASection() {
   const trustBadges = [
@@ -22,13 +23,7 @@ export default function CTASection() {
     }
   ];
 
-  const handleStartConsultation = () => {
-    console.log('Final CTA: Start consultation clicked');
-  };
-
-  const handleLearnMore = () => {
-    console.log('Learn more about process clicked');
-  };
+  // Removed old handlers - using Link components for proper routing
 
   return (
     <section className="py-20 bg-earthy-gradient dark:bg-earthy-gradient-dark relative overflow-hidden" data-testid="section-final-cta">
@@ -57,22 +52,26 @@ export default function CTASection() {
           <div className="mb-16">
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Button 
+                asChild
                 size="lg" 
-                onClick={handleStartConsultation}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-semibold"
                 data-testid="button-final-start-consultation"
               >
-                Start Your Consultation
+                <Link href="/signup">
+                  Start Your Consultation
+                </Link>
               </Button>
               
               <Button 
+                asChild
                 variant="outline" 
                 size="lg"
-                onClick={handleLearnMore}
                 className="border-2 border-foreground/20 hover:border-primary px-8 py-4 text-lg"
                 data-testid="button-learn-more-process"
               >
-                Learn More About Our Process
+                <Link href="/science">
+                  Learn More About Our Process
+                </Link>
               </Button>
             </div>
             
