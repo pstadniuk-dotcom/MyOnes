@@ -8,7 +8,7 @@ import type { InsertMessage, InsertChatSession } from "@shared/schema";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import type { SignupData, LoginData, AuthResponse } from "@shared/schema";
-import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, insertHealthProfileSchema } from "@shared/schema";
+import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, insertHealthProfileSchema, insertSupportTicketSchema, insertSupportTicketResponseSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError, enforceConsentRequirements } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 
@@ -2491,6 +2491,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating sample notifications:', error);
       res.status(500).json({ error: 'Failed to create sample notifications' });
+    }
+  });
+
+  // Support system API endpoints
+  // FAQ endpoints
+  app.get('/api/support/faq', async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const faqItems = await storage.listFaqItems(category);
+      res.json({ faqItems });
+    } catch (error) {
+      console.error('Error fetching FAQ items:', error);
+      res.status(500).json({ error: 'Failed to fetch FAQ items' });
+    }
+  });
+
+  app.get('/api/support/faq/:id', async (req, res) => {
+    try {
+      const faqItem = await storage.getFaqItem(req.params.id);
+      if (!faqItem) {
+        return res.status(404).json({ error: 'FAQ item not found' });
+      }
+      res.json({ faqItem });
+    } catch (error) {
+      console.error('Error fetching FAQ item:', error);
+      res.status(500).json({ error: 'Failed to fetch FAQ item' });
+    }
+  });
+
+  // Support ticket endpoints
+  app.get('/api/support/tickets', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const tickets = await storage.listSupportTicketsByUser(userId);
+      res.json({ tickets });
+    } catch (error) {
+      console.error('Error fetching support tickets:', error);
+      res.status(500).json({ error: 'Failed to fetch support tickets' });
+    }
+  });
+
+  app.get('/api/support/tickets/:id', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const ticketWithResponses = await storage.getSupportTicketWithResponses(req.params.id, userId);
+      if (!ticketWithResponses) {
+        return res.status(404).json({ error: 'Support ticket not found' });
+      }
+      res.json(ticketWithResponses);
+    } catch (error) {
+      console.error('Error fetching support ticket:', error);
+      res.status(500).json({ error: 'Failed to fetch support ticket' });
+    }
+  });
+
+  app.post('/api/support/tickets', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      
+      // Validate request body with Zod
+      const validationResult = insertSupportTicketSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: 'Invalid ticket data', 
+          details: validationResult.error.errors 
+        });
+      }
+      
+      const ticketData = {
+        ...validationResult.data,
+        userId
+      };
+      const ticket = await storage.createSupportTicket(ticketData);
+      res.json({ ticket });
+    } catch (error) {
+      console.error('Error creating support ticket:', error);
+      res.status(500).json({ error: 'Failed to create support ticket' });
+    }
+  });
+
+  app.post('/api/support/tickets/:id/responses', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const ticketId = req.params.id;
+      
+      // Validate request body with Zod
+      const messageValidation = z.object({
+        message: z.string().min(1, 'Message cannot be empty').max(2000, 'Message too long')
+      }).safeParse(req.body);
+      
+      if (!messageValidation.success) {
+        return res.status(400).json({ 
+          error: 'Invalid message data', 
+          details: messageValidation.error.errors 
+        });
+      }
+      
+      // Verify user owns the ticket
+      const ticket = await storage.getSupportTicket(ticketId);
+      if (!ticket || ticket.userId !== userId) {
+        return res.status(404).json({ error: 'Support ticket not found' });
+      }
+      
+      const responseData = {
+        ticketId,
+        userId,
+        message: messageValidation.data.message,
+        isStaff: false
+      };
+      const response = await storage.createSupportTicketResponse(responseData);
+      res.json({ response });
+    } catch (error) {
+      console.error('Error creating support ticket response:', error);
+      res.status(500).json({ error: 'Failed to create response' });
+    }
+  });
+
+  // Help article endpoints
+  app.get('/api/support/help', async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const articles = await storage.listHelpArticles(category);
+      res.json({ articles });
+    } catch (error) {
+      console.error('Error fetching help articles:', error);
+      res.status(500).json({ error: 'Failed to fetch help articles' });
+    }
+  });
+
+  app.get('/api/support/help/:id', async (req, res) => {
+    try {
+      const article = await storage.getHelpArticle(req.params.id);
+      if (!article) {
+        return res.status(404).json({ error: 'Help article not found' });
+      }
+      
+      // Increment view count
+      await storage.incrementHelpArticleViewCount(req.params.id);
+      
+      res.json({ article });
+    } catch (error) {
+      console.error('Error fetching help article:', error);
+      res.status(500).json({ error: 'Failed to fetch help article' });
     }
   });
 

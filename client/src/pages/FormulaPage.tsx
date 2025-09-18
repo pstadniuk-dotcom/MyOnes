@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   FlaskConical, 
   Calendar, 
@@ -19,72 +20,82 @@ import {
   Beaker
 } from 'lucide-react';
 import { Link } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Formula } from '@shared/schema';
 
-// Mock formula data - in production this would come from APIs
-const currentFormula = {
-  version: 3,
-  createdDate: '2024-09-15',
-  totalMg: 1850,
-  bases: [
-    {
-      name: 'Multivitamin Base',
-      dose: '800mg',
-      purpose: 'Essential vitamin and mineral foundation',
-      ingredients: ['Vitamin D3 (2000 IU)', 'B-Complex', 'Magnesium Glycinate', 'Zinc Picolinate']
-    },
-    {
-      name: 'Omega-3 Complex',
-      dose: '500mg',
-      purpose: 'Anti-inflammatory and cognitive support',
-      ingredients: ['EPA (300mg)', 'DHA (200mg)']
-    }
-  ],
-  additions: [
-    {
-      name: 'Vitamin D3 Boost',
-      dose: '400mg',
-      purpose: 'Addressing deficiency shown in recent labs',
-      reason: 'Lab results showed levels at 28 ng/mL (optimal: 40-60)'
-    },
-    {
-      name: 'Adaptogenic Blend',
-      dose: '150mg', 
-      purpose: 'Stress management and cortisol regulation',
-      reason: 'User reported high stress levels and sleep issues'
-    }
-  ],
-  warnings: [
-    'Take with meals to optimize absorption',
-    'Avoid taking with calcium supplements (separate by 2+ hours)',
-    'Monitor for any digestive discomfort in first week'
-  ],
-  rationale: 'Formula optimized based on recent blood work showing Vitamin D deficiency and user-reported stress/energy concerns. The adaptogenic blend addresses cortisol dysregulation while maintaining foundational nutrition.',
-  nextReview: '2024-11-15'
+// Helper function to format dates
+const formatDate = (dateStr: string) => {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 };
 
-const formulaHistory = [
-  {
-    version: 3,
-    date: '2024-09-15',
-    changes: 'Added Vitamin D3 boost and adaptogenic blend',
-    reason: 'Lab results analysis + stress management'
-  },
-  {
-    version: 2,
-    date: '2024-08-15',
-    changes: 'Increased Omega-3 dosage, added B-Complex',
-    reason: 'Cognitive enhancement request'
-  },
-  {
-    version: 1,
-    date: '2024-07-20',
-    changes: 'Initial formula created',
-    reason: 'Health assessment and initial consultation'
-  }
-];
+// Loading skeleton component
+function FormulaSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-32" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+          <div className="space-y-2">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function FormulaPage() {
   const [activeTab, setActiveTab] = useState('current');
+  const { user } = useAuth();
+  
+  // Fetch current formula
+  const { data: currentFormula, isLoading: formulaLoading, error: formulaError } = useQuery<Formula>({
+    queryKey: ['/api/formulas/current'],
+    enabled: !!user,
+  });
+  
+  // Fetch formula history
+  const { data: formulaHistoryData, isLoading: historyLoading } = useQuery<{history: Formula[]}>({
+    queryKey: ['/api/formulas/history'],
+    enabled: !!user,
+  });
+  
+  const formulaHistory = formulaHistoryData?.history || [];
+  
+  if (formulaLoading) {
+    return <FormulaSkeleton />;
+  }
+  
+  if (formulaError || !currentFormula) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="p-6">
+          <div className="text-center space-y-3">
+            <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto" />
+            <h3 className="text-lg font-semibold">No Formula Found</h3>
+            <p className="text-muted-foreground">You haven't created a personalized formula yet.</p>
+            <Button asChild>
+              <Link href="/dashboard/consultation">
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Start Consultation
+              </Link>
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" data-testid="page-formula">
@@ -130,7 +141,7 @@ export default function FormulaPage() {
                     Current Formula v{currentFormula.version}
                   </CardTitle>
                   <CardDescription>
-                    Created on {new Date(currentFormula.createdDate).toLocaleDateString()} • Total: {currentFormula.totalMg}mg
+                    Created on {new Date(currentFormula.createdAt).toLocaleDateString()} • Total: {currentFormula.totalMg}mg
                   </CardDescription>
                 </div>
                 <Button variant="outline" size="sm" data-testid="button-download-formula">
@@ -148,16 +159,13 @@ export default function FormulaPage() {
                     <Card key={idx} className="border-l-4 border-l-primary">
                       <CardContent className="pt-4">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium">{base.name}</h4>
-                          <Badge variant="secondary">{base.dose}</Badge>
+                          <h4 className="font-medium">{base.ingredient}</h4>
+                          <Badge variant="secondary">{base.amount}{base.unit}</Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-3">{base.purpose}</p>
                         <div className="flex flex-wrap gap-1">
-                          {base.ingredients.map((ingredient, i) => (
-                            <Badge key={i} variant="outline" className="text-xs">
-                              {ingredient}
-                            </Badge>
-                          ))}
+                          <Badge variant="outline" className="text-xs">
+                            {base.ingredient}
+                          </Badge>
                         </div>
                       </CardContent>
                     </Card>
@@ -175,14 +183,13 @@ export default function FormulaPage() {
                     <Card key={idx} className="border-l-4 border-l-blue-400">
                       <CardContent className="pt-4">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium">{addition.name}</h4>
-                          <Badge variant="outline">{addition.dose}</Badge>
+                          <h4 className="font-medium">{addition.ingredient}</h4>
+                          <Badge variant="outline">{addition.amount}{addition.unit}</Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-2">{addition.purpose}</p>
-                        <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded border-l-4 border-blue-400">
-                          <p className="text-sm text-blue-700 dark:text-blue-400">
-                            <strong>Why added:</strong> {addition.reason}
-                          </p>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="outline" className="text-xs">
+                            {addition.ingredient}
+                          </Badge>
                         </div>
                       </CardContent>
                     </Card>
@@ -192,53 +199,37 @@ export default function FormulaPage() {
 
               <Separator />
 
-              {/* Formula Rationale */}
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
-                  <Info className="w-5 h-5" />
-                  Formula Rationale
-                </h3>
-                <p className="text-sm leading-relaxed">{currentFormula.rationale}</p>
-              </div>
-
-              {/* Important Notes */}
-              {currentFormula.warnings.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 text-amber-600">
-                    <AlertTriangle className="w-5 h-5" />
-                    Important Usage Notes
+              {/* Formula Notes */}
+              {currentFormula.notes && (
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                    <Info className="w-5 h-5" />
+                    Formula Notes
                   </h3>
-                  <div className="space-y-2">
-                    {currentFormula.warnings.map((warning, idx) => (
-                      <div key={idx} className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded">
-                        <span className="text-amber-600 mt-0.5">•</span>
-                        <span className="text-sm text-amber-800 dark:text-amber-300">{warning}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-sm leading-relaxed">{currentFormula.notes}</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Next Review */}
-          <Card data-testid="section-next-review">
+          {/* Request Formula Review */}
+          <Card data-testid="section-request-review">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-primary/10 rounded-full">
-                    <Calendar className="w-5 h-5 text-primary" />
+                    <RefreshCw className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-medium">Next Review Scheduled</h3>
+                    <h3 className="font-medium">Need Changes to Your Formula?</h3>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(currentFormula.nextReview).toLocaleDateString()}
+                      Discuss updates with our AI based on new health insights
                     </p>
                   </div>
                 </div>
                 <Button variant="outline" asChild data-testid="button-schedule-review">
                   <Link href="/dashboard/consultation">
-                    <RefreshCw className="w-4 h-4 mr-2" />
+                    <MessageSquare className="w-4 h-4 mr-2" />
                     Request Review
                   </Link>
                 </Button>
@@ -255,7 +246,7 @@ export default function FormulaPage() {
                 Formula Analysis
               </CardTitle>
               <CardDescription>
-                Breakdown of your formula composition and optimization
+                Breakdown of your formula composition
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -265,35 +256,41 @@ export default function FormulaPage() {
                   <div className="space-y-3">
                     <div>
                       <div className="flex justify-between text-sm mb-1">
-                        <span>Base Formulas</span>
-                        <span>70% (1,300mg)</span>
+                        <span>Base Ingredients</span>
+                        <span>
+                          {currentFormula.bases.reduce((sum, base) => sum + base.amount, 0)}{currentFormula.bases[0]?.unit || 'mg'}
+                        </span>
                       </div>
-                      <Progress value={70} />
+                      <Progress value={Math.round((currentFormula.bases.reduce((sum, base) => sum + base.amount, 0) / currentFormula.totalMg) * 100)} />
                     </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Personalized Additions</span>
-                        <span>30% (550mg)</span>
+                    {currentFormula.additions.length > 0 && (
+                      <div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span>Additional Supplements</span>
+                          <span>
+                            {currentFormula.additions.reduce((sum, addition) => sum + addition.amount, 0)}{currentFormula.additions[0]?.unit || 'mg'}
+                          </span>
+                        </div>
+                        <Progress value={Math.round((currentFormula.additions.reduce((sum, addition) => sum + addition.amount, 0) / currentFormula.totalMg) * 100)} />
                       </div>
-                      <Progress value={30} />
-                    </div>
+                    )}
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="font-medium mb-3">Formula Focus Areas</h4>
+                  <h4 className="font-medium mb-3">Ingredient Summary</h4>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm">Foundational Nutrition</span>
-                      <Badge variant="secondary">Primary</Badge>
+                      <span className="text-sm">Total Ingredients</span>
+                      <Badge variant="secondary">{currentFormula.bases.length + currentFormula.additions.length}</Badge>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm">Stress Management</span>
-                      <Badge variant="outline">Added</Badge>
+                      <span className="text-sm">Base Formulas</span>
+                      <Badge variant="outline">{currentFormula.bases.length}</Badge>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm">Vitamin D Support</span>
-                      <Badge variant="outline">Corrective</Badge>
+                      <span className="text-sm">Added Supplements</span>
+                      <Badge variant="outline">{currentFormula.additions.length}</Badge>
                     </div>
                   </div>
                 </div>
@@ -302,24 +299,26 @@ export default function FormulaPage() {
               <Separator />
 
               <div>
-                <h4 className="font-medium mb-3">Optimization Score</h4>
+                <h4 className="font-medium mb-3">Formula Details</h4>
                 <div className="grid gap-4 md:grid-cols-3">
                   <Card>
                     <CardContent className="pt-4 text-center">
-                      <div className="text-2xl font-bold text-green-600">95%</div>
-                      <p className="text-sm text-muted-foreground">Lab Alignment</p>
+                      <div className="text-2xl font-bold text-green-600">v{currentFormula.version}</div>
+                      <p className="text-sm text-muted-foreground">Version</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="pt-4 text-center">
-                      <div className="text-2xl font-bold text-blue-600">87%</div>
-                      <p className="text-sm text-muted-foreground">Goal Match</p>
+                      <div className="text-2xl font-bold text-blue-600">{currentFormula.totalMg}mg</div>
+                      <p className="text-sm text-muted-foreground">Total Daily</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="pt-4 text-center">
-                      <div className="text-2xl font-bold text-orange-600">92%</div>
-                      <p className="text-sm text-muted-foreground">Safety Score</p>
+                      <div className="text-2xl font-bold text-orange-600">
+                        {new Date(currentFormula.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Created</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -341,7 +340,7 @@ export default function FormulaPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {formulaHistory.map((entry, idx) => (
+                {formulaHistory.length > 0 ? formulaHistory.map((entry, idx) => (
                   <div key={entry.version} className="flex gap-4">
                     <div className="flex flex-col items-center">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -357,14 +356,26 @@ export default function FormulaPage() {
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-medium">Version {entry.version}</h4>
                         <span className="text-sm text-muted-foreground">
-                          {new Date(entry.date).toLocaleDateString()}
+                          {new Date(entry.createdAt).toLocaleDateString()}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground mb-1">{entry.changes}</p>
-                      <p className="text-xs text-muted-foreground">{entry.reason}</p>
+                      <div className="text-sm text-muted-foreground mb-2">
+                        Total: {entry.totalMg}mg
+                      </div>
+                      {entry.notes && (
+                        <p className="text-xs text-muted-foreground">{entry.notes}</p>
+                      )}
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="text-center py-8">
+                    <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="font-medium mb-2">No Previous Versions</h3>
+                    <p className="text-sm text-muted-foreground">
+                      This is your first personalized formula
+                    </p>
+                  </div>
+                )}}
               </div>
             </CardContent>
           </Card>
