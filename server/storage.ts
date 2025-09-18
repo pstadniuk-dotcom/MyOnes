@@ -186,14 +186,8 @@ export class DrizzleStorage implements IStorage {
 
   async createHealthProfile(insertProfile: InsertHealthProfile): Promise<HealthProfile> {
     try {
-      // Ensure JSON arrays are properly typed
-      const safeProfile = {
-        ...insertProfile,
-        conditions: Array.isArray(insertProfile.conditions) ? insertProfile.conditions : insertProfile.conditions ? [insertProfile.conditions as any].flat() : [],
-        medications: Array.isArray(insertProfile.medications) ? insertProfile.medications : insertProfile.medications ? [insertProfile.medications as any].flat() : [],
-        allergies: Array.isArray(insertProfile.allergies) ? insertProfile.allergies : insertProfile.allergies ? [insertProfile.allergies as any].flat() : []
-      };
-      const [profile] = await db.insert(healthProfiles).values([safeProfile]).returning();
+      // Data is now pre-validated by Zod schemas at the API route level
+      const [profile] = await db.insert(healthProfiles).values([insertProfile]).returning();
       return profile;
     } catch (error) {
       console.error('Error creating health profile:', error);
@@ -203,16 +197,10 @@ export class DrizzleStorage implements IStorage {
 
   async updateHealthProfile(userId: string, updates: Partial<InsertHealthProfile>): Promise<HealthProfile | undefined> {
     try {
-      // Handle JSON arrays properly
-      const safeUpdates = {
-        ...updates,
-        ...(updates.conditions !== undefined && { conditions: Array.isArray(updates.conditions) ? updates.conditions : [] }),
-        ...(updates.medications !== undefined && { medications: Array.isArray(updates.medications) ? updates.medications : [] }),
-        ...(updates.allergies !== undefined && { allergies: Array.isArray(updates.allergies) ? updates.allergies : [] })
-      };
+      // Data is now pre-validated by Zod schemas at the API route level
       const [profile] = await db
         .update(healthProfiles)
-        .set(safeUpdates)
+        .set(updates)
         .where(eq(healthProfiles.userId, userId))
         .returning();
       return profile || undefined;
@@ -309,13 +297,8 @@ export class DrizzleStorage implements IStorage {
 
   async createFormula(insertFormula: InsertFormula): Promise<Formula> {
     try {
-      // Ensure bases and additions are properly typed arrays
-      const safeFormula = {
-        ...insertFormula,
-        bases: Array.isArray(insertFormula.bases) ? insertFormula.bases : insertFormula.bases ? [insertFormula.bases as any].flat() : [],
-        additions: Array.isArray(insertFormula.additions) ? insertFormula.additions : insertFormula.additions ? [insertFormula.additions as any].flat() : []
-      };
-      const [formula] = await db.insert(formulas).values([safeFormula]).returning();
+      // Data is now pre-validated by Zod schemas at the API route level
+      const [formula] = await db.insert(formulas).values([insertFormula]).returning();
       return formula;
     } catch (error) {
       console.error('Error creating formula:', error);
@@ -365,14 +348,13 @@ export class DrizzleStorage implements IStorage {
         version: nextVersion
       };
       
-      // Only set bases if it's provided and not undefined
+      // Only set bases and additions if provided (data is pre-validated by Zod schemas)
       if (updates.bases !== undefined) {
-        safeUpdates.bases = Array.isArray(updates.bases) ? updates.bases : updates.bases ? [updates.bases as any].flat() : [];
+        safeUpdates.bases = updates.bases;
       }
       
-      // Only set additions if it's provided
       if (updates.additions !== undefined) {
-        safeUpdates.additions = Array.isArray(updates.additions) ? updates.additions : updates.additions ? [updates.additions as any].flat() : [];
+        safeUpdates.additions = updates.additions;
       }
       const [formula] = await db.insert(formulas).values([safeUpdates]).returning();
       return formula;
@@ -646,14 +628,7 @@ export class DrizzleStorage implements IStorage {
       const safeUpdates = {
         ...updates,
         ...(updates.labReportData && {
-          labReportData: {
-            testDate: typeof updates.labReportData.testDate === 'string' ? updates.labReportData.testDate : undefined,
-            testType: typeof updates.labReportData.testType === 'string' ? updates.labReportData.testType : undefined,
-            labName: typeof updates.labReportData.labName === 'string' ? updates.labReportData.labName : undefined,
-            physicianName: typeof updates.labReportData.physicianName === 'string' ? updates.labReportData.physicianName : undefined,
-            analysisStatus: ['error', 'pending', 'processing', 'completed'].includes(updates.labReportData.analysisStatus as string) ? updates.labReportData.analysisStatus as 'error' | 'pending' | 'processing' | 'completed' : undefined,
-            extractedData: updates.labReportData.extractedData && typeof updates.labReportData.extractedData === 'object' ? updates.labReportData.extractedData as Record<string, any> : undefined
-          }
+          labReportData: updates.labReportData  // Data is pre-validated by Zod schemas at API route level
         })
       };
       const [fileUpload] = await db
@@ -759,9 +734,9 @@ export class DrizzleStorage implements IStorage {
 
   async getAuditLogsByUser(userId: string, limit?: number): Promise<AuditLog[]> {
     try {
-      let query = db.select().from(auditLogs).where(eq(auditLogs.userId, userId)).orderBy(desc(auditLogs.timestamp));
+      const query = db.select().from(auditLogs).where(eq(auditLogs.userId, userId)).orderBy(desc(auditLogs.timestamp));
       if (limit) {
-        query = query.limit(limit);
+        return await query.limit(limit);
       }
       return await query;
     } catch (error) {
@@ -855,18 +830,8 @@ export class DrizzleStorage implements IStorage {
   async createLabAnalysis(insertAnalysis: InsertLabAnalysis): Promise<LabAnalysis> {
     try {
       // Handle extractedMarkers and aiInsights fields properly
-      const safeAnalysis = {
-        ...insertAnalysis,
-        extractedMarkers: Array.isArray(insertAnalysis.extractedMarkers) ? insertAnalysis.extractedMarkers : insertAnalysis.extractedMarkers ? [insertAnalysis.extractedMarkers as any].flat() : [],
-        aiInsights: insertAnalysis.aiInsights && typeof insertAnalysis.aiInsights === 'object' ? {
-          summary: typeof insertAnalysis.aiInsights.summary === 'string' ? insertAnalysis.aiInsights.summary : '',
-          recommendations: Array.isArray(insertAnalysis.aiInsights.recommendations) ? insertAnalysis.aiInsights.recommendations : insertAnalysis.aiInsights.recommendations ? [insertAnalysis.aiInsights.recommendations as any].flat() : [],
-          riskFactors: Array.isArray(insertAnalysis.aiInsights.riskFactors) ? insertAnalysis.aiInsights.riskFactors : insertAnalysis.aiInsights.riskFactors ? [insertAnalysis.aiInsights.riskFactors as any].flat() : [],
-          nutritionalNeeds: Array.isArray(insertAnalysis.aiInsights.nutritionalNeeds) ? insertAnalysis.aiInsights.nutritionalNeeds : insertAnalysis.aiInsights.nutritionalNeeds ? [insertAnalysis.aiInsights.nutritionalNeeds as any].flat() : [],
-          confidence: typeof insertAnalysis.aiInsights.confidence === 'number' ? insertAnalysis.aiInsights.confidence : 0
-        } : null
-      };
-      const [analysis] = await db.insert(labAnalyses).values([safeAnalysis]).returning();
+      // Data is pre-validated by Zod schemas at API route level
+      const [analysis] = await db.insert(labAnalyses).values([insertAnalysis]).returning();
       return analysis;
     } catch (error) {
       console.error('Error creating lab analysis:', error);
@@ -886,13 +851,9 @@ export class DrizzleStorage implements IStorage {
 
   async updateLabAnalysis(id: string, updates: Partial<InsertLabAnalysis>): Promise<LabAnalysis | undefined> {
     try {
-      // Handle extractedMarkers field properly
-      const safeUpdates = {
-        ...updates,
-        ...(updates.extractedMarkers !== undefined && {
-          extractedMarkers: Array.isArray(updates.extractedMarkers) ? updates.extractedMarkers : []
-        })
-      };
+      // Handle extractedMarkers and aiInsights fields properly
+      // Data is pre-validated by Zod schemas at API route level
+      const safeUpdates = updates;
       const [analysis] = await db
         .update(labAnalyses)
         .set(safeUpdates)
@@ -962,7 +923,8 @@ export class DrizzleStorage implements IStorage {
 
   async createNotification(insertNotification: InsertNotification): Promise<Notification> {
     try {
-      const [notification] = await db.insert(notifications).values(insertNotification).returning();
+      // Data is pre-validated by Zod schemas at API route level
+      const [notification] = await db.insert(notifications).values([insertNotification]).returning();
       return notification;
     } catch (error) {
       console.error('Error creating notification:', error);
@@ -972,9 +934,9 @@ export class DrizzleStorage implements IStorage {
 
   async listNotificationsByUser(userId: string, limit?: number): Promise<Notification[]> {
     try {
-      let query = db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
+      const query = db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
       if (limit) {
-        query = query.limit(limit);
+        return await query.limit(limit);
       }
       return await query;
     } catch (error) {
@@ -1045,6 +1007,7 @@ export class MemStorage implements IStorage {
   private addresses: Map<string, Address> = new Map();
   private paymentMethodRefs: Map<string, PaymentMethodRef> = new Map();
   private fileUploads: Map<string, FileUpload> = new Map();
+  private notifications: Map<string, Notification> = new Map();
   private notificationPrefs: Map<string, NotificationPref> = new Map(); // keyed by userId
   private auditLogs: Map<string, AuditLog> = new Map();
   private userConsents: Map<string, UserConsent> = new Map();
@@ -1693,12 +1656,14 @@ export class MemStorage implements IStorage {
       fileSize: insertFileUpload.fileSize ?? null,
       mimeType: insertFileUpload.mimeType ?? null,
       retentionPolicyId: insertFileUpload.retentionPolicyId ?? null,
+      hipaaCompliant: insertFileUpload.hipaaCompliant ?? true,
+      encryptedAtRest: insertFileUpload.encryptedAtRest ?? true,
       labReportData: insertFileUpload.labReportData ? {
         testDate: typeof insertFileUpload.labReportData.testDate === 'string' ? insertFileUpload.labReportData.testDate : undefined,
         testType: typeof insertFileUpload.labReportData.testType === 'string' ? insertFileUpload.labReportData.testType : undefined,
         labName: typeof insertFileUpload.labReportData.labName === 'string' ? insertFileUpload.labReportData.labName : undefined,
         physicianName: typeof insertFileUpload.labReportData.physicianName === 'string' ? insertFileUpload.labReportData.physicianName : undefined,
-        analysisStatus: ['error', 'pending', 'processing', 'completed'].includes(insertFileUpload.labReportData.analysisStatus) ? insertFileUpload.labReportData.analysisStatus as 'error' | 'pending' | 'processing' | 'completed' : undefined,
+        analysisStatus: ['error', 'pending', 'processing', 'completed'].includes(insertFileUpload.labReportData.analysisStatus as string) ? insertFileUpload.labReportData.analysisStatus as 'error' | 'pending' | 'processing' | 'completed' : undefined,
         extractedData: insertFileUpload.labReportData.extractedData && typeof insertFileUpload.labReportData.extractedData === 'object' ? insertFileUpload.labReportData.extractedData as Record<string, any> : undefined
       } : null,
       deletedAt: insertFileUpload.deletedAt ?? null,
@@ -1732,7 +1697,7 @@ export class MemStorage implements IStorage {
         testType: typeof updates.labReportData.testType === 'string' ? updates.labReportData.testType : undefined,
         labName: typeof updates.labReportData.labName === 'string' ? updates.labReportData.labName : undefined,
         physicianName: typeof updates.labReportData.physicianName === 'string' ? updates.labReportData.physicianName : undefined,
-        analysisStatus: ['error', 'pending', 'processing', 'completed'].includes(updates.labReportData.analysisStatus) ? updates.labReportData.analysisStatus as 'error' | 'pending' | 'processing' | 'completed' : undefined,
+        analysisStatus: ['error', 'pending', 'processing', 'completed'].includes(updates.labReportData.analysisStatus as string) ? updates.labReportData.analysisStatus as 'error' | 'pending' | 'processing' | 'completed' : undefined,
         extractedData: updates.labReportData.extractedData && typeof updates.labReportData.extractedData === 'object' ? updates.labReportData.extractedData as Record<string, any> : undefined
       } : null) : fileUpload.labReportData,
       deletedAt: updates.deletedAt !== undefined ? updates.deletedAt : fileUpload.deletedAt,
@@ -1830,8 +1795,9 @@ export class MemStorage implements IStorage {
       ipAddress: insertConsent.ipAddress ?? null,
       userAgent: insertConsent.userAgent ?? null,
       consentText: insertConsent.consentText ?? null,
+      consentVersion: insertConsent.consentVersion ?? '1.0',
       metadata: insertConsent.metadata ? {
-        source: ['upload_form', 'dashboard', 'api'].includes(insertConsent.metadata.source) ? insertConsent.metadata.source as 'upload_form' | 'dashboard' | 'api' : undefined,
+        source: ['upload_form', 'dashboard', 'api'].includes(insertConsent.metadata.source as string) ? insertConsent.metadata.source as 'upload_form' | 'dashboard' | 'api' : undefined,
         fileId: typeof insertConsent.metadata.fileId === 'string' ? insertConsent.metadata.fileId : undefined,
         additionalInfo: insertConsent.metadata.additionalInfo && typeof insertConsent.metadata.additionalInfo === 'object' ? insertConsent.metadata.additionalInfo as Record<string, any> : undefined
       } : null
@@ -1878,8 +1844,14 @@ export class MemStorage implements IStorage {
       ...insertAnalysis,
       id,
       processedAt: new Date(),
-      extractedMarkers: insertAnalysis.extractedMarkers ?? null,
-      aiInsights: insertAnalysis.aiInsights ?? null,
+      extractedMarkers: Array.isArray(insertAnalysis.extractedMarkers) ? insertAnalysis.extractedMarkers : (insertAnalysis.extractedMarkers ? Array.from(insertAnalysis.extractedMarkers as any) : null),
+      aiInsights: insertAnalysis.aiInsights && typeof insertAnalysis.aiInsights === 'object' ? {
+        summary: typeof insertAnalysis.aiInsights.summary === 'string' ? insertAnalysis.aiInsights.summary : '',
+        recommendations: Array.isArray(insertAnalysis.aiInsights.recommendations) ? insertAnalysis.aiInsights.recommendations : (insertAnalysis.aiInsights.recommendations ? Array.from(insertAnalysis.aiInsights.recommendations as any) : []),
+        riskFactors: Array.isArray(insertAnalysis.aiInsights.riskFactors) ? insertAnalysis.aiInsights.riskFactors : (insertAnalysis.aiInsights.riskFactors ? Array.from(insertAnalysis.aiInsights.riskFactors as any) : []),
+        nutritionalNeeds: Array.isArray(insertAnalysis.aiInsights.nutritionalNeeds) ? insertAnalysis.aiInsights.nutritionalNeeds : (insertAnalysis.aiInsights.nutritionalNeeds ? Array.from(insertAnalysis.aiInsights.nutritionalNeeds as any) : []),
+        confidence: typeof insertAnalysis.aiInsights.confidence === 'number' ? insertAnalysis.aiInsights.confidence : 0
+      } : null,
       errorMessage: insertAnalysis.errorMessage ?? null
     };
     this.labAnalyses.set(id, analysis);
@@ -1897,8 +1869,14 @@ export class MemStorage implements IStorage {
     const updatedAnalysis: LabAnalysis = {
       ...analysis,
       ...updates,
-      extractedMarkers: updates.extractedMarkers !== undefined ? updates.extractedMarkers : analysis.extractedMarkers,
-      aiInsights: updates.aiInsights !== undefined ? updates.aiInsights : analysis.aiInsights,
+      extractedMarkers: updates.extractedMarkers !== undefined ? (Array.isArray(updates.extractedMarkers) ? updates.extractedMarkers : (updates.extractedMarkers ? Array.from(updates.extractedMarkers as any) : null)) : analysis.extractedMarkers,
+      aiInsights: updates.aiInsights !== undefined ? (updates.aiInsights && typeof updates.aiInsights === 'object' ? {
+        summary: typeof updates.aiInsights.summary === 'string' ? updates.aiInsights.summary : '',
+        recommendations: Array.isArray(updates.aiInsights.recommendations) ? updates.aiInsights.recommendations : (updates.aiInsights.recommendations ? Array.from(updates.aiInsights.recommendations as any) : []),
+        riskFactors: Array.isArray(updates.aiInsights.riskFactors) ? updates.aiInsights.riskFactors : (updates.aiInsights.riskFactors ? Array.from(updates.aiInsights.riskFactors as any) : []),
+        nutritionalNeeds: Array.isArray(updates.aiInsights.nutritionalNeeds) ? updates.aiInsights.nutritionalNeeds : (updates.aiInsights.nutritionalNeeds ? Array.from(updates.aiInsights.nutritionalNeeds as any) : []),
+        confidence: typeof updates.aiInsights.confidence === 'number' ? updates.aiInsights.confidence : 0
+      } : null) : analysis.aiInsights,
       errorMessage: updates.errorMessage !== undefined ? updates.errorMessage : analysis.errorMessage
     };
     this.labAnalyses.set(id, updatedAnalysis);
@@ -1939,6 +1917,72 @@ export class MemStorage implements IStorage {
     };
     this.notificationPrefs.set(userId, updatedPrefs);
     return updatedPrefs;
+  }
+
+  // Notification operations
+  async getNotification(id: string): Promise<Notification | undefined> {
+    return Array.from(this.notifications.values()).find(n => n.id === id);
+  }
+
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    const id = randomUUID();
+    const notification: Notification = {
+      ...insertNotification,
+      id,
+      isRead: insertNotification.isRead ?? false,
+      formulaId: insertNotification.formulaId ?? null,
+      orderId: insertNotification.orderId ?? null,
+      metadata: insertNotification.metadata ? {
+        actionUrl: insertNotification.metadata.actionUrl ? String(insertNotification.metadata.actionUrl) : undefined,
+        icon: insertNotification.metadata.icon ? String(insertNotification.metadata.icon) : undefined,
+        priority: ['high', 'low', 'medium'].includes(String(insertNotification.metadata.priority)) ? insertNotification.metadata.priority as 'high' | 'low' | 'medium' : undefined,
+        additionalData: insertNotification.metadata.additionalData && typeof insertNotification.metadata.additionalData === 'object' ? insertNotification.metadata.additionalData as Record<string, any> : undefined
+      } : null,
+      createdAt: new Date()
+    };
+    this.notifications.set(id, notification);
+    return notification;
+  }
+
+  async listNotificationsByUser(userId: string, limit?: number): Promise<Notification[]> {
+    const notifications = Array.from(this.notifications.values())
+      .filter(n => n.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    
+    return limit ? notifications.slice(0, limit) : notifications;
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    return Array.from(this.notifications.values())
+      .filter(n => n.userId === userId && !n.isRead)
+      .length;
+  }
+
+  async markNotificationAsRead(id: string, userId: string): Promise<Notification | undefined> {
+    const notification = this.notifications.get(id);
+    if (!notification || notification.userId !== userId) return undefined;
+    
+    const updatedNotification = { ...notification, isRead: true };
+    this.notifications.set(id, updatedNotification);
+    return updatedNotification;
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<boolean> {
+    const userNotifications = Array.from(this.notifications.entries())
+      .filter(([_, n]) => n.userId === userId && !n.isRead);
+    
+    userNotifications.forEach(([id, notification]) => {
+      this.notifications.set(id, { ...notification, isRead: true });
+    });
+    
+    return true;
+  }
+
+  async deleteNotification(id: string, userId: string): Promise<boolean> {
+    const notification = this.notifications.get(id);
+    if (!notification || notification.userId !== userId) return false;
+    
+    return this.notifications.delete(id);
   }
 }
 

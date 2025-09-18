@@ -8,7 +8,7 @@ import type { InsertMessage, InsertChatSession } from "@shared/schema";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import type { SignupData, LoginData, AuthResponse } from "@shared/schema";
-import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema } from "@shared/schema";
+import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, insertHealthProfileSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 
@@ -1633,24 +1633,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/users/me/health-profile', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
-      const { age, sex, weightKg, conditions, medications, allergies } = req.body;
+      
+      // Validate request body with proper Zod schema
+      const healthProfileUpdate = insertHealthProfileSchema.omit({ userId: true }).parse({
+        age: req.body.age,
+        sex: req.body.sex,
+        weightKg: req.body.weightKg,
+        conditions: req.body.conditions,
+        medications: req.body.medications,
+        allergies: req.body.allergies
+      });
 
       // Check if profile exists
       const existingProfile = await storage.getHealthProfile(userId);
       
       let healthProfile;
       if (existingProfile) {
-        healthProfile = await storage.updateHealthProfile(userId, {
-          age, sex, weightKg, conditions, medications, allergies
-        });
+        healthProfile = await storage.updateHealthProfile(userId, healthProfileUpdate);
       } else {
         healthProfile = await storage.createHealthProfile({
-          userId, age, sex, weightKg, conditions, medications, allergies
+          userId,
+          ...healthProfileUpdate
         });
       }
 
       res.json(healthProfile);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: 'Invalid health profile data', 
+          details: error.errors 
+        });
+      }
       console.error('Save health profile error:', error);
       res.status(500).json({ error: 'Failed to save health profile' });
     }

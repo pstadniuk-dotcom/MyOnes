@@ -32,6 +32,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect } from 'react';
+import type { Formula, HealthProfile, Subscription } from '@shared/schema';
 
 // Types for dashboard data
 interface DashboardMetrics {
@@ -42,15 +43,7 @@ interface DashboardMetrics {
   nextDelivery: string | null;
 }
 
-interface Formula {
-  id: string;
-  version: number;
-  bases: Array<{ingredient: string, amount: number, unit: string}>;
-  additions: Array<{ingredient: string, amount: number, unit: string}>;
-  totalMg: number;
-  notes: string | null;
-  createdAt: string;
-}
+// Using Formula type from shared schema
 
 interface ActivityItem {
   id: string;
@@ -64,7 +57,9 @@ interface ActivityItem {
 interface DashboardData {
   metrics: DashboardMetrics;
   currentFormula: Formula | null;
+  healthProfile: HealthProfile | null;
   recentActivity: ActivityItem[];
+  subscription: Subscription | null;
   hasActiveFormula: boolean;
   isNewUser: boolean;
 }
@@ -201,7 +196,7 @@ function WelcomeOnboarding({ userName }: { userName: string }) {
 
 // Current Formula Widget
 function CurrentFormulaWidget({ formula }: { formula: Formula }) {
-  const totalIngredients = formula.bases.length + formula.additions.length;
+  const totalIngredients = formula.bases.length + (formula.additions?.length || 0);
   const safetyPercentage = Math.min((formula.totalMg / 800) * 100, 100);
   const isOptimal = formula.totalMg >= 600 && formula.totalMg <= 800;
 
@@ -258,19 +253,19 @@ function CurrentFormulaWidget({ formula }: { formula: Formula }) {
               </div>
             </div>
             
-            {formula.additions.length > 0 && (
+            {(formula.additions?.length || 0) > 0 && (
               <div>
-                <h4 className="font-medium text-sm mb-2">Additions ({formula.additions.length})</h4>
+                <h4 className="font-medium text-sm mb-2">Additions ({formula.additions?.length || 0})</h4>
                 <div className="space-y-1">
-                  {formula.additions.slice(0, 3).map((addition, index) => (
+                  {formula.additions?.slice(0, 3).map((addition, index) => (
                     <div key={index} className="flex justify-between text-xs">
                       <span className="truncate">{addition.ingredient}</span>
                       <span className="text-muted-foreground ml-2">{addition.amount}mg</span>
                     </div>
                   ))}
-                  {formula.additions.length > 3 && (
+                  {(formula.additions?.length || 0) > 3 && (
                     <div className="text-xs text-muted-foreground">
-                      +{formula.additions.length - 3} more
+                      +{(formula.additions?.length || 0) - 3} more
                     </div>
                   )}
                 </div>
@@ -339,22 +334,9 @@ export default function DashboardPage() {
     .join('')
     .toUpperCase() || 'U';
 
-  // Fetch dashboard data
+  // Fetch dashboard data using configured queryClient
   const { data: dashboardData, isLoading, error } = useQuery<DashboardData>({
-    queryKey: ['dashboard'],
-    queryFn: async () => {
-      const response = await fetch('/api/dashboard', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch dashboard data');
-      }
-      
-      return response.json();
-    },
+    queryKey: ['/api', 'dashboard'],
   });
 
   // Show error message if data fetch fails - moved to useEffect to prevent infinite re-render
