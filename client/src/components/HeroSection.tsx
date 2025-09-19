@@ -34,7 +34,7 @@ export default function HeroSection() {
                 className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg micro-bounce micro-glow transition-all duration-300"
                 data-testid="button-hero-start-consultation"
               >
-                <Link href="/dashboard/consultation">
+                <Link href="/consultation">
                   Start Your Free Consultation
                 </Link>
               </Button>

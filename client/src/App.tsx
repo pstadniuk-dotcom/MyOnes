@@ -77,6 +77,9 @@ function Router() {
       <Route path="/signup" component={SignupPage} />
       <Route path="/login" component={LoginPage} />
       
+      {/* Public Consultation Route - no authentication required */}
+      <Route path="/consultation" component={ConsultationPage} />
+      
       {/* Protected Dashboard Routes */}
       <Route path="/dashboard*">
         <ProtectedRoute>
