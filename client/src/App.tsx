@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Router } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -51,25 +51,27 @@ function HomePage() {
   );
 }
 
-// Dashboard Router - handles all dashboard routes
+// Dashboard Router - handles all dashboard routes with base routing context
 function DashboardRouter() {
   return (
-    <DashboardLayout>
-      <Switch>
-        <Route path="/dashboard" component={DashboardPage} />
-        <Route path="/dashboard/consultation" component={ConsultationPage} />
-        <Route path="/dashboard/formula" component={MyFormulaPage} />
-        <Route path="/dashboard/orders" component={OrdersPage} />
-        <Route path="/dashboard/profile" component={ProfilePage} />
-        <Route path="/dashboard/support" component={SupportPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </DashboardLayout>
+    <Router base="/dashboard">
+      <DashboardLayout>
+        <Switch>
+          <Route path="/" component={DashboardPage} />
+          <Route path="/consultation" component={ConsultationPage} />
+          <Route path="/formula" component={MyFormulaPage} />
+          <Route path="/orders" component={OrdersPage} />
+          <Route path="/profile" component={ProfilePage} />
+          <Route path="/support" component={SupportPage} />
+          <Route component={NotFound} />
+        </Switch>
+      </DashboardLayout>
+    </Router>
   );
 }
 
 // Main Router
-function Router() {
+function MainRouter() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
@@ -108,7 +110,7 @@ function App() {
         <AuthProvider>
           <TooltipProvider>
             <Toaster />
-            <Router />
+            <MainRouter />
           </TooltipProvider>
         </AuthProvider>
       </ThemeProvider>
