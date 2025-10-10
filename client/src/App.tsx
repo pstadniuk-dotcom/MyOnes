@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation, Router } from "wouter";
+import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -51,23 +51,6 @@ function HomePage() {
   );
 }
 
-// Dashboard Router - handles all dashboard routes
-function DashboardRouter() {
-  return (
-    <DashboardLayout>
-      <Switch>
-        <Route path="/dashboard" component={DashboardPage} />
-        <Route path="/dashboard/consultation" component={ConsultationPage} />
-        <Route path="/dashboard/formula" component={MyFormulaPage} />
-        <Route path="/dashboard/orders" component={OrdersPage} />
-        <Route path="/dashboard/profile" component={ProfilePage} />
-        <Route path="/dashboard/support" component={SupportPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </DashboardLayout>
-  );
-}
-
 // Main Router
 function MainRouter() {
   return (
@@ -77,10 +60,47 @@ function MainRouter() {
       <Route path="/signup" component={SignupPage} />
       <Route path="/login" component={LoginPage} />
       
-      {/* Protected Dashboard Routes */}
-      <Route path="/dashboard*">
+      {/* Protected Dashboard Routes - explicit paths */}
+      <Route path="/dashboard">
         <ProtectedRoute>
-          <DashboardRouter />
+          <DashboardLayout>
+            <DashboardPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/consultation">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <ConsultationPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/formula">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <MyFormulaPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/orders">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <OrdersPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/profile">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <ProfilePage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/support">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <SupportPage />
+          </DashboardLayout>
         </ProtectedRoute>
       </Route>
       
