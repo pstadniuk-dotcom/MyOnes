@@ -117,25 +117,25 @@ function UserDropdown() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile" data-testid="link-profile-settings">
+            <Link href="/profile" data-testid="link-profile-settings">
               <User className="mr-2 h-4 w-4" />
               <span>Profile Settings</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile?tab=settings" data-testid="link-account-center">
+            <Link href="/profile?tab=settings" data-testid="link-account-center">
               <Settings className="mr-2 h-4 w-4" />
               <span>Account Center</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile?tab=health" data-testid="link-health-profile">
+            <Link href="/profile?tab=health" data-testid="link-health-profile">
               <Heart className="mr-2 h-4 w-4" />
               <span>Health Profile</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile?tab=settings" data-testid="link-notifications">
+            <Link href="/profile?tab=settings" data-testid="link-notifications">
               <Bell className="mr-2 h-4 w-4" />
               <span>Notification Settings</span>
             </Link>
@@ -144,13 +144,13 @@ function UserDropdown() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/orders?tab=billing" data-testid="link-billing">
+            <Link href="/orders?tab=billing" data-testid="link-billing">
               <CreditCard className="mr-2 h-4 w-4" />
               <span>Billing & Subscription</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/support" data-testid="link-support">
+            <Link href="/support" data-testid="link-support">
               <HelpCircle className="mr-2 h-4 w-4" />
               <span>Help & Support</span>
             </Link>
