@@ -30,24 +30,24 @@ import { Badge } from '@/components/ui/badge';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Menu items configuration (relative to /dashboard Router base)
+// Menu items configuration
 const mainMenuItems = [
   {
     title: 'Dashboard',
-    url: '/',
+    url: '/dashboard',
     icon: Home,
     description: 'Overview and key metrics',
   },
   {
     title: 'AI Consultation',
-    url: '/consultation',
+    url: '/dashboard/consultation',
     icon: MessageSquare,
     description: 'Chat with ONES AI',
     badge: 'AI',
   },
   {
     title: 'My Formula',
-    url: '/formula',
+    url: '/dashboard/formula',
     icon: FlaskConical,
     description: 'Current supplement formula',
   },
@@ -56,13 +56,13 @@ const mainMenuItems = [
 const healthMenuItems = [
   {
     title: 'Health Profile',
-    url: '/profile',
+    url: '/dashboard/profile',
     icon: Activity,
     description: 'Manage health information',
   },
   {
     title: 'Lab Reports',
-    url: '/profile?tab=reports',
+    url: '/dashboard/profile?tab=reports',
     icon: FileText,
     description: 'Upload and view reports',
   },
@@ -71,19 +71,19 @@ const healthMenuItems = [
 const accountMenuItems = [
   {
     title: 'Orders & Billing',
-    url: '/orders',
+    url: '/dashboard/orders',
     icon: Package,
     description: 'Subscription and orders',
   },
   {
     title: 'Payment Methods',
-    url: '/orders?tab=billing',
+    url: '/dashboard/orders?tab=billing',
     icon: CreditCard,
     description: 'Manage payment methods',
   },
   {
     title: 'Account Settings',
-    url: '/profile?tab=settings',
+    url: '/dashboard/profile?tab=settings',
     icon: Settings,
     description: 'Privacy and preferences',
   },
@@ -92,7 +92,7 @@ const accountMenuItems = [
 const supportMenuItems = [
   {
     title: 'Help Center',
-    url: '/support',
+    url: '/dashboard/support',
     icon: HelpCircle,
     description: 'Get help and support',
   },
@@ -103,8 +103,8 @@ export function AppSidebar() {
   const { user } = useAuth();
 
   const isActive = (url: string) => {
-    if (url === '/') {
-      return location === '/';
+    if (url === '/dashboard') {
+      return location === '/dashboard';
     }
     return location.startsWith(url);
   };
