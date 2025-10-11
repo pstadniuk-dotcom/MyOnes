@@ -1530,13 +1530,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Math.min(...chatSessions.map(s => s.createdAt.getTime())) : Date.now();
       const daysActive = Math.floor((Date.now() - oldestSession) / (1000 * 60 * 60 * 24));
       
-      // Health score calculation (basic implementation)
-      let healthScore = 50; // baseline
-      if (currentFormula) healthScore += 20;
-      if (healthProfile?.age && healthProfile?.weightKg) healthScore += 10;
-      if (totalConsultations > 0) healthScore += 10;
-      if (totalConsultations >= 5) healthScore += 10;
-      healthScore = Math.min(healthScore, 100);
+      // Comprehensive Health Score Calculation (0-100)
+      let healthScore = 0;
+      const scoreBreakdown: Record<string, {score: number, max: number, status: string}> = {};
+      
+      // 1. BMI Score (20 points max)
+      if (healthProfile?.weightKg && healthProfile?.heightCm) {
+        const heightM = healthProfile.heightCm / 100;
+        const bmi = healthProfile.weightKg / (heightM * heightM);
+        let bmiScore = 0;
+        let bmiStatus = '';
+        
+        if (bmi >= 18.5 && bmi <= 24.9) {
+          bmiScore = 20;
+          bmiStatus = 'Healthy weight';
+        } else if ((bmi >= 17 && bmi < 18.5) || (bmi >= 25 && bmi <= 29.9)) {
+          bmiScore = 15;
+          bmiStatus = bmi < 18.5 ? 'Slightly underweight' : 'Slightly overweight';
+        } else if ((bmi >= 15 && bmi < 17) || (bmi >= 30 && bmi <= 34.9)) {
+          bmiScore = 10;
+          bmiStatus = bmi < 17 ? 'Underweight' : 'Overweight';
+        } else {
+          bmiScore = 5;
+          bmiStatus = bmi < 15 ? 'Severely underweight' : 'Obese';
+        }
+        
+        healthScore += bmiScore;
+        scoreBreakdown['bmi'] = { score: bmiScore, max: 20, status: `${bmi.toFixed(1)} - ${bmiStatus}` };
+      }
+      
+      // 2. Blood Pressure Score (20 points max)
+      if (healthProfile?.bloodPressureSystolic && healthProfile?.bloodPressureDiastolic) {
+        const sys = healthProfile.bloodPressureSystolic;
+        const dia = healthProfile.bloodPressureDiastolic;
+        let bpScore = 0;
+        let bpStatus = '';
+        
+        if (sys < 120 && dia < 80) {
+          bpScore = 20;
+          bpStatus = 'Optimal';
+        } else if (sys >= 120 && sys <= 129 && dia < 80) {
+          bpScore = 15;
+          bpStatus = 'Elevated';
+        } else if ((sys >= 130 && sys <= 139) || (dia >= 80 && dia <= 89)) {
+          bpScore = 10;
+          bpStatus = 'Stage 1 Hypertension';
+        } else {
+          bpScore = 5;
+          bpStatus = 'Stage 2+ Hypertension';
+        }
+        
+        healthScore += bpScore;
+        scoreBreakdown['bloodPressure'] = { score: bpScore, max: 20, status: `${sys}/${dia} - ${bpStatus}` };
+      }
+      
+      // 3. Lifestyle Factors (30 points max)
+      let lifestyleScore = 0;
+      
+      // Sleep (10 points)
+      if (healthProfile?.sleepHoursPerNight) {
+        const sleep = healthProfile.sleepHoursPerNight;
+        let sleepScore = 0;
+        if (sleep >= 7 && sleep <= 9) sleepScore = 10;
+        else if (sleep === 6 || sleep === 10) sleepScore = 7;
+        else sleepScore = 3;
+        lifestyleScore += sleepScore;
+        scoreBreakdown['sleep'] = { score: sleepScore, max: 10, status: `${sleep} hours/night` };
+      }
+      
+      // Exercise (10 points)
+      if (healthProfile?.exerciseDaysPerWeek !== null && healthProfile?.exerciseDaysPerWeek !== undefined) {
+        const exercise = healthProfile.exerciseDaysPerWeek;
+        let exerciseScore = 0;
+        if (exercise >= 5) exerciseScore = 10;
+        else if (exercise >= 3) exerciseScore = 7;
+        else if (exercise >= 1) exerciseScore = 4;
+        else exerciseScore = 0;
+        lifestyleScore += exerciseScore;
+        scoreBreakdown['exercise'] = { score: exerciseScore, max: 10, status: `${exercise} days/week` };
+      }
+      
+      // Stress Level (10 points)
+      if (healthProfile?.stressLevel) {
+        const stress = healthProfile.stressLevel;
+        let stressScore = 0;
+        if (stress >= 1 && stress <= 3) stressScore = 10;
+        else if (stress >= 4 && stress <= 6) stressScore = 7;
+        else stressScore = 3;
+        lifestyleScore += stressScore;
+        scoreBreakdown['stress'] = { score: stressScore, max: 10, status: `Level ${stress}/10` };
+      }
+      
+      healthScore += lifestyleScore;
+      
+      // 4. Risk Factors (15 points max)
+      let riskScore = 0;
+      
+      // Smoking (10 points)
+      if (healthProfile?.smokingStatus) {
+        const smoking = healthProfile.smokingStatus;
+        let smokingScore = 0;
+        if (smoking === 'never') smokingScore = 10;
+        else if (smoking === 'former') smokingScore = 7;
+        else smokingScore = 0;
+        riskScore += smokingScore;
+        scoreBreakdown['smoking'] = { score: smokingScore, max: 10, status: smoking.charAt(0).toUpperCase() + smoking.slice(1) };
+      }
+      
+      // Alcohol (5 points)
+      if (healthProfile?.alcoholDrinksPerWeek !== null && healthProfile?.alcoholDrinksPerWeek !== undefined) {
+        const drinks = healthProfile.alcoholDrinksPerWeek;
+        let alcoholScore = 0;
+        if (drinks <= 7) alcoholScore = 5;
+        else if (drinks <= 14) alcoholScore = 3;
+        else alcoholScore = 0;
+        riskScore += alcoholScore;
+        scoreBreakdown['alcohol'] = { score: alcoholScore, max: 5, status: `${drinks} drinks/week` };
+      }
+      
+      healthScore += riskScore;
+      
+      // 5. Heart Health (10 points max)
+      if (healthProfile?.restingHeartRate) {
+        const hr = healthProfile.restingHeartRate;
+        let hrScore = 0;
+        let hrStatus = '';
+        if (hr >= 60 && hr <= 80) {
+          hrScore = 10;
+          hrStatus = 'Excellent';
+        } else if ((hr >= 50 && hr < 60) || (hr > 80 && hr <= 90)) {
+          hrScore = 7;
+          hrStatus = 'Good';
+        } else {
+          hrScore = 3;
+          hrStatus = 'Needs attention';
+        }
+        healthScore += hrScore;
+        scoreBreakdown['heartRate'] = { score: hrScore, max: 10, status: `${hr} bpm - ${hrStatus}` };
+      }
+      
+      // 6. Data Completeness Bonus (5 points)
+      const fieldsProvided = [
+        healthProfile?.age,
+        healthProfile?.weightKg,
+        healthProfile?.heightCm,
+        healthProfile?.bloodPressureSystolic,
+        healthProfile?.sleepHoursPerNight,
+        healthProfile?.exerciseDaysPerWeek,
+        healthProfile?.stressLevel,
+        healthProfile?.smokingStatus,
+        healthProfile?.alcoholDrinksPerWeek,
+        healthProfile?.restingHeartRate
+      ].filter(v => v !== null && v !== undefined).length;
+      
+      const completenessScore = Math.floor((fieldsProvided / 10) * 5);
+      healthScore += completenessScore;
+      scoreBreakdown['completeness'] = { 
+        score: completenessScore, 
+        max: 5, 
+        status: `${fieldsProvided}/10 fields complete` 
+      };
+      
+      // Cap at 100
+      healthScore = Math.min(Math.round(healthScore), 100);
 
       // Get recent activity
       const recentActivity: Array<{
@@ -1581,6 +1737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dashboardData = {
         metrics: {
           healthScore,
+          healthScoreBreakdown: scoreBreakdown,
           formulaVersion: currentFormula?.version || 0,
           consultationsSessions: totalConsultations,
           daysActive: Math.max(daysActive, 0),
