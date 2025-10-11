@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   MessageSquare, 
   FlaskConical, 
@@ -25,7 +26,15 @@ import {
   Target,
   Sparkles,
   PlayCircle,
-  FileText
+  FileText,
+  Info,
+  Scale,
+  Stethoscope,
+  Moon,
+  Dumbbell,
+  Brain,
+  Cigarette,
+  Wine
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,8 +44,17 @@ import { useEffect } from 'react';
 import type { Formula, HealthProfile, Subscription } from '@shared/schema';
 
 // Types for dashboard data
+interface HealthScoreBreakdown {
+  [key: string]: {
+    score: number;
+    max: number;
+    status: string;
+  };
+}
+
 interface DashboardMetrics {
   healthScore: number;
+  healthScoreBreakdown?: HealthScoreBreakdown;
   formulaVersion: number;
   consultationsSessions: number;
   daysActive: number;
@@ -464,20 +482,96 @@ export default function DashboardPage() {
       {/* Key Metrics */}
       {!isNewUser && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card data-testid="metric-health-score">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Health Score</CardTitle>
-              <Heart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{metrics.healthScore}%</div>
-              <p className="text-xs text-muted-foreground">
-                <TrendingUp className="inline w-3 h-3 mr-1" />
-                Based on your profile
-              </p>
-              <Progress value={metrics.healthScore} className="mt-2" />
-            </CardContent>
-          </Card>
+          {/* Enhanced Health Score Card with Breakdown */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Card data-testid="metric-health-score" className="cursor-pointer hover-elevate">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Health Score</CardTitle>
+                  <div className="flex items-center gap-1">
+                    <Heart className="h-4 w-4 text-muted-foreground" />
+                    <Info className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">{metrics.healthScore}%</div>
+                  <p className="text-xs text-muted-foreground">
+                    <TrendingUp className="inline w-3 h-3 mr-1" />
+                    Click for breakdown
+                  </p>
+                  <Progress value={metrics.healthScore} className="mt-2" />
+                </CardContent>
+              </Card>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-green-600" />
+                  Health Score Breakdown
+                </DialogTitle>
+                <DialogDescription>
+                  Your overall health score is {metrics.healthScore}% based on real health metrics
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                {metrics.healthScoreBreakdown ? (
+                  Object.entries(metrics.healthScoreBreakdown).map(([key, data]) => {
+                    const getIcon = (key: string) => {
+                      const icons: Record<string, any> = {
+                        bmi: Scale,
+                        bloodPressure: Stethoscope,
+                        sleep: Moon,
+                        exercise: Dumbbell,
+                        stress: Brain,
+                        smoking: Cigarette,
+                        alcohol: Wine,
+                        heartRate: Heart,
+                        completeness: CheckCircle
+                      };
+                      return icons[key] || Activity;
+                    };
+                    const Icon = getIcon(key);
+                    const percentage = Math.round((data.score / data.max) * 100);
+                    
+                    return (
+                      <div key={key} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4 text-primary" />
+                            <span className="font-medium capitalize">
+                              {key === 'bmi' ? 'BMI' : 
+                               key === 'bloodPressure' ? 'Blood Pressure' :
+                               key === 'heartRate' ? 'Heart Rate' :
+                               key === 'completeness' ? 'Profile Completeness' :
+                               key.replace(/([A-Z])/g, ' $1').trim()}
+                            </span>
+                          </div>
+                          <Badge variant={percentage >= 80 ? "default" : percentage >= 60 ? "secondary" : "destructive"}>
+                            {data.score}/{data.max}
+                          </Badge>
+                        </div>
+                        <Progress value={percentage} className="mb-2" />
+                        <p className="text-sm text-muted-foreground">{data.status}</p>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8">
+                    <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                    <p className="text-muted-foreground mb-4">
+                      Complete your health profile to see your detailed health score
+                    </p>
+                    <Link href="/dashboard/profile?tab=health">
+                      <Button data-testid="button-complete-profile">
+                        <User className="w-4 h-4 mr-2" />
+                        Complete Profile
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <Card data-testid="metric-formula-version">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
