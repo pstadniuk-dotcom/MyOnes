@@ -39,12 +39,32 @@ export const users = pgTable("users", {
 export const healthProfiles = pgTable("health_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  // Basic demographics
   age: integer("age"),
   sex: sexEnum("sex"),
+  
+  // Physical measurements
   weightKg: integer("weight_kg"),
+  heightCm: integer("height_cm"), // For BMI calculation
+  
+  // Vital signs
+  bloodPressureSystolic: integer("blood_pressure_systolic"),
+  bloodPressureDiastolic: integer("blood_pressure_diastolic"),
+  restingHeartRate: integer("resting_heart_rate"),
+  
+  // Lifestyle factors
+  sleepHoursPerNight: integer("sleep_hours_per_night"),
+  exerciseDaysPerWeek: integer("exercise_days_per_week"),
+  stressLevel: integer("stress_level"), // 1-10 scale
+  smokingStatus: text("smoking_status"), // 'never', 'former', 'current'
+  alcoholDrinksPerWeek: integer("alcohol_drinks_per_week"),
+  
+  // Medical history
   conditions: json("conditions").$type<string[]>().default([]),
   medications: json("medications").$type<string[]>().default([]),
   allergies: json("allergies").$type<string[]>().default([]),
+  
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
