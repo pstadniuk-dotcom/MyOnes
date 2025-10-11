@@ -134,6 +134,15 @@ export default function ProfilePage() {
     age: '',
     sex: '',
     weightKg: '',
+    heightCm: '',
+    bloodPressureSystolic: '',
+    bloodPressureDiastolic: '',
+    restingHeartRate: '',
+    sleepHoursPerNight: '',
+    exerciseDaysPerWeek: '',
+    stressLevel: '',
+    smokingStatus: '',
+    alcoholDrinksPerWeek: '',
     conditions: [] as string[],
     medications: [] as string[],
     allergies: [] as string[],
@@ -166,6 +175,15 @@ export default function ProfilePage() {
         age: healthProfile.age?.toString() || '',
         sex: healthProfile.sex || '',
         weightKg: healthProfile.weightKg?.toString() || '',
+        heightCm: healthProfile.heightCm?.toString() || '',
+        bloodPressureSystolic: healthProfile.bloodPressureSystolic?.toString() || '',
+        bloodPressureDiastolic: healthProfile.bloodPressureDiastolic?.toString() || '',
+        restingHeartRate: healthProfile.restingHeartRate?.toString() || '',
+        sleepHoursPerNight: healthProfile.sleepHoursPerNight?.toString() || '',
+        exerciseDaysPerWeek: healthProfile.exerciseDaysPerWeek?.toString() || '',
+        stressLevel: healthProfile.stressLevel?.toString() || '',
+        smokingStatus: healthProfile.smokingStatus || '',
+        alcoholDrinksPerWeek: healthProfile.alcoholDrinksPerWeek?.toString() || '',
         conditions: healthProfile.conditions || [],
         medications: healthProfile.medications || [],
         allergies: healthProfile.allergies || [],
@@ -181,9 +199,10 @@ export default function ProfilePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/users/me/health-profile'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
       toast({
         title: "Health profile updated",
-        description: "Your health information has been saved successfully.",
+        description: "Your health score will update based on the new information.",
       });
     },
     onError: (error: Error) => {
@@ -442,6 +461,11 @@ export default function ProfilePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Basic Demographics */}
+              <div className="space-y-2 mb-4">
+                <h3 className="text-lg font-semibold">Basic Information</h3>
+                <p className="text-sm text-muted-foreground">Essential details for health calculations</p>
+              </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div>
                   <Label htmlFor="age">Age</Label>
@@ -476,6 +500,24 @@ export default function ProfilePage() {
                   )}
                 </div>
                 <div>
+                  <Label htmlFor="height">Height (cm)</Label>
+                  {healthLoading ? (
+                    <Skeleton className="h-10 w-full" />
+                  ) : (
+                    <Input
+                      id="height"
+                      type="number"
+                      value={healthData.heightCm}
+                      onChange={(e) => setHealthData({...healthData, heightCm: e.target.value})}
+                      placeholder="Enter height in cm"
+                      data-testid="input-height"
+                    />
+                  )}
+                </div>
+              </div>
+              
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
                   <Label htmlFor="weight">Weight (kg)</Label>
                   {healthLoading ? (
                     <Skeleton className="h-10 w-full" />
@@ -489,6 +531,131 @@ export default function ProfilePage() {
                       data-testid="input-weight"
                     />
                   )}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Vital Signs */}
+              <div className="space-y-2 mb-4">
+                <h3 className="text-lg font-semibold">Vital Signs</h3>
+                <p className="text-sm text-muted-foreground">Current measurements for accurate health scoring</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <Label htmlFor="bpSystolic">Blood Pressure - Systolic</Label>
+                  <Input
+                    id="bpSystolic"
+                    type="number"
+                    value={healthData.bloodPressureSystolic}
+                    onChange={(e) => setHealthData({...healthData, bloodPressureSystolic: e.target.value})}
+                    placeholder="e.g. 120"
+                    data-testid="input-bp-systolic"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="bpDiastolic">Blood Pressure - Diastolic</Label>
+                  <Input
+                    id="bpDiastolic"
+                    type="number"
+                    value={healthData.bloodPressureDiastolic}
+                    onChange={(e) => setHealthData({...healthData, bloodPressureDiastolic: e.target.value})}
+                    placeholder="e.g. 80"
+                    data-testid="input-bp-diastolic"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="heartRate">Resting Heart Rate (bpm)</Label>
+                  <Input
+                    id="heartRate"
+                    type="number"
+                    value={healthData.restingHeartRate}
+                    onChange={(e) => setHealthData({...healthData, restingHeartRate: e.target.value})}
+                    placeholder="e.g. 70"
+                    data-testid="input-heart-rate"
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Lifestyle Factors */}
+              <div className="space-y-2 mb-4">
+                <h3 className="text-lg font-semibold">Lifestyle Factors</h3>
+                <p className="text-sm text-muted-foreground">Help us understand your daily habits</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <Label htmlFor="sleep">Sleep Hours per Night</Label>
+                  <Input
+                    id="sleep"
+                    type="number"
+                    value={healthData.sleepHoursPerNight}
+                    onChange={(e) => setHealthData({...healthData, sleepHoursPerNight: e.target.value})}
+                    placeholder="e.g. 7"
+                    data-testid="input-sleep"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="exercise">Exercise Days per Week</Label>
+                  <Input
+                    id="exercise"
+                    type="number"
+                    value={healthData.exerciseDaysPerWeek}
+                    onChange={(e) => setHealthData({...healthData, exerciseDaysPerWeek: e.target.value})}
+                    placeholder="e.g. 3"
+                    min="0"
+                    max="7"
+                    data-testid="input-exercise"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="stress">Stress Level (1-10)</Label>
+                  <Input
+                    id="stress"
+                    type="number"
+                    value={healthData.stressLevel}
+                    onChange={(e) => setHealthData({...healthData, stressLevel: e.target.value})}
+                    placeholder="e.g. 5"
+                    min="1"
+                    max="10"
+                    data-testid="input-stress"
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Risk Factors */}
+              <div className="space-y-2 mb-4">
+                <h3 className="text-lg font-semibold">Risk Factors</h3>
+                <p className="text-sm text-muted-foreground">Important for personalized recommendations</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="smoking">Smoking Status</Label>
+                  <Select value={healthData.smokingStatus} onValueChange={(value) => setHealthData({...healthData, smokingStatus: value})}>
+                    <SelectTrigger data-testid="select-smoking">
+                      <SelectValue placeholder="Select smoking status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="never">Never</SelectItem>
+                      <SelectItem value="former">Former Smoker</SelectItem>
+                      <SelectItem value="current">Current Smoker</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="alcohol">Alcohol Drinks per Week</Label>
+                  <Input
+                    id="alcohol"
+                    type="number"
+                    value={healthData.alcoholDrinksPerWeek}
+                    onChange={(e) => setHealthData({...healthData, alcoholDrinksPerWeek: e.target.value})}
+                    placeholder="e.g. 2"
+                    min="0"
+                    data-testid="input-alcohol"
+                  />
                 </div>
               </div>
 
@@ -627,6 +794,15 @@ export default function ProfilePage() {
                         age: healthData.age ? parseInt(healthData.age) : null,
                         sex: healthData.sex || null,
                         weightKg: healthData.weightKg ? parseInt(healthData.weightKg) : null,
+                        heightCm: healthData.heightCm ? parseInt(healthData.heightCm) : null,
+                        bloodPressureSystolic: healthData.bloodPressureSystolic ? parseInt(healthData.bloodPressureSystolic) : null,
+                        bloodPressureDiastolic: healthData.bloodPressureDiastolic ? parseInt(healthData.bloodPressureDiastolic) : null,
+                        restingHeartRate: healthData.restingHeartRate ? parseInt(healthData.restingHeartRate) : null,
+                        sleepHoursPerNight: healthData.sleepHoursPerNight ? parseInt(healthData.sleepHoursPerNight) : null,
+                        exerciseDaysPerWeek: healthData.exerciseDaysPerWeek ? parseInt(healthData.exerciseDaysPerWeek) : null,
+                        stressLevel: healthData.stressLevel ? parseInt(healthData.stressLevel) : null,
+                        smokingStatus: healthData.smokingStatus || null,
+                        alcoholDrinksPerWeek: healthData.alcoholDrinksPerWeek ? parseInt(healthData.alcoholDrinksPerWeek) : null,
                         conditions: healthData.conditions,
                         medications: healthData.medications,
                         allergies: healthData.allergies,
