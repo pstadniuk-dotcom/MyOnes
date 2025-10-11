@@ -655,7 +655,9 @@ export default function ConsultationPage() {
     setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
   }, []);
   
-  // Voice input handling
+  // Voice input handling with continuous recording
+  const recognitionRef = useRef<any>(null);
+  
   const handleVoiceInput = useCallback(async () => {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       toast({
@@ -666,51 +668,87 @@ export default function ConsultationPage() {
       return;
     }
 
+    // If already recording, stop
+    if (isRecording && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+      return;
+    }
+
     try {
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
       const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
       
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.continuous = true;  // Enable continuous recording
+      recognition.interimResults = true;  // Show interim results as user speaks
       recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
       
-      setIsRecording(true);
+      let finalTranscript = '';
       
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInputValue(prev => prev + (prev ? ' ' : '') + transcript);
-        setIsRecording(false);
-        
+      recognition.onstart = () => {
+        setIsRecording(true);
         toast({
-          title: "Voice Captured",
-          description: `Added: "${transcript}"`,
+          title: "Listening...",
+          description: "Speak freely. Click the microphone again when done.",
           variant: "default"
         });
       };
       
-      recognition.onerror = () => {
-        setIsRecording(false);
-        toast({
-          title: "Voice Recognition Error",
-          description: "Failed to capture voice input. Please try again.",
-          variant: "destructive"
+      recognition.onresult = (event: any) => {
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        // Update input with both final and interim results
+        setInputValue(prev => {
+          const baseText = prev.split('[Speaking...]')[0].trim();
+          const combinedTranscript = (finalTranscript + interimTranscript).trim();
+          return baseText + (baseText && combinedTranscript ? ' ' : '') + combinedTranscript + (interimTranscript ? ' [Speaking...]' : '');
         });
+      };
+      
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsRecording(false);
+        recognitionRef.current = null;
+        
+        if (event.error !== 'aborted' && event.error !== 'no-speech') {
+          toast({
+            title: "Voice Recognition Error",
+            description: "Failed to capture voice input. Please try again.",
+            variant: "destructive"
+          });
+        }
       };
       
       recognition.onend = () => {
         setIsRecording(false);
+        recognitionRef.current = null;
+        
+        // Clean up the [Speaking...] indicator
+        setInputValue(prev => prev.replace(' [Speaking...]', '').trim());
       };
       
       recognition.start();
     } catch (error) {
       setIsRecording(false);
+      recognitionRef.current = null;
       toast({
         title: "Voice Input Error",
         description: "Unable to start voice recognition.",
         variant: "destructive"
       });
     }
-  }, [toast]);
+  }, [toast, isRecording]);
 
   // Format file size
   const formatFileSize = useCallback((bytes: number) => {
