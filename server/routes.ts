@@ -1179,6 +1179,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const previousMessages = chatSession ? 
         (await storage.listMessagesBySession(chatSession.id)).slice(-10) : [];
 
+      // Get user's health profile to check for missing information
+      let healthProfile;
+      try {
+        healthProfile = await storage.getHealthProfile(userId!);
+      } catch (e) {
+        console.log('No health profile found for user');
+      }
+
+      // Build health profile context for AI
+      const missingFields: string[] = [];
+      const completedFields: string[] = [];
+      
+      // Helper to check if a value is missing (null, undefined, or empty string)
+      const isMissing = (value: any): boolean => {
+        return value === null || value === undefined || value === '';
+      };
+      
+      if (healthProfile) {
+        // Check basic info
+        if (!isMissing(healthProfile.age)) completedFields.push('age');
+        else missingFields.push('age');
+        
+        if (!isMissing(healthProfile.sex)) completedFields.push('sex');
+        else missingFields.push('sex');
+        
+        if (!isMissing(healthProfile.heightCm)) completedFields.push('height');
+        else missingFields.push('height');
+        
+        if (!isMissing(healthProfile.weightKg)) completedFields.push('weight');
+        else missingFields.push('weight');
+        
+        // Check vital signs
+        if (!isMissing(healthProfile.bloodPressureSystolic) && !isMissing(healthProfile.bloodPressureDiastolic)) {
+          completedFields.push('blood pressure');
+        } else {
+          missingFields.push('blood pressure');
+        }
+        
+        if (!isMissing(healthProfile.restingHeartRate)) completedFields.push('resting heart rate');
+        else missingFields.push('resting heart rate');
+        
+        // Check lifestyle
+        if (!isMissing(healthProfile.sleepHoursPerNight)) completedFields.push('sleep hours');
+        else missingFields.push('sleep hours per night');
+        
+        if (!isMissing(healthProfile.exerciseDaysPerWeek)) completedFields.push('exercise frequency');
+        else missingFields.push('exercise frequency');
+        
+        if (!isMissing(healthProfile.stressLevel)) completedFields.push('stress level');
+        else missingFields.push('stress level (1-10)');
+        
+        // Check risk factors
+        if (!isMissing(healthProfile.smokingStatus)) completedFields.push('smoking status');
+        else missingFields.push('smoking status');
+        
+        if (!isMissing(healthProfile.alcoholDrinksPerWeek)) completedFields.push('alcohol consumption');
+        else missingFields.push('alcohol consumption per week');
+        
+        // Check health conditions
+        if (healthProfile.conditions && healthProfile.conditions.length > 0) {
+          completedFields.push(`health conditions (${healthProfile.conditions.join(', ')})`);
+        } else {
+          missingFields.push('current health conditions or concerns');
+        }
+        
+        if (healthProfile.medications && healthProfile.medications.length > 0) {
+          completedFields.push(`medications (${healthProfile.medications.join(', ')})`);
+        } else {
+          missingFields.push('current medications');
+        }
+        
+        if (healthProfile.allergies && healthProfile.allergies.length > 0) {
+          completedFields.push(`allergies (${healthProfile.allergies.join(', ')})`);
+        } else {
+          missingFields.push('allergies');
+        }
+      } else {
+        // No health profile at all
+        missingFields.push('age', 'sex', 'height', 'weight', 'blood pressure', 'resting heart rate', 
+          'sleep hours per night', 'exercise frequency', 'stress level (1-10)', 'smoking status', 
+          'alcohol consumption per week', 'current health conditions or concerns', 'current medications', 'allergies');
+      }
+
+      const healthContextMessage = `
+=== USER'S CURRENT HEALTH PROFILE STATUS ===
+
+Information we have: ${completedFields.length > 0 ? completedFields.join(', ') : 'None yet'}
+
+Information still needed: ${missingFields.length > 0 ? missingFields.join(', ') : 'Complete!'}
+
+INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
+- Naturally weave requests for missing information into the conversation
+- Don't ask for all missing items at once - prioritize the most important ones first
+- If the user doesn't know or doesn't want to provide certain information, that's okay - leave it blank
+- Priority order: medications > health conditions > age/sex/height/weight > vital signs > lifestyle factors
+- Always extract and save any health data the user provides in the health-data JSON block
+`;
+
       // Build conversation history with file context
       let messageWithFileContext = message;
       if (files && files.length > 0) {
@@ -1187,7 +1285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const conversationHistory: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
-        { role: 'system', content: ONES_AI_SYSTEM_PROMPT },
+        { role: 'system', content: ONES_AI_SYSTEM_PROMPT + healthContextMessage },
         ...previousMessages.map(msg => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content
