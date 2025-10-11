@@ -784,7 +784,46 @@ When providing a supplement recommendation, ALWAYS include both:
 - This is supplement support, not medical advice
 - Recommend consulting healthcare provider
 - Monitor for any adverse reactions
-- Retest blood work in 3-6 months`;
+- Retest blood work in 3-6 months
+
+=== HEALTH DATA EXTRACTION ===
+
+CRITICAL: Whenever users mention ANY health metrics in their messages, you MUST extract and return them in a special JSON block.
+This allows us to automatically update their health profile so they don't have to enter data twice.
+
+Extract these metrics when mentioned:
+- age (number)
+- sex ("male", "female", or "other")
+- heightCm (number, convert from feet/inches if needed: e.g., 5'10" = 178cm)
+- weightKg (number, convert from lbs if needed: e.g., 160lbs = 72.6kg)
+- bloodPressureSystolic (number, e.g., "120/80" → systolic=120)
+- bloodPressureDiastolic (number, e.g., "120/80" → diastolic=80)
+- restingHeartRate (number in bpm)
+- sleepHoursPerNight (number)
+- exerciseDaysPerWeek (number, 0-7)
+- stressLevel (number, 1-10 scale)
+- smokingStatus ("never", "former", or "current")
+- alcoholDrinksPerWeek (number)
+- conditions (array of strings for health conditions)
+- medications (array of strings for current medications)
+- allergies (array of strings for allergies)
+
+At the END of your response, if you extracted ANY health data, include it in this exact format:
+\`\`\`health-data
+{
+  "age": 35,
+  "weightKg": 75,
+  "exerciseDaysPerWeek": 3
+}
+\`\`\`
+
+IMPORTANT RULES:
+1. Only include fields you're confident about from the user's message
+2. Always convert imperial units (lbs, feet/inches) to metric (kg, cm)
+3. For blood pressure like "120/80", split into systolic (120) and diastolic (80)
+4. For exercise, convert "3 times a week" → 3, "daily" → 7, etc.
+5. The health-data block should come AFTER your conversational response
+6. If no health data is mentioned, don't include the health-data block at all`;
 
 // Rate limiting store for OpenAI API calls
 const rateLimitStore = new Map<string, { count: number, resetTime: number }>();
@@ -1338,6 +1377,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } catch (e) {
         console.log('No valid formula JSON found in response');
+      }
+
+      // Extract health data from response if present
+      try {
+        const healthDataMatch = fullResponse.match(/```health-data\s*({[\s\S]*?})\s*```/);
+        if (healthDataMatch && userId) {
+          const healthData = JSON.parse(healthDataMatch[1]);
+          console.log('Extracted health data from AI response:', healthData);
+          
+          // Get existing health profile to merge with new data
+          const existingProfile = await storage.getHealthProfile(userId);
+          
+          // Merge with existing data (new data takes precedence)
+          const mergedData = {
+            age: healthData.age ?? existingProfile?.age,
+            sex: healthData.sex ?? existingProfile?.sex,
+            heightCm: healthData.heightCm ?? existingProfile?.heightCm,
+            weightKg: healthData.weightKg ?? existingProfile?.weightKg,
+            bloodPressureSystolic: healthData.bloodPressureSystolic ?? existingProfile?.bloodPressureSystolic,
+            bloodPressureDiastolic: healthData.bloodPressureDiastolic ?? existingProfile?.bloodPressureDiastolic,
+            restingHeartRate: healthData.restingHeartRate ?? existingProfile?.restingHeartRate,
+            sleepHoursPerNight: healthData.sleepHoursPerNight ?? existingProfile?.sleepHoursPerNight,
+            exerciseDaysPerWeek: healthData.exerciseDaysPerWeek ?? existingProfile?.exerciseDaysPerWeek,
+            stressLevel: healthData.stressLevel ?? existingProfile?.stressLevel,
+            smokingStatus: healthData.smokingStatus ?? existingProfile?.smokingStatus,
+            alcoholDrinksPerWeek: healthData.alcoholDrinksPerWeek ?? existingProfile?.alcoholDrinksPerWeek,
+            conditions: healthData.conditions ?? existingProfile?.conditions,
+            medications: healthData.medications ?? existingProfile?.medications,
+            allergies: healthData.allergies ?? existingProfile?.allergies,
+          };
+          
+          // Validate merged data against schema before persisting
+          const validatedData = insertHealthProfileSchema.omit({ userId: true }).parse(mergedData);
+          
+          // Update or create health profile
+          if (existingProfile) {
+            await storage.updateHealthProfile(userId, validatedData);
+          } else {
+            await storage.createHealthProfile({
+              userId,
+              ...validatedData
+            });
+          }
+          
+          console.log('Health profile automatically updated from AI conversation');
+        }
+      } catch (e) {
+        console.log('No valid health data found in response or error updating profile:', e);
       }
 
       // Save extracted formula to storage if valid
