@@ -9,7 +9,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import type { SignupData, LoginData, AuthResponse } from "@shared/schema";
 import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, insertHealthProfileSchema, insertSupportTicketSchema, insertSupportTicketResponseSchema } from "@shared/schema";
-import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError, enforceConsentRequirements } from "./objectStorage";
+import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 
 // Extend Express Request interface to include userId property
@@ -1139,23 +1139,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get previous messages for context (last 10 messages)
       const previousMessages = chatSession ? 
         (await storage.listMessagesBySession(chatSession.id)).slice(-10) : [];
-
-      // CRITICAL: HIPAA Compliance - Enforce consent requirements before OpenAI analysis
-      try {
-        await enforceConsentRequirements(userId!, 'ai_analysis', {
-          ipAddress: clientIP,
-          userAgent: req.headers['user-agent']
-        });
-      } catch (consentError: any) {
-        sendSSE({
-          type: 'error',
-          error: 'AI analysis consent required. Please provide consent to use AI features.',
-          code: 'CONSENT_REQUIRED',
-          sessionId: chatSession?.id
-        });
-        endStream();
-        return;
-      }
 
       // Build conversation history with file context
       let messageWithFileContext = message;
