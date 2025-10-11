@@ -162,13 +162,13 @@ export default function ConsultationPage() {
     
     const welcomeMessage: Message = {
       id: 'welcome-' + Date.now(),
-      content: `Hello ${user?.name?.split(' ')[0] || 'there'}! I'm ONES AI, your personalized supplement consultant. I'm here to help you optimize your health through personalized supplement formulations based on your unique biochemistry and health goals.\n\nHow can I assist you today? You can:\n• Ask about your current formula\n• Upload new lab results for analysis\n• Discuss health concerns or goals\n• Get recommendations for formula adjustments`,
+      content: `Hello ${user?.name?.split(' ')[0] || 'there'}! I'm here to help you optimize your health. Let's get started with creating the perfect supplement formula for you.\n\nTo give you the best recommendations, I need to understand your complete health picture. Please share as much information as you can about yourself:\n\n• Your age, gender, height, and weight\n• Any medications you're currently taking\n• Health goals or concerns you have\n• Any specific symptoms or issues you're experiencing\n• Lifestyle factors (exercise, diet, sleep patterns)\n\nFeel free to click the microphone icon to speak with me, or simply type in the chat. This is just like a doctor's visit - the more you share, the better I can help you.`,
       sender: 'ai',
       timestamp: new Date()
     };
     
     setMessages([welcomeMessage]);
-    setShowSuggestions(true);
+    setShowSuggestions(false);
     
     // Load history data
     if (historyData) {
@@ -503,19 +503,26 @@ export default function ConsultationPage() {
   
   // Start new consultation session
   const handleNewSession = useCallback(() => {
-    setMessages([]);
+    const welcomeMessage: Message = {
+      id: 'welcome-' + Date.now(),
+      content: `Hello ${user?.name?.split(' ')[0] || 'there'}! I'm here to help you optimize your health. Let's get started with creating the perfect supplement formula for you.\n\nTo give you the best recommendations, I need to understand your complete health picture. Please share as much information as you can about yourself:\n\n• Your age, gender, height, and weight\n• Any medications you're currently taking\n• Health goals or concerns you have\n• Any specific symptoms or issues you're experiencing\n• Lifestyle factors (exercise, diet, sleep patterns)\n\nFeel free to click the microphone icon to speak with me, or simply type in the chat. This is just like a doctor's visit - the more you share, the better I can help you.`,
+      sender: 'ai',
+      timestamp: new Date()
+    };
+    
+    setMessages([welcomeMessage]);
     setCurrentSessionId(null);
     setIsNewSession(true);
     setUploadedFiles([]);
     setInputValue('');
-    setShowSuggestions(true);
+    setShowSuggestions(false);
     
     toast({
       title: "New Consultation Started",
       description: "Ready to discuss your health goals with ONES AI.",
       variant: "default"
     });
-  }, [toast]);
+  }, [toast, user?.name]);
   
   // Load previous session
   const handleLoadSession = useCallback((session: ChatSession) => {
@@ -888,42 +895,6 @@ export default function ConsultationPage() {
         {/* Messages Area */}
         <ScrollArea className="flex-1" data-testid="container-chat-messages">
           <div className="p-6 space-y-6">
-            {/* Suggested Prompts */}
-            {showSuggestions && isNewSession && (
-              <div className="space-y-4 mb-8">
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-primary mb-2">How can I help you today?</h3>
-                  <p className="text-muted-foreground text-sm mb-4">Click a suggestion below or type your own question</p>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  {suggestedPrompts.map((prompt) => {
-                    const IconComponent = prompt.icon;
-                    return (
-                      <Button
-                        key={prompt.id}
-                        variant="outline"
-                        className="p-4 h-auto text-left justify-start hover-elevate"
-                        onClick={() => handlePromptSelect(prompt)}
-                        data-testid={`prompt-${prompt.id}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-md bg-primary/10">
-                            <IconComponent className="w-4 h-4 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm">{prompt.text}</p>
-                            <Badge variant="secondary" className="mt-1 text-xs capitalize">
-                              {prompt.category}
-                            </Badge>
-                          </div>
-                        </div>
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            
             {filteredMessages.map((message, index) => (
               <div
                 key={message.id}
