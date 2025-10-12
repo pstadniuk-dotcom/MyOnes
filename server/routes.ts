@@ -12,6 +12,7 @@ import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, in
 import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { BASE_FORMULAS, INDIVIDUAL_INGREDIENTS } from "./supplement-catalog";
+import { buildONESAISystemPrompt } from "./ones-ai-system-prompt";
 
 // Extend Express Request interface to include userId property
 declare global {
@@ -484,63 +485,51 @@ const FormulaExtractionSchema = z.object({
 });
 
 // Generate AI system prompt dynamically from supplement catalog
-function buildAISystemPrompt(): string {
-  // Build base formulas section
-  const baseFormulasSection = BASE_FORMULAS.map((formula, index) => {
-    return `${index + 1}. ${formula.name.toUpperCase()}
-- System Supported: ${formula.systemSupported}
-- Active Ingredients: ${formula.activeIngredients}
-- Suggested Dosage: ${formula.suggestedDosage}${formula.totalMg ? `\n- Total Formula: ${formula.totalMg}mg` : ''}${formula.similarTo ? `\n- Similar to: ${formula.similarTo}` : ''}`;
-  }).join('\n\n');
+// Complete ONES AI system prompt - built from actual catalog
+const ONES_AI_SYSTEM_PROMPT_BASE = buildONESAISystemPrompt();
 
-  // Build individual ingredients section
-  const ingredientsSection = INDIVIDUAL_INGREDIENTS.map((ingredient, index) => {
-    const drugInteractions = ingredient.drugInteractions.length > 0 
-      ? ingredient.drugInteractions.join(', ') 
-      : 'None known';
-    return `${index + 1}. ${ingredient.name}
-- Standard Dose: ${ingredient.standardDose}
-- Drug Interactions: ${drugInteractions}
-- Benefits: ${ingredient.benefits}`;
-  }).join('\n\n');
+// Rate limiting store for OpenAI API calls
+const rateLimitStore = new Map<string, { count: number, resetTime: number }>();
 
-  return `You are ONES AI, an expert supplement formulation assistant. You create personalized supplement formulas using Alive Innovations' exact ingredient catalog.
-
-CRITICAL RULES:
-1. You MUST ONLY use the exact BASE FORMULAS and INDIVIDUAL INGREDIENTS listed below
-2. Every formula MUST start with at least one Base Formula (pre-made blends)
-3. Individual ingredients can be added ON TOP of bases for personalization
-4. CAPSULE SIZE LIMITS:
-   - Size 00 capsules: 500-750mg capacity
-   - Size 000 capsules: 750-1000mg capacity
-   - Calculate total mg and recommend capsule count and size
-5. ALWAYS check drug interactions against user's medications
-6. Consider user's age, gender, health conditions, and goals
-
-=== AVAILABLE BASE FORMULAS (${BASE_FORMULAS.length} total) ===
-
-${baseFormulasSection}
-
-=== AVAILABLE INDIVIDUAL INGREDIENTS (${INDIVIDUAL_INGREDIENTS.length} total) ===
-
-${ingredientsSection}`;
+// Security middleware functions
+function getClientIP(req: any): string {
+  return req.headers['x-forwarded-for']?.split(',')[0] || 
+         req.connection?.remoteAddress || 
+         req.socket?.remoteAddress ||
+         'unknown';
 }
 
-// Complete ONES AI system prompt - built from actual catalog
-const ONES_AI_SYSTEM_PROMPT_BASE = buildAISystemPrompt() + `
+function checkRateLimit(clientId: string, limit: number, windowMs: number): { allowed: boolean, remaining: number, resetTime: number } {
+  const now = Date.now();
+  const entry = rateLimitStore.get(clientId);
+  
+  if (!entry || now > entry.resetTime) {
+    // Reset or create new entry
+    const resetTime = now + windowMs;
+    rateLimitStore.set(clientId, { count: 1, resetTime });
+    return { allowed: true, remaining: limit - 1, resetTime };
+  }
+  
+  if (entry.count >= limit) {
+    return { allowed: false, remaining: 0, resetTime: entry.resetTime };
+  }
+  
+  entry.count++;
+  return { allowed: true, remaining: limit - entry.count, resetTime: entry.resetTime };
+}
 
-=== CAPSULE FORMULATION GUIDELINES ===
+// Clean up rate limit store periodically
+setInterval(() => {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+  rateLimitStore.forEach((value, key) => {
+    if (now > value.resetTime) {
+      keysToDelete.push(key);
+    }
+  });
+  keysToDelete.forEach(key => rateLimitStore.delete(key));
+}, 60000); // Clean up every minute
 
-When creating a formula:
-1. Select 2-3 base formulas that address the user's primary concerns (1000-1500mg)
-2. Add 5-7 individual ingredients for personalization (1000-2500mg)
-3. Calculate total mg: typically 2000-4000mg
-4. Recommend capsule plan:
-   - Size 00: 4-6 capsules per day
-   - Size 000: 3-4 capsules per day
-   - Offer AM/PM split if >3 capsules/day
-
-=== DRUG INTERACTION CHECKING ===
 
 CRITICAL: Before finalizing any formula, check EACH ingredient against the user's medications:
 - Review the "Drug Interactions" field for each individual ingredient
@@ -624,12 +613,14 @@ IMPORTANT RULES:
 const rateLimitStore = new Map<string, { count: number, resetTime: number }>();
 
 // Security middleware functions
-- Purpose: Allergic response, histamine regulation
-- Key ingredients: Quercetin, Bromelain, Stinging Nettle, NAC, Vitamin C
-- Base dose: 450mg
-- Best for: Seasonal allergies, food sensitivities, histamine intolerance
+function getClientIP(req: any): string {
+  return req.headers['x-forwarded-for']?.split(',')[0] || 
+         req.connection?.remoteAddress || 
+         req.socket?.remoteAddress ||
+         'unknown';
+}
 
-3. ANTIOXIDANT
+function checkRateLimit(clientId: string, limit: number, windowMs: number): { allowed: boolean, remaining: number, resetTime: number } {
 - Purpose: Cell protection, anti-aging, oxidative stress
 - Key ingredients: Resveratrol, Alpha Lipoic Acid, CoQ10, Vitamin E, Selenium
 - Base dose: 400mg
