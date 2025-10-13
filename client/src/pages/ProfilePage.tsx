@@ -10,6 +10,14 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { 
   User, 
   FileText, 
@@ -94,6 +102,8 @@ export default function ProfilePage() {
   const [showPassword, setShowPassword] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [showConsentDialog, setShowConsentDialog] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   
   // React Query for user data
   const { data: userData, isLoading: userLoading, error: userError } = useQuery<{user: UserType}>({
@@ -239,33 +249,35 @@ export default function ProfilePage() {
     },
   });
 
-  // File upload handler
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-    if (!allowedTypes.includes(file.type)) {
+  // Consent mutation
+  const grantConsentMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/consents/grant', {
+        consentType: 'lab_data_processing',
+        consentVersion: '1.0',
+        consentText: 'I consent to ONES AI processing my lab data and health information to provide personalized supplement recommendations.'
+      });
+      return response.json();
+    },
+    onSuccess: async () => {
+      setShowConsentDialog(false);
+      // Now proceed with the file upload
+      if (pendingFile) {
+        await uploadFile(pendingFile);
+        setPendingFile(null);
+      }
+    },
+    onError: (error: Error) => {
       toast({
-        title: "Invalid file type",
-        description: "Please upload a PDF, JPG, or PNG file.",
+        title: "Consent failed",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
-      return;
     }
+  });
 
-    // Validate file size (10MB max)
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      toast({
-        title: "File too large",
-        description: "Please upload a file smaller than 10MB.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  // Actual file upload function
+  const uploadFile = async (file: File) => {
     setIsUploading(true);
 
     try {
@@ -316,6 +328,38 @@ export default function ProfilePage() {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  // File upload handler
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF, JPG, or PNG file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: "File too large",
+        description: "Please upload a file smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Store the file and show consent dialog
+    setPendingFile(file);
+    setShowConsentDialog(true);
   };
 
   // Show error message if any critical data fetch fails
@@ -1220,6 +1264,57 @@ export default function ProfilePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Consent Dialog */}
+      <Dialog open={showConsentDialog} onOpenChange={setShowConsentDialog}>
+        <DialogContent data-testid="dialog-consent">
+          <DialogHeader>
+            <DialogTitle>Consent to Process Health Data</DialogTitle>
+            <DialogDescription>
+              To upload and analyze your lab results, we need your consent to process your health information.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm">
+              By providing consent, you agree to allow ONES AI to:
+            </p>
+            <ul className="text-sm space-y-2 ml-4 list-disc">
+              <li>Process and analyze your uploaded lab results</li>
+              <li>Use this data to create personalized supplement recommendations</li>
+              <li>Store your health information securely with HIPAA-compliant encryption</li>
+              <li>Use this data to optimize your formula over time</li>
+            </ul>
+            <p className="text-sm text-muted-foreground">
+              Your data is encrypted and never shared with third parties. You can revoke this consent at any time from your privacy settings.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowConsentDialog(false);
+                setPendingFile(null);
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+              }}
+              data-testid="button-consent-cancel"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => grantConsentMutation.mutate()}
+              disabled={grantConsentMutation.isPending}
+              data-testid="button-consent-agree"
+            >
+              {grantConsentMutation.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              I Consent
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
