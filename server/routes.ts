@@ -75,70 +75,70 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 
 // Canonical dose mapping for all supplement bases and additions
 const CANONICAL_DOSES_MG = {
-  // Formula Bases (standardized mg amounts)
-  'ADRENAL SUPPORT': 450,
-  'ALLERGY DEFENSE': 450,
-  'ANTIOXIDANT': 400,
-  'BETAMAX CAMO': 300,
-  'BRAIN HEALTH': 500,
-  'CARDIOVASCULAR': 450,
-  'COGNITIVE': 400,
-  'DETOX': 500,
-  'ENDURANCE': 450,
-  'ENERGY': 400,
-  'ENZYME DIGESTIVE': 350,
-  'ESTROGEN METABOLISM': 400,
-  'EYE HEALTH': 350,
-  'FEMALE FERTILITY': 450,
-  'GI PRO': 400,
-  'GLUCOSE': 400,
-  'GLUTATHIONE': 350,
-  'HISTAMINE': 400,
-  'HPA AXIS': 450,
-  'IMMUNE': 500,
-  'INFLAMMATION': 500,
-  'JOINT HEALTH': 600,
-  'KIDNEY': 400,
-  'LIVER': 450,
-  'LUNG': 400,
-  'MALE FERTILITY': 450,
-  'MENOPAUSE': 400,
-  'METHYLATION': 350,
-  'MITOCHONDRIA': 400,
-  'MOOD': 450,
-  'MULTI VITAMIN': 600,
-  'MUSCLE HEALTH': 500,
-  'NEUROTRANSMITTER': 400,
-  'PARASITE': 450,
-  'SKIN HEALTH': 400,
-  'SLEEP': 400,
-  'TESTOSTERONE': 500,
-  'THYROID': 350,
-  'VASCULAR': 400,
+  // APPROVED BASE FORMULAS (32 total) - Exact doses from catalog
+  'Adrenal Support': 420,
+  'Alpha Gest III': 636,
+  'Alpha Green II': 400,
+  'Alpha Oxyme': 350,
+  'Alpha Zyme III': 400,
+  'Beta Max': 2500,
+  'Br-SP Plus': 400,
+  'C Boost': 1680,
+  'Circu Plus': 540,
+  'Colostrum Powder': 1000,
+  'Chola Plus': 350,
+  'Dia Zyme': 494,
+  'Diadren Forte': 400,
+  'Endocrine Support': 350,
+  'Heart Support': 450,
+  'Histamine Support': 190,
+  'Immune-C': 430,
+  'Intestinal Formula': 400,
+  'Ligament Support': 400,
+  'LSK Plus': 450,
+  'Liver Support': 480,
+  'Lung Support': 250,
+  'MG/K': 500,
+  'Mold RX': 525,
+  'Spleen Support': 400,
+  'Ovary Uterus Support': 300,
+  'Para X': 500,
+  'Para Thy': 335,
+  'Pitui Plus': 495,
+  'Prostate Support': 300,
+  'Kidney & Bladder Support': 400,
+  'Thyroid Support': 470,
   
-  // Common individual supplement additions (typical therapeutic doses)
-  'Vitamin D3': 1,      // 1000 IU = ~1mg
-  'Vitamin C': 250,     // 250mg
-  'Magnesium': 200,     // 200mg
-  'Zinc': 15,           // 15mg
-  'Iron': 18,           // 18mg
-  'Calcium': 200,       // 200mg
-  'Omega-3': 300,       // 300mg
-  'Probiotics': 50,     // 50mg (10 billion CFU)
-  'CoQ10': 100,         // 100mg
-  'Curcumin': 250,      // 250mg
-  'Ashwagandha': 300,   // 300mg
-  'Rhodiola': 150,      // 150mg
-  'Melatonin': 3,       // 3mg
-  'Quercetin': 250,     // 250mg
-  'NAC': 200,           // 200mg
-  'Alpha Lipoic Acid': 100, // 100mg
-  'L-Theanine': 100,    // 100mg
-  'B-Complex': 50,      // 50mg
-  'Biotin': 1,          // 1mg (1000mcg)
-  'Folate': 1,          // 1mg (400mcg)
-  'B12': 1,             // 1mg (1000mcg)
-  'K2': 1,              // 100mcg = ~1mg
+  // APPROVED INDIVIDUAL INGREDIENTS (29 total) - Exact names from catalog
+  'Aloe Vera Powder': 250,
+  'Ahswaganda': 600,
+  'Astragalus': 300,
+  'Black Currant Extract': 300,
+  'Broccoli Powder': 300,
+  'Camu Camu': 300,
+  'Cape Aloe': 300,
+  'Cats Claw': 30,
+  'Chaga': 300,
+  'Cinnamon 20:1': 1000,
+  'CoEnzyme Q10': 200,
+  'Gaba': 300,
+  'Garlic (powder)': 200,
+  'Ginger Root': 500,
+  'Ginko Biloba Extract 24%': 100,
+  'Graviola': 300,
+  'Hawthorn Berry PE 1/8% Flavones': 300,
+  'Lutein': 10,
+  'Maca Root .6%': 300,
+  'Magnesium': 320,
+  'Omega 3 (algae omega)': 300,
+  'Phosphatidylcholine 40% (soy)': 300,
+  'Resveratrol': 300,
+  'Saw Palmetto Extract 45% Fatty Acid (GC)': 300,
+  'Stinging Nettle': 300,
+  'Sumar Root': 300,
+  'Turmeric Root Extract 4:1': 500,
+  'Vitamin C': 90,
+  'Vitamin E (Mixed tocopherols)': 15
 };
 
 // Dose parsing utility that converts string doses to numeric mg
@@ -186,11 +186,27 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
   const errors: string[] = [];
   let calculatedTotal = 0;
   
+  // Get approved base formula names (first 32 entries in CANONICAL_DOSES_MG)
+  const approvedBases = Object.keys(CANONICAL_DOSES_MG).slice(0, 32);
+  
+  // Get approved individual ingredient names (last 29 entries in CANONICAL_DOSES_MG)
+  const approvedIngredients = Object.keys(CANONICAL_DOSES_MG).slice(32);
+  
   // Validate bases
   if (!formula.bases || formula.bases.length === 0) {
     errors.push('Formula must include at least one base formula');
   } else {
     for (const base of formula.bases) {
+      // Check if base is in approved list (case-insensitive)
+      const isApproved = approvedBases.some(approved => 
+        approved.toLowerCase() === base.name.toLowerCase()
+      );
+      
+      if (!isApproved) {
+        errors.push(`UNAUTHORIZED BASE FORMULA: "${base.name}" is not in the approved catalog. Formula REJECTED.`);
+        continue;
+      }
+      
       const mgAmount = parseDoseToMg(base.dose, base.name);
       if (mgAmount === 0) {
         errors.push(`Cannot determine mg amount for base: ${base.name} with dose: ${base.dose}`);
@@ -202,6 +218,16 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
   // Validate additions
   if (formula.additions) {
     for (const addition of formula.additions) {
+      // Check if addition is in approved list (case-insensitive)
+      const isApproved = approvedIngredients.some(approved => 
+        approved.toLowerCase() === addition.name.toLowerCase()
+      );
+      
+      if (!isApproved) {
+        errors.push(`UNAUTHORIZED INGREDIENT: "${addition.name}" is not in the approved catalog. Formula REJECTED.`);
+        continue;
+      }
+      
       const mgAmount = parseDoseToMg(addition.dose, addition.name);
       if (mgAmount === 0) {
         errors.push(`Cannot determine mg amount for addition: ${addition.name} with dose: ${addition.dose}`);
@@ -210,12 +236,46 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
     }
   }
   
-  // Enforce 800mg hard limit
-  const isValid = calculatedTotal <= 800 && errors.length === 0;
-  
-  if (calculatedTotal > 800) {
-    errors.push(`Formula exceeds 800mg safety limit. Calculated total: ${calculatedTotal}mg. Formula REJECTED.`);
+  // Validate daily total is within expected range (2000-4000mg for custom formulas)
+  if (calculatedTotal < 1000) {
+    errors.push(`Formula total too low: ${calculatedTotal}mg. Minimum 1000mg for therapeutic effect.`);
   }
+  
+  if (calculatedTotal > 5000) {
+    errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum 5000mg for safety.`);
+  }
+  
+  // Validate capsule sizing if provided
+  if (formula.capsulesPerDay && formula.capsuleSize) {
+    const mgPerCapsule = calculatedTotal / formula.capsulesPerDay;
+    
+    // Size 00 capacity: 500-750mg
+    if (formula.capsuleSize === '00') {
+      if (mgPerCapsule < 500) {
+        errors.push(`Capsule size 00 underfilled: ${mgPerCapsule.toFixed(0)}mg per capsule. Use fewer capsules or switch to Size 000.`);
+      }
+      if (mgPerCapsule > 750) {
+        errors.push(`Capsule size 00 overfilled: ${mgPerCapsule.toFixed(0)}mg per capsule. Use more capsules or switch to Size 000.`);
+      }
+    }
+    
+    // Size 000 capacity: 750-1000mg
+    if (formula.capsuleSize === '000') {
+      if (mgPerCapsule < 750) {
+        errors.push(`Capsule size 000 underfilled: ${mgPerCapsule.toFixed(0)}mg per capsule. Use fewer capsules or switch to Size 00.`);
+      }
+      if (mgPerCapsule > 1000) {
+        errors.push(`Capsule size 000 overfilled: ${mgPerCapsule.toFixed(0)}mg per capsule. Use more capsules.`);
+      }
+    }
+    
+    // Validate capsule count is reasonable (3-6 per day)
+    if (formula.capsulesPerDay < 2 || formula.capsulesPerDay > 8) {
+      errors.push(`Capsule count out of range: ${formula.capsulesPerDay}. Recommend 3-6 capsules per day.`);
+    }
+  }
+  
+  const isValid = errors.length === 0;
   
   return { isValid, calculatedTotalMg: calculatedTotal, errors };
 }
@@ -510,264 +570,190 @@ const ONES_AI_SYSTEM_PROMPT = `You are ONES AI, a functional medicine supplement
 === APPROVED BASE FORMULAS (32 TOTAL) ===
 CRITICAL: You can ONLY use these exact formulas. Do not create formulas outside this list.
 
-1. ADRENAL SUPPORT
-   System: Endocrine, Metabolism
-   Ingredients: Vitamin C (Camu Camu Berry) 20mg, Pantothenic Acid 50mg, Adrenal (bovine) 250mg, Licorice root 50mg, Ginger rhizome 25mg, Kelp 25mg
-   Dosage: 1x daily (~420mg total)
-   Best for: Stress, fatigue, burnout
+1. Adrenal Support - Endocrine/Metabolism
+   Ingredients: Vitamin C 20mg, Pantothenic Acid 50mg, Adrenal (bovine) 250mg, Licorice root 50mg, Ginger 25mg, Kelp 25mg
+   Dose: 1x daily | Best for: Stress, fatigue, adrenal health
 
-2. ALLERGY DEFENSE
-- Purpose: Allergic response, histamine regulation
-- Key ingredients: Quercetin, Bromelain, Stinging Nettle, NAC, Vitamin C
-- Base dose: 450mg
-- Best for: Seasonal allergies, food sensitivities, histamine intolerance
+2. Alpha Gest III - Digestion
+   Ingredients: Betaine HCl 496mg, Pepsin 140mg
+   Dose: 1x daily | Best for: Low stomach acid, digestion
 
-3. ANTIOXIDANT
-- Purpose: Cell protection, anti-aging, oxidative stress
-- Key ingredients: Resveratrol, Alpha Lipoic Acid, CoQ10, Vitamin E, Selenium
-- Base dose: 400mg
-- Best for: Anti-aging, general health, oxidative stress
+3. Alpha Green II - Spleen/Lymphatic
+   Ingredients: Vitamin E 75 IU, Bovine Spleen 250mcg, Dandelion 75mg, Nettle root 75mg
+   Dose: 1x daily | Best for: Lymphatic support, spleen health
 
-4. BETAMAX CAMO
-- Purpose: Immune support, specialized protection
-- Key ingredients: Proprietary immune blend with camostat
-- Base dose: 300mg
-- Best for: Immune system support, viral defense
+4. Alpha Oxyme - Antioxidant
+   Ingredients: Vitamin A (Beta-Carotene) 1500 IU, Selenium 5mcg, SOD, Aloe Vera, Rosemary, L-Cysteine
+   Dose: 1x daily | Best for: Antioxidant support, oxidative stress
 
-5. BRAIN HEALTH
-- Purpose: Cognitive function, memory, focus
-- Key ingredients: Lion's Mane, Bacopa, Ginkgo, Phosphatidylserine, DHA
-- Base dose: 500mg
-- Best for: Brain fog, memory issues, cognitive decline prevention
+5. Alpha Zyme III - Pancreas/Nutrition
+   Ingredients: Magnesium 23mg, Potassium 23mg, Pancreatin 8X 78mg, Ox Bile 63mg, L-Lysine 63mg, Pepsin 42mg, Cellulase, Green blend
+   Dose: 1x daily | Best for: Pancreatic support, nutrient absorption
 
-6. CARDIOVASCULAR
-- Purpose: Heart health, circulation
-- Key ingredients: Hawthorn, CoQ10, Magnesium, B-vitamins, Garlic extract
-- Base dose: 450mg
-- Best for: Heart health, blood pressure support, circulation
+6. Beta Max - Liver/Gallbladder/Pancreas
+   Ingredients: Calcium 220mg, Niacin 10mg, Phosphorus 164mg, Choline 1664mg, Inositol 160mg, Betaine HCl 76mg, Lecithin 76mg, Artichoke 50mg, Dandelion 50mg, Milk Thistle 50mg, Turmeric 50mg, DL-Methionine 30mg
+   Dose: 4x daily | Best for: Liver/gallbladder detox, fat digestion
 
-7. COGNITIVE
-- Purpose: Mental clarity, focus, concentration
-- Key ingredients: L-Theanine, Caffeine, Alpha GPC, Rhodiola, B-vitamins
-- Base dose: 400mg
-- Best for: Focus, studying, mental performance
+7. Br-SP Plus - Digestion/Immune
+   Ingredients: Black Radish root, Green Cabbage, Alfalfa, Pepsin, Pituitary (bovine), Duodenum/Stomach (porcine)
+   Dose: 1x daily | Best for: Digestive/immune support
 
-8. DETOX
-- Purpose: Liver support, detoxification
-- Key ingredients: Milk Thistle, NAC, Alpha Lipoic Acid, Dandelion, Artichoke
-- Base dose: 500mg
-- Best for: Liver health, detox support, alcohol recovery
+8. C Boost - Soft Tissue/Capillaries
+   Ingredients: Vitamin C 80mg, Citrus Bioflavonoids 1100mg, Camu Camu 500mg
+   Dose: 3x daily | Best for: Vitamin C, capillary strength
 
-9. ENDURANCE
-- Purpose: Athletic performance, stamina
-- Key ingredients: Cordyceps, Rhodiola, CoQ10, B-vitamins, Electrolytes
-- Base dose: 450mg
-- Best for: Athletes, endurance, energy production
+9. Circu Plus - Circulation
+   Ingredients: Calcium 20mg, Ginkgo Biloba 166mg, Siberian Ginseng 166mg, Butcher's Broom 166mg, Pancreatin 25mg
+   Dose: 1x daily | Best for: Circulation, blood flow
 
-10. ENERGY
-- Purpose: Natural energy boost, fatigue fighting
-- Key ingredients: B-complex, Green Tea Extract, Ginseng, CoQ10, Iron
-- Base dose: 400mg
-- Best for: Daily energy, chronic fatigue, afternoon slump
+10. Colostrum Powder - Immune/Growth Factors
+    Ingredients: Colostrum powder
+    Dose: 1000mg daily | Best for: Immune support, gut health
 
-11. ENZYME DIGESTIVE
-- Purpose: Digestive support, nutrient absorption
-- Key ingredients: Protease, Lipase, Amylase, Bromelain, Papain
-- Base dose: 350mg
-- Best for: Digestive issues, bloating, nutrient absorption
+11. Chola Plus - Stomach/Liver/Gallbladder/Pancreas
+    Ingredients: Niacin 0.4mg, Chromium 40mg, Lecithin 100mg, Flax seed 100mg, Pancreatin 40mg, Choline 50mg, Ginkgo 17mg, Eleuthero 17mg, Butcher's Broom 17mg, Inositol 6mg, Sage 4mg, DL-Methionine 2mg, Betaine HCl 2mg, Artichoke 2mg, Dandelion 2mg, Milk Thistle 2mg, Turmeric 2mg, Bromelain 2mg
+    Dose: 1x daily | Best for: Comprehensive digestive support
 
-12. ESTROGEN METABOLISM
-- Purpose: Hormone balance, estrogen detox
-- Key ingredients: DIM, Calcium D-Glucarate, Broccoli extract, B-vitamins
-- Base dose: 400mg
-- Best for: Hormonal balance, PMS, estrogen dominance
+12. Dia Zyme - Digestion/Pancreas
+    Ingredients: Calcium 25mg, Phosphorus 19mg, Pancreatin 8X 420mg, Trypsin 30mg, Chymotrypsin 30mg
+    Dose: 1x daily | Best for: Protein digestion, pancreatic enzymes
 
-13. EYE HEALTH
-- Purpose: Vision support, eye protection
-- Key ingredients: Lutein, Zeaxanthin, Bilberry, Vitamin A, Zinc
-- Base dose: 350mg
-- Best for: Eye strain, macular health, night vision
+13. Diadren Forte - Liver/Gallbladder/Pancreas/Adrenal
+    Ingredients: Vitamin C 25mg, Niacin 0.5mg, Pantothenic Acid 25mg, Chromium 50mcg, Pancreatin 8X, Adrenal 50mg, Licorice 25mg, Ginger 12.5mg, Choline 10mg, Inositol 7.5mg, Lecithin 5mg, Sage 5mg, L-Methionine 2.5mg, Betaine HCl 2mg, Dandelion 2.5mg, Turmeric 2.5mg, Milk Thistle 2.5mg, Artichoke 2.5mg, Bromelain 2.5mg, Kelp 12.5mg
+    Dose: 1x daily | Best for: Comprehensive organ support
 
-14. FEMALE FERTILITY
-- Purpose: Reproductive health, conception support
-- Key ingredients: Folate, Inositol, CoQ10, Vitamin D, NAC
-- Base dose: 450mg
-- Best for: Trying to conceive, egg quality, PCOS
+14. Endocrine Support - Female Endocrine
+    Ingredients: Pantothenic Acid 4.5mg, Zinc 5.3mg, Manganese 1.8mg, Ovary/Adrenal (bovine), Goldenseal, Kelp, Pituitary, Hypothalamus, Dulse, Yarrow
+    Dose: 1x daily | Best for: Female hormone balance
 
-15. GI PRO (PLANT-BASED PROBIOTIC)
-- Purpose: Gut health, microbiome balance
-- Key ingredients: Plant-based probiotics, Prebiotics, Digestive herbs
-- Base dose: 400mg
-- Best for: Gut health, IBS, microbiome support
+15. Heart Support - Heart
+    Ingredients: Magnesium 126mg, Heart (bovine), Inulin, L-Carnitine 175mg, L-Taurine 87mg, CoQ10 21mg
+    Dose: 1-3x daily | Best for: Heart health, cardiovascular support
 
-16. GLUCOSE
-- Purpose: Blood sugar regulation
-- Key ingredients: Chromium, Cinnamon, Alpha Lipoic Acid, Bitter Melon
-- Base dose: 400mg
-- Best for: Blood sugar balance, insulin sensitivity, pre-diabetes
+16. Histamine Support - Immune/Histamine Control
+    Ingredients: Calcium 38mg, Iron 1.95mg, Vitamin B12 10mcg, Phosphorus 29mg, Chromium 1mcg, Liver (bovine) 80mg, Bovine liver fat 40mg
+    Dose: 1x daily | Best for: Histamine intolerance, allergies
 
-17. GLUTATHIONE
-- Purpose: Master antioxidant, detoxification
-- Key ingredients: Reduced Glutathione, NAC, Selenium, Milk Thistle
-- Base dose: 350mg
-- Best for: Detox, immune support, anti-aging
+17. Immune-C - Immune
+    Ingredients: Vitamin C 8.4mg, Soursop 70mg, Cats Claw 70mg, Dragon's Blood Croton 70mg, Astragalus 70mg, Camu Camu 70mg
+    Dose: 3x daily | Best for: Immune support, infection prevention
 
-18. HISTAMINE
-- Purpose: Histamine intolerance support
-- Key ingredients: DAO enzymes, Quercetin, Vitamin C, SAMe
-- Base dose: 400mg
-- Best for: Histamine intolerance, food reactions, allergies
+18. Intestinal Formula - Digestion/Elimination
+    Ingredients: Cape Aloe, Senna, Cascara Sagrada, Ginger, Barberry, Garlic, Cayenne
+    Dose: 1x daily | Best for: Constipation, bowel support
 
-19. HPA AXIS (Hypothalamic-Pituitary-Adrenal)
-- Purpose: Stress response regulation
-- Key ingredients: Ashwagandha, Phosphatidylserine, Magnesium, L-Theanine
-- Base dose: 450mg
-- Best for: Chronic stress, anxiety, cortisol dysregulation
+19. Ligament Support - Muscles/Connective Tissues
+    Ingredients: Calcium 4mg, Phosphorus 29mg, Magnesium 2mg, Manganese 11mg, Citrus Bioflavonoids 50mg, Pancreatin 12mg, L-Lysine 5mg, Ox Bile 5mg, Spleen 5mg, Thymus 5mg, Betaine HCl 2mg, Boron 100mcg, Bromelain 0.3mg
+    Dose: 1-3x daily | Best for: Ligament repair, connective tissue
 
-20. IMMUNE
-- Purpose: Immune system support
-- Key ingredients: Vitamin C, Zinc, Elderberry, Mushroom blend, Echinacea
-- Base dose: 500mg
-- Best for: Immune support, frequent illness, prevention
+20. LSK Plus - Liver/Kidneys/Spleen
+    Ingredients: Dandelion root, Stinging Nettle, Uva Ursi, Artichoke, Goldenrod, Marshmallow, Milk Thistle, Yellow Dock, Yarrow, Agrimony, Oat Straw, Meadowsweet, Liver 5mg, Spleen/Kidney 5mg
+    Dose: 1x daily | Best for: Liver/kidney/spleen detox
 
-21. INFLAMMATION
-- Purpose: Anti-inflammatory support
-- Key ingredients: Curcumin, Boswellia, Ginger, Omega-3, Proteolytic enzymes
-- Base dose: 500mg
-- Best for: Chronic inflammation, joint pain, autoimmune support
+21. Liver Support - Liver
+    Ingredients: Vitamin A 1000 IU, Liver (bovine) 350mg, Dandelion 50mg, Oregon Grape 50mg, Barberry 50mg, Choline 10mg, Inositol 10mg, Betaine HCl 10mg
+    Dose: 1x daily | Best for: Liver health, detoxification
 
-22. JOINT HEALTH
-- Purpose: Joint support and mobility
-- Key ingredients: Glucosamine, Chondroitin, MSM, Collagen, Boswellia
-- Base dose: 600mg
-- Best for: Joint pain, arthritis, mobility issues
+22. Lung Support - Lungs/Immune
+    Ingredients: Vitamin A 8000 IU, Vitamin C 16mg, Vitamin B5 15mg, Lung 75mg, Adrenal 55mg, Lymph 30mg, Eucalyptus 30mg, Thymus 20mg, Psyllium 1mg
+    Dose: 1x daily | Best for: Respiratory health, lung support
 
-23. KIDNEY
-- Purpose: Kidney health and function
-- Key ingredients: Cranberry, Dandelion, Nettle, B6, Magnesium
-- Base dose: 400mg
-- Best for: Kidney support, UTI prevention, fluid balance
+23. MG/K - Nervous System/Adrenal
+    Ingredients: Magnesium 90mg, Potassium 90mg
+    Dose: 1x daily | Best for: Electrolyte balance, adrenal support
 
-24. LIVER
-- Purpose: Liver health and detoxification
-- Key ingredients: Milk Thistle, NAC, Artichoke, Turmeric, B-vitamins
-- Base dose: 450mg
-- Best for: Liver health, detox, fatty liver
+24. Mold RX - Detox/Mold
+    Ingredients: Wild oregano 200mg, Pau D'Arco 100mg, Chaga 75mg, Sage 50mg, Mullein 50mg, Stinging Nettle 50mg
+    Dose: 1x daily | Best for: Mold exposure, fungal issues
 
-25. LUNG
-- Purpose: Respiratory health
-- Key ingredients: NAC, Mullein, Cordyceps, Vitamin C, Quercetin
-- Base dose: 400mg
-- Best for: Lung health, asthma, respiratory support
+25. Spleen Support - Lymphatic/Blood
+    Ingredients: Vitamin E 75 IU, Bovine Spleen 250mcg, Dandelion 75mg, Nettle 75mg
+    Dose: 1x daily | Best for: Spleen health, lymphatic drainage
 
-26. MALE FERTILITY
-- Purpose: Male reproductive health
-- Key ingredients: Zinc, Selenium, CoQ10, L-Carnitine, Vitamin E
-- Base dose: 450mg
-- Best for: Sperm health, male fertility, testosterone support
+26. Ovary Uterus Support - Female Reproductive
+    Ingredients: Calcium 26mg, Phosphorus 21mg, Zinc 5mg, Ovary 100mg, Uterus 100mg, Blue Cohosh 1mg
+    Dose: 1x daily | Best for: Female reproductive health
 
-27. MENOPAUSE
-- Purpose: Menopausal symptom relief
-- Key ingredients: Black Cohosh, Dong Quai, Red Clover, Vitamin E, B6
-- Base dose: 400mg
-- Best for: Hot flashes, mood swings, menopausal symptoms
+27. Para X - Antiparasitic
+    Ingredients: Black Walnut 100mg, Pumpkin seed 100mg, Wormwood 100mg, Hyssop 50mg, Thyme 50mg, Pancreatin 31mg, L-Lysine 25mg, Ox Bile 25mg, Pepsin 17mg, Cellulase 2mg, Bromelain 84 MCU
+    Dose: 1x daily | Best for: Parasites, gut infections
 
-28. METHYLATION
-- Purpose: Genetic methylation support
-- Key ingredients: Methylfolate, Methylcobalamin, TMG, SAMe, B6
-- Base dose: 350mg
-- Best for: MTHFR mutations, methylation issues, homocysteine
+28. Para Thy - Parathyroid/Thyroid
+    Ingredients: Calcium 100mg, Iodine 225mcg, Parathyroid 500mcg, Thyroid 25mg, Papain 10mg
+    Dose: 1x daily | Best for: Thyroid/parathyroid support
 
-29. MITOCHONDRIA
-- Purpose: Cellular energy production
-- Key ingredients: CoQ10, PQQ, NAD+, Alpha Lipoic Acid, Acetyl-L-Carnitine
-- Base dose: 400mg
-- Best for: Chronic fatigue, aging, cellular health
+29. Pitui Plus - Pituitary
+    Ingredients: Calcium 219mg, Phosphorous 170mg, Manganese 11mg, Pituitary 135mg, Hypothalamus 75mg, Yarrow 45mg
+    Dose: 1-3x daily | Best for: Pituitary function, hormones
 
-30. MOOD
-- Purpose: Emotional balance, mood support
-- Key ingredients: 5-HTP, L-Theanine, B-vitamins, Magnesium, Saffron
-- Base dose: 450mg
-- Best for: Depression, anxiety, mood swings
+30. Prostate Support - Prostate
+    Ingredients: Magnesium 3mg, Zinc 15mg, Molybdenum 50mcg, Potassium 4mg, Boron 250mcg, Prostate 90mg, Juniper Berry 50mg, Chaga 20mg, Betaine HCl 5mg, Saw Palmetto 15mg
+    Dose: 1x daily | Best for: Prostate health, male urinary
 
-31. MULTI VITAMIN
-- Purpose: General nutritional support
-- Key ingredients: Complete vitamin/mineral blend
-- Base dose: 600mg
-- Best for: General health, nutritional gaps
+31. Kidney & Bladder Support - Kidneys/Bladder
+    Ingredients: Kidney (bovine), Liver (bovine), Uva-Ursi, Echinacea, Goldenrod, Juniper berry
+    Dose: 1x daily | Best for: Kidney/bladder health, UTI prevention
 
-32. MUSCLE HEALTH
-- Purpose: Muscle recovery and growth
-- Key ingredients: BCAAs, L-Glutamine, Magnesium, Vitamin D, Zinc
-- Base dose: 500mg
-- Best for: Athletes, muscle recovery, sarcopenia
+32. Thyroid Support - Thyroid/Adrenal
+    Ingredients: Iodine 900mcg, Thyroid (bovine) 60mg, Adrenal (porcine) 30mg, Pituitary (bovine) 10mg, Spleen (porcine) 10mg, Kelp 180mg
+    Dose: 1-3x daily | Best for: Thyroid function, metabolism
 
-33. NEUROTRANSMITTER
-- Purpose: Brain chemical balance
-- Key ingredients: L-Tyrosine, 5-HTP, GABA, Taurine, B6
-- Base dose: 400mg
-- Best for: Mood disorders, neurotransmitter imbalances
+=== APPROVED INDIVIDUAL INGREDIENTS (29 TOTAL) ===
+Add these ON TOP of base formulas. NEVER use ingredients outside this list. Use EXACT names.
 
-34. PARASITE
-- Purpose: Parasitic infection support
-- Key ingredients: Black Walnut, Wormwood, Clove, Oregano oil
-- Base dose: 450mg
-- Best for: Parasitic infections, gut issues, travel
+1. Aloe Vera Powder - 250mg | Interactions: Digoxin, diabetes drugs, laxatives, diuretics
+2. Ahswaganda - 600mg | Interactions: Digoxin | Benefits: Anti-inflammatory, anticancer, respiratory
+3. Astragalus | Interactions: Immunosuppressants, Lithium | Benefits: Immune boost, heart function
+4. Black Currant Extract | Benefits: Immune, joint, antimicrobial, anti-inflammatory
+5. Broccoli Powder | Benefits: Blood sugar, heart health, detox, bone health, antioxidant
+6. Camu Camu | Benefits: Vitamin C, antioxidants, anti-inflammatory, blood sugar, weight
+7. Cape Aloe | Benefits: Wound healing, laxative, antioxidant, anti-inflammatory, antimicrobial
+8. Cats Claw - 30mg | Interactions: Immunosuppressants, blood pressure meds | Benefits: Immune, arthritis
+9. Chaga | Interactions: Diabetes meds | Benefits: Anti-aging, cholesterol, cancer prevention, blood pressure, immune
+10. Cinnamon 20:1 - 1000mg | Benefits: Antioxidant, anti-inflammatory, heart health, insulin, blood sugar
+11. CoEnzyme Q10 - 200mg | Interactions: Diabetes, blood thinning, thyroid meds | Benefits: Antioxidant, anti-inflammatory, heart, insulin
+12. Gaba | Benefits: Anxiety, mood, PMS, ADHD, muscle growth, fat burning, blood pressure, pain
+13. Garlic (powder) - 200mg | Interactions: Isoniazid, NNRTIs, Saquinavir, Estrogens, Cyclosporine, Anticoagulants | Benefits: Common cold, blood pressure, cholesterol, heart, Alzheimer's, performance, detox, bone health
+14. Ginger Root - 500mg | Interactions: Blood thinners | Benefits: Antibacterial, nausea, soreness, anti-inflammatory, cancer, insulin, period pain, cholesterol, indigestion
+15. Ginko Biloba Extract 24% - 100mg | Interactions: Ibuprofen, blood thinners, antidepressants, brain chemistry meds, blood sugar lowering | Benefits: Antioxidants, inflammation, circulation, heart, psychiatric disorders, brain function, anxiety, depression, vision
+16. Graviola | Benefits: Antioxidant, anti-inflammatory, blood sugar, blood pressure, ulcers, herpes, anticancer
+17. Hawthorn Berry PE 1/8% Flavones | Interactions: Digoxin, blood pressure, blood flow meds | Benefits: Antioxidants, anti-inflammatory, blood pressure, blood fats, digestion, hair loss, anxiety, heart failure
+18. Lutein - 10mg | Benefits: Eye health, skin protection, anti-inflammatory, protect proteins/fats/DNA
+19. Maca Root .6% | Benefits: Libido, erectile dysfunction, energy, endurance, fertility, mood, blood pressure, sun protection, free radicals, menopause, learning/memory
+20. Magnesium - 320mg | Interactions: Antibiotics, potassium-sparing diuretics, muscle relaxants, calcium channel blockers | Benefits: Exercise performance, depression, type 2 diabetes, blood pressure, anti-inflammatory, migraines, insulin resistance
+21. Omega 3 (algae omega) | Benefits: Cardiovascular disease prevention, blood platelets, triglycerides, inflammation, depression, anxiety, eye health, brain health, pregnancy, heart disease, ADHD, metabolic syndrome
+22. Phosphatidylcholine 40% (soy) | Interactions: Cholinergic/Anticholinergic drugs | Benefits: Cognitive function, liver repair, medication side effects, ulcerative colitis, lipolysis, gallstones
+23. Resveratrol | Interactions: Estrogen-based meds | Benefits: Blood pressure, blood fats, brain protection, insulin sensitivity, joint pain, cancer suppression
+24. Saw Palmetto Extract 45% Fatty Acid (GC) | Interactions: Estrogen-based meds | Benefits: Hair loss, urinary tract, prostate, inflammation, testosterone
+25. Stinging Nettle | Interactions: Lithium, diabetes, blood pressure, sedatives, blood thinners | Benefits: Inflammation, enlarged prostate, hay fever, blood pressure, blood sugar
+26. Sumar Root | Benefits: Adaptogen, anti-inflammatory, antioxidant, cancer protection, fertility, digestion
+27. Turmeric Root Extract 4:1 - 500mg | Interactions: Blood clotting | Benefits: Anti-inflammatory, antioxidant, anticancer, skin conditions, brain food
+28. Vitamin C - 90mg | Interactions: Chemotherapy, blood thinners | Benefits: Chronic disease, blood pressure, blood fats, uric acid, gout, iron deficiency, immunity
+29. Vitamin E (Mixed tocopherols) - 15mg | Interactions: Aspirin, blood thinners | Benefits: Antioxidant, cell life, oil balance, skin nourishment
 
-35. SKIN HEALTH
-- Purpose: Skin, hair, and nail support
-- Key ingredients: Collagen, Biotin, Vitamin C, Zinc, Silica
-- Base dose: 400mg
-- Best for: Skin health, anti-aging, hair/nail strength
+=== PROACTIVE FOLLOW-UP QUESTION LOGIC ===
 
-36. SLEEP
-- Purpose: Sleep quality and duration
-- Key ingredients: Melatonin, L-Theanine, Magnesium, Valerian, Passionflower
-- Base dose: 400mg
-- Best for: Insomnia, sleep quality, jet lag
+Before finalizing a formulation, ask 2-3 smart follow-up questions based on what wasn't mentioned but could impact health:
 
-37. TESTOSTERONE
-- Purpose: Male hormone support
-- Key ingredients: Tribulus, Fenugreek, D-Aspartic Acid, Zinc, Vitamin D
-- Base dose: 500mg
-- Best for: Low testosterone, male vitality, muscle mass
+FEMALE-SPECIFIC:
+- If female and "fertility" not mentioned: "Are you currently trying to get pregnant or planning to in the near future?"
+- If female over 45 and no menopause discussion: "Are you experiencing any menopausal symptoms like hot flashes or mood changes?"
 
-38. THYROID
-- Purpose: Thyroid function support
-- Key ingredients: Iodine, Tyrosine, Selenium, Ashwagandha, B-vitamins
-- Base dose: 350mg
-- Best for: Hypothyroid, metabolism, energy
+DIGESTION:
+- If "digestion" mentioned without parasite screening: "Have you ever been tested for parasites or experienced bloating after meals?"
+- If digestive issues but no food sensitivity discussion: "Have you noticed any foods that consistently don't agree with you?"
 
-39. VASCULAR
-- Purpose: Circulation and vein health
-- Key ingredients: Horse Chestnut, Butcher's Broom, Vitamin C, Rutin
-- Base dose: 400mg
-- Best for: Varicose veins, circulation, vascular health
+AGE-RELATED:
+- If over 50 and no joint support mentioned: "Do you experience joint stiffness, especially in mornings or after physical activity?"
+- If over 60 and no cognitive concerns: "Have you noticed any changes in memory or mental clarity?"
 
-=== CRITICAL FORMULATION RULES ===
+ENVIRONMENTAL:
+- If "mold" not in exposures: "Have you lived or worked in places with known mold exposure (old buildings, water damage)?"
+- If chronic fatigue without environmental check: "Are you exposed to chemicals, heavy metals, or environmental toxins at work/home?"
 
-1. ALWAYS START WITH A FORMULA BASE
-   - Never create a formula with only individual ingredients
-   - Formula bases provide synergistic blends
-
-2. DOSING LIMITS
-   - Total formula cannot exceed 800mg
-   - Consider capsule size and patient compliance
-   - Some ingredients have very small doses (mcg) and MUST be in bases
-
-3. INTERACTION CHECKS
-   - Iron blocks calcium absorption (separate by 2 hours)
-   - Zinc competes with copper (maintain 10:1 ratio)
-   - Vitamin K interacts with blood thinners
-   - 5-HTP/SAMe interact with antidepressants
-   - Ginseng interacts with blood pressure meds
-   - St. John's Wort interacts with many medications
-
-4. SPECIAL POPULATIONS
-   - Pregnancy: Avoid vitamin A, limit herbs
-   - Elderly: May need lower doses, consider absorption
-   - Children: Requires specific pediatric formulations
-   - Athletes: Consider testing regulations
+LIFESTYLE:
+- If high stress without sleep discussion: "How many hours of quality sleep are you getting per night?"
+- If exercise mentioned without recovery discussion: "How do you typically recover after workouts? Any persistent soreness?"
 
 === BLOOD TEST INTERPRETATION GUIDELINES ===
 
@@ -784,12 +770,27 @@ When users provide blood test results, optimize based on these ranges:
 
 === RESPONSE FORMAT ===
 
-When providing a supplement recommendation, ALWAYS include both:
-1. A conversational, educational response explaining your reasoning
-2. A structured JSON block enclosed in triple backticks with "json" tag containing:
+When providing a supplement recommendation, ALWAYS include:
+
+1. CONVERSATIONAL RESPONSE with:
+   - Educational explanation of your reasoning
+   - 2-3 smart follow-up questions based on missing information
+   - Ask about capsule preference: Size 00 (smaller, need 4-6/day) or Size 000 (larger, need 3-4/day)
+   - Ask about AM/PM preference or minimize to 3 caps/day
+
+2. CAPSULE CALCULATION:
+   - Base formulas total: Calculate exact mg
+   - Individual additions total: Calculate exact mg
+   - Daily total: Show 2000-4000mg range
+   - Capsule count: Based on user's size preference
+   - Dosing schedule: AM/PM split or concentrated dosing
+
+3. STRUCTURED JSON BLOCK (in triple backticks with "json" tag):
    - bases: array of formula bases with name, dose, purpose
    - additions: array of additional ingredients with name, dose, purpose  
-   - totalMg: total formula weight (must not exceed 800)
+   - totalMg: total formula weight
+   - capsulesPerDay: number of capsules needed daily
+   - capsuleSize: "00" or "000"
    - warnings: array of drug interactions or contraindications
    - rationale: brief explanation of formula strategy
    - disclaimers: array of safety disclaimers
