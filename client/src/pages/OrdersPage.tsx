@@ -129,7 +129,25 @@ export default function OrdersPage() {
 
   // Show error messages
   useEffect(() => {
-    if (subscriptionError || ordersError || paymentsError || billingError) {
+    // Check if error is a 404 "not found" or JSON parsing error (expected for new users)
+    const isNonCriticalError = (error: Error | null) => {
+      if (!error) return false;
+      const msg = error.message || '';
+      // Check for 404s, "not found" errors, or JSON parsing errors
+      return msg.includes('404') || 
+             msg.includes('not found') || 
+             msg.includes('No subscription') ||
+             msg.includes('Unexpected token') ||
+             msg.includes('is not valid JSON');
+    };
+    
+    // Only show toast for real errors (not 404 "not found" or parsing errors)
+    const hasSubscriptionError = subscriptionError && !isNonCriticalError(subscriptionError);
+    const hasOrdersError = ordersError && !isNonCriticalError(ordersError);
+    const hasPaymentsError = paymentsError && !isNonCriticalError(paymentsError);
+    const hasBillingError = billingError && !isNonCriticalError(billingError);
+    
+    if (hasSubscriptionError || hasOrdersError || hasPaymentsError || hasBillingError) {
       const errorMessage = subscriptionError?.message || ordersError?.message || paymentsError?.message || billingError?.message;
       toast({
         title: 'Error loading data',
