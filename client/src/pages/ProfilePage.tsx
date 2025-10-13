@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,6 +92,8 @@ export default function ProfilePage() {
   const initialTab = searchParams.get('tab') || 'profile';
   const [activeTab, setActiveTab] = useState(initialTab);
   const [showPassword, setShowPassword] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   // React Query for user data
   const { data: userData, isLoading: userLoading, error: userError } = useQuery<{user: UserType}>({
@@ -236,6 +238,77 @@ export default function ProfilePage() {
       });
     },
   });
+
+  // File upload handler
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF, JPG, or PNG file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: "File too large",
+        description: "Please upload a file smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'lab-report');
+      formData.append('metadata', JSON.stringify({
+        uploadSource: 'health-profile-page',
+        originalName: file.name
+      }));
+
+      const response = await fetch('/api/files/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
+      
+      toast({
+        title: "File uploaded successfully",
+        description: `${file.name} has been securely uploaded.`,
+      });
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Show error message if any critical data fetch fails
   // But ignore 404 errors for health profile (user hasn't created one yet)
@@ -848,17 +921,21 @@ export default function ProfilePage() {
                   </CardDescription>
                 </div>
                 <Button 
-                  onClick={() => {
-                    toast({
-                      title: "File upload feature",
-                      description: "HIPAA-compliant file upload will be implemented using ObjectStorageService APIs.",
-                      variant: "default",
-                    });
-                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
                   data-testid="button-upload-report"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Upload Report
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Upload Report
+                    </>
+                  )}
                 </Button>
               </div>
             </CardHeader>
@@ -932,23 +1009,36 @@ export default function ProfilePage() {
                       Upload your blood work and medical reports to get personalized insights
                     </p>
                     <Button 
-                      onClick={() => {
-                        toast({
-                          title: "File upload feature",
-                          description: "HIPAA-compliant file upload functionality will be implemented using the backend ObjectStorageService.",
-                          variant: "default",
-                        });
-                      }}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
                       data-testid="button-upload-first-report"
                     >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Upload Your First Report
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload Your First Report
+                        </>
+                      )}
                     </Button>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
+
+          {/* Hidden file input for lab report uploads */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-6">
