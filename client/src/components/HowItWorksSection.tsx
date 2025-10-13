@@ -38,28 +38,28 @@ export default function HowItWorksSection() {
   };
 
   return (
-    <section className="py-20 bg-muted/50" data-testid="section-how-it-works">
+    <section className="py-24 bg-background" data-testid="section-how-it-works">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-foreground mb-6" data-testid="text-how-it-works-headline">
+        <div className="text-center mb-16 max-w-3xl mx-auto">
+          <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4 tracking-tight" data-testid="text-how-it-works-headline">
             How ONES Works
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto" data-testid="text-how-it-works-description">
+          <p className="text-lg text-muted-foreground" data-testid="text-how-it-works-description">
             A simple, science-backed process that evolves with your health journey.
           </p>
         </div>
 
         {/* Progress Line */}
-        <div className="hidden lg:block mb-16">
+        <div className="hidden lg:block mb-12">
           <div className="flex items-center justify-center max-w-4xl mx-auto">
             {steps.map((_, index) => (
               <div key={index} className="flex items-center">
-                <div className={`w-4 h-4 rounded-full transition-all duration-300 ${
-                  activeStep >= index ? 'bg-primary scale-125' : 'bg-muted'
+                <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                  activeStep >= index ? 'bg-primary scale-125' : 'bg-border'
                 }`}></div>
                 {index < steps.length - 1 && (
-                  <div className={`h-1 w-24 transition-all duration-300 ${
-                    activeStep > index ? 'bg-primary' : 'bg-muted'
+                  <div className={`h-0.5 w-24 transition-all duration-300 ${
+                    activeStep > index ? 'bg-primary' : 'bg-border'
                   }`}></div>
                 )}
               </div>
@@ -67,40 +67,40 @@ export default function HowItWorksSection() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-2 xl:grid-cols-4 gap-8 max-w-7xl mx-auto">
+        <div className="grid lg:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {steps.map((step, index) => {
             const IconComponent = step.icon;
             return (
               <Card 
                 key={index}
-                className={`p-6 hover-elevate transition-all duration-300 cursor-pointer ${
-                  activeStep === index ? 'ring-2 ring-primary shadow-lg' : ''
+                className={`p-6 border-border/50 hover-elevate transition-all duration-300 cursor-pointer ${
+                  activeStep === index ? 'ring-1 ring-primary shadow-lg' : ''
                 }`}
                 onMouseEnter={() => handleStepHover(index)}
                 data-testid={`card-step-${index}`}
               >
                 <div className="text-center">
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 transition-all duration-300 ${
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 transition-all duration-300 ${
                     activeStep === index ? 'bg-primary text-primary-foreground scale-110' : 'bg-primary/10 text-primary'
                   }`}>
-                    <IconComponent className="w-8 h-8" />
+                    <IconComponent className="w-7 h-7" />
                   </div>
                   
-                  <div className="text-sm font-medium text-primary mb-2" data-testid={`text-step-number-${index}`}>
-                    Step {index + 1}
+                  <div className="text-xs font-semibold text-primary mb-2" data-testid={`text-step-number-${index}`}>
+                    STEP {index + 1}
                   </div>
                   
-                  <h3 className="text-lg font-semibold text-foreground mb-4" data-testid={`text-step-title-${index}`}>
+                  <h3 className="text-base font-semibold text-foreground mb-3" data-testid={`text-step-title-${index}`}>
                     {step.title}
                   </h3>
                   
-                  <p className="text-muted-foreground mb-4" data-testid={`text-step-description-${index}`}>
+                  <p className="text-sm text-muted-foreground mb-4 leading-relaxed" data-testid={`text-step-description-${index}`}>
                     {step.description}
                   </p>
                   
                   {activeStep === index && (
-                    <div className="border-t border-border pt-4 mt-4">
-                      <p className="text-sm text-muted-foreground" data-testid={`text-step-details-${index}`}>
+                    <div className="border-t border-border/50 pt-4 mt-2">
+                      <p className="text-xs text-muted-foreground leading-relaxed" data-testid={`text-step-details-${index}`}>
                         {step.details}
                       </p>
                     </div>
@@ -113,9 +113,9 @@ export default function HowItWorksSection() {
 
         {/* Call to action */}
         <div className="text-center mt-16">
-          <div className="inline-flex items-center space-x-4 bg-primary/10 px-6 py-3 rounded-full">
-            <span className="text-primary font-medium">Ready to start?</span>
-            <span className="text-muted-foreground">It takes less than 10 minutes</span>
+          <div className="inline-flex items-center gap-4 bg-primary/5 px-6 py-3 rounded-full border border-primary/10">
+            <span className="text-primary font-semibold text-sm">Ready to start?</span>
+            <span className="text-muted-foreground text-sm">It takes less than 10 minutes</span>
           </div>
         </div>
       </div>

@@ -41,11 +41,9 @@ export default function AIChat() {
   const handleSendMessage = useCallback(async () => {
     if (!inputValue.trim()) return;
 
-    // Save message to localStorage and redirect to signup
     try {
       localStorage.setItem('preAuthMessage', inputValue);
       
-      // Show user message in UI
       const userMessage: Message = {
         id: Date.now().toString(),
         content: inputValue,
@@ -55,10 +53,8 @@ export default function AIChat() {
       setMessages(prev => [...prev, userMessage]);
       setInputValue('');
 
-      // Show brief loading state to indicate message was received
       setIsTyping(true);
       
-      // Brief delay to show the message was received, then redirect
       setTimeout(() => {
         setLocation('/signup');
       }, 500);
@@ -89,8 +85,6 @@ export default function AIChat() {
       };
       setMessages(prev => [...prev, fileMessage]);
       
-      // TODO: Implement file upload to server and OCR processing
-      // For now, we'll send a message indicating file upload
       setInputValue(`I've uploaded my blood test results: ${file.name}. Please analyze them and create a personalized supplement formula.`);
       
       toast({
@@ -109,22 +103,22 @@ export default function AIChat() {
   };
 
   return (
-    <Card className="w-full max-w-md h-[500px] flex flex-col glass shadow-premium-lg border-none" data-testid="card-ai-chat">
+    <Card className="w-full h-[550px] flex flex-col border-border/50 shadow-lg overflow-hidden" data-testid="card-ai-chat">
       {/* Chat Header */}
-      <div className="p-4 border-b border-card-border">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <Bot className="w-4 h-4 text-primary-foreground" />
+      <div className="p-5 border-b border-border/50 bg-card/50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+            <Bot className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-medium text-sm" data-testid="text-ai-name">ONES AI</h3>
+            <h3 className="font-semibold text-sm" data-testid="text-ai-name">ONES AI</h3>
             <p className="text-xs text-muted-foreground">Your health consultant</p>
           </div>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4" data-testid="container-messages">
+      <div className="flex-1 overflow-y-auto p-5 space-y-4" data-testid="container-messages">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -132,35 +126,30 @@ export default function AIChat() {
             data-testid={`message-${message.sender}-${message.id}`}
           >
             <div
-              className={`max-w-[80%] rounded-lg p-3 space-y-3 ${
+              className={`max-w-[85%] rounded-2xl px-4 py-3 space-y-3 ${
                 message.sender === 'user'
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground'
+                  : 'bg-muted/50 text-foreground'
               }`}
             >
-              <div className="flex items-start space-x-2">
+              <div className="flex items-start gap-2">
                 {message.sender === 'ai' && (
-                  <Bot className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                )}
-                {message.sender === 'user' && (
-                  <User className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <Bot className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
                 )}
                 <div className="flex-1">
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                   
-                  {/* Formula visualization */}
                   {message.formula && (
-                    <div className="mt-3 p-3 bg-background/50 rounded-lg border text-foreground">
-                      <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
+                    <div className="mt-3 p-4 bg-background/80 rounded-xl border border-border/50">
+                      <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-primary" />
                         Personalized Formula ({message.formula.totalMg}mg)
                       </h4>
                       
-                      {/* Formula Bases */}
                       {message.formula.bases.length > 0 && (
                         <div className="mb-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Base Formulas:</p>
-                          <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Base Formulas:</p>
+                          <div className="space-y-1.5">
                             {message.formula.bases.map((base, idx) => (
                               <div key={idx} className="flex items-center justify-between text-xs">
                                 <span className="font-medium">{base.name}</span>
@@ -171,11 +160,10 @@ export default function AIChat() {
                         </div>
                       )}
                       
-                      {/* Additional Ingredients */}
                       {message.formula.additions.length > 0 && (
                         <div className="mb-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Additional Ingredients:</p>
-                          <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Additional Ingredients:</p>
+                          <div className="space-y-1.5">
                             {message.formula.additions.map((addition, idx) => (
                               <div key={idx} className="flex items-center justify-between text-xs">
                                 <span className="font-medium">{addition.name}</span>
@@ -186,17 +174,16 @@ export default function AIChat() {
                         </div>
                       )}
                       
-                      {/* Warnings */}
                       {message.formula.warnings.length > 0 && (
                         <div className="mb-2">
-                          <p className="text-xs font-medium text-amber-600 mb-1 flex items-center gap-1">
+                          <p className="text-xs font-medium text-amber-600 dark:text-amber-500 mb-1.5 flex items-center gap-1">
                             <AlertTriangle className="w-3 h-3" />
                             Important Warnings:
                           </p>
-                          <ul className="text-xs text-amber-700 space-y-1">
+                          <ul className="text-xs text-amber-700 dark:text-amber-400 space-y-1">
                             {message.formula.warnings.map((warning, idx) => (
                               <li key={idx} className="flex items-start gap-1">
-                                <span className="text-amber-600 mt-0.5">•</span>
+                                <span className="text-amber-600 dark:text-amber-500 mt-0.5">•</span>
                                 {warning}
                               </li>
                             ))}
@@ -204,9 +191,8 @@ export default function AIChat() {
                         </div>
                       )}
                       
-                      {/* Disclaimers */}
                       {message.formula.disclaimers.length > 0 && (
-                        <div className="text-xs text-muted-foreground border-t pt-2">
+                        <div className="text-xs text-muted-foreground border-t border-border/50 pt-2 mt-2">
                           {message.formula.disclaimers.map((disclaimer, idx) => (
                             <p key={idx} className="mb-1">• {disclaimer}</p>
                           ))}
@@ -222,13 +208,13 @@ export default function AIChat() {
         
         {isTyping && (
           <div className="flex justify-start" data-testid="indicator-typing">
-            <div className="bg-muted text-muted-foreground rounded-lg p-3 max-w-[80%]">
-              <div className="flex items-center space-x-2">
-                <Bot className="w-4 h-4" />
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div className="bg-muted/50 text-foreground rounded-2xl px-4 py-3 max-w-[85%]">
+              <div className="flex items-center gap-2">
+                <Bot className="w-4 h-4 text-primary" />
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
               </div>
             </div>
@@ -237,21 +223,20 @@ export default function AIChat() {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 border-t border-card-border">
-        <div className="flex space-x-2">
+      <div className="p-5 border-t border-border/50 bg-card/50">
+        <div className="flex gap-2">
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Tell me about your health goals..."
-            className="flex-1"
+            className="flex-1 bg-background/50"
             data-testid="input-chat-message"
           />
           <Button
             variant="outline"
             size="icon"
             onClick={handleFileUpload}
-            className="micro-bounce transition-all duration-300"
             data-testid="button-upload-file"
           >
             <Upload className="w-4 h-4" />
@@ -260,7 +245,6 @@ export default function AIChat() {
             onClick={handleSendMessage}
             size="icon"
             disabled={!inputValue.trim() || isTyping}
-            className="micro-bounce micro-glow transition-all duration-300"
             data-testid="button-send-message"
           >
             <Send className="w-4 h-4" />
@@ -274,9 +258,9 @@ export default function AIChat() {
           className="hidden"
           data-testid="input-file-upload"
         />
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-xs text-muted-foreground mt-2.5">
           Upload blood tests (PDF/image) or describe your health goals
-          {sessionId && <span className="ml-2 text-green-600">• Connected</span>}
+          {sessionId && <span className="ml-2 text-primary">• Connected</span>}
         </p>
       </div>
     </Card>
