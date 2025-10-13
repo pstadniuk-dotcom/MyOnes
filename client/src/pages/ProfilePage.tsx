@@ -128,6 +128,7 @@ export default function ProfilePage() {
     emailConsultation: true,
     emailShipping: true,
     emailBilling: true,
+    pushNotifications: false,
   });
 
   const [healthData, setHealthData] = useState({
@@ -165,6 +166,7 @@ export default function ProfilePage() {
         emailConsultation: notificationPrefs.emailConsultation,
         emailShipping: notificationPrefs.emailShipping,
         emailBilling: notificationPrefs.emailBilling,
+        pushNotifications: false, // Not supported in backend yet
       });
     }
   }, [notificationPrefs]);
@@ -236,8 +238,14 @@ export default function ProfilePage() {
   });
 
   // Show error message if any critical data fetch fails
+  // But ignore 404 errors for health profile (user hasn't created one yet)
   useEffect(() => {
-    if (userError || healthError || notificationError) {
+    const isHealthNotFound = healthError && 
+      (healthError.message?.includes('No health profile found') || 
+       healthError.message?.includes('404'));
+    
+    // Only show toast for real errors, not "not found" states
+    if (userError || notificationError || (healthError && !isHealthNotFound)) {
       toast({
         title: "Error loading profile data",
         description: "Please refresh the page to try again.",
