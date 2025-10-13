@@ -277,8 +277,16 @@ export default function ProfilePage() {
         originalName: file.name
       }));
 
+      // Get auth token from localStorage
+      const token = localStorage.getItem('authToken');
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch('/api/files/upload', {
         method: 'POST',
+        headers,
         body: formData,
         credentials: 'include'
       });
