@@ -23,7 +23,7 @@ import { apiRequest } from '@/lib/queryClient';
 interface Message {
   id: string;
   content: string;
-  sender: 'user' | 'ai';
+  sender: 'user' | 'ai' | 'system';
   timestamp: Date;
   sessionId?: string;
   fileAttachment?: {
@@ -322,6 +322,15 @@ export default function ConsultationPage() {
                   if (data.sessionId && !currentSessionId) {
                     setCurrentSessionId(data.sessionId);
                   }
+                } else if (data.type === 'health_data_updated') {
+                  // Add a system message indicating profile was updated
+                  const systemMessageId = (Date.now() + Math.random()).toString();
+                  setMessages(prev => [...prev, {
+                    id: systemMessageId,
+                    content: data.message || "✓ We've updated your health profile based on the information you provided.",
+                    sender: 'system',
+                    timestamp: new Date()
+                  }]);
                 } else if (data.type === 'complete') {
                   completed = true;
                   if (data.formula) {
@@ -936,19 +945,36 @@ export default function ConsultationPage() {
         {/* Messages Area */}
         <ScrollArea className="flex-1" data-testid="container-chat-messages">
           <div className="p-6 space-y-6">
-            {filteredMessages.map((message, index) => (
-              <div
-                key={message.id}
-                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                data-testid={`message-${message.sender}-${message.id}`}
-              >
+            {filteredMessages.map((message, index) => {
+              // System messages render differently
+              if (message.sender === 'system') {
+                return (
+                  <div
+                    key={message.id}
+                    className="flex justify-center"
+                    data-testid={`message-system-${message.id}`}
+                  >
+                    <div className="max-w-md px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium border border-primary/20">
+                      {message.content}
+                    </div>
+                  </div>
+                );
+              }
+              
+              // Regular user/AI messages
+              return (
                 <div
-                  className={`max-w-[85%] rounded-lg p-4 space-y-3 ${
-                    message.sender === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-background text-foreground border shadow-sm'
-                  }`}
+                  key={message.id}
+                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  data-testid={`message-${message.sender}-${message.id}`}
                 >
+                  <div
+                    className={`max-w-[85%] rounded-lg p-4 space-y-3 ${
+                      message.sender === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background text-foreground border shadow-sm'
+                    }`}
+                  >
                   <div className="flex items-start space-x-3">
                     {message.sender === 'ai' && (
                       <Avatar className="h-8 w-8">
@@ -1104,7 +1130,8 @@ export default function ConsultationPage() {
                   </div>
                 </div>
               </div>
-            ))}
+            );
+          })}
             
             {/* Enhanced Typing Indicator */}
             {isTyping && (
