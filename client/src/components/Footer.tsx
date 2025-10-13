@@ -44,29 +44,29 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-card border-t border-border/50" data-testid="footer">
+    <footer className="bg-background border-t border-border" data-testid="footer">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
         {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-10 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8 mb-12">
           {/* Brand Section */}
           <div className="lg:col-span-2">
-            <h2 className="text-2xl font-bold text-foreground mb-3 tracking-tight" data-testid="text-footer-brand">
+            <h2 className="text-2xl font-serif font-bold text-primary mb-4" data-testid="text-footer-brand">
               ONES
             </h2>
-            <p className="text-muted-foreground mb-6 max-w-sm text-sm leading-relaxed" data-testid="text-footer-description">
+            <p className="text-muted-foreground mb-6 max-w-sm" data-testid="text-footer-description">
               Personalized supplements powered by AI. Transforming health one formula at a time.
             </p>
             
             {/* Newsletter Signup */}
             <div className="space-y-3">
               <h3 className="text-sm font-semibold text-foreground">Get health tips & updates</h3>
-              <form onSubmit={handleEmailSubmit} className="flex gap-2">
+              <form onSubmit={handleEmailSubmit} className="flex space-x-2">
                 <Input
                   type="email"
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1 bg-background/50"
+                  className="flex-1"
                   data-testid="input-newsletter-email"
                 />
                 <Button 
@@ -83,12 +83,12 @@ export default function Footer() {
           {/* Product Links */}
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-4">Product</h3>
-            <ul className="space-y-2.5">
+            <ul className="space-y-3">
               {footerLinks.product.map((link, index) => (
                 <li key={index}>
                   <button
                     onClick={() => handleLinkClick(link.href)}
-                    className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm"
+                    className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
                     data-testid={`link-footer-product-${index}`}
                   >
                     {link.name}
@@ -101,12 +101,12 @@ export default function Footer() {
           {/* Company Links */}
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-4">Company</h3>
-            <ul className="space-y-2.5">
+            <ul className="space-y-3">
               {footerLinks.company.map((link, index) => (
                 <li key={index}>
                   <button
                     onClick={() => handleLinkClick(link.href)}
-                    className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm"
+                    className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
                     data-testid={`link-footer-company-${index}`}
                   >
                     {link.name}
@@ -119,12 +119,12 @@ export default function Footer() {
           {/* Support Links */}
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-4">Support</h3>
-            <ul className="space-y-2.5">
+            <ul className="space-y-3">
               {footerLinks.support.map((link, index) => (
                 <li key={index}>
                   <button
                     onClick={() => handleLinkClick(link.href)}
-                    className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm"
+                    className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
                     data-testid={`link-footer-support-${index}`}
                   >
                     {link.name}
@@ -137,12 +137,12 @@ export default function Footer() {
           {/* Legal Links */}
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-4">Legal</h3>
-            <ul className="space-y-2.5">
+            <ul className="space-y-3">
               {footerLinks.legal.map((link, index) => (
                 <li key={index}>
                   <button
                     onClick={() => handleLinkClick(link.href)}
-                    className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm"
+                    className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
                     data-testid={`link-footer-legal-${index}`}
                   >
                     {link.name}
@@ -155,34 +155,44 @@ export default function Footer() {
 
         <Separator className="mb-8" />
 
-        {/* Bottom Footer */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-          <p data-testid="text-footer-copyright">
-            © {new Date().getFullYear()} ONES. All rights reserved.
-          </p>
-          
-          <div className="flex items-center gap-6">
-            <button 
-              onClick={() => handleLinkClick('#twitter')}
-              className="hover:text-foreground transition-colors"
-              data-testid="link-footer-twitter"
-            >
-              Twitter
-            </button>
-            <button 
-              onClick={() => handleLinkClick('#instagram')}
-              className="hover:text-foreground transition-colors"
-              data-testid="link-footer-instagram"
-            >
-              Instagram
-            </button>
-            <button 
-              onClick={() => handleLinkClick('#linkedin')}
-              className="hover:text-foreground transition-colors"
-              data-testid="link-footer-linkedin"
-            >
-              LinkedIn
-            </button>
+        {/* Bottom Section */}
+        <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+          <div className="flex items-center space-x-6">
+            <p className="text-sm text-muted-foreground" data-testid="text-footer-copyright">
+              © 2024 ONES. All rights reserved.
+            </p>
+            
+            {/* Social Proof */}
+            <div className="hidden md:flex items-center space-x-4 text-sm text-muted-foreground">
+              <span className="flex items-center space-x-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span>10,000+ optimizing their health</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Trust Badges */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center">
+                <span className="text-primary font-bold text-xs">FDA</span>
+              </div>
+              <span>FDA-registered</span>
+            </div>
+            
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center">
+                <span className="text-primary font-bold text-xs">✓</span>
+              </div>
+              <span>3rd party tested</span>
+            </div>
+            
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center">
+                <span className="text-primary font-bold text-xs">USA</span>
+              </div>
+              <span>Made in USA</span>
+            </div>
           </div>
         </div>
       </div>
