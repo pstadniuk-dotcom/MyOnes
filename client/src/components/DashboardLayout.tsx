@@ -192,9 +192,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
                 <div className="h-6 w-px bg-border mx-2" />
                 <div className="flex items-center gap-1">
-                  <div className="w-6 h-6 bg-primary rounded-md flex items-center justify-center">
-                    <span className="text-xs font-bold text-primary-foreground">O</span>
-                  </div>
                   <span className="font-semibold text-lg">ONES</span>
                   <Badge variant="secondary" className="text-xs">AI</Badge>
                 </div>
