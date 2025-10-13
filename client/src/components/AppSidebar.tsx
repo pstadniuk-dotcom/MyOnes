@@ -70,12 +70,6 @@ const accountMenuItems = [
     description: 'Subscription and orders',
   },
   {
-    title: 'Payment Methods',
-    url: '/dashboard/orders?tab=billing',
-    icon: CreditCard,
-    description: 'Manage payment methods',
-  },
-  {
     title: 'Account Settings',
     url: '/dashboard/profile?tab=settings',
     icon: Settings,
