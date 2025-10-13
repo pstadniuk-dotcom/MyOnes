@@ -1574,6 +1574,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
 
       // Extract health data from response if present
+      let healthDataUpdated = false;
       try {
         const healthDataMatch = fullResponse.match(/```health-data\s*({[\s\S]*?})\s*```/);
         if (healthDataMatch && userId) {
@@ -1616,6 +1617,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           }
           
           console.log('Health profile automatically updated from AI conversation');
+          healthDataUpdated = true;
+          
+          // Remove the health-data block from fullResponse before saving
+          fullResponse = fullResponse.replace(/```health-data\s*{[\s\S]*?}\s*```\s*/g, '').trim();
         }
       } catch (e) {
         console.log('No valid health data found in response or error updating profile:', e);
@@ -1647,6 +1652,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         } catch (formulaSaveError) {
           console.error('Error saving formula:', formulaSaveError);
         }
+      }
+      
+      // Send health data update notification if applicable
+      if (healthDataUpdated) {
+        sendSSE({
+          type: 'health_data_updated',
+          message: "✓ We've updated your health profile based on the information you provided.",
+          sessionId: chatSession?.id
+        });
       }
       
       // Send completion event with any extracted formula
