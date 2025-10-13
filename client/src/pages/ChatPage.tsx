@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Send, Upload, Bot, User, AlertTriangle, CheckCircle, Menu } from 'lucide-react';
+import { Send, Upload, Brain, User, AlertTriangle, CheckCircle, Menu } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
 
@@ -289,7 +289,7 @@ export default function ChatPage() {
       <header className="flex items-center justify-between p-4 border-b border-border bg-card/50 backdrop-blur">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-            <Bot className="w-5 h-5 text-primary-foreground" />
+            <Brain className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
             <h1 className="text-xl font-semibold" data-testid="text-chat-title">ONES AI</h1>
@@ -322,7 +322,7 @@ export default function ChatPage() {
             >
               <div className="flex items-start space-x-3">
                 {message.sender === 'ai' && (
-                  <Bot className="w-5 h-5 mt-0.5 flex-shrink-0 text-primary" />
+                  <Brain className="w-5 h-5 mt-0.5 flex-shrink-0 text-primary" />
                 )}
                 {message.sender === 'user' && (
                   <User className="w-5 h-5 mt-0.5 flex-shrink-0" />
@@ -420,7 +420,7 @@ export default function ChatPage() {
           <div className="flex justify-start" data-testid="indicator-typing">
             <div className="bg-muted rounded-lg p-4 max-w-[80%] border">
               <div className="flex items-center space-x-3">
-                <Bot className="w-5 h-5 text-primary" />
+                <Brain className="w-5 h-5 text-primary" />
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">ONES AI is thinking...</p>
                   <div className="flex space-x-1">
