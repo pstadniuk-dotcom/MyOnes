@@ -313,15 +313,19 @@ export default function ProfilePage() {
   // Show error message if any critical data fetch fails
   // But ignore 404 errors for health profile (user hasn't created one yet)
   useEffect(() => {
-    const isHealthNotFound = healthError && 
-      (healthError.message?.includes('No health profile found') || 
-       healthError.message?.startsWith('404'));
+    // Check if error is a 404 "not found" (expected for new users)
+    const is404Error = (error: Error | null) => {
+      if (!error) return false;
+      const msg = error.message || '';
+      return msg.includes('404') || msg.includes('not found') || msg.includes('No health profile');
+    };
     
-    const isNotificationNotFound = notificationError && 
-      notificationError.message?.startsWith('404');
+    // Only show toast for real errors (not 404 "not found" states)
+    const hasRealError = userError && !is404Error(userError);
+    const hasHealthError = healthError && !is404Error(healthError);
+    const hasNotificationError = notificationError && !is404Error(notificationError);
     
-    // Only show toast for real errors, not "not found" states
-    if (userError || (healthError && !isHealthNotFound) || (notificationError && !isNotificationNotFound)) {
+    if (hasRealError || hasHealthError || hasNotificationError) {
       toast({
         title: "Error loading profile data",
         description: "Please refresh the page to try again.",
