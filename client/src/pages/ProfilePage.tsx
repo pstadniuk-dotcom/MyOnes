@@ -315,10 +315,13 @@ export default function ProfilePage() {
   useEffect(() => {
     const isHealthNotFound = healthError && 
       (healthError.message?.includes('No health profile found') || 
-       healthError.message?.includes('404'));
+       healthError.message?.startsWith('404'));
+    
+    const isNotificationNotFound = notificationError && 
+      notificationError.message?.startsWith('404');
     
     // Only show toast for real errors, not "not found" states
-    if (userError || notificationError || (healthError && !isHealthNotFound)) {
+    if (userError || (healthError && !isHealthNotFound) || (notificationError && !isNotificationNotFound)) {
       toast({
         title: "Error loading profile data",
         description: "Please refresh the page to try again.",
