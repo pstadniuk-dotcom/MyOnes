@@ -5,7 +5,7 @@ import {
   Package,
   User,
   HelpCircle,
-  Bot,
+  Brain,
   Activity,
   CreditCard,
   Settings,
@@ -121,7 +121,7 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-3">
           <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
-            <Bot className="w-4 h-4 text-primary-foreground" />
+            <Brain className="w-4 h-4 text-primary-foreground" />
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2">

@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
-  Send, Upload, Bot, User, AlertTriangle, CheckCircle, Sparkles, FileText,
+  Send, Upload, Brain, User, AlertTriangle, CheckCircle, Sparkles, FileText,
   History, Download, Search, Plus, RotateCcw, Copy, Share2, Mic, 
   Loader2, FlaskConical, Clock, ArrowUp, Settings2, Zap,
   Shield, Trash2, Calendar, Eye, EyeOff, X, ChevronDown, ChevronUp
@@ -843,7 +843,7 @@ export default function ConsultationPage() {
                 <Avatar className="h-10 w-10">
                   <AvatarImage src="" alt="ONES AI" />
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    <Bot className="w-5 h-5" />
+                    <Brain className="w-5 h-5" />
                   </AvatarFallback>
                 </Avatar>
                 <div>
@@ -950,7 +950,7 @@ export default function ConsultationPage() {
                     {message.sender === 'ai' && (
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="bg-primary/10">
-                          <Bot className="w-4 h-4 text-primary" />
+                          <Brain className="w-4 h-4 text-primary" />
                         </AvatarFallback>
                       </Avatar>
                     )}
@@ -1110,7 +1110,7 @@ export default function ConsultationPage() {
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-primary/10">
-                        <Bot className="w-4 h-4 text-primary" />
+                        <Brain className="w-4 h-4 text-primary" />
                       </AvatarFallback>
                     </Avatar>
                     <div>
