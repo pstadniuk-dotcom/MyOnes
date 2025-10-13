@@ -1023,7 +1023,7 @@ export default function ProfilePage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="default">
-                              HIPAA Compliant
+                              Encrypted
                             </Badge>
                             <Button 
                               variant="outline" 
@@ -1045,7 +1045,7 @@ export default function ProfilePage() {
                               onClick={() => {
                                 toast({
                                   title: "Delete feature",
-                                  description: "Lab report deletion functionality will be implemented with HIPAA compliance.",
+                                  description: "Lab report deletion functionality will be implemented.",
                                   variant: "default",
                                 });
                               }}
@@ -1057,9 +1057,9 @@ export default function ProfilePage() {
                         </div>
                         
                         <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-md">
-                          <h5 className="font-medium text-sm mb-2 text-blue-800 dark:text-blue-300">HIPAA Compliant Storage:</h5>
+                          <h5 className="font-medium text-sm mb-2 text-blue-800 dark:text-blue-300">Secure Storage:</h5>
                           <p className="text-sm text-blue-700 dark:text-blue-400">
-                            Your medical documents are securely stored with end-to-end encryption and full audit logging.
+                            Your medical documents are stored with encryption and audit logging.
                           </p>
                         </div>
                       </CardContent>

@@ -2395,6 +2395,37 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Get user's uploaded files
+  app.get('/api/files/user/:userId/:type', requireAuth, async (req, res) => {
+    const { userId, type } = req.params;
+    const requestingUserId = req.userId!;
+
+    // Users can only access their own files
+    if (userId !== requestingUserId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const files = await db
+        .select()
+        .from(fileUploads)
+        .where(
+          type === 'lab-reports'
+            ? and(
+                eq(fileUploads.userId, userId),
+                eq(fileUploads.type, 'lab_report')
+              )
+            : eq(fileUploads.userId, userId)
+        )
+        .orderBy(desc(fileUploads.uploadedAt));
+
+      res.json(files);
+    } catch (error) {
+      console.error('Error fetching files:', error);
+      res.status(500).json({ error: 'Failed to fetch files' });
+    }
+  });
+
   // HIPAA-compliant file upload endpoint with full audit logging and consent enforcement
   app.post('/api/files/upload', requireAuth, async (req, res) => {
     const userId = req.userId!;
