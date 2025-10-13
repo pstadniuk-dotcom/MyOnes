@@ -1281,11 +1281,11 @@ export default function ProfilePage() {
             <ul className="text-sm space-y-2 ml-4 list-disc">
               <li>Process and analyze your uploaded lab results</li>
               <li>Use this data to create personalized supplement recommendations</li>
-              <li>Store your health information securely with HIPAA-compliant encryption</li>
+              <li>Store your health information securely</li>
               <li>Use this data to optimize your formula over time</li>
             </ul>
             <p className="text-sm text-muted-foreground">
-              Your data is encrypted and never shared with third parties. You can revoke this consent at any time from your privacy settings.
+              Your data is stored with encryption and not shared with third parties. You can revoke this consent at any time from your privacy settings.
             </p>
           </div>
           <DialogFooter>
