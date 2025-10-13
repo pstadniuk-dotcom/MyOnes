@@ -2349,6 +2349,52 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Grant user consent for HIPAA-compliant operations
+  app.post('/api/consents/grant', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { consentType, consentVersion, consentText } = req.body;
+      
+      // Validate consent type
+      const validConsentTypes = ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing'];
+      if (!validConsentTypes.includes(consentType)) {
+        return res.status(400).json({ error: 'Invalid consent type' });
+      }
+      
+      // Get audit information
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+      
+      // Create consent record
+      const consent = await storage.createUserConsent({
+        userId,
+        consentType,
+        granted: true,
+        grantedAt: new Date(),
+        consentVersion: consentVersion || '1.0',
+        ipAddress,
+        userAgent,
+        consentText: consentText || `User consents to ${consentType}`,
+        metadata: {
+          source: 'upload_form'
+        }
+      });
+      
+      console.log("HIPAA AUDIT LOG - Consent Granted:", {
+        timestamp: new Date().toISOString(),
+        userId,
+        consentType,
+        ipAddress,
+        userAgent
+      });
+      
+      res.json({ success: true, consent });
+    } catch (error) {
+      console.error('Consent grant error:', error);
+      res.status(500).json({ error: 'Failed to grant consent' });
+    }
+  });
+
   // HIPAA-compliant file upload endpoint with full audit logging and consent enforcement
   app.post('/api/files/upload', requireAuth, async (req, res) => {
     const userId = req.userId!;
