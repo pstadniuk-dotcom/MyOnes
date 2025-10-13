@@ -68,22 +68,6 @@ export default function ProblemSection() {
             );
           })}
         </div>
-
-        {/* Visual representation of supplement chaos */}
-        <div className="mt-16 text-center">
-          <div className="inline-flex items-center space-x-2 glass p-6 rounded-xl shadow-premium">
-            {Array.from({length: 8}).map((_, i) => (
-              <div 
-                key={i} 
-                className="w-6 h-14 bg-gradient-to-b from-green-400 to-green-600 rounded-full opacity-75 shadow-sm"
-                style={{ transform: `rotate(${(i - 4) * 4}deg)` }}
-              ></div>
-            ))}
-            <span className="text-2xl mx-4">→</span>
-            <div className="w-8 h-16 bg-gradient-to-b from-green-700 to-green-900 rounded-full shadow-md"></div>
-          </div>
-          <p className="text-sm text-muted-foreground mt-4">From chaos to precision</p>
-        </div>
       </div>
     </section>
   );
