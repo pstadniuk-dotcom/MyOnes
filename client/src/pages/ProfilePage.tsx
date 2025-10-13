@@ -313,20 +313,22 @@ export default function ProfilePage() {
   // Show error message if any critical data fetch fails
   // But ignore 404 errors for health profile (user hasn't created one yet)
   useEffect(() => {
-    // Check if error is a 404 "not found" (expected for new users)
-    const is404Error = (error: Error | null) => {
+    // Check if error is a 404 "not found" or JSON parsing error (expected for new users)
+    const isNonCriticalError = (error: Error | null) => {
       if (!error) return false;
       const msg = error.message || '';
-      console.log('Checking error:', msg);
-      return msg.includes('404') || msg.includes('not found') || msg.includes('No health profile');
+      // Check for 404s, "not found" errors, or JSON parsing errors (which happen when endpoint returns HTML)
+      return msg.includes('404') || 
+             msg.includes('not found') || 
+             msg.includes('No health profile') ||
+             msg.includes('Unexpected token') ||
+             msg.includes('is not valid JSON');
     };
     
-    // Only show toast for real errors (not 404 "not found" states)
-    const hasRealError = userError && !is404Error(userError);
-    const hasHealthError = healthError && !is404Error(healthError);
-    const hasNotificationError = notificationError && !is404Error(notificationError);
-    
-    console.log('Error check:', { hasRealError, hasHealthError, hasNotificationError, userError, healthError, notificationError });
+    // Only show toast for real errors (not 404 "not found" or parsing errors)
+    const hasRealError = userError && !isNonCriticalError(userError);
+    const hasHealthError = healthError && !isNonCriticalError(healthError);
+    const hasNotificationError = notificationError && !isNonCriticalError(notificationError);
     
     if (hasRealError || hasHealthError || hasNotificationError) {
       toast({
