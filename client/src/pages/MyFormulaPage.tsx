@@ -233,9 +233,24 @@ export default function MyFormulaPage() {
     return <FormulaSkeleton />;
   }
 
-  // Error states
-  if (currentError || !currentFormula) {
+  // Check if it's a "no formula found" (404) vs a real error
+  const isNoFormulaError = currentError && 
+    (currentError.message?.includes('No formula found') || 
+     currentError.message?.includes('404'));
+
+  // No formula yet (empty state) - either no data or 404 error
+  if (!currentFormula && (isNoFormulaError || !currentError)) {
+    return <FormulaEmptyState />;
+  }
+
+  // Real error states (network errors, server errors, etc.)
+  if (currentError && !isNoFormulaError) {
     return <FormulaError error={currentError} />;
+  }
+
+  // Shouldn't normally reach here, but safety fallback
+  if (!currentFormula) {
+    return <FormulaEmptyState />;
   }
 
   return (
@@ -1152,6 +1167,29 @@ function FormulaSkeleton() {
   );
 }
 
+// Empty State Component - shown when user has no formula yet
+function FormulaEmptyState() {
+  return (
+    <div className="space-y-6" data-testid="empty-formula-page">
+      <Card>
+        <CardContent className="pt-12 pb-12 text-center">
+          <FlaskConical className="w-16 h-16 text-primary mx-auto mb-6" />
+          <h3 className="text-2xl font-semibold mb-3">Start Your Personalized Journey</h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            Begin a conversation with ONES AI to receive your first personalized supplement formula tailored to your unique health profile.
+          </p>
+          <Button asChild size="lg" data-testid="button-start-consultation">
+            <Link href="/dashboard/consultation">
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Start AI Consultation
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // Error Component
 function FormulaError({ error }: { error: any }) {
   return (
@@ -1166,7 +1204,7 @@ function FormulaError({ error }: { error: any }) {
           <Button asChild data-testid="button-retry-formula">
             <Link href="/dashboard/consultation">
               <MessageSquare className="w-4 h-4 mr-2" />
-              Start New Consultation
+              Try Again
             </Link>
           </Button>
         </CardContent>
