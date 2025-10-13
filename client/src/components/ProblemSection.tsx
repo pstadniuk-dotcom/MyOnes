@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { Boxes, Users, Eye } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function ProblemSection() {
   const problems = [
@@ -21,54 +22,67 @@ export default function ProblemSection() {
   ];
 
   return (
-    <section className="py-24 bg-muted/30" data-testid="section-problem">
+    <section className="py-20 bg-premium-gradient-subtle" data-testid="section-problem">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16 max-w-3xl mx-auto">
-          <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4 tracking-tight" data-testid="text-problem-headline">
+        <motion.div 
+          className="text-center mb-16"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          viewport={{ once: true }}
+        >
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-foreground mb-6" data-testid="text-problem-headline">
             Your supplement cabinet is a mess of guesswork
           </h2>
-          <p className="text-lg text-muted-foreground" data-testid="text-problem-description">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto" data-testid="text-problem-description">
             Most people are taking supplements without any real strategy, wasting money and potentially harming their health.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {problems.map((problem, index) => {
             const IconComponent = problem.icon;
             return (
-              <Card 
+              <motion.div
                 key={index}
-                className="p-8 text-center border-border/50 hover-elevate transition-all duration-300"
-                data-testid={`card-problem-${index}`}
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+                viewport={{ once: true }}
               >
-                <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                  <IconComponent className="w-7 h-7 text-primary" />
+                <Card 
+                  className="p-8 text-center glass shadow-premium micro-bounce transition-all duration-500 group border-none"
+                  data-testid={`card-problem-${index}`}
+                >
+                <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:bg-green-500/20 transition-colors duration-300">
+                  <IconComponent className="w-8 h-8 text-green-500" />
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-3" data-testid={`text-problem-title-${index}`}>
+                <h3 className="text-xl font-semibold text-foreground mb-4" data-testid={`text-problem-title-${index}`}>
                   {problem.title}
                 </h3>
-                <p className="text-muted-foreground leading-relaxed text-sm" data-testid={`text-problem-description-${index}`}>
+                <p className="text-muted-foreground leading-relaxed" data-testid={`text-problem-description-${index}`}>
                   {problem.description}
                 </p>
-              </Card>
+                </Card>
+              </motion.div>
             );
           })}
         </div>
 
         {/* Visual representation of supplement chaos */}
-        <div className="mt-20 text-center">
-          <div className="inline-flex items-center gap-3 bg-card/50 border border-border/50 p-8 rounded-2xl">
+        <div className="mt-16 text-center">
+          <div className="inline-flex items-center space-x-2 glass p-6 rounded-xl shadow-premium">
             {Array.from({length: 8}).map((_, i) => (
               <div 
                 key={i} 
-                className="w-5 h-12 bg-gradient-to-b from-primary/40 to-primary/70 rounded-full"
-                style={{ transform: `rotate(${(i - 4) * 3}deg)` }}
+                className="w-6 h-14 bg-gradient-to-b from-green-400 to-green-600 rounded-full opacity-75 shadow-sm"
+                style={{ transform: `rotate(${(i - 4) * 4}deg)` }}
               ></div>
             ))}
-            <span className="text-2xl mx-4 text-muted-foreground">→</span>
-            <div className="w-6 h-14 bg-gradient-to-b from-primary to-primary/80 rounded-full"></div>
+            <span className="text-2xl mx-4">→</span>
+            <div className="w-8 h-16 bg-gradient-to-b from-green-700 to-green-900 rounded-full shadow-md"></div>
           </div>
-          <p className="text-sm text-muted-foreground mt-4 font-medium">From chaos to precision</p>
+          <p className="text-sm text-muted-foreground mt-4">From chaos to precision</p>
         </div>
       </div>
     </section>
