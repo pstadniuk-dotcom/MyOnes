@@ -657,6 +657,7 @@ export default function ConsultationPage() {
   
   // Voice input handling with continuous recording
   const recognitionRef = useRef<any>(null);
+  const initialInputRef = useRef<string>('');
   
   const handleVoiceInput = useCallback(async () => {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
@@ -689,6 +690,8 @@ export default function ConsultationPage() {
       
       recognition.onstart = () => {
         setIsRecording(true);
+        // Store the initial input value when recording starts
+        initialInputRef.current = inputValue;
         toast({
           title: "Listening...",
           description: "Speak freely. Click the microphone again when done.",
@@ -709,11 +712,11 @@ export default function ConsultationPage() {
         }
         
         // Update input with both final and interim results
-        setInputValue(prev => {
-          const baseText = prev.split('[Speaking...]')[0].trim();
-          const combinedTranscript = (finalTranscript + interimTranscript).trim();
-          return baseText + (baseText && combinedTranscript ? ' ' : '') + combinedTranscript + (interimTranscript ? ' [Speaking...]' : '');
-        });
+        // Use the initial input value stored when recording started
+        const baseText = initialInputRef.current.trim();
+        const combinedTranscript = (finalTranscript + interimTranscript).trim();
+        const newValue = baseText + (baseText && combinedTranscript ? ' ' : '') + combinedTranscript + (interimTranscript ? ' [Speaking...]' : '');
+        setInputValue(newValue);
       };
       
       recognition.onerror = (event: any) => {
@@ -748,7 +751,7 @@ export default function ConsultationPage() {
         variant: "destructive"
       });
     }
-  }, [toast, isRecording]);
+  }, [toast, isRecording, inputValue]);
 
   // Format file size
   const formatFileSize = useCallback((bytes: number) => {
