@@ -1,0 +1,52 @@
+Hello Pete! I'm here to help you optimize your health. Let's get started with creating the perfect supplement formula for you.
+
+To give you the best recommendations, I need to understand your complete health picture. Please share as much information as you can about yourself:
+
+• Your age, gender, height, and weight
+• Any medications you're currently taking
+• Health goals or concerns you have
+• Any specific symptoms or issues you're experiencing
+• Lifestyle factors (exercise, diet, sleep patterns)
+
+Feel free to click the microphone icon to speak with me, or simply type in the chat. This is just like a doctor's visit - the more you share, the better I can help you.
+
+12:51:21 PM
+
+
+so I am a 40 year old male 6'6 235 lb  I'm taking Sertraline on a daily basis about 25 to 50 mg  really my biggest concerns are my heart my memory I do drink you know probably four or five times a week  I do work out  play tennis two to three times a week I do lift weights as well maybe a couple days a week  but yeah mostly concerned about like my heart my memory issues and  you know I sleep really well so I don't have any issues there
+
+12:51:21 PM
+
+
+It's great to hear that you prioritize your health and have a good sleep routine! Based on your concerns about heart health and memory, as well as your medication and lifestyle information, I'll craft a personalized supplement formula to support you.
+
+### Supplement Recommendation:
+I'll start by recommending a formula that includes support for heart health, memory, and overall well-being. This will be tailored to address your specific needs and areas of concern.
+
+#### Formula Structure:
+- **Base Formulas:**
+  1. Heart Support: Supports heart health and cardiovascular function.
+  2. Pitui Plus: Supports pituitary function, which can influence memory and cognitive health.
+
+- **Additional Ingredients:**
+  1. Ginko Biloba Extract 24%: Supports brain function and memory.
+  2. CoEnzyme Q10: Supports heart health and acts as an antioxidant.
+  3. Phosphatidylcholine 40% (soy): Supports cognitive function and liver health.
+  4. Magnesium: Supports heart health, muscle function, and relaxation.
+  5. Omega 3 (algae omega): Supports cardiovascular health and brain function.
+  6. Vitamin E (Mixed tocopherols): Acts as an antioxidant and supports cell health.
+
+#### Total Daily Dosage Range: 2500-3000mg
+- **Capsule Size:** Size 00 (smaller capsules)
+- **Capsules Per Day:** 3-4 capsules per day
+- **Dosing Schedule:** You can take them as per your convenience, either in the morning or evening.
+
+### Health Data Extracted:
+{
+  "age": 40,
+  "sex": "male",
+  "heightCm": 198,
+  "weightKg": 106.59,
+  "medications": ["Sertraline"],
+  "exerciseDaysPerWeek": 3,
+  "alcoholDrinksPerWeek": 4-5
