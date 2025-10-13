@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Check, Star } from 'lucide-react';
 
 export default function PricingSection() {
-  const [selectedPlan, setSelectedPlan] = useState(1); // Default to middle plan
+  const [selectedPlan, setSelectedPlan] = useState(1);
 
   const plans = [
     {
@@ -77,94 +77,94 @@ export default function PricingSection() {
   };
 
   return (
-    <section className="py-20 bg-background" data-testid="section-pricing">
+    <section className="py-24 bg-muted/30" data-testid="section-pricing">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-foreground mb-6" data-testid="text-pricing-headline">
+        <div className="text-center mb-16 max-w-3xl mx-auto">
+          <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4 tracking-tight" data-testid="text-pricing-headline">
             Choose Your Health Journey
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8" data-testid="text-pricing-description">
+          <p className="text-lg text-muted-foreground mb-8" data-testid="text-pricing-description">
             All plans include AI consultation, custom formula, and free shipping. Start with any plan and adjust as needed.
           </p>
           
           {/* Included Features */}
-          <div className="flex flex-wrap justify-center gap-4 mb-8">
+          <div className="flex flex-wrap justify-center gap-3">
             {includedFeatures.map((feature, index) => (
-              <div key={index} className="flex items-center space-x-2 bg-muted px-3 py-2 rounded-full">
-                <Check className="w-4 h-4 text-green-500" />
-                <span className="text-sm text-foreground">{feature}</span>
+              <div key={index} className="flex items-center gap-2 bg-background border border-border/50 px-4 py-2 rounded-full">
+                <Check className="w-3.5 h-3.5 text-primary" />
+                <span className="text-sm text-muted-foreground">{feature}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {plans.map((plan, index) => (
             <Card 
               key={index}
-              className={`relative p-8 hover-elevate transition-all duration-300 cursor-pointer ${
-                selectedPlan === index ? 'ring-2 ring-primary shadow-lg scale-105' : ''
-              } ${plan.popular ? 'border-2 border-primary' : ''}`}
+              className={`relative p-8 border-border/50 hover-elevate transition-all duration-300 cursor-pointer ${
+                selectedPlan === index ? 'ring-1 ring-primary shadow-lg scale-[1.02]' : ''
+              } ${plan.popular ? 'border-primary/50' : ''}`}
               onClick={() => handlePlanSelect(index)}
               data-testid={`card-plan-${index}`}
             >
               {/* Popular Badge */}
               {plan.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground px-4 py-1 flex items-center space-x-1">
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                  <Badge className="bg-primary text-primary-foreground px-4 py-1 flex items-center gap-1.5">
                     <Star className="w-3 h-3 fill-current" />
-                    <span>Most Popular</span>
+                    <span className="text-xs font-semibold">Most Popular</span>
                   </Badge>
                 </div>
               )}
 
               {/* Savings Badge */}
               {plan.savings && (
-                <div className="absolute top-4 right-4">
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                <div className="absolute top-6 right-6">
+                  <Badge variant="secondary" className="bg-primary/10 text-primary border-0 text-xs font-semibold">
                     {plan.savings}
                   </Badge>
                 </div>
               )}
 
+              {/* Plan Content */}
               <div className="text-center mb-6">
-                <h3 className="text-2xl font-serif font-bold text-foreground mb-2" data-testid={`text-plan-name-${index}`}>
+                <h3 className="text-xl font-semibold text-foreground mb-2" data-testid={`text-plan-name-${index}`}>
                   {plan.name}
                 </h3>
-                <p className="text-muted-foreground mb-4" data-testid={`text-plan-description-${index}`}>
+                <p className="text-sm text-muted-foreground mb-4" data-testid={`text-plan-description-${index}`}>
                   {plan.description}
                 </p>
-                
-                <div className="mb-4">
+                <div className="flex items-baseline justify-center gap-2">
                   <span className="text-4xl font-bold text-foreground" data-testid={`text-plan-price-${index}`}>
-                    ${plan.price}
+                    ${plan.monthlyPrice}
                   </span>
-                  <span className="text-muted-foreground ml-2">for {plan.duration}</span>
+                  <span className="text-muted-foreground text-sm">/month</span>
                 </div>
-                
-                <p className="text-sm text-muted-foreground" data-testid={`text-plan-monthly-${index}`}>
-                  ${plan.monthlyPrice}/month
+                <p className="text-xs text-muted-foreground mt-2">
+                  ${plan.price} billed every {plan.duration}
                 </p>
               </div>
 
               {/* Features */}
-              <div className="space-y-3 mb-8">
+              <ul className="space-y-3 mb-6">
                 {plan.features.map((feature, featureIndex) => (
-                  <div key={featureIndex} className="flex items-start space-x-2">
-                    <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-foreground" data-testid={`text-plan-feature-${index}-${featureIndex}`}>
-                      {feature}
-                    </span>
-                  </div>
+                  <li 
+                    key={featureIndex} 
+                    className="flex items-start gap-3 text-sm"
+                    data-testid={`text-plan-feature-${index}-${featureIndex}`}
+                  >
+                    <Check className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                    <span className="text-muted-foreground">{feature}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
 
               {/* CTA Button */}
-              <Button 
-                className={`w-full ${plan.popular ? 'bg-primary hover:bg-primary/90' : ''}`}
-                variant={plan.popular ? 'default' : 'outline'}
-                size="lg"
+              <Button
+                className="w-full"
+                variant={plan.popular ? "default" : "outline"}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleSubscribe(plan.name);
@@ -177,21 +177,11 @@ export default function PricingSection() {
           ))}
         </div>
 
-        {/* Bottom CTA */}
-        <div className="text-center mt-16">
-          <div className="max-w-2xl mx-auto">
-            <p className="text-muted-foreground mb-6">
-              Not sure which plan is right for you? Start with our free consultation and we'll recommend the best path forward.
-            </p>
-            <Button 
-              variant="outline" 
-              size="lg"
-              onClick={() => console.log('Free consultation clicked')}
-              data-testid="button-free-consultation"
-            >
-              Get Free Consultation First
-            </Button>
-          </div>
+        {/* Trust Footer */}
+        <div className="text-center mt-16 max-w-2xl mx-auto">
+          <p className="text-sm text-muted-foreground">
+            All plans include our satisfaction guarantee. If you're not completely satisfied with your formula, we'll refund your order within 30 days.
+          </p>
         </div>
       </div>
     </section>
