@@ -2406,19 +2406,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
 
     try {
-      const files = await db
-        .select()
-        .from(fileUploads)
-        .where(
-          type === 'lab-reports'
-            ? and(
-                eq(fileUploads.userId, userId),
-                eq(fileUploads.type, 'lab_report')
-              )
-            : eq(fileUploads.userId, userId)
-        )
-        .orderBy(desc(fileUploads.uploadedAt));
-
+      const fileType = type === 'lab-reports' ? 'lab_report' : undefined;
+      const files = await storage.listFileUploadsByUser(userId, fileType, false);
       res.json(files);
     } catch (error) {
       console.error('Error fetching files:', error);
