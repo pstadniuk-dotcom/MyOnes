@@ -60,12 +60,6 @@ const healthMenuItems = [
     icon: Activity,
     description: 'Manage health information',
   },
-  {
-    title: 'Lab Reports',
-    url: '/dashboard/profile?tab=reports',
-    icon: FileText,
-    description: 'Upload and view reports',
-  },
 ];
 
 const accountMenuItems = [
