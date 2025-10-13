@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Send, Upload, Bot, User, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Send, Upload, Brain, User, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 
@@ -114,7 +114,7 @@ export default function AIChat() {
       <div className="p-4 border-b border-card-border">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <Bot className="w-4 h-4 text-primary-foreground" />
+            <Brain className="w-4 h-4 text-primary-foreground" />
           </div>
           <div>
             <h3 className="font-medium text-sm" data-testid="text-ai-name">ONES AI</h3>
@@ -140,7 +140,7 @@ export default function AIChat() {
             >
               <div className="flex items-start space-x-2">
                 {message.sender === 'ai' && (
-                  <Bot className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <Brain className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 )}
                 {message.sender === 'user' && (
                   <User className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -224,7 +224,7 @@ export default function AIChat() {
           <div className="flex justify-start" data-testid="indicator-typing">
             <div className="bg-muted text-muted-foreground rounded-lg p-3 max-w-[80%]">
               <div className="flex items-center space-x-2">
-                <Bot className="w-4 h-4" />
+                <Brain className="w-4 h-4" />
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
                   <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
