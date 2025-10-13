@@ -1,13 +1,37 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, MessageSquare, Brain, Target, X, Check, AlertTriangle, Sparkles } from 'lucide-react';
+import ag1Image from '@assets/ag1_1760380986912.png';
+import blueprintImage from '@assets/blueprint_1760380986912.webp';
+import ritualImage from '@assets/Ritual_1760380986912.avif';
+import huelImage from '@assets/Huel_1760380986912.png';
 
 export default function ScienceSection() {
   const competitors = [
-    { name: "AG1", formula: "Same greens powder for everyone", color: "bg-red-50 border-red-200" },
-    { name: "Blueprint", formula: "Bryan's exact 100-pill protocol for everyone", color: "bg-red-50 border-red-200" },
-    { name: "Ritual", formula: "Same \"Essential\" whether you're 18 or 80", color: "bg-red-50 border-red-200" },
-    { name: "Huel", formula: "One formula, millions of bodies", color: "bg-red-50 border-red-200" }
+    { 
+      name: "AG1", 
+      formula: "Same greens powder for everyone", 
+      color: "bg-red-50 border-red-200",
+      image: ag1Image
+    },
+    { 
+      name: "Blueprint", 
+      formula: "Bryan's exact 100-pill protocol for everyone", 
+      color: "bg-red-50 border-red-200",
+      image: blueprintImage
+    },
+    { 
+      name: "Ritual", 
+      formula: "Same \"Essential\" whether you're 18 or 80", 
+      color: "bg-red-50 border-red-200",
+      image: ritualImage
+    },
+    { 
+      name: "Huel", 
+      formula: "One formula, millions of bodies", 
+      color: "bg-red-50 border-red-200",
+      image: huelImage
+    }
   ];
 
   const audienceTypes = [
@@ -56,14 +80,23 @@ export default function ScienceSection() {
           </p>
 
           {/* Competitor Cards */}
-          <div className="grid md:grid-cols-2 gap-4 mb-8 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-6 mb-8 max-w-4xl mx-auto">
             {competitors.map((competitor, index) => (
-              <Card key={index} className={`p-6 ${competitor.color} hover-elevate`} data-testid={`card-competitor-${index}`}>
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-red-500 rounded-full flex-shrink-0"></div>
-                  <div>
-                    <span className="font-bold text-foreground">{competitor.name}</span>
-                    <span className="text-muted-foreground ml-2">→ {competitor.formula}</span>
+              <Card key={index} className={`overflow-hidden ${competitor.color} hover-elevate`} data-testid={`card-competitor-${index}`}>
+                <div className="aspect-square w-full bg-white flex items-center justify-center p-8">
+                  <img 
+                    src={competitor.image} 
+                    alt={competitor.name}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="p-6">
+                  <div className="flex items-start gap-3">
+                    <div className="w-3 h-3 bg-red-500 rounded-full flex-shrink-0 mt-1"></div>
+                    <div>
+                      <h4 className="font-bold text-foreground mb-1">{competitor.name}</h4>
+                      <p className="text-sm text-muted-foreground">{competitor.formula}</p>
+                    </div>
                   </div>
                 </div>
               </Card>
