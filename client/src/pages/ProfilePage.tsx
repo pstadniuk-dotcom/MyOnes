@@ -317,6 +317,7 @@ export default function ProfilePage() {
     const is404Error = (error: Error | null) => {
       if (!error) return false;
       const msg = error.message || '';
+      console.log('Checking error:', msg);
       return msg.includes('404') || msg.includes('not found') || msg.includes('No health profile');
     };
     
@@ -324,6 +325,8 @@ export default function ProfilePage() {
     const hasRealError = userError && !is404Error(userError);
     const hasHealthError = healthError && !is404Error(healthError);
     const hasNotificationError = notificationError && !is404Error(notificationError);
+    
+    console.log('Error check:', { hasRealError, hasHealthError, hasNotificationError, userError, healthError, notificationError });
     
     if (hasRealError || hasHealthError || hasNotificationError) {
       toast({
