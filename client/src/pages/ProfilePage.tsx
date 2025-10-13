@@ -858,20 +858,6 @@ export default function ProfilePage() {
               <div className="space-y-4">
                 {labReportsLoading ? (
                   <LabReportsSkeleton />
-                ) : labReportsError ? (
-                  <div className="text-center py-8">
-                    <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-                    <h3 className="font-medium mb-2">Error loading reports</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      There was an issue loading your lab reports. Please try again.
-                    </p>
-                    <Button 
-                      onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] })}
-                      variant="outline"
-                    >
-                      Retry
-                    </Button>
-                  </div>
                 ) : labReports && labReports.length > 0 ? (
                   labReports.map((report) => (
                     <Card key={report.id} className="border-l-4 border-l-blue-400" data-testid={`report-${report.id}`}>
