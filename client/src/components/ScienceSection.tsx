@@ -58,143 +58,180 @@ export default function ScienceSection() {
   ];
 
   return (
-    <section className="py-20 bg-background" data-testid="section-science">
+    <section className="py-24 bg-background" data-testid="section-science">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Headline */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-20">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-foreground mb-6" data-testid="text-main-headline">
             Why One Size Fits None
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto" data-testid="text-main-description">
-            Different bodies. Different needs. Same bottle.
+            Major wellness brands give identical formulas to completely different people
           </p>
         </div>
 
         {/* The Same Formula Problem */}
-        <div className="mb-16">
-          <h3 className="text-2xl md:text-3xl font-serif font-bold text-center text-foreground mb-8" data-testid="text-problem-title">
-            The Same Formula Problem
-          </h3>
-          <p className="text-lg text-muted-foreground text-center mb-8 max-w-3xl mx-auto">
-            Major brands give identical formulas to completely different people:
-          </p>
-
+        <div className="mb-24">
           {/* Competitor Cards */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 max-w-7xl mx-auto">
             {competitors.map((competitor, index) => (
-              <Card key={index} className={`overflow-hidden ${competitor.color} hover-elevate`} data-testid={`card-competitor-${index}`}>
-                <div className="aspect-square w-full bg-white flex items-center justify-center p-8">
+              <Card key={index} className="overflow-hidden bg-card border hover-elevate transition-premium" data-testid={`card-competitor-${index}`}>
+                <div className="aspect-square w-full bg-white flex items-center justify-center p-6">
                   <img 
                     src={competitor.image} 
                     alt={competitor.name}
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <div className="p-6">
-                  <div className="flex items-start gap-3">
-                    <div className="w-3 h-3 bg-red-500 rounded-full flex-shrink-0 mt-1"></div>
-                    <div>
-                      <h4 className="font-bold text-foreground mb-1">{competitor.name}</h4>
-                      <p className="text-sm text-muted-foreground">{competitor.formula}</p>
-                    </div>
-                  </div>
+                <div className="p-5 bg-muted/30">
+                  <h4 className="font-semibold text-foreground mb-2">{competitor.name}</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{competitor.formula}</p>
                 </div>
               </Card>
             ))}
           </div>
 
-          <p className="text-center text-muted-foreground mb-6 italic">Going to:</p>
+          {/* Flow indicator */}
+          <div className="flex items-center justify-center mb-12">
+            <div className="w-16 h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
+            <span className="mx-4 text-sm text-muted-foreground uppercase tracking-wider">Serving</span>
+            <div className="w-16 h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
+          </div>
 
-          {/* Audience Types */}
-          <div className="grid md:grid-cols-2 gap-3 max-w-3xl mx-auto mb-8">
+          {/* Audience Types - Modern Grid */}
+          <div className="grid md:grid-cols-2 gap-4 max-w-4xl mx-auto mb-16">
             {audienceTypes.map((audience, index) => (
-              <div key={index} className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg" data-testid={`audience-type-${index}`}>
-                <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-sm text-muted-foreground">{audience}</span>
+              <div 
+                key={index} 
+                className="group relative overflow-hidden rounded-lg border bg-card p-6 hover-elevate transition-premium" 
+                data-testid={`audience-type-${index}`}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <p className="text-sm text-foreground leading-relaxed pt-2">{audience}</p>
+                </div>
               </div>
             ))}
           </div>
 
-          <div className="text-center">
-            <Card className="inline-block p-6 bg-destructive/5 border-2 border-destructive/20">
-              <h4 className="text-xl font-bold text-destructive mb-2" data-testid="text-same-bottle">
-                Different bodies. Different needs. Same bottle.
-              </h4>
-            </Card>
+          {/* Problem Statement */}
+          <div className="text-center max-w-3xl mx-auto">
+            <div className="relative inline-block">
+              <div className="absolute inset-0 bg-gradient-to-r from-destructive/5 via-destructive/10 to-destructive/5 blur-xl"></div>
+              <Card className="relative inline-block px-10 py-8 bg-background/80 backdrop-blur-sm border-destructive/20">
+                <h4 className="text-2xl md:text-3xl font-serif font-bold text-destructive leading-relaxed" data-testid="text-same-bottle">
+                  Different bodies. Different needs.<br />Same bottle.
+                </h4>
+              </Card>
+            </div>
           </div>
         </div>
 
         {/* The ONES Difference */}
-        <div className="mb-16">
-          <h3 className="text-2xl md:text-3xl font-serif font-bold text-center text-foreground mb-12" data-testid="text-ones-difference-title">
-            The ONES Difference
-          </h3>
+        <div className="mb-24">
+          <div className="text-center mb-16">
+            <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-4" data-testid="text-ones-difference-title">
+              The ONES Difference
+            </h3>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              Beyond generic quizzes to true personalization
+            </p>
+          </div>
 
           <div className="grid lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
             {/* Them: 5-Question Quiz */}
-            <Card className="p-8 bg-red-50 border-red-200" data-testid="card-competitor-approach">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <AlertTriangle className="w-8 h-8 text-red-600" />
-                </div>
-                <h4 className="text-xl font-bold text-red-700 mb-2">Them: 5-Question Quiz</h4>
-              </div>
-              
-              <div className="space-y-3">
-                {competitorApproach.map((item, index) => (
-                  <div key={index} className="flex items-center gap-3" data-testid={`competitor-item-${index}`}>
-                    <X className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <span className="text-sm text-red-700">{item}</span>
+            <Card className="relative overflow-hidden p-10 bg-gradient-to-br from-muted/30 to-muted/10 border hover-elevate transition-premium" data-testid="card-competitor-approach">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-destructive/5 rounded-full blur-3xl"></div>
+              <div className="relative">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <AlertTriangle className="w-6 h-6 text-destructive/70" />
                   </div>
-                ))}
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Standard Approach</p>
+                    <h4 className="text-xl font-semibold text-foreground">5-Question Quiz</h4>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  {competitorApproach.map((item, index) => (
+                    <div key={index} className="flex items-start gap-3 pl-2" data-testid={`competitor-item-${index}`}>
+                      <X className="w-4 h-4 text-destructive/60 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground leading-relaxed">{item}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </Card>
 
             {/* ONES: AI Conversation */}
-            <Card className="p-8 bg-primary/5 border-primary/20" data-testid="card-ones-approach">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Brain className="w-8 h-8 text-primary" />
-                </div>
-                <h4 className="text-xl font-bold text-primary mb-2">ONES: AI Conversation</h4>
-              </div>
-              
-              <div className="space-y-3">
-                {onesApproach.map((item, index) => (
-                  <div key={index} className="flex items-center gap-3" data-testid={`ones-item-${index}`}>
-                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span className="text-sm text-primary">{item}</span>
+            <Card className="relative overflow-hidden p-10 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 hover-elevate transition-premium" data-testid="card-ones-approach">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl"></div>
+              <div className="relative">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center">
+                    <Brain className="w-6 h-6 text-primary" />
                   </div>
-                ))}
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-primary/70 mb-1">ONES Approach</p>
+                    <h4 className="text-xl font-semibold text-primary">AI Conversation</h4>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  {onesApproach.map((item, index) => (
+                    <div key={index} className="flex items-start gap-3 pl-2" data-testid={`ones-item-${index}`}>
+                      <Check className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-foreground leading-relaxed">{item}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </Card>
           </div>
         </div>
 
         {/* Key Statistics */}
-        <div className="mb-16 text-center">
-          <Card className="inline-block p-8 bg-accent/10 border-accent/20">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <Target className="w-6 h-6 text-accent" />
-              <span className="text-2xl font-bold text-accent">42%</span>
+        <div className="mb-24">
+          <div className="max-w-4xl mx-auto">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-accent/5 via-accent/10 to-accent/5 blur-2xl"></div>
+              <Card className="relative overflow-hidden border-accent/20">
+                <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x">
+                  <div className="p-10 text-center">
+                    <div className="flex items-center justify-center gap-3 mb-4">
+                      <Target className="w-8 h-8 text-accent" />
+                    </div>
+                    <div className="text-5xl font-serif font-bold text-accent mb-3">42%</div>
+                    <p className="text-foreground font-medium mb-2">
+                      of Americans take prescription meds
+                    </p>
+                  </div>
+                  <div className="p-10 flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-lg text-muted-foreground mb-2">Yet most supplement brands</p>
+                      <p className="text-xl font-semibold text-foreground">Never ask about medications</p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
             </div>
-            <p className="text-muted-foreground mb-2">
-              <strong className="text-foreground">42% of Americans take prescription meds.</strong>
-            </p>
-            <p className="text-sm text-muted-foreground">Most brands never ask.</p>
-          </Card>
+          </div>
         </div>
 
         {/* Final Quote */}
         <div className="text-center">
-          <Card className="inline-block p-8 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20 max-w-2xl">
-            <div className="flex items-center justify-center mb-4">
-              <Sparkles className="w-8 h-8 text-primary" />
-            </div>
-            <blockquote className="text-xl md:text-2xl font-serif font-bold text-primary leading-relaxed" data-testid="text-final-quote">
-              "You wouldn't take someone else's prescription. Why take their vitamins?"
-            </blockquote>
-          </Card>
+          <div className="relative inline-block max-w-3xl">
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 blur-3xl"></div>
+            <Card className="relative px-12 py-10 bg-background/90 backdrop-blur-sm border-primary/20">
+              <Sparkles className="w-10 h-10 text-primary mx-auto mb-6" />
+              <blockquote className="text-2xl md:text-3xl font-serif font-bold text-primary leading-relaxed" data-testid="text-final-quote">
+                "You wouldn't take someone else's prescription. Why take their vitamins?"
+              </blockquote>
+            </Card>
+          </div>
         </div>
       </div>
     </section>
