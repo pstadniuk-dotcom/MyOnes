@@ -1,7 +1,7 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, MessageSquare, Brain, Target, X, Check, AlertTriangle, Sparkles } from 'lucide-react';
-import ag1Image from '@assets/ag1_1760380986912.png';
+import ag1Image from '@assets/ag1_1760387996934.jpg';
 import blueprintImage from '@assets/blueprint_1760380986912.webp';
 import ritualImage from '@assets/Ritual_1760380986912.avif';
 import huelImage from '@assets/Huel_1760380986912.png';
