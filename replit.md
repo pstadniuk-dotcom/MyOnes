@@ -40,6 +40,15 @@ Preferred communication style: Simple, everyday language.
 
 ### Core Features Architecture
 - **AI Chat Interface**: Conversational UI for health assessments with file upload capabilities for blood tests
+- **Comprehensive Health Profile Collection** (Updated Oct 14, 2025):
+  - 5-phase systematic questioning approach to collect ALL health profile data
+  - Phase 1: Basic demographics, medications, allergies, sleep hours
+  - Phase 2: Lifestyle habits including smoking status, alcohol consumption (drinks/week), exercise frequency, stress level
+  - Phase 3: Symptoms, cardiovascular metrics (blood pressure, heart rate), chronic conditions
+  - Phase 4: Blood test upload prompts, medical history
+  - Phase 5: Environmental exposures
+  - Automatic health data extraction from conversations with ```health-data JSON blocks
+  - AI explicitly asks about every field: medications, smoking, alcohol, conditions, allergies, etc.
 - **Lab Data Extraction System** (Added Oct 2025):
   - Automatic analysis of uploaded PDF and image lab reports
   - PDF text extraction using pdf-parse library
@@ -48,7 +57,11 @@ Preferred communication style: Simple, everyday language.
   - Extracted lab data automatically integrated into AI chat context for personalized recommendations
   - Robust error handling with graceful fallbacks
 - **Personalization Engine**: Algorithm that processes user health data to create custom supplement formulas
-- **Formula Management**: System for combining base formulas with individual ingredients (400+ premium ingredients)
+- **Formula Management**: System for combining base formulas with individual ingredients (32 base formulas + 29 individual ingredients)
+  - Formula display shows individual ingredient names with mg amounts (e.g., "Heart Support - 450mg")
+  - Formulas automatically saved to database with proper version numbering
+  - "See Your Formulation" button appears after AI creates formula, linking to My Formulation tab
+  - Clean AI responses with JSON code extracted backend before display
 - **Progress Tracking**: User journey monitoring with iterative formula optimization
 - **Subscription Management**: Automated refill system with periodic health reassessments
 

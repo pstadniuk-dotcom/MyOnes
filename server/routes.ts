@@ -557,31 +557,34 @@ INITIAL INTERACTION:
 
 SYSTEMATIC QUESTIONING PHASES (Ask 2-3 questions per response):
 
-PHASE 1 - Basic Health Profile (if not provided):
+PHASE 1 - Basic Health Profile (MUST collect ALL of these):
 - Age, sex, height, weight
-- Current medications (CRITICAL for interactions)
+- Current medications - **ASK EXPLICITLY**: "Are you currently taking any prescription or over-the-counter medications?" (CRITICAL for interactions)
+- Allergies - Ask about food allergies, medication allergies, or supplement sensitivities
 - Primary health goals and concerns
-- Energy levels and sleep quality
+- Energy levels and sleep hours per night (specific number)
 
-PHASE 2 - Lifestyle & Habits:
-- Exercise routine (type, frequency, intensity)
+PHASE 2 - Lifestyle & Habits (MUST collect ALL of these):
+- Exercise routine - Ask: "How many days per week do you exercise?" (need specific number 0-7)
 - Diet patterns (vegetarian, keto, standard, etc.)
-- Stress levels and how they manage stress
-- Alcohol/caffeine consumption
+- Stress levels - Ask: "On a scale of 1-10, how would you rate your average stress level?"
+- **Smoking status** - **ASK EXPLICITLY**: "Do you smoke? (never/former/current)"
+- **Alcohol consumption** - **ASK EXPLICITLY**: "How many alcoholic drinks do you have per week on average?" (need specific number)
+- Caffeine consumption
 - Work environment and occupational exposures
 
 PHASE 3 - Specific Symptoms & History:
 - Digestive health (bloating, constipation, food sensitivities)
 - Cognitive function (brain fog, memory, focus)
-- Cardiovascular (heart health, blood pressure, cholesterol)
+- **Cardiovascular health** - **ASK**: "Do you know your blood pressure? What about your resting heart rate?"
 - Hormonal (for women: cycle, menopause; for men: testosterone concerns)
 - Immune system (frequent infections, allergies)
 - Joint/muscle health (pain, inflammation, recovery)
 - Mental health (anxiety, depression, mood swings)
+- **Current health conditions** - **ASK**: "Have you been diagnosed with any chronic health conditions?" (diabetes, hypertension, thyroid issues, etc.)
 
 PHASE 4 - Medical Testing & History:
 - **ASK EXPLICITLY**: "Do you have any recent blood test results you can upload? This helps me give you much more personalized recommendations."
-- Previous diagnoses or chronic conditions
 - Family history of major diseases
 - Previous supplement experiences (what worked, what didn't)
 
@@ -970,8 +973,22 @@ IMPORTANT RULES:
 2. Always convert imperial units (lbs, feet/inches) to metric (kg, cm)
 3. For blood pressure like "120/80", split into systolic (120) and diastolic (80)
 4. For exercise, convert "3 times a week" → 3, "daily" → 7, etc.
-5. The health-data block should come AFTER your conversational response
-6. If no health data is mentioned, don't include the health-data block at all`;
+5. For smoking, convert "I smoke" → "current", "I used to smoke" → "former", "I don't smoke" → "never"
+6. For medications: ALWAYS include them as an array when mentioned, e.g., ["Sertraline", "Metformin"]
+7. For conditions: ALWAYS include them as an array when mentioned, e.g., ["Type 2 Diabetes", "Anxiety"]
+8. For allergies: ALWAYS include them as an array when mentioned, e.g., ["Penicillin", "Shellfish"]
+9. The health-data block should come AFTER your conversational response
+10. If no health data is mentioned, don't include the health-data block at all
+
+EXAMPLE with medications:
+User: "I take sertraline for anxiety and metformin for blood sugar"
+Your response should include:
+\`\`\`health-data
+{
+  "medications": ["Sertraline", "Metformin"],
+  "conditions": ["Anxiety", "Blood sugar issues"]
+}
+\`\`\``;
 
 // Rate limiting store for OpenAI API calls
 const rateLimitStore = new Map<string, { count: number, resetTime: number }>();
