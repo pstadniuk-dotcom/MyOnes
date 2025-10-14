@@ -858,20 +858,19 @@ export default function ConsultationPage() {
   }, [messages, searchTerm]);
 
   return (
-    <div className="flex h-full max-h-[calc(100vh-4rem)]" data-testid="page-consultation">
+    <div className="flex h-full max-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
       {/* History Sidebar */}
       {showHistory && (
-        <Card className="w-80 rounded-r-none border-r flex flex-col">
-          <CardHeader className="pb-3">
+        <div className="w-80 border-r bg-background/80 backdrop-blur-sm flex flex-col">
+          <div className="p-4 border-b bg-gradient-to-br from-primary/10 to-secondary/10">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Consultation History</CardTitle>
+              <h3 className="text-sm font-semibold">Consultation History</h3>
               <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)}>
                 <X className="w-4 h-4" />
               </Button>
             </div>
-          </CardHeader>
-          <CardContent className="flex-1 p-0">
-            <ScrollArea className="h-full px-4">
+          </div>
+          <ScrollArea className="flex-1 px-4">
               <div className="space-y-2 pb-4">
                 {isLoadingHistory ? (
                   <div className="space-y-2">
@@ -937,81 +936,79 @@ export default function ConsultationPage() {
                 )}
               </div>
             </ScrollArea>
-          </CardContent>
-        </Card>
+        </div>
       )}
       
       {/* Main Chat Interface */}
       <div className="flex-1 flex flex-col">
-        {/* Enhanced Header */}
-        <Card className={`rounded-b-none border-b ${showHistory ? 'rounded-l-none' : ''}`}>
-          <CardHeader className="pb-3">
+        {/* Modern Gradient Header */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 border-b backdrop-blur-sm">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-secondary/5 opacity-50"></div>
+          <div className="relative p-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <Avatar className="h-10 w-10">
+              <div className="flex items-center space-x-4">
+                <Avatar className="h-12 w-12 ring-2 ring-primary/20">
                   <AvatarImage src="" alt="ONES AI" />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    <Brain className="w-5 h-5" />
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
+                    <Brain className="w-6 h-6" />
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <CardTitle className="text-xl flex items-center gap-2" data-testid="text-consultation-title">
+                  <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-consultation-title">
                     ONES AI Consultation
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
                       <Sparkles className="w-3 h-3 mr-1" />
                       AI-Powered
                     </Badge>
-                  </CardTitle>
-                  <CardDescription className="flex items-center gap-2">
-                    Your personalized supplement consultant
+                  </h1>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-sm text-muted-foreground">Your personalized supplement consultant</p>
                     {isConnected && (
-                      <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                      <Badge variant="outline" className="text-xs text-green-600 border-green-200 bg-green-50">
                         <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
                         Connected
                       </Badge>
                     )}
-                    {currentSessionId && (
-                      <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
-                        Session Active
-                      </Badge>
-                    )}
-                  </CardDescription>
+                  </div>
                 </div>
               </div>
               
               {/* Header Actions */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <Button 
                   variant="ghost" 
-                  size="sm" 
+                  size="icon" 
                   onClick={() => setShowHistory(!showHistory)}
+                  className="hover-elevate"
                   data-testid="button-toggle-history"
                 >
-                  <History className="w-4 h-4" />
+                  <History className="w-5 h-5" />
                 </Button>
                 <Button 
                   variant="ghost" 
-                  size="sm" 
+                  size="icon" 
                   onClick={handleNewSession}
+                  className="hover-elevate"
                   data-testid="button-new-session"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5" />
                 </Button>
                 <Button 
                   variant="ghost" 
-                  size="sm" 
+                  size="icon" 
                   onClick={handleExportConsultation}
                   disabled={messages.length === 0}
+                  className="hover-elevate"
                   data-testid="button-export"
                 >
-                  <Download className="w-4 h-4" />
+                  <Download className="w-5 h-5" />
                 </Button>
               </div>
             </div>
             
             {/* Search Bar (when enabled) */}
             {searchTerm && (
-              <div className="mt-3">
+              <div className="mt-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
@@ -1019,7 +1016,7 @@ export default function ConsultationPage() {
                     placeholder="Search messages..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm bg-background/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     data-testid="input-search-messages"
                   />
                   {searchTerm && (
@@ -1035,8 +1032,8 @@ export default function ConsultationPage() {
                 </div>
               </div>
             )}
-          </CardHeader>
-        </Card>
+          </div>
+        </div>
 
         {/* Messages Area */}
         <ScrollArea className="flex-1" data-testid="container-chat-messages">
@@ -1065,24 +1062,24 @@ export default function ConsultationPage() {
                   data-testid={`message-${message.sender}-${message.id}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-lg p-4 space-y-3 ${
+                    className={`max-w-[85%] rounded-2xl p-5 space-y-3 ${
                       message.sender === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-background text-foreground border shadow-sm'
-                    }`}
+                        ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-lg'
+                        : 'bg-background/80 backdrop-blur-sm text-foreground border shadow-md'
+                    } ${message.sender === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
                   >
-                  <div className={`flex items-start gap-3 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+                  <div className={`flex items-start gap-4 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
                     {message.sender === 'ai' && (
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarFallback className="bg-primary/10">
-                          <Brain className="w-4 h-4 text-primary" />
+                      <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-primary/10">
+                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10">
+                          <Brain className="w-5 h-5 text-primary" />
                         </AvatarFallback>
                       </Avatar>
                     )}
                     {message.sender === 'user' && (
-                      <Avatar className="h-8 w-8 flex-shrink-0 ring-2 ring-white/20 dark:ring-white/20">
-                        <AvatarFallback className="bg-white/20 dark:bg-white/20 text-white dark:text-white">
-                          <User className="w-4 h-4" />
+                      <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-white/30 dark:ring-white/20">
+                        <AvatarFallback className="bg-white/30 dark:bg-white/20 text-white dark:text-white">
+                          <User className="w-5 h-5" />
                         </AvatarFallback>
                       </Avatar>
                     )}
@@ -1240,25 +1237,25 @@ export default function ConsultationPage() {
             );
           })}
             
-            {/* Enhanced Typing Indicator */}
+            {/* Modern Typing Indicator */}
             {isTyping && (
               <div className="flex justify-start" data-testid="indicator-typing">
-                <div className="bg-background rounded-lg p-4 max-w-[85%] border shadow-sm">
-                  <div className="flex items-center space-x-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-primary/10">
-                        <Brain className="w-4 h-4 text-primary" />
+                <div className="bg-background/80 backdrop-blur-sm rounded-2xl rounded-tl-sm p-5 max-w-[85%] border shadow-md">
+                  <div className="flex items-center space-x-4">
+                    <Avatar className="h-9 w-9 ring-2 ring-primary/10">
+                      <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10">
+                        <Brain className="w-5 h-5 text-primary" />
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        ONES AI is analyzing your request...
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                        ONES AI is analyzing...
                       </p>
                       <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                       </div>
                     </div>
                   </div>
@@ -1269,9 +1266,9 @@ export default function ConsultationPage() {
           </div>
         </ScrollArea>
         
-        {/* Enhanced Input Area */}
-        <Card className="rounded-t-none border-t">
-          <CardContent className="p-4 space-y-4">
+        {/* Modern Input Area */}
+        <div className="border-t bg-background/95 backdrop-blur-sm">
+          <div className="p-4 space-y-4">
             {/* Uploaded Files Preview */}
             {uploadedFiles.length > 0 && (
               <div className="space-y-2">
@@ -1385,8 +1382,8 @@ export default function ConsultationPage() {
               className="hidden"
               data-testid="input-file-upload"
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
       
       {/* Delete Confirmation Dialog */}
