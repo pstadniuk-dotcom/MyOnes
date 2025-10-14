@@ -1639,6 +1639,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           if (!extractedFormula.disclaimers.some(d => d.includes('interactions'))) {
             extractedFormula.disclaimers.push('Monitor for interactions with medications and adverse reactions');
           }
+          
+          // Remove the formula JSON block from fullResponse before displaying to user
+          // This keeps the conversational response clean while still extracting the data
+          fullResponse = fullResponse.replace(/```json\s*{[\s\S]*?}\s*```\s*/g, '').trim();
         }
       } catch (e) {
         console.log('No valid formula JSON found in response');
