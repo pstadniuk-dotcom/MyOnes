@@ -231,7 +231,7 @@ export default function Footer() {
             <div className="hidden md:flex items-center space-x-4 text-sm text-muted-foreground">
               <span className="flex items-center space-x-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                <span>10,000+ optimizing their health</span>
+                <span>1,000+ optimizing their health</span>
               </span>
             </div>
           </div>
@@ -240,9 +240,9 @@ export default function Footer() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2 text-xs text-muted-foreground">
               <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center">
-                <span className="text-primary font-bold text-xs">FDA</span>
+                <span className="text-primary font-bold text-xs">cGMP</span>
               </div>
-              <span>FDA-registered</span>
+              <span>cGMP-certified</span>
             </div>
             
             <div className="flex items-center space-x-2 text-xs text-muted-foreground">
