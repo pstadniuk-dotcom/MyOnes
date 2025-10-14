@@ -16,6 +16,11 @@ export default function Header() {
   const handleNavClick = (section: string) => {
     console.log('Navigation clicked:', section);
     setIsMenuOpen(false);
+    
+    const element = document.getElementById(section);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   return (
