@@ -983,15 +983,15 @@ export default function ConsultationPage() {
                       </Avatar>
                     )}
                     {message.sender === 'user' && (
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-primary text-primary-foreground">
+                      <Avatar className="h-8 w-8 ring-2 ring-white/20 dark:ring-white/20">
+                        <AvatarFallback className="bg-white/20 dark:bg-white/20 text-white dark:text-white">
                           <User className="w-4 h-4" />
                         </AvatarFallback>
                       </Avatar>
                     )}
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs text-muted-foreground">
+                        <span className={`text-xs ${message.sender === 'user' ? 'text-white/70 dark:text-white/70' : 'text-muted-foreground'}`}>
                           {message.timestamp && !isNaN(new Date(message.timestamp).getTime()) 
                             ? new Date(message.timestamp).toLocaleTimeString() 
                             : 'Just now'}
