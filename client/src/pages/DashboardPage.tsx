@@ -447,40 +447,48 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-8" data-testid="page-dashboard">
-      {/* Welcome Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-welcome">
-            Welcome back, {userName}!
-          </h1>
-          <p className="text-muted-foreground">
-            {isNewUser 
-              ? "Let's start your personalized supplement journey with ONES AI." 
-              : "Here's your personalized supplement journey overview."
-            }
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Avatar className="h-12 w-12">
-            <AvatarImage src="" alt={user?.name} />
-            <AvatarFallback>{userInitials}</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">{user?.name}</span>
-            <Badge variant="secondary" className="w-fit">Premium</Badge>
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-dashboard">
+      <div className="space-y-8 p-6">
+        {/* Modern Welcome Header */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 border rounded-2xl backdrop-blur-sm p-6">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-secondary/5 opacity-50"></div>
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16 ring-4 ring-primary/20">
+                <AvatarImage src="" alt={userName} />
+                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-xl font-bold">
+                  {userInitials}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight" data-testid="text-welcome">
+                  Welcome back, {userName}!
+                </h1>
+                <p className="text-muted-foreground">
+                  {isNewUser 
+                    ? "Let's start your personalized supplement journey with ONES AI." 
+                    : "Here's your personalized supplement journey overview."
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
+                <Sparkles className="w-3 h-3 mr-1" />
+                Premium Member
+              </Badge>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Welcome/Onboarding for New Users */}
-      {isNewUser && <WelcomeOnboarding userName={userName} />}
+        {/* Welcome/Onboarding for New Users */}
+        {isNewUser && <WelcomeOnboarding userName={userName} />}
 
-      {/* Current Formula Widget */}
-      {currentFormula && <CurrentFormulaWidget formula={currentFormula} />}
+        {/* Current Formula Widget */}
+        {currentFormula && <CurrentFormulaWidget formula={currentFormula} />}
 
-      {/* Key Metrics */}
-      {!isNewUser && (
+        {/* Key Metrics */}
+        {!isNewUser && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Enhanced Health Score Card with Breakdown */}
           <Dialog>
@@ -610,11 +618,11 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-      )}
+        )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Quick Actions */}
-        <Card data-testid="section-quick-actions">
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Quick Actions */}
+          <Card data-testid="section-quick-actions">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="w-5 h-5" />
@@ -651,133 +659,134 @@ export default function DashboardPage() {
               </Link>
             ))}
           </CardContent>
-        </Card>
+          </Card>
 
-        {/* Recent Activity / Health Snapshot */}
-        <Card data-testid="section-recent-activity">
-          <CardHeader>
+          {/* Recent Activity / Health Snapshot */}
+          <Card data-testid="section-recent-activity">
+            <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5" />
               {recentActivity.length > 0 ? "Recent Activity" : "Health Snapshot"}
-            </CardTitle>
-            <CardDescription>
-              {recentActivity.length > 0 
-                ? "Your latest interactions and updates"
-                : "Track your health journey progress"
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {recentActivity.length > 0 ? (
-              // Show recent activity
-              recentActivity.map((activity) => {
-                const IconComponent = getActivityIcon(activity.icon);
-                return (
-                  <div key={activity.id} className="flex items-start gap-3" data-testid={`activity-${activity.type}`}>
-                    <div className="p-2 rounded-full bg-muted">
-                      <IconComponent className="w-3 h-3" />
+              </CardTitle>
+              <CardDescription>
+                {recentActivity.length > 0 
+                  ? "Your latest interactions and updates"
+                  : "Track your health journey progress"
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {recentActivity.length > 0 ? (
+                // Show recent activity
+                recentActivity.map((activity) => {
+                  const IconComponent = getActivityIcon(activity.icon);
+                  return (
+                    <div key={activity.id} className="flex items-start gap-3" data-testid={`activity-${activity.type}`}>
+                      <div className="p-2 rounded-full bg-muted">
+                        <IconComponent className="w-3 h-3" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{activity.title}</p>
+                        <p className="text-xs text-muted-foreground">{activity.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatRelativeTime(activity.time)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">{activity.title}</p>
-                      <p className="text-xs text-muted-foreground">{activity.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatRelativeTime(activity.time)}
-                      </p>
+                  );
+                })
+              ) : (
+                // Show health snapshot for new users
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-3 rounded-lg border">
+                    <Target className="w-5 h-5 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium">Set Your Health Goals</p>
+                      <p className="text-xs text-muted-foreground">Define what you want to achieve</p>
                     </div>
                   </div>
-                );
-              })
-            ) : (
-              // Show health snapshot for new users
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-3 rounded-lg border">
-                  <Target className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">Set Your Health Goals</p>
-                    <p className="text-xs text-muted-foreground">Define what you want to achieve</p>
+                  
+                  <div className="flex items-center gap-3 p-3 rounded-lg border">
+                    <MessageSquare className="w-5 h-5 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium">Start AI Consultation</p>
+                      <p className="text-xs text-muted-foreground">Get personalized recommendations</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 p-3 rounded-lg border opacity-50">
+                    <FlaskConical className="w-5 h-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Receive Your Formula</p>
+                      <p className="text-xs text-muted-foreground">Custom blend for your needs</p>
+                    </div>
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-3 p-3 rounded-lg border">
-                  <MessageSquare className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">Start AI Consultation</p>
-                    <p className="text-xs text-muted-foreground">Get personalized recommendations</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3 p-3 rounded-lg border opacity-50">
-                  <FlaskConical className="w-5 h-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Receive Your Formula</p>
-                    <p className="text-xs text-muted-foreground">Custom blend for your needs</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Next Steps */}
-      {!isNewUser && (
-        <Card data-testid="section-next-steps">
+        {/* Next Steps */}
+        {!isNewUser && (
+          <Card data-testid="section-next-steps">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5" />
-              Recommended Next Steps
-            </CardTitle>
-            <CardDescription>
-              Personalized recommendations to optimize your health journey
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              {metrics.consultationsSessions === 0 || metrics.daysActive > 14 ? (
+                Recommended Next Steps
+              </CardTitle>
+              <CardDescription>
+                Personalized recommendations to optimize your health journey
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                {metrics.consultationsSessions === 0 || metrics.daysActive > 14 ? (
+                  <div className="p-4 rounded-lg border">
+                    <h4 className="font-medium mb-2">Schedule Check-in</h4>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      {metrics.consultationsSessions === 0 
+                        ? "Start with your first AI consultation to get personalized recommendations."
+                        : "It's been a while since your last consultation. Share how you're feeling."
+                      }
+                    </p>
+                    <Button size="sm" asChild data-testid="button-schedule-checkin">
+                      <Link href="/dashboard/consultation">
+                        Start Consultation
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-lg border">
+                    <h4 className="font-medium mb-2">Track Progress</h4>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Monitor how your current formula is working for you.
+                    </p>
+                    <Button size="sm" variant="outline" asChild data-testid="button-track-progress">
+                      <Link href="/dashboard/profile">
+                        Update Profile
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+                
                 <div className="p-4 rounded-lg border">
-                  <h4 className="font-medium mb-2">Schedule Check-in</h4>
+                  <h4 className="font-medium mb-2">Upload Lab Results</h4>
                   <p className="text-sm text-muted-foreground mb-3">
-                    {metrics.consultationsSessions === 0 
-                      ? "Start with your first AI consultation to get personalized recommendations."
-                      : "It's been a while since your last consultation. Share how you're feeling."
-                    }
+                    Add recent blood work to optimize your formula further.
                   </p>
-                  <Button size="sm" asChild data-testid="button-schedule-checkin">
-                    <Link href="/dashboard/consultation">
-                      Start Consultation
+                  <Button variant="outline" size="sm" asChild data-testid="button-upload-labs">
+                    <Link href="/dashboard/profile?tab=reports">
+                      Upload Reports
                     </Link>
                   </Button>
                 </div>
-              ) : (
-                <div className="p-4 rounded-lg border">
-                  <h4 className="font-medium mb-2">Track Progress</h4>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Monitor how your current formula is working for you.
-                  </p>
-                  <Button size="sm" variant="outline" asChild data-testid="button-track-progress">
-                    <Link href="/dashboard/profile">
-                      Update Profile
-                    </Link>
-                  </Button>
-                </div>
-              )}
-              
-              <div className="p-4 rounded-lg border">
-                <h4 className="font-medium mb-2">Upload Lab Results</h4>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Add recent blood work to optimize your formula further.
-                </p>
-                <Button variant="outline" size="sm" asChild data-testid="button-upload-labs">
-                  <Link href="/dashboard/profile?tab=reports">
-                    Upload Reports
-                  </Link>
-                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
