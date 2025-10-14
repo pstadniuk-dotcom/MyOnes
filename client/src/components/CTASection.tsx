@@ -8,7 +8,7 @@ export default function CTASection() {
   const trustBadges = [
     {
       icon: Shield,
-      title: "cGMP-certified facility",
+      title: "FDA Registered Facility",
       description: "Manufactured to the highest safety standards"
     },
     {
