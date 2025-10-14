@@ -980,24 +980,27 @@ export default function ConsultationPage() {
                         : 'bg-background text-foreground border shadow-sm'
                     }`}
                   >
-                  <div className="flex items-start space-x-3">
+                  <div className={`flex items-start gap-3 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
                     {message.sender === 'ai' && (
-                      <Avatar className="h-8 w-8">
+                      <Avatar className="h-8 w-8 flex-shrink-0">
                         <AvatarFallback className="bg-primary/10">
                           <Brain className="w-4 h-4 text-primary" />
                         </AvatarFallback>
                       </Avatar>
                     )}
                     {message.sender === 'user' && (
-                      <Avatar className="h-8 w-8 ring-2 ring-white/20 dark:ring-white/20">
+                      <Avatar className="h-8 w-8 flex-shrink-0 ring-2 ring-white/20 dark:ring-white/20">
                         <AvatarFallback className="bg-white/20 dark:bg-white/20 text-white dark:text-white">
                           <User className="w-4 h-4" />
                         </AvatarFallback>
                       </Avatar>
                     )}
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`text-xs ${message.sender === 'user' ? 'text-white/70 dark:text-white/70' : 'text-muted-foreground'}`}>
+                        <span className={`text-xs font-medium ${message.sender === 'user' ? 'text-white/90 dark:text-white/90' : 'text-muted-foreground'}`}>
+                          {message.sender === 'user' ? 'You' : 'ONES AI'}
+                        </span>
+                        <span className={`text-xs ${message.sender === 'user' ? 'text-white/60 dark:text-white/60' : 'text-muted-foreground/70'}`}>
                           {message.timestamp && !isNaN(new Date(message.timestamp).getTime()) 
                             ? new Date(message.timestamp).toLocaleTimeString() 
                             : 'Just now'}
