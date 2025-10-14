@@ -446,6 +446,60 @@ export class ObjectStorageService {
     });
   }
 
+  // Gets a signed download URL for a lab report for internal analysis
+  async getLabReportDownloadURL(
+    objectPath: string,
+    userId: string,
+    auditInfo?: { ipAddress?: string, userAgent?: string }
+  ): Promise<string> {
+    // HIPAA Compliance: Enforce consent requirements before download
+    await enforceConsentRequirements(userId, 'download', auditInfo);
+
+    if (!objectPath.startsWith("/objects/lab-reports/")) {
+      throw new Error("Invalid object path - not a lab report");
+    }
+
+    const parts = objectPath.slice(1).split("/");
+    if (parts.length < 4) { // objects/lab-reports/userId/filename
+      throw new Error("Invalid object path structure");
+    }
+
+    // Extract userId from path and validate ownership
+    const pathUserId = parts[2];
+    if (pathUserId !== userId) {
+      // Log unauthorized access attempt
+      console.warn("HIPAA AUDIT LOG - Unauthorized Access Attempt:", {
+        timestamp: new Date().toISOString(),
+        userId,
+        action: 'access_denied',
+        objectPath,
+        ipAddress: auditInfo?.ipAddress,
+        userAgent: auditInfo?.userAgent,
+        success: false,
+        reason: "User attempted to access another user's lab report"
+      });
+      
+      throw new Error("Access denied: User can only access their own lab reports");
+    }
+
+    // Convert logical path to actual storage path (same as getLabReportFile)
+    const entityId = parts.slice(1).join("/");
+    let entityDir = this.getPrivateObjectDir();
+    if (!entityDir.endsWith("/")) {
+      entityDir = `${entityDir}/`;
+    }
+    const objectEntityPath = `${entityDir}${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(objectEntityPath);
+
+    // Sign URL for GET method with short TTL (5 minutes for analysis)
+    return signObjectURL({
+      bucketName,
+      objectName,
+      method: "GET",
+      ttlSec: 300, // 5 minutes
+    });
+  }
+
   // Gets the object entity file from the object path with enhanced security checks
   async getLabReportFile(
     objectPath: string, 

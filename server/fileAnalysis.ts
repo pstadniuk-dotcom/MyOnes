@@ -1,12 +1,11 @@
 import OpenAI from 'openai';
 import * as pdfParseModule from 'pdf-parse';
-import { Storage } from '@google-cloud/storage';
+import { ObjectStorageService } from './objectStorage';
 
 // Handle both CommonJS and ESM exports
 const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const storage = new Storage();
 
 export interface LabDataExtraction {
   testDate?: string;
@@ -156,20 +155,22 @@ export async function analyzeLabReport(
   userId: string
 ): Promise<LabDataExtraction> {
   try {
-    // Parse object path to get bucket and file name
-    // Format: /<bucket_name>/<object_name>
-    const pathParts = objectPath.split('/').filter(part => part.length > 0);
-    if (pathParts.length < 2) {
-      throw new Error('Invalid object path');
+    // Get signed download URL from ObjectStorageService
+    const objectStorageService = new ObjectStorageService();
+    const downloadUrl = await objectStorageService.getLabReportDownloadURL(
+      objectPath,
+      userId,
+      { ipAddress: 'internal-analysis', userAgent: 'lab-analysis-service' }
+    );
+    
+    // Download file using HTTP fetch
+    const response = await fetch(downloadUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
     }
     
-    const bucketName = pathParts[0];
-    const fileName = pathParts.slice(1).join('/');
-    
-    // Download file from object storage
-    const bucket = storage.bucket(bucketName);
-    const file = bucket.file(fileName);
-    const [fileBuffer] = await file.download();
+    const arrayBuffer = await response.arrayBuffer();
+    const fileBuffer = Buffer.from(arrayBuffer);
     
     // Detect file type
     const fileType = getFileType(mimeType);
