@@ -46,6 +46,7 @@ export interface IStorage {
   createChatSession(session: InsertChatSession): Promise<ChatSession>;
   listChatSessionsByUser(userId: string): Promise<ChatSession[]>;
   updateChatSessionStatus(id: string, status: 'active' | 'completed' | 'archived'): Promise<ChatSession | undefined>;
+  deleteChatSession(id: string): Promise<void>;
   
   // Message operations
   getMessage(id: string): Promise<Message | undefined>;
@@ -289,6 +290,18 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error updating chat session status:', error);
       return undefined;
+    }
+  }
+
+  async deleteChatSession(id: string): Promise<void> {
+    try {
+      // Delete associated messages first (if not cascading)
+      await db.delete(messages).where(eq(messages.sessionId, id));
+      // Delete the session
+      await db.delete(chatSessions).where(eq(chatSessions.id, id));
+    } catch (error) {
+      console.error('Error deleting chat session:', error);
+      throw new Error('Failed to delete chat session');
     }
   }
 
@@ -1592,6 +1605,18 @@ export class MemStorage implements IStorage {
     const updatedSession = { ...session, status };
     this.chatSessions.set(id, updatedSession);
     return updatedSession;
+  }
+
+  async deleteChatSession(id: string): Promise<void> {
+    // Delete associated messages
+    const messagesToDelete = Array.from(this.messages.entries())
+      .filter(([_, msg]) => msg.sessionId === id)
+      .map(([msgId]) => msgId);
+    
+    messagesToDelete.forEach(msgId => this.messages.delete(msgId));
+    
+    // Delete the session
+    this.chatSessions.delete(id);
   }
 
   // Message operations

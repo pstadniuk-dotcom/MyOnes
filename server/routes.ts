@@ -1913,6 +1913,32 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Delete consultation session
+  app.delete('/api/consultations/:sessionId', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const sessionId = req.params.sessionId;
+      
+      // Verify session belongs to user
+      const session = await storage.getChatSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      if (session.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      // Delete the session (this should cascade delete messages)
+      await storage.deleteChatSession(sessionId);
+      
+      res.json({ success: true, sessionId });
+    } catch (error) {
+      console.error('Delete consultation error:', error);
+      res.status(500).json({ error: 'Failed to delete consultation' });
+    }
+  });
+
   // Get dashboard data
   app.get('/api/dashboard', requireAuth, async (req, res) => {
     try {
