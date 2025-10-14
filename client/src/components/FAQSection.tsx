@@ -28,7 +28,7 @@ export default function FAQSection() {
     },
     {
       question: "Are your supplements third-party tested?",
-      answer: "Yes, every batch of supplements is tested by independent laboratories for purity, potency, and contaminants. We manufacture in FDA-registered facilities following Good Manufacturing Practices (GMP). You can access your batch's certificate of analysis through your account dashboard."
+      answer: "Yes, every batch of supplements is tested by independent laboratories for purity, potency, and contaminants. We manufacture in cGMP-certified facilities following current Good Manufacturing Practices. You can access your batch's certificate of analysis through your account dashboard."
     }
   ];
 

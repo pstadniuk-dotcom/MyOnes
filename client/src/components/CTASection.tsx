@@ -8,7 +8,7 @@ export default function CTASection() {
   const trustBadges = [
     {
       icon: Shield,
-      title: "FDA-registered facility",
+      title: "cGMP-certified facility",
       description: "Manufactured to the highest safety standards"
     },
     {
@@ -117,7 +117,7 @@ export default function CTASection() {
           <div className="mt-16">
             <div className="inline-flex items-center space-x-6 bg-background/80 backdrop-blur-sm px-8 py-4 rounded-full">
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary">10,000+</div>
+                <div className="text-2xl font-bold text-primary">1,000+</div>
                 <div className="text-sm text-muted-foreground">Happy customers</div>
               </div>
               <div className="h-8 w-px bg-border"></div>

@@ -39,7 +39,7 @@ export default function TestimonialsSection() {
     { value: "87%", label: "Report better energy within 30 days" },
     { value: "92%", label: "Continue their subscription after 6 months" },
     { value: "78%", label: "See improvements in sleep quality" },
-    { value: "10,000+", label: "Health journeys optimized with ONES" }
+    { value: "1,000+", label: "Health journeys optimized with ONES" }
   ];
 
   const handleTestimonialClick = (name: string) => {
@@ -151,7 +151,7 @@ export default function TestimonialsSection() {
                   <span className="text-xs text-primary-foreground font-bold">+</span>
                 </div>
               </div>
-              <span className="text-sm text-muted-foreground">10,000+ members</span>
+              <span className="text-sm text-muted-foreground">1,000+ members</span>
             </div>
             
             <div className="h-8 w-px bg-border"></div>
