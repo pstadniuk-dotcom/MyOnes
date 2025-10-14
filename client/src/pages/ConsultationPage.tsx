@@ -149,16 +149,41 @@ export default function ConsultationPage() {
     enabled: !!user?.id
   });
   
-  // Load history data whenever it changes
+  // Load history data and restore most recent session
   useEffect(() => {
     if (historyData?.sessions) {
       setSessionHistory(historyData.sessions);
+      
+      // Auto-restore the most recent active session on initial load
+      if (historyData.sessions.length > 0 && messages.length === 0 && isNewSession) {
+        const mostRecentSession = historyData.sessions[0]; // Sessions are sorted by timestamp descending
+        if (mostRecentSession && historyData.messages[mostRecentSession.id]) {
+          const sessionMessages = historyData.messages[mostRecentSession.id].map(msg => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }));
+          
+          setMessages(sessionMessages);
+          setCurrentSessionId(mostRecentSession.id);
+          setIsNewSession(false);
+          setShowSuggestions(false);
+          
+          console.log('Auto-restored session:', mostRecentSession.id);
+        }
+      }
     }
-  }, [historyData]);
+  }, [historyData, messages.length, isNewSession]);
   
-  // Initialize welcome message on component mount
+  // Initialize welcome message ONLY if no sessions exist
   useEffect(() => {
-    if (!isNewSession || messages.length > 0) return;
+    // Don't show welcome if we already have messages or if we're loading history
+    if (messages.length > 0 || isLoadingHistory) return;
+    
+    // Don't show welcome if we have sessions (they'll be auto-loaded)
+    if (historyData?.sessions && historyData.sessions.length > 0) return;
+    
+    // Only show welcome for truly new users with no history
+    if (!isNewSession) return;
     
     const welcomeMessage: Message = {
       id: 'welcome-' + Date.now(),
@@ -181,7 +206,7 @@ export default function ConsultationPage() {
         handleSendMessage(preservedMessage);
       }, 1000);
     }
-  }, [user?.name, isNewSession, messages.length]);
+  }, [user?.name, isNewSession, messages.length, isLoadingHistory, historyData?.sessions]);
   
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = useCallback(() => {
