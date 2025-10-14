@@ -36,6 +36,7 @@ export default function AIChat() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const initialInputRef = useRef<string>('');
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -82,83 +83,108 @@ export default function AIChat() {
     }
   };
 
-  // Initialize speech recognition
+  // Cleanup voice recognition on unmount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
-        recognitionRef.current.lang = 'en-US';
-
-        recognitionRef.current.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setInputValue(prev => prev + (prev ? ' ' : '') + transcript);
-          setIsListening(false);
-        };
-
-        recognitionRef.current.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
-          setIsListening(false);
-          
-          if (event.error === 'not-allowed') {
-            toast({
-              title: "Microphone Access Denied",
-              description: "Please allow microphone access to use voice input.",
-              variant: "destructive"
-            });
-          } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
-            toast({
-              title: "Voice Input Error",
-              description: "Unable to process voice input. Please try again.",
-              variant: "destructive"
-            });
-          }
-        };
-
-        recognitionRef.current.onend = () => {
-          setIsListening(false);
-        };
-      }
-    }
-
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
+        recognitionRef.current = null;
       }
     };
-  }, [toast]);
+  }, []);
 
-  const handleVoiceInput = () => {
-    if (!recognitionRef.current) {
+  const handleVoiceInput = useCallback(async () => {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       toast({
-        title: "Voice Input Unavailable",
-        description: "Your browser doesn't support voice input. Please use Chrome, Edge, or Safari.",
+        title: "Voice Input Not Supported",
+        description: "Your browser doesn't support voice recognition.",
         variant: "destructive"
       });
       return;
     }
 
-    if (isListening) {
+    // If already recording, stop
+    if (isListening && recognitionRef.current) {
       recognitionRef.current.stop();
       setIsListening(false);
-    } else {
-      try {
-        recognitionRef.current.start();
+      return;
+    }
+
+    try {
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      
+      recognition.continuous = true;  // Enable continuous recording
+      recognition.interimResults = true;  // Show interim results as user speaks
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+      
+      let finalTranscript = '';
+      
+      recognition.onstart = () => {
         setIsListening(true);
+        // Store the initial input value when recording starts
+        initialInputRef.current = inputValue;
         toast({
           title: "Listening...",
-          description: "Speak now to tell us about your health goals.",
-          variant: "default"
+          description: "Speak freely. Click the microphone again when done.",
+          variant: "success"
         });
-      } catch (error) {
-        console.error('Error starting recognition:', error);
+      };
+      
+      recognition.onresult = (event: any) => {
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        // Update input with both final and interim results
+        const baseText = initialInputRef.current.trim();
+        const combinedTranscript = (finalTranscript + interimTranscript).trim();
+        const newValue = baseText + (baseText && combinedTranscript ? ' ' : '') + combinedTranscript + (interimTranscript ? ' [Speaking...]' : '');
+        setInputValue(newValue);
+      };
+      
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
         setIsListening(false);
-      }
+        recognitionRef.current = null;
+        
+        if (event.error !== 'aborted' && event.error !== 'no-speech') {
+          toast({
+            title: "Voice Recognition Error",
+            description: "Failed to capture voice input. Please try again.",
+            variant: "destructive"
+          });
+        }
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+        recognitionRef.current = null;
+        
+        // Clean up the [Speaking...] indicator
+        setInputValue(prev => prev.replace(' [Speaking...]', '').trim());
+      };
+      
+      recognition.start();
+    } catch (error) {
+      setIsListening(false);
+      recognitionRef.current = null;
+      toast({
+        title: "Voice Input Error",
+        description: "Unable to start voice recognition.",
+        variant: "destructive"
+      });
     }
-  };
+  }, [toast, isListening, inputValue]);
 
   return (
     <Card className="w-full max-w-md h-[500px] flex flex-col glass shadow-premium-lg border-none" data-testid="card-ai-chat">
