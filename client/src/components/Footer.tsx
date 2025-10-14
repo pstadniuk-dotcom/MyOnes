@@ -240,9 +240,9 @@ export default function Footer() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2 text-xs text-muted-foreground">
               <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center">
-                <span className="text-primary font-bold text-xs">cGMP</span>
+                <span className="text-primary font-bold text-xs">FDA</span>
               </div>
-              <span>cGMP-certified</span>
+              <span>FDA Registered</span>
             </div>
             
             <div className="flex items-center space-x-2 text-xs text-muted-foreground">
