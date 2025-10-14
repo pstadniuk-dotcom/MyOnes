@@ -549,6 +549,46 @@ export default function ConsultationPage() {
     }
   }, [historyData]);
   
+  // Delete session mutation
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const response = await apiRequest('DELETE', `/api/consultations/${sessionId}`);
+      if (!response.ok) throw new Error('Failed to delete session');
+      return sessionId;
+    },
+    onSuccess: (deletedSessionId) => {
+      // Invalidate history query to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['/api/consultations/history', user?.id] });
+      
+      // If we deleted the current session, start a new one
+      if (deletedSessionId === currentSessionId) {
+        handleNewSession();
+      }
+      
+      toast({
+        title: "Conversation Deleted",
+        description: "The consultation has been removed from your history.",
+        variant: "default"
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Delete Failed",
+        description: "Unable to delete the conversation. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Handle delete session with confirmation
+  const handleDeleteSession = useCallback((sessionId: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent triggering the load session
+    
+    if (window.confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
+      deleteSessionMutation.mutate(sessionId);
+    }
+  }, [deleteSessionMutation]);
+  
   // Copy message content
   const handleCopyMessage = useCallback((content: string) => {
     navigator.clipboard.writeText(content).then(() => {
@@ -810,19 +850,34 @@ export default function ConsultationPage() {
                   sessionHistory.map((session) => (
                     <div
                       key={session.id}
-                      className="p-3 border rounded-lg hover-elevate cursor-pointer group"
+                      className="p-3 border rounded-lg hover-elevate cursor-pointer group relative"
                       onClick={() => handleLoadSession(session)}
                       data-testid={`session-${session.id}`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{session.title}</p>
-                          <p className="text-xs text-muted-foreground truncate mt-1">
-                            {session.lastMessage}
-                          </p>
-                          <div className="flex items-center gap-2 mt-2">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate pr-2">{session.title}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => handleDeleteSession(session.id, e)}
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
+                            data-testid={`button-delete-session-${session.id}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        
+                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                          {session.lastMessage}
+                        </p>
+                        
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-xs">
-                              {session.messageCount} messages
+                              {session.messageCount} msgs
                             </Badge>
                             {session.hasFormula && (
                               <Badge variant="secondary" className="text-xs">
@@ -831,10 +886,13 @@ export default function ConsultationPage() {
                               </Badge>
                             )}
                           </div>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(session.timestamp).toLocaleDateString(undefined, { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(session.timestamp).toLocaleDateString()}
-                        </span>
                       </div>
                     </div>
                   ))
