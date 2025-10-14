@@ -58,7 +58,7 @@ export default function ScienceSection() {
   ];
 
   return (
-    <section className="py-24 bg-background" data-testid="section-science">
+    <section id="science" className="py-24 bg-background" data-testid="section-science">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Headline */}
         <div className="text-center mb-20">
