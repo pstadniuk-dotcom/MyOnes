@@ -2810,6 +2810,77 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Delete lab report with audit logging
+  app.delete('/api/files/:fileId', requireAuth, async (req, res) => {
+    const userId = req.userId!;
+    const { fileId } = req.params;
+    const auditInfo = {
+      ipAddress: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent']
+    };
+
+    try {
+      // Verify file belongs to user
+      const fileUpload = await storage.getFileUpload(fileId);
+      
+      if (!fileUpload) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      
+      if (fileUpload.userId !== userId) {
+        console.warn("HIPAA AUDIT LOG - Unauthorized Delete Attempt:", {
+          timestamp: new Date().toISOString(),
+          userId,
+          fileId,
+          action: 'delete',
+          ipAddress: auditInfo.ipAddress,
+          userAgent: auditInfo.userAgent,
+          success: false,
+          reason: 'User does not own this file'
+        });
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Soft delete the file
+      const deleted = await storage.softDeleteFileUpload(fileId, userId);
+      
+      if (!deleted) {
+        throw new Error('Failed to delete file');
+      }
+
+      // Log successful deletion
+      console.log("HIPAA AUDIT LOG - File Deleted:", {
+        timestamp: new Date().toISOString(),
+        userId,
+        fileId,
+        fileName: fileUpload.fileName,
+        fileType: fileUpload.type,
+        action: 'delete',
+        ipAddress: auditInfo.ipAddress,
+        userAgent: auditInfo.userAgent,
+        success: true,
+        reason: 'User requested file deletion'
+      });
+
+      res.json({ success: true, message: 'File deleted successfully' });
+      
+    } catch (error) {
+      console.error("HIPAA AUDIT LOG - Delete Error:", {
+        timestamp: new Date().toISOString(),
+        userId,
+        fileId,
+        action: 'delete',
+        ipAddress: auditInfo.ipAddress,
+        userAgent: auditInfo.userAgent,
+        success: false,
+        reason: `Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+      
+      console.error('File delete error:', error);
+      res.status(500).json({ error: 'Failed to delete file' });
+    }
+  });
+
   // ==================== FORMULA MANAGEMENT ENDPOINTS ====================
 
   // Get current active formula for user

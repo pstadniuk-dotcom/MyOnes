@@ -276,6 +276,30 @@ export default function ProfilePage() {
     }
   });
 
+  // Delete file mutation
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  const deleteFileMutation = useMutation({
+    mutationFn: async (fileId: string) => {
+      const response = await apiRequest('DELETE', `/api/files/${fileId}`, null);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
+      toast({
+        title: "File deleted",
+        description: "Lab report has been permanently deleted.",
+      });
+      setFileToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message || "Failed to delete file",
+        variant: "destructive",
+      });
+    }
+  });
+
   // Actual file upload function
   const uploadFile = async (file: File) => {
     setIsUploading(true);
@@ -1042,13 +1066,7 @@ export default function ProfilePage() {
                             <Button 
                               variant="destructive" 
                               size="sm"
-                              onClick={() => {
-                                toast({
-                                  title: "Delete feature",
-                                  description: "Lab report deletion functionality will be implemented.",
-                                  variant: "default",
-                                });
-                              }}
+                              onClick={() => setFileToDelete(report.id)}
                               data-testid={`button-delete-${report.id}`}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1315,6 +1333,33 @@ export default function ProfilePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!fileToDelete} onOpenChange={() => setFileToDelete(null)}>
+        <AlertDialogContent data-testid="dialog-delete-file">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lab Report?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this lab report from your account. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-delete-cancel">
+              No, Keep It
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => fileToDelete && deleteFileMutation.mutate(fileToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-delete-confirm"
+            >
+              {deleteFileMutation.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Yes, Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
