@@ -63,15 +63,16 @@ export default function CTASection() {
               </Button>
               
               <Button 
-                asChild
                 variant="outline" 
                 size="lg"
                 className="border-2 border-foreground/20 hover:border-primary px-8 py-4 text-lg"
                 data-testid="button-learn-more-process"
+                onClick={() => {
+                  const scienceSection = document.getElementById('science');
+                  scienceSection?.scrollIntoView({ behavior: 'smooth' });
+                }}
               >
-                <Link href="/science">
-                  Learn More About Our Process
-                </Link>
+                Learn More About Our Process
               </Button>
             </div>
             
