@@ -138,19 +138,9 @@ export default function ConsultationPage() {
 
   // Query to fetch consultation history
   const { data: historyData, isLoading: isLoadingHistory } = useQuery({
-    queryKey: ['consultation-history', user?.id],
+    queryKey: ['/api/consultations/history', user?.id],
     queryFn: async () => {
-      const response = await fetch('/api/consultations/history', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch consultation history');
-      }
-      
-      const data = await response.json();
+      const data = await apiRequest('/api/consultations/history');
       return data as { sessions: ChatSession[], messages: Record<string, Message[]> };
     },
     enabled: !!user?.id

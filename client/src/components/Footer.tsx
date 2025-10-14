@@ -136,10 +136,8 @@ export default function Footer() {
                       {link.name}
                     </button>
                   ) : (
-                    <Link href={link.href}>
-                      <a className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-product-${index}`}>
-                        {link.name}
-                      </a>
+                    <Link href={link.href} className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-product-${index}`}>
+                      {link.name}
                     </Link>
                   )}
                 </li>
@@ -162,10 +160,8 @@ export default function Footer() {
                       {link.name}
                     </button>
                   ) : (
-                    <Link href={link.href}>
-                      <a className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-company-${index}`}>
-                        {link.name}
-                      </a>
+                    <Link href={link.href} className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-company-${index}`}>
+                      {link.name}
                     </Link>
                   )}
                 </li>
@@ -188,10 +184,8 @@ export default function Footer() {
                       {link.name}
                     </button>
                   ) : (
-                    <Link href={link.href}>
-                      <a className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-support-${index}`}>
-                        {link.name}
-                      </a>
+                    <Link href={link.href} className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-support-${index}`}>
+                      {link.name}
                     </Link>
                   )}
                 </li>
@@ -214,10 +208,8 @@ export default function Footer() {
                       {link.name}
                     </button>
                   ) : (
-                    <Link href={link.href}>
-                      <a className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-legal-${index}`}>
-                        {link.name}
-                      </a>
+                    <Link href={link.href} className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-legal-${index}`}>
+                      {link.name}
                     </Link>
                   )}
                 </li>
