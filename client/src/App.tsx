@@ -11,6 +11,19 @@ import LoginPage from "@/pages/LoginPage";
 import SciencePage from "@/pages/SciencePage";
 import { ThemeProvider } from "next-themes";
 
+// Import static pages
+import AboutPage from "@/pages/AboutPage";
+import BlogPage from "@/pages/BlogPage";
+import CareersPage from "@/pages/CareersPage";
+import PressPage from "@/pages/PressPage";
+import ContactPage from "@/pages/ContactPage";
+import PrivacyPage from "@/pages/PrivacyPage";
+import TermsPage from "@/pages/TermsPage";
+import RefundsPage from "@/pages/RefundsPage";
+import DisclaimerPage from "@/pages/DisclaimerPage";
+import ReturnsPage from "@/pages/ReturnsPage";
+import ShippingPage from "@/pages/ShippingPage";
+
 // Import dashboard components
 import { DashboardLayout } from "@/components/DashboardLayout";
 import DashboardPage from "@/pages/DashboardPage";
@@ -59,6 +72,20 @@ function MainRouter() {
       <Route path="/science" component={SciencePage} />
       <Route path="/signup" component={SignupPage} />
       <Route path="/login" component={LoginPage} />
+      
+      {/* Static Pages */}
+      <Route path="/about" component={AboutPage} />
+      <Route path="/blog" component={BlogPage} />
+      <Route path="/careers" component={CareersPage} />
+      <Route path="/press" component={PressPage} />
+      <Route path="/contact" component={ContactPage} />
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/terms" component={TermsPage} />
+      <Route path="/refunds" component={RefundsPage} />
+      <Route path="/disclaimer" component={DisclaimerPage} />
+      <Route path="/returns" component={ReturnsPage} />
+      <Route path="/shipping" component={ShippingPage} />
+      <Route path="/help" component={SupportPage} />
       
       {/* Protected Dashboard Routes - explicit paths */}
       <Route path="/dashboard">
