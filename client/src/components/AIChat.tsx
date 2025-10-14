@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Send, Upload, Brain, User, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Send, Mic, MicOff, Brain, User, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 
@@ -34,7 +34,8 @@ export default function AIChat() {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -73,38 +74,89 @@ export default function AIChat() {
     }
   }, [inputValue, toast, setLocation]);
 
-  const handleFileUpload = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      console.log('File uploaded:', file.name);
-      const fileMessage: Message = {
-        id: Date.now().toString(),
-        content: `📄 Uploaded: ${file.name}`,
-        sender: 'user',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, fileMessage]);
-      
-      // TODO: Implement file upload to server and OCR processing
-      // For now, we'll send a message indicating file upload
-      setInputValue(`I've uploaded my blood test results: ${file.name}. Please analyze them and create a personalized supplement formula.`);
-      
-      toast({
-        title: "File Uploaded",
-        description: `${file.name} ready for analysis. Click send to have ONES AI analyze your results.`,
-        variant: "default"
-      });
-    }
-  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.lang = 'en-US';
+
+        recognitionRef.current.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setInputValue(prev => prev + (prev ? ' ' : '') + transcript);
+          setIsListening(false);
+        };
+
+        recognitionRef.current.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          setIsListening(false);
+          
+          if (event.error === 'not-allowed') {
+            toast({
+              title: "Microphone Access Denied",
+              description: "Please allow microphone access to use voice input.",
+              variant: "destructive"
+            });
+          } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
+            toast({
+              title: "Voice Input Error",
+              description: "Unable to process voice input. Please try again.",
+              variant: "destructive"
+            });
+          }
+        };
+
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+        };
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [toast]);
+
+  const handleVoiceInput = () => {
+    if (!recognitionRef.current) {
+      toast({
+        title: "Voice Input Unavailable",
+        description: "Your browser doesn't support voice input. Please use Chrome, Edge, or Safari.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+        toast({
+          title: "Listening...",
+          description: "Speak now to tell us about your health goals.",
+          variant: "default"
+        });
+      } catch (error) {
+        console.error('Error starting recognition:', error);
+        setIsListening(false);
+      }
     }
   };
 
@@ -250,11 +302,11 @@ export default function AIChat() {
           <Button
             variant="outline"
             size="icon"
-            onClick={handleFileUpload}
-            className="micro-bounce transition-all duration-300"
-            data-testid="button-upload-file"
+            onClick={handleVoiceInput}
+            className={`micro-bounce transition-all duration-300 ${isListening ? 'bg-red-500 text-white border-red-600 animate-pulse' : ''}`}
+            data-testid="button-voice-input"
           >
-            <Upload className="w-4 h-4" />
+            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </Button>
           <Button
             onClick={handleSendMessage}
@@ -266,16 +318,8 @@ export default function AIChat() {
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png"
-          onChange={handleFileChange}
-          className="hidden"
-          data-testid="input-file-upload"
-        />
         <p className="text-xs text-muted-foreground mt-2">
-          Upload blood tests (PDF/image) or describe your health goals
+          Use voice input or type to tell us about your health goals
           {sessionId && <span className="ml-2 text-green-600">• Connected</span>}
         </p>
       </div>
