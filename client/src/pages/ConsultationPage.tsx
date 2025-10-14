@@ -137,10 +137,11 @@ export default function ConsultationPage() {
   ], []);
 
   // Query to fetch consultation history
-  const { data: historyData, isLoading: isLoadingHistory } = useQuery({
+  const { data: historyData, isLoading: isLoadingHistory, error: historyError } = useQuery({
     queryKey: ['/api/consultations/history', user?.id],
     queryFn: async () => {
-      const data = await apiRequest('/api/consultations/history');
+      const response = await apiRequest('GET', '/api/consultations/history');
+      const data = await response.json();
       return data as { sessions: ChatSession[], messages: Record<string, Message[]> };
     },
     enabled: !!user?.id
