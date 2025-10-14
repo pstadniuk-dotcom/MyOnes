@@ -13,12 +13,13 @@ import {
   Send, Upload, Brain, User, AlertTriangle, CheckCircle, Sparkles, FileText,
   History, Download, Search, Plus, RotateCcw, Copy, Share2, Mic, 
   Loader2, FlaskConical, Clock, ArrowUp, Settings2, Zap,
-  Shield, Trash2, Calendar, Eye, EyeOff, X, ChevronDown, ChevronUp
+  Shield, Trash2, Calendar, Eye, EyeOff, X, ChevronDown, ChevronUp, ArrowRight
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import { Link } from 'wouter';
 
 interface Message {
   id: string;
@@ -231,6 +232,7 @@ export default function ConsultationPage() {
 
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
+    initialInputRef.current = ''; // Clear voice input reference
     setIsTyping(true);
     setUploadedFiles([]);
     
