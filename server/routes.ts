@@ -1807,9 +1807,16 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const userId = req.userId!;
       const sessions = await storage.listChatSessionsByUser(userId);
       
+      // Build messages map for all sessions
+      const messagesMap: Record<string, any[]> = {};
+      
       // Enrich each session with additional data
       const enrichedSessions = await Promise.all(sessions.map(async (session) => {
         const messages = await storage.listMessagesBySession(session.id);
+        
+        // Store messages in map for frontend
+        messagesMap[session.id] = messages;
+        
         const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
         const hasFormula = messages.some(msg => msg.content?.includes('"bases":') || msg.content?.includes('"additions":'));
         
@@ -1824,7 +1831,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         };
       }));
       
-      res.json({ sessions: enrichedSessions, messages: {} });
+      res.json({ sessions: enrichedSessions, messages: messagesMap });
     } catch (error) {
       console.error('Get consultation history error:', error);
       res.status(500).json({ error: 'Failed to get consultation history' });
