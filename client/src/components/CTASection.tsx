@@ -112,26 +112,6 @@ export default function CTASection() {
               );
             })}
           </div>
-
-          {/* Social Proof */}
-          <div className="mt-16">
-            <div className="inline-flex items-center space-x-6 bg-background/80 backdrop-blur-sm px-8 py-4 rounded-full">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">1,000+</div>
-                <div className="text-sm text-muted-foreground">Happy customers</div>
-              </div>
-              <div className="h-8 w-px bg-border"></div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">4.9/5</div>
-                <div className="text-sm text-muted-foreground">Average rating</div>
-              </div>
-              <div className="h-8 w-px bg-border"></div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">87%</div>
-                <div className="text-sm text-muted-foreground">See results in 30 days</div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </section>
