@@ -40,6 +40,13 @@ Preferred communication style: Simple, everyday language.
 
 ### Core Features Architecture
 - **AI Chat Interface**: Conversational UI for health assessments with file upload capabilities for blood tests
+- **Lab Data Extraction System** (Added Oct 2025):
+  - Automatic analysis of uploaded PDF and image lab reports
+  - PDF text extraction using pdf-parse library
+  - Image OCR using OpenAI GPT-4o Vision API
+  - AI-powered structured data extraction (test values, dates, ranges, status flags)
+  - Extracted lab data automatically integrated into AI chat context for personalized recommendations
+  - Robust error handling with graceful fallbacks
 - **Personalization Engine**: Algorithm that processes user health data to create custom supplement formulas
 - **Formula Management**: System for combining base formulas with individual ingredients (400+ premium ingredients)
 - **Progress Tracking**: User journey monitoring with iterative formula optimization
@@ -74,8 +81,10 @@ Preferred communication style: Simple, everyday language.
 - **Hookform Resolvers**: Integration between form validation and schema validation
 - **Date-fns**: Date manipulation utilities
 
-### File Handling
-- **File Upload Support**: PDF and image processing for blood test analysis
+### File Handling & Analysis
+- **pdf-parse**: PDF text extraction for lab report analysis
+- **OpenAI GPT-4o Vision**: Image OCR for scanned lab reports
+- **File Upload Support**: HIPAA-compliant secure upload with automatic lab data extraction
 - **Asset Management**: Vite-based asset optimization and serving
 
 ### Font & Typography
