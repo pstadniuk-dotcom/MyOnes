@@ -4,6 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { Link } from 'wouter';
 
 export default function Footer() {
   const [email, setEmail] = useState('');
@@ -12,28 +13,28 @@ export default function Footer() {
 
   const footerLinks = {
     product: [
-      { name: 'How it Works', href: '#how-it-works' },
-      { name: 'Science', href: '#science' },
-      { name: 'Pricing', href: '#pricing' },
-      { name: 'Ingredients', href: '#ingredients' }
+      { name: 'How it Works', href: '#how-it-works', isSection: true },
+      { name: 'Science', href: '#science', isSection: true },
+      { name: 'Pricing', href: '#pricing', isSection: true },
+      { name: 'Ingredients', href: '#ingredients', isSection: true }
     ],
     company: [
-      { name: 'About Us', href: '#about' },
-      { name: 'Blog', href: '#blog' },
-      { name: 'Careers', href: '#careers' },
-      { name: 'Press', href: '#press' }
+      { name: 'About Us', href: '/about', isSection: false },
+      { name: 'Blog', href: '/blog', isSection: false },
+      { name: 'Careers', href: '/careers', isSection: false },
+      { name: 'Press', href: '/press', isSection: false }
     ],
     support: [
-      { name: 'Help Center', href: '#help' },
-      { name: 'Contact Us', href: '#contact' },
-      { name: 'Returns', href: '#returns' },
-      { name: 'Shipping', href: '#shipping' }
+      { name: 'Help Center', href: '/help', isSection: false },
+      { name: 'Contact Us', href: '/contact', isSection: false },
+      { name: 'Returns', href: '/returns', isSection: false },
+      { name: 'Shipping', href: '/shipping', isSection: false }
     ],
     legal: [
-      { name: 'Privacy Policy', href: '#privacy' },
-      { name: 'Terms of Service', href: '#terms' },
-      { name: 'Refund Policy', href: '#refunds' },
-      { name: 'Medical Disclaimer', href: '#disclaimer' }
+      { name: 'Privacy Policy', href: '/privacy', isSection: false },
+      { name: 'Terms of Service', href: '/terms', isSection: false },
+      { name: 'Refund Policy', href: '/refunds', isSection: false },
+      { name: 'Medical Disclaimer', href: '/disclaimer', isSection: false }
     ]
   };
 
@@ -65,9 +66,7 @@ export default function Footer() {
     }
   };
 
-  const handleLinkClick = (href: string) => {
-    console.log('Footer link clicked:', href);
-    
+  const handleSectionClick = (href: string) => {
     // Remove the # from href
     const sectionId = href.replace('#', '');
     
@@ -79,7 +78,7 @@ export default function Footer() {
       // If section doesn't exist, show a toast
       toast({
         title: "Coming Soon",
-        description: "This page is under construction.",
+        description: "This section is not available yet.",
       });
     }
   };
@@ -128,13 +127,21 @@ export default function Footer() {
             <ul className="space-y-3">
               {footerLinks.product.map((link, index) => (
                 <li key={index}>
-                  <button
-                    onClick={() => handleLinkClick(link.href)}
-                    className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
-                    data-testid={`link-footer-product-${index}`}
-                  >
-                    {link.name}
-                  </button>
+                  {link.isSection ? (
+                    <button
+                      onClick={() => handleSectionClick(link.href)}
+                      className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
+                      data-testid={`link-footer-product-${index}`}
+                    >
+                      {link.name}
+                    </button>
+                  ) : (
+                    <Link href={link.href}>
+                      <a className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-product-${index}`}>
+                        {link.name}
+                      </a>
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
@@ -146,13 +153,21 @@ export default function Footer() {
             <ul className="space-y-3">
               {footerLinks.company.map((link, index) => (
                 <li key={index}>
-                  <button
-                    onClick={() => handleLinkClick(link.href)}
-                    className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
-                    data-testid={`link-footer-company-${index}`}
-                  >
-                    {link.name}
-                  </button>
+                  {link.isSection ? (
+                    <button
+                      onClick={() => handleSectionClick(link.href)}
+                      className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
+                      data-testid={`link-footer-company-${index}`}
+                    >
+                      {link.name}
+                    </button>
+                  ) : (
+                    <Link href={link.href}>
+                      <a className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-company-${index}`}>
+                        {link.name}
+                      </a>
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
@@ -164,13 +179,21 @@ export default function Footer() {
             <ul className="space-y-3">
               {footerLinks.support.map((link, index) => (
                 <li key={index}>
-                  <button
-                    onClick={() => handleLinkClick(link.href)}
-                    className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
-                    data-testid={`link-footer-support-${index}`}
-                  >
-                    {link.name}
-                  </button>
+                  {link.isSection ? (
+                    <button
+                      onClick={() => handleSectionClick(link.href)}
+                      className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
+                      data-testid={`link-footer-support-${index}`}
+                    >
+                      {link.name}
+                    </button>
+                  ) : (
+                    <Link href={link.href}>
+                      <a className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-support-${index}`}>
+                        {link.name}
+                      </a>
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
@@ -182,13 +205,21 @@ export default function Footer() {
             <ul className="space-y-3">
               {footerLinks.legal.map((link, index) => (
                 <li key={index}>
-                  <button
-                    onClick={() => handleLinkClick(link.href)}
-                    className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
-                    data-testid={`link-footer-legal-${index}`}
-                  >
-                    {link.name}
-                  </button>
+                  {link.isSection ? (
+                    <button
+                      onClick={() => handleSectionClick(link.href)}
+                      className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm"
+                      data-testid={`link-footer-legal-${index}`}
+                    >
+                      {link.name}
+                    </button>
+                  ) : (
+                    <Link href={link.href}>
+                      <a className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm" data-testid={`link-footer-legal-${index}`}>
+                        {link.name}
+                      </a>
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
