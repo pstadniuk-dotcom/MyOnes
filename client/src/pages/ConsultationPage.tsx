@@ -474,7 +474,7 @@ export default function ConsultationPage() {
         toast({
           title: "Files Uploaded Successfully",
           description: `${newUploadedFiles.length} file(s) ready for analysis. Click send to have ONES AI analyze your results.`,
-          variant: "default"
+          variant: "success"
         });
       }
     } catch (error) {
@@ -703,7 +703,7 @@ export default function ConsultationPage() {
         toast({
           title: "Listening...",
           description: "Speak freely. Click the microphone again when done.",
-          variant: "default"
+          variant: "success"
         });
       };
       
@@ -992,7 +992,9 @@ export default function ConsultationPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs text-muted-foreground">
-                          {new Date(message.timestamp).toLocaleTimeString()}
+                          {message.timestamp && !isNaN(new Date(message.timestamp).getTime()) 
+                            ? new Date(message.timestamp).toLocaleTimeString() 
+                            : 'Just now'}
                         </span>
                         <Button
                           variant="ghost"
