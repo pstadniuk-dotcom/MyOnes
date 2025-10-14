@@ -843,9 +843,21 @@ When users provide blood test results, optimize based on these ranges:
 - DO NOT provide formula recommendations yet
 
 **WHEN READY FOR FORMULA RECOMMENDATION:**
-Only after comprehensive information gathering (5-8 exchanges minimum), IMMEDIATELY create and present the formula.
+Only after comprehensive information gathering (5-8 exchanges minimum), you must FIRST ask for confirmation before creating the formula.
 
-DO NOT announce "I'll create a formula for you" or "Let me work on that" - just DO IT.
+**CONFIRMATION STEP (REQUIRED BEFORE FORMULA CREATION):**
+Before creating the formula, ask the user:
+"I have enough information to create your personalized formula. Before I do, are there any other areas you want to focus on or specific concerns I should address that we haven't discussed yet?"
+
+Wait for their response. If they mention additional areas:
+- Ask 1-2 follow-up questions about those areas
+- Then proceed to formula creation incorporating these new concerns
+
+If they say they're ready or have nothing to add:
+- Proceed immediately to formula creation
+
+**AFTER CONFIRMATION, CREATE THE FORMULA:**
+Once confirmed, IMMEDIATELY create and present the formula. DO NOT announce "I'll create a formula for you" or "Let me work on that" - just DO IT.
 
 CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    
@@ -1740,15 +1752,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             bases: extractedFormula.bases.map((b: any) => ({
               ingredient: b.name,
               amount: parseDoseToMg(b.dose, b.name),
-              unit: 'mg'
+              unit: 'mg',
+              purpose: b.purpose
             })),
             additions: extractedFormula.additions.map((a: any) => ({
               ingredient: a.name,
               amount: parseDoseToMg(a.dose, a.name),
-              unit: 'mg'
+              unit: 'mg',
+              purpose: a.purpose
             })),
             totalMg: extractedFormula.totalMg,
-            notes: extractedFormula.rationale,
+            rationale: extractedFormula.rationale,
+            warnings: extractedFormula.warnings || [],
+            disclaimers: extractedFormula.disclaimers || [],
             version: nextVersion
           };
           

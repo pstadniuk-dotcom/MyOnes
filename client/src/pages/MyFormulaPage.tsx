@@ -33,6 +33,7 @@ interface FormulaIngredient {
   ingredient: string;
   amount: number;
   unit: string;
+  purpose?: string;
 }
 
 interface Formula {
@@ -42,6 +43,9 @@ interface Formula {
   bases: FormulaIngredient[];
   additions: FormulaIngredient[];
   totalMg: number;
+  rationale?: string;
+  warnings?: string[];
+  disclaimers?: string[];
   notes?: string;
   createdAt: Date;
   changes?: {
@@ -270,7 +274,21 @@ export default function MyFormulaPage() {
             <FlaskConical className="w-3 h-3 mr-1" />
             Version {currentFormula.version}
           </Badge>
-          <Button asChild className="gap-2" data-testid="button-discuss-formula">
+          <Button 
+            variant="default" 
+            className="gap-2 bg-primary hover:bg-primary/90" 
+            data-testid="button-order-formula"
+            onClick={() => {
+              toast({
+                title: "Order Formula",
+                description: "Checkout integration coming soon! Contact support to place your order.",
+              });
+            }}
+          >
+            <ShoppingCart className="w-4 h-4" />
+            Order Your Formula
+          </Button>
+          <Button asChild variant="outline" className="gap-2" data-testid="button-discuss-formula">
             <Link href="/dashboard/consultation">
               <MessageSquare className="w-4 h-4" />
               Discuss with AI
@@ -418,6 +436,9 @@ function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
                         <h4 className="font-medium">{base.ingredient}</h4>
                         <Badge variant="secondary">{base.amount}{base.unit}</Badge>
                       </div>
+                      {base.purpose && (
+                        <p className="text-sm text-muted-foreground mb-3">{base.purpose}</p>
+                      )}
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <FlaskConical className="w-3 h-3" />
@@ -452,6 +473,9 @@ function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
                         <h4 className="font-medium">{addition.ingredient}</h4>
                         <Badge variant="outline">{addition.amount}{addition.unit}</Badge>
                       </div>
+                      {addition.purpose && (
+                        <p className="text-sm text-muted-foreground mb-3">{addition.purpose}</p>
+                      )}
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Lightbulb className="w-3 h-3" />
@@ -467,6 +491,56 @@ function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Formula Rationale */}
+          {formula.rationale && (
+            <>
+              <Separator />
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border-l-4 border-blue-400">
+                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2 text-blue-800 dark:text-blue-300">
+                  <Lightbulb className="w-5 h-5" />
+                  Why This Formula
+                </h3>
+                <p className="text-sm leading-relaxed text-blue-700 dark:text-blue-400">{formula.rationale}</p>
+              </div>
+            </>
+          )}
+
+          {/* Warnings */}
+          {formula.warnings && formula.warnings.length > 0 && (
+            <>
+              <Separator />
+              <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border-l-4 border-amber-400">
+                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                  <AlertTriangle className="w-5 h-5" />
+                  Important Warnings
+                </h3>
+                <ul className="space-y-1">
+                  {formula.warnings.map((warning, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400">
+                      <span className="text-amber-600 mt-0.5 font-bold">•</span>
+                      <span>{warning}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+
+          {/* Disclaimers */}
+          {formula.disclaimers && formula.disclaimers.length > 0 && (
+            <>
+              <Separator />
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <h3 className="font-semibold text-sm mb-2 text-muted-foreground">Medical Disclaimers</h3>
+                <ul className="space-y-1">
+                  {formula.disclaimers.map((disclaimer, idx) => (
+                    <li key={idx} className="text-xs text-muted-foreground">• {disclaimer}</li>
+                  ))}
+                </ul>
+              </div>
+            </>
           )}
 
           {/* Formula Notes */}

@@ -366,6 +366,10 @@ export default function ConsultationPage() {
                         ? { ...msg, formula: data.formula }
                         : msg
                     ));
+                    
+                    // Invalidate formula queries so the new formula appears in My Formula tab
+                    queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/current'] });
+                    queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/history'] });
                   }
                   setIsTyping(false);
                 } else if (data.type === 'formula_error') {
