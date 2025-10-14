@@ -1705,6 +1705,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       let savedFormula = null;
       if (extractedFormula && chatSession && userId) {
         try {
+          // Get current formula to determine next version number
+          const currentFormula = await storage.getCurrentFormulaByUser(userId);
+          const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
+          
           // Convert formula to storage format
           const formulaData = {
             userId,
@@ -1720,10 +1724,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             })),
             totalMg: extractedFormula.totalMg,
             notes: extractedFormula.rationale,
-            version: 1
+            version: nextVersion
           };
           
           savedFormula = await storage.createFormula(formulaData);
+          console.log(`Formula v${nextVersion} saved successfully for user ${userId}`);
         } catch (formulaSaveError) {
           console.error('Error saving formula:', formulaSaveError);
         }
