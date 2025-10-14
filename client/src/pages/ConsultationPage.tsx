@@ -1125,9 +1125,9 @@ export default function ConsultationPage() {
                             </div>
                           </div>
                           
-                          {message.formula.bases.length > 0 && (
+                          {/* All Ingredients in Formula */}
+                          {(message.formula.bases.length > 0 || message.formula.additions.length > 0) && (
                             <div className="mb-4 space-y-2">
-                              <p className="text-sm font-medium text-muted-foreground">Base Formulas:</p>
                               <div className="grid gap-2">
                                 {message.formula.bases.map((base, idx) => (
                                   <div 
@@ -1137,19 +1137,11 @@ export default function ConsultationPage() {
                                   >
                                     <div className="flex-1">
                                       <span className="font-medium text-sm">{base.name}</span>
-                                      <p className="text-xs text-muted-foreground mt-1">{base.purpose}</p>
+                                      {base.purpose && <p className="text-xs text-muted-foreground mt-1">{base.purpose}</p>}
                                     </div>
-                                    <Badge variant="secondary" className="text-xs">{base.dose}</Badge>
+                                    <Badge variant="secondary" className="text-xs font-semibold">{base.dose}</Badge>
                                   </div>
                                 ))}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {message.formula.additions.length > 0 && (
-                            <div className="mb-4 space-y-2">
-                              <p className="text-sm font-medium text-muted-foreground">Additional Ingredients:</p>
-                              <div className="grid gap-2">
                                 {message.formula.additions.map((addition, idx) => (
                                   <div 
                                     key={idx} 
@@ -1158,9 +1150,9 @@ export default function ConsultationPage() {
                                   >
                                     <div className="flex-1">
                                       <span className="font-medium text-sm">{addition.name}</span>
-                                      <p className="text-xs text-muted-foreground mt-1">{addition.purpose}</p>
+                                      {addition.purpose && <p className="text-xs text-muted-foreground mt-1">{addition.purpose}</p>}
                                     </div>
-                                    <Badge variant="outline" className="text-xs">{addition.dose}</Badge>
+                                    <Badge variant="outline" className="text-xs font-semibold">{addition.dose}</Badge>
                                   </div>
                                 ))}
                               </div>
@@ -1198,6 +1190,20 @@ export default function ConsultationPage() {
                               ))}
                             </div>
                           )}
+                          
+                          {/* Call to Action - View Full Formulation */}
+                          <div className="mt-4 pt-4 border-t">
+                            <Button asChild className="w-full" data-testid="button-view-formulation">
+                              <Link href="/dashboard/my-formula">
+                                <FlaskConical className="w-4 h-4 mr-2" />
+                                See Your Formulation
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                              </Link>
+                            </Button>
+                            <p className="text-xs text-muted-foreground text-center mt-2">
+                              View complete details and place your order
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>
