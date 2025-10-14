@@ -1322,13 +1322,6 @@ export default function ConsultationPage() {
                     <FileText className="w-3 h-3" />
                     <span>Upload files or type your question</span>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <span>Ctrl+N: New</span>
-                    <span>•</span>
-                    <span>Ctrl+E: Export</span>
-                    <span>•</span>
-                    <span>Enter: Send</span>
-                  </div>
                 </div>
               </div>
               
