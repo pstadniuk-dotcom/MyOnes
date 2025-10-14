@@ -35,6 +35,14 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Newsletter subscribers
+export const newsletterSubscribers = pgTable("newsletter_subscribers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  subscribedAt: timestamp("subscribed_at").defaultNow().notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+});
+
 // Health profiles for personalized recommendations
 export const healthProfiles = pgTable("health_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -542,3 +550,13 @@ export type SupportTicketResponse = typeof supportTicketResponses.$inferSelect;
 
 export type InsertHelpArticle = z.infer<typeof insertHelpArticleSchema>;
 export type HelpArticle = typeof helpArticles.$inferSelect;
+
+// Newsletter subscriber schema
+export const insertNewsletterSubscriberSchema = createInsertSchema(newsletterSubscribers).omit({
+  id: true,
+  subscribedAt: true,
+  isActive: true,
+});
+
+export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSubscriberSchema>;
+export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;

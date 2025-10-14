@@ -2,9 +2,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 
 export default function Footer() {
   const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   const footerLinks = {
     product: [
@@ -33,14 +37,51 @@ export default function Footer() {
     ]
   };
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Email signup:', email);
-    setEmail('');
+    if (!email || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      await apiRequest('/api/newsletter/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      toast({
+        title: "Subscribed!",
+        description: "You'll receive health tips and updates in your inbox.",
+      });
+      setEmail('');
+    } catch (error: any) {
+      toast({
+        title: "Subscription failed",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleLinkClick = (href: string) => {
     console.log('Footer link clicked:', href);
+    
+    // Remove the # from href
+    const sectionId = href.replace('#', '');
+    
+    // Try to scroll to the section
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      // If section doesn't exist, show a toast
+      toast({
+        title: "Coming Soon",
+        description: "This page is under construction.",
+      });
+    }
   };
 
   return (
@@ -72,9 +113,10 @@ export default function Footer() {
                 <Button 
                   type="submit" 
                   size="sm"
+                  disabled={isSubmitting}
                   data-testid="button-newsletter-submit"
                 >
-                  Subscribe
+                  {isSubmitting ? 'Subscribing...' : 'Subscribe'}
                 </Button>
               </form>
             </div>
