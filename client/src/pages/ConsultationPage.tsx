@@ -93,6 +93,7 @@ export default function ConsultationPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedFormula, setSelectedFormula] = useState<any>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   
   // Refs and hooks
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -583,11 +584,16 @@ export default function ConsultationPage() {
   // Handle delete session with confirmation
   const handleDeleteSession = useCallback((sessionId: string, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent triggering the load session
-    
-    if (window.confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
-      deleteSessionMutation.mutate(sessionId);
+    setSessionToDelete(sessionId);
+  }, []);
+  
+  // Confirm delete session
+  const confirmDeleteSession = useCallback(() => {
+    if (sessionToDelete) {
+      deleteSessionMutation.mutate(sessionToDelete);
+      setSessionToDelete(null);
     }
-  }, [deleteSessionMutation]);
+  }, [sessionToDelete, deleteSessionMutation]);
   
   // Copy message content
   const handleCopyMessage = useCallback((content: string) => {
@@ -1356,6 +1362,37 @@ export default function ConsultationPage() {
           </CardContent>
         </Card>
       </div>
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!sessionToDelete} onOpenChange={(open) => !open && setSessionToDelete(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-foreground">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Delete Conversation
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Are you sure you want to delete this conversation? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 justify-end mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setSessionToDelete(null)}
+              data-testid="button-cancel-delete"
+            >
+              No, Keep It
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteSession}
+              data-testid="button-confirm-delete"
+            >
+              Yes, Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
