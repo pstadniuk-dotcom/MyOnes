@@ -41,6 +41,12 @@ export default function AIChat() {
   const { toast } = useToast();
 
   const handleSendMessage = useCallback(async () => {
+    // Stop voice recording if active
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+
     if (!inputValue.trim()) return;
 
     // Save message to localStorage and redirect to signup
@@ -73,7 +79,7 @@ export default function AIChat() {
         variant: "destructive"
       });
     }
-  }, [inputValue, toast, setLocation]);
+  }, [inputValue, toast, setLocation, isListening]);
 
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -103,10 +109,8 @@ export default function AIChat() {
       return;
     }
 
-    // If already recording, stop
+    // If already recording, do nothing (user clicks Send to stop)
     if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
       return;
     }
 
@@ -126,11 +130,6 @@ export default function AIChat() {
         setIsListening(true);
         // Store the initial input value when recording starts
         initialInputRef.current = inputValue;
-        toast({
-          title: "Listening...",
-          description: "Speak freely. Click the microphone again when done.",
-          variant: "success"
-        });
       };
       
       recognition.onresult = (event: any) => {
@@ -345,7 +344,7 @@ export default function AIChat() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
-          Use voice input or type to tell us about your health goals
+          Click the mic to speak, then click send when done
           {sessionId && <span className="ml-2 text-green-600">• Connected</span>}
         </p>
       </div>
