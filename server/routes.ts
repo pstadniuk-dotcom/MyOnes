@@ -11,6 +11,7 @@ import type { SignupData, LoginData, AuthResponse } from "@shared/schema";
 import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, insertHealthProfileSchema, insertSupportTicketSchema, insertSupportTicketResponseSchema, insertNewsletterSubscriberSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
+import { analyzeLabReport } from "./fileAnalysis";
 
 // Extend Express Request interface to include userId property
 declare global {
@@ -1358,6 +1359,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'alcohol consumption per week', 'current health conditions or concerns', 'current medications', 'allergies');
       }
 
+      // Fetch user's lab reports with extracted data
+      const labReports = await storage.getLabReportsByUser(userId!);
+      const labDataContext = labReports
+        .filter(report => report.labReportData?.analysisStatus === 'completed' && report.labReportData?.extractedData)
+        .map(report => {
+          const data = report.labReportData!;
+          const values = data.extractedData as any[];
+          const formattedValues = values.map(v => 
+            `${v.testName}: ${v.value} ${v.unit || ''} (${v.status || 'normal'}${v.referenceRange ? `, ref: ${v.referenceRange}` : ''})`
+          ).join(', ');
+          return `Lab Report from ${data.testDate || 'unknown date'} (${data.labName || 'unknown lab'}): ${formattedValues}`;
+        })
+        .join('\n');
+
       const healthContextMessage = `
 === USER'S CURRENT HEALTH PROFILE STATUS ===
 
@@ -1365,6 +1380,11 @@ Information we have: ${completedFields.length > 0 ? completedFields.join(', ') :
 
 Information still needed: ${missingFields.length > 0 ? missingFields.join(', ') : 'Complete!'}
 
+${labDataContext ? `=== LABORATORY TEST RESULTS ===
+${labDataContext}
+
+USE THIS LAB DATA: When creating supplement recommendations, consider these test results. If values are out of range, address them with targeted supplementation.
+` : ''}
 INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 - Naturally weave requests for missing information into the conversation
 - Don't ask for all missing items at once - prioritize the most important ones first
@@ -2599,6 +2619,40 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         retentionPolicyId: '7_years' // Default 7-year retention for medical records
       });
 
+      // Analyze lab reports automatically (PDF or images only)
+      let labDataExtraction = null;
+      if (fileType === 'lab_report' && (uploadedFile.mimetype === 'application/pdf' || uploadedFile.mimetype.startsWith('image/'))) {
+        try {
+          console.log(`Analyzing lab report: ${uploadedFile.name}`);
+          labDataExtraction = await analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId);
+          
+          // Update file upload with extracted lab data
+          if (labDataExtraction && fileUpload.id) {
+            await storage.updateFileUpload(fileUpload.id, {
+              labReportData: {
+                testDate: labDataExtraction.testDate,
+                testType: labDataExtraction.testType,
+                labName: labDataExtraction.labName,
+                physicianName: labDataExtraction.physicianName,
+                analysisStatus: 'completed',
+                extractedData: labDataExtraction.extractedData || []
+              }
+            });
+            console.log(`Lab data extracted successfully from ${uploadedFile.name}`);
+          }
+        } catch (error) {
+          console.error('Lab report analysis failed:', error);
+          // Update status to error but don't fail the upload
+          if (fileUpload.id) {
+            await storage.updateFileUpload(fileUpload.id, {
+              labReportData: {
+                analysisStatus: 'error'
+              }
+            });
+          }
+        }
+      }
+
       // Log successful upload
       console.log("HIPAA AUDIT LOG - Successful Upload:", {
         timestamp: new Date().toISOString(),
@@ -2611,7 +2665,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         reason: `Successfully uploaded ${fileType}: ${uploadedFile.name}`
       });
 
-      // Return file metadata
+      // Return file metadata with lab data if extracted
       const responseData = {
         id: fileUpload.id,
         name: uploadedFile.name,
@@ -2619,7 +2673,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         type: fileUpload.type,
         size: uploadedFile.size,
         uploadedAt: fileUpload.uploadedAt,
-        hipaaCompliant: true
+        hipaaCompliant: true,
+        labData: labDataExtraction
       };
 
       res.json(responseData);
