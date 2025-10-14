@@ -204,6 +204,12 @@ export default function ConsultationPage() {
     const currentMessage = messageText || inputValue;
     if (!currentMessage.trim() && !attachedFiles?.length) return;
 
+    // Stop voice recording if active
+    if (isRecording && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    }
+
     // Hide suggestions after first message
     setShowSuggestions(false);
     setIsNewSession(false);
@@ -397,7 +403,7 @@ export default function ConsultationPage() {
     } finally {
       clearTimeout(timeoutId);
     }
-  }, [inputValue, currentSessionId, toast, user?.id]);
+  }, [inputValue, currentSessionId, toast, user?.id, isRecording]);
 
   // Enhanced file upload with object storage
   const handleFileUpload = useCallback(async () => {
