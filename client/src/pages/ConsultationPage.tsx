@@ -529,7 +529,13 @@ export default function ConsultationPage() {
   // Load previous session
   const handleLoadSession = useCallback((session: ChatSession) => {
     if (historyData && historyData.messages[session.id]) {
-      setMessages(historyData.messages[session.id]);
+      // Convert timestamp strings to Date objects
+      const messagesWithDates = historyData.messages[session.id].map((msg: any) => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp)
+      }));
+      
+      setMessages(messagesWithDates);
       setCurrentSessionId(session.id);
       setIsNewSession(false);
       setShowHistory(false);
@@ -986,7 +992,7 @@ export default function ConsultationPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs text-muted-foreground">
-                          {message.timestamp.toLocaleTimeString()}
+                          {new Date(message.timestamp).toLocaleTimeString()}
                         </span>
                         <Button
                           variant="ghost"
