@@ -2620,7 +2620,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
       // Determine file type category for HIPAA compliance
       let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'other';
-      if (fileName.includes('lab') || fileName.includes('blood') || fileName.includes('test')) {
+      const labKeywords = ['lab', 'blood', 'test', 'cbc', 'panel', 'result', 'report', 'analysis', 'metabolic', 'lipid', 'thyroid', 'vitamin', 'serum', 'urine', 'specimen'];
+      const fileNameLower = fileName.toLowerCase();
+      
+      if (labKeywords.some(keyword => fileNameLower.includes(keyword))) {
         fileType = 'lab_report';
       } else if (fileName.includes('prescription') || fileName.includes('rx')) {
         fileType = 'prescription';  
