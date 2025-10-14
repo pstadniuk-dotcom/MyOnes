@@ -891,14 +891,35 @@ Only after comprehensive information gathering, provide:
    - Capsule count: Based on size (e.g., "4 capsules at 750mg each (Size 00)")
    - Dosing schedule: Be specific (e.g., "2 with breakfast, 2 with dinner")
 
-4. STRUCTURED JSON BLOCK (in triple backticks with "json" tag):
-   - bases: array of formula bases with name, dose, purpose
-   - additions: array of additional ingredients with name, dose, purpose  
-   - totalMg: total formula weight
-   - capsulesPerDay: number of capsules needed daily
-   - capsuleSize: "00" or "000"
-   - warnings: array of drug interactions or contraindications
-   - rationale: brief explanation of formula strategy
+4. **CRITICAL: STRUCTURED FORMULA JSON BLOCK** 
+   
+   MANDATORY: You MUST include this JSON block after your conversational explanation. This is how the formula gets saved to the system.
+   
+   Format it EXACTLY like this with triple backticks and "json" tag:
+   
+   \`\`\`json
+   {
+     "bases": [
+       {"name": "Heart Support", "dose": "450mg", "purpose": "Supports cardiovascular health with L-Carnitine, CoQ10, and Magnesium for your elevated cholesterol"},
+       {"name": "Alpha Gest III", "dose": "636mg", "purpose": "Improves digestion with Betaine HCl and Pepsin for your bloating issues"}
+     ],
+     "additions": [
+       {"name": "Magnesium", "dose": "320mg", "purpose": "Supports muscle relaxation, stress management, and enhances Vitamin D absorption"},
+       {"name": "Omega 3 (algae omega)", "dose": "500mg", "purpose": "Reduces inflammation and supports heart health for your cardiovascular concerns"}
+     ],
+     "totalMg": 3000,
+     "warnings": ["Ginger may have mild blood-thinning properties - monitor if taking aspirin"],
+     "rationale": "Formula targets digestive health, cardiovascular support, and stress management based on elevated cholesterol, bloating, and high stress levels",
+     "disclaimers": ["This is supplement support, not medical advice", "Always consult your healthcare provider before starting new supplements"]
+   }
+   \`\`\`
+   
+   REQUIRED FIELDS:
+   - bases: array of base formulas (name, dose with unit, purpose tied to their health data)
+   - additions: array of individual ingredients (name, dose with unit, purpose tied to their health data)
+   - totalMg: total daily formula weight in mg (number)
+   - warnings: array of any drug interactions or contraindications
+   - rationale: brief explanation of overall formula strategy
    - disclaimers: array of safety disclaimers
 
 5. NEXT STEPS:
