@@ -146,7 +146,14 @@ export default function ConsultationPage() {
     enabled: !!user?.id
   });
   
-  // Initialize welcome message and history on component mount
+  // Load history data whenever it changes
+  useEffect(() => {
+    if (historyData?.sessions) {
+      setSessionHistory(historyData.sessions);
+    }
+  }, [historyData]);
+  
+  // Initialize welcome message on component mount
   useEffect(() => {
     if (!isNewSession || messages.length > 0) return;
     
@@ -160,11 +167,6 @@ export default function ConsultationPage() {
     setMessages([welcomeMessage]);
     setShowSuggestions(false);
     
-    // Load history data
-    if (historyData) {
-      setSessionHistory(historyData.sessions);
-    }
-    
     // Check for preserved message
     const preservedMessage = localStorage.getItem('preAuthMessage');
     if (preservedMessage) {
@@ -176,7 +178,7 @@ export default function ConsultationPage() {
         handleSendMessage(preservedMessage);
       }, 1000);
     }
-  }, [user?.name, historyData, isNewSession, messages.length]);
+  }, [user?.name, isNewSession, messages.length]);
   
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = useCallback(() => {
