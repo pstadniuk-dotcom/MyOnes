@@ -1801,6 +1801,36 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Get consultation history with enriched data
+  app.get('/api/consultations/history', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const sessions = await storage.listChatSessionsByUser(userId);
+      
+      // Enrich each session with additional data
+      const enrichedSessions = await Promise.all(sessions.map(async (session) => {
+        const messages = await storage.listMessagesBySession(session.id);
+        const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+        const hasFormula = messages.some(msg => msg.content?.includes('"bases":') || msg.content?.includes('"additions":'));
+        
+        return {
+          id: session.id,
+          title: `Consultation ${new Date(session.createdAt).toLocaleDateString()}`,
+          lastMessage: lastMessage ? lastMessage.content.substring(0, 100) : 'No messages',
+          timestamp: session.createdAt,
+          messageCount: messages.length,
+          hasFormula,
+          status: session.status
+        };
+      }));
+      
+      res.json({ sessions: enrichedSessions, messages: {} });
+    } catch (error) {
+      console.error('Get consultation history error:', error);
+      res.status(500).json({ error: 'Failed to get consultation history' });
+    }
+  });
+
   // Get dashboard data
   app.get('/api/dashboard', requireAuth, async (req, res) => {
     try {
