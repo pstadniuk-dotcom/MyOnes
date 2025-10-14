@@ -8,7 +8,7 @@ import type { InsertMessage, InsertChatSession } from "@shared/schema";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import type { SignupData, LoginData, AuthResponse } from "@shared/schema";
-import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, insertHealthProfileSchema, insertSupportTicketSchema, insertSupportTicketResponseSchema } from "@shared/schema";
+import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, insertHealthProfileSchema, insertSupportTicketSchema, insertSupportTicketResponseSchema, insertNewsletterSubscriberSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 
@@ -3144,6 +3144,40 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     } catch (error) {
       console.error('Error fetching help article:', error);
       res.status(500).json({ error: 'Failed to fetch help article' });
+    }
+  });
+
+  // Newsletter subscription endpoint (public)
+  app.post('/api/newsletter/subscribe', async (req, res) => {
+    try {
+      const { email } = insertNewsletterSubscriberSchema.parse(req.body);
+      
+      // Check if email already exists
+      const existing = await storage.getNewsletterSubscriberByEmail(email);
+      if (existing) {
+        if (existing.isActive) {
+          return res.status(400).json({ error: 'Email already subscribed' });
+        } else {
+          // Reactivate subscription
+          await storage.reactivateNewsletterSubscriber(email);
+          return res.json({ success: true, message: 'Subscription reactivated' });
+        }
+      }
+      
+      // Create new subscription
+      const subscriber = await storage.createNewsletterSubscriber({ email });
+      res.json({ success: true, subscriber });
+    } catch (error) {
+      // Handle Zod validation errors with 400
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: 'Invalid email address', 
+          details: error.errors 
+        });
+      }
+      
+      console.error('Newsletter subscription error:', error);
+      res.status(500).json({ error: 'Failed to subscribe to newsletter' });
     }
   });
 

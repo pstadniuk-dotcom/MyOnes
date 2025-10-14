@@ -5,7 +5,7 @@ import {
   users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
   notifications, notificationPrefs, auditLogs, userConsents, labAnalyses,
-  faqItems, supportTickets, supportTicketResponses, helpArticles,
+  faqItems, supportTickets, supportTicketResponses, helpArticles, newsletterSubscribers,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -25,7 +25,8 @@ import {
   type FaqItem, type InsertFaqItem,
   type SupportTicket, type InsertSupportTicket,
   type SupportTicketResponse, type InsertSupportTicketResponse,
-  type HelpArticle, type InsertHelpArticle
+  type HelpArticle, type InsertHelpArticle,
+  type NewsletterSubscriber, type InsertNewsletterSubscriber
 } from "@shared/schema";
 
 export interface IStorage {
@@ -157,6 +158,11 @@ export interface IStorage {
   incrementHelpArticleViewCount(id: string): Promise<boolean>;
   markAllNotificationsAsRead(userId: string): Promise<boolean>;
   deleteNotification(id: string, userId: string): Promise<boolean>;
+  
+  // Newsletter subscriber operations
+  getNewsletterSubscriberByEmail(email: string): Promise<NewsletterSubscriber | undefined>;
+  createNewsletterSubscriber(subscriber: InsertNewsletterSubscriber): Promise<NewsletterSubscriber>;
+  reactivateNewsletterSubscriber(email: string): Promise<boolean>;
 }
 
 export class DrizzleStorage implements IStorage {
@@ -1022,6 +1028,49 @@ export class DrizzleStorage implements IStorage {
       return true;
     } catch (error) {
       console.error('Error deleting notification:', error);
+      return false;
+    }
+  }
+
+  // Newsletter subscriber operations
+  async getNewsletterSubscriberByEmail(email: string): Promise<NewsletterSubscriber | undefined> {
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const [subscriber] = await db
+        .select()
+        .from(newsletterSubscribers)
+        .where(eq(newsletterSubscribers.email, normalizedEmail));
+      return subscriber || undefined;
+    } catch (error) {
+      console.error('Error getting newsletter subscriber:', error);
+      return undefined;
+    }
+  }
+
+  async createNewsletterSubscriber(insertSubscriber: InsertNewsletterSubscriber): Promise<NewsletterSubscriber> {
+    try {
+      const normalizedEmail = insertSubscriber.email.trim().toLowerCase();
+      const [subscriber] = await db
+        .insert(newsletterSubscribers)
+        .values({ email: normalizedEmail })
+        .returning();
+      return subscriber;
+    } catch (error) {
+      console.error('Error creating newsletter subscriber:', error);
+      throw error;
+    }
+  }
+
+  async reactivateNewsletterSubscriber(email: string): Promise<boolean> {
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      await db
+        .update(newsletterSubscribers)
+        .set({ isActive: true })
+        .where(eq(newsletterSubscribers.email, normalizedEmail));
+      return true;
+    } catch (error) {
+      console.error('Error reactivating newsletter subscriber:', error);
       return false;
     }
   }
@@ -2356,6 +2405,39 @@ export class MemStorage implements IStorage {
       viewCount: article.viewCount + 1
     };
     this.helpArticles.set(id, updatedArticle);
+    return true;
+  }
+
+  // Newsletter subscriber operations
+  private newsletterSubscribers: Map<string, NewsletterSubscriber> = new Map();
+
+  async getNewsletterSubscriberByEmail(email: string): Promise<NewsletterSubscriber | undefined> {
+    const normalizedEmail = email.trim().toLowerCase();
+    return Array.from(this.newsletterSubscribers.values()).find(s => s.email === normalizedEmail);
+  }
+
+  async createNewsletterSubscriber(insertSubscriber: InsertNewsletterSubscriber): Promise<NewsletterSubscriber> {
+    const id = randomUUID();
+    const normalizedEmail = insertSubscriber.email.trim().toLowerCase();
+    const subscriber: NewsletterSubscriber = {
+      email: normalizedEmail,
+      id,
+      subscribedAt: new Date(),
+      isActive: true
+    };
+    this.newsletterSubscribers.set(id, subscriber);
+    return subscriber;
+  }
+
+  async reactivateNewsletterSubscriber(email: string): Promise<boolean> {
+    const subscriber = await this.getNewsletterSubscriberByEmail(email);
+    if (!subscriber) return false;
+    
+    const updated: NewsletterSubscriber = {
+      ...subscriber,
+      isActive: true
+    };
+    this.newsletterSubscribers.set(subscriber.id, updated);
     return true;
   }
 }
