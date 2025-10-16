@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -103,12 +103,14 @@ interface FormulaComparison {
 
 export default function MyFormulaPage() {
   // State management
-  const [activeTab, setActiveTab] = useState('current');
+  const [activeTab, setActiveTab] = useState('formulas');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [expandedIngredients, setExpandedIngredients] = useState<Set<string>>(new Set());
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
   const [revertReason, setRevertReason] = useState('');
+  const [selectedFormulaId, setSelectedFormulaId] = useState<string | null>(null);
+  const [expandedFormulaId, setExpandedFormulaId] = useState<string | null>(null);
   
   // Hooks
   const { user } = useAuth();
@@ -156,12 +158,41 @@ export default function MyFormulaPage() {
   // Derived data
   const currentFormula = currentFormulaData?.formula;
   const formulaHistory = historyData?.history;
-
-  // Safety calculations
-  const safetyMetrics = useMemo(() => {
-    if (!currentFormula) return null;
+  
+  // Combine current formula with history to ensure all formulas are shown
+  // History API may or may not include the current formula
+  const allFormulas = useMemo(() => {
+    if (!formulaHistory) return currentFormula ? [currentFormula] : [];
     
-    const totalMg = currentFormula.totalMg;
+    // Check if currentFormula is already in history
+    const hasCurrentInHistory = currentFormula && formulaHistory.some(f => f.id === currentFormula.id);
+    
+    // If current formula exists and isn't in history, prepend it
+    if (currentFormula && !hasCurrentInHistory) {
+      return [currentFormula, ...formulaHistory];
+    }
+    
+    return formulaHistory;
+  }, [currentFormula, formulaHistory]);
+  
+  // Get selected formula (either from history or current)
+  const selectedFormula = useMemo(() => {
+    if (!selectedFormulaId) return currentFormula;
+    return allFormulas.find(f => f.id === selectedFormulaId) || currentFormula;
+  }, [selectedFormulaId, currentFormula, allFormulas]);
+  
+  // Auto-select newest formula on load
+  useEffect(() => {
+    if (currentFormula && !selectedFormulaId) {
+      setSelectedFormulaId(currentFormula.id);
+    }
+  }, [currentFormula, selectedFormulaId]);
+
+  // Safety calculations based on selected formula
+  const safetyMetrics = useMemo(() => {
+    if (!selectedFormula) return null;
+    
+    const totalMg = selectedFormula.totalMg;
     const safetyPercentage = Math.min((totalMg / 800) * 100, 100);
     const isOptimal = totalMg >= 600 && totalMg <= 800;
     const isOverLimit = totalMg > 800;
@@ -174,15 +205,15 @@ export default function MyFormulaPage() {
       remainingCapacity: Math.max(0, 800 - totalMg),
       status: isOverLimit ? 'danger' : isOptimal ? 'optimal' : 'safe'
     };
-  }, [currentFormula]);
+  }, [selectedFormula]);
 
   // Ingredient filtering and searching
   const filteredIngredients = useMemo(() => {
-    if (!currentFormula) return [];
+    if (!selectedFormula) return [];
     
     const allIngredients = [
-      ...currentFormula.bases.map(ing => ({ ...ing, type: 'base' as const })),
-      ...currentFormula.additions.map(ing => ({ ...ing, type: 'addition' as const }))
+      ...selectedFormula.bases.map(ing => ({ ...ing, type: 'base' as const })),
+      ...selectedFormula.additions.map(ing => ({ ...ing, type: 'addition' as const }))
     ];
 
     return allIngredients.filter(ingredient => {
@@ -192,7 +223,7 @@ export default function MyFormulaPage() {
                             (categoryFilter === 'additions' && ingredient.type === 'addition');
       return matchesSearch && matchesCategory;
     });
-  }, [currentFormula, searchTerm, categoryFilter]);
+  }, [selectedFormula, searchTerm, categoryFilter]);
 
   // Event handlers
   const toggleIngredientExpansion = useCallback((ingredientName: string) => {
@@ -270,14 +301,18 @@ export default function MyFormulaPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="secondary" className="text-sm" data-testid="badge-formula-version">
-            <FlaskConical className="w-3 h-3 mr-1" />
-            Version {currentFormula.version}
-          </Badge>
+          {selectedFormula && (
+            <Badge variant="secondary" className="text-sm" data-testid="badge-formula-version">
+              <FlaskConical className="w-3 h-3 mr-1" />
+              Version {selectedFormula.version}
+              {selectedFormula.id === currentFormula?.id && ' (Newest)'}
+            </Badge>
+          )}
           <Button 
             variant="default" 
             className="gap-2 bg-primary hover:bg-primary/90" 
             data-testid="button-order-formula"
+            disabled={!selectedFormula}
             onClick={() => {
               toast({
                 title: "Order Formula",
@@ -332,16 +367,41 @@ export default function MyFormulaPage() {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="current" data-testid="tab-current-formula">Current</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="formulas" data-testid="tab-my-formulas">My Formulas</TabsTrigger>
           <TabsTrigger value="ingredients" data-testid="tab-ingredients">Ingredients</TabsTrigger>
-          <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
           <TabsTrigger value="actions" data-testid="tab-actions">Actions</TabsTrigger>
         </TabsList>
 
-        {/* Current Formula Tab */}
-        <TabsContent value="current" className="space-y-6">
-          <CurrentFormulaDisplay formula={currentFormula} />
+        {/* My Formulas Tab - Grid of all formulas */}
+        <TabsContent value="formulas" className="space-y-6">
+          {isLoadingHistory || isLoadingCurrent ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-64" />)}
+            </div>
+          ) : allFormulas && allFormulas.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {allFormulas.map((formula) => (
+                <FormulaCard
+                  key={formula.id}
+                  formula={formula}
+                  isSelected={selectedFormulaId === formula.id}
+                  isExpanded={expandedFormulaId === formula.id}
+                  isNewest={formula.id === currentFormula?.id}
+                  onSelect={() => setSelectedFormulaId(formula.id)}
+                  onToggleExpand={() => setExpandedFormulaId(
+                    expandedFormulaId === formula.id ? null : formula.id
+                  )}
+                />
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="pt-6 text-center text-muted-foreground">
+                <p>No formulas found. Start a consultation to create your first formula.</p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Ingredients Tab */}
@@ -374,10 +434,174 @@ export default function MyFormulaPage() {
 
         {/* Actions Tab */}
         <TabsContent value="actions" className="space-y-6">
-          <ActionsSection formula={currentFormula} />
+          {selectedFormula && <ActionsSection formula={selectedFormula} />}
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// Formula Card Component for Grid Display
+interface FormulaCardProps {
+  formula: Formula;
+  isSelected: boolean;
+  isExpanded: boolean;
+  isNewest: boolean;
+  onSelect: () => void;
+  onToggleExpand: () => void;
+}
+
+function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onToggleExpand }: FormulaCardProps) {
+  const totalIngredients = formula.bases.length + formula.additions.length;
+  const createdDate = new Date(formula.createdAt).toLocaleDateString();
+  
+  return (
+    <Card 
+      className={`relative transition-all ${
+        isSelected ? 'ring-2 ring-primary shadow-lg' : 'hover-elevate'
+      }`}
+      data-testid={`card-formula-${formula.version}`}
+    >
+      {/* Badges */}
+      <div className="absolute top-2 right-2 flex gap-2">
+        {isNewest && (
+          <Badge variant="default" className="text-xs">
+            <Star className="w-3 h-3 mr-1" />
+            Newest
+          </Badge>
+        )}
+        {isSelected && (
+          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Selected
+          </Badge>
+        )}
+      </div>
+      
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <FlaskConical className="w-4 h-4" />
+          Version {formula.version}
+        </CardTitle>
+        <CardDescription className="text-xs">
+          {createdDate} • {totalIngredients} ingredients
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent className="space-y-3">
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="text-center p-2 bg-muted/30 rounded">
+            <div className="font-bold text-primary">{formula.bases.length}</div>
+            <div className="text-xs text-muted-foreground">Base Formulas</div>
+          </div>
+          <div className="text-center p-2 bg-muted/30 rounded">
+            <div className="font-bold text-blue-600">{formula.additions.length}</div>
+            <div className="text-xs text-muted-foreground">Additions</div>
+          </div>
+        </div>
+        
+        {/* Total Dosage */}
+        <div className="flex items-center justify-between p-2 bg-muted/20 rounded">
+          <span className="text-sm text-muted-foreground">Total Daily:</span>
+          <span className="font-bold">{formula.totalMg}mg</span>
+        </div>
+        
+        {/* Expandable Details */}
+        <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm" className="w-full">
+              {isExpanded ? <ChevronUp className="w-4 h-4 mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
+              {isExpanded ? 'Hide Details' : 'View Details'}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3 space-y-3">
+            {/* Base Formulas */}
+            {formula.bases.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
+                  <Beaker className="w-3 h-3" />
+                  Base Formulas
+                </h4>
+                <div className="space-y-1">
+                  {formula.bases.map((base, idx) => (
+                    <div key={idx} className="text-xs p-2 bg-muted/20 rounded">
+                      <div className="font-medium">{base.ingredient} - {base.amount}{base.unit}</div>
+                      {base.purpose && <div className="text-muted-foreground mt-1">{base.purpose}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Additions */}
+            {formula.additions.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
+                  <Plus className="w-3 h-3" />
+                  Custom Additions
+                </h4>
+                <div className="space-y-1">
+                  {formula.additions.map((addition, idx) => (
+                    <div key={idx} className="text-xs p-2 bg-muted/20 rounded">
+                      <div className="font-medium">{addition.ingredient} - {addition.amount}{addition.unit}</div>
+                      {addition.purpose && <div className="text-muted-foreground mt-1">{addition.purpose}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Rationale */}
+            {formula.rationale && (
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
+                  <Lightbulb className="w-3 h-3" />
+                  Rationale
+                </h4>
+                <p className="text-xs text-muted-foreground">{formula.rationale}</p>
+              </div>
+            )}
+            
+            {/* Warnings */}
+            {formula.warnings && formula.warnings.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1 text-orange-600">
+                  <AlertTriangle className="w-3 h-3" />
+                  Warnings
+                </h4>
+                <ul className="space-y-1">
+                  {formula.warnings.map((warning, idx) => (
+                    <li key={idx} className="text-xs text-orange-600 dark:text-orange-400">• {warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+        
+        {/* Select Button */}
+        <Button 
+          variant={isSelected ? "secondary" : "default"}
+          size="sm"
+          className="w-full"
+          onClick={onSelect}
+          data-testid={`button-select-formula-${formula.version}`}
+        >
+          {isSelected ? (
+            <>
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Selected
+            </>
+          ) : (
+            <>
+              <Target className="w-4 h-4 mr-2" />
+              Select This Formula
+            </>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
