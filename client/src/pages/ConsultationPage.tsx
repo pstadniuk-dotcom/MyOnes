@@ -172,11 +172,22 @@ export default function ConsultationPage() {
       if (historyData.sessions.length > 0 && messages.length === 0 && isNewSession) {
         const mostRecentSession = historyData.sessions[0]; // Sessions are sorted by timestamp descending
         if (mostRecentSession && historyData.messages[mostRecentSession.id]) {
-          const sessionMessages = historyData.messages[mostRecentSession.id].map((msg: any) => ({
-            ...msg,
-            sender: msg.role === 'assistant' ? 'ai' : msg.role === 'user' ? 'user' : 'system',
-            timestamp: new Date(msg.timestamp)
-          }));
+          const sessionMessages = historyData.messages[mostRecentSession.id].map((msg: any) => {
+            // CRITICAL: Backend sends 'role' but frontend needs 'sender'
+            // Backend values: 'user' | 'assistant' | 'system'  
+            // Frontend values: 'user' | 'ai' | 'system'
+            let sender = msg.sender; // Use existing sender if present
+            if (!sender || sender === 'assistant') {
+              // Transform 'assistant' -> 'ai' OR use role field as fallback
+              sender = msg.role === 'assistant' ? 'ai' : msg.role === 'user' ? 'user' : msg.role === 'system' ? 'system' : 'ai';
+            }
+            
+            return {
+              ...msg,
+              sender,
+              timestamp: new Date(msg.timestamp)
+            };
+          });
           
           setMessages(sessionMessages);
           setCurrentSessionId(mostRecentSession.id);
@@ -583,11 +594,22 @@ export default function ConsultationPage() {
   const handleLoadSession = useCallback((session: ChatSession) => {
     if (historyData && historyData.messages[session.id]) {
       // Convert timestamp strings to Date objects and transform role to sender
-      const messagesWithDates = historyData.messages[session.id].map((msg: any) => ({
-        ...msg,
-        sender: msg.role === 'assistant' ? 'ai' : msg.role === 'user' ? 'user' : 'system',
-        timestamp: new Date(msg.timestamp)
-      }));
+      const messagesWithDates = historyData.messages[session.id].map((msg: any) => {
+        // CRITICAL: Backend sends 'role' but frontend needs 'sender'
+        // Backend values: 'user' | 'assistant' | 'system'  
+        // Frontend values: 'user' | 'ai' | 'system'
+        let sender = msg.sender; // Use existing sender if present
+        if (!sender || sender === 'assistant') {
+          // Transform 'assistant' -> 'ai' OR use role field as fallback
+          sender = msg.role === 'assistant' ? 'ai' : msg.role === 'user' ? 'user' : msg.role === 'system' ? 'system' : 'ai';
+        }
+        
+        return {
+          ...msg,
+          sender,
+          timestamp: new Date(msg.timestamp)
+        };
+      });
       
       setMessages(messagesWithDates);
       setCurrentSessionId(session.id);
