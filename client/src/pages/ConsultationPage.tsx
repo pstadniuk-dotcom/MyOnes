@@ -158,8 +158,9 @@ export default function ConsultationPage() {
       if (historyData.sessions.length > 0 && messages.length === 0 && isNewSession) {
         const mostRecentSession = historyData.sessions[0]; // Sessions are sorted by timestamp descending
         if (mostRecentSession && historyData.messages[mostRecentSession.id]) {
-          const sessionMessages = historyData.messages[mostRecentSession.id].map(msg => ({
+          const sessionMessages = historyData.messages[mostRecentSession.id].map((msg: any) => ({
             ...msg,
+            sender: msg.role === 'assistant' ? 'ai' : msg.role === 'user' ? 'user' : 'system',
             timestamp: new Date(msg.timestamp)
           }));
           
@@ -567,9 +568,10 @@ export default function ConsultationPage() {
   // Load previous session
   const handleLoadSession = useCallback((session: ChatSession) => {
     if (historyData && historyData.messages[session.id]) {
-      // Convert timestamp strings to Date objects
+      // Convert timestamp strings to Date objects and transform role to sender
       const messagesWithDates = historyData.messages[session.id].map((msg: any) => ({
         ...msg,
+        sender: msg.role === 'assistant' ? 'ai' : msg.role === 'user' ? 'user' : 'system',
         timestamp: new Date(msg.timestamp)
       }));
       
