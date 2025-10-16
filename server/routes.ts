@@ -753,7 +753,13 @@ CRITICAL: You can ONLY use these exact formulas. Do not create formulas outside 
     Dose: 1-3x daily | Best for: Thyroid function, metabolism
 
 === APPROVED INDIVIDUAL INGREDIENTS (29 TOTAL) ===
-Add these ON TOP of base formulas. NEVER use ingredients outside this list. Use EXACT names.
+Add these ON TOP of base formulas. 
+
+⚠️ CRITICAL VALIDATION RULE ⚠️
+You MUST ONLY use ingredients from this exact list below. NEVER suggest, recommend, or include ANY ingredient not explicitly listed here.
+- If a user asks for an ingredient NOT on this list (like Vitamin D3, Zinc, Iron, etc.), politely explain: "That ingredient isn't part of our current catalog, but I can recommend similar alternatives from our approved list that may address the same health concern."
+- ALWAYS verify each ingredient you suggest is in the approved list below before recommending it.
+- Use EXACT names as listed (including capitalization and specifications like "24%" or "4:1").
 
 1. Aloe Vera Powder - 250mg | Interactions: Digoxin, diabetes drugs, laxatives, diuretics
 2. Ahswaganda - 600mg | Interactions: Digoxin | Benefits: Anti-inflammatory, anticancer, respiratory
@@ -878,20 +884,20 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
       - Example: "Heart Support (450mg total) contains L-Carnitine 175mg, CoQ10 21mg, and Magnesium 126mg. I'm including this because your cholesterol came back at 220 mg/dL (slightly elevated), and these three ingredients work synergistically to support cardiovascular health and healthy cholesterol metabolism."
    
    d) **Individual Ingredients - Explain Each Addition WITH DETAILED REASONING**:
-      For EACH individual ingredient:
+      For EACH individual ingredient (MUST be from approved catalog only):
       - Name it with the exact dose
       - Explain its primary therapeutic action
       - **CRITICAL**: Connect it SPECIFICALLY to their health data, symptoms, or goals they mentioned
       - Reference specific numbers from labs, specific symptoms they described, or specific goals they stated
-      - Example: "Vitamin D3 (5000 IU / 125mcg) - Your lab results showed 22 ng/mL which is clinically deficient. This dose will help bring you to the optimal range of 50-80 ng/mL over the next 8-12 weeks. Vitamin D supports immune function, bone health, and mood - all areas you mentioned as concerns."
+      - Example: "Turmeric Root Extract 4:1 (500mg) - Your CRP came back at 3.2 mg/L indicating inflammation. This dose of turmeric provides powerful anti-inflammatory compounds (curcumin) that can help reduce systemic inflammation. You mentioned joint pain and brain fog - turmeric addresses both by reducing inflammatory markers."
       - Example: "Magnesium (320mg) - You mentioned working out 3-4 times per week and experiencing muscle soreness. Magnesium supports muscle recovery and relaxation. It also helps with your stress (you rated 7/10) by calming the nervous system."
    
    e) **Synergies**: Explain how 2-3 key ingredients work together
-      - Example: "The Magnesium in Heart Support enhances Vitamin D3 absorption and also supports the cardiovascular benefits of CoQ10..."
+      - Example: "The Magnesium works synergistically with the CoQ10 in Heart Support to enhance cardiovascular function and energy production..."
    
    f) **What's Actually In Each Capsule**:
       - "So when you take your 3 capsules in the morning, here's what you're getting: [list the actual breakdown]"
-      - Be specific: "Each morning capsule contains approximately 250mg of Heart Support base, 83mg of Vitamin D3 blend, 100mg of Magnesium Glycinate..."
+      - Be specific: "Each morning capsule contains approximately 250mg of Heart Support base, 167mg of Turmeric Extract, 107mg of Magnesium..."
    
    g) **Safety Check**: 
       - "I've verified no interactions with [their medication]"
@@ -909,6 +915,12 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    
    MANDATORY: You MUST include this JSON block after your conversational explanation. This is how the formula gets saved to the system.
    
+   ⚠️ VALIDATION REQUIREMENTS ⚠️
+   - ALL base formula names MUST match exactly from the 32 approved base formulas list
+   - ALL individual ingredient names MUST match exactly from the 29 approved individual ingredients list
+   - Use EXACT capitalization and specifications (e.g., "Ginko Biloba Extract 24%" not "Ginkgo Biloba")
+   - NEVER include ingredients not in the approved catalog
+   
    Format it EXACTLY like this with triple backticks and "json" tag:
    
    \`\`\`json
@@ -918,8 +930,8 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
        {"name": "Alpha Gest III", "dose": "636mg", "purpose": "Improves digestion with Betaine HCl and Pepsin for your bloating issues"}
      ],
      "additions": [
-       {"name": "Magnesium", "dose": "320mg", "purpose": "Supports muscle relaxation, stress management, and enhances Vitamin D absorption"},
-       {"name": "Omega 3 (algae omega)", "dose": "500mg", "purpose": "Reduces inflammation and supports heart health for your cardiovascular concerns"}
+       {"name": "Magnesium", "dose": "320mg", "purpose": "Supports muscle relaxation, stress management, and nervous system health"},
+       {"name": "Omega 3 (algae omega)", "dose": "300mg", "purpose": "Reduces inflammation and supports heart health for your cardiovascular concerns"}
      ],
      "totalMg": 3000,
      "warnings": ["Ginger may have mild blood-thinning properties - monitor if taking aspirin"],
@@ -929,8 +941,8 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    \`\`\`
    
    REQUIRED FIELDS:
-   - bases: array of base formulas (name, dose with unit, purpose tied to their health data)
-   - additions: array of individual ingredients (name, dose with unit, purpose tied to their health data)
+   - bases: array of base formulas (MUST use exact names from approved 32 base formulas)
+   - additions: array of individual ingredients (MUST use exact names from approved 29 individual ingredients)
    - totalMg: total daily formula weight in mg (number)
    - warnings: array of any drug interactions or contraindications
    - rationale: brief explanation of overall formula strategy
@@ -1742,6 +1754,26 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       let savedFormula = null;
       if (extractedFormula && chatSession && userId) {
         try {
+          // CRITICAL: Validate all ingredients against approved catalog
+          const approvedBaseFormulas = new Set(Object.keys(CANONICAL_DOSES_MG).slice(0, 32));
+          const approvedIndividualIngredients = new Set(Object.keys(CANONICAL_DOSES_MG).slice(32));
+          
+          // Validate base formulas
+          for (const base of extractedFormula.bases) {
+            if (!approvedBaseFormulas.has(base.name)) {
+              console.error(`VALIDATION ERROR: Unapproved base formula "${base.name}" detected in AI response`);
+              throw new Error(`The ingredient "${base.name}" is not in our approved catalog. Please use only approved base formulas.`);
+            }
+          }
+          
+          // Validate individual ingredients
+          for (const addition of extractedFormula.additions) {
+            if (!approvedIndividualIngredients.has(addition.name)) {
+              console.error(`VALIDATION ERROR: Unapproved ingredient "${addition.name}" detected in AI response`);
+              throw new Error(`The ingredient "${addition.name}" is not in our approved catalog. Please use only approved individual ingredients.`);
+            }
+          }
+          
           // Get current formula to determine next version number
           const currentFormula = await storage.getCurrentFormulaByUser(userId);
           const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
@@ -1772,6 +1804,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           console.log(`Formula v${nextVersion} saved successfully for user ${userId}`);
         } catch (formulaSaveError) {
           console.error('Error saving formula:', formulaSaveError);
+          // Don't throw - just log the error and continue without saving invalid formula
         }
       }
       
