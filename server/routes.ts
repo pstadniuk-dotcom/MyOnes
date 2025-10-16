@@ -1682,9 +1682,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
 
       // Extract formula data from response if present
+      console.log('🔍 FORMULA EXTRACTION: Checking AI response for ```json block...');
+      console.log('📝 Full AI Response Length:', fullResponse.length);
+      console.log('📝 Full AI Response Preview (first 500 chars):', fullResponse.substring(0, 500));
+      
       try {
         const jsonMatch = fullResponse.match(/```json\s*({[\s\S]*?})\s*```/);
         if (jsonMatch) {
+          console.log('✅ FORMULA EXTRACTION: Found ```json block in AI response!');
+          console.log('📦 Extracted JSON:', jsonMatch[1].substring(0, 300));
           const jsonData = JSON.parse(jsonMatch[1]);
           let validatedFormula = FormulaExtractionSchema.parse(jsonData);
           
@@ -1764,8 +1770,16 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           // Remove the formula JSON block from fullResponse before displaying to user
           // This keeps the conversational response clean while still extracting the data
           fullResponse = fullResponse.replace(/```json\s*{[\s\S]*?}\s*```\s*/g, '').trim();
+        } else {
+          console.log('❌ FORMULA EXTRACTION: NO ```json block found in AI response!');
+          console.log('🔍 Searching for other patterns...');
+          // Check if AI outputted formula without proper formatting
+          if (fullResponse.includes('bases') || fullResponse.includes('additions')) {
+            console.log('⚠️ FOUND formula keywords but NOT in ```json block format!');
+          }
         }
       } catch (e) {
+        console.error('❌ FORMULA EXTRACTION ERROR:', e);
         console.log('No valid formula JSON found in response');
       }
 
