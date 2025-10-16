@@ -62,6 +62,12 @@ Preferred communication style: Simple, everyday language.
   - Formulas automatically saved to database with proper version numbering
   - "See Your Formulation" button appears after AI creates formula, linking to My Formulation tab
   - Clean AI responses with JSON code extracted backend before display
+- **Ingredient Validation System** (Added Oct 16, 2025):
+  - Strict enforcement: AI can ONLY recommend ingredients from approved catalog (CANONICAL_DOSES_MG)
+  - AI prompt includes validation warnings preventing unapproved ingredients
+  - Backend validation checks all formula ingredients against approved catalog before saving
+  - If user requests unapproved ingredient, AI explains it's not available and suggests alternatives
+  - Prevents formula creation with ingredients outside company's offerings (e.g., Vitamin D3, Zinc, Iron)
 - **Progress Tracking**: User journey monitoring with iterative formula optimization
 - **Subscription Management**: Automated refill system with periodic health reassessments
 
