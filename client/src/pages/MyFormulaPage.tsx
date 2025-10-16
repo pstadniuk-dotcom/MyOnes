@@ -111,6 +111,7 @@ export default function MyFormulaPage() {
   const [revertReason, setRevertReason] = useState('');
   const [selectedFormulaId, setSelectedFormulaId] = useState<string | null>(null);
   const [expandedFormulaId, setExpandedFormulaId] = useState<string | null>(null);
+  const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
   
   // Hooks
   const { user } = useAuth();
@@ -313,12 +314,7 @@ export default function MyFormulaPage() {
             className="gap-2 bg-primary hover:bg-primary/90" 
             data-testid="button-order-formula"
             disabled={!selectedFormula}
-            onClick={() => {
-              toast({
-                title: "Order Formula",
-                description: "Checkout integration coming soon! Contact support to place your order.",
-              });
-            }}
+            onClick={() => setShowOrderConfirmation(true)}
           >
             <ShoppingCart className="w-4 h-4" />
             Order Your Formula
@@ -437,6 +433,151 @@ export default function MyFormulaPage() {
           {selectedFormula && <ActionsSection formula={selectedFormula} />}
         </TabsContent>
       </Tabs>
+      
+      {/* Order Confirmation Dialog */}
+      <Dialog open={showOrderConfirmation} onOpenChange={setShowOrderConfirmation}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-2xl">
+              <ShoppingCart className="w-6 h-6" />
+              Confirm Your Formula Order
+            </DialogTitle>
+            <DialogDescription>
+              Review your selected formula before proceeding to checkout
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedFormula && (
+            <div className="space-y-4 py-4">
+              {/* Formula Summary */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FlaskConical className="w-5 h-5" />
+                    Formula Version {selectedFormula.version}
+                    {selectedFormula.id === currentFormula?.id && (
+                      <Badge variant="secondary" className="ml-2">Newest</Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    Created {new Date(selectedFormula.createdAt).toLocaleDateString()} • 
+                    {selectedFormula.bases.length + selectedFormula.additions.length} ingredients • 
+                    {selectedFormula.totalMg}mg total
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Base Formulas */}
+                  {selectedFormula.bases.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Beaker className="w-4 h-4" />
+                        Base Formulas ({selectedFormula.bases.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {selectedFormula.bases.map((base, idx) => (
+                          <div key={idx} className="p-2 bg-muted/30 rounded text-sm">
+                            <div className="font-medium">{base.ingredient} - {base.amount}{base.unit}</div>
+                            {base.purpose && <div className="text-muted-foreground text-xs mt-1">{base.purpose}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Custom Additions */}
+                  {selectedFormula.additions.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Plus className="w-4 h-4" />
+                        Custom Additions ({selectedFormula.additions.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {selectedFormula.additions.map((addition, idx) => (
+                          <div key={idx} className="p-2 bg-muted/30 rounded text-sm">
+                            <div className="font-medium">{addition.ingredient} - {addition.amount}{addition.unit}</div>
+                            {addition.purpose && <div className="text-muted-foreground text-xs mt-1">{addition.purpose}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Warnings */}
+                  {selectedFormula.warnings && selectedFormula.warnings.length > 0 && (
+                    <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2 text-orange-800 dark:text-orange-400">
+                        <AlertTriangle className="w-4 h-4" />
+                        Important Warnings
+                      </h4>
+                      <ul className="space-y-1">
+                        {selectedFormula.warnings.map((warning, idx) => (
+                          <li key={idx} className="text-sm text-orange-700 dark:text-orange-300">• {warning}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              {/* Safety Metrics */}
+              {safetyMetrics && (
+                <div className={`p-4 rounded-lg border-l-4 ${
+                  safetyMetrics.status === 'danger' ? 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20' :
+                  safetyMetrics.status === 'optimal' ? 'border-l-green-500 bg-green-50/50 dark:bg-green-950/20' :
+                  'border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Shield className={`w-4 h-4 ${
+                          safetyMetrics.status === 'danger' ? 'text-red-600' :
+                          safetyMetrics.status === 'optimal' ? 'text-green-600' :
+                          'text-blue-600'
+                        }`} />
+                        <span className="font-semibold text-sm">
+                          Formula Safety: {safetyMetrics.status === 'optimal' ? 'Optimal' : safetyMetrics.status === 'danger' ? 'Over Limit' : 'Safe'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {safetyMetrics.totalMg}mg of 800mg maximum • {safetyMetrics.remainingCapacity}mg remaining
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xl font-bold">{Math.round(safetyMetrics.safetyPercentage)}%</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Action Buttons */}
+          <div className="flex gap-3 justify-end pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowOrderConfirmation(false)}
+              data-testid="button-cancel-order"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="default"
+              className="bg-primary hover:bg-primary/90"
+              onClick={() => {
+                setShowOrderConfirmation(false);
+                toast({
+                  title: "Redirecting to checkout...",
+                  description: "Checkout page coming soon!",
+                });
+              }}
+              data-testid="button-proceed-checkout"
+            >
+              <ArrowRight className="w-4 h-4 mr-2" />
+              Proceed to Checkout
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
