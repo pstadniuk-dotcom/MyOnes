@@ -58,6 +58,20 @@ interface ChatSession {
   status: 'active' | 'completed' | 'archived';
 }
 
+// Utility function to remove JSON code blocks from AI messages for clean display
+const removeJsonBlocks = (content: string): string => {
+  if (!content) return '';
+  
+  // Remove ```json blocks (formula data)
+  let cleaned = content.replace(/```json\s*[\s\S]*?```/g, '');
+  
+  // Remove ```health-data blocks (health profile updates)
+  cleaned = cleaned.replace(/```health-data\s*[\s\S]*?```/g, '');
+  
+  // Trim extra whitespace that might result from removal
+  return cleaned.trim();
+};
+
 interface UploadedFile {
   id: string;
   name: string;
@@ -1119,7 +1133,7 @@ export default function ConsultationPage() {
                         </Button>
                       </div>
                       
-                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{removeJsonBlocks(message.content)}</p>
                       
                       {/* File Attachment Display */}
                       {message.fileAttachment && (

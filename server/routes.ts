@@ -980,17 +980,20 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    - Capsule count: Based on size (e.g., "4 capsules at 750mg each (Size 00)")
    - Dosing schedule: Be specific (e.g., "2 with breakfast, 2 with dinner")
 
-4. **CRITICAL: STRUCTURED FORMULA JSON BLOCK** 
+4. **🚨 CRITICAL: STRUCTURED FORMULA JSON BLOCK (ABSOLUTELY MANDATORY) 🚨**
    
-   MANDATORY: You MUST include this JSON block after your conversational explanation. This is how the formula gets saved to the system.
+   ⚠️ WARNING: The formula will NOT be saved without this JSON block. You MUST ALWAYS include it. NO EXCEPTIONS. ⚠️
+   
+   AFTER your conversational explanation, you MUST include this exact JSON structure. This is NON-NEGOTIABLE and how formulas get persisted.
    
    ⚠️ VALIDATION REQUIREMENTS ⚠️
-   - ALL base formula names MUST match exactly from the 32 approved base formulas list
-   - ALL individual ingredient names MUST match exactly from the 29 approved individual ingredients list
+   - ALL base formula names MUST match exactly from the 32 approved base formulas list above
+   - ALL individual ingredient names MUST match exactly from the 29 approved individual ingredients list above  
    - Use EXACT capitalization and specifications (e.g., "Ginko Biloba Extract 24%" not "Ginkgo Biloba")
-   - NEVER include ingredients not in the approved catalog
+   - NEVER include ingredients not in the approved catalog (if not listed above, DON'T use it)
+   - NEVER make up formula names like "Brain Health Blend" - ONLY use approved base formulas
    
-   Format it EXACTLY like this with triple backticks and "json" tag:
+   Format it EXACTLY like this with triple backticks and "json" tag (replace \` with actual backticks):
    
    \`\`\`json
    {
@@ -2018,43 +2021,6 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     } catch (error) {
       console.error('List chat sessions error:', error);
       res.status(500).json({ error: 'Failed to list chat sessions' });
-    }
-  });
-
-  // Get consultation history with enriched data
-  app.get('/api/consultations/history', requireAuth, async (req, res) => {
-    try {
-      const userId = req.userId!;
-      const sessions = await storage.listChatSessionsByUser(userId);
-      
-      // Build messages map for all sessions
-      const messagesMap: Record<string, any[]> = {};
-      
-      // Enrich each session with additional data
-      const enrichedSessions = await Promise.all(sessions.map(async (session) => {
-        const messages = await storage.listMessagesBySession(session.id);
-        
-        // Store messages in map for frontend
-        messagesMap[session.id] = messages;
-        
-        const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-        const hasFormula = messages.some(msg => msg.content?.includes('"bases":') || msg.content?.includes('"additions":'));
-        
-        return {
-          id: session.id,
-          title: `Consultation ${new Date(session.createdAt).toLocaleDateString()}`,
-          lastMessage: lastMessage ? lastMessage.content.substring(0, 100) : 'No messages',
-          timestamp: session.createdAt,
-          messageCount: messages.length,
-          hasFormula,
-          status: session.status
-        };
-      }));
-      
-      res.json({ sessions: enrichedSessions, messages: messagesMap });
-    } catch (error) {
-      console.error('Get consultation history error:', error);
-      res.status(500).json({ error: 'Failed to get consultation history' });
     }
   });
 
