@@ -75,6 +75,75 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 // Canonical dose mapping for all supplement bases and additions
+// APPROVED BASE FORMULAS (32 total) - Exact doses from catalog
+const APPROVED_BASE_FORMULAS = new Set([
+  'Adrenal Support',
+  'Alpha Gest III',
+  'Alpha Green II',
+  'Alpha Oxyme',
+  'Alpha Zyme III',
+  'Beta Max',
+  'Br-SP Plus',
+  'C Boost',
+  'Circu Plus',
+  'Colostrum Powder',
+  'Chola Plus',
+  'Dia Zyme',
+  'Diadren Forte',
+  'Endocrine Support',
+  'Heart Support',
+  'Histamine Support',
+  'Immune-C',
+  'Intestinal Formula',
+  'Ligament Support',
+  'LSK Plus',
+  'Liver Support',
+  'Lung Support',
+  'MG/K',
+  'Mold RX',
+  'Spleen Support',
+  'Ovary Uterus Support',
+  'Para X',
+  'Para Thy',
+  'Pitui Plus',
+  'Prostate Support',
+  'Kidney & Bladder Support',
+  'Thyroid Support'
+]);
+
+// APPROVED INDIVIDUAL INGREDIENTS (29 total) - Exact names from catalog
+const APPROVED_INDIVIDUAL_INGREDIENTS = new Set([
+  'Aloe Vera Powder',
+  'Ahswaganda',
+  'Astragalus',
+  'Black Currant Extract',
+  'Broccoli Powder',
+  'Camu Camu',
+  'Cape Aloe',
+  'Cats Claw',
+  'Chaga',
+  'Cinnamon 20:1',
+  'CoEnzyme Q10',
+  'Gaba',
+  'Garlic (powder)',
+  'Ginger Root',
+  'Ginko Biloba Extract 24%',
+  'Graviola',
+  'Hawthorn Berry PE 1/8% Flavones',
+  'Lutein',
+  'Maca Root .6%',
+  'Magnesium',
+  'Omega 3 (algae omega)',
+  'Phosphatidylcholine 40% (soy)',
+  'Resveratrol',
+  'Saw Palmetto Extract 45% Fatty Acid (GC)',
+  'Stinging Nettle',
+  'Sumar Root',
+  'Turmeric Root Extract 4:1',
+  'Vitamin C',
+  'Vitamin E (Mixed tocopherols)'
+]);
+
 const CANONICAL_DOSES_MG = {
   // APPROVED BASE FORMULAS (32 total) - Exact doses from catalog
   'Adrenal Support': 420,
@@ -1755,12 +1824,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       if (extractedFormula && chatSession && userId) {
         try {
           // CRITICAL: Validate all ingredients against approved catalog
-          const approvedBaseFormulas = new Set(Object.keys(CANONICAL_DOSES_MG).slice(0, 32));
-          const approvedIndividualIngredients = new Set(Object.keys(CANONICAL_DOSES_MG).slice(32));
-          
           // Validate base formulas
           for (const base of extractedFormula.bases) {
-            if (!approvedBaseFormulas.has(base.name)) {
+            if (!APPROVED_BASE_FORMULAS.has(base.name)) {
               console.error(`VALIDATION ERROR: Unapproved base formula "${base.name}" detected in AI response`);
               throw new Error(`The ingredient "${base.name}" is not in our approved catalog. Please use only approved base formulas.`);
             }
@@ -1768,7 +1834,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           
           // Validate individual ingredients
           for (const addition of extractedFormula.additions) {
-            if (!approvedIndividualIngredients.has(addition.name)) {
+            if (!APPROVED_INDIVIDUAL_INGREDIENTS.has(addition.name)) {
               console.error(`VALIDATION ERROR: Unapproved ingredient "${addition.name}" detected in AI response`);
               throw new Error(`The ingredient "${addition.name}" is not in our approved catalog. Please use only approved individual ingredients.`);
             }
