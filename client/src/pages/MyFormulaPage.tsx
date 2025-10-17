@@ -199,8 +199,11 @@ export default function MyFormulaPage() {
     if (!selectedFormula) return [];
     
     const allIngredients = [
-      ...selectedFormula.bases.map(ing => ({ ...ing, type: 'base' as const })),
-      ...selectedFormula.additions.map(ing => ({ ...ing, type: 'addition' as const }))
+      ...selectedFormula.bases.map(ing => ({ ...ing, type: 'base' as const, source: 'ai' as const })),
+      ...selectedFormula.additions.map(ing => ({ ...ing, type: 'addition' as const, source: 'ai' as const })),
+      // Include user-added customizations
+      ...(selectedFormula.userCustomizations?.addedBases?.map(ing => ({ ...ing, type: 'base' as const, source: 'user' as const })) || []),
+      ...(selectedFormula.userCustomizations?.addedIndividuals?.map(ing => ({ ...ing, type: 'addition' as const, source: 'user' as const })) || [])
     ];
 
     return allIngredients.filter(ingredient => {
@@ -469,13 +472,35 @@ export default function MyFormulaPage() {
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-2">
                         <Plus className="w-4 h-4" />
-                        Custom Additions ({selectedFormula.additions.length})
+                        AI-Recommended Additions ({selectedFormula.additions.length})
                       </h4>
                       <div className="space-y-2">
                         {selectedFormula.additions.map((addition, idx) => (
                           <div key={idx} className="p-2 bg-muted/30 rounded text-sm">
                             <div className="font-medium">{addition.ingredient} - {addition.amount}{addition.unit}</div>
                             {addition.purpose && <div className="text-muted-foreground text-xs mt-1">{addition.purpose}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* User Customizations */}
+                  {(selectedFormula.userCustomizations?.addedBases?.length > 0 || selectedFormula.userCustomizations?.addedIndividuals?.length > 0) && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-purple-600" />
+                        <span className="text-purple-600 dark:text-purple-400">Your Customizations ({(selectedFormula.userCustomizations?.addedBases?.length || 0) + (selectedFormula.userCustomizations?.addedIndividuals?.length || 0)})</span>
+                      </h4>
+                      <div className="space-y-2">
+                        {selectedFormula.userCustomizations?.addedBases?.map((base, idx) => (
+                          <div key={`base-${idx}`} className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded text-sm border border-purple-200 dark:border-purple-800">
+                            <div className="font-medium text-purple-900 dark:text-purple-100">{base.ingredient} - {base.amount}{base.unit}</div>
+                          </div>
+                        ))}
+                        {selectedFormula.userCustomizations?.addedIndividuals?.map((ind, idx) => (
+                          <div key={`ind-${idx}`} className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded text-sm border border-purple-200 dark:border-purple-800">
+                            <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
                           </div>
                         ))}
                       </div>
@@ -560,7 +585,8 @@ interface FormulaCardProps {
 }
 
 function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onToggleExpand }: FormulaCardProps) {
-  const totalIngredients = formula.bases.length + formula.additions.length;
+  const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
+  const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
   const createdDate = new Date(formula.createdAt).toLocaleDateString();
   
   return (
@@ -647,13 +673,35 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
               <div>
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
                   <Plus className="w-3 h-3" />
-                  Custom Additions
+                  AI-Recommended Additions
                 </h4>
                 <div className="space-y-1">
                   {formula.additions.map((addition, idx) => (
                     <div key={idx} className="text-xs p-2 bg-muted/20 rounded">
                       <div className="font-medium">{addition.ingredient} - {addition.amount}{addition.unit}</div>
                       {addition.purpose && <div className="text-muted-foreground mt-1">{addition.purpose}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* User Customizations */}
+            {(formula.userCustomizations?.addedBases?.length > 0 || formula.userCustomizations?.addedIndividuals?.length > 0) && (
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
+                  <Users className="w-3 h-3 text-purple-600" />
+                  <span className="text-purple-600 dark:text-purple-400">Your Customizations</span>
+                </h4>
+                <div className="space-y-1">
+                  {formula.userCustomizations?.addedBases?.map((base, idx) => (
+                    <div key={`base-${idx}`} className="text-xs p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-800">
+                      <div className="font-medium text-purple-900 dark:text-purple-100">{base.ingredient} - {base.amount}{base.unit}</div>
+                    </div>
+                  ))}
+                  {formula.userCustomizations?.addedIndividuals?.map((ind, idx) => (
+                    <div key={`ind-${idx}`} className="text-xs p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-800">
+                      <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
                     </div>
                   ))}
                 </div>
@@ -904,7 +952,7 @@ function IngredientsSection({
   expandedIngredients,
   toggleIngredientExpansion
 }: {
-  ingredients: Array<FormulaIngredient & { type: 'base' | 'addition' }>;
+  ingredients: Array<FormulaIngredient & { type: 'base' | 'addition'; source: 'ai' | 'user' }>;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   categoryFilter: string;
@@ -972,7 +1020,7 @@ function IngredientCard({
   isExpanded, 
   onToggleExpansion 
 }: {
-  ingredient: FormulaIngredient & { type: 'base' | 'addition' };
+  ingredient: FormulaIngredient & { type: 'base' | 'addition'; source: 'ai' | 'user' };
   isExpanded: boolean;
   onToggleExpansion: () => void;
 }) {
@@ -989,11 +1037,17 @@ function IngredientCard({
           <CardHeader className="cursor-pointer hover-elevate" data-testid={`button-expand-${ingredient.ingredient}`}>
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
                   <CardTitle className="text-lg">{ingredient.ingredient}</CardTitle>
                   <Badge variant={ingredient.type === 'base' ? 'default' : 'outline'} data-testid={`badge-ingredient-type-${ingredient.ingredient}`}>
                     {ingredient.type === 'base' ? 'Base Formula' : 'Addition'}
                   </Badge>
+                  {ingredient.source === 'user' && (
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100">
+                      <Users className="w-3 h-3 mr-1" />
+                      You Added
+                    </Badge>
+                  )}
                 </div>
                 <CardDescription className="mt-1">
                   {ingredient.amount}{ingredient.unit} dose
