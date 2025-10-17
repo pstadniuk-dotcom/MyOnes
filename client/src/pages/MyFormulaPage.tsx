@@ -698,28 +698,26 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
       </div>
       
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2 pr-20">
-          <div className="flex-1">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <FlaskConical className="w-4 h-4" />
-              {formula.name || `Version ${formula.version}`}
-            </CardTitle>
-            {formula.name && (
-              <p className="text-xs text-muted-foreground mt-1">Version {formula.version}</p>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRename(formula.id, formula.name);
-            }}
-            data-testid={`button-rename-formula-${formula.version}`}
-          >
-            <Pencil className="w-3 h-3" />
-          </Button>
+        <div className="pr-20">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FlaskConical className="w-4 h-4" />
+            {formula.name || `Version ${formula.version}`}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 shrink-0 -ml-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRename(formula.id, formula.name);
+              }}
+              data-testid={`button-rename-formula-${formula.version}`}
+            >
+              <Pencil className="w-3 h-3" />
+            </Button>
+          </CardTitle>
+          {formula.name && (
+            <p className="text-xs text-muted-foreground mt-1">Version {formula.version}</p>
+          )}
         </div>
         <CardDescription className="text-xs">
           {createdDate} • {totalIngredients} ingredients
