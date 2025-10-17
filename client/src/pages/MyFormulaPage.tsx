@@ -444,7 +444,7 @@ export default function MyFormulaPage() {
                   </CardTitle>
                   <CardDescription>
                     Created {new Date(selectedFormula.createdAt).toLocaleDateString()} • 
-                    {selectedFormula.bases.length + selectedFormula.additions.length} ingredients • 
+                    {selectedFormula.bases.length + selectedFormula.additions.length + (selectedFormula.userCustomizations?.addedBases?.length || 0) + (selectedFormula.userCustomizations?.addedIndividuals?.length || 0)} ingredients • 
                     {selectedFormula.totalMg}mg total
                   </CardDescription>
                 </CardHeader>
@@ -763,7 +763,8 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
 
 // Current Formula Display Component
 function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
-  const totalIngredients = formula.bases.length + formula.additions.length;
+  const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
+  const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
   
   return (
     <div className="space-y-6">
