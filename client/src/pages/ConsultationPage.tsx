@@ -1260,7 +1260,7 @@ export default function ConsultationPage() {
                           {/* Call to Action - View Full Formulation */}
                           <div className="mt-4 pt-4 border-t">
                             <Button asChild className="w-full" data-testid="button-view-formulation">
-                              <Link href="/dashboard/my-formula">
+                              <Link href="/dashboard/formula">
                                 <FlaskConical className="w-4 h-4 mr-2" />
                                 See Your Formulation
                                 <ArrowRight className="w-4 h-4 ml-2" />
