@@ -20,13 +20,14 @@ import {
   Clock, ArrowRight, ArrowLeft, GitBranch, Star, Shield, Zap,
   Heart, Brain, Activity, Target, Plus, Minus, RotateCcw, 
   ExternalLink, Copy, Users, Lightbulb, BookOpen, Award,
-  Package, AlertCircle
+  Package, AlertCircle, Sparkles
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { FormulaCustomizationDialog } from '@/components/FormulaCustomizationDialog';
 
 // Types for Formula data matching backend schema
 interface FormulaIngredient {
@@ -42,6 +43,10 @@ interface Formula {
   version: number;
   bases: FormulaIngredient[];
   additions: FormulaIngredient[];
+  userCustomizations?: {
+    addedBases?: FormulaIngredient[];
+    addedIndividuals?: FormulaIngredient[];
+  };
   totalMg: number;
   rationale?: string;
   warnings?: string[];
@@ -112,6 +117,7 @@ export default function MyFormulaPage() {
   const [selectedFormulaId, setSelectedFormulaId] = useState<string | null>(null);
   const [expandedFormulaId, setExpandedFormulaId] = useState<string | null>(null);
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
+  const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   
   // Hooks
   const { user } = useAuth();
@@ -430,7 +436,34 @@ export default function MyFormulaPage() {
 
         {/* Actions Tab */}
         <TabsContent value="actions" className="space-y-6">
-          {selectedFormula && <ActionsSection formula={selectedFormula} />}
+          {selectedFormula && (
+            <>
+              {/* Customization Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5" />
+                    Customize Your Formula
+                  </CardTitle>
+                  <CardDescription>
+                    Add extra base formulations or individual ingredients to personalize your formula
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button 
+                    onClick={() => setShowCustomizationDialog(true)}
+                    className="w-full"
+                    data-testid="button-open-customization"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Ingredients
+                  </Button>
+                </CardContent>
+              </Card>
+              
+              <ActionsSection formula={selectedFormula} />
+            </>
+          )}
         </TabsContent>
       </Tabs>
       
@@ -578,6 +611,23 @@ export default function MyFormulaPage() {
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Customization Dialog */}
+      {selectedFormula && (
+        <FormulaCustomizationDialog
+          open={showCustomizationDialog}
+          onOpenChange={setShowCustomizationDialog}
+          formulaId={selectedFormula.id}
+          existingBases={[
+            ...selectedFormula.bases.map(b => b.ingredient),
+            ...(selectedFormula.userCustomizations?.addedBases?.map(b => b.ingredient) || [])
+          ]}
+          existingIndividuals={[
+            ...selectedFormula.additions.map(a => a.ingredient),
+            ...(selectedFormula.userCustomizations?.addedIndividuals?.map(i => i.ingredient) || [])
+          ]}
+        />
+      )}
     </div>
   );
 }
