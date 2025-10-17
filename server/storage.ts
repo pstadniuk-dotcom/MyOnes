@@ -60,6 +60,7 @@ export interface IStorage {
   getFormulaHistory(userId: string): Promise<Formula[]>;
   updateFormulaVersion(userId: string, updates: Partial<InsertFormula>): Promise<Formula>;
   getFormulaByUserAndVersion(userId: string, version: number): Promise<Formula | undefined>;
+  updateFormulaCustomizations(formulaId: string, customizations: { addedBases?: any[], addedIndividuals?: any[] }, newTotalMg: number): Promise<Formula>;
   
   // Formula Version Change operations
   createFormulaVersionChange(change: InsertFormulaVersionChange): Promise<FormulaVersionChange>;
@@ -425,6 +426,28 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error getting formula by user and version:', error);
       return undefined;
+    }
+  }
+
+  async updateFormulaCustomizations(formulaId: string, customizations: { addedBases?: any[], addedIndividuals?: any[] }, newTotalMg: number): Promise<Formula> {
+    try {
+      const [updated] = await db
+        .update(formulas)
+        .set({
+          userCustomizations: customizations,
+          totalMg: newTotalMg
+        })
+        .where(eq(formulas.id, formulaId))
+        .returning();
+      
+      if (!updated) {
+        throw new Error('Formula not found');
+      }
+      
+      return updated;
+    } catch (error) {
+      console.error('Error updating formula customizations:', error);
+      throw new Error('Failed to update formula customizations');
     }
   }
 
