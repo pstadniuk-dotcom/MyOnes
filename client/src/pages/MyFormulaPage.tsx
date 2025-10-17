@@ -698,7 +698,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
       </div>
       
       <CardHeader className="pb-3">
-        <div className="pr-20">
+        <div className="pr-20 pt-2">
           <CardTitle className="text-lg flex items-center gap-1.5">
             <FlaskConical className="w-4 h-4" />
             <span>{formula.name || `Version ${formula.version}`}</span>
