@@ -980,18 +980,24 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    - Capsule count: Based on size (e.g., "4 capsules at 750mg each (Size 00)")
    - Dosing schedule: Be specific (e.g., "2 with breakfast, 2 with dinner")
 
-4. **🚨 CRITICAL: STRUCTURED FORMULA JSON BLOCK (ABSOLUTELY MANDATORY) 🚨**
+4. **🚨🚨🚨 CRITICAL: STRUCTURED FORMULA JSON BLOCK (ABSOLUTELY MANDATORY) 🚨🚨🚨**
    
-   ⚠️ WARNING: The formula will NOT be saved without this JSON block. You MUST ALWAYS include it. NO EXCEPTIONS. ⚠️
+   ⚠️⚠️⚠️ WARNING: The formula will NOT be saved to the database without this JSON block ⚠️⚠️⚠️
+   ⚠️⚠️⚠️ You MUST ALWAYS include it after EVERY formula recommendation ⚠️⚠️⚠️
+   ⚠️⚠️⚠️ NO EXCEPTIONS - If you skip this, the user loses their formula ⚠️⚠️⚠️
    
-   AFTER your conversational explanation, you MUST include this exact JSON structure. This is NON-NEGOTIABLE and how formulas get persisted.
+   AFTER your conversational explanation, you MUST include this exact JSON structure in triple backticks.
+   This is NON-NEGOTIABLE and the ONLY way formulas get saved to the database.
    
-   ⚠️ VALIDATION REQUIREMENTS ⚠️
-   - ALL base formula names MUST match exactly from the 32 approved base formulas list above
-   - ALL individual ingredient names MUST match exactly from the 29 approved individual ingredients list above  
+   ⚠️ VALIDATION REQUIREMENTS - READ CAREFULLY ⚠️
+   - ALL base formula names MUST match EXACTLY from the 32 approved base formulas list above (scroll up to see full list)
+   - ALL individual ingredient names MUST match EXACTLY from the 29 approved individual ingredients list above (scroll up to see full list)
    - Use EXACT capitalization and specifications (e.g., "Ginko Biloba Extract 24%" not "Ginkgo Biloba")
    - NEVER include ingredients not in the approved catalog (if not listed above, DON'T use it)
-   - NEVER make up formula names like "Brain Health Blend" - ONLY use approved base formulas
+   - NEVER EVER make up formula names like "Brain Health Blend", "Cognitive Support Mix", etc. - ONLY use the exact names from approved base formulas
+   - If you use an unapproved ingredient or made-up formula name, the entire formula will be REJECTED and NOT saved
+   
+   🔴🔴🔴 MANDATORY: You MUST copy this exact format below. Replace the example data with your formula, but keep the JSON structure identical. 🔴🔴🔴
    
    Format it EXACTLY like this with triple backticks and "json" tag (replace \` with actual backticks):
    
@@ -1019,6 +1025,15 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    - warnings: array of any drug interactions or contraindications
    - rationale: brief explanation of overall formula strategy
    - disclaimers: array of safety disclaimers
+   
+   🔴 FINAL CHECKPOINT BEFORE SENDING: 🔴
+   Before you send your response, verify:
+   ✓ Did I include the JSON block in triple backticks with "json" tag exactly as shown in example?
+   ✓ Did I use ONLY approved base formula names (check the list above)?
+   ✓ Did I use ONLY approved individual ingredient names (check the list above)?
+   ✓ Did I include all required fields (bases, additions, totalMg, warnings, rationale, disclaimers)?
+   
+   If you answer NO to any of these, STOP and FIX IT before sending. The user's formula will be LOST if you skip this.
 
 5. FOLLOW-UP QUESTIONS (CRITICAL - Always ask after presenting formula):
    
@@ -1771,11 +1786,16 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           // This keeps the conversational response clean while still extracting the data
           fullResponse = fullResponse.replace(/```json\s*{[\s\S]*?}\s*```\s*/g, '').trim();
         } else {
-          console.log('❌ FORMULA EXTRACTION: NO ```json block found in AI response!');
+          console.error('❌ FORMULA EXTRACTION FAILURE: NO ```json block found in AI response!');
           console.log('🔍 Searching for other patterns...');
           // Check if AI outputted formula without proper formatting
-          if (fullResponse.includes('bases') || fullResponse.includes('additions')) {
-            console.log('⚠️ FOUND formula keywords but NOT in ```json block format!');
+          if (fullResponse.includes('bases') || fullResponse.includes('additions') || 
+              fullResponse.includes('Base Formulas') || fullResponse.includes('Individual Ingredients')) {
+            console.error('⚠️ CRITICAL: FOUND formula keywords but NOT in ```json block format!');
+            console.error('⚠️ This formula will NOT be saved! User needs to request it again.');
+            
+            // Append error message to user response
+            fullResponse += '\n\n---\n\n⚠️ **System Notice:** I apologize, but there was a technical issue saving your formula to the database. The formula structure I provided was not in the correct format for our system to save it.\n\nPlease ask me to create your formula again, and I will ensure it\'s saved properly this time. You can say: "Can you create my personalized formula now?"';
           }
         }
       } catch (e) {
@@ -1886,7 +1906,18 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           savedFormula = await storage.createFormula(formulaData);
           console.log(`Formula v${nextVersion} saved successfully for user ${userId}`);
         } catch (formulaSaveError) {
-          console.error('Error saving formula:', formulaSaveError);
+          console.error('❌ ERROR SAVING FORMULA:', formulaSaveError);
+          
+          // Check if it's a validation error for unapproved ingredients
+          if (formulaSaveError instanceof Error && formulaSaveError.message.includes('not in our approved catalog')) {
+            console.error('⚠️ CRITICAL: AI used unapproved ingredient - formula rejected!');
+            
+            // Notify user via server-sent event
+            sendSSE({
+              type: 'error',
+              error: `⚠️ Formula Validation Error: ${formulaSaveError.message}\n\nPlease ask me to create your formula again using only approved ingredients from our catalog.`
+            });
+          }
           // Don't throw - just log the error and continue without saving invalid formula
         }
       }
