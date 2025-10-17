@@ -728,11 +728,15 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="text-center p-2 bg-muted/30 rounded">
-            <div className="font-bold text-primary">{formula.bases.length}</div>
+            <div className="font-bold text-primary">
+              {formula.bases.length + (formula.userCustomizations?.addedBases?.length || 0)}
+            </div>
             <div className="text-xs text-muted-foreground">Base Formulas</div>
           </div>
           <div className="text-center p-2 bg-muted/30 rounded">
-            <div className="font-bold text-blue-600">{formula.additions.length}</div>
+            <div className="font-bold text-blue-600">
+              {formula.additions.length + (formula.userCustomizations?.addedIndividuals?.length || 0)}
+            </div>
             <div className="text-xs text-muted-foreground">Additions</div>
           </div>
         </div>
