@@ -699,13 +699,13 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
       
       <CardHeader className="pb-3">
         <div className="pr-20">
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="text-lg flex items-center gap-1.5">
             <FlaskConical className="w-4 h-4" />
-            {formula.name || `Version ${formula.version}`}
+            <span>{formula.name || `Version ${formula.version}`}</span>
             <Button
               variant="ghost"
               size="icon"
-              className="h-5 w-5 shrink-0 -ml-1"
+              className="h-5 w-5 shrink-0 ml-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 onRename(formula.id, formula.name);
