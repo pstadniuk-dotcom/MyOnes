@@ -19,7 +19,7 @@ import {
   Clock, ArrowRight, ArrowLeft, GitBranch, Star, Zap,
   Heart, Brain, Activity, Target, Plus, Minus, RotateCcw, 
   ExternalLink, Copy, Users, Lightbulb, BookOpen, Award,
-  Package, AlertCircle, Sparkles
+  Package, AlertCircle, Pencil, Sparkles
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
@@ -718,7 +718,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
             }}
             data-testid={`button-rename-formula-${formula.version}`}
           >
-            <Sparkles className="w-3 h-3" />
+            <Pencil className="w-3 h-3" />
           </Button>
         </div>
         <CardDescription className="text-xs">
