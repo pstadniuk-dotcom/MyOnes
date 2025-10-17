@@ -75,12 +75,14 @@ Preferred communication style: Simple, everyday language.
   - Validation error alerts for unapproved ingredients with retry instructions
   - Comprehensive logging of extraction failures for debugging
   - Prevents silent formula loss with clear error messaging
-- **Ingredient Validation System** (Added Oct 16, 2025):
-  - Strict enforcement: AI can ONLY recommend ingredients from approved catalog (CANONICAL_DOSES_MG)
-  - AI prompt includes validation warnings preventing unapproved ingredients
+- **Ingredient Validation System** (Added Oct 16-17, 2025):
+  - Strict enforcement: AI can ONLY recommend ingredients from approved catalog (32 base formulas + 29 individual ingredients)
+  - Critical ingredient rules at top of AI prompt preventing made-up formula names
+  - AI explicitly instructed that user's current supplements are for REFERENCE ONLY - not for inclusion in formulas
+  - Specific guidance for brain/cognitive support using individual ingredients (Ginko Biloba, Phosphatidylcholine, Omega 3)
   - Backend validation checks all formula ingredients against approved catalog before saving
   - If user requests unapproved ingredient, AI explains it's not available and suggests alternatives
-  - Prevents formula creation with ingredients outside company's offerings (e.g., Vitamin D3, Zinc, Iron)
+  - Prevents formula creation with made-up names like "Brain Support", "Cognitive Support", etc.
 - **Progress Tracking**: User journey monitoring with iterative formula optimization
 - **Subscription Management**: Automated refill system with periodic health reassessments
 
