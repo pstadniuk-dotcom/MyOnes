@@ -1763,6 +1763,20 @@ export class MemStorage implements IStorage {
     
     return formula;
   }
+
+  async updateFormulaCustomizations(formulaId: string, customizations: { addedBases?: any[], addedIndividuals?: any[] }, newTotalMg: number): Promise<Formula> {
+    const formula = this.formulas.get(formulaId);
+    
+    if (!formula) {
+      throw new Error('Formula not found');
+    }
+    
+    formula.userCustomizations = customizations;
+    formula.totalMg = newTotalMg;
+    this.formulas.set(formulaId, formula);
+    
+    return formula;
+  }
   
   private generateVersionChangeSummary(oldFormula: Formula, newFormula: Formula, updates: Partial<InsertFormula>): string {
     const changes = [];
