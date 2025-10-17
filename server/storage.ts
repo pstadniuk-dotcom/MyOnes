@@ -61,6 +61,7 @@ export interface IStorage {
   updateFormulaVersion(userId: string, updates: Partial<InsertFormula>): Promise<Formula>;
   getFormulaByUserAndVersion(userId: string, version: number): Promise<Formula | undefined>;
   updateFormulaCustomizations(formulaId: string, customizations: { addedBases?: any[], addedIndividuals?: any[] }, newTotalMg: number): Promise<Formula>;
+  updateFormulaName(formulaId: string, name: string): Promise<Formula>;
   
   // Formula Version Change operations
   createFormulaVersionChange(change: InsertFormulaVersionChange): Promise<FormulaVersionChange>;
@@ -448,6 +449,25 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error updating formula customizations:', error);
       throw new Error('Failed to update formula customizations');
+    }
+  }
+
+  async updateFormulaName(formulaId: string, name: string): Promise<Formula> {
+    try {
+      const [updated] = await db
+        .update(formulas)
+        .set({ name })
+        .where(eq(formulas.id, formulaId))
+        .returning();
+      
+      if (!updated) {
+        throw new Error('Formula not found');
+      }
+      
+      return updated;
+    } catch (error) {
+      console.error('Error updating formula name:', error);
+      throw new Error('Failed to update formula name');
     }
   }
 
@@ -1773,6 +1793,19 @@ export class MemStorage implements IStorage {
     
     formula.userCustomizations = customizations;
     formula.totalMg = newTotalMg;
+    this.formulas.set(formulaId, formula);
+    
+    return formula;
+  }
+
+  async updateFormulaName(formulaId: string, name: string): Promise<Formula> {
+    const formula = this.formulas.get(formulaId);
+    
+    if (!formula) {
+      throw new Error('Formula not found');
+    }
+    
+    formula.name = name;
     this.formulas.set(formulaId, formula);
     
     return formula;

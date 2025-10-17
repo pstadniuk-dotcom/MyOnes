@@ -3228,6 +3228,42 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Rename a formula
+  app.patch('/api/users/me/formula/:formulaId/rename', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId;
+      const { formulaId } = req.params;
+      const { name } = req.body;
+
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ error: 'Valid name is required' });
+      }
+
+      if (name.trim().length > 100) {
+        return res.status(400).json({ error: 'Name must be 100 characters or less' });
+      }
+
+      // Get the formula to verify ownership
+      const formula = await storage.getFormula(formulaId);
+      
+      if (!formula || formula.userId !== userId) {
+        return res.status(404).json({ error: 'Formula not found or access denied' });
+      }
+
+      // Update the formula name
+      const updatedFormula = await storage.updateFormulaName(formulaId, name.trim());
+
+      res.json({ 
+        success: true,
+        formula: updatedFormula,
+        message: 'Formula renamed successfully'
+      });
+    } catch (error) {
+      console.error('Error renaming formula:', error);
+      res.status(500).json({ error: 'Failed to rename formula' });
+    }
+  });
+
   // Get ingredient catalog for customization UI
   app.get('/api/ingredients/catalog', requireAuth, async (req: any, res: any) => {
     try {
