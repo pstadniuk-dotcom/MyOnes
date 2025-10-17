@@ -62,13 +62,19 @@ Preferred communication style: Simple, everyday language.
   - Formulas automatically saved to database with proper version numbering
   - "See Your Formulation" button appears after AI creates formula, linking to My Formulation tab
   - Clean AI responses with JSON code extracted backend before display
-- **Formula Selection & History** (Added Oct 16, 2025):
+- **Formula Selection & History** (Added Oct 16-17, 2025):
   - Grid view displaying all formula versions (newest to oldest) as expandable cards
   - Visual selection mechanism with ring borders and "Selected" badges
   - Auto-selects newest formula by default
   - All tabs (Ingredients, Safety Metrics, Actions) synchronized to reflect selected formula
   - Order confirmation dialog showing comprehensive formula details before checkout
   - User can review and order any previous formula version
+- **Formula Extraction & Validation System** (Added Oct 17, 2025):
+  - Server-side detection of AI formula output failures
+  - Automatic user notification when formula missing required JSON format
+  - Validation error alerts for unapproved ingredients with retry instructions
+  - Comprehensive logging of extraction failures for debugging
+  - Prevents silent formula loss with clear error messaging
 - **Ingredient Validation System** (Added Oct 16, 2025):
   - Strict enforcement: AI can ONLY recommend ingredients from approved catalog (CANONICAL_DOSES_MG)
   - AI prompt includes validation warnings preventing unapproved ingredients
