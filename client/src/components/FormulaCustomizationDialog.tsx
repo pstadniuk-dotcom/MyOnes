@@ -26,6 +26,7 @@ interface IngredientInfo {
   name: string;
   doseMg: number;
   category: 'base' | 'individual';
+  description?: string;
 }
 
 interface Props {
@@ -163,7 +164,12 @@ export function FormulaCustomizationDialog({
                 <SelectContent>
                   {availableBases.map(base => (
                     <SelectItem key={base.name} value={base.name}>
-                      {base.name} - {base.doseMg}mg
+                      <div className="flex flex-col">
+                        <span className="font-medium">{base.name} - {base.doseMg}mg</span>
+                        {base.description && (
+                          <span className="text-xs text-muted-foreground">{base.description}</span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
