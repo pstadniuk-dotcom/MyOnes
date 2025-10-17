@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,7 +16,7 @@ import {
   FlaskConical, Calendar, TrendingUp, AlertTriangle, CheckCircle, Download,
   MessageSquare, RefreshCw, Info, Pill, Beaker, Search, Filter, Eye, 
   Share2, Archive, FileText, ShoppingCart, ChevronDown, ChevronUp,
-  Clock, ArrowRight, ArrowLeft, GitBranch, Star, Shield, Zap,
+  Clock, ArrowRight, ArrowLeft, GitBranch, Star, Zap,
   Heart, Brain, Activity, Target, Plus, Minus, RotateCcw, 
   ExternalLink, Copy, Users, Lightbulb, BookOpen, Award,
   Package, AlertCircle, Sparkles
@@ -195,25 +194,6 @@ export default function MyFormulaPage() {
     }
   }, [currentFormula, selectedFormulaId]);
 
-  // Safety calculations based on selected formula
-  const safetyMetrics = useMemo(() => {
-    if (!selectedFormula) return null;
-    
-    const totalMg = selectedFormula.totalMg;
-    const safetyPercentage = Math.min((totalMg / 800) * 100, 100);
-    const isOptimal = totalMg >= 600 && totalMg <= 800;
-    const isOverLimit = totalMg > 800;
-    
-    return {
-      totalMg,
-      safetyPercentage,
-      isOptimal,
-      isOverLimit,
-      remainingCapacity: Math.max(0, 800 - totalMg),
-      status: isOverLimit ? 'danger' : isOptimal ? 'optimal' : 'safe'
-    };
-  }, [selectedFormula]);
-
   // Ingredient filtering and searching
   const filteredIngredients = useMemo(() => {
     if (!selectedFormula) return [];
@@ -333,39 +313,6 @@ export default function MyFormulaPage() {
           </Button>
         </div>
       </div>
-
-      {/* Safety Status Card */}
-      {safetyMetrics && (
-        <Card className={`border-l-4 ${
-          safetyMetrics.status === 'danger' ? 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20' :
-          safetyMetrics.status === 'optimal' ? 'border-l-green-500 bg-green-50/50 dark:bg-green-950/20' :
-          'border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20'
-        }`} data-testid="section-safety-status">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Shield className={`w-5 h-5 ${
-                    safetyMetrics.status === 'danger' ? 'text-red-600' :
-                    safetyMetrics.status === 'optimal' ? 'text-green-600' :
-                    'text-blue-600'
-                  }`} />
-                  <h3 className="font-semibold">
-                    Formula Safety: {safetyMetrics.status === 'optimal' ? 'Optimal' : safetyMetrics.status === 'danger' ? 'Over Limit' : 'Safe'}
-                  </h3>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {safetyMetrics.totalMg}mg of 800mg maximum • {safetyMetrics.remainingCapacity}mg remaining capacity
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold">{Math.round(safetyMetrics.safetyPercentage)}%</div>
-                <Progress value={safetyMetrics.safetyPercentage} className="w-24 mt-2" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -551,36 +498,6 @@ export default function MyFormulaPage() {
                   )}
                 </CardContent>
               </Card>
-              
-              {/* Safety Metrics */}
-              {safetyMetrics && (
-                <div className={`p-4 rounded-lg border-l-4 ${
-                  safetyMetrics.status === 'danger' ? 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20' :
-                  safetyMetrics.status === 'optimal' ? 'border-l-green-500 bg-green-50/50 dark:bg-green-950/20' :
-                  'border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Shield className={`w-4 h-4 ${
-                          safetyMetrics.status === 'danger' ? 'text-red-600' :
-                          safetyMetrics.status === 'optimal' ? 'text-green-600' :
-                          'text-blue-600'
-                        }`} />
-                        <span className="font-semibold text-sm">
-                          Formula Safety: {safetyMetrics.status === 'optimal' ? 'Optimal' : safetyMetrics.status === 'danger' ? 'Over Limit' : 'Safe'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {safetyMetrics.totalMg}mg of 800mg maximum • {safetyMetrics.remainingCapacity}mg remaining
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xl font-bold">{Math.round(safetyMetrics.safetyPercentage)}%</div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
           
