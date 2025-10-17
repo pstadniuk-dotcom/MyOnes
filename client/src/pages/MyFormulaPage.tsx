@@ -40,6 +40,7 @@ interface Formula {
   id: string;
   userId: string;
   version: number;
+  name?: string;
   bases: FormulaIngredient[];
   additions: FormulaIngredient[];
   userCustomizations?: {
@@ -117,6 +118,8 @@ export default function MyFormulaPage() {
   const [expandedFormulaId, setExpandedFormulaId] = useState<string | null>(null);
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
+  const [renamingFormulaId, setRenamingFormulaId] = useState<string | null>(null);
+  const [newFormulaName, setNewFormulaName] = useState('');
   
   // Hooks
   const { user } = useAuth();
@@ -156,6 +159,28 @@ export default function MyFormulaPage() {
       toast({
         title: 'Error reverting formula',
         description: error.message || 'Failed to revert formula',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const renameFormulaMutation = useMutation({
+    mutationFn: ({ formulaId, name }: { formulaId: string, name: string }) =>
+      apiRequest('PATCH', `/api/users/me/formula/${formulaId}/rename`, { name }).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/current'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/history'] });
+      toast({
+        title: 'Formula renamed successfully',
+        description: 'Your formula name has been updated.'
+      });
+      setRenamingFormulaId(null);
+      setNewFormulaName('');
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error renaming formula',
+        description: error.message || 'Failed to rename formula',
         variant: 'destructive'
       });
     }
@@ -344,6 +369,10 @@ export default function MyFormulaPage() {
                   onToggleExpand={() => setExpandedFormulaId(
                     expandedFormulaId === formula.id ? null : formula.id
                   )}
+                  onRename={(id, currentName) => {
+                    setRenamingFormulaId(id);
+                    setNewFormulaName(currentName || '');
+                  }}
                 />
               ))}
             </div>
@@ -570,6 +599,61 @@ export default function MyFormulaPage() {
           ]}
         />
       )}
+
+      {/* Rename Dialog */}
+      <Dialog open={!!renamingFormulaId} onOpenChange={(open) => {
+        if (!open) {
+          setRenamingFormulaId(null);
+          setNewFormulaName('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Formula</DialogTitle>
+            <DialogDescription>
+              Give your formula a custom name to make it easier to identify
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              value={newFormulaName}
+              onChange={(e) => setNewFormulaName(e.target.value)}
+              placeholder="e.g., My Morning Formula"
+              maxLength={100}
+              data-testid="input-formula-name"
+            />
+            <p className="text-xs text-muted-foreground">
+              {newFormulaName.length}/100 characters
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRenamingFormulaId(null);
+                setNewFormulaName('');
+              }}
+              data-testid="button-cancel-rename"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (renamingFormulaId && newFormulaName.trim()) {
+                  renameFormulaMutation.mutate({
+                    formulaId: renamingFormulaId,
+                    name: newFormulaName.trim()
+                  });
+                }
+              }}
+              disabled={!newFormulaName.trim() || renameFormulaMutation.isPending}
+              data-testid="button-save-rename"
+            >
+              {renameFormulaMutation.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -582,9 +666,10 @@ interface FormulaCardProps {
   isNewest: boolean;
   onSelect: () => void;
   onToggleExpand: () => void;
+  onRename: (formulaId: string, currentName?: string) => void;
 }
 
-function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onToggleExpand }: FormulaCardProps) {
+function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onToggleExpand, onRename }: FormulaCardProps) {
   const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
   const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
   const createdDate = new Date(formula.createdAt).toLocaleDateString();
@@ -613,10 +698,29 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
       </div>
       
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <FlaskConical className="w-4 h-4" />
-          Version {formula.version}
-        </CardTitle>
+        <div className="flex items-start justify-between gap-2 pr-20">
+          <div className="flex-1">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FlaskConical className="w-4 h-4" />
+              {formula.name || `Version ${formula.version}`}
+            </CardTitle>
+            {formula.name && (
+              <p className="text-xs text-muted-foreground mt-1">Version {formula.version}</p>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRename(formula.id, formula.name);
+            }}
+            data-testid={`button-rename-formula-${formula.version}`}
+          >
+            <Sparkles className="w-3 h-3" />
+          </Button>
+        </div>
         <CardDescription className="text-xs">
           {createdDate} • {totalIngredients} ingredients
         </CardDescription>
