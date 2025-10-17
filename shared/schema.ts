@@ -100,6 +100,10 @@ export const formulas = pgTable("formulas", {
   version: integer("version").default(1).notNull(),
   bases: json("bases").$type<Array<{ingredient: string, amount: number, unit: string, purpose?: string}>>().notNull(),
   additions: json("additions").$type<Array<{ingredient: string, amount: number, unit: string, purpose?: string}>>().default([]),
+  userCustomizations: json("user_customizations").$type<{
+    addedBases?: Array<{ingredient: string, amount: number, unit: string}>;
+    addedIndividuals?: Array<{ingredient: string, amount: number, unit: string}>;
+  }>().default({}),
   totalMg: integer("total_mg").notNull(),
   rationale: text("rationale"),
   warnings: json("warnings").$type<string[]>().default([]),
