@@ -12,6 +12,7 @@ import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, in
 import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { analyzeLabReport } from "./fileAnalysis";
+import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDIENTS } from "@shared/ingredients";
 
 // Extend Express Request interface to include userId property
 declare global {
@@ -3161,6 +3162,82 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     } catch (error) {
       console.error('Error reverting formula:', error);
       res.status(500).json({ error: 'Failed to revert formula' });
+    }
+  });
+
+  // Add user customizations to a formula
+  app.patch('/api/users/me/formula/:formulaId/customize', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId;
+      const { formulaId } = req.params;
+      const { addedBases, addedIndividuals } = req.body;
+
+      // Validate that all added ingredients are valid
+      const allAdded = [...(addedBases || []), ...(addedIndividuals || [])];
+      for (const item of allAdded) {
+        if (!isValidIngredient(item.ingredient)) {
+          return res.status(400).json({ 
+            error: `Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.` 
+          });
+        }
+      }
+
+      // Get the formula
+      const formula = await storage.getFormula(formulaId);
+      
+      if (!formula || formula.userId !== userId) {
+        return res.status(404).json({ error: 'Formula not found or access denied' });
+      }
+
+      // Calculate new total mg with customizations
+      let newTotalMg = formula.totalMg;
+      
+      if (addedBases) {
+        for (const base of addedBases) {
+          const dose = getIngredientDose(base.ingredient);
+          if (dose) {
+            newTotalMg += dose;
+          }
+        }
+      }
+      
+      if (addedIndividuals) {
+        for (const individual of addedIndividuals) {
+          const dose = getIngredientDose(individual.ingredient);
+          if (dose) {
+            newTotalMg += dose;
+          }
+        }
+      }
+
+      // Update formula with customizations
+      const updatedFormula = await storage.updateFormulaCustomizations(
+        formulaId,
+        { addedBases, addedIndividuals },
+        newTotalMg
+      );
+
+      res.json({ 
+        success: true,
+        formula: updatedFormula,
+        message: 'Formula customized successfully'
+      });
+    } catch (error) {
+      console.error('Error customizing formula:', error);
+      res.status(500).json({ error: 'Failed to customize formula' });
+    }
+  });
+
+  // Get ingredient catalog for customization UI
+  app.get('/api/ingredients/catalog', requireAuth, async (req: any, res: any) => {
+    try {
+      res.json({
+        baseFormulas: BASE_FORMULAS,
+        individualIngredients: INDIVIDUAL_INGREDIENTS
+      });
+    } catch (error) {
+      console.error('Error fetching ingredient catalog:', error);
+      res.status(500).json({ error: 'Failed to fetch ingredient catalog' });
     }
   });
 
