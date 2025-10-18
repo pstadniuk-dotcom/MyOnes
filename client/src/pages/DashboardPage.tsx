@@ -214,7 +214,8 @@ function WelcomeOnboarding({ userName }: { userName: string }) {
 
 // Current Formula Widget
 function CurrentFormulaWidget({ formula }: { formula: Formula }) {
-  const totalIngredients = formula.bases.length + (formula.additions?.length || 0);
+  const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
+  const totalIngredients = formula.bases.length + (formula.additions?.length || 0) + userAddedCount;
   const safetyPercentage = Math.min((formula.totalMg / 800) * 100, 100);
   const isOptimal = formula.totalMg >= 600 && formula.totalMg <= 800;
 
@@ -255,35 +256,51 @@ function CurrentFormulaWidget({ formula }: { formula: Formula }) {
           {/* Ingredient Breakdown */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <h4 className="font-medium text-sm mb-2">Base Formulas ({formula.bases.length})</h4>
+              <h4 className="font-medium text-sm mb-2">
+                Base Formulas ({formula.bases.length + (formula.userCustomizations?.addedBases?.length || 0)})
+              </h4>
               <div className="space-y-1">
-                {formula.bases.slice(0, 3).map((base, index) => (
+                {formula.bases.slice(0, 2).map((base, index) => (
                   <div key={index} className="flex justify-between text-xs">
                     <span className="truncate">{base.ingredient}</span>
                     <span className="text-muted-foreground ml-2">{base.amount}mg</span>
                   </div>
                 ))}
-                {formula.bases.length > 3 && (
+                {formula.userCustomizations?.addedBases?.slice(0, 3 - Math.min(formula.bases.length, 2)).map((base, index) => (
+                  <div key={`user-base-${index}`} className="flex justify-between text-xs">
+                    <span className="truncate text-purple-700 dark:text-purple-400">{base.ingredient}</span>
+                    <span className="text-muted-foreground ml-2">{base.amount}mg</span>
+                  </div>
+                ))}
+                {(formula.bases.length + (formula.userCustomizations?.addedBases?.length || 0)) > 3 && (
                   <div className="text-xs text-muted-foreground">
-                    +{formula.bases.length - 3} more
+                    +{(formula.bases.length + (formula.userCustomizations?.addedBases?.length || 0)) - 3} more
                   </div>
                 )}
               </div>
             </div>
             
-            {(formula.additions?.length || 0) > 0 && (
+            {((formula.additions?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0)) > 0 && (
               <div>
-                <h4 className="font-medium text-sm mb-2">Additions ({formula.additions?.length || 0})</h4>
+                <h4 className="font-medium text-sm mb-2">
+                  Additions ({(formula.additions?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0)})
+                </h4>
                 <div className="space-y-1">
-                  {formula.additions?.slice(0, 3).map((addition, index) => (
+                  {formula.additions?.slice(0, 2).map((addition, index) => (
                     <div key={index} className="flex justify-between text-xs">
                       <span className="truncate">{addition.ingredient}</span>
                       <span className="text-muted-foreground ml-2">{addition.amount}mg</span>
                     </div>
                   ))}
-                  {(formula.additions?.length || 0) > 3 && (
+                  {formula.userCustomizations?.addedIndividuals?.slice(0, 3 - Math.min((formula.additions?.length || 0), 2)).map((ind, index) => (
+                    <div key={`user-ind-${index}`} className="flex justify-between text-xs">
+                      <span className="truncate text-purple-700 dark:text-purple-400">{ind.ingredient}</span>
+                      <span className="text-muted-foreground ml-2">{ind.amount}mg</span>
+                    </div>
+                  ))}
+                  {((formula.additions?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0)) > 3 && (
                     <div className="text-xs text-muted-foreground">
-                      +{(formula.additions?.length || 0) - 3} more
+                      +{((formula.additions?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0)) - 3} more
                     </div>
                   )}
                 </div>
