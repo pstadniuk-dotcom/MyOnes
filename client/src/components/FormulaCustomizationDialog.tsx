@@ -76,7 +76,7 @@ export function FormulaCustomizationDialog({
       }).then(res => res.json());
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/me/formula"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me/formula/current"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users/me/formula/history"] });
       toast({
         title: "Formula customized!",
