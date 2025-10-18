@@ -515,7 +515,7 @@ export default function MyFormulaPage() {
                   )}
                   
                   {/* User Customizations */}
-                  {(selectedFormula.userCustomizations?.addedBases?.length > 0 || selectedFormula.userCustomizations?.addedIndividuals?.length > 0) && (
+                  {((selectedFormula.userCustomizations?.addedBases?.length || 0) > 0 || (selectedFormula.userCustomizations?.addedIndividuals?.length || 0) > 0) && (
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-2">
                         <Users className="w-4 h-4 text-purple-600" />
@@ -793,7 +793,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
             )}
             
             {/* User Customizations */}
-            {(formula.userCustomizations?.addedBases?.length > 0 || formula.userCustomizations?.addedIndividuals?.length > 0) && (
+            {((formula.userCustomizations?.addedBases?.length || 0) > 0 || (formula.userCustomizations?.addedIndividuals?.length || 0) > 0) && (
               <div>
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
                   <Users className="w-3 h-3 text-purple-600" />
