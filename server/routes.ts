@@ -1436,8 +1436,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Valid message is required' });
       }
       
-      if (message.length > 2000) {
-        return res.status(400).json({ error: 'Message too long (max 2000 characters)' });
+      if (message.length > 20000) {
+        return res.status(400).json({ error: 'Message too long (max 20,000 characters)' });
       }
       
       // userId is guaranteed to be a valid string from authentication middleware
