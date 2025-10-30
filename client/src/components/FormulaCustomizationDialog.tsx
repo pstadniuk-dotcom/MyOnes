@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, X, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, X, Sparkles, ChevronDown, ChevronUp, CheckCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface IngredientInfo {
@@ -51,6 +51,7 @@ export function FormulaCustomizationDialog({
   const [addedBases, setAddedBases] = useState<IngredientInfo[]>([]);
   const [addedIndividuals, setAddedIndividuals] = useState<IngredientInfo[]>([]);
   const [breakdownExpanded, setBreakdownExpanded] = useState(true);
+  const [expandedSubIngredients, setExpandedSubIngredients] = useState<Record<number, boolean>>({});
 
   // Fetch ingredient catalog
   const { data: catalog, isLoading: catalogLoading } = useQuery<{
@@ -66,7 +67,7 @@ export function FormulaCustomizationDialog({
     name: string;
     doseMg: number;
     systemSupported: string;
-    activeIngredients: Array<{ name: string; amount: string; description?: string }>;
+    activeIngredients: Array<{ name: string; amount: string; description?: string; benefits?: string[] }>;
     suggestedDosage: string;
     description: string;
   }> }>({
@@ -83,6 +84,7 @@ export function FormulaCustomizationDialog({
   useEffect(() => {
     if (selectedBase) {
       setBreakdownExpanded(false);
+      setExpandedSubIngredients({});
     }
   }, [selectedBase]);
 
@@ -249,20 +251,83 @@ export function FormulaCustomizationDialog({
                       </div>
                       <div className="space-y-1">
                         {/* Always show first 3 ingredients */}
-                        {selectedBaseBreakdown.activeIngredients.slice(0, 3).map((ing, idx) => (
-                          <div key={idx} className="flex items-center justify-between text-xs p-1.5 bg-background rounded">
-                            <span className="font-medium">{ing.name}</span>
-                            <Badge variant="outline" className="text-xs">{ing.amount}</Badge>
-                          </div>
-                        ))}
+                        {selectedBaseBreakdown.activeIngredients.slice(0, 3).map((ing, idx) => {
+                          const hasBenefits = ing.benefits && ing.benefits.length > 0;
+                          const isExpanded = expandedSubIngredients[idx] || false;
+                          
+                          return (
+                            <div key={idx} className="bg-background rounded overflow-hidden">
+                              <button
+                                onClick={() => hasBenefits && setExpandedSubIngredients(prev => ({
+                                  ...prev,
+                                  [idx]: !prev[idx]
+                                }))}
+                                className={`w-full flex items-center justify-between text-xs p-1.5 ${hasBenefits ? 'hover-elevate cursor-pointer' : ''}`}
+                                disabled={!hasBenefits}
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">{ing.name}</span>
+                                  {hasBenefits && (
+                                    <ChevronDown className={`w-2.5 h-2.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                  )}
+                                </div>
+                                <Badge variant="outline" className="text-xs">{ing.amount}</Badge>
+                              </button>
+                              {hasBenefits && isExpanded && ing.benefits && (
+                                <div className="px-2 pb-2 pt-1 bg-primary/5">
+                                  <div className="space-y-0.5">
+                                    {ing.benefits.map((benefit: string, benefitIdx: number) => (
+                                      <div key={benefitIdx} className="flex items-start gap-1 text-xs">
+                                        <CheckCircle className="w-2.5 h-2.5 text-green-600 flex-shrink-0 mt-0.5" />
+                                        <span className="text-xs">{benefit}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                         {/* Show remaining ingredients when expanded */}
                         <CollapsibleContent className="space-y-1">
-                          {selectedBaseBreakdown.activeIngredients.slice(3).map((ing, idx) => (
-                            <div key={idx + 3} className="flex items-center justify-between text-xs p-1.5 bg-background rounded">
-                              <span className="font-medium">{ing.name}</span>
-                              <Badge variant="outline" className="text-xs">{ing.amount}</Badge>
-                            </div>
-                          ))}
+                          {selectedBaseBreakdown.activeIngredients.slice(3).map((ing, idx) => {
+                            const actualIdx = idx + 3;
+                            const hasBenefits = ing.benefits && ing.benefits.length > 0;
+                            const isExpanded = expandedSubIngredients[actualIdx] || false;
+                            
+                            return (
+                              <div key={actualIdx} className="bg-background rounded overflow-hidden">
+                                <button
+                                  onClick={() => hasBenefits && setExpandedSubIngredients(prev => ({
+                                    ...prev,
+                                    [actualIdx]: !prev[actualIdx]
+                                  }))}
+                                  className={`w-full flex items-center justify-between text-xs p-1.5 ${hasBenefits ? 'hover-elevate cursor-pointer' : ''}`}
+                                  disabled={!hasBenefits}
+                                >
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-medium">{ing.name}</span>
+                                    {hasBenefits && (
+                                      <ChevronDown className={`w-2.5 h-2.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                    )}
+                                  </div>
+                                  <Badge variant="outline" className="text-xs">{ing.amount}</Badge>
+                                </button>
+                                {hasBenefits && isExpanded && ing.benefits && (
+                                  <div className="px-2 pb-2 pt-1 bg-primary/5">
+                                    <div className="space-y-0.5">
+                                      {ing.benefits.map((benefit: string, benefitIdx: number) => (
+                                        <div key={benefitIdx} className="flex items-start gap-1 text-xs">
+                                          <CheckCircle className="w-2.5 h-2.5 text-green-600 flex-shrink-0 mt-0.5" />
+                                          <span className="text-xs">{benefit}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </CollapsibleContent>
                       </div>
                     </Collapsible>
