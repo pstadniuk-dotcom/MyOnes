@@ -11,6 +11,7 @@ export interface SubIngredient {
   name: string;
   amount: string;  // e.g., "20mg", "75 IU", "250mcg"
   description?: string;
+  benefits?: string[];  // Health benefits of this specific ingredient
 }
 
 export interface BaseFormulaDetails {
@@ -97,12 +98,12 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     suggestedDosage: '1x daily',
     description: 'Supports adrenal gland function and stress response',
     activeIngredients: [
-      { name: 'Vitamin C', amount: '20mg', description: 'from Camu Camu Berry' },
-      { name: 'Pantothenic Acid', amount: '50mg', description: 'as Calcium Pantothenate' },
-      { name: 'Adrenal', amount: '250mg', description: 'of bovine source, not an extract' },
-      { name: 'Licorice', amount: '50mg', description: 'root' },
-      { name: 'Ginger', amount: '25mg', description: 'rhizome' },
-      { name: 'Kelp', amount: '25mg', description: 'entire plant' },
+      { name: 'Vitamin C', amount: '20mg', description: 'from Camu Camu Berry', benefits: ['Supports adrenal cortex function and cortisol production', 'Powerful antioxidant that reduces oxidative stress', 'Essential for immune system function', 'Aids in collagen synthesis and wound healing'] },
+      { name: 'Pantothenic Acid', amount: '50mg', description: 'as Calcium Pantothenate', benefits: ['Critical for adrenal hormone synthesis including cortisol', 'Helps convert food into energy (ATP production)', 'Supports healthy skin and wound healing', 'May reduce stress-related fatigue and exhaustion'] },
+      { name: 'Adrenal', amount: '250mg', description: 'of bovine source, not an extract', benefits: ['Provides glandular support for adrenal function', 'Contains natural cofactors and nutrients found in adrenal tissue', 'May help rebuild depleted adrenal reserves'] },
+      { name: 'Licorice', amount: '50mg', description: 'root', benefits: ['Slows breakdown of cortisol, extending its effects', 'Anti-inflammatory properties support adrenal recovery', 'May help balance cortisol levels naturally', 'Traditional use for fatigue and stress support'] },
+      { name: 'Ginger', amount: '25mg', description: 'rhizome', benefits: ['Powerful anti-inflammatory compound (gingerol)', 'Supports digestive health and reduces nausea', 'May improve circulation and reduce oxidative stress', 'Helps modulate stress response'] },
+      { name: 'Kelp', amount: '25mg', description: 'entire plant', benefits: ['Rich source of natural iodine for thyroid function', 'Thyroid health directly impacts adrenal function', 'Provides trace minerals and antioxidants', 'Supports metabolic rate and energy production'] },
     ]
   },
   {
@@ -112,8 +113,8 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     suggestedDosage: '1x daily',
     description: 'Supports digestive enzyme production and gut health',
     activeIngredients: [
-      { name: 'Betaine', amount: '496mg', description: 'from 650mg Betaine HCl' },
-      { name: 'Pepsin', amount: '140mg', description: '1:10,000' },
+      { name: 'Betaine', amount: '496mg', description: 'from 650mg Betaine HCl', benefits: ['Increases stomach acid production for better protein digestion', 'Supports breakdown of food and nutrient absorption', 'Acts as methyl donor for liver detoxification', 'May improve digestive symptoms like bloating and gas'] },
+      { name: 'Pepsin', amount: '140mg', description: '1:10,000', benefits: ['Digestive enzyme that breaks down protein into peptides', 'Works best in acidic stomach environment', 'Supports complete protein digestion', 'May reduce digestive discomfort after protein-rich meals'] },
     ]
   },
   {
@@ -123,10 +124,10 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     suggestedDosage: '1x daily',
     description: 'Provides greens and phytonutrients for detoxification',
     activeIngredients: [
-      { name: 'Vitamin E', amount: '75 IU', description: 'as dl-alpha Tocopheryl Acetate' },
-      { name: 'Bovine Spleen Concentrate', amount: '250mcg' },
-      { name: 'Dandelion', amount: '75mg', description: 'aerial parts' },
-      { name: 'Nettle', amount: '75mg', description: 'root' },
+      { name: 'Vitamin E', amount: '75 IU', description: 'as dl-alpha Tocopheryl Acetate', benefits: ['Powerful fat-soluble antioxidant protecting cell membranes', 'Supports immune system function and antibody production', 'May improve skin health and wound healing', 'Protects against oxidative stress and inflammation'] },
+      { name: 'Bovine Spleen Concentrate', amount: '250mcg', benefits: ['Provides glandular support for spleen function', 'Spleen filters blood and supports immune response', 'Contains natural cofactors found in spleen tissue'] },
+      { name: 'Dandelion', amount: '75mg', description: 'aerial parts', benefits: ['Supports liver detoxification and bile production', 'Natural diuretic that reduces water retention', 'Rich in vitamins A, C, and K plus minerals', 'May support healthy blood sugar levels'] },
+      { name: 'Nettle', amount: '75mg', description: 'root', benefits: ['Anti-inflammatory properties support joint health', 'May support prostate health and urinary function', 'Rich in minerals including iron and calcium', 'Traditional use for seasonal allergies'] },
     ]
   },
   {
