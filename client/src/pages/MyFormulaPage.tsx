@@ -1136,6 +1136,23 @@ function IngredientCard({
     enabled: isExpanded
   });
 
+  // Fetch base formula details if this is a base formula type
+  const { data: baseFormulaData } = useQuery<{ baseFormulaDetails: Array<{
+    name: string;
+    doseMg: number;
+    systemSupported: string;
+    activeIngredients: Array<{ name: string; amount: string; description?: string }>;
+    suggestedDosage: string;
+    description: string;
+  }> }>({
+    queryKey: ['/api/ingredients/base-details'],
+    enabled: ingredient.type === 'base' && isExpanded
+  });
+
+  const formulaBreakdown = baseFormulaData?.baseFormulaDetails.find(
+    f => f.name === ingredient.ingredient
+  );
+
   return (
     <Card className={`border-l-4 ${ingredient.type === 'base' ? 'border-l-primary' : 'border-l-blue-500'}`} 
           data-testid={`card-ingredient-${ingredient.ingredient}`}>
@@ -1178,109 +1195,154 @@ function IngredientCard({
                   <Skeleton key={i} className="h-4 w-full" />
                 ))}
               </div>
-            ) : ingredientDetail ? (
+            ) : (
               <div className="space-y-6">
-                {/* Benefits */}
-                <div>
-                  <h4 className="font-medium mb-2 flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-red-500" />
-                    Health Benefits
-                  </h4>
-                  <div className="space-y-1">
-                    {ingredientDetail.benefits.map((benefit: string, idx: number) => (
-                      <div key={idx} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="w-3 h-3 text-green-600 flex-shrink-0" />
-                        <span>{benefit}</span>
+                {/* Base Formula Breakdown - Show for base formulas */}
+                {ingredient.type === 'base' && formulaBreakdown && (
+                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                    <h4 className="font-semibold mb-3 flex items-center gap-2 text-primary">
+                      <Beaker className="w-4 h-4" />
+                      Formula Breakdown
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                        <div>
+                          <span className="text-muted-foreground">System:</span>
+                          <p className="font-medium">{formulaBreakdown.systemSupported}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Dosage:</span>
+                          <p className="font-medium">{formulaBreakdown.suggestedDosage}</p>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Dosage Information */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <h4 className="font-medium mb-2 flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-blue-500" />
-                      Dosage Info
-                    </h4>
-                    <div className="space-y-1 text-sm">
-                      <p>Amount: {ingredient.amount}{ingredient.unit}</p>
-                      {ingredientDetail.dailyValuePercentage && (
-                        <p>Daily Value: {ingredientDetail.dailyValuePercentage}%</p>
-                      )}
-                      <p>Category: {ingredientDetail.category}</p>
+                      <div>
+                        <p className="text-sm font-medium mb-2">Active Ingredients:</p>
+                        <div className="space-y-2">
+                          {formulaBreakdown.activeIngredients.map((subIng, idx) => (
+                            <div 
+                              key={idx} 
+                              className="flex items-start justify-between p-2 bg-background rounded text-sm hover-elevate"
+                            >
+                              <div className="flex-1">
+                                <span className="font-medium">{subIng.name}</span>
+                                {subIng.description && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">{subIng.description}</p>
+                                )}
+                              </div>
+                              <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">
+                                {subIng.amount}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
+                )}
 
+                {/* Benefits */}
+                {ingredientDetail && (
                   <div>
                     <h4 className="font-medium mb-2 flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-purple-500" />
-                      Research
+                      <Heart className="w-4 h-4 text-red-500" />
+                      Health Benefits
                     </h4>
-                    <div className="space-y-1 text-sm">
-                      <p>Studies: {ingredientDetail.researchBacking.studyCount}+</p>
-                      <p>Evidence: {ingredientDetail.researchBacking.evidenceLevel}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Sources */}
-                <div>
-                  <h4 className="font-medium mb-2 flex items-center gap-2">
-                    <Package className="w-4 h-4 text-green-500" />
-                    Sources & Quality
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {ingredientDetail.sources.map((source: string, idx: number) => (
-                      <Badge key={idx} variant="outline" className="text-xs">{source}</Badge>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {ingredientDetail.qualityIndicators.map((indicator: string, idx: number) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
-                        <Award className="w-3 h-3 mr-1" />
-                        {indicator}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Interactions */}
-                {ingredientDetail.interactions.length > 0 && (
-                  <div>
-                    <h4 className="font-medium mb-2 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-orange-500" />
-                      Interactions & Warnings
-                    </h4>
-                    <div className="space-y-2">
-                      {ingredientDetail.interactions.map((interaction: string, idx: number) => (
-                        <div key={idx} className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded border-l-4 border-orange-400">
-                          <p className="text-sm text-orange-800 dark:text-orange-300">{interaction}</p>
+                    <div className="space-y-1">
+                      {ingredientDetail.benefits.map((benefit: string, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="w-3 h-3 text-green-600 flex-shrink-0" />
+                          <span>{benefit}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Alternatives */}
-                {ingredientDetail.alternatives.length > 0 && (
-                  <div>
-                    <h4 className="font-medium mb-2 flex items-center gap-2">
-                      <RefreshCw className="w-4 h-4 text-blue-500" />
-                      Alternatives
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {ingredientDetail.alternatives.map((alternative: string, idx: number) => (
-                        <Badge key={idx} variant="outline" className="text-xs">{alternative}</Badge>
-                      ))}
+                {/* Additional ingredient details - only show if available */}
+                {ingredientDetail && (
+                  <>
+                    {/* Dosage Information */}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <h4 className="font-medium mb-2 flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-blue-500" />
+                          Dosage Info
+                        </h4>
+                        <div className="space-y-1 text-sm">
+                          <p>Amount: {ingredient.amount}{ingredient.unit}</p>
+                          {ingredientDetail.dailyValuePercentage && (
+                            <p>Daily Value: {ingredientDetail.dailyValuePercentage}%</p>
+                          )}
+                          <p>Category: {ingredientDetail.category}</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-medium mb-2 flex items-center gap-2">
+                          <BookOpen className="w-4 h-4 text-purple-500" />
+                          Research
+                        </h4>
+                        <div className="space-y-1 text-sm">
+                          <p>Studies: {ingredientDetail.researchBacking.studyCount}+</p>
+                          <p>Evidence: {ingredientDetail.researchBacking.evidenceLevel}</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+
+                    {/* Sources */}
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Package className="w-4 h-4 text-green-500" />
+                        Sources & Quality
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {ingredientDetail.sources.map((source: string, idx: number) => (
+                          <Badge key={idx} variant="outline" className="text-xs">{source}</Badge>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {ingredientDetail.qualityIndicators.map((indicator: string, idx: number) => (
+                          <Badge key={idx} variant="secondary" className="text-xs">
+                            <Award className="w-3 h-3 mr-1" />
+                            {indicator}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Interactions */}
+                    {ingredientDetail.interactions.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-2 flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-orange-500" />
+                          Interactions & Warnings
+                        </h4>
+                        <div className="space-y-2">
+                          {ingredientDetail.interactions.map((interaction: string, idx: number) => (
+                            <div key={idx} className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded border-l-4 border-orange-400">
+                              <p className="text-sm text-orange-800 dark:text-orange-300">{interaction}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Alternatives */}
+                    {ingredientDetail.alternatives.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-2 flex items-center gap-2">
+                          <RefreshCw className="w-4 h-4 text-blue-500" />
+                          Alternatives
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {ingredientDetail.alternatives.map((alternative: string, idx: number) => (
+                            <Badge key={idx} variant="outline" className="text-xs">{alternative}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground py-4">
-                <AlertCircle className="w-6 h-6 mx-auto mb-2" />
-                Unable to load ingredient details
               </div>
             )}
           </CardContent>
