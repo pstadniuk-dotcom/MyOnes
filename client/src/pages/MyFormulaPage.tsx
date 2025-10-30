@@ -120,6 +120,7 @@ export default function MyFormulaPage() {
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [renamingFormulaId, setRenamingFormulaId] = useState<string | null>(null);
   const [newFormulaName, setNewFormulaName] = useState('');
+  const [expandedIndividualIngredients, setExpandedIndividualIngredients] = useState<Record<string, boolean>>({});
   
   // Hooks
   const { user } = useAuth();
@@ -141,6 +142,20 @@ export default function MyFormulaPage() {
     queryKey: ['/api/users/me/formula/compare', selectedVersions[0], selectedVersions[1]],
     enabled: selectedVersions.length === 2
   });
+
+  // Fetch ingredient catalog for individual ingredient benefits
+  const { data: ingredientCatalog } = useQuery<{
+    baseFormulas: Array<{ name: string; doseMg: number; category: string; description?: string; benefits?: string[] }>;
+    individualIngredients: Array<{ name: string; doseMg: number; category: string; description?: string; benefits?: string[] }>;
+  }>({
+    queryKey: ['/api/ingredients/catalog'],
+    enabled: !!user?.id
+  });
+
+  // Helper function to get individual ingredient details with benefits
+  const getIndividualIngredientDetails = useCallback((ingredientName: string) => {
+    return ingredientCatalog?.individualIngredients?.find(ing => ing.name === ingredientName);
+  }, [ingredientCatalog]);
 
   // Mutations - using apiRequest pattern
   const revertFormulaMutation = useMutation({
@@ -373,6 +388,9 @@ export default function MyFormulaPage() {
                     setRenamingFormulaId(id);
                     setNewFormulaName(currentName || '');
                   }}
+                  getIndividualIngredientDetails={getIndividualIngredientDetails}
+                  expandedIndividualIngredients={expandedIndividualIngredients}
+                  setExpandedIndividualIngredients={setExpandedIndividualIngredients}
                 />
               ))}
             </div>
@@ -527,11 +545,45 @@ export default function MyFormulaPage() {
                             <div className="font-medium text-purple-900 dark:text-purple-100">{base.ingredient} - {base.amount}{base.unit}</div>
                           </div>
                         ))}
-                        {selectedFormula.userCustomizations?.addedIndividuals?.map((ind, idx) => (
-                          <div key={`ind-${idx}`} className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded text-sm border border-purple-200 dark:border-purple-800">
-                            <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
-                          </div>
-                        ))}
+                        {selectedFormula.userCustomizations?.addedIndividuals?.map((ind, idx) => {
+                          const ingredientDetails = getIndividualIngredientDetails(ind.ingredient);
+                          const expandKey = `order-ind-${idx}`;
+                          return (
+                            <div key={`ind-${idx}`} className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded text-sm border border-purple-200 dark:border-purple-800">
+                              {ingredientDetails?.benefits && ingredientDetails.benefits.length > 0 ? (
+                                <Collapsible
+                                  open={expandedIndividualIngredients[expandKey]}
+                                  onOpenChange={(open) => {
+                                    setExpandedIndividualIngredients(prev => ({ ...prev, [expandKey]: open }));
+                                  }}
+                                >
+                                  <CollapsibleTrigger className="w-full hover-elevate active-elevate-2 rounded p-1 -m-1">
+                                    <div className="flex items-center justify-between">
+                                      <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
+                                      {expandedIndividualIngredients[expandKey] ? (
+                                        <ChevronUp className="w-3 h-3 text-purple-600" />
+                                      ) : (
+                                        <ChevronDown className="w-3 h-3 text-purple-600" />
+                                      )}
+                                    </div>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent className="mt-2">
+                                    <div className="bg-primary/5 dark:bg-primary/10 rounded-md p-2 space-y-1">
+                                      {ingredientDetails.benefits.map((benefit, bidx) => (
+                                        <div key={bidx} className="flex items-start gap-2">
+                                          <CheckCircle className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                                          <span className="text-xs text-muted-foreground">{benefit}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </CollapsibleContent>
+                                </Collapsible>
+                              ) : (
+                                <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -667,9 +719,12 @@ interface FormulaCardProps {
   onSelect: () => void;
   onToggleExpand: () => void;
   onRename: (formulaId: string, currentName?: string) => void;
+  getIndividualIngredientDetails: (ingredientName: string) => { name: string; doseMg: number; category: string; description?: string; benefits?: string[] } | undefined;
+  expandedIndividualIngredients: Record<string, boolean>;
+  setExpandedIndividualIngredients: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
-function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onToggleExpand, onRename }: FormulaCardProps) {
+function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onToggleExpand, onRename, getIndividualIngredientDetails, expandedIndividualIngredients, setExpandedIndividualIngredients }: FormulaCardProps) {
   const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
   const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
   const createdDate = new Date(formula.createdAt).toLocaleDateString();
@@ -805,11 +860,45 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
                       <div className="font-medium text-purple-900 dark:text-purple-100">{base.ingredient} - {base.amount}{base.unit}</div>
                     </div>
                   ))}
-                  {formula.userCustomizations?.addedIndividuals?.map((ind, idx) => (
-                    <div key={`ind-${idx}`} className="text-xs p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-800">
-                      <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
-                    </div>
-                  ))}
+                  {formula.userCustomizations?.addedIndividuals?.map((ind, idx) => {
+                    const ingredientDetails = getIndividualIngredientDetails(ind.ingredient);
+                    const expandKey = `card-ind-${formula.id}-${idx}`;
+                    return (
+                      <div key={`ind-${idx}`} className="text-xs p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-800">
+                        {ingredientDetails?.benefits && ingredientDetails.benefits.length > 0 ? (
+                          <Collapsible
+                            open={expandedIndividualIngredients[expandKey]}
+                            onOpenChange={(open) => {
+                              setExpandedIndividualIngredients(prev => ({ ...prev, [expandKey]: open }));
+                            }}
+                          >
+                            <CollapsibleTrigger className="w-full hover-elevate active-elevate-2 rounded p-1 -m-1">
+                              <div className="flex items-center justify-between">
+                                <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
+                                {expandedIndividualIngredients[expandKey] ? (
+                                  <ChevronUp className="w-3 h-3 text-purple-600" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3 text-purple-600" />
+                                )}
+                              </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-2">
+                              <div className="bg-primary/5 dark:bg-primary/10 rounded-md p-2 space-y-1">
+                                {ingredientDetails.benefits.map((benefit, bidx) => (
+                                  <div key={bidx} className="flex items-start gap-2">
+                                    <CheckCircle className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                                    <span className="text-xs text-muted-foreground">{benefit}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        ) : (
+                          <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
