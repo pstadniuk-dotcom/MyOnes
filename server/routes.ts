@@ -12,7 +12,7 @@ import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, in
 import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { analyzeLabReport } from "./fileAnalysis";
-import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDIENTS } from "@shared/ingredients";
+import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDIENTS, BASE_FORMULA_DETAILS } from "@shared/ingredients";
 
 // Extend Express Request interface to include userId property
 declare global {
@@ -3294,6 +3294,18 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     } catch (error) {
       console.error('Error fetching ingredient catalog:', error);
       res.status(500).json({ error: 'Failed to fetch ingredient catalog' });
+    }
+  });
+
+  // Get detailed base formula breakdowns (ingredient compositions)
+  app.get('/api/ingredients/base-details', requireAuth, async (req: any, res: any) => {
+    try {
+      res.json({
+        baseFormulaDetails: BASE_FORMULA_DETAILS
+      });
+    } catch (error) {
+      console.error('Error fetching base formula details:', error);
+      res.status(500).json({ error: 'Failed to fetch base formula details' });
     }
   });
 
