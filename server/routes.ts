@@ -307,42 +307,32 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
     }
   }
   
-  // Validate daily total is within expected range (2000-4000mg for custom formulas)
-  if (calculatedTotal < 1000) {
-    errors.push(`Formula total too low: ${calculatedTotal}mg. Minimum 1000mg for therapeutic effect.`);
+  // Validate daily total is within expected range for 00 capsule size (4500-6800mg)
+  if (calculatedTotal < 4500) {
+    errors.push(`Formula total too low: ${calculatedTotal}mg. Minimum 4500mg required for proper 00 capsule fill (approximately 6-8 capsules per day).`);
   }
   
-  if (calculatedTotal > 5000) {
-    errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum 5000mg for safety.`);
+  if (calculatedTotal > 6800) {
+    errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum 6800mg for 00 capsule safety limit.`);
   }
   
-  // Validate capsule sizing if provided
+  // Validate capsule sizing if provided (00 capsules hold approximately 700-850mg)
   if (formula.capsulesPerDay && formula.capsuleSize) {
     const mgPerCapsule = calculatedTotal / formula.capsulesPerDay;
     
-    // Size 00 capacity: 500-750mg
+    // Size 00 capacity: 700-850mg (industry standard for 00 capsules)
     if (formula.capsuleSize === '00') {
-      if (mgPerCapsule < 500) {
-        errors.push(`Capsule size 00 underfilled: ${mgPerCapsule.toFixed(0)}mg per capsule. Use fewer capsules or switch to Size 000.`);
+      if (mgPerCapsule < 600) {
+        errors.push(`Capsule size 00 underfilled: ${mgPerCapsule.toFixed(0)}mg per capsule. Recommend using fewer capsules per day.`);
       }
-      if (mgPerCapsule > 750) {
-        errors.push(`Capsule size 00 overfilled: ${mgPerCapsule.toFixed(0)}mg per capsule. Use more capsules or switch to Size 000.`);
-      }
-    }
-    
-    // Size 000 capacity: 750-1000mg
-    if (formula.capsuleSize === '000') {
-      if (mgPerCapsule < 750) {
-        errors.push(`Capsule size 000 underfilled: ${mgPerCapsule.toFixed(0)}mg per capsule. Use fewer capsules or switch to Size 00.`);
-      }
-      if (mgPerCapsule > 1000) {
-        errors.push(`Capsule size 000 overfilled: ${mgPerCapsule.toFixed(0)}mg per capsule. Use more capsules.`);
+      if (mgPerCapsule > 900) {
+        errors.push(`Capsule size 00 overfilled: ${mgPerCapsule.toFixed(0)}mg per capsule. Recommend using more capsules per day.`);
       }
     }
     
-    // Validate capsule count is reasonable (3-6 per day)
-    if (formula.capsulesPerDay < 2 || formula.capsulesPerDay > 8) {
-      errors.push(`Capsule count out of range: ${formula.capsulesPerDay}. Recommend 3-6 capsules per day.`);
+    // Validate capsule count is reasonable for daily regimen (6-8 capsules for 4500-6800mg range)
+    if (formula.capsulesPerDay < 5 || formula.capsulesPerDay > 10) {
+      errors.push(`Capsule count out of range: ${formula.capsulesPerDay}. Recommend 6-8 capsules per day for optimal 00 capsule fill.`);
     }
   }
   
@@ -667,20 +657,49 @@ PHASE 2 - Lifestyle & Habits (MUST collect ALL of these):
 - Caffeine consumption
 - Work environment and occupational exposures
 
-PHASE 3 - Specific Symptoms & History:
-- Digestive health (bloating, constipation, food sensitivities)
-- Cognitive function (brain fog, memory, focus)
-- **Cardiovascular health** - **ASK**: "Do you know your blood pressure? What about your resting heart rate?"
-- Hormonal (for women: cycle, menopause; for men: testosterone concerns)
-- Immune system (frequent infections, allergies)
-- Joint/muscle health (pain, inflammation, recovery)
-- Mental health (anxiety, depression, mood swings)
-- **Current health conditions** - **ASK**: "Have you been diagnosed with any chronic health conditions?" (diabetes, hypertension, thyroid issues, etc.)
+PHASE 3 - Detailed Symptom Investigation (Ask follow-up questions like a doctor would):
+- **Digestive health** - Don't just ask "any digestive issues?" Ask specifically:
+  * "How are your bowel movements? Regular, constipated, or loose?"
+  * "Do you experience bloating, gas, or heartburn? If so, when?"
+  * "Any food sensitivities you've noticed? Does anything consistently upset your stomach?"
+- **Cognitive function** - Be specific:
+  * "Do you experience brain fog? If so, what time of day is it worst?"
+  * "How's your memory? Any trouble remembering names, words, or recent events?"
+  * "How's your focus and concentration? Can you stay on task?"
+- **Cardiovascular health** - **ASK DETAILED QUESTIONS**:
+  * "Do you know your blood pressure readings? (e.g., 120/80)"
+  * "What's your resting heart rate, if you know it?"
+  * "Any history of high blood pressure, high cholesterol, or heart palpitations?"
+  * "Any chest pain, shortness of breath, or rapid heartbeat during normal activities?"
+- **Hormonal** - Be thorough:
+  * For women: "Are your periods regular? Any PMS symptoms? Are you peri/menopausal?"
+  * For men: "Any concerns about energy, libido, or testosterone levels?"
+- **Immune system** - Ask about patterns:
+  * "How often do you get sick? (colds, flu, infections)"
+  * "Do you have seasonal allergies? Year-round allergies?"
+  * "Do you heal slowly from cuts or infections?"
+- **Joint/muscle health** - Get specific:
+  * "Any joint pain or stiffness? Which joints?"
+  * "Morning stiffness? Does it improve with movement?"
+  * "Any recent injuries or chronic pain?"
+- **Mental health** - Ask sensitively but thoroughly:
+  * "How would you describe your mood overall? Any anxiety or low mood?"
+  * "Any panic attacks, racing thoughts, or difficulty calming your mind?"
+  * "Sleep quality? Trouble falling asleep, staying asleep, or early waking?"
+- **Current health conditions** - **GET COMPREHENSIVE LIST**:
+  * "Have you been diagnosed with any chronic conditions like diabetes, thyroid issues, autoimmune diseases, or anything else?"
+  * "Any past surgeries or hospitalizations I should know about?"
 
-PHASE 4 - Medical Testing & History:
-- **ASK EXPLICITLY**: "Do you have any recent blood test results you can upload? This helps me give you much more personalized recommendations."
-- Family history of major diseases
-- Previous supplement experiences (what worked, what didn't)
+PHASE 4 - Medical Testing & Family History (Critical for personalization):
+- **Blood work** - **ASK EXPLICITLY**: "Do you have any recent blood test results you can upload? This is incredibly valuable - I can analyze vitamin levels, cholesterol, thyroid markers, blood sugar, and more to fine-tune your formula."
+- **Family history** - **ASK THOROUGHLY**:
+  * "Any family history of heart disease, diabetes, or cancer?"
+  * "Any autoimmune conditions, thyroid issues, or Alzheimer's in your family?"
+  * "Did your parents or grandparents have any major health issues?"
+- **Previous supplement experiences**:
+  * "What supplements have you tried before? Did any work really well for you?"
+  * "Any supplements that caused side effects or didn't seem to help?"
+  * "Are you currently taking any vitamins or supplements? (List them - this helps me avoid duplicates and ensure compatibility)"
 
 PHASE 5 - Environmental & Exposures:
 - Mold exposure history
@@ -701,13 +720,14 @@ If user tries to rush you or asks "what should I take?", politely explain:
    - NEVER use ingredients outside our approved catalog
    - If an ingredient isn't listed below, you CANNOT use it
 
-2. CAPSULE SPECIFICATIONS:
-   - Size 00 capsules: 500-750mg capacity
-   - Size 000 capsules: 750-1000mg capacity
-   - Base formulas total: ~1000-1500mg
-   - Individual additions: ~1000-2500mg (avg 300mg each)
-   - Daily total: 2000-4000mg = 3-6 capsules per day
-   - Always ask user preference for AM/PM split or minimize to 3 caps/day
+2. CAPSULE SPECIFICATIONS (UPDATED FOR 00 SIZE CAPSULES):
+   - Size 00 capsules: 700-850mg capacity (industry standard)
+   - DAILY TOTAL RANGE: **4500-6800mg** (MINIMUM 4500mg, MAXIMUM 6800mg)
+   - Base formulas total: ~2500-3500mg (select 2-3 base formulas)
+   - Individual additions: ~2000-3300mg (select 5-7 individual ingredients at ~300mg each)
+   - Capsule count: 6-8 capsules per day (at ~750mg per capsule = optimal 00 fill)
+   - Always ask user preference for AM/PM split or suggest 4 caps AM, 4 caps PM for convenience
+   - CRITICAL: Your formula MUST be between 4500-6800mg total. Formulas below 4500mg or above 6800mg will be rejected.
 
 3. SAFETY PROTOCOLS:
    - Check all drug interactions from ingredient catalog
