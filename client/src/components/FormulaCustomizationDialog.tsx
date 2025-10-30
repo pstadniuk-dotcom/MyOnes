@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -20,7 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, X, Sparkles } from "lucide-react";
+import { Plus, X, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface IngredientInfo {
   name: string;
@@ -49,6 +50,7 @@ export function FormulaCustomizationDialog({
   const [selectedIndividual, setSelectedIndividual] = useState<string>("");
   const [addedBases, setAddedBases] = useState<IngredientInfo[]>([]);
   const [addedIndividuals, setAddedIndividuals] = useState<IngredientInfo[]>([]);
+  const [breakdownExpanded, setBreakdownExpanded] = useState(true);
 
   // Fetch ingredient catalog
   const { data: catalog, isLoading: catalogLoading } = useQuery<{
@@ -58,6 +60,31 @@ export function FormulaCustomizationDialog({
     queryKey: ["/api/ingredients/catalog"],
     enabled: open,
   });
+
+  // Fetch base formula details for ingredient breakdowns
+  const { data: baseFormulaData, isLoading: baseDetailsLoading } = useQuery<{ baseFormulaDetails: Array<{
+    name: string;
+    doseMg: number;
+    systemSupported: string;
+    activeIngredients: Array<{ name: string; amount: string; description?: string }>;
+    suggestedDosage: string;
+    description: string;
+  }> }>({
+    queryKey: ['/api/ingredients/base-details'],
+    enabled: open
+  });
+
+  // Get breakdown for currently selected base formula
+  const selectedBaseBreakdown = selectedBase ? baseFormulaData?.baseFormulaDetails.find(
+    f => f.name === selectedBase
+  ) : null;
+
+  // Reset expansion state when selected base changes
+  useEffect(() => {
+    if (selectedBase) {
+      setBreakdownExpanded(false);
+    }
+  }, [selectedBase]);
 
   // Save customizations mutation
   const saveMutation = useMutation({
@@ -183,6 +210,75 @@ export function FormulaCustomizationDialog({
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
+
+            {/* Show breakdown for selected base formula */}
+            {selectedBase && selectedBaseBreakdown && (
+              <Card className="p-4 bg-primary/5 border-primary/20">
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm text-primary">
+                    {selectedBase} - Ingredient Breakdown
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">System:</span>
+                      <p className="font-medium">{selectedBaseBreakdown.systemSupported}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Dosage:</span>
+                      <p className="font-medium">{selectedBaseBreakdown.suggestedDosage}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <Collapsible open={breakdownExpanded} onOpenChange={setBreakdownExpanded}>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-medium">
+                          Contains ({selectedBaseBreakdown.activeIngredients.length} ingredients):
+                        </p>
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-6 px-2">
+                            <span className="text-xs mr-1">
+                              {breakdownExpanded ? "Show less" : "Show all"}
+                            </span>
+                            {breakdownExpanded ? (
+                              <ChevronUp className="w-3 h-3" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3" />
+                            )}
+                          </Button>
+                        </CollapsibleTrigger>
+                      </div>
+                      <div className="space-y-1">
+                        {/* Always show first 3 ingredients */}
+                        {selectedBaseBreakdown.activeIngredients.slice(0, 3).map((ing, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-xs p-1.5 bg-background rounded">
+                            <span className="font-medium">{ing.name}</span>
+                            <Badge variant="outline" className="text-xs">{ing.amount}</Badge>
+                          </div>
+                        ))}
+                        {/* Show remaining ingredients when expanded */}
+                        <CollapsibleContent className="space-y-1">
+                          {selectedBaseBreakdown.activeIngredients.slice(3).map((ing, idx) => (
+                            <div key={idx + 3} className="flex items-center justify-between text-xs p-1.5 bg-background rounded">
+                              <span className="font-medium">{ing.name}</span>
+                              <Badge variant="outline" className="text-xs">{ing.amount}</Badge>
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </div>
+                    </Collapsible>
+                  </div>
+                </div>
+              </Card>
+            )}
+            
+            {/* Loading state for breakdown */}
+            {selectedBase && baseDetailsLoading && (
+              <Card className="p-4 bg-muted/30">
+                <p className="text-xs text-muted-foreground text-center">
+                  Loading ingredient breakdown...
+                </p>
+              </Card>
+            )}
 
             {addedBases.length > 0 && (
               <div className="space-y-2">
