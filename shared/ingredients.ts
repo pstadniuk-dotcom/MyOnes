@@ -137,9 +137,9 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     suggestedDosage: '1x daily',
     description: 'Supports cellular oxygen utilization and energy',
     activeIngredients: [
-      { name: 'Vitamin A', amount: '1500 IU', description: 'as Beta-Carotene' },
-      { name: 'Selenium', amount: '5mcg', description: 'Amino Acid Chelate' },
-      { name: 'Superoxide Dismutase (SOD)', amount: 'blend', description: 'Supplying Aloe Vera leaf, Rosemary Leaf Extract, and L-Cysteine' },
+      { name: 'Vitamin A', amount: '1500 IU', description: 'as Beta-Carotene', benefits: ['Essential for vision, immune function, and cellular growth', 'Powerful antioxidant that protects against free radical damage', 'Supports healthy skin and mucous membranes', 'Important for reproductive health and gene expression'] },
+      { name: 'Selenium', amount: '5mcg', description: 'Amino Acid Chelate', benefits: ['Critical component of antioxidant enzymes like glutathione peroxidase', 'Protects cells from oxidative damage', 'Supports thyroid hormone metabolism', 'Important for immune system function and DNA synthesis'] },
+      { name: 'Superoxide Dismutase (SOD)', amount: 'blend', description: 'Supplying Aloe Vera leaf, Rosemary Leaf Extract, and L-Cysteine', benefits: ['Powerful antioxidant enzyme that neutralizes superoxide radicals', 'Reduces oxidative stress and cellular aging', 'May support joint health and reduce inflammation', 'Helps protect against UV radiation damage'] },
     ]
   },
   {
@@ -187,12 +187,12 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     suggestedDosage: '1x daily',
     description: 'Supports digestive health and immune function',
     activeIngredients: [
-      { name: 'Black Radish', amount: 'blend', description: 'root' },
-      { name: 'Green Cabbage', amount: 'blend', description: 'leaf' },
-      { name: 'Alfalfa', amount: 'blend', description: 'leaf' },
-      { name: 'Pepsin', amount: 'blend', description: '100,000 FCC' },
-      { name: 'Pituitary', amount: 'blend', description: 'of bovine source, not an extract' },
-      { name: 'Duodenum and Stomach', amount: 'blend', description: 'of porcine source, not an extract' },
+      { name: 'Black Radish', amount: 'blend', description: 'root', benefits: ['Supports liver detoxification and bile flow', 'Contains glucosinolates that support Phase II detox pathways', 'May help dissolve gallstones and support gallbladder function', 'Traditional remedy for digestive complaints'] },
+      { name: 'Green Cabbage', amount: 'blend', description: 'leaf', benefits: ['Rich in vitamin K for blood clotting and bone health', 'Contains sulforaphane and other cancer-protective compounds', 'Supports gut lining health and may reduce ulcers', 'Anti-inflammatory properties benefit digestive tract'] },
+      { name: 'Alfalfa', amount: 'blend', description: 'leaf', benefits: ['Nutrient-dense source of vitamins A, C, E, and K', 'Rich in minerals including calcium, potassium, and iron', 'Contains chlorophyll with detoxifying properties', 'May support healthy cholesterol levels'] },
+      { name: 'Pepsin', amount: 'blend', description: '100,000 FCC', benefits: ['Digestive enzyme that breaks down protein into peptides', 'Works best in acidic stomach environment', 'Supports complete protein digestion', 'May reduce digestive discomfort after protein-rich meals'] },
+      { name: 'Pituitary', amount: 'blend', description: 'of bovine source, not an extract', benefits: ['Provides glandular support for pituitary function', 'Pituitary is the "master gland" regulating other hormones', 'Contains natural cofactors found in pituitary tissue', 'May support overall hormonal balance'] },
+      { name: 'Duodenum and Stomach', amount: 'blend', description: 'of porcine source, not an extract', benefits: ['Provides glandular support for digestive tract health', 'Contains natural digestive factors and enzymes', 'May support gut lining integrity and healing', 'Traditional use for digestive system restoration'] },
     ]
   },
   {
