@@ -28,6 +28,7 @@ interface IngredientInfo {
   doseMg: number;
   category: 'base' | 'individual';
   description?: string;
+  benefits?: string[];
 }
 
 interface Props {
@@ -52,6 +53,7 @@ export function FormulaCustomizationDialog({
   const [addedIndividuals, setAddedIndividuals] = useState<IngredientInfo[]>([]);
   const [breakdownExpanded, setBreakdownExpanded] = useState(true);
   const [expandedSubIngredients, setExpandedSubIngredients] = useState<Record<number, boolean>>({});
+  const [expandedIndividualIngredients, setExpandedIndividualIngredients] = useState<Record<number, boolean>>({});
 
   // Fetch ingredient catalog
   const { data: catalog, isLoading: catalogLoading } = useQuery<{
@@ -396,19 +398,50 @@ export function FormulaCustomizationDialog({
             {addedIndividuals.length > 0 && (
               <div className="space-y-2">
                 {addedIndividuals.map((ingredient, index) => (
-                  <Card key={index} className="p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{ingredient.doseMg}mg</Badge>
-                      <span className="text-sm">{ingredient.name}</span>
+                  <Card key={index} className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-1">
+                        <Badge variant="secondary">{ingredient.doseMg}mg</Badge>
+                        {ingredient.benefits && ingredient.benefits.length > 0 ? (
+                          <Collapsible
+                            open={expandedIndividualIngredients[index]}
+                            onOpenChange={(open) => {
+                              setExpandedIndividualIngredients(prev => ({ ...prev, [index]: open }));
+                            }}
+                            className="flex-1"
+                          >
+                            <CollapsibleTrigger className="flex items-center gap-1 text-sm font-medium hover-elevate active-elevate-2 rounded px-2 py-1 -ml-2" data-testid={`trigger-individual-${index}`}>
+                              <span>{ingredient.name}</span>
+                              {expandedIndividualIngredients[index] ? (
+                                <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                              )}
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-2">
+                              <div className="bg-primary/5 dark:bg-primary/10 rounded-md p-3 space-y-1.5">
+                                {ingredient.benefits.map((benefit, bidx) => (
+                                  <div key={bidx} className="flex items-start gap-2">
+                                    <CheckCircle className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                                    <span className="text-xs text-muted-foreground">{benefit}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        ) : (
+                          <span className="text-sm">{ingredient.name}</span>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveIndividual(index)}
+                        data-testid={`button-remove-individual-${index}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemoveIndividual(index)}
-                      data-testid={`button-remove-individual-${index}`}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
                   </Card>
                 ))}
               </div>

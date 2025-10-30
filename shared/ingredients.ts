@@ -5,6 +5,7 @@ export interface IngredientInfo {
   doseMg: number;
   category: 'base' | 'individual';
   description?: string;  // Helpful description for user selection
+  benefits?: string[];  // Health benefits of this ingredient
 }
 
 export interface SubIngredient {
@@ -59,35 +60,35 @@ export const BASE_FORMULAS: IngredientInfo[] = [
 ];
 
 export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
-  { name: 'Aloe Vera Powder', doseMg: 250, category: 'individual' },
-  { name: 'Ahswaganda', doseMg: 600, category: 'individual' },
-  { name: 'Astragalus', doseMg: 300, category: 'individual' },
-  { name: 'Black Currant Extract', doseMg: 300, category: 'individual' },
-  { name: 'Broccoli Powder', doseMg: 300, category: 'individual' },
-  { name: 'Camu Camu', doseMg: 300, category: 'individual' },
-  { name: 'Cape Aloe', doseMg: 300, category: 'individual' },
-  { name: 'Cats Claw', doseMg: 30, category: 'individual' },
-  { name: 'Chaga', doseMg: 300, category: 'individual' },
-  { name: 'Cinnamon 20:1', doseMg: 1000, category: 'individual' },
-  { name: 'CoEnzyme Q10', doseMg: 200, category: 'individual' },
-  { name: 'Gaba', doseMg: 300, category: 'individual' },
-  { name: 'Garlic (powder)', doseMg: 200, category: 'individual' },
-  { name: 'Ginger Root', doseMg: 500, category: 'individual' },
-  { name: 'Ginko Biloba Extract 24%', doseMg: 100, category: 'individual' },
-  { name: 'Graviola', doseMg: 300, category: 'individual' },
-  { name: 'Hawthorn Berry PE 1/8% Flavones', doseMg: 300, category: 'individual' },
-  { name: 'Lutein', doseMg: 10, category: 'individual' },
-  { name: 'Maca Root .6%', doseMg: 300, category: 'individual' },
-  { name: 'Magnesium', doseMg: 320, category: 'individual' },
-  { name: 'Omega 3 (algae omega)', doseMg: 300, category: 'individual' },
-  { name: 'Phosphatidylcholine 40% (soy)', doseMg: 300, category: 'individual' },
-  { name: 'Resveratrol', doseMg: 300, category: 'individual' },
-  { name: 'Saw Palmetto Extract 45% Fatty Acid (GC)', doseMg: 300, category: 'individual' },
-  { name: 'Stinging Nettle', doseMg: 300, category: 'individual' },
-  { name: 'Sumar Root', doseMg: 300, category: 'individual' },
-  { name: 'Turmeric Root Extract 4:1', doseMg: 500, category: 'individual' },
-  { name: 'Vitamin C', doseMg: 90, category: 'individual' },
-  { name: 'Vitamin E (Mixed tocopherols)', doseMg: 15, category: 'individual' },
+  { name: 'Aloe Vera Powder', doseMg: 250, category: 'individual', benefits: ['Soothes and heals digestive tract lining', 'Anti-inflammatory properties support gut health', 'Contains polysaccharides that boost immune function', 'May help regulate blood sugar levels'] },
+  { name: 'Ahswaganda', doseMg: 600, category: 'individual', benefits: ['Adaptogen that helps body manage stress and anxiety', 'Supports healthy cortisol levels and adrenal function', 'May improve sleep quality and reduce insomnia', 'Enhances cognitive function and memory'] },
+  { name: 'Astragalus', doseMg: 300, category: 'individual', benefits: ['Powerful immune system booster and modulator', 'Adaptogenic properties support stress resilience', 'May improve heart health and reduce inflammation', 'Traditional use for increasing energy and vitality'] },
+  { name: 'Black Currant Extract', doseMg: 300, category: 'individual', benefits: ['Rich in anthocyanins with powerful antioxidant effects', 'Supports eye health and may improve night vision', 'Anti-inflammatory benefits for joint health', 'High in gamma-linolenic acid (GLA) for hormonal balance'] },
+  { name: 'Broccoli Powder', doseMg: 300, category: 'individual', benefits: ['Contains sulforaphane with potent anti-cancer properties', 'Supports Phase II liver detoxification pathways', 'Rich in vitamins C, K, and folate', 'May support cardiovascular and brain health'] },
+  { name: 'Camu Camu', doseMg: 300, category: 'individual', benefits: ['One of the richest natural sources of vitamin C', 'Powerful antioxidant and immune system support', 'May improve mood and reduce inflammation', 'Supports collagen production and skin health'] },
+  { name: 'Cape Aloe', doseMg: 300, category: 'individual', benefits: ['Natural laxative that supports bowel regularity', 'May help cleanse digestive system', 'Contains anthraquinones with antimicrobial properties', 'Traditional use for constipation relief'] },
+  { name: 'Cats Claw', doseMg: 30, category: 'individual', benefits: ['Powerful immune system modulator and enhancer', 'Anti-inflammatory benefits for joint pain and arthritis', 'May support gut health and reduce leaky gut', 'Antioxidant properties protect against cellular damage'] },
+  { name: 'Chaga', doseMg: 300, category: 'individual', benefits: ['Exceptionally high in antioxidants (ORAC value)', 'Supports immune system function and may fight cancer', 'Anti-inflammatory properties benefit overall health', 'May support healthy blood sugar and cholesterol levels'] },
+  { name: 'Cinnamon 20:1', doseMg: 1000, category: 'individual', benefits: ['Helps regulate blood sugar and improve insulin sensitivity', 'Powerful antioxidant and anti-inflammatory effects', 'May support heart health and reduce cholesterol', 'Antimicrobial properties fight infections'] },
+  { name: 'CoEnzyme Q10', doseMg: 200, category: 'individual', benefits: ['Essential for cellular energy production (ATP)', 'Powerful antioxidant protecting heart and brain', 'Supports cardiovascular health and blood pressure', 'May improve exercise performance and reduce fatigue'] },
+  { name: 'Gaba', doseMg: 300, category: 'individual', benefits: ['Neurotransmitter that promotes relaxation and calm', 'May reduce anxiety and improve sleep quality', 'Supports mental clarity and focus', 'May help regulate blood pressure'] },
+  { name: 'Garlic (powder)', doseMg: 200, category: 'individual', benefits: ['Supports cardiovascular health and blood pressure', 'Natural antimicrobial and immune system booster', 'May help reduce cholesterol and triglycerides', 'Anti-inflammatory and antioxidant properties'] },
+  { name: 'Ginger Root', doseMg: 500, category: 'individual', benefits: ['Powerful anti-nausea effects for digestive comfort', 'Anti-inflammatory properties reduce pain and soreness', 'Supports digestive health and reduces bloating', 'May help reduce menstrual pain and cramping'] },
+  { name: 'Ginko Biloba Extract 24%', doseMg: 100, category: 'individual', benefits: ['Improves blood circulation, especially to the brain', 'Supports cognitive function, memory, and focus', 'Antioxidant properties protect brain cells', 'May help with anxiety and depression symptoms'] },
+  { name: 'Graviola', doseMg: 300, category: 'individual', benefits: ['Traditional use for immune support and fighting infections', 'Contains compounds studied for anti-cancer properties', 'May help reduce inflammation and oxidative stress', 'Supports digestive health and reduces parasites'] },
+  { name: 'Hawthorn Berry PE 1/8% Flavones', doseMg: 300, category: 'individual', benefits: ['Supports heart health and cardiovascular function', 'May improve blood flow and reduce blood pressure', 'Rich in antioxidants that protect heart tissue', 'Traditional use for heart failure and chest pain'] },
+  { name: 'Lutein', doseMg: 10, category: 'individual', benefits: ['Essential for eye health and protecting macula', 'Filters harmful blue light from screens and sun', 'May reduce risk of age-related macular degeneration', 'Antioxidant properties protect eye tissues'] },
+  { name: 'Maca Root .6%', doseMg: 300, category: 'individual', benefits: ['Adaptogen that increases energy and stamina', 'May improve libido and sexual function', 'Supports hormonal balance in men and women', 'May enhance mood and reduce anxiety'] },
+  { name: 'Magnesium', doseMg: 320, category: 'individual', benefits: ['Essential for over 300 enzymatic reactions in body', 'Supports muscle relaxation and reduces cramping', 'Important for bone health and calcium absorption', 'May improve sleep quality and reduce anxiety'] },
+  { name: 'Omega 3 (algae omega)', doseMg: 300, category: 'individual', benefits: ['Supports heart health and reduces inflammation', 'Essential for brain function and mental health', 'May reduce risk of chronic diseases', 'Plant-based source suitable for vegetarians'] },
+  { name: 'Phosphatidylcholine 40% (soy)', doseMg: 300, category: 'individual', benefits: ['Essential component of cell membranes', 'Supports brain health, memory, and cognition', 'Important for liver function and fat metabolism', 'Precursor to acetylcholine neurotransmitter'] },
+  { name: 'Resveratrol', doseMg: 300, category: 'individual', benefits: ['Powerful antioxidant with anti-aging properties', 'May support heart health and healthy blood vessels', 'Activates longevity genes (sirtuins)', 'Anti-inflammatory benefits throughout the body'] },
+  { name: 'Saw Palmetto Extract 45% Fatty Acid (GC)', doseMg: 300, category: 'individual', benefits: ['Supports prostate health and urinary function in men', 'May reduce symptoms of benign prostatic hyperplasia', 'Anti-inflammatory properties', 'May help balance hormone levels'] },
+  { name: 'Stinging Nettle', doseMg: 300, category: 'individual', benefits: ['May reduce inflammation in joints and arthritis', 'Supports prostate health and urinary flow', 'Rich in vitamins and minerals including iron', 'Traditional use for seasonal allergies and hay fever'] },
+  { name: 'Sumar Root', doseMg: 300, category: 'individual', benefits: ['Adaptogen that helps body cope with stress', 'May support hormonal balance and vitality', 'Traditional use for enhancing energy and stamina', 'Supports overall wellness and resilience'] },
+  { name: 'Turmeric Root Extract 4:1', doseMg: 500, category: 'individual', benefits: ['Contains curcumin with powerful anti-inflammatory effects', 'Supports joint health and reduces arthritis pain', 'May improve brain function and reduce depression', 'Antioxidant properties protect against chronic disease'] },
+  { name: 'Vitamin C', doseMg: 90, category: 'individual', benefits: ['Essential for immune system function', 'Powerful antioxidant that protects cells', 'Required for collagen synthesis and wound healing', 'Enhances iron absorption from plant foods'] },
+  { name: 'Vitamin E (Mixed tocopherols)', doseMg: 15, category: 'individual', benefits: ['Fat-soluble antioxidant protecting cell membranes', 'Supports immune function and skin health', 'May reduce risk of heart disease', 'Protects against oxidative stress and aging'] },
 ];
 
 export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
