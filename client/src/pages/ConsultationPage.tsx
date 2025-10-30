@@ -1185,7 +1185,7 @@ export default function ConsultationPage() {
                                 {message.formula.totalMg}mg total
                               </Badge>
                               <Progress 
-                                value={(message.formula.totalMg / 800) * 100} 
+                                value={(message.formula.totalMg / 6800) * 100} 
                                 className="w-20 h-2"
                               />
                             </div>

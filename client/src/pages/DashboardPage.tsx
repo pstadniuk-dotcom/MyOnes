@@ -216,8 +216,8 @@ function WelcomeOnboarding({ userName }: { userName: string }) {
 function CurrentFormulaWidget({ formula }: { formula: Formula }) {
   const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
   const totalIngredients = formula.bases.length + (formula.additions?.length || 0) + userAddedCount;
-  const safetyPercentage = Math.min((formula.totalMg / 800) * 100, 100);
-  const isOptimal = formula.totalMg >= 600 && formula.totalMg <= 800;
+  const safetyPercentage = Math.min((formula.totalMg / 6800) * 100, 100);
+  const isOptimal = formula.totalMg >= 4500 && formula.totalMg <= 6800;
 
   return (
     <Card className="mb-6" data-testid="widget-current-formula">
@@ -243,8 +243,8 @@ function CurrentFormulaWidget({ formula }: { formula: Formula }) {
           {/* Safety Compliance */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span>Safety Limit (800mg max)</span>
-              <span className="font-medium">{formula.totalMg}mg / 800mg</span>
+              <span>Capsule Fill (4500-6800mg)</span>
+              <span className="font-medium">{formula.totalMg}mg / 6800mg</span>
             </div>
             <Progress 
               value={safetyPercentage} 
