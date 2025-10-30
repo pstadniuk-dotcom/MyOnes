@@ -1131,6 +1131,8 @@ function IngredientCard({
   isExpanded: boolean;
   onToggleExpansion: () => void;
 }) {
+  const [expandedIngredients, setExpandedIngredients] = useState<Record<string, boolean>>({});
+
   const { data: ingredientDetail, isLoading } = useQuery<IngredientDetail>({
     queryKey: ['/api/ingredients', encodeURIComponent(ingredient.ingredient)],
     enabled: isExpanded
@@ -1141,7 +1143,7 @@ function IngredientCard({
     name: string;
     doseMg: number;
     systemSupported: string;
-    activeIngredients: Array<{ name: string; amount: string; description?: string }>;
+    activeIngredients: Array<{ name: string; amount: string; description?: string; benefits?: string[] }>;
     suggestedDosage: string;
     description: string;
   }> }>({
@@ -1218,22 +1220,53 @@ function IngredientCard({
                       <div>
                         <p className="text-sm font-medium mb-2">Active Ingredients:</p>
                         <div className="space-y-2">
-                          {formulaBreakdown.activeIngredients.map((subIng, idx) => (
-                            <div 
-                              key={idx} 
-                              className="flex items-start justify-between p-2 bg-background rounded text-sm hover-elevate"
-                            >
-                              <div className="flex-1">
-                                <span className="font-medium">{subIng.name}</span>
-                                {subIng.description && (
-                                  <p className="text-xs text-muted-foreground mt-0.5">{subIng.description}</p>
+                          {formulaBreakdown.activeIngredients.map((subIng, idx) => {
+                            const hasExpanded = expandedIngredients[`${ingredient.ingredient}-${idx}`] || false;
+                            const hasBenefits = subIng.benefits && subIng.benefits.length > 0;
+                            
+                            return (
+                              <div key={idx} className="bg-background rounded overflow-hidden">
+                                <button
+                                  onClick={() => hasBenefits && setExpandedIngredients(prev => ({
+                                    ...prev,
+                                    [`${ingredient.ingredient}-${idx}`]: !prev[`${ingredient.ingredient}-${idx}`]
+                                  }))}
+                                  className={`w-full flex items-start justify-between p-2 text-sm ${hasBenefits ? 'hover-elevate cursor-pointer' : ''}`}
+                                  disabled={!hasBenefits}
+                                  data-testid={`button-expand-subingredient-${idx}`}
+                                >
+                                  <div className="flex-1 text-left">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-medium">{subIng.name}</span>
+                                      {hasBenefits && (
+                                        <ChevronDown className={`w-3 h-3 text-muted-foreground transition-transform ${hasExpanded ? 'rotate-180' : ''}`} />
+                                      )}
+                                    </div>
+                                    {subIng.description && (
+                                      <p className="text-xs text-muted-foreground mt-0.5">{subIng.description}</p>
+                                    )}
+                                  </div>
+                                  <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">
+                                    {subIng.amount}
+                                  </Badge>
+                                </button>
+                                
+                                {hasBenefits && hasExpanded && subIng.benefits && (
+                                  <div className="px-3 pb-3 pt-1 bg-primary/5">
+                                    <p className="text-xs font-medium mb-1.5 text-primary">Health Benefits:</p>
+                                    <div className="space-y-1">
+                                      {subIng.benefits.map((benefit: string, benefitIdx: number) => (
+                                        <div key={benefitIdx} className="flex items-start gap-1.5 text-xs">
+                                          <CheckCircle className="w-3 h-3 text-green-600 flex-shrink-0 mt-0.5" />
+                                          <span>{benefit}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
                                 )}
                               </div>
-                              <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">
-                                {subIng.amount}
-                              </Badge>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
