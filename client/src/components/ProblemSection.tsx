@@ -55,8 +55,8 @@ export default function ProblemSection() {
                   className="h-full flex flex-col p-8 text-center glass shadow-premium micro-bounce transition-all duration-500 group border-none"
                   data-testid={`card-problem-${index}`}
                 >
-                <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:bg-green-500/20 transition-colors duration-300">
-                  <IconComponent className="w-8 h-8 text-green-500" />
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:bg-primary/20 transition-colors duration-300">
+                  <IconComponent className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-xl font-semibold text-foreground mb-4" data-testid={`text-problem-title-${index}`}>
                   {problem.title}
