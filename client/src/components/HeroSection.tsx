@@ -11,7 +11,7 @@ export default function HeroSection() {
       {/* Background Gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/20 dark:from-primary/20 dark:via-background dark:to-accent/30"></div>
 
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-[70px] pb-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center min-h-[80vh]">
           {/* Left Side - Headline and Description */}
           <div className="space-y-8">
