@@ -17,9 +17,9 @@ export default function HeroSection() {
           <div className="space-y-8">
             <div className="space-y-6">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground leading-tight" data-testid="text-hero-headline">
-                One capsule.
-                <span className="text-primary block">Fully personalized.</span>
-                <span className="text-muted-foreground block">Always evolving.</span>
+                <span className="block animate-fade-in">One capsule.</span>
+                <span className="block animate-fade-in" style={{ animationDelay: '0.5s', opacity: 0, animationFillMode: 'forwards' }}>Fully personalized.</span>
+                <span className="text-accent block animate-fade-in" style={{ animationDelay: '1s', opacity: 0, animationFillMode: 'forwards' }}>Always evolving.</span>
               </h1>
               
               <p className="text-lg md:text-xl text-muted-foreground max-w-lg leading-relaxed" data-testid="text-hero-description">
