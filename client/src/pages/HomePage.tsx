@@ -18,6 +18,7 @@ import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import type { Formula } from '@shared/schema';
+import { calculateDosage } from '@/lib/utils';
 
 interface DashboardData {
   metrics: {
@@ -208,6 +209,19 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {/* Daily Dosage */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Daily Dosage</span>
+                  <span className="font-medium text-base" data-testid="text-dosage-display">
+                    {calculateDosage(currentFormula.totalMg).display}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {calculateDosage(currentFormula.totalMg).total} capsules per day ({currentFormula.totalMg}mg total)
+                </p>
+              </div>
+
               {/* Dosage Progress */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
