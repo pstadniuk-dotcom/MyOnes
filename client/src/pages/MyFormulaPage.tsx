@@ -27,6 +27,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { FormulaCustomizationDialog } from '@/components/FormulaCustomizationDialog';
+import { calculateDosage } from '@/lib/utils';
 
 // Types for Formula data matching backend schema
 interface FormulaIngredient {
@@ -496,6 +497,24 @@ export default function MyFormulaPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Daily Dosage Instructions */}
+                  <div className="p-3 bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-sm flex items-center gap-2">
+                        <Pill className="w-4 h-4" />
+                        Daily Dosage Instructions
+                      </h4>
+                      <span className="font-medium text-base" data-testid="text-order-dosage">
+                        {calculateDosage(selectedFormula.totalMg).display}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Take {calculateDosage(selectedFormula.totalMg).perMeal} capsules with each meal (morning, lunch, dinner) • 
+                      {calculateDosage(selectedFormula.totalMg).total} capsules per day
+                    </p>
+                  </div>
+                  
+                  <Separator />
                   {/* Base Formulas */}
                   {selectedFormula.bases.length > 0 && (
                     <div>
@@ -796,10 +815,17 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
           </div>
         </div>
         
-        {/* Total Dosage */}
-        <div className="flex items-center justify-between p-2 bg-muted/20 rounded">
-          <span className="text-sm text-muted-foreground">Total Daily:</span>
-          <span className="font-bold">{formula.totalMg}mg</span>
+        {/* Daily Dosage */}
+        <div className="space-y-1.5 p-2 bg-muted/20 rounded">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Daily Dosage:</span>
+            <span className="font-medium text-sm" data-testid={`text-formula-dosage-${formula.version}`}>
+              {calculateDosage(formula.totalMg).display}
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {calculateDosage(formula.totalMg).total} capsules/day • {formula.totalMg}mg total
+          </div>
         </div>
         
         {/* Expandable Details */}
