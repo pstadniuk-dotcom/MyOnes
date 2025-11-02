@@ -175,7 +175,7 @@ export default function ScienceSection() {
                     <MessageSquare className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wider text-primary/70 mb-1">ONES Approach</p>
+                    <p className="text-xs uppercase tracking-wider text-primary/70 mb-1">Ones Approach</p>
                     <h4 className="text-xl font-semibold text-primary">AI Conversation</h4>
                   </div>
                 </div>
