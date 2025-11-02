@@ -311,7 +311,7 @@ export default function LabReportsPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm">
-              By providing consent, you agree to allow ONES AI to:
+              By providing consent, you agree to allow Ones AI to:
             </p>
             <ul className="text-sm space-y-2 ml-4 list-disc">
               <li>Process and analyze your uploaded lab results</li>

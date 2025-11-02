@@ -191,10 +191,10 @@ export default function AIChat() {
       <div className="p-4 border-b border-card-border">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <span className="text-xs font-semibold text-primary-foreground">ONES</span>
+            <span className="text-xs font-semibold text-primary-foreground">Ones</span>
           </div>
           <div>
-            <h3 className="font-medium text-sm" data-testid="text-ai-name">ONES AI</h3>
+            <h3 className="font-medium text-sm" data-testid="text-ai-name">Ones AI</h3>
             <p className="text-xs text-muted-foreground">Your health consultant</p>
           </div>
         </div>
@@ -291,7 +291,7 @@ export default function AIChat() {
           <div className="flex justify-start" data-testid="indicator-typing">
             <div className="bg-muted text-muted-foreground rounded-lg p-3 max-w-[80%]">
               <div className="flex items-center space-x-2">
-                <span className="text-xs font-semibold">ONES</span>
+                <span className="text-xs font-semibold">Ones</span>
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
                   <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>

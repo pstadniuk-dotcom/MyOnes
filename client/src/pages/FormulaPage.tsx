@@ -106,7 +106,7 @@ export default function FormulaPage() {
             My Formula
           </h1>
           <p className="text-muted-foreground">
-            Your personalized supplement formula, optimized by ONES AI
+            Your personalized supplement formula, optimized by Ones AI
           </p>
         </div>
         <div className="flex items-center gap-3">

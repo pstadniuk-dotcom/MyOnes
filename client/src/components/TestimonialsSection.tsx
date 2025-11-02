@@ -39,7 +39,7 @@ export default function TestimonialsSection() {
     { value: "87%", label: "Report better energy within 30 days" },
     { value: "92%", label: "Continue their subscription after 6 months" },
     { value: "78%", label: "See improvements in sleep quality" },
-    { value: "1,000+", label: "Health journeys optimized with ONES" }
+    { value: "1,000+", label: "Health journeys optimized with Ones" }
   ];
 
   const handleTestimonialClick = (name: string) => {

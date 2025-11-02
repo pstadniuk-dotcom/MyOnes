@@ -30,7 +30,7 @@ export default function Header() {
           {/* Logo */}
           <div className="flex-shrink-0">
             <h1 className="text-2xl font-serif font-bold text-primary" data-testid="text-logo">
-              ONES
+              Ones
             </h1>
           </div>
 

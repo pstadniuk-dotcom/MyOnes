@@ -265,7 +265,7 @@ export default function ProfilePage() {
       const response = await apiRequest('POST', '/api/consents/grant', {
         consentType: 'lab_data_processing',
         consentVersion: '1.0',
-        consentText: 'I consent to ONES AI processing my lab data and health information to provide personalized supplement recommendations.'
+        consentText: 'I consent to Ones AI processing my lab data and health information to provide personalized supplement recommendations.'
       });
       return response.json();
     },
@@ -1304,7 +1304,7 @@ export default function ProfilePage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm">
-              By providing consent, you agree to allow ONES AI to:
+              By providing consent, you agree to allow Ones AI to:
             </p>
             <ul className="text-sm space-y-2 ml-4 list-disc">
               <li>Process and analyze your uploaded lab results</li>

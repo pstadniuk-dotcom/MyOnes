@@ -26,7 +26,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: "Welcome back! I'm ONES AI, your personalized supplement consultant. I'm here to help you create the perfect supplement formula based on your unique health profile.",
+      content: "Welcome back! I'm Ones AI, your personalized supplement consultant. I'm here to help you create the perfect supplement formula based on your unique health profile.",
       sender: 'ai',
       timestamp: new Date()
     }
@@ -270,7 +270,7 @@ export default function ChatPage() {
       
       toast({
         title: "File Uploaded",
-        description: `${file.name} ready for analysis. Click send to have ONES AI analyze your results.`,
+        description: `${file.name} ready for analysis. Click send to have Ones AI analyze your results.`,
         variant: "default"
       });
     }
@@ -289,10 +289,10 @@ export default function ChatPage() {
       <header className="flex items-center justify-between p-4 border-b border-border bg-card/50 backdrop-blur">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-            <span className="text-sm font-semibold text-primary-foreground">ONES</span>
+            <span className="text-sm font-semibold text-primary-foreground">Ones</span>
           </div>
           <div>
-            <h1 className="text-xl font-semibold" data-testid="text-chat-title">ONES AI</h1>
+            <h1 className="text-xl font-semibold" data-testid="text-chat-title">Ones AI</h1>
             <p className="text-sm text-muted-foreground">
               Your personalized supplement consultant
               {isConnected && <span className="ml-2 text-green-600">• Connected</span>}
@@ -410,9 +410,9 @@ export default function ChatPage() {
           <div className="flex justify-start" data-testid="indicator-typing">
             <div className="bg-muted rounded-lg p-4 max-w-[80%] border">
               <div className="flex items-center space-x-3">
-                <span className="text-sm font-semibold text-primary">ONES</span>
+                <span className="text-sm font-semibold text-primary">Ones</span>
                 <div>
-                  <p className="text-sm text-muted-foreground mb-2">ONES AI is thinking...</p>
+                  <p className="text-sm text-muted-foreground mb-2">Ones AI is thinking...</p>
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>

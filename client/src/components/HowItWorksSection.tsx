@@ -42,7 +42,7 @@ export default function HowItWorksSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-foreground mb-6" data-testid="text-how-it-works-headline">
-            How ONES Works
+            How Ones Works
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto" data-testid="text-how-it-works-description">
             A simple, science-backed process that evolves with your health journey.

@@ -52,7 +52,7 @@ export default function CareersPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-6xl mx-auto">
             <h2 className="text-3xl font-serif font-bold text-foreground mb-12 text-center">
-              Why Work at ONES?
+              Why Work at Ones?
             </h2>
             <div className="grid md:grid-cols-3 gap-8">
               <Card>
