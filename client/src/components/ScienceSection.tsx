@@ -65,8 +65,8 @@ export default function ScienceSection() {
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-foreground mb-6" data-testid="text-main-headline">
             Why One Size Fits None
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto" data-testid="text-main-description">
-            Major wellness brands give identical formulas to completely different people
+          <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed" data-testid="text-main-description">
+            Same formula for everyone — every day. No personalization, no evolution. Doesn't account for your goals, sex, age, or medications. Major wellness brands give identical formulas to completely different people.
           </p>
         </div>
 
