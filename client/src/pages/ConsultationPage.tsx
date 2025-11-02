@@ -988,30 +988,22 @@ export default function ConsultationPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-secondary/5 opacity-50"></div>
           <div className="relative p-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-                  <AvatarImage src="" alt="Ones AI" />
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-semibold">
-                    Ones
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-consultation-title">
-                    Ones AI Consultation
-                    <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
-                      <Sparkles className="w-3 h-3 mr-1" />
-                      AI-Powered
+              <div>
+                <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-consultation-title">
+                  Ones AI Consultation
+                  <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    AI-Powered
+                  </Badge>
+                </h1>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-sm text-muted-foreground">Your personalized supplement consultant</p>
+                  {isConnected && (
+                    <Badge variant="outline" className="text-xs text-green-600 border-green-200 bg-green-50">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
+                      Connected
                     </Badge>
-                  </h1>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-sm text-muted-foreground">Your personalized supplement consultant</p>
-                    {isConnected && (
-                      <Badge variant="outline" className="text-xs text-green-600 border-green-200 bg-green-50">
-                        <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
-                        Connected
-                      </Badge>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
               
