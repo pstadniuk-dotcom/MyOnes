@@ -18,63 +18,63 @@
 
   --foreground: 0 0% 15%;
 
-  --border: 120 12% 90%;
+  --border: 63 12% 88%;
 
-  --card: 120 15% 98%;
+  --card: 63 20% 96%;
 
   --card-foreground: 0 0% 15%;
 
-  --card-border: 120 12% 92%;
+  --card-border: 63 15% 90%;
 
-  --sidebar: 120 18% 96%;
+  --sidebar: 63 20% 94%;
 
   --sidebar-foreground: 0 0% 15%;
 
-  --sidebar-border: 120 12% 90%;
+  --sidebar-border: 63 12% 88%;
 
-  --sidebar-primary: 120 35% 42%;
+  --sidebar-primary: 83 25% 66%;
 
-  --sidebar-primary-foreground: 120 35% 98%;
+  --sidebar-primary-foreground: 83 25% 15%;
 
-  --sidebar-accent: 120 15% 92%;
+  --sidebar-accent: 63 17% 90%;
 
-  --sidebar-accent-foreground: 0 0% 20%;
+  --sidebar-accent-foreground: 64 7% 25%;
 
-  --sidebar-ring: 120 35% 42%;
+  --sidebar-ring: 83 25% 66%;
 
-  --popover: 120 18% 97%;
+  --popover: 63 18% 96%;
 
   --popover-foreground: 0 0% 15%;
 
-  --popover-border: 120 12% 90%;
+  --popover-border: 63 12% 88%;
 
-  --primary: 120 35% 42%;
+  --primary: 83 25% 66%;
 
-  --primary-foreground: 120 35% 98%;
+  --primary-foreground: 83 25% 15%;
 
-  --secondary: 120 15% 92%;
+  --secondary: 64 7% 37%;
 
-  --secondary-foreground: 0 0% 20%;
+  --secondary-foreground: 64 7% 95%;
 
-  --muted: 120 12% 94%;
+  --muted: 63 17% 90%;
 
-  --muted-foreground: 0 0% 45%;
+  --muted-foreground: 64 7% 40%;
 
-  --accent: 25 45% 65%;
+  --accent: 64 58% 80%;
 
-  --accent-foreground: 25 45% 15%;
+  --accent-foreground: 64 58% 20%;
 
   --destructive: 0 72% 55%;
 
   --destructive-foreground: 0 72% 98%;
 
-  --input: 120 12% 88%;
-  --ring: 120 35% 42%;
-  --chart-1: 120 35% 42%;
-  --chart-2: 45 75% 60%;
+  --input: 63 12% 88%;
+  --ring: 83 25% 66%;
+  --chart-1: 83 25% 66%;
+  --chart-2: 64 58% 70%;
   --chart-3: 185 50% 48%;
   --chart-4: 280 50% 55%;
-  --chart-5: 15 65% 58%;
+  --chart-5: 64 7% 45%;
 
   --font-sans: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   --font-serif: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
@@ -132,67 +132,67 @@
   --elevate-1: rgba(255,255,255, .03);
   --elevate-2: rgba(255,255,255, .06);
 
-  --background: 120 15% 8%;
+  --background: 64 12% 10%;
 
-  --foreground: 120 10% 88%;
+  --foreground: 63 10% 88%;
 
-  --border: 120 12% 18%;
+  --border: 64 8% 20%;
 
-  --card: 120 12% 11%;
+  --card: 64 10% 13%;
 
-  --card-foreground: 120 10% 88%;
+  --card-foreground: 63 10% 88%;
 
-  --card-border: 120 12% 15%;
+  --card-border: 64 8% 17%;
 
-  --sidebar: 120 14% 12%;
+  --sidebar: 64 12% 14%;
 
-  --sidebar-foreground: 120 10% 88%;
+  --sidebar-foreground: 63 10% 88%;
 
-  --sidebar-border: 120 12% 18%;
+  --sidebar-border: 64 8% 20%;
 
-  --sidebar-primary: 120 32% 48%;
+  --sidebar-primary: 83 30% 55%;
 
-  --sidebar-primary-foreground: 120 32% 96%;
+  --sidebar-primary-foreground: 83 30% 10%;
 
-  --sidebar-accent: 120 12% 18%;
+  --sidebar-accent: 64 8% 20%;
 
-  --sidebar-accent-foreground: 120 10% 78%;
+  --sidebar-accent-foreground: 63 10% 78%;
 
-  --sidebar-ring: 120 32% 48%;
+  --sidebar-ring: 83 30% 55%;
 
-  --popover: 120 12% 13%;
+  --popover: 64 10% 15%;
 
-  --popover-foreground: 120 10% 88%;
+  --popover-foreground: 63 10% 88%;
 
-  --popover-border: 120 12% 20%;
+  --popover-border: 64 8% 22%;
 
-  --primary: 120 32% 48%;
+  --primary: 83 30% 55%;
 
-  --primary-foreground: 120 32% 96%;
+  --primary-foreground: 83 30% 10%;
 
-  --secondary: 120 12% 18%;
+  --secondary: 64 10% 30%;
 
-  --secondary-foreground: 120 10% 78%;
+  --secondary-foreground: 63 10% 88%;
 
-  --muted: 120 10% 16%;
+  --muted: 64 8% 18%;
 
-  --muted-foreground: 120 8% 65%;
+  --muted-foreground: 63 8% 65%;
 
-  --accent: 25 35% 45%;
+  --accent: 64 50% 65%;
 
-  --accent-foreground: 25 35% 90%;
+  --accent-foreground: 64 50% 15%;
 
   --destructive: 0 65% 52%;
 
   --destructive-foreground: 0 65% 96%;
 
-  --input: 120 12% 22%;
-  --ring: 120 32% 48%;
-  --chart-1: 120 32% 48%;
-  --chart-2: 45 65% 62%;
+  --input: 64 8% 24%;
+  --ring: 83 30% 55%;
+  --chart-1: 83 30% 55%;
+  --chart-2: 64 50% 65%;
   --chart-3: 185 45% 52%;
   --chart-4: 280 45% 58%;
-  --chart-5: 15 60% 60%;
+  --chart-5: 64 10% 50%;
 
   --shadow-2xs: 0px 1px 2px 0px hsl(120 20% 5% / 0.15);
   --shadow-xs: 0px 1px 3px 0px hsl(120 20% 5% / 0.20);
