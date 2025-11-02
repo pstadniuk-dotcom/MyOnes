@@ -394,7 +394,7 @@
   }
   
   .animate-fade-in-shimmer {
-    animation: fade-in-shimmer 0.8s ease-out forwards, shimmer 3s ease-in-out infinite 0.8s;
+    animation: fade-in-shimmer 0.8s ease-out forwards, shimmer 6s ease-in-out infinite 0.8s;
     background: linear-gradient(
       90deg,
       hsl(64 44% 60%) 0%,
