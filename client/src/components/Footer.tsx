@@ -224,7 +224,7 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
           <div className="flex items-center space-x-6">
             <p className="text-sm text-muted-foreground" data-testid="text-footer-copyright">
-              © 2024 Ones. All rights reserved.
+              © 2025 Ones. All rights reserved.
             </p>
             
             {/* Social Proof */}
