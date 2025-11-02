@@ -17,9 +17,9 @@ export default function HeroSection() {
           <div className="space-y-8">
             <div className="space-y-6">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground leading-tight" data-testid="text-hero-headline">
-                One personalized capsule.
-                <span className="text-primary block">Powered by AI.</span>
-                <span className="text-muted-foreground block">Evolved by you.</span>
+                One capsule.
+                <span className="text-primary block">Fully personalized.</span>
+                <span className="text-muted-foreground block">Always evolving.</span>
               </h1>
               
               <p className="text-lg md:text-xl text-muted-foreground max-w-lg leading-relaxed" data-testid="text-hero-description">
