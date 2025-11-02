@@ -19,12 +19,12 @@ export default function FAQSection() {
       answer: "Absolutely! After your AI consultation, you'll receive a detailed breakdown of your personalized formula, including each ingredient, dosage, and the scientific reasoning behind its inclusion. You can review everything before placing your order and even request modifications if needed."
     },
     {
-      question: "How do refills work?",
-      answer: "Refills are automated based on your selected plan schedule. Before each refill, you'll receive a check-in survey about how you're feeling and any changes in your health or lifestyle. Our AI analyzes this data and may adjust your formula for the next month to optimize your results. You can pause, modify, or cancel your subscription at any time."
+      question: "How do orders work?",
+      answer: "You purchase a 3-month, 6-month, or 12-month supply of your custom formula. When you're ready to reorder, you'll have a consultation to discuss how you're feeling and any changes in your health or lifestyle. Our AI analyzes this data and may adjust your formula for your next order to optimize your results."
     },
     {
       question: "What if I don't see results?",
-      answer: "We offer a 30-day money-back guarantee because we're confident in our approach. Most people see improvements in energy and sleep within 2-4 weeks. If you don't notice positive changes, we'll work with you to adjust your formula or provide a full refund. Health optimization is a journey, and we're committed to finding what works for you."
+      answer: "Health optimization is a journey, and we're committed to finding what works for you. Most people see improvements in energy and sleep within 2-4 weeks. If you're not noticing positive changes, we'll work with you through follow-up consultations to adjust your formula. Since each formula is custom-made specifically for you, we cannot accept returns, but we're dedicated to optimizing your results."
     },
     {
       question: "Are your supplements third-party tested?",

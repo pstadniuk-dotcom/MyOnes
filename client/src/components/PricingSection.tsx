@@ -63,9 +63,9 @@ export default function PricingSection() {
 
   const includedFeatures = [
     "Free shipping nationwide",
-    "Cancel or pause anytime",
-    "30-day money-back guarantee",
-    "Third-party tested ingredients"
+    "Custom-made for you",
+    "Third-party tested ingredients",
+    "FDA registered facility"
   ];
 
   const handlePlanSelect = (index: number) => {
@@ -80,7 +80,7 @@ export default function PricingSection() {
             Choose Your Health Journey
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8" data-testid="text-pricing-description">
-            All plans include AI consultation, custom formula, and free shipping. Start with any plan and adjust as needed.
+            All plans include AI consultation, custom-made formula, and free shipping. Choose your supply duration.
           </p>
           
           {/* Included Features */}

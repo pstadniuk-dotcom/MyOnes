@@ -83,11 +83,11 @@ export default function CTASection() {
               </span>
               <span className="flex items-center">
                 <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                30-day money-back guarantee
+                Free nationwide shipping
               </span>
               <span className="flex items-center">
                 <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                Cancel anytime
+                Custom-made formulas
               </span>
             </div>
           </div>
