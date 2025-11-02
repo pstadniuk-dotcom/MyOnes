@@ -11,7 +11,7 @@ export default function ReturnsPage() {
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Our Returns Process</h2>
             <p className="text-muted-foreground">
-              We want you to be completely satisfied with your ONES experience. If you need to return a product, we've made the process simple and straightforward.
+              We want you to be completely satisfied with your Ones experience. If you need to return a product, we've made the process simple and straightforward.
             </p>
           </section>
 

@@ -83,7 +83,7 @@ export default function ShippingPage() {
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
               <li>Email confirmation with tracking number</li>
               <li>Text message updates (if opted in)</li>
-              <li>Real-time tracking through your ONES account</li>
+              <li>Real-time tracking through your Ones account</li>
             </ul>
           </section>
 

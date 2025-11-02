@@ -8,7 +8,7 @@ export default function FAQSection() {
   const faqs = [
     {
       question: "How is this different from other personalized vitamins?",
-      answer: "ONES uses advanced AI to analyze your complete health profile, including blood tests, lifestyle factors, and health goals. Unlike other services that use simple questionnaires, we create truly personalized formulas that evolve with your health journey. Our AI considers interactions between ingredients and optimizes dosages based on the latest scientific research."
+      answer: "Ones uses advanced AI to analyze your complete health profile, including blood tests, lifestyle factors, and health goals. Unlike other services that use simple questionnaires, we create truly personalized formulas that evolve with your health journey. Our AI considers interactions between ingredients and optimizes dosages based on the latest scientific research."
     },
     {
       question: "What if I'm taking medications?",
