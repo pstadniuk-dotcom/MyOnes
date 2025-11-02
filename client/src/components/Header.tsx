@@ -80,26 +80,14 @@ export default function Header() {
                     Login
                   </Button>
                 </Link>
-                <Button 
-                  onClick={() => {
-                    console.log('Start consultation clicked');
-                    // Scroll to the AI Chat component
-                    const aiChatElement = document.querySelector('[data-testid="card-ai-chat"]') as HTMLElement;
-                    if (aiChatElement) {
-                      aiChatElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      // Add a subtle highlight effect
-                      aiChatElement.style.transform = 'scale(1.05)';
-                      aiChatElement.style.transition = 'transform 0.3s ease';
-                      setTimeout(() => {
-                        aiChatElement.style.transform = 'scale(1)';
-                      }, 600);
-                    }
-                  }}
-                  className="micro-bounce micro-glow transition-all duration-300"
-                  data-testid="button-start-consultation"
-                >
-                  Start Consultation
-                </Button>
+                <Link href="/signup">
+                  <Button 
+                    className="micro-bounce micro-glow transition-all duration-300"
+                    data-testid="button-start-consultation"
+                  >
+                    Start Consultation
+                  </Button>
+                </Link>
               </>
             )}
           </div>
@@ -156,13 +144,14 @@ export default function Header() {
                       Login
                     </Button>
                   </Link>
-                  <Button 
-                    onClick={() => console.log('Start consultation clicked')}
-                    className="w-full mt-2"
-                    data-testid="button-mobile-start-consultation"
-                  >
-                    Start Consultation
-                  </Button>
+                  <Link href="/signup" className="w-full">
+                    <Button 
+                      className="w-full mt-2"
+                      data-testid="button-mobile-start-consultation"
+                    >
+                      Start Consultation
+                    </Button>
+                  </Link>
                 </>
               )}
             </div>
