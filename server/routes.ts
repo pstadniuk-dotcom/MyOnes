@@ -307,13 +307,13 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
     }
   }
   
-  // Validate daily total is within expected range for 00 capsule size (4500-6800mg)
+  // Validate daily total is within expected range for 00 capsule size (4500-5500mg)
   if (calculatedTotal < 4500) {
     errors.push(`Formula total too low: ${calculatedTotal}mg. Minimum 4500mg required for proper 00 capsule fill (approximately 6-8 capsules per day).`);
   }
   
-  if (calculatedTotal > 6800) {
-    errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum 6800mg for 00 capsule safety limit.`);
+  if (calculatedTotal > 5500) {
+    errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum 5500mg for 00 capsule safety limit.`);
   }
   
   // Validate capsule sizing if provided (00 capsules hold approximately 700-850mg)
@@ -330,7 +330,7 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
       }
     }
     
-    // Validate capsule count is reasonable for daily regimen (6-8 capsules for 4500-6800mg range)
+    // Validate capsule count is reasonable for daily regimen (6-8 capsules for 4500-5500mg range)
     if (formula.capsulesPerDay < 5 || formula.capsulesPerDay > 10) {
       errors.push(`Capsule count out of range: ${formula.capsulesPerDay}. Recommend 6-8 capsules per day for optimal 00 capsule fill.`);
     }
@@ -722,12 +722,12 @@ If user tries to rush you or asks "what should I take?", politely explain:
 
 2. CAPSULE SPECIFICATIONS (UPDATED FOR 00 SIZE CAPSULES):
    - Size 00 capsules: 700-850mg capacity (industry standard)
-   - DAILY TOTAL RANGE: **4500-6800mg** (MINIMUM 4500mg, MAXIMUM 6800mg)
+   - DAILY TOTAL RANGE: **4500-5500mg** (MINIMUM 4500mg, MAXIMUM 5500mg)
    - Base formulas total: ~2500-3500mg (select 2-3 base formulas)
-   - Individual additions: ~2000-3300mg (select 5-7 individual ingredients at ~300mg each)
+   - Individual additions: ~2000-2000mg (select 5-7 individual ingredients at ~300mg each)
    - Capsule count: 6-8 capsules per day (at ~750mg per capsule = optimal 00 fill)
    - Always ask user preference for AM/PM split or suggest 4 caps AM, 4 caps PM for convenience
-   - CRITICAL: Your formula MUST be between 4500-6800mg total. Formulas below 4500mg or above 6800mg will be rejected.
+   - CRITICAL: Your formula MUST be between 4500-5500mg total. Formulas below 4500mg or above 5500mg will be rejected.
 
 3. SAFETY PROTOCOLS:
    - Check all drug interactions from ingredient catalog
@@ -1746,12 +1746,12 @@ ${additionsText}
 
 Total Daily Dose: ${activeFormula.dailyTotalMg}mg
 Capsules per Day: ${activeFormula.capsulesPerDay || 'Not specified'}
-Target Range: 4500-6800mg (00 capsule capacity)
+Target Range: 4500-5500mg (00 capsule capacity)
 
 ⚠️ IMPORTANT: When analyzing blood tests and making recommendations:
 - Review this current formula FIRST
 - Identify what's working and what might need adjustment
-- Calculate the gap: Current ${activeFormula.dailyTotalMg}mg → Target 4500-6800mg = ${Math.max(0, 4500 - activeFormula.dailyTotalMg)}mg minimum addition needed
+- Calculate the gap: Current ${activeFormula.dailyTotalMg}mg → Target 4500-5500mg = ${Math.max(0, 4500 - activeFormula.dailyTotalMg)}mg minimum addition needed
 - Suggest specific base formulas or individual ingredients from the approved catalog to ADD
 - Explain which current ingredients to keep, increase, or remove based on lab results
 - Show your math: "Current XYZ 450mg + Adding ABC 300mg = 750mg total for cardiovascular support"
@@ -1786,7 +1786,7 @@ STEP 2 - CURRENT FORMULA REVIEW
 ${activeFormula ? `Analyze the user's current ${activeFormula.dailyTotalMg}mg formula:
 - What's already addressing their issues?
 - What's missing based on lab results?
-- Calculate capacity remaining: ${Math.max(0, 6800 - activeFormula.dailyTotalMg)}mg available for additions (max 6800mg total)` : 'User has no current formula - create comprehensive first formula based on labs'}
+- Calculate capacity remaining: ${Math.max(0, 5500 - activeFormula.dailyTotalMg)}mg available for additions (max 5500mg total)` : 'User has no current formula - create comprehensive first formula based on labs'}
 
 STEP 3 - SPECIFIC CATALOG-BASED RECOMMENDATIONS
 For EACH abnormal biomarker, specify:
@@ -1800,7 +1800,7 @@ Show explicit math:
 - Current total: ${activeFormula ? `${activeFormula.dailyTotalMg}mg` : '0mg'}
 - Additions recommended: [calculate sum of new ingredients]
 - New total: [show calculation]
-- Verify: 4500mg ≤ New Total ≤ 6800mg
+- Verify: 4500mg ≤ New Total ≤ 5500mg
 
 🚨 YOU MUST DEMONSTRATE EXPERTISE:
 - Reference specific lab values (not "your cholesterol is high" but "your total cholesterol of 220 mg/dL")

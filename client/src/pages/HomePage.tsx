@@ -225,11 +225,11 @@ export default function HomePage() {
               {/* Dosage Progress */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Capsule Fill (4500-6800mg)</span>
+                  <span className="text-muted-foreground">Capsule Fill (4500-5500mg)</span>
                   <span className="font-medium">{currentFormula.totalMg}mg</span>
                 </div>
                 <Progress 
-                  value={Math.min((currentFormula.totalMg / 6800) * 100, 100)} 
+                  value={Math.min((currentFormula.totalMg / 5500) * 100, 100)} 
                   className="h-2"
                 />
               </div>
