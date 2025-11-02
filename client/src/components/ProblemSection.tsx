@@ -49,9 +49,10 @@ export default function ProblemSection() {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 viewport={{ once: true }}
+                className="h-full"
               >
                 <Card 
-                  className="p-8 text-center glass shadow-premium micro-bounce transition-all duration-500 group border-none"
+                  className="h-full flex flex-col p-8 text-center glass shadow-premium micro-bounce transition-all duration-500 group border-none"
                   data-testid={`card-problem-${index}`}
                 >
                 <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:bg-green-500/20 transition-colors duration-300">
