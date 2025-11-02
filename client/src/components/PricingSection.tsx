@@ -65,7 +65,7 @@ export default function PricingSection() {
     "Free shipping nationwide",
     "Custom-made for you",
     "Third-party tested ingredients",
-    "FDA registered facility"
+    "Made in USA"
   ];
 
   const handlePlanSelect = (index: number) => {
