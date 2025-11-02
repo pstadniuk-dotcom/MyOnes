@@ -28,7 +28,7 @@ export default function AboutPage() {
                 Our Mission
               </h2>
               <p className="text-muted-foreground mb-4">
-                At ONES, we believe that everyone deserves access to personalized nutrition based on their unique health profile. Traditional supplements take a one-size-fits-all approach, but your body is unique.
+                At Ones, we believe that everyone deserves access to personalized nutrition based on their unique health profile. Traditional supplements take a one-size-fits-all approach, but your body is unique.
               </p>
               <p className="text-muted-foreground mb-4">
                 Using advanced AI and a comprehensive catalog of premium ingredients, we create custom supplement formulas tailored specifically to your health needs, goals, and biomarkers.
@@ -72,13 +72,13 @@ export default function AboutPage() {
             </h2>
             <div className="prose prose-lg max-w-none">
               <p className="text-muted-foreground mb-4">
-                ONES was founded by a team of health professionals, data scientists, and engineers who experienced firsthand the frustration of generic supplements. Despite trying dozens of products, they couldn't find solutions tailored to their specific needs.
+                Ones was founded by a team of health professionals, data scientists, and engineers who experienced firsthand the frustration of generic supplements. Despite trying dozens of products, they couldn't find solutions tailored to their specific needs.
               </p>
               <p className="text-muted-foreground mb-4">
                 The breakthrough came when they realized that AI could analyze individual health profiles the same way a skilled practitioner would—but at scale. By combining extensive medical knowledge with advanced machine learning, they created a system that asks the right questions, understands complex health data, and formulates precise supplement recommendations.
               </p>
               <p className="text-muted-foreground">
-                Today, ONES serves thousands of customers who trust us to deliver personalized nutrition that actually works. We're continuously improving our AI, expanding our ingredient catalog, and staying at the forefront of nutritional science.
+                Today, Ones serves thousands of customers who trust us to deliver personalized nutrition that actually works. We're continuously improving our AI, expanding our ingredient catalog, and staying at the forefront of nutritional science.
               </p>
             </div>
           </div>

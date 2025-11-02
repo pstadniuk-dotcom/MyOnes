@@ -18,7 +18,7 @@ export default function PressPage() {
     },
     {
       id: 3,
-      title: 'Clinical Study Validates ONES Personalization Approach',
+      title: 'Clinical Study Validates Ones Personalization Approach',
       date: '2024-01-20',
       excerpt: 'New research shows significant improvements in health outcomes with personalized supplementation.'
     }
@@ -52,7 +52,7 @@ export default function PressPage() {
               Press & Media
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto" data-testid="text-press-description">
-              Latest news, press releases, and media resources for ONES.
+              Latest news, press releases, and media resources for Ones.
             </p>
           </div>
         </div>

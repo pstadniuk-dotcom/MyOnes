@@ -328,7 +328,7 @@ export default function MyFormulaPage() {
             My Formula
           </h1>
           <p className="text-muted-foreground">
-            Your personalized supplement formula, optimized by ONES AI
+            Your personalized supplement formula, optimized by Ones AI
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -1953,7 +1953,7 @@ function FormulaEmptyState() {
           <FlaskConical className="w-16 h-16 text-primary mx-auto mb-6" />
           <h3 className="text-2xl font-semibold mb-3">Start Your Personalized Journey</h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            Begin a conversation with ONES AI to receive your first personalized supplement formula tailored to your unique health profile.
+            Begin a conversation with Ones AI to receive your first personalized supplement formula tailored to your unique health profile.
           </p>
           <Button asChild size="lg" data-testid="button-start-consultation">
             <Link href="/dashboard/consultation">

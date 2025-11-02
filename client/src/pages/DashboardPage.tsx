@@ -158,7 +158,7 @@ function WelcomeOnboarding({ userName }: { userName: string }) {
             <div className="space-y-4">
               <div>
                 <h2 className="text-2xl font-bold text-primary mb-2">
-                  Welcome to ONES AI, {userName}!
+                  Welcome to Ones AI, {userName}!
                 </h2>
                 <p className="text-muted-foreground">
                   Let's create your personalized supplement formula. Our AI will analyze your health profile and goals to recommend the perfect blend just for you.
@@ -414,7 +414,7 @@ export default function DashboardPage() {
   const quickActions = [
     {
       title: 'Start New Consultation',
-      description: 'Chat with ONES AI about your health goals',
+      description: 'Chat with Ones AI about your health goals',
       href: '/dashboard/consultation',
       icon: MessageSquare,
       variant: 'default' as const,
@@ -483,7 +483,7 @@ export default function DashboardPage() {
                 </h1>
                 <p className="text-muted-foreground">
                   {isNewUser 
-                    ? "Let's start your personalized supplement journey with ONES AI." 
+                    ? "Let's start your personalized supplement journey with Ones AI." 
                     : "Here's your personalized supplement journey overview."
                   }
                 </p>

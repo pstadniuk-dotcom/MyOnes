@@ -11,7 +11,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Introduction</h2>
             <p className="text-muted-foreground">
-              At ONES, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our personalized supplement platform.
+              At Ones, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our personalized supplement platform.
             </p>
           </section>
 
@@ -50,7 +50,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Data Security</h2>
             <p className="text-muted-foreground">
-              We implement industry-standard security measures to protect your data, including encryption in transit and at rest, access controls, and audit logging. However, please note that ONES is not HIPAA compliant. We maintain strong security practices but are not certified for HIPAA compliance.
+              We implement industry-standard security measures to protect your data, including encryption in transit and at rest, access controls, and audit logging. However, please note that Ones is not HIPAA compliant. We maintain strong security practices but are not certified for HIPAA compliance.
             </p>
           </section>
 

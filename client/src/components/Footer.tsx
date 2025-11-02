@@ -91,7 +91,7 @@ export default function Footer() {
           {/* Brand Section */}
           <div className="lg:col-span-2">
             <h2 className="text-2xl font-serif font-bold text-primary mb-4" data-testid="text-footer-brand">
-              ONES
+              Ones
             </h2>
             <p className="text-muted-foreground mb-6 max-w-sm" data-testid="text-footer-description">
               Personalized supplements powered by AI. Transforming health one formula at a time.
@@ -224,7 +224,7 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
           <div className="flex items-center space-x-6">
             <p className="text-sm text-muted-foreground" data-testid="text-footer-copyright">
-              © 2024 ONES. All rights reserved.
+              © 2024 Ones. All rights reserved.
             </p>
             
             {/* Social Proof */}

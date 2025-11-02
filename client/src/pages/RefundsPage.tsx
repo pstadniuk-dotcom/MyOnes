@@ -11,7 +11,7 @@ export default function RefundsPage() {
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Our Commitment</h2>
             <p className="text-muted-foreground">
-              At ONES, we're committed to your satisfaction. We want you to be completely happy with your personalized supplements. If you're not satisfied, we're here to help.
+              At Ones, we're committed to your satisfaction. We want you to be completely happy with your personalized supplements. If you're not satisfied, we're here to help.
             </p>
           </section>
 

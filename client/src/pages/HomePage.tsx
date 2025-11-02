@@ -149,7 +149,7 @@ export default function HomePage() {
             <div className="space-y-4">
               <div>
                 <h2 className="text-2xl font-semibold text-primary mb-2">
-                  Welcome to ONES AI
+                  Welcome to Ones AI
                 </h2>
                 <p className="text-muted-foreground">
                   Let's create your personalized supplement formula. Our AI will analyze your health profile to recommend the perfect blend.

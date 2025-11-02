@@ -11,7 +11,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Agreement to Terms</h2>
             <p className="text-muted-foreground">
-              By accessing or using ONES, you agree to be bound by these Terms of Service and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using our services.
+              By accessing or using Ones, you agree to be bound by these Terms of Service and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using our services.
             </p>
           </section>
 
@@ -19,7 +19,7 @@ export default function TermsPage() {
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Use of Service</h2>
             <h3 className="text-xl font-semibold text-foreground mb-3">Eligibility</h3>
             <p className="text-muted-foreground mb-4">
-              You must be at least 18 years old to use ONES. By using our service, you represent and warrant that you meet this requirement.
+              You must be at least 18 years old to use Ones. By using our service, you represent and warrant that you meet this requirement.
             </p>
 
             <h3 className="text-xl font-semibold text-foreground mb-3">Account Responsibilities</h3>
@@ -44,7 +44,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Subscription & Payments</h2>
             <p className="text-muted-foreground mb-4">
-              By subscribing to ONES, you agree to:
+              By subscribing to Ones, you agree to:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
               <li>Recurring monthly charges to your payment method</li>
@@ -57,14 +57,14 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Intellectual Property</h2>
             <p className="text-muted-foreground">
-              All content, features, and functionality of ONES, including our AI algorithms, formulation system, and platform design, are owned by ONES and protected by intellectual property laws. You may not copy, modify, or create derivative works without our written permission.
+              All content, features, and functionality of Ones, including our AI algorithms, formulation system, and platform design, are owned by Ones and protected by intellectual property laws. You may not copy, modify, or create derivative works without our written permission.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Limitation of Liability</h2>
             <p className="text-muted-foreground">
-              ONES shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of or inability to use the service. Our total liability shall not exceed the amount you paid for the service in the past 12 months.
+              Ones shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of or inability to use the service. Our total liability shall not exceed the amount you paid for the service in the past 12 months.
             </p>
           </section>
 

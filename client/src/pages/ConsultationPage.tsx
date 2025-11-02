@@ -537,7 +537,7 @@ export default function ConsultationPage() {
         
         toast({
           title: "Files Uploaded Successfully",
-          description: `${newUploadedFiles.length} file(s) ready for analysis. Click send to have ONES AI analyze your results.`,
+          description: `${newUploadedFiles.length} file(s) ready for analysis. Click send to have Ones AI analyze your results.`,
           variant: "success"
         });
       }
@@ -585,7 +585,7 @@ export default function ConsultationPage() {
     
     toast({
       title: "New Consultation Started",
-      description: "Ready to discuss your health goals with ONES AI.",
+      description: "Ready to discuss your health goals with Ones AI.",
       variant: "default"
     });
   }, [toast, user?.name]);
@@ -684,10 +684,10 @@ export default function ConsultationPage() {
   // Share message content
   const handleShareMessage = useCallback(async (content: string, formula?: any) => {
     const shareData = {
-      title: 'ONES AI Consultation',
+      title: 'Ones AI Consultation',
       text: formula 
-        ? `Check out my personalized supplement formula from ONES AI:\n\n${content}\n\nTotal: ${formula.totalMg}mg formula with ${formula.bases.length} base formulas and ${formula.additions?.length || 0} additions.`
-        : `ONES AI Health Consultation:\n\n${content}`,
+        ? `Check out my personalized supplement formula from Ones AI:\n\n${content}\n\nTotal: ${formula.totalMg}mg formula with ${formula.bases.length} base formulas and ${formula.additions?.length || 0} additions.`
+        : `Ones AI Health Consultation:\n\n${content}`,
       url: window.location.origin
     };
 
@@ -990,14 +990,14 @@ export default function ConsultationPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-                  <AvatarImage src="" alt="ONES AI" />
+                  <AvatarImage src="" alt="Ones AI" />
                   <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-semibold">
-                    ONES
+                    Ones
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-consultation-title">
-                    ONES AI Consultation
+                    Ones AI Consultation
                     <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
                       <Sparkles className="w-3 h-3 mr-1" />
                       AI-Powered
@@ -1114,7 +1114,7 @@ export default function ConsultationPage() {
                     {message.sender === 'ai' && (
                       <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-primary/10">
                         <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-xs font-semibold text-primary">
-                          ONES
+                          Ones
                         </AvatarFallback>
                       </Avatar>
                     )}
@@ -1128,7 +1128,7 @@ export default function ConsultationPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`text-xs font-medium ${message.sender === 'user' ? 'text-white/90 dark:text-white/90' : 'text-muted-foreground'}`}>
-                          {message.sender === 'user' ? 'You' : 'ONES AI'}
+                          {message.sender === 'user' ? 'You' : 'Ones AI'}
                         </span>
                         <span className={`text-xs ${message.sender === 'user' ? 'text-white/60 dark:text-white/60' : 'text-muted-foreground/70'}`}>
                           {message.timestamp && !isNaN(new Date(message.timestamp).getTime()) 
@@ -1286,13 +1286,13 @@ export default function ConsultationPage() {
                   <div className="flex items-center space-x-4">
                     <Avatar className="h-9 w-9 ring-2 ring-primary/10">
                       <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-xs font-semibold text-primary">
-                        ONES
+                        Ones
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                        ONES AI is analyzing...
+                        Ones AI is analyzing...
                       </p>
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce"></div>

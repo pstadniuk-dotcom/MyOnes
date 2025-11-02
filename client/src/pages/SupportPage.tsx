@@ -34,7 +34,7 @@ import type { FaqItem, SupportTicket, HelpArticle } from '@shared/schema';
 const helpCategoryConfigs = [
   {
     title: 'Getting Started',
-    description: 'Learn the basics of using ONES AI',
+    description: 'Learn the basics of using Ones AI',
     icon: Book,
     category: 'Getting Started'
   },
@@ -315,7 +315,7 @@ export default function SupportPage() {
                 <Button variant="outline" className="justify-start h-auto p-4" asChild data-testid="link-ai-consultation">
                   <Link href="/dashboard/consultation">
                     <div>
-                      <div className="font-medium">Ask ONES AI</div>
+                      <div className="font-medium">Ask Ones AI</div>
                       <div className="text-sm text-muted-foreground">Get instant help from our AI assistant</div>
                     </div>
                   </Link>
@@ -484,7 +484,7 @@ export default function SupportPage() {
                 <CardContent>
                   <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200">
                     <p className="text-sm text-red-800 dark:text-red-300 mb-3">
-                      <strong>Important:</strong> ONES AI provides supplement recommendations, not medical advice. 
+                      <strong>Important:</strong> Ones AI provides supplement recommendations, not medical advice. 
                       For medical emergencies, please contact emergency services immediately.
                     </p>
                     <div className="space-y-1 text-sm text-red-700 dark:text-red-400">
