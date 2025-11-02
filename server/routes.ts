@@ -940,9 +940,108 @@ MEDICAL HISTORY:
 - "Any family history of heart disease, diabetes, cancer, or autoimmune conditions?"
 - "Have you tried supplements before? What worked or didn't work for you?"
 
-=== BLOOD TEST INTERPRETATION GUIDELINES ===
+=== BIOMARKER-TO-INGREDIENT MAPPING (CRITICAL REFERENCE) ===
 
-When users provide blood test results, optimize based on these ranges:
+When analyzing blood tests, use this mapping to select appropriate base formulas and individual ingredients from our approved catalog:
+
+🔴 CARDIOVASCULAR BIOMARKERS:
+• Total Cholesterol >200 mg/dL or LDL >100 mg/dL
+  → ADD: Heart Support (450mg) - contains L-Carnitine 175mg, CoQ10 21mg, Magnesium 126mg
+  → ADD: Omega 3 (algae omega) (300mg) - reduces triglycerides and inflammation
+  → ADD: Garlic (powder) (200mg) - supports healthy cholesterol levels
+
+• Triglycerides >150 mg/dL
+  → ADD: Omega 3 (algae omega) (300mg) - primary intervention for triglycerides
+  → ADD: Heart Support (450mg) - L-Carnitine supports lipid metabolism
+  → ADD: Cinnamon 20:1 (1000mg) - helps regulate blood lipids
+
+• Blood Pressure >120/80 mmHg
+  → ADD: Heart Support (450mg) - Magnesium and CoQ10 support healthy BP
+  → ADD: Magnesium (320mg) - critical for BP regulation
+  → ADD: Hawthorn Berry PE 1/8% Flavones (dose as needed) - traditional BP support
+
+🟠 INFLAMMATION MARKERS:
+• CRP >1.0 mg/L (elevated inflammation)
+  → ADD: Turmeric Root Extract 4:1 (500mg) - powerful anti-inflammatory (curcumin)
+  → ADD: Omega 3 (algae omega) (300mg) - reduces inflammatory cytokines
+  → ADD: Ginger Root (500mg) - anti-inflammatory gingerols
+  → ADD: Resveratrol (dose as needed) - reduces oxidative stress
+
+• High ESR or other inflammation markers
+  → Same as CRP protocol above
+
+🟡 BLOOD SUGAR / METABOLIC:
+• HbA1c >5.4% or Fasting Glucose >100 mg/dL
+  → ADD: Cinnamon 20:1 (1000mg) - improves insulin sensitivity
+  → ADD: Alpha Oxyme (350mg) - supports cellular glucose metabolism
+  → ADD: Magnesium (320mg) - essential for insulin function
+  → ADD: Resveratrol (dose as needed) - improves insulin sensitivity
+
+• Insulin Resistance indicators
+  → Same as above, emphasize Cinnamon 20:1 and Magnesium
+
+🟢 LIVER FUNCTION:
+• Elevated ALT, AST, or Total Bilirubin
+  → ADD: Liver Support (480mg) - bovine liver glandular + Dandelion + Barberry
+  → ADD: LSK Plus (450mg) - liver/kidney/spleen detox blend
+  → ADD: Diadren Forte (400mg) - comprehensive liver/pancreas support
+  → ADD: Turmeric Root Extract 4:1 (500mg) - supports liver detoxification
+
+• Elevated GGT (alcohol/toxin related)
+  → ADD: Liver Support (480mg)
+  → ADD: Mold RX (525mg) - if mold/toxin exposure suspected
+
+🔵 THYROID FUNCTION:
+• TSH >2.5 mIU/L (suboptimal)
+  → ADD: Thyroid Support (470mg) - contains Iodine 900mcg, bovine thyroid 60mg
+  → ADD: Para Thy (dose as needed) - parathyroid/thyroid glandular support
+
+• Low TSH <1.0 mIU/L (hyperthyroid pattern)
+  → Use caution with iodine - consult with healthcare provider
+
+🟣 DIGESTIVE MARKERS:
+• H. Pylori positive or digestive symptoms
+  → ADD: Alpha Gest III (636mg) - Betaine HCl + Pepsin for protein digestion
+  → ADD: Alpha Zyme III (400mg) - comprehensive digestive enzymes
+  → ADD: Aloe Vera Powder (250mg) - soothes gut lining
+
+• Low enzyme function
+  → ADD: Dia Zyme (494mg) - Pancreatin 8X + Trypsin + Chymotrypsin
+  → ADD: Chola Plus (350mg) - bile production support
+
+🟤 IMMUNE FUNCTION:
+• Low WBC or recurrent infections
+  → ADD: Beta Max (2500mg) - beta-glucans for immune enhancement
+  → ADD: Immune-C (430mg) - Vitamin C + herbs (Cats Claw, Astragalus)
+  → ADD: Colostrum Powder (1000mg) - immune factors
+
+• High WBC (inflammation/infection)
+  → ADD: Immune-C (430mg)
+  → ADD: Turmeric Root Extract 4:1 (500mg) - modulates immune response
+
+⚫ STRESS / ADRENAL MARKERS:
+• High Cortisol or DHEA imbalance
+  → ADD: Adrenal Support (420mg) - Pantothenic Acid + bovine adrenal
+  → ADD: Diadren Forte (400mg) - advanced adrenal support
+  → ADD: Ahswaganda (600mg) - adaptogen that balances cortisol
+  → ADD: MG/K (180mg) - Magnesium/Potassium for adrenal support
+
+🔴 NUTRIENT DEFICIENCIES (if tested):
+• Vitamin D <30 ng/mL
+  → NOT IN CATALOG - recommend separate supplementation
+
+• B12 <400 pg/mL
+  → NOT IN CATALOG - recommend separate B12
+
+• Ferritin <50 ng/mL (iron deficiency)
+  → ADD: Histamine Support (190mg) - contains iron 1.95mg (mild support)
+  → Recommend separate iron supplementation for severe deficiency
+
+• Magnesium (RBC) <5.0 mg/dL
+  → ADD: Magnesium (320mg) - primary intervention
+  → ADD: MG/K (180mg) - Magnesium 90mg + Potassium 90mg
+
+=== OPTIMAL BIOMARKER REFERENCE RANGES ===
 
 - Vitamin D: Optimal 40-60 ng/mL (supplement if <30)
 - B12: Optimal >500 pg/mL (supplement if <400)
@@ -952,6 +1051,10 @@ When users provide blood test results, optimize based on these ranges:
 - Homocysteine: Optimal <7 μmol/L
 - CRP: Optimal <1.0 mg/L
 - HbA1c: Optimal <5.4%
+- Total Cholesterol: Optimal <200 mg/dL
+- LDL: Optimal <100 mg/dL
+- Triglycerides: Optimal <150 mg/dL
+- Fasting Glucose: Optimal 70-99 mg/dL
 
 === RESPONSE FORMAT ===
 
@@ -1593,20 +1696,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'alcohol consumption per week', 'current health conditions or concerns', 'current medications', 'allergies');
       }
 
-      // Fetch user's lab reports with extracted data
+      // Fetch user's lab reports with extracted data and format as structured table
       const labReports = await storage.getLabReportsByUser(userId!);
-      const labDataContext = labReports
-        .filter(report => report.labReportData?.analysisStatus === 'completed' && report.labReportData?.extractedData)
-        .map(report => {
-          const data = report.labReportData!;
-          const values = data.extractedData as any[];
-          const formattedValues = values.map(v => 
-            `${v.testName}: ${v.value} ${v.unit || ''} (${v.status || 'normal'}${v.referenceRange ? `, ref: ${v.referenceRange}` : ''})`
-          ).join(', ');
-          return `Lab Report from ${data.testDate || 'unknown date'} (${data.labName || 'unknown lab'}): ${formattedValues}`;
-        })
-        .join('\n');
+      let labDataContext = '';
+      
+      if (labReports.length > 0) {
+        const processedReports = labReports
+          .filter(report => report.labReportData?.analysisStatus === 'completed' && report.labReportData?.extractedData)
+          .map(report => {
+            const data = report.labReportData!;
+            const values = data.extractedData as any[];
+            
+            const tableRows = values.map(v => {
+              const status = v.status || 'normal';
+              const statusFlag = status === 'high' ? '⬆️ HIGH' : status === 'low' ? '⬇️ LOW' : '✓ Normal';
+              return `  • ${v.testName}: ${v.value} ${v.unit || ''} | Status: ${statusFlag} | Reference: ${v.referenceRange || 'N/A'}`;
+            }).join('\n');
+            
+            return `📋 Lab Report from ${data.testDate || 'unknown date'} (${data.labName || 'unknown lab'}):\n${tableRows}`;
+          });
+        
+        if (processedReports.length > 0) {
+          labDataContext = processedReports.join('\n\n');
+        }
+      }
+      
+      // Fetch user's current active formula
+      const userFormulas = await storage.listFormulas(userId!);
+      const activeFormula = userFormulas.length > 0 ? userFormulas[0] : null;
+      
+      let currentFormulaContext = '';
+      if (activeFormula) {
+        const bases = activeFormula.bases as Array<{name: string, dose: string, purpose?: string}>;
+        const additions = (activeFormula.additions || []) as Array<{name: string, dose: string, purpose?: string}>;
+        
+        const basesText = bases.map(b => `  • ${b.name} - ${b.dose}`).join('\n');
+        const additionsText = additions.length > 0 
+          ? additions.map(a => `  • ${a.name} - ${a.dose}`).join('\n')
+          : '  (none)';
+        
+        currentFormulaContext = `
+📦 CURRENT ACTIVE FORMULA (Version ${activeFormula.version || 1}):
 
+Base Formulas:
+${basesText}
+
+Individual Additions:
+${additionsText}
+
+Total Daily Dose: ${activeFormula.dailyTotalMg}mg
+Capsules per Day: ${activeFormula.capsulesPerDay || 'Not specified'}
+Target Range: 4500-6800mg (00 capsule capacity)
+
+⚠️ IMPORTANT: When analyzing blood tests and making recommendations:
+- Review this current formula FIRST
+- Identify what's working and what might need adjustment
+- Calculate the gap: Current ${activeFormula.dailyTotalMg}mg → Target 4500-6800mg = ${Math.max(0, 4500 - activeFormula.dailyTotalMg)}mg minimum addition needed
+- Suggest specific base formulas or individual ingredients from the approved catalog to ADD
+- Explain which current ingredients to keep, increase, or remove based on lab results
+- Show your math: "Current XYZ 450mg + Adding ABC 300mg = 750mg total for cardiovascular support"
+`;
+
+      }
+      
       const healthContextMessage = `
 === USER'S CURRENT HEALTH PROFILE STATUS ===
 
@@ -1614,11 +1766,49 @@ Information we have: ${completedFields.length > 0 ? completedFields.join(', ') :
 
 Information still needed: ${missingFields.length > 0 ? missingFields.join(', ') : 'Complete!'}
 
-${labDataContext ? `=== LABORATORY TEST RESULTS ===
+${currentFormulaContext}
+
+${labDataContext ? `
+=== LABORATORY TEST RESULTS (ANALYZE THESE CAREFULLY) ===
 ${labDataContext}
 
-USE THIS LAB DATA: When creating supplement recommendations, consider these test results. If values are out of range, address them with targeted supplementation.
+🔬 MANDATORY BLOOD TEST ANALYSIS PROTOCOL:
+When blood test results are provided, you MUST follow this structured analysis approach:
+
+STEP 1 - BIOMARKER INTERPRETATION TABLE
+Create a clear table analyzing EACH abnormal biomarker:
+- Biomarker name and actual value
+- Reference range and how far out of range
+- Clinical significance (what this means for health)
+- Which approved base formula or individual ingredient addresses it
+
+STEP 2 - CURRENT FORMULA REVIEW
+${activeFormula ? `Analyze the user's current ${activeFormula.dailyTotalMg}mg formula:
+- What's already addressing their issues?
+- What's missing based on lab results?
+- Calculate capacity remaining: ${Math.max(0, 6800 - activeFormula.dailyTotalMg)}mg available for additions (max 6800mg total)` : 'User has no current formula - create comprehensive first formula based on labs'}
+
+STEP 3 - SPECIFIC CATALOG-BASED RECOMMENDATIONS
+For EACH abnormal biomarker, specify:
+- Exact base formula or individual ingredient from approved catalog (NO generic suggestions)
+- Exact mg dosage
+- Scientific rationale tied to their specific lab value
+- Example: "Total Cholesterol 220 mg/dL (⬆️ HIGH, ref: <200) → ADD Heart Support 450mg (contains L-Carnitine 175mg, CoQ10 21mg, Magnesium 126mg which support cardiovascular health and cholesterol metabolism)"
+
+STEP 4 - DOSAGE CALCULATIONS
+Show explicit math:
+- Current total: ${activeFormula ? `${activeFormula.dailyTotalMg}mg` : '0mg'}
+- Additions recommended: [calculate sum of new ingredients]
+- New total: [show calculation]
+- Verify: 4500mg ≤ New Total ≤ 6800mg
+
+🚨 YOU MUST DEMONSTRATE EXPERTISE:
+- Reference specific lab values (not "your cholesterol is high" but "your total cholesterol of 220 mg/dL")
+- Explain why each ingredient targets that specific biomarker
+- Only use ingredients from the approved 32 base formulas + 29 individual ingredients
+- Show dosage math explicitly
 ` : ''}
+
 INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 - Naturally weave requests for missing information into the conversation
 - Don't ask for all missing items at once - prioritize the most important ones first
