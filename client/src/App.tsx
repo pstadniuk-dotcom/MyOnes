@@ -26,9 +26,10 @@ import ShippingPage from "@/pages/ShippingPage";
 
 // Import dashboard components
 import { DashboardLayout } from "@/components/DashboardLayout";
-import DashboardPage from "@/pages/DashboardPage";
+import HomePage from "@/pages/HomePage";
 import ConsultationPage from "@/pages/ConsultationPage";
 import MyFormulaPage from "@/pages/MyFormulaPage";
+import LabReportsPage from "@/pages/LabReportsPage";
 import OrdersPage from "@/pages/OrdersPage";
 import ProfilePage from "@/pages/ProfilePage";
 import SupportPage from "@/pages/SupportPage";
@@ -45,7 +46,7 @@ import FAQSection from "@/components/FAQSection";
 import CTASection from "@/components/CTASection";
 import Footer from "@/components/Footer";
 
-function HomePage() {
+function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -68,7 +69,7 @@ function HomePage() {
 function MainRouter() {
   return (
     <Switch>
-      <Route path="/" component={HomePage} />
+      <Route path="/" component={LandingPage} />
       <Route path="/science" component={SciencePage} />
       <Route path="/signup" component={SignupPage} />
       <Route path="/login" component={LoginPage} />
@@ -91,7 +92,14 @@ function MainRouter() {
       <Route path="/dashboard">
         <ProtectedRoute>
           <DashboardLayout>
-            <DashboardPage />
+            <HomePage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/chat">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <ConsultationPage />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
@@ -106,6 +114,13 @@ function MainRouter() {
         <ProtectedRoute>
           <DashboardLayout>
             <MyFormulaPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/lab-reports">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <LabReportsPage />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
