@@ -75,7 +75,7 @@ export default function ScienceSection() {
           {/* Competitor Cards */}
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 max-w-7xl mx-auto">
             {competitors.map((competitor, index) => (
-              <Card key={index} className="overflow-hidden bg-card border hover-elevate transition-premium" data-testid={`card-competitor-${index}`}>
+              <Card key={index} className="flex flex-col overflow-hidden bg-card border hover-elevate transition-premium" data-testid={`card-competitor-${index}`}>
                 <div className="aspect-square w-full bg-white flex items-center justify-center p-6">
                   <img 
                     src={competitor.image} 
@@ -83,7 +83,7 @@ export default function ScienceSection() {
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <div className="p-5 bg-muted/30">
+                <div className="flex-1 p-5 bg-muted/30">
                   <h4 className="font-semibold text-foreground mb-2">{competitor.name}</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">{competitor.formula}</p>
                 </div>
