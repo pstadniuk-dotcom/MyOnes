@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Check, Star } from 'lucide-react';
+import { Link } from 'wouter';
 
 export default function PricingSection() {
   const [selectedPlan, setSelectedPlan] = useState(1); // Default to middle plan
@@ -69,11 +70,6 @@ export default function PricingSection() {
 
   const handlePlanSelect = (index: number) => {
     setSelectedPlan(index);
-    console.log('Plan selected:', plans[index].name);
-  };
-
-  const handleSubscribe = (planName: string) => {
-    console.log('Subscribe clicked for:', planName);
   };
 
   return (
@@ -162,16 +158,16 @@ export default function PricingSection() {
 
               {/* CTA Button */}
               <Button 
+                asChild
                 className={`w-full ${plan.popular ? 'bg-primary hover:bg-primary/90' : ''}`}
                 variant={plan.popular ? 'default' : 'outline'}
                 size="lg"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleSubscribe(plan.name);
                 }}
                 data-testid={`button-subscribe-${index}`}
               >
-                {plan.cta}
+                <Link href="/signup">{plan.cta}</Link>
               </Button>
             </Card>
           ))}
@@ -184,12 +180,12 @@ export default function PricingSection() {
               Not sure which plan is right for you? Start with our free consultation and we'll recommend the best path forward.
             </p>
             <Button 
+              asChild
               variant="outline" 
               size="lg"
-              onClick={() => console.log('Free consultation clicked')}
               data-testid="button-free-consultation"
             >
-              Get Free Consultation First
+              <Link href="/signup">Get Free Consultation First</Link>
             </Button>
           </div>
         </div>

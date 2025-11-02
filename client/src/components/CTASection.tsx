@@ -57,7 +57,7 @@ export default function CTASection() {
                 className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-semibold"
                 data-testid="button-final-start-consultation"
               >
-                <Link href="/dashboard/consultation">
+                <Link href="/signup">
                   Start Your Consultation
                 </Link>
               </Button>
