@@ -83,9 +83,9 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["Suisse Int'l", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
-        serif: ["Suisse Int'l", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
-        mono: ["Suisse Int'l Mono", "ui-monospace", "SF Mono", "Menlo", "Monaco", "monospace"],
+        sans: ["Montserrat", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
+        serif: ["Montserrat", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
+        mono: ["ui-monospace", "SF Mono", "Menlo", "Monaco", "monospace"],
       },
       backgroundImage: {
         'earthy-gradient': 'linear-gradient(135deg, #EDE8E2 0%, #CCCDBB 100%)',
