@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
-  Send, Upload, Brain, User, AlertTriangle, CheckCircle, Sparkles, FileText,
+  Send, Upload, User, AlertTriangle, CheckCircle, Sparkles, FileText,
   History, Download, Search, Plus, RotateCcw, Copy, Share2, Mic, 
   Loader2, FlaskConical, Clock, ArrowUp, Settings2, Zap,
   Shield, Trash2, Calendar, Eye, EyeOff, X, ChevronDown, ChevronUp, ArrowRight
@@ -991,8 +991,8 @@ export default function ConsultationPage() {
               <div className="flex items-center space-x-4">
                 <Avatar className="h-12 w-12 ring-2 ring-primary/20">
                   <AvatarImage src="" alt="ONES AI" />
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-                    <Brain className="w-6 h-6" />
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-semibold">
+                    ONES
                   </AvatarFallback>
                 </Avatar>
                 <div>
@@ -1113,8 +1113,8 @@ export default function ConsultationPage() {
                   <div className={`flex items-start gap-4 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
                     {message.sender === 'ai' && (
                       <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-primary/10">
-                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10">
-                          <Brain className="w-5 h-5 text-primary" />
+                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-xs font-semibold text-primary">
+                          ONES
                         </AvatarFallback>
                       </Avatar>
                     )}
@@ -1285,8 +1285,8 @@ export default function ConsultationPage() {
                 <div className="bg-background/80 backdrop-blur-sm rounded-2xl rounded-tl-sm p-5 max-w-[85%] border shadow-md">
                   <div className="flex items-center space-x-4">
                     <Avatar className="h-9 w-9 ring-2 ring-primary/10">
-                      <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10">
-                        <Brain className="w-5 h-5 text-primary" />
+                      <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-xs font-semibold text-primary">
+                        ONES
                       </AvatarFallback>
                     </Avatar>
                     <div>
