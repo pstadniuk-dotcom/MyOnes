@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, MessageSquare, Brain, Target, X, Check, AlertTriangle, Sparkles } from 'lucide-react';
+import { Users, MessageSquare, Target, X, Check, AlertTriangle, Sparkles } from 'lucide-react';
 import ag1Image from '@assets/ag1_1760387996934.jpg';
 import blueprintImage from '@assets/blueprint_1760380986912.webp';
 import ritualImage from '@assets/Ritual_1760380986912.avif';
@@ -172,7 +172,7 @@ export default function ScienceSection() {
               <div className="relative">
                 <div className="flex items-center gap-3 mb-8">
                   <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center">
-                    <Brain className="w-6 h-6 text-primary" />
+                    <MessageSquare className="w-6 h-6 text-primary" />
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wider text-primary/70 mb-1">ONES Approach</p>

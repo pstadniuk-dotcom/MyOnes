@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Send, Mic, MicOff, Brain, User, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Send, Mic, MicOff, User, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 
@@ -191,7 +191,7 @@ export default function AIChat() {
       <div className="p-4 border-b border-card-border">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <Brain className="w-4 h-4 text-primary-foreground" />
+            <span className="text-xs font-semibold text-primary-foreground">ONES</span>
           </div>
           <div>
             <h3 className="font-medium text-sm" data-testid="text-ai-name">ONES AI</h3>
@@ -215,84 +215,74 @@ export default function AIChat() {
                   : 'bg-muted text-muted-foreground'
               }`}
             >
-              <div className="flex items-start space-x-2">
-                {message.sender === 'ai' && (
-                  <Brain className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                )}
-                {message.sender === 'user' && (
-                  <User className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                )}
-                <div className="flex-1">
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                   
-                  {/* Formula visualization */}
-                  {message.formula && (
-                    <div className="mt-3 p-3 bg-background/50 rounded-lg border text-foreground">
-                      <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        Personalized Formula ({message.formula.totalMg}mg)
-                      </h4>
-                      
-                      {/* Formula Bases */}
-                      {message.formula.bases.length > 0 && (
-                        <div className="mb-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Base Formulas:</p>
-                          <div className="space-y-1">
-                            {message.formula.bases.map((base, idx) => (
-                              <div key={idx} className="flex items-center justify-between text-xs">
-                                <span className="font-medium">{base.name}</span>
-                                <Badge variant="secondary" className="text-xs">{base.dose}</Badge>
-                              </div>
-                            ))}
+              {/* Formula visualization */}
+              {message.formula && (
+                <div className="mt-3 p-3 bg-background/50 rounded-lg border text-foreground">
+                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    Personalized Formula ({message.formula.totalMg}mg)
+                  </h4>
+                  
+                  {/* Formula Bases */}
+                  {message.formula.bases.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Base Formulas:</p>
+                      <div className="space-y-1">
+                        {message.formula.bases.map((base, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-xs">
+                            <span className="font-medium">{base.name}</span>
+                            <Badge variant="secondary" className="text-xs">{base.dose}</Badge>
                           </div>
-                        </div>
-                      )}
-                      
-                      {/* Additional Ingredients */}
-                      {message.formula.additions.length > 0 && (
-                        <div className="mb-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Additional Ingredients:</p>
-                          <div className="space-y-1">
-                            {message.formula.additions.map((addition, idx) => (
-                              <div key={idx} className="flex items-center justify-between text-xs">
-                                <span className="font-medium">{addition.name}</span>
-                                <Badge variant="outline" className="text-xs">{addition.dose}</Badge>
-                              </div>
-                            ))}
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Additional Ingredients */}
+                  {message.formula.additions.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Additional Ingredients:</p>
+                      <div className="space-y-1">
+                        {message.formula.additions.map((addition, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-xs">
+                            <span className="font-medium">{addition.name}</span>
+                            <Badge variant="outline" className="text-xs">{addition.dose}</Badge>
                           </div>
-                        </div>
-                      )}
-                      
-                      {/* Warnings */}
-                      {message.formula.warnings.length > 0 && (
-                        <div className="mb-2">
-                          <p className="text-xs font-medium text-amber-600 mb-1 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" />
-                            Important Warnings:
-                          </p>
-                          <ul className="text-xs text-amber-700 space-y-1">
-                            {message.formula.warnings.map((warning, idx) => (
-                              <li key={idx} className="flex items-start gap-1">
-                                <span className="text-amber-600 mt-0.5">•</span>
-                                {warning}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      
-                      {/* Disclaimers */}
-                      {message.formula.disclaimers.length > 0 && (
-                        <div className="text-xs text-muted-foreground border-t pt-2">
-                          {message.formula.disclaimers.map((disclaimer, idx) => (
-                            <p key={idx} className="mb-1">• {disclaimer}</p>
-                          ))}
-                        </div>
-                      )}
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Warnings */}
+                  {message.formula.warnings.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-xs font-medium text-amber-600 mb-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        Important Warnings:
+                      </p>
+                      <ul className="text-xs text-amber-700 space-y-1">
+                        {message.formula.warnings.map((warning, idx) => (
+                          <li key={idx} className="flex items-start gap-1">
+                            <span className="text-amber-600 mt-0.5">•</span>
+                            {warning}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {/* Disclaimers */}
+                  {message.formula.disclaimers.length > 0 && (
+                    <div className="text-xs text-muted-foreground border-t pt-2">
+                      {message.formula.disclaimers.map((disclaimer, idx) => (
+                        <p key={idx} className="mb-1">• {disclaimer}</p>
+                      ))}
                     </div>
                   )}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         ))}
@@ -301,7 +291,7 @@ export default function AIChat() {
           <div className="flex justify-start" data-testid="indicator-typing">
             <div className="bg-muted text-muted-foreground rounded-lg p-3 max-w-[80%]">
               <div className="flex items-center space-x-2">
-                <Brain className="w-4 h-4" />
+                <span className="text-xs font-semibold">ONES</span>
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
                   <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
