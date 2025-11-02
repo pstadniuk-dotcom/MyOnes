@@ -16,10 +16,10 @@ export default function HeroSection() {
           {/* Left Side - Headline and Description */}
           <div className="space-y-8">
             <div className="space-y-6">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground leading-tight" data-testid="text-hero-headline">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground leading-[1.2]" data-testid="text-hero-headline">
                 <span className="block animate-fade-in">One capsule.</span>
                 <span className="block animate-fade-in" style={{ animationDelay: '0.5s', opacity: 0, animationFillMode: 'forwards' }}>Fully personalized.</span>
-                <span className="block animate-fade-in-shimmer" style={{ animationDelay: '1s', opacity: 0 }}>Always evolving.</span>
+                <span className="block animate-fade-in-shimmer pb-2" style={{ animationDelay: '1s', opacity: 0 }}>Always evolving.</span>
               </h1>
               
               <p className="text-lg md:text-xl text-muted-foreground max-w-lg leading-relaxed" data-testid="text-hero-description">
