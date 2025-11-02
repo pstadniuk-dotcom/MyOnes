@@ -189,14 +189,9 @@ export default function AIChat() {
     <Card className="w-full max-w-md h-[500px] flex flex-col glass shadow-premium-lg border-none" data-testid="card-ai-chat">
       {/* Chat Header */}
       <div className="p-4 border-b border-card-border">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <span className="text-xs font-semibold text-primary-foreground">Ones</span>
-          </div>
-          <div>
-            <h3 className="font-medium text-sm" data-testid="text-ai-name">Ones AI</h3>
-            <p className="text-xs text-muted-foreground">Your health consultant</p>
-          </div>
+        <div>
+          <h3 className="font-medium text-sm" data-testid="text-ai-name">Ones AI</h3>
+          <p className="text-xs text-muted-foreground">Your health consultant</p>
         </div>
       </div>
 
