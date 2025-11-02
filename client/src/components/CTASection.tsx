@@ -7,11 +7,6 @@ import { Link } from 'wouter';
 export default function CTASection() {
   const trustBadges = [
     {
-      icon: Shield,
-      title: "FDA Registered Facility",
-      description: "Manufactured to the highest safety standards"
-    },
-    {
       icon: Award,
       title: "Third-party tested",
       description: "Every batch verified for purity and potency"
@@ -20,6 +15,11 @@ export default function CTASection() {
       icon: MapPin,
       title: "Made in USA",
       description: "Proudly manufactured in American facilities"
+    },
+    {
+      icon: Shield,
+      title: "Quality Assured",
+      description: "Manufactured to the highest safety standards"
     }
   ];
 
