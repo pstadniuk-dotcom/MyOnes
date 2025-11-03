@@ -234,6 +234,11 @@
   h4 {
     @apply text-xl md:text-2xl font-medium;
   }
+
+  /* Use branded foreground color for strong tags instead of browser default blue */
+  strong {
+    @apply text-foreground font-semibold;
+  }
 }
 
 /**

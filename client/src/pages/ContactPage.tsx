@@ -6,6 +6,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Label } from '@/components/ui/label';
 import { Mail, MessageSquare, Phone, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -27,6 +29,7 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Header />
       {/* Hero Section */}
       <section className="py-24 bg-gradient-to-b from-primary/5 to-background">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -156,6 +159,7 @@ export default function ContactPage() {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 }
