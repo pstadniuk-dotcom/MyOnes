@@ -5,7 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { FileText, Plus, Trash2, Download, Loader2, Upload } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FileText, Plus, Trash2, Download, Loader2, Upload, ClipboardPaste } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -41,6 +44,9 @@ export default function LabReportsPage() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  const [showManualEntryDialog, setShowManualEntryDialog] = useState(false);
+  const [manualEntryText, setManualEntryText] = useState('');
+  const [selectedTestType, setSelectedTestType] = useState<'blood_test'>('blood_test');
 
   // Fetch lab reports
   const { data: labReports, isLoading: labReportsLoading } = useQuery<FileUpload[]>({
@@ -52,7 +58,7 @@ export default function LabReportsPage() {
   const grantConsentMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/user-consent', {
-        consentType: 'health_data_processing',
+        consentType: 'lab_data_processing',
         granted: true
       });
       return response.json();
@@ -180,6 +186,74 @@ export default function LabReportsPage() {
     setShowConsentDialog(true);
   };
 
+  const handleManualEntry = async () => {
+    if (!manualEntryText.trim()) {
+      toast({
+        title: "No data entered",
+        description: "Please paste or type your lab results.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    setShowManualEntryDialog(false);
+
+    try {
+      // Create a text file from the manual entry
+      const blob = new Blob([manualEntryText], { type: 'text/plain' });
+      const fileName = `${selectedTestType}_manual_entry_${new Date().toISOString().split('T')[0]}.txt`;
+      const file = new File([blob], fileName, { type: 'text/plain' });
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'lab_report');
+      formData.append('testType', selectedTestType);
+      formData.append('metadata', JSON.stringify({
+        uploadSource: 'manual-entry',
+        testType: selectedTestType,
+        originalName: fileName,
+        manualEntry: true
+      }));
+
+      const token = localStorage.getItem('authToken');
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/files/upload', {
+        method: 'POST',
+        headers,
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
+      
+      toast({
+        title: "Lab results saved",
+        description: "Your manually entered results have been saved successfully.",
+      });
+
+      // Reset manual entry
+      setManualEntryText('');
+    } catch (error: any) {
+      toast({
+        title: "Save failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6" data-testid="page-lab-reports">
       {/* Header */}
@@ -212,24 +286,36 @@ export default function LabReportsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            data-testid="button-upload-report"
-            className="w-full sm:w-auto"
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4 mr-2" />
-                Upload Report
-              </>
-            )}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              data-testid="button-upload-report"
+              className="flex-1"
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Upload PDF/Image
+                </>
+              )}
+            </Button>
+            <Button 
+              onClick={() => setShowManualEntryDialog(true)}
+              disabled={isUploading}
+              variant="outline"
+              data-testid="button-manual-entry"
+              className="flex-1"
+            >
+              <ClipboardPaste className="w-4 h-4 mr-2" />
+              Paste Results
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -346,6 +432,71 @@ export default function LabReportsPage() {
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               )}
               I Consent
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Entry Dialog */}
+      <Dialog open={showManualEntryDialog} onOpenChange={setShowManualEntryDialog}>
+        <DialogContent className="max-w-2xl" data-testid="dialog-manual-entry">
+          <DialogHeader>
+            <DialogTitle>Paste Lab Results</DialogTitle>
+            <DialogDescription>
+              Copy and paste your lab results directly from your test report or doctor's portal.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="test-type">Test Type</Label>
+              <Select value={selectedTestType} onValueChange={(value: any) => setSelectedTestType(value)}>
+                <SelectTrigger id="test-type" data-testid="select-test-type">
+                  <SelectValue placeholder="Select test type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="blood_test">Blood Test</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                More test types (urine analysis, iris scan) coming soon.
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="lab-results">Lab Results</Label>
+              <Textarea
+                id="lab-results"
+                placeholder="Paste your lab results here. Include test names, values, reference ranges, and units.&#10;&#10;Example:&#10;Vitamin D: 32 ng/mL (30-100 ng/mL)&#10;B12: 450 pg/mL (200-900 pg/mL)&#10;Iron: 85 µg/dL (50-170 µg/dL)"
+                value={manualEntryText}
+                onChange={(e) => setManualEntryText(e.target.value)}
+                className="min-h-[300px] font-mono text-sm"
+                data-testid="textarea-lab-results"
+              />
+              <p className="text-xs text-muted-foreground">
+                Our AI will analyze this data to optimize your supplement formula.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowManualEntryDialog(false);
+                setManualEntryText('');
+              }}
+              data-testid="button-manual-entry-cancel"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleManualEntry}
+              disabled={isUploading || !manualEntryText.trim()}
+              data-testid="button-manual-entry-save"
+            >
+              {isUploading && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Save Results
             </Button>
           </DialogFooter>
         </DialogContent>
