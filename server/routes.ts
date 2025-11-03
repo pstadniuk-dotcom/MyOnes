@@ -2112,7 +2112,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             model: 'gpt-4o', // Using GPT-4o for 128K context to handle large prompts with lab data
             messages: conversationHistory,
             stream: true,
-            max_completion_tokens: 2000,
+            max_completion_tokens: 4000, // Increased to allow complete JSON formula generation
             temperature: 0.7
           });
           
