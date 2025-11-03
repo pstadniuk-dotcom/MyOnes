@@ -25,14 +25,29 @@ export interface LabDataExtraction {
 /**
  * Detects file type based on MIME type
  */
-export function getFileType(mimeType: string): 'pdf' | 'image' | 'unknown' {
+export function getFileType(mimeType: string): 'pdf' | 'image' | 'text' | 'unknown' {
   if (mimeType === 'application/pdf') {
     return 'pdf';
   }
   if (mimeType.startsWith('image/')) {
     return 'image';
   }
+  if (mimeType === 'text/plain') {
+    return 'text';
+  }
   return 'unknown';
+}
+
+/**
+ * Extracts text from plain text files
+ */
+export async function extractTextFromTextFile(buffer: Buffer): Promise<string> {
+  try {
+    return buffer.toString('utf-8');
+  } catch (error) {
+    console.error('Text file reading error:', error);
+    throw new Error('Failed to read text file');
+  }
 }
 
 /**
@@ -182,6 +197,8 @@ export async function analyzeLabReport(
       extractedText = await extractTextFromPDF(fileBuffer);
     } else if (fileType === 'image') {
       extractedText = await extractTextFromImage(fileBuffer, mimeType);
+    } else if (fileType === 'text') {
+      extractedText = await extractTextFromTextFile(fileBuffer);
     } else {
       throw new Error(`Unsupported file type: ${mimeType}`);
     }

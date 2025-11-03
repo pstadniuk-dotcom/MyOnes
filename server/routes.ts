@@ -3318,6 +3318,60 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Re-trigger analysis on existing lab report
+  app.post('/api/files/:fileId/reanalyze', requireAuth, async (req, res) => {
+    try {
+      const { fileId } = req.params;
+      const userId = req.userId!;
+      
+      // Get the file upload record
+      const fileUpload = await storage.getFileUpload(fileId);
+      
+      if (!fileUpload) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      
+      if (fileUpload.userId !== userId) {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
+      
+      if (fileUpload.type !== 'lab_report') {
+        return res.status(400).json({ error: 'Only lab reports can be re-analyzed' });
+      }
+      
+      console.log('🔄 Re-analyzing lab report:', fileId, fileUpload.originalFileName);
+      
+      // Trigger analysis
+      const labData = await analyzeLabReport(
+        fileUpload.objectPath,
+        fileUpload.mimeType || 'text/plain',
+        userId
+      );
+      
+      // Update the file upload with analyzed data
+      await storage.updateFileUpload(fileId, {
+        labReportData: {
+          ...labData,
+          analysisStatus: 'completed'
+        }
+      });
+      
+      console.log('✅ Re-analysis complete for:', fileId);
+      
+      res.json({ 
+        success: true,
+        message: 'Lab report re-analyzed successfully',
+        data: labData
+      });
+    } catch (error) {
+      console.error('Re-analysis error:', error);
+      res.status(500).json({ 
+        error: 'Failed to re-analyze lab report',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Delete lab report with audit logging
   app.delete('/api/files/:fileId', requireAuth, async (req, res) => {
     const userId = req.userId!;
