@@ -2593,6 +2593,51 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Update user profile (name, email, phone)
+  app.patch('/api/users/me/profile', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
+      
+      // Create validation schema for profile updates
+      const updateProfileSchema = z.object({
+        name: z.string().min(1).optional(),
+        email: z.string().email().optional(),
+        phone: z.string().nullable().optional(),
+      });
+      
+      // Validate request body
+      const validatedData = updateProfileSchema.parse(req.body);
+      
+      // If email is being changed, check if it's already in use
+      if (validatedData.email) {
+        const existingUser = await storage.getUserByEmail(validatedData.email);
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(409).json({ error: 'Email already in use by another account' });
+        }
+      }
+      
+      // Update user profile
+      const updatedUser = await storage.updateUser(userId, validatedData);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Return user without password
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json({ user: userWithoutPassword });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: 'Invalid profile data', 
+          details: error.errors 
+        });
+      }
+      console.error('Update profile error:', error);
+      res.status(500).json({ error: 'Failed to update profile' });
+    }
+  });
+
   // Get user's orders
   app.get('/api/users/me/orders', requireAuth, async (req, res) => {
     try {

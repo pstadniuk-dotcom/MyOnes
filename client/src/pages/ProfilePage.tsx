@@ -238,6 +238,27 @@ export default function ProfilePage() {
     },
   });
 
+  const updateUserProfileMutation = useMutation({
+    mutationFn: async (data: { name?: string; email?: string; phone?: string | null }) => {
+      const response = await apiRequest('PATCH', '/api/users/me/profile', data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      toast({
+        title: "Profile updated",
+        description: "Your profile information has been saved successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error updating profile",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const updateNotificationPrefsMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest('PATCH', '/api/notification-prefs', data);
@@ -542,15 +563,22 @@ export default function ProfilePage() {
               <div className="flex justify-end">
                 <Button 
                   onClick={async () => {
-                    // Note: User profile updates will need a backend endpoint to be implemented
-                    toast({
-                      title: "Feature coming soon",
-                      description: "User profile updates will be available once the backend endpoint is implemented.",
-                      variant: "default",
-                    });
+                    try {
+                      await updateUserProfileMutation.mutateAsync({
+                        name: profile.name,
+                        email: profile.email,
+                        phone: profile.phone || null,
+                      });
+                    } catch (error) {
+                      // Error handling is done in the mutation
+                    }
                   }}
+                  disabled={updateUserProfileMutation.isPending}
                   data-testid="button-save-profile"
                 >
+                  {updateUserProfileMutation.isPending && (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  )}
                   Save Changes
                 </Button>
               </div>
