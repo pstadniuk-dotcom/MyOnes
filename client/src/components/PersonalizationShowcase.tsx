@@ -7,7 +7,7 @@ import triathlete from '@assets/pstad_41-year-old_triathlete_training_for_Ironma
 import pregnantWoman from '@assets/pstad_28_year_old_pregnant_woman_--stylize_50_--v_7_9b49bd6d-18e2-40ec-b1ec-00ed13aad376_3_1762188075768.png';
 import seniorMan from '@assets/pstad_retiree_with_arthritis_--stylize_50_--v_7_c97ff5c7-490a-4a2e-91d3-6aa2d97a61d3_1_1762188154463.png';
 import perimenopauseWoman from '@assets/pstad_42_year_old_woman_--stylize_50_--v_7_d80049cc-ef52-4362-9a12-b5ef3771637a_1_1762189445790.png';
-import veganWoman from '@assets/stock_images/young_vegan_woman_20_260f4bdd.jpg';
+import veganWoman from '@assets/pstad_29-year-old_vegan_content_creator_--stylize_50_--v_7_4fd1d9eb-5ea5-4bd1-9071-138a045d963f_1_1762198616065.png';
 
 interface ChatMessage {
   role: 'ai' | 'user';
