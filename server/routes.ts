@@ -1227,7 +1227,7 @@ Extract these metrics when mentioned:
 - age (number)
 - sex ("male", "female", or "other")
 - heightCm (number, convert from feet/inches if needed: e.g., 5'10" = 178cm)
-- weightKg (number, convert from lbs if needed: e.g., 160lbs = 72.6kg)
+- weightLbs (number, in pounds)
 - bloodPressureSystolic (number, e.g., "120/80" → systolic=120)
 - bloodPressureDiastolic (number, e.g., "120/80" → diastolic=80)
 - restingHeartRate (number in bpm)
@@ -1244,14 +1244,14 @@ At the END of your response, if you extracted ANY health data, include it in thi
 \`\`\`health-data
 {
   "age": 35,
-  "weightKg": 75,
+  "weightLbs": 160,
   "exerciseDaysPerWeek": 3
 }
 \`\`\`
 
 IMPORTANT RULES:
 1. Only include fields you're confident about from the user's message
-2. Always convert imperial units (lbs, feet/inches) to metric (kg, cm)
+2. For height, convert feet/inches to cm (e.g., 5'10" = 178cm)
 3. For blood pressure like "120/80", split into systolic (120) and diastolic (80)
 4. For exercise, convert "3 times a week" → 3, "daily" → 7, etc.
 5. For smoking, convert "I smoke" → "current", "I used to smoke" → "former", "I don't smoke" → "never"
@@ -1653,7 +1653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!isMissing(healthProfile.heightCm)) completedFields.push('height');
         else missingFields.push('height');
         
-        if (!isMissing(healthProfile.weightKg)) completedFields.push('weight');
+        if (!isMissing(healthProfile.weightLbs)) completedFields.push('weight');
         else missingFields.push('weight');
         
         // Check vital signs
@@ -2068,7 +2068,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             age: healthData.age ?? existingProfile?.age,
             sex: healthData.sex ?? existingProfile?.sex,
             heightCm: healthData.heightCm ?? existingProfile?.heightCm,
-            weightKg: healthData.weightKg ?? existingProfile?.weightKg,
+            weightLbs: healthData.weightLbs ?? existingProfile?.weightLbs,
             bloodPressureSystolic: healthData.bloodPressureSystolic ?? existingProfile?.bloodPressureSystolic,
             bloodPressureDiastolic: healthData.bloodPressureDiastolic ?? existingProfile?.bloodPressureDiastolic,
             restingHeartRate: healthData.restingHeartRate ?? existingProfile?.restingHeartRate,
@@ -2378,7 +2378,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         ],
         // Physical measurements (2 fields)
         physical: [
-          healthProfile?.weightKg,
+          healthProfile?.weightLbs,
           healthProfile?.heightCm
         ],
         // Vital signs (3 fields)
@@ -2552,7 +2552,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const healthProfileUpdate = insertHealthProfileSchema.omit({ userId: true }).parse({
         age: req.body.age,
         sex: req.body.sex,
-        weightKg: req.body.weightKg,
+        weightLbs: req.body.weightLbs,
         heightCm: req.body.heightCm,
         bloodPressureSystolic: req.body.bloodPressureSystolic,
         bloodPressureDiastolic: req.body.bloodPressureDiastolic,

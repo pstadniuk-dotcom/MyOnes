@@ -156,7 +156,7 @@ export default function ProfilePage() {
   const [healthData, setHealthData] = useState({
     age: '',
     sex: '',
-    weightKg: '',
+    weightLbs: '',
     heightCm: '',
     bloodPressureSystolic: '',
     bloodPressureDiastolic: '',
@@ -198,7 +198,7 @@ export default function ProfilePage() {
       setHealthData({
         age: healthProfile.age?.toString() || '',
         sex: healthProfile.sex || '',
-        weightKg: healthProfile.weightKg?.toString() || '',
+        weightLbs: healthProfile.weightLbs?.toString() || '',
         heightCm: healthProfile.heightCm?.toString() || '',
         bloodPressureSystolic: healthProfile.bloodPressureSystolic?.toString() || '',
         bloodPressureDiastolic: healthProfile.bloodPressureDiastolic?.toString() || '',
@@ -697,16 +697,16 @@ export default function ProfilePage() {
               
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <Label htmlFor="weight">Weight (kg)</Label>
+                  <Label htmlFor="weight">Weight (lbs)</Label>
                   {healthLoading ? (
                     <Skeleton className="h-10 w-full" />
                   ) : (
                     <Input
                       id="weight"
                       type="number"
-                      value={healthData.weightKg}
-                      onChange={(e) => setHealthData({...healthData, weightKg: e.target.value})}
-                      placeholder="Enter weight in kg"
+                      value={healthData.weightLbs}
+                      onChange={(e) => setHealthData({...healthData, weightLbs: e.target.value})}
+                      placeholder="Enter weight in lbs"
                       data-testid="input-weight"
                     />
                   )}
@@ -972,7 +972,7 @@ export default function ProfilePage() {
                       const healthProfileData = {
                         age: healthData.age ? parseInt(healthData.age) : null,
                         sex: healthData.sex || null,
-                        weightKg: healthData.weightKg ? parseInt(healthData.weightKg) : null,
+                        weightLbs: healthData.weightLbs ? parseInt(healthData.weightLbs) : null,
                         heightCm: healthData.heightCm ? parseInt(healthData.heightCm) : null,
                         bloodPressureSystolic: healthData.bloodPressureSystolic ? parseInt(healthData.bloodPressureSystolic) : null,
                         bloodPressureDiastolic: healthData.bloodPressureDiastolic ? parseInt(healthData.bloodPressureDiastolic) : null,
