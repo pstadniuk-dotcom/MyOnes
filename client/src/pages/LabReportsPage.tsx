@@ -57,7 +57,7 @@ export default function LabReportsPage() {
   // Grant consent mutation
   const grantConsentMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/user-consent', {
+      const response = await apiRequest('POST', '/api/consents/grant', {
         consentType: 'lab_data_processing',
         granted: true
       });
