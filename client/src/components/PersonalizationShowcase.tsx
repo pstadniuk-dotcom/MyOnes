@@ -34,9 +34,7 @@ const personas: Persona[] = [
       { role: 'user', content: "I need to optimize energy and focus during 12-hour workdays, plus improve my sleep quality.", delay: 1500 },
       { role: 'ai', content: "Got it. Are you currently taking any supplements or medications?", delay: 3000 },
       { role: 'user', content: "Just caffeine pills and melatonin. I also track everything with my Oura ring.", delay: 4500 },
-      { role: 'ai', content: "Perfect! I see low magnesium and suboptimal vitamin levels in your uploaded labs. Let me create your formula.", delay: 6000 },
-      { role: 'user', content: "What will be in it?", delay: 7500 },
-      { role: 'ai', content: "Br-SP Plus for brain support, CoEnzyme Q10 for cellular energy, Ashwagandha for stress management, Ginkgo Biloba for focus, and Magnesium for sleep quality - all in one capsule.", delay: 9000 }
+      { role: 'ai', content: "Perfect! I can see low magnesium and suboptimal vitamin levels in your uploaded labs. Let me design a formula to optimize your cognitive performance, sustained energy, and sleep quality...", delay: 6500 }
     ]
   },
   {
@@ -49,9 +47,7 @@ const personas: Persona[] = [
       { role: 'user', content: "Training 15-20 hours a week. My knees are taking a beating and recovery is getting slower.", delay: 1500 },
       { role: 'ai', content: "That's intense! Any inflammation or muscle cramping during or after workouts?", delay: 3000 },
       { role: 'user', content: "Yes, knee inflammation after long runs, and my calves cramp during night swims.", delay: 4500 },
-      { role: 'ai', content: "I'll optimize for joint support and recovery. What supplements are you currently taking?", delay: 6000 },
-      { role: 'user', content: "Fish oil, a multivitamin, and electrolyte powders.", delay: 7500 },
-      { role: 'ai', content: "Your formula: Ligament Support for joints, Heart Support for cardiovascular performance, Turmeric Extract for inflammation, Magnesium for muscle recovery, and CoQ10 for mitochondrial energy.", delay: 9500 }
+      { role: 'ai', content: "I'm seeing the pattern. Let me create a performance formula targeting joint recovery, inflammation reduction, and muscle repair specifically for your Ironman training demands...", delay: 6500 }
     ]
   },
   {
@@ -64,9 +60,7 @@ const personas: Persona[] = [
       { role: 'user', content: "Thank you! I'm 18 weeks - second trimester.", delay: 1500 },
       { role: 'ai', content: "Wonderful! Are you experiencing any symptoms like nausea, fatigue, or specific concerns?", delay: 3000 },
       { role: 'user', content: "The nausea comes and goes, and I'm tired a lot. My OB said my iron is borderline low.", delay: 4500 },
-      { role: 'ai', content: "I see that in your uploaded lab results. For nausea, I can include Ginger Root which is pregnancy-safe. For development, Omega-3 algae is essential.", delay: 6500 },
-      { role: 'user', content: "What about the iron? My prenatal has some but it's not enough.", delay: 8000 },
-      { role: 'ai', content: "You'll need to coordinate with your OB on iron supplementation since pregnancy doses need medical oversight. Your formula will focus on Ginger Root for nausea and Omega-3 for fetal brain development.", delay: 9500 }
+      { role: 'ai', content: "I can see your lab results showing the low iron. Let me create a pregnancy-safe formula addressing your nausea, energy levels, and supporting healthy fetal development...", delay: 6500 }
     ]
   },
   {
@@ -77,11 +71,9 @@ const personas: Persona[] = [
     chat: [
       { role: 'ai', content: "Hi Robert! I see you're on several medications. Can you list them for me?", delay: 0 },
       { role: 'user', content: "Lisinopril for blood pressure, Atorvastatin for cholesterol, and Metformin for blood sugar.", delay: 1500 },
-      { role: 'ai', content: "Thank you. I'll check for supplement interactions. Any specific health concerns besides managing these conditions?", delay: 3500 },
-      { role: 'user', content: "My doctor mentioned my magnesium is low, and I'm concerned about heart health and bone density.", delay: 5000 },
-      { role: 'ai', content: "I've cross-referenced your medications. I can safely include Heart Support for cardiovascular health, CoQ10 which helps reduce statin side effects, and Magnesium for bone and muscle health.", delay: 7000 },
-      { role: 'user', content: "Will any of this interfere with my prescriptions?", delay: 8500 },
-      { role: 'ai', content: "No interactions detected. Your personalized formula avoids anything that affects blood pressure or blood sugar medications, and includes only complementary, doctor-safe nutrients.", delay: 10000 }
+      { role: 'ai', content: "Thank you. Any specific health concerns besides managing these conditions?", delay: 3000 },
+      { role: 'user', content: "My magnesium is low, and I'm concerned about heart health and bone density.", delay: 4500 },
+      { role: 'ai', content: "Perfect. I'm cross-referencing your medications for interactions and creating a safe formula optimized for cardiovascular health, bone density, and addressing your low magnesium...", delay: 6500 }
     ]
   },
   {
@@ -94,9 +86,7 @@ const personas: Persona[] = [
       { role: 'user', content: "Hot flashes, mood swings, terrible sleep, and I'm exhausted all the time. I think it's perimenopause.", delay: 1500 },
       { role: 'ai', content: "Those are classic perimenopause symptoms. Have you had any recent hormone testing or bloodwork?", delay: 3000 },
       { role: 'user', content: "Yes, I uploaded my labs. My estrogen is fluctuating and cortisol is high.", delay: 4500 },
-      { role: 'ai', content: "I see that. I'll create a formula to support hormonal balance. Are you taking any medications or HRT?", delay: 6000 },
-      { role: 'user', content: "Not yet. I want to try natural support first.", delay: 7500 },
-      { role: 'ai', content: "Your formula: Endocrine Support for hormonal balance, Maca Root for hormone regulation, Ashwagandha to lower cortisol and improve sleep, and Black Currant Extract which contains GLA for hormonal health.", delay: 9500 }
+      { role: 'ai', content: "I can see your hormone panel. Let me design a formula to support hormonal balance, reduce your elevated cortisol, improve sleep quality, and manage those perimenopause symptoms...", delay: 6500 }
     ]
   },
   {
