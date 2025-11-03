@@ -1734,8 +1734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Fetch user's current active formula
-      const userFormulas = await storage.listFormulas(userId!);
-      const activeFormula = userFormulas.length > 0 ? userFormulas[0] : null;
+      const activeFormula = await storage.getCurrentFormulaByUser(userId!);
       
       let currentFormulaContext = '';
       if (activeFormula) {
