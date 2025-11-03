@@ -18,7 +18,7 @@ export default function ReturnsPage() {
               At Ones, every supplement formula is custom-made specifically for your unique health profile. Each order is manufactured to your exact specifications based on your health data, lab results, and individual needs.
             </p>
             <p className="text-muted-foreground">
-              Due to the personalized and made-to-order nature of our products, <strong>we do not accept returns or exchanges</strong> on any orders. Once your custom formula is manufactured, it cannot be resold or used by another customer.
+              Due to the personalized and made-to-order nature of our products, <strong className="text-primary">we do not accept returns or exchanges</strong> on any orders. Once your custom formula is manufactured, it cannot be resold or used by another customer.
             </p>
           </section>
 
