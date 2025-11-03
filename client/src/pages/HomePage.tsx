@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { 
   MessageSquare, 
   FlaskConical, 
@@ -48,27 +47,20 @@ function ThemeToggle() {
   }, []);
 
   if (!mounted) {
-    return (
-      <div className="flex items-center gap-2">
-        <Sun className="h-4 w-4 text-muted-foreground" />
-        <Switch disabled />
-        <Moon className="h-4 w-4 text-muted-foreground" />
-      </div>
-    );
+    return <Button variant="ghost" size="icon" className="w-9 h-9"><Sun className="h-4 w-4" /></Button>;
   }
 
-  const isDark = theme === 'dark';
-
   return (
-    <div className="flex items-center gap-2" data-testid="theme-toggle-container">
-      <Sun className={`h-4 w-4 transition-colors ${!isDark ? 'text-primary' : 'text-muted-foreground'}`} />
-      <Switch
-        checked={isDark}
-        onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-        data-testid="switch-theme-toggle"
-      />
-      <Moon className={`h-4 w-4 transition-colors ${isDark ? 'text-primary' : 'text-muted-foreground'}`} />
-    </div>
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+      className="w-9 h-9"
+      data-testid="button-theme-toggle"
+    >
+      {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+      <span className="sr-only">Toggle theme</span>
+    </Button>
   );
 }
 
