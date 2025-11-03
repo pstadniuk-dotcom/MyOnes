@@ -30,15 +30,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { 
   User, 
-  FileText, 
-  Settings, 
-  Upload, 
-  Download,
-  Trash2,
-  Plus,
   Activity,
   Shield,
-  Bell,
   Eye,
   EyeOff,
   AlertCircle,
@@ -49,7 +42,7 @@ import { useSearch } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import type { User as UserType, HealthProfile, NotificationPref, FileUpload } from '@shared/schema';
+import type { User as UserType, HealthProfile } from '@shared/schema';
 
 // Loading skeleton components
 function ProfileSkeleton() {
@@ -82,26 +75,6 @@ function HealthProfileSkeleton() {
   );
 }
 
-function LabReportsSkeleton() {
-  return (
-    <div className="space-y-4">
-      {Array.from({length: 3}).map((_, i) => (
-        <Card key={i}>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-3 w-32" />
-              </div>
-              <Skeleton className="h-8 w-16" />
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
 export default function ProfilePage() {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
@@ -127,30 +100,11 @@ export default function ProfilePage() {
     enabled: isAuthenticated,
   });
 
-  // React Query for notification preferences
-  const { data: notificationPrefs, isLoading: notificationLoading, error: notificationError } = useQuery<NotificationPref>({
-    queryKey: ['/api/notification-prefs'],
-    enabled: isAuthenticated,
-  });
-
-  // React Query for lab reports
-  const { data: labReports, isLoading: labReportsLoading, error: labReportsError } = useQuery<FileUpload[]>({
-    queryKey: ['/api/files', 'user', user?.id, 'lab-reports'],
-    enabled: isAuthenticated && !!user?.id,
-  });
-
   // Form states - initialize with fetched data
   const [profile, setProfile] = useState({
     name: '',
     email: '',
     phone: '',
-  });
-
-  const [notifications, setNotifications] = useState({
-    emailConsultation: true,
-    emailShipping: true,
-    emailBilling: true,
-    pushNotifications: false,
   });
 
   const [healthData, setHealthData] = useState({
@@ -181,17 +135,6 @@ export default function ProfilePage() {
       });
     }
   }, [userData]);
-
-  useEffect(() => {
-    if (notificationPrefs) {
-      setNotifications({
-        emailConsultation: notificationPrefs.emailConsultation,
-        emailShipping: notificationPrefs.emailShipping,
-        emailBilling: notificationPrefs.emailBilling,
-        pushNotifications: false, // Not supported in backend yet
-      });
-    }
-  }, [notificationPrefs]);
 
   useEffect(() => {
     if (healthProfile) {
@@ -253,27 +196,6 @@ export default function ProfilePage() {
     onError: (error: Error) => {
       toast({
         title: "Error updating profile",
-        description: error.message || "Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateNotificationPrefsMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await apiRequest('PATCH', '/api/notification-prefs', data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/notification-prefs'] });
-      toast({
-        title: "Notification preferences updated",
-        description: "Your preferences have been saved successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error updating preferences",
         description: error.message || "Please try again.",
         variant: "destructive",
       });
@@ -435,16 +357,15 @@ export default function ProfilePage() {
     // Only show toast for real errors (not 404 "not found" or parsing errors)
     const hasRealError = userError && !isNonCriticalError(userError);
     const hasHealthError = healthError && !isNonCriticalError(healthError);
-    const hasNotificationError = notificationError && !isNonCriticalError(notificationError);
     
-    if (hasRealError || hasHealthError || hasNotificationError) {
+    if (hasRealError || hasHealthError) {
       toast({
         title: "Error loading profile data",
         description: "Please refresh the page to try again.",
         variant: "destructive",
       });
     }
-  }, [userError, healthError, notificationError, toast]);
+  }, [userError, healthError, toast]);
 
   // Show loading state if critical data is still loading
   if (userLoading) {
@@ -457,11 +378,9 @@ export default function ProfilePage() {
           </div>
         </div>
         <Tabs className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="health">Health Info</TabsTrigger>
-            <TabsTrigger value="reports">Lab Reports</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
           <Card>
             <CardContent className="pt-6">
@@ -508,11 +427,9 @@ export default function ProfilePage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="profile" data-testid="tab-profile">Profile</TabsTrigger>
           <TabsTrigger value="health" data-testid="tab-health">Health Info</TabsTrigger>
-          <TabsTrigger value="reports" data-testid="tab-reports">Lab Reports</TabsTrigger>
-          <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-6">
@@ -1031,294 +948,6 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="reports" className="space-y-6">
-          {/* Lab Reports */}
-          <Card data-testid="section-lab-reports">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Lab Reports & Documents
-                  </CardTitle>
-                  <CardDescription>
-                    Upload and manage your blood work, medical reports, and other health documents
-                  </CardDescription>
-                </div>
-                <Button 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  data-testid="button-upload-report"
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Upload Report
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {labReportsLoading ? (
-                  <LabReportsSkeleton />
-                ) : labReports && labReports.length > 0 ? (
-                  labReports.map((report) => (
-                    <Card key={report.id} className="border-l-4 border-l-blue-400" data-testid={`report-${report.id}`}>
-                      <CardContent className="pt-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h4 className="font-medium">{report.originalFileName}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              Uploaded on {new Date(report.uploadedAt).toLocaleDateString()}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {report.fileSize ? `${(report.fileSize / 1024 / 1024).toFixed(2)} MB` : ''} • {report.type}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="default">
-                              Encrypted
-                            </Badge>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => {
-                                toast({
-                                  title: "Download feature",
-                                  description: "Lab report download functionality will be implemented.",
-                                  variant: "default",
-                                });
-                              }}
-                              data-testid={`button-download-${report.id}`}
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="destructive" 
-                              size="sm"
-                              onClick={() => setFileToDelete(report.id)}
-                              data-testid={`button-delete-${report.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-md">
-                          <h5 className="font-medium text-sm mb-2 text-blue-800 dark:text-blue-300">Secure Storage:</h5>
-                          <p className="text-sm text-blue-700 dark:text-blue-400">
-                            Your medical documents are stored with encryption and audit logging.
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                ) : (
-                  <div className="text-center py-8">
-                    <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="font-medium mb-2">No reports uploaded yet</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Upload your blood work and medical reports to get personalized insights
-                    </p>
-                    <Button 
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      data-testid="button-upload-first-report"
-                    >
-                      {isUploading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4 mr-2" />
-                          Upload Your First Report
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Hidden file input for lab report uploads */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-        </TabsContent>
-
-        <TabsContent value="settings" className="space-y-6">
-          {/* Notification Preferences */}
-          <Card data-testid="section-notifications">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="w-5 h-5" />
-                Notification Preferences
-              </CardTitle>
-              <CardDescription>
-                Choose how you want to be notified about updates and activities
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="email-consultation">Email Consultation Updates</Label>
-                    <p className="text-sm text-muted-foreground">Get notified about AI consultation responses</p>
-                  </div>
-                  <Switch
-                    id="email-consultation"
-                    checked={notifications.emailConsultation}
-                    onCheckedChange={(checked) => 
-                      setNotifications({...notifications, emailConsultation: checked})
-                    }
-                    data-testid="switch-email-consultation"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="email-shipping">Shipping Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Order confirmations, shipping, and delivery updates</p>
-                  </div>
-                  <Switch
-                    id="email-shipping"
-                    checked={notifications.emailShipping}
-                    onCheckedChange={(checked) => 
-                      setNotifications({...notifications, emailShipping: checked})
-                    }
-                    data-testid="switch-email-shipping"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="email-billing">Billing & Account</Label>
-                    <p className="text-sm text-muted-foreground">Payment confirmations and account changes</p>
-                  </div>
-                  <Switch
-                    id="email-billing"
-                    checked={notifications.emailBilling}
-                    onCheckedChange={(checked) => 
-                      setNotifications({...notifications, emailBilling: checked})
-                    }
-                    data-testid="switch-email-billing"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="push-notifications">Push Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Browser notifications for important updates</p>
-                  </div>
-                  <Switch
-                    id="push-notifications"
-                    checked={notifications.pushNotifications}
-                    onCheckedChange={(checked) => 
-                      setNotifications({...notifications, pushNotifications: checked})
-                    }
-                    data-testid="switch-push-notifications"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button 
-                  onClick={async () => {
-                    try {
-                      const notificationData = {
-                        emailConsultation: notifications.emailConsultation,
-                        emailShipping: notifications.emailShipping,
-                        emailBilling: notifications.emailBilling,
-                        // Note: pushNotifications is not in the backend schema yet
-                      };
-                      await updateNotificationPrefsMutation.mutateAsync(notificationData);
-                    } catch (error) {
-                      // Error handling is done in the mutation
-                    }
-                  }}
-                  disabled={updateNotificationPrefsMutation.isPending || notificationLoading}
-                  data-testid="button-save-notifications"
-                >
-                  {updateNotificationPrefsMutation.isPending && (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  )}
-                  Save Preferences
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Privacy Settings */}
-          <Card data-testid="section-privacy">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                Privacy & Data
-              </CardTitle>
-              <CardDescription>
-                Control how your data is used and shared
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-medium mb-2">Data Export</h4>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Download a copy of all your data including health profile, consultations, and formulas.
-                </p>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    toast({
-                      title: "Data export feature",
-                      description: "HIPAA-compliant data export functionality will be implemented.",
-                      variant: "default",
-                    });
-                  }}
-                  data-testid="button-export-data"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export My Data
-                </Button>
-              </div>
-
-              <div className="p-4 border border-red-200 rounded-lg bg-red-50 dark:bg-red-950/30">
-                <h4 className="font-medium mb-2 text-red-800 dark:text-red-300">Delete Account</h4>
-                <p className="text-sm text-red-700 dark:text-red-400 mb-3">
-                  Permanently delete your account and all associated data. This action cannot be undone.
-                </p>
-                <Button 
-                  variant="destructive" 
-                  onClick={() => {
-                    toast({
-                      title: "Account deletion feature",
-                      description: "Secure account deletion with HIPAA-compliant data removal will be implemented.",
-                      variant: "default",
-                    });
-                  }}
-                  data-testid="button-delete-account"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Account
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* Consent Dialog */}
@@ -1386,14 +1015,22 @@ export default function ProfilePage() {
               No, Keep It
             </AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => fileToDelete && deleteFileMutation.mutate(fileToDelete)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (fileToDelete) {
+                  deleteFileMutation.mutate(fileToDelete);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
               data-testid="button-delete-confirm"
             >
-              {deleteFileMutation.isPending && (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              {deleteFileMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Yes, Delete'
               )}
-              Yes, Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
