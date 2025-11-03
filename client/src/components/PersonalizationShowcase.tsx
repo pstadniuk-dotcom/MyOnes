@@ -66,7 +66,7 @@ const personas: Persona[] = [
       { role: 'user', content: "The nausea comes and goes, and I'm tired a lot. My OB said my iron is borderline low.", delay: 4500 },
       { role: 'ai', content: "I see that in your uploaded lab results. For nausea, I can include Ginger Root which is pregnancy-safe. For development, Omega-3 algae is essential.", delay: 6500 },
       { role: 'user', content: "What about the iron? My prenatal has some but it's not enough.", delay: 8000 },
-      { role: 'ai', content: "I'll coordinate with your OB on iron supplementation since pregnancy doses need medical oversight. Your formula will focus on Ginger Root for nausea and Omega-3 for fetal brain development.", delay: 9500 }
+      { role: 'ai', content: "You'll need to coordinate with your OB on iron supplementation since pregnancy doses need medical oversight. Your formula will focus on Ginger Root for nausea and Omega-3 for fetal brain development.", delay: 9500 }
     ]
   },
   {
@@ -124,30 +124,30 @@ export default function PersonalizationShowcase() {
   const activePersona = personas[activeIndex];
 
   useEffect(() => {
+    // Reset state
     setVisibleMessages(0);
     setIsAnimating(true);
     
+    const timeouts: NodeJS.Timeout[] = [];
     const maxMessages = activePersona.chat.length;
-    let messageIndex = 0;
+    
+    // Schedule all messages with cumulative delays
+    activePersona.chat.forEach((message, index) => {
+      const timeout = setTimeout(() => {
+        setVisibleMessages(index + 1);
+        if (index === maxMessages - 1) {
+          setIsAnimating(false);
+        }
+      }, message.delay);
+      
+      timeouts.push(timeout);
+    });
 
-    const showNextMessage = () => {
-      if (messageIndex < maxMessages) {
-        const timeout = setTimeout(() => {
-          setVisibleMessages(messageIndex + 1);
-          messageIndex++;
-          if (messageIndex < maxMessages) {
-            showNextMessage();
-          } else {
-            setIsAnimating(false);
-          }
-        }, activePersona.chat[messageIndex].delay);
-        
-        return () => clearTimeout(timeout);
-      }
+    // Cleanup: clear all timeouts if persona changes
+    return () => {
+      timeouts.forEach(timeout => clearTimeout(timeout));
     };
-
-    showNextMessage();
-  }, [activeIndex]);
+  }, [activeIndex, activePersona]);
 
   const nextPersona = () => {
     setActiveIndex((prev) => (prev + 1) % personas.length);
