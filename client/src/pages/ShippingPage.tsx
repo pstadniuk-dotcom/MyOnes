@@ -51,10 +51,10 @@ export default function ShippingPage() {
               Your personalized supplements are formulated specifically for you when you place your order. Here's our timeline:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li><strong>Formula Creation:</strong> 24-48 hours for AI analysis and formula preparation</li>
-              <li><strong>Encapsulation:</strong> 1-2 business days to create your custom capsules</li>
-              <li><strong>Quality Control:</strong> Final inspection and packaging</li>
-              <li><strong>Shipping:</strong> Handed off to carrier within 3-4 business days of order</li>
+              <li><strong className="text-primary">Formula Creation:</strong> 24-48 hours for AI analysis and formula preparation</li>
+              <li><strong className="text-primary">Encapsulation:</strong> 1-2 business days to create your custom capsules</li>
+              <li><strong className="text-primary">Quality Control:</strong> Final inspection and packaging</li>
+              <li><strong className="text-primary">Shipping:</strong> Handed off to carrier within 3-4 business days of order</li>
             </ul>
           </section>
 
@@ -70,9 +70,9 @@ export default function ShippingPage() {
               We currently ship to Canada, UK, Australia, and select European countries. International shipping rates and times vary by location:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li><strong>Canada:</strong> 7-14 business days, starting at $15</li>
-              <li><strong>UK & Europe:</strong> 10-21 business days, starting at $25</li>
-              <li><strong>Australia:</strong> 14-28 business days, starting at $30</li>
+              <li><strong className="text-primary">Canada:</strong> 7-14 business days, starting at $15</li>
+              <li><strong className="text-primary">UK & Europe:</strong> 10-21 business days, starting at $25</li>
+              <li><strong className="text-primary">Australia:</strong> 14-28 business days, starting at $30</li>
             </ul>
             <p className="text-muted-foreground mt-4 text-sm">
               Note: International customers are responsible for any customs fees, duties, or taxes imposed by their country.
@@ -129,9 +129,9 @@ export default function ShippingPage() {
               Questions about shipping? Our support team is here to help:
             </p>
             <p className="text-muted-foreground mt-4">
-              <strong>Email:</strong> support@ones.health<br />
-              <strong>Phone:</strong> 1-800-ONES-HELP<br />
-              <strong>Hours:</strong> Monday-Friday, 9am-6pm PST
+              <strong className="text-primary">Email:</strong> support@ones.health<br />
+              <strong className="text-primary">Phone:</strong> 1-800-ONES-HELP<br />
+              <strong className="text-primary">Hours:</strong> Monday-Friday, 9am-6pm PST
             </p>
           </section>
         </div>

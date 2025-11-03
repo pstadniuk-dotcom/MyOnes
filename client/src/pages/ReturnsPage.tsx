@@ -28,10 +28,10 @@ export default function ReturnsPage() {
               Your Ones formula is unique to you:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li><strong>Personalized formulation</strong> - Created from your specific biomarkers and health conditions</li>
-              <li><strong>Made to order</strong> - Production begins immediately after order confirmation</li>
-              <li><strong>Cannot be resold</strong> - Your formula is designed for you and cannot be used by others</li>
-              <li><strong>Third-party tested</strong> - Each batch is quality controlled and safety verified</li>
+              <li><strong className="text-primary">Personalized formulation</strong> - Created from your specific biomarkers and health conditions</li>
+              <li><strong className="text-primary">Made to order</strong> - Production begins immediately after order confirmation</li>
+              <li><strong className="text-primary">Cannot be resold</strong> - Your formula is designed for you and cannot be used by others</li>
+              <li><strong className="text-primary">Third-party tested</strong> - Each batch is quality controlled and safety verified</li>
             </ul>
             <p className="text-muted-foreground mt-4">
               This custom approach ensures you get the most effective, personalized supplement possible, but it also means we cannot accept returns or offer refunds on manufactured orders.
@@ -105,9 +105,9 @@ export default function ReturnsPage() {
               All Ones orders are one-time purchases:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li><strong>3-Month Supply</strong> - Single payment, delivered once</li>
-              <li><strong>6-Month Supply</strong> - Single payment, delivered once</li>
-              <li><strong>12-Month Supply</strong> - Single payment, delivered once</li>
+              <li><strong className="text-primary">3-Month Supply</strong> - Single payment, delivered once</li>
+              <li><strong className="text-primary">6-Month Supply</strong> - Single payment, delivered once</li>
+              <li><strong className="text-primary">12-Month Supply</strong> - Single payment, delivered once</li>
             </ul>
             <p className="text-muted-foreground mt-4">
               There are no recurring charges or automatic shipments. When you're ready for your next supply, simply place a new order with your updated health profile.
