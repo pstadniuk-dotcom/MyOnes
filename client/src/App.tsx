@@ -40,6 +40,7 @@ import HeroSection from "@/components/HeroSection";
 import ProblemSection from "@/components/ProblemSection";
 import HowItWorksSection from "@/components/HowItWorksSection";
 import ScienceSection from "@/components/ScienceSection";
+import PersonalizationShowcase from "@/components/PersonalizationShowcase";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import PricingSection from "@/components/PricingSection";
 import FAQSection from "@/components/FAQSection";
@@ -55,6 +56,9 @@ function LandingPage() {
         <ProblemSection />
         <HowItWorksSection />
         <ScienceSection />
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <PersonalizationShowcase />
+        </div>
         <TestimonialsSection />
         <PricingSection />
         <FAQSection />

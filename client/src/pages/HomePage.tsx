@@ -23,7 +23,6 @@ import type { Formula } from '@shared/schema';
 import { calculateDosage } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
-import PersonalizationShowcase from '@/components/PersonalizationShowcase';
 
 // Map next actions to their appropriate routes
 function getNextActionRoute(nextAction: string): string {
@@ -362,9 +361,6 @@ export default function HomePage() {
           </Card>
         </div>
       )}
-
-      {/* Personalization Showcase */}
-      <PersonalizationShowcase />
 
       {/* Promotional/Info Section (inspired by Function Health's right sidebar) */}
       {!isNewUser && (
