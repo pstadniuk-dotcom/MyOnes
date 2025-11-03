@@ -514,10 +514,24 @@ export default function ConsultationPage() {
         });
 
         if (!uploadResponse.ok) {
-          throw new Error(`Upload failed for ${file.name}`);
+          let errorMessage = `Upload failed for ${file.name}`;
+          try {
+            const errorData = await uploadResponse.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (e) {
+            // Response might not be JSON
+            console.error('Failed to parse error response:', e);
+          }
+          throw new Error(errorMessage);
         }
 
-        const uploadResult = await uploadResponse.json();
+        let uploadResult;
+        try {
+          uploadResult = await uploadResponse.json();
+        } catch (e) {
+          console.error('Failed to parse upload response as JSON:', e);
+          throw new Error(`Invalid response format for ${file.name}`);
+        }
         
         const uploadedFile: UploadedFile = {
           id: uploadResult.id || Date.now().toString(),
