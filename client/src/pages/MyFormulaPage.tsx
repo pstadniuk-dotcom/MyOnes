@@ -626,6 +626,22 @@ export default function MyFormulaPage() {
             </div>
           )}
           
+          {/* Medical Disclaimer */}
+          <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-amber-800 dark:text-amber-200">
+                <p className="font-semibold mb-1">Medical Disclaimer</p>
+                <p>
+                  This personalized formula is a supplement recommendation, not medical advice. 
+                  Consult your healthcare provider before starting any new supplement regimen, 
+                  especially if you have medical conditions or take medications. See our{' '}
+                  <Link href="/disclaimer" className="underline">Medical Disclaimer</Link> for full details.
+                </p>
+              </div>
+            </div>
+          </div>
+          
           {/* Action Buttons */}
           <div className="flex gap-3 justify-end pt-4 border-t">
             <Button 

@@ -26,7 +26,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: "Welcome back! I'm Ones AI, your personalized supplement consultant. I'm here to help you create the perfect supplement formula based on your unique health profile.",
+      content: "Welcome back! I'm Ones AI, your personalized supplement consultant. I'm here to help you create the perfect supplement formula based on your unique health profile.\n\n⚕️ Important: I provide personalized supplement recommendations, not medical advice. Always consult your healthcare provider before starting any new supplement regimen, especially if you have medical conditions or take medications.",
       sender: 'ai',
       timestamp: new Date()
     }
