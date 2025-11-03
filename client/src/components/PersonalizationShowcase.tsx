@@ -108,8 +108,8 @@ const personas: Persona[] = [
       { role: 'ai', content: "Hi Maya! Tell me about your diet and lifestyle.", delay: 0 },
       { role: 'user', content: "I've been vegan for 5 years, very active, but I'm worried about nutrient gaps. I feel tired often.", delay: 1500 },
       { role: 'ai', content: "That's a valid concern. Have you had bloodwork done recently to check your levels?", delay: 3000 },
-      { role: 'user', content: "Yes, uploaded my labs. My B12 is low and iron is borderline. Omega-3s weren't tested.", delay: 4500 },
-      { role: 'ai', content: "I can see your results. Your formula will be: Immune-C (1050mg) for immune support, Alpha Oxyme (350mg) for antioxidant protection, plus Omega-3 algae (400mg), Broccoli Powder (250mg), Camu Camu (210mg) for vitamin C, and Ashwagandha (600mg) for energy. Total: 4,860mg in 6 capsules daily. For B12 and iron, you'll need separate medical-grade supplements—please coordinate with your doctor on proper dosing.", delay: 7000 }
+      { role: 'user', content: "Yes, I just uploaded my labs. My B12 is low and iron is borderline.", delay: 4500 },
+      { role: 'ai', content: "Perfect, I can see your results. Let me analyze your blood work and start formulating a personalized supplement plan specifically for your vegan lifestyle and nutritional gaps...", delay: 7000 }
     ]
   }
 ];
