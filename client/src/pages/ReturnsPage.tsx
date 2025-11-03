@@ -113,7 +113,7 @@ export default function ReturnsPage() {
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Questions Before Ordering?</h2>
             <p className="text-muted-foreground mb-4">
-              We encourage you to reach out before placing your order if you have any concerns about:
+              Before placing your order, carefully review your personalized formula and consider:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
               <li>Your personalized formula and ingredient selection</li>
@@ -122,18 +122,6 @@ export default function ReturnsPage() {
               <li>Choosing the right supply duration</li>
               <li>Our third-party testing and quality standards</li>
             </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Contact Support</h2>
-            <p className="text-muted-foreground">
-              For questions about our returns policy or to report a damaged/defective product:
-            </p>
-            <p className="text-muted-foreground mt-4">
-              <strong>Email:</strong> support@ones.health<br />
-              <strong>Phone:</strong> 1-800-ONES-HELP<br />
-              <strong>Hours:</strong> Monday-Friday, 9am-6pm PST
-            </p>
           </section>
         </div>
       </div>
