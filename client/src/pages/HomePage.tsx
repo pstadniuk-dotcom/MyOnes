@@ -28,10 +28,10 @@ import { useEffect, useState } from 'react';
 function getNextActionRoute(nextAction: string): string {
   const actionRoutes: Record<string, string> = {
     'Upload lab results': '/dashboard/lab-reports',
-    'Add demographics': '/dashboard/chat',
-    'Add medications': '/dashboard/chat',
-    'Add health conditions': '/dashboard/chat',
-    'Add lifestyle data': '/dashboard/chat',
+    'Add demographics': '/dashboard/profile?tab=profile',
+    'Add medications': '/dashboard/profile?tab=health',
+    'Add health conditions': '/dashboard/profile?tab=health',
+    'Add lifestyle data': '/dashboard/profile?tab=health',
     'Profile complete': '/dashboard/formula',
     'Complete your profile': '/dashboard/chat'
   };
