@@ -109,9 +109,7 @@ const personas: Persona[] = [
       { role: 'user', content: "I've been vegan for 5 years, very active, but I'm worried about nutrient gaps. I feel tired often.", delay: 1500 },
       { role: 'ai', content: "That's a valid concern. Have you had bloodwork done recently to check your levels?", delay: 3000 },
       { role: 'user', content: "Yes, uploaded my labs. My B12 is low and iron is borderline. Omega-3s weren't tested.", delay: 4500 },
-      { role: 'ai', content: "Perfect, I can see those results. For B12, you'll need a separate medical-grade supplement since our formulas focus on whole-food nutrients. But I can optimize everything else.", delay: 6500 },
-      { role: 'user', content: "What would you include for me?", delay: 8000 },
-      { role: 'ai', content: "Omega-3 from algae for brain and heart health, Broccoli Powder for bioavailable plant nutrients, and we can coordinate with your doctor on B12 and iron supplementation to ensure proper medical dosing.", delay: 10000 }
+      { role: 'ai', content: "I can see your results. Your formula will be: Immune-C (1050mg) for immune support, Alpha Oxyme (350mg) for antioxidant protection, plus Omega-3 algae (400mg), Broccoli Powder (250mg), Camu Camu (210mg) for vitamin C, and Ashwagandha (600mg) for energy. Total: 4,860mg in 6 capsules daily. For B12 and iron, you'll need separate medical-grade supplements—please coordinate with your doctor on proper dosing.", delay: 7000 }
     ]
   }
 ];
