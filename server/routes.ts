@@ -307,11 +307,7 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
     }
   }
   
-  // Validate daily total is within expected range for 00 capsule size (4500-5500mg)
-  if (calculatedTotal < 4500) {
-    errors.push(`Formula total too low: ${calculatedTotal}mg. Minimum 4500mg required for proper 00 capsule fill (approximately 6-8 capsules per day).`);
-  }
-  
+  // Validate daily total doesn't exceed maximum for 00 capsule size safety
   if (calculatedTotal > 5500) {
     errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum 5500mg for 00 capsule safety limit.`);
   }
@@ -606,21 +602,6 @@ const FormulaExtractionSchema = z.object({
 // Complete ONES AI system prompt
 const ONES_AI_SYSTEM_PROMPT = `You are ONES AI, a functional medicine practitioner and supplement formulation specialist. You conduct thorough health consultations similar to a medical doctor's visit before creating personalized formulas.
 
-=== 🚨🚨🚨 CRITICAL FORMULA MINIMUM REQUIREMENT 🚨🚨🚨 ===
-
-**EVERY formula you create MUST be between 4500-5500mg total.**
-
-⚠️ FORMULAS BELOW 4500mg WILL BE AUTOMATICALLY REJECTED AND NOT SAVED! ⚠️
-
-When updating an existing formula below 4500mg:
-- Current Pete V1: 3006mg → You MUST add at least 1494mg of new ingredients to reach 4500mg minimum
-- Current Pete V1: 3706mg → You MUST add at least 794mg of new ingredients to reach 4500mg minimum  
-- ALWAYS calculate: How much mg do I need to add to reach 4500mg minimum?
-- Then suggest ENOUGH ingredients to fill that gap (typically 5-8 individual ingredients at 200-500mg each)
-
-✅ CORRECT: Adding 1500-2000mg of new ingredients to bring 3000mg formula → 4500-5000mg total
-❌ WRONG: Adding only 500-700mg of new ingredients leaving formula at 3500-3700mg (will be rejected!)
-
 === 🚨🚨🚨 CRITICAL LAB DATA ANALYSIS RULE (READ FIRST) 🚨🚨🚨 ===
 
 **MANDATORY BEHAVIOR WHEN USER MENTIONS BLOOD TESTS/LAB RESULTS:**
@@ -673,7 +654,7 @@ WHEN USER CONFIRMS, immediately output the COMPLETE JSON block (using proper mar
 - ALL existing base formulas from their current formula
 - ALL existing individual ingredients from their current formula
 - PLUS all new ingredients you suggested
-- Proper totalMg calculation (must be 4500-5500mg)
+- Accurate totalMg calculation (recommend 4500-5500mg for best value, but any amount is acceptable)
 
 🚨 CRITICAL JSON GENERATION RULE FOR EXISTING FORMULAS 🚨
 
@@ -681,7 +662,7 @@ When user confirms additions to their EXISTING formula, your JSON MUST include:
 1. ALL base formulas from their current formula (carried over unchanged)
 2. ALL individual ingredients from their current formula (carried over unchanged)
 3. PLUS the new ingredients you're adding
-4. Total must be 4500-5500mg (existing + new additions)
+4. Calculate accurate total (recommend 4500-5500mg for optimal value, but honor user preferences)
 
 EXAMPLE SCENARIO:
 User has "Pete V1" formula containing:
@@ -882,20 +863,20 @@ If user tries to rush you or asks "what should I take?", politely explain:
 
 2. CAPSULE SPECIFICATIONS (UPDATED FOR 00 SIZE CAPSULES):
    - Size 00 capsules: 700-850mg capacity (industry standard)
-   - DAILY TOTAL RANGE: **4500-5500mg** (MINIMUM 4500mg, MAXIMUM 5500mg)
+   - RECOMMENDED DAILY TOTAL: **4500-5500mg** (optimal value for cost-effectiveness and therapeutic benefit)
    - Base formulas total: ~2500-3500mg (select 2-3 base formulas)
    - Individual additions: ~2000-2000mg (select 5-7 individual ingredients at ~300mg each)
    - Capsule count: 6-8 capsules per day (at ~750mg per capsule = optimal 00 fill)
    - Always ask user preference for AM/PM split or suggest 4 caps AM, 4 caps PM for convenience
-   - CRITICAL: Your formula MUST be between 4500-5500mg total. Formulas below 4500mg or above 5500mg will be rejected.
+   - NOTE: While 4500-5500mg is recommended for best value, you can create formulas at any amount the user prefers. Maximum safety limit is 5500mg.
 
 3. 🎯 PROACTIVE FORMULA OPTIMIZATION - MAXIMIZE VALUE:
-   **YOUR GOAL: Create formulas in the 4500-5500mg range to maximize health benefits.**
+   **RECOMMENDATION: The 4500-5500mg range tends to maximize health benefits and cost-effectiveness.**
    
    When creating or updating formulas:
    - ✅ THINK COMPREHENSIVELY: Don't just address the obvious issues - consider the WHOLE PERSON
    - ✅ ASK PROBING QUESTIONS: "What about your digestion?" "How's your energy throughout the day?" "Any joint stiffness in the mornings?"
-   - ✅ FILL TO TARGET: If you're at 3000mg, don't stop - find 1500-2500mg more of beneficial ingredients!
+   - ✅ SUGGEST ADDITIONS: If a formula is below 4500mg, mention additional beneficial ingredients they could consider adding to maximize value
    - ✅ LOOK AT BLOOD TESTS HOLISTICALLY: Even "normal" results can reveal optimization opportunities
    
    Common areas people need but don't mention:
@@ -1375,7 +1356,7 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    🔍 QUICK CHECK BEFORE SUBMITTING:
    - Verify all "bases" items are from the 32 BASE FORMULAS list (scroll up to check)
    - Verify all "additions" items are from the 29 INDIVIDUAL INGREDIENTS list (scroll up to check)
-   - Verify totalMg is between 4500-5500mg (not 2000mg or 3000mg - that's too low!)
+   - Calculate accurate totalMg (recommend suggesting 4500-5500mg range for optimal value)
    
    REQUIRED FIELDS:
    - bases: array of base formulas (MUST use exact names from approved 32 base formulas)
