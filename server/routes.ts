@@ -2220,6 +2220,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           console.log('🔄 Validating formula mg calculations...');
           const validation = validateAndCalculateFormula(validatedFormula);
           console.log('📊 Validation result:', validation.isValid ? 'VALID' : 'INVALID', '- Total mg:', validation.calculatedTotalMg);
+          console.log('📊 Validation errors:', validation.errors);
           
           if (!validation.isValid) {
             // Formula is invalid - reject it and send error to client
