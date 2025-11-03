@@ -3233,11 +3233,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         retentionPolicyId: '7_years' // Default 7-year retention for medical records
       });
 
-      // Analyze lab reports automatically (PDF or images only)
+      // Analyze lab reports automatically (PDF, images, and text files)
       let labDataExtraction = null;
-      if (fileType === 'lab_report' && (uploadedFile.mimetype === 'application/pdf' || uploadedFile.mimetype.startsWith('image/'))) {
+      if (fileType === 'lab_report' && (uploadedFile.mimetype === 'application/pdf' || uploadedFile.mimetype.startsWith('image/') || uploadedFile.mimetype === 'text/plain')) {
         try {
-          console.log(`Analyzing lab report: ${uploadedFile.name}`);
+          console.log(`✨ Analyzing lab report: ${uploadedFile.name} (${uploadedFile.mimetype})`);
           labDataExtraction = await analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId);
           
           // Update file upload with extracted lab data
