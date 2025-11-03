@@ -1836,16 +1836,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let currentFormulaContext = '';
       if (activeFormula) {
-        const bases = activeFormula.bases as Array<{name: string, dose: string, purpose?: string}>;
-        const additions = (activeFormula.additions || []) as Array<{name: string, dose: string, purpose?: string}>;
+        // Match actual database schema: ingredient, amount, unit
+        const bases = activeFormula.bases as Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
+        const additions = (activeFormula.additions || []) as Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
         
-        const basesText = bases.map(b => `  • ${b.name} - ${b.dose}`).join('\n');
+        const basesText = bases.map(b => `  • ${b.ingredient} (${b.amount}${b.unit}) - ${b.purpose || 'No description'}`).join('\n');
         const additionsText = additions.length > 0 
-          ? additions.map(a => `  • ${a.name} - ${a.dose}`).join('\n')
+          ? additions.map(a => `  • ${a.ingredient} (${a.amount}${a.unit}) - ${a.purpose || 'No description'}`).join('\n')
           : '  (none)';
         
         currentFormulaContext = `
-📦 CURRENT ACTIVE FORMULA (Version ${activeFormula.version || 1}):
+📦 CURRENT ACTIVE FORMULA: "${activeFormula.name || 'Unnamed'}" (Version ${activeFormula.version || 1})
 
 Base Formulas:
 ${basesText}
@@ -1853,14 +1854,13 @@ ${basesText}
 Individual Additions:
 ${additionsText}
 
-Total Daily Dose: ${activeFormula.dailyTotalMg}mg
-Capsules per Day: ${activeFormula.capsulesPerDay || 'Not specified'}
+Total Daily Dose: ${activeFormula.totalMg}mg
 Target Range: 4500-5500mg (00 capsule capacity)
 
 ⚠️ IMPORTANT: When analyzing blood tests and making recommendations:
 - Review this current formula FIRST
 - Identify what's working and what might need adjustment
-- Calculate the gap: Current ${activeFormula.dailyTotalMg}mg → Target 4500-5500mg = ${Math.max(0, 4500 - activeFormula.dailyTotalMg)}mg minimum addition needed
+- Calculate the gap: Current ${activeFormula.totalMg}mg → Target 4500-5500mg = ${Math.max(0, 4500 - activeFormula.totalMg)}mg minimum addition needed (${5500 - activeFormula.totalMg}mg maximum capacity available)
 - Suggest specific base formulas or individual ingredients from the approved catalog to ADD
 - Explain which current ingredients to keep, increase, or remove based on lab results
 - Show your math: "Current XYZ 450mg + Adding ABC 300mg = 750mg total for cardiovascular support"
@@ -1921,10 +1921,10 @@ Create a clear table analyzing EACH abnormal biomarker:
 - Which approved base formula or individual ingredient addresses it
 
 STEP 2 - CURRENT FORMULA REVIEW
-${activeFormula ? `Analyze the user's current ${activeFormula.dailyTotalMg}mg formula:
+${activeFormula ? `Analyze the user's current ${activeFormula.totalMg}mg formula:
 - What's already addressing their issues?
 - What's missing based on lab results?
-- Calculate capacity remaining: ${Math.max(0, 5500 - activeFormula.dailyTotalMg)}mg available for additions (max 5500mg total)` : 'User has no current formula - create comprehensive first formula based on labs'}
+- Calculate capacity remaining: ${Math.max(0, 5500 - activeFormula.totalMg)}mg available for additions (max 5500mg total)` : 'User has no current formula - create comprehensive first formula based on labs'}
 
 STEP 3 - SPECIFIC CATALOG-BASED RECOMMENDATIONS
 For EACH abnormal biomarker, specify:
@@ -1935,7 +1935,7 @@ For EACH abnormal biomarker, specify:
 
 STEP 4 - DOSAGE CALCULATIONS
 Show explicit math:
-- Current total: ${activeFormula ? `${activeFormula.dailyTotalMg}mg` : '0mg'}
+- Current total: ${activeFormula ? `${activeFormula.totalMg}mg` : '0mg'}
 - Additions recommended: [calculate sum of new ingredients]
 - New total: [show calculation]
 - Verify: 4500mg ≤ New Total ≤ 5500mg
