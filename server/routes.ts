@@ -2025,7 +2025,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           }
           
           const streamPromise = openai.chat.completions.create({
-            model: 'gpt-3.5-turbo', // Using GPT-3.5-turbo as it's widely accessible without organization verification
+            model: 'gpt-4o', // Using GPT-4o for 128K context to handle large prompts with lab data
             messages: conversationHistory,
             stream: true,
             max_completion_tokens: 2000,
