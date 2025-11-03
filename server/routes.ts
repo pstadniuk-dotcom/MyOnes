@@ -2202,15 +2202,28 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       console.log('📝 Full AI Response Preview (first 500 chars):', fullResponse.substring(0, 500));
       
       try {
-        const jsonMatch = fullResponse.match(/```json\s*({[\s\S]*?})\s*```/);
+        // Extract everything between ```json and ``` (greedy match to get complete JSON)
+        const jsonMatch = fullResponse.match(/```json\s*([\s\S]*?)\s*```/);
         if (jsonMatch) {
           console.log('✅ FORMULA EXTRACTION: Found ```json block in AI response!');
-          console.log('📦 Extracted JSON:', jsonMatch[1].substring(0, 300));
+          console.log('📦 Extracted JSON length:', jsonMatch[1].length, 'chars');
+          console.log('📦 Extracted JSON preview (first 300):', jsonMatch[1].substring(0, 300));
+          console.log('📦 Extracted JSON preview (last 200):', jsonMatch[1].substring(Math.max(0, jsonMatch[1].length - 200)));
+          
+          console.log('🔄 Attempting to parse JSON...');
           const jsonData = JSON.parse(jsonMatch[1]);
+          console.log('✅ JSON parsed successfully');
+          console.log('📊 Parsed data keys:', Object.keys(jsonData));
+          
+          console.log('🔄 Validating against FormulaExtractionSchema...');
           let validatedFormula = FormulaExtractionSchema.parse(jsonData);
+          console.log('✅ Schema validation passed');
+          console.log('📊 Validated formula has', validatedFormula.bases?.length || 0, 'bases and', validatedFormula.additions?.length || 0, 'additions');
           
           // CRITICAL: Server-side validation and 800mg enforcement
+          console.log('🔄 Validating formula mg calculations...');
           const validation = validateAndCalculateFormula(validatedFormula);
+          console.log('📊 Validation result:', validation.isValid ? 'VALID' : 'INVALID', '- Total mg:', validation.calculatedTotalMg);
           
           if (!validation.isValid) {
             // Formula is invalid - reject it and send error to client
@@ -2358,10 +2371,17 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
       // Save extracted formula to storage if valid
       let savedFormula = null;
+      console.log('💾 Checking if we should save formula...');
+      console.log('💾 extractedFormula exists?', !!extractedFormula);
+      console.log('💾 chatSession exists?', !!chatSession);
+      console.log('💾 userId exists?', !!userId);
+      
       if (extractedFormula && chatSession && userId) {
+        console.log('✅ All conditions met - proceeding to save formula');
         try {
           // CRITICAL: Validate all ingredients against approved catalog
           // Validate base formulas
+          console.log('🔍 Validating', extractedFormula.bases.length, 'base formulas against approved catalog');
           for (const base of extractedFormula.bases) {
             if (!APPROVED_BASE_FORMULAS.has(base.name)) {
               console.error(`VALIDATION ERROR: Unapproved base formula "${base.name}" detected in AI response`);
