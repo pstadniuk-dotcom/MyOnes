@@ -640,6 +640,32 @@ STEP 4 - Ask for confirmation
 - Wait for user to say yes/approve
 - When they confirm, create the updated formula JSON with ALL existing ingredients + new additions
 
+🚨 CRITICAL JSON GENERATION RULE FOR EXISTING FORMULAS 🚨
+
+When user confirms additions to their EXISTING formula, your JSON MUST include:
+1. ALL base formulas from their current formula (carried over unchanged)
+2. ALL individual ingredients from their current formula (carried over unchanged)
+3. PLUS the new ingredients you're adding
+4. Total must be 4500-5500mg (existing + new additions)
+
+EXAMPLE SCENARIO:
+User has "Pete V1" formula containing:
+  Bases: Heart Support (450mg), Liver Support (480mg)
+  Additions: CoQ10 (150mg), Omega 3 (300mg)
+  Current total: 1380mg
+
+You suggest adding: Turmeric (500mg), Chlorella (400mg)
+
+WRONG APPROACH: Only including the new ingredients (will fail validation)
+  Result: Only Turmeric + Chlorella = 900mg total (REJECTED - below 4500mg minimum)
+
+CORRECT APPROACH: Include ALL existing + ALL new ingredients
+  Bases section: Heart Support (450mg), Liver Support (480mg)
+  Additions section: CoQ10 (150mg), Omega 3 (300mg), Turmeric (500mg), Chlorella (400mg)
+  Total: 450 + 480 + 150 + 300 + 500 + 400 = 2280mg
+
+The JSON must preserve everything from the old formula and add the new items to it.
+
 NEVER EVER:
 - ❌ Say "I'll review the data and get back to you"
 - ❌ Ignore their current formula exists (always acknowledge it)
