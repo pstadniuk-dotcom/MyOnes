@@ -97,7 +97,7 @@ export default function RefundsPage() {
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Questions Before Ordering</h2>
             <p className="text-muted-foreground mb-4">
-              We want you to feel confident in your purchase. Before placing your order, our team is happy to answer questions about:
+              We want you to feel confident in your purchase. Before placing your order, carefully review your personalized formula and consider questions about:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
               <li>Your personalized formula and ingredients</li>
@@ -106,18 +106,6 @@ export default function RefundsPage() {
               <li>Choosing the right supply duration for your needs</li>
               <li>Ingredient sourcing and third-party testing</li>
             </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Contact Us</h2>
-            <p className="text-muted-foreground">
-              If you have questions about our policy or need to report a damaged/defective product, please contact us at:
-            </p>
-            <p className="text-muted-foreground mt-4">
-              <strong>Email:</strong> support@ones.health<br />
-              <strong>Phone:</strong> 1-800-ONES-HELP<br />
-              <strong>Hours:</strong> Monday-Friday, 9am-6pm PST
-            </p>
           </section>
         </div>
       </div>
