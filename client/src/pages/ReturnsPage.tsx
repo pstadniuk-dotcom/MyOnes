@@ -5,108 +5,129 @@ export default function ReturnsPage() {
         <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-8" data-testid="heading-returns">
           Returns Policy
         </h1>
-        <p className="text-sm text-muted-foreground mb-12">Last updated: March 2024</p>
+        <p className="text-sm text-muted-foreground mb-12">Last updated: November 2025</p>
 
         <div className="prose prose-lg max-w-none space-y-8">
           <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Our Returns Process</h2>
-            <p className="text-muted-foreground">
-              We want you to be completely satisfied with your Ones experience. If you need to return a product, we've made the process simple and straightforward.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">30-Day Return Window</h2>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">No Returns on Custom Orders</h2>
             <p className="text-muted-foreground mb-4">
-              You may return your order within 30 days of receipt for a full refund. This applies to your first order with our money-back guarantee. For subsequent orders, please see our Refund Policy.
+              At Ones, every supplement formula is custom-made specifically for your unique health profile. Each order is manufactured to your exact specifications based on your health data, lab results, and individual needs.
+            </p>
+            <p className="text-muted-foreground">
+              Due to the personalized and made-to-order nature of our products, <strong>we do not accept returns or exchanges</strong> on any orders. Once your custom formula is manufactured, it cannot be resold or used by another customer.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">How to Initiate a Return</h2>
-            <ol className="list-decimal pl-6 space-y-3 text-muted-foreground">
-              <li>
-                <strong>Contact Support:</strong> Email support@ones.health with your order number and reason for return
-              </li>
-              <li>
-                <strong>Receive Return Authorization:</strong> We'll send you a return authorization number and shipping instructions
-              </li>
-              <li>
-                <strong>Package Your Return:</strong> Securely package the product in its original packaging if possible
-              </li>
-              <li>
-                <strong>Ship Your Return:</strong> Use the prepaid shipping label we provide (for US returns)
-              </li>
-              <li>
-                <strong>Receive Your Refund:</strong> Once we receive and inspect your return, we'll process your refund within 5-7 business days
-              </li>
-            </ol>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Return Conditions</h2>
-            <p className="text-muted-foreground mb-4">To be eligible for a return, your item must be:</p>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Why Custom Products Cannot Be Returned</h2>
+            <p className="text-muted-foreground mb-4">
+              Your Ones formula is unique to you:
+            </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li>Returned within 30 days of receipt</li>
-              <li>In its original condition and packaging when possible</li>
-              <li>Accompanied by proof of purchase</li>
+              <li><strong>Personalized formulation</strong> - Created from your specific biomarkers and health conditions</li>
+              <li><strong>Made to order</strong> - Production begins immediately after order confirmation</li>
+              <li><strong>Cannot be resold</strong> - Your formula is designed for you and cannot be used by others</li>
+              <li><strong>Third-party tested</strong> - Each batch is quality controlled and safety verified</li>
             </ul>
             <p className="text-muted-foreground mt-4">
-              We understand that you may need to open the product to try it. Opened products are accepted for return under our 30-day guarantee.
+              This custom approach ensures you get the most effective, personalized supplement possible, but it also means we cannot accept returns or offer refunds on manufactured orders.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Return Shipping</h2>
-            <h3 className="text-xl font-semibold text-foreground mb-3">United States</h3>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Review Your Order Carefully</h2>
             <p className="text-muted-foreground mb-4">
-              For returns within the US, we provide a prepaid return shipping label at no cost to you. Simply print the label and drop off your package at any authorized shipping location.
+              Before confirming your order, please carefully review:
             </p>
-
-            <h3 className="text-xl font-semibold text-foreground mb-3">International Returns</h3>
-            <p className="text-muted-foreground">
-              International customers are responsible for return shipping costs. We recommend using a trackable shipping service to ensure your return reaches us safely.
+            <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
+              <li>Your personalized formula and all ingredients</li>
+              <li>Total daily dosage and capsule count</li>
+              <li>Supply duration (3, 6, or 12 months)</li>
+              <li>Shipping address accuracy</li>
+              <li>Any potential interactions with current medications</li>
+            </ul>
+            <p className="text-muted-foreground mt-4">
+              Our support team is available to answer any questions before you place your order. We want you to feel confident in your purchase.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Damaged or Defective Products</h2>
             <p className="text-muted-foreground mb-4">
-              If your order arrives damaged or defective, we'll replace it immediately at no cost. Please contact us within 7 days of receipt with:
+              While we do not accept returns, we stand behind the quality of every order. If your product arrives damaged, defective, or does not match your confirmed formula specifications, we will replace it at no cost.
+            </p>
+            <p className="text-muted-foreground mb-4">
+              To request a replacement, contact us within 7 days of receiving your order with:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
               <li>Your order number</li>
-              <li>Clear photos of the damaged or defective product</li>
+              <li>Clear photos showing the damage or defect</li>
               <li>Description of the issue</li>
+              <li>Photo of the formula label (if the ingredients are incorrect)</li>
             </ul>
             <p className="text-muted-foreground mt-4">
-              In most cases, we won't require you to return damaged or defective items. We'll send a replacement immediately.
+              We will review your case within 1-2 business days. If the issue is confirmed, we'll ship a replacement immediately at no charge. In most cases, you won't need to return the damaged product.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Exchanges</h2>
-            <p className="text-muted-foreground">
-              We don't offer direct exchanges. If you'd like a different product or formula adjustment, please return your current order for a refund and place a new order. Our AI health assessment can be updated anytime to create a new personalized formula.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Non-Returnable Items</h2>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Shipping Address Errors</h2>
             <p className="text-muted-foreground mb-4">
-              The following items cannot be returned:
+              If we ship your order to the wrong address due to an error on our part, we will reship at no additional cost.
+            </p>
+            <p className="text-muted-foreground">
+              However, if an incorrect address was provided by you during checkout, we cannot offer a replacement or refund. Please verify your shipping address carefully before completing your purchase.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Formula Adjustments</h2>
+            <p className="text-muted-foreground mb-4">
+              If you need to adjust your formula after trying it:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li>Gift cards</li>
-              <li>Digital products or downloadable content</li>
-              <li>Products returned after 30 days (except damaged/defective)</li>
+              <li>Upload new lab results to get updated recommendations</li>
+              <li>Start a new AI consultation to discuss your experience</li>
+              <li>Place a new order with your refined formula when ready</li>
+            </ul>
+            <p className="text-muted-foreground mt-4">
+              We recommend ordering a 3-month supply initially so you can assess how the formula works for you before committing to a larger supply.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">One-Time Purchases, Not Subscriptions</h2>
+            <p className="text-muted-foreground mb-4">
+              All Ones orders are one-time purchases:
+            </p>
+            <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
+              <li><strong>3-Month Supply</strong> - Single payment, delivered once</li>
+              <li><strong>6-Month Supply</strong> - Single payment, delivered once</li>
+              <li><strong>12-Month Supply</strong> - Single payment, delivered once</li>
+            </ul>
+            <p className="text-muted-foreground mt-4">
+              There are no recurring charges or automatic shipments. When you're ready for your next supply, simply place a new order with your updated health profile.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Questions Before Ordering?</h2>
+            <p className="text-muted-foreground mb-4">
+              We encourage you to reach out before placing your order if you have any concerns about:
+            </p>
+            <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
+              <li>Your personalized formula and ingredient selection</li>
+              <li>Potential interactions with medications</li>
+              <li>Expected results and timeline</li>
+              <li>Choosing the right supply duration</li>
+              <li>Our third-party testing and quality standards</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Questions?</h2>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Contact Support</h2>
             <p className="text-muted-foreground">
-              If you have questions about returns or need assistance, our support team is here to help:
+              For questions about our returns policy or to report a damaged/defective product:
             </p>
             <p className="text-muted-foreground mt-4">
               <strong>Email:</strong> support@ones.health<br />

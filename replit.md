@@ -84,7 +84,12 @@ Preferred communication style: Simple, everyday language.
   - If user requests unapproved ingredient, AI explains it's not available and suggests alternatives
   - Prevents formula creation with made-up names like "Brain Support", "Cognitive Support", etc.
 - **Progress Tracking**: User journey monitoring with iterative formula optimization
-- **Subscription Management**: Automated refill system with periodic health reassessments
+- **Business Model & Refund Policy** (Updated Nov 2025):
+  - One-time purchases only (3/6/12 month supplies) - NOT subscriptions
+  - No refunds or returns on custom orders due to personalized, made-to-order nature
+  - Exception: Damaged/defective products receive free replacement
+  - Refund and Returns policy pages updated to reflect custom order policy
+  - Maximum formula dosage updated from 6800mg to 5500mg (Nov 2025)
 
 ## External Dependencies
 
