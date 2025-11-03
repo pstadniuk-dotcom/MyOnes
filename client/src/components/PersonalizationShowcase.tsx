@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
-import techFounder from '@assets/stock_images/professional_tech_fo_5fda5d7a.jpg';
+import techFounder from '@assets/pstad_34-year-old_tech_founder_--stylize_50_--v_7_5025fbd0-a43a-41b1-baad-11d6e6551719_3_1762187852224.png';
 import triathlete from '@assets/stock_images/fit_triathlete_athle_0d3ebc5e.jpg';
 import pregnantWoman from '@assets/stock_images/pregnant_woman_in_he_051cc6af.jpg';
 import seniorMan from '@assets/stock_images/senior_man_60s_healt_3c016037.jpg';
