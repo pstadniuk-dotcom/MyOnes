@@ -640,6 +640,26 @@ STEP 4 - Ask for confirmation
 - Wait for user to say yes/approve
 - When they confirm, create the updated formula JSON with ALL existing ingredients + new additions
 
+🚨🚨🚨 WHEN TO OUTPUT THE FORMULA JSON BLOCK 🚨🚨🚨
+
+OUTPUT the json formula block (enclosed in triple backticks with json tag) IMMEDIATELY when user says ANY of these:
+- "Yes" / "Yeah" / "Sure" / "Okay" / "Yes please" / "Do it" / "Add them"
+- "Go ahead" / "Proceed" / "Let's do it" / "Sounds good" / "That works"
+- "Add those" / "Add these" / "Include those" / "Make those changes"
+- "Update my formula" / "Create the formula" / "Let's update it"
+
+DO NOT output the JSON formula block when user:
+- Asks questions about the suggestions
+- Says "tell me more" / "why those?" / "explain"
+- Requests different ingredients
+- Has not yet confirmed
+
+WHEN USER CONFIRMS, immediately output the COMPLETE JSON block (using proper markdown code fence) with:
+- ALL existing base formulas from their current formula
+- ALL existing individual ingredients from their current formula
+- PLUS all new ingredients you suggested
+- Proper totalMg calculation (must be 4500-5500mg)
+
 🚨 CRITICAL JSON GENERATION RULE FOR EXISTING FORMULAS 🚨
 
 When user confirms additions to their EXISTING formula, your JSON MUST include:
