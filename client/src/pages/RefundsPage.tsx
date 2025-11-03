@@ -18,7 +18,7 @@ export default function RefundsPage() {
               At Ones, every formula is custom-made specifically for you based on your unique health profile, lab results, and individual needs. Each order is manufactured to your exact specifications after you place your order.
             </p>
             <p className="text-muted-foreground">
-              Due to the personalized and custom-made nature of our products, <strong>we do not offer refunds, returns, or cancellations</strong> on any orders once they have been placed and manufactured.
+              Due to the personalized and custom-made nature of our products, <strong className="text-primary">we do not offer refunds, returns, or cancellations</strong> on any orders once they have been placed and manufactured.
             </p>
           </section>
 
@@ -28,10 +28,10 @@ export default function RefundsPage() {
               Unlike mass-produced supplements, your Ones formula is:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li><strong>Personalized to your health data</strong> - Created based on your specific biomarkers, health conditions, and goals</li>
-              <li><strong>Made to order</strong> - Manufactured specifically for you after your order is confirmed</li>
-              <li><strong>Cannot be resold</strong> - Your custom formula cannot be sold to another customer</li>
-              <li><strong>Quality controlled</strong> - Each batch is third-party tested and quality verified for your safety</li>
+              <li><strong className="text-primary">Personalized to your health data</strong> - Created based on your specific biomarkers, health conditions, and goals</li>
+              <li><strong className="text-primary">Made to order</strong> - Manufactured specifically for you after your order is confirmed</li>
+              <li><strong className="text-primary">Cannot be resold</strong> - Your custom formula cannot be sold to another customer</li>
+              <li><strong className="text-primary">Quality controlled</strong> - Each batch is third-party tested and quality verified for your safety</li>
             </ul>
             <p className="text-muted-foreground mt-4">
               This ensures you receive the highest quality, most personalized supplement possible, but it also means we cannot accept returns or offer refunds on custom orders.
@@ -89,9 +89,9 @@ export default function RefundsPage() {
               Ones offers 3-month, 6-month, and 12-month supplies. These are one-time purchases, not subscriptions:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li><strong>3-Month Supply</strong> - Single payment, delivered once</li>
-              <li><strong>6-Month Supply</strong> - Single payment, delivered once</li>
-              <li><strong>12-Month Supply</strong> - Single payment, delivered once</li>
+              <li><strong className="text-primary">3-Month Supply</strong> - Single payment, delivered once</li>
+              <li><strong className="text-primary">6-Month Supply</strong> - Single payment, delivered once</li>
+              <li><strong className="text-primary">12-Month Supply</strong> - Single payment, delivered once</li>
             </ul>
             <p className="text-muted-foreground mt-4">
               There are no recurring charges or automatic renewals. When you're ready for your next supply, simply create a new order with your updated health profile.
