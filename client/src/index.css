@@ -237,7 +237,7 @@
 
   /* Use branded accent color for strong tags instead of browser default blue */
   strong {
-    @apply text-accent-foreground font-semibold;
+    @apply text-primary font-semibold;
   }
 }
 
