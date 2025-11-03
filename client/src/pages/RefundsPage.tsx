@@ -5,77 +5,113 @@ export default function RefundsPage() {
         <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-8" data-testid="heading-refunds">
           Refund Policy
         </h1>
-        <p className="text-sm text-muted-foreground mb-12">Last updated: March 2024</p>
+        <p className="text-sm text-muted-foreground mb-12">Last updated: November 2025</p>
 
         <div className="prose prose-lg max-w-none space-y-8">
           <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Our Commitment</h2>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Custom-Made Products</h2>
+            <p className="text-muted-foreground mb-4">
+              At Ones, every formula is custom-made specifically for you based on your unique health profile, lab results, and individual needs. Each order is manufactured to your exact specifications after you place your order.
+            </p>
             <p className="text-muted-foreground">
-              At Ones, we're committed to your satisfaction. We want you to be completely happy with your personalized supplements. If you're not satisfied, we're here to help.
+              Due to the personalized and custom-made nature of our products, <strong>we do not offer refunds, returns, or cancellations</strong> on any orders once they have been placed and manufactured.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">30-Day Money-Back Guarantee</h2>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Why No Refunds?</h2>
             <p className="text-muted-foreground mb-4">
-              We offer a 30-day money-back guarantee on your first order. If you're not satisfied with your personalized formula, you can request a full refund within 30 days of receiving your order.
+              Unlike mass-produced supplements, your Ones formula is:
             </p>
-            <p className="text-muted-foreground">
-              To be eligible for a refund under our guarantee, please contact our support team at support@ones.health with your order number and reason for the refund request.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Subscription Refunds</h2>
-            <h3 className="text-xl font-semibold text-foreground mb-3">Recurring Orders</h3>
-            <p className="text-muted-foreground mb-4">
-              For recurring subscription orders, you can cancel at any time before your next billing date. No refunds are provided for the current billing cycle, but you will not be charged again after cancellation.
-            </p>
-
-            <h3 className="text-xl font-semibold text-foreground mb-3">Cancellation Process</h3>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li>Log into your account and go to Subscription Settings</li>
-              <li>Click "Cancel Subscription"</li>
-              <li>Confirm your cancellation</li>
-              <li>You'll receive a confirmation email</li>
+              <li><strong>Personalized to your health data</strong> - Created based on your specific biomarkers, health conditions, and goals</li>
+              <li><strong>Made to order</strong> - Manufactured specifically for you after your order is confirmed</li>
+              <li><strong>Cannot be resold</strong> - Your custom formula cannot be sold to another customer</li>
+              <li><strong>Quality controlled</strong> - Each batch is third-party tested and quality verified for your safety</li>
             </ul>
+            <p className="text-muted-foreground mt-4">
+              This ensures you receive the highest quality, most personalized supplement possible, but it also means we cannot accept returns or offer refunds on custom orders.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Order Carefully</h2>
+            <p className="text-muted-foreground mb-4">
+              Before placing your order, please:
+            </p>
+            <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
+              <li>Review your personalized formula carefully</li>
+              <li>Verify your shipping address is correct</li>
+              <li>Confirm your supply duration (3, 6, or 12 months)</li>
+              <li>Ask our support team any questions before ordering</li>
+            </ul>
+            <p className="text-muted-foreground mt-4">
+              Once your order is confirmed, it enters production immediately and cannot be modified or cancelled.
+            </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Damaged or Defective Products</h2>
             <p className="text-muted-foreground mb-4">
-              If your order arrives damaged or defective, we'll replace it at no cost to you. Please contact us within 7 days of receiving your order with:
+              While we cannot offer refunds, we stand behind the quality of our products. If your order arrives damaged, defective, or does not match your confirmed formula specifications, we will replace it at no cost to you.
+            </p>
+            <p className="text-muted-foreground mb-4">
+              To request a replacement for damaged or defective products, please contact us within 7 days of receiving your order with:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
               <li>Your order number</li>
-              <li>Photos of the damaged product</li>
+              <li>Clear photos of the damaged product or defect</li>
               <li>Description of the issue</li>
+              <li>Photo of the formula label showing ingredients (if formula is incorrect)</li>
             </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Processing Time</h2>
-            <p className="text-muted-foreground">
-              Approved refunds will be processed within 5-7 business days and credited to your original payment method. Depending on your bank or credit card company, it may take an additional 3-5 business days for the credit to appear on your statement.
+            <p className="text-muted-foreground mt-4">
+              We will review your case within 1-2 business days and ship a replacement if the issue is confirmed.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Non-Refundable Items</h2>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Shipping Errors</h2>
             <p className="text-muted-foreground mb-4">
-              The following items are not eligible for refunds:
+              If your order was shipped to the wrong address due to an error on our part, we will reship your order at no additional cost. However, if the incorrect address was provided by you during checkout, we cannot offer a replacement or refund.
+            </p>
+            <p className="text-muted-foreground">
+              Please double-check your shipping address before placing your order.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Supply Duration</h2>
+            <p className="text-muted-foreground mb-4">
+              Ones offers 3-month, 6-month, and 12-month supplies. These are one-time purchases, not subscriptions:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li>Orders placed more than 30 days ago (except for damaged/defective products)</li>
-              <li>Products that have been opened or used (except within the 30-day guarantee period)</li>
-              <li>Gift cards and promotional codes</li>
+              <li><strong>3-Month Supply</strong> - Single payment, delivered once</li>
+              <li><strong>6-Month Supply</strong> - Single payment, delivered once</li>
+              <li><strong>12-Month Supply</strong> - Single payment, delivered once</li>
+            </ul>
+            <p className="text-muted-foreground mt-4">
+              There are no recurring charges or automatic renewals. When you're ready for your next supply, simply create a new order with your updated health profile.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Questions Before Ordering</h2>
+            <p className="text-muted-foreground mb-4">
+              We want you to feel confident in your purchase. Before placing your order, our team is happy to answer questions about:
+            </p>
+            <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
+              <li>Your personalized formula and ingredients</li>
+              <li>Expected timeline for results</li>
+              <li>Interactions with medications or other supplements</li>
+              <li>Choosing the right supply duration for your needs</li>
+              <li>Ingredient sourcing and third-party testing</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Contact Us</h2>
             <p className="text-muted-foreground">
-              If you have questions about our refund policy or need to request a refund, please contact us at:
+              If you have questions about our policy or need to report a damaged/defective product, please contact us at:
             </p>
             <p className="text-muted-foreground mt-4">
               <strong>Email:</strong> support@ones.health<br />
