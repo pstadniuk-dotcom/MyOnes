@@ -220,11 +220,11 @@ export default function PersonalizationShowcase() {
                   </div>
 
                   {/* Chat Messages */}
-                  <div className="space-y-4 py-6 min-h-[400px] max-h-[500px] overflow-y-auto">
+                  <div key={`chat-${activeIndex}`} className="space-y-4 py-6 min-h-[400px] max-h-[500px] overflow-y-auto transition-opacity duration-300">
                     {activePersona.chat.slice(0, visibleMessages).map((message, index) => (
                       <div
-                        key={index}
-                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}
+                        key={`${activeIndex}-${index}`}
+                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
                       >
                         <div
                           className={`max-w-[85%] rounded-2xl px-4 py-3 ${
