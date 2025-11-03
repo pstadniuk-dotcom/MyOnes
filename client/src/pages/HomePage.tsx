@@ -24,6 +24,21 @@ import { calculateDosage } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 
+// Map next actions to their appropriate routes
+function getNextActionRoute(nextAction: string): string {
+  const actionRoutes: Record<string, string> = {
+    'Upload lab results': '/dashboard/lab-reports',
+    'Add demographics': '/dashboard/chat',
+    'Add medications': '/dashboard/chat',
+    'Add health conditions': '/dashboard/chat',
+    'Add lifestyle data': '/dashboard/chat',
+    'Profile complete': '/dashboard/formula',
+    'Complete your profile': '/dashboard/chat'
+  };
+  
+  return actionRoutes[nextAction] || '/dashboard/chat';
+}
+
 interface DashboardData {
   metrics: {
     profileCompleteness: number;
@@ -114,7 +129,7 @@ export default function HomePage() {
       <div className="grid gap-4 md:grid-cols-3">
         {/* Profile Completeness */}
         <Card data-testid="card-profile-completeness" className="hover-elevate cursor-pointer">
-          <Link href="/dashboard/consultation">
+          <Link href={getNextActionRoute(metrics?.nextAction || 'Complete your profile')}>
             <CardHeader className="space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Profile Completeness</CardTitle>
             </CardHeader>
