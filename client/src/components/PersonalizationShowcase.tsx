@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import techFounder from '@assets/pstad_34-year-old_tech_founder_--stylize_50_--v_7_5025fbd0-a43a-41b1-baad-11d6e6551719_3_1762187852224.png';
 import triathlete from '@assets/pstad_41-year-old_triathlete_training_for_Ironman_--stylize_5_e6168110-f9ee-4e01-9beb-50344db0ecaf_3_1762188020759.png';
-import pregnantWoman from '@assets/stock_images/pregnant_woman_in_he_051cc6af.jpg';
+import pregnantWoman from '@assets/pstad_28_year_old_pregnant_woman_--stylize_50_--v_7_9b49bd6d-18e2-40ec-b1ec-00ed13aad376_3_1762188075768.png';
 import seniorMan from '@assets/stock_images/senior_man_60s_healt_3c016037.jpg';
 import perimenopauseWoman from '@assets/stock_images/woman_perimenopause__ec1ca4d3.jpg';
 import veganWoman from '@assets/stock_images/young_vegan_woman_20_260f4bdd.jpg';
