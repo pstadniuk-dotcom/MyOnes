@@ -160,7 +160,7 @@ export default function PersonalizationShowcase() {
   return (
     <div className="w-full bg-gradient-to-br from-primary/5 via-background to-secondary/5">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative rounded-2xl overflow-hidden border border-primary/10">
+        <div className="relative rounded-2xl overflow-hidden">
           {/* Header */}
           <div className="text-center py-8 px-4">
             <div className="inline-flex items-center gap-2 bg-primary/10 px-4 py-1.5 rounded-full mb-4">
