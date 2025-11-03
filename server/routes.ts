@@ -289,10 +289,22 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
   // Validate additions
   if (formula.additions) {
     for (const addition of formula.additions) {
-      // Check if addition is in approved list (case-insensitive)
-      const isApproved = approvedIngredients.some(approved => 
-        approved.toLowerCase() === addition.name.toLowerCase()
-      );
+      // Normalize names for comparison (case-insensitive, ignore parentheses content)
+      const normalizeForMatch = (name: string) => {
+        return name.toLowerCase()
+          .replace(/\s*\([^)]*\)/g, '') // Remove parentheses and content
+          .trim();
+      };
+      
+      const normalizedAddition = normalizeForMatch(addition.name);
+      
+      // Check if addition is in approved list (fuzzy match)
+      const isApproved = approvedIngredients.some(approved => {
+        const normalizedApproved = normalizeForMatch(approved);
+        return normalizedApproved === normalizedAddition || 
+               normalizedApproved.includes(normalizedAddition) ||
+               normalizedAddition.includes(normalizedApproved);
+      });
       
       if (!isApproved) {
         errors.push(`UNAUTHORIZED INGREDIENT: "${addition.name}" is not in the approved catalog. Formula REJECTED.`);
