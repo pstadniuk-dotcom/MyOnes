@@ -53,7 +53,7 @@ export const healthProfiles = pgTable("health_profiles", {
   sex: sexEnum("sex"),
   
   // Physical measurements
-  weightKg: integer("weight_kg"),
+  weightLbs: integer("weight_lbs"),
   heightCm: integer("height_cm"), // For BMI calculation
   
   // Vital signs
