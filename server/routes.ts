@@ -1834,11 +1834,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch user's current active formula
       const activeFormula = await storage.getCurrentFormulaByUser(userId!);
       
+      console.log('🔍 DEBUG: Active formula fetched:', activeFormula ? `YES - ${activeFormula.name} (${activeFormula.totalMg}mg)` : 'NO FORMULA FOUND');
+      
       let currentFormulaContext = '';
       if (activeFormula) {
         // Match actual database schema: ingredient, amount, unit
         const bases = activeFormula.bases as Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
         const additions = (activeFormula.additions || []) as Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
+        
+        console.log('🔍 DEBUG: Bases count:', bases.length, 'Additions count:', additions.length);
         
         const basesText = bases.map(b => `  • ${b.ingredient} (${b.amount}${b.unit}) - ${b.purpose || 'No description'}`).join('\n');
         const additionsText = additions.length > 0 
@@ -1866,6 +1870,9 @@ Target Range: 4500-5500mg (00 capsule capacity)
 - Show your math: "Current XYZ 450mg + Adding ABC 300mg = 750mg total for cardiovascular support"
 `;
 
+        console.log('📦 DEBUG: Formula context built, length:', currentFormulaContext.length, 'chars');
+      } else {
+        console.log('⚠️ DEBUG: No active formula found for user');
       }
       
       const healthContextMessage = `
@@ -1962,8 +1969,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         messageWithFileContext = `[User has attached files: ${fileDescriptions}] ${message}`;
       }
 
+      const fullSystemPrompt = ONES_AI_SYSTEM_PROMPT + healthContextMessage;
+      console.log('📤 DEBUG: System prompt length:', fullSystemPrompt.length, 'chars');
+      console.log('📤 DEBUG: Current formula in prompt?', fullSystemPrompt.includes('CURRENT ACTIVE FORMULA'));
+      console.log('📤 DEBUG: Lab data in prompt?', fullSystemPrompt.includes('LABORATORY TEST RESULTS'));
+      
       const conversationHistory: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
-        { role: 'system', content: ONES_AI_SYSTEM_PROMPT + healthContextMessage },
+        { role: 'system', content: fullSystemPrompt },
         ...previousMessages.map(msg => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content
