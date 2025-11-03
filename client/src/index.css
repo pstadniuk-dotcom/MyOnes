@@ -235,9 +235,9 @@
     @apply text-xl md:text-2xl font-medium;
   }
 
-  /* Use branded foreground color for strong tags instead of browser default blue */
+  /* Use branded accent color for strong tags instead of browser default blue */
   strong {
-    @apply text-foreground font-semibold;
+    @apply text-accent-foreground font-semibold;
   }
 }
 
