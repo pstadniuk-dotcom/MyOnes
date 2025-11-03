@@ -1821,11 +1821,40 @@ Target Range: 4500-5500mg (00 capsule capacity)
       }
       
       const healthContextMessage = `
+${labDataContext ? `
+🚨🚨🚨 CRITICAL OVERRIDE INSTRUCTION 🚨🚨🚨
+
+THE USER HAS UPLOADED BLOOD TEST RESULTS. THEY ARE SHOWN BELOW IN YOUR CONTEXT.
+
+⚠️ ABSOLUTE REQUIREMENT: When a user mentions they've uploaded blood tests, lab results, or Function Health data:
+1. DO NOT say "I'll review the data" or "I'll get back to you" or "Let me analyze" or any future-tense statement
+2. DO NOT ask for missing health profile information first
+3. The lab data is ALREADY EXTRACTED and FORMATTED in your context below
+4. You MUST IMMEDIATELY ANALYZE the blood test data in THIS SAME RESPONSE
+5. Provide specific findings with actual biomarker values and recommendations
+6. Then you can ask for any missing profile information afterwards if needed
+
+WRONG RESPONSE EXAMPLE (DO NOT DO THIS):
+"Thank you for uploading your blood tests. I'll review the data and provide recommendations..."
+
+CORRECT RESPONSE EXAMPLE (DO THIS):
+"I've analyzed your Function Health results. Here's what I found:
+
+🔴 Cardiovascular Markers:
+- Total Cholesterol: 220 mg/dL (⬆️ HIGH, ref: <200 mg/dL)
+- LDL: 145 mg/dL (⬆️ HIGH, ref: <100 mg/dL)
+
+These elevated lipids indicate we should focus on cardiovascular support. I'm adding Heart Support (450mg) and Omega-3 (300mg) to target these specific concerns..."
+
+THE LAB DATA IS ALREADY HERE - ANALYZE IT NOW:
+` : ''}
+
 === USER'S CURRENT HEALTH PROFILE STATUS ===
 
 Information we have: ${completedFields.length > 0 ? completedFields.join(', ') : 'None yet'}
 
 Information still needed: ${missingFields.length > 0 ? missingFields.join(', ') : 'Complete!'}
+${labDataContext ? '⚠️ BUT ANALYZE THE LAB RESULTS ABOVE FIRST BEFORE ASKING FOR MISSING INFORMATION!' : ''}
 
 ${currentFormulaContext}
 

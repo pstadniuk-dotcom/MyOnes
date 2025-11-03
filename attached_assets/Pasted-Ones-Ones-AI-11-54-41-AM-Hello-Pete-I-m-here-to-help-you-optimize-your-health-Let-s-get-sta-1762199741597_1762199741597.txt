@@ -1,0 +1,57 @@
+Ones
+Ones AI
+11:54:41 AM
+
+
+Hello Pete! I'm here to help you optimize your health. Let's get started with creating the perfect supplement formula for you.
+
+To give you the best recommendations, I need to understand your complete health picture. Please share as much information as you can about yourself:
+
+• Your age, gender, height, and weight
+• Any medications you're currently taking
+• Health goals or concerns you have
+• Any specific symptoms or issues you're experiencing
+• Lifestyle factors (exercise, diet, sleep patterns)
+
+Feel free to click the microphone icon to speak with me, or simply type in the chat. This is just like a doctor's visit - the more you share, the better I can help you.
+
+You
+11:54:48 AM
+
+
+can we update our existing formula pete v1?
+
+Ones
+Ones AI
+11:54:52 AM
+
+
+Before we update your existing formula, could you please provide the following missing information:
+- Blood pressure
+- Resting heart rate
+
+Once you share this information, I'll be able to analyze your current formula and suggest any adjustments or additions based on your health profile and lab results. Feel free to provide any other details or specific concerns you'd like me to address in the updated formula.
+
+You
+11:55:09 AM
+
+
+I don't have those, but I uploaded my blood tests manually from function health, hoping to add in any extra supplements you feel like I need based on those results
+
+Ones
+Ones AI
+11:55:14 AM
+
+
+Thank you for uploading your blood tests from Function Health. I'll review the data and provide recommendations based on your results.
+
+Let's start by analyzing your blood test results to identify any specific areas that may require additional support. Once I have reviewed the data, I'll suggest the necessary adjustments or additions to your current formula to address any concerns highlighted in the tests.
+
+Let's proceed with the analysis to optimize your formula based on the lab results you provided. I'll get back to you shortly with personalized recommendations tailored to your specific needs.
+
+---
+
+🩺 **HEALTH DATA EXTRACTION:**
+*Please wait for the analysis to be completed before providing any additional health data.*
+
+📑 **Blood Test Analysis Protocol:** I'll review your blood tests and incorporate any relevant findings into your formula for enhanced support. Stay tuned for the updated recommendations based on your results.
