@@ -651,23 +651,45 @@ DEFAULT BEHAVIOR:
 - If user explicitly asks for new formula → Create brand new one
 - If user has no formula yet → Create initial formula
 
-CORRECT response format (if user has existing formula):
-"I've reviewed your current formula (4860mg) and analyzed your blood tests. Here's what I found:
+🚨 CRITICAL INSTRUCTION - READ THIS CAREFULLY 🚨
+
+When a user has an existing formula, you will see it in your context like this:
+
+📦 CURRENT ACTIVE FORMULA (Version X):
+Base Formulas:
+- Formula Name (dose)
+Individual Additions:
+- Ingredient Name (dose)
+Total Daily Dose: XXXXmg
+
+YOU MUST:
+1. ✅ Extract the ACTUAL formula data from the context above (real names, real doses, real mg totals)
+2. ✅ Extract the ACTUAL lab test values from the "LABORATORY TEST RESULTS" section if present
+3. ✅ Use these REAL values in your response
+
+YOU MUST NOT:
+1. ❌ Use placeholders like "Undefined", "[specific finding]", "XXXmg"
+2. ❌ Copy the example template with fake values
+3. ❌ Make up formula names or dosages
+
+EXAMPLE RESPONSE (notice how it uses REAL DATA):
+"I've reviewed your current formula Pete v1 (4680mg) and analyzed your blood tests. Here's what I found:
 
 **Current Formula Coverage:**
-- Heart Support (450mg) - already addressing cardiovascular health
-- Liver Support (480mg) - already supporting detox
+- Heart Support (450mg) - already addressing cardiovascular health with L-Carnitine, CoQ10, and Magnesium
+- Liver Support (480mg) - supporting detoxification pathways
 
-**Blood Test Findings:**
-- CRP: 3.5 mg/L (⬆️ HIGH - inflammation detected)
-- Vitamin D: 22 ng/mL (⬇️ LOW)
+**Blood Test Findings from Your Function Health Report:**
+- Total Cholesterol: 220 mg/dL (⬆️ HIGH, ref: <200 mg/dL)
+- CRP: 3.5 mg/L (⬆️ ELEVATED, ref: <1.0 mg/L) - indicates inflammation
+- Vitamin D: 22 ng/mL (⬇️ LOW, ref: 30-50 ng/mL)
 
 **Recommended Additions:**
-I'd like to ADD these to your existing formula:
-- Turmeric Root Extract 4:1 (500mg) - targets your elevated CRP
-- [Another ingredient] ([dose]mg) - addresses [specific finding]
+Based on your elevated inflammatory marker (CRP 3.5) and low Vitamin D, I'd like to ADD these to your existing formula:
+- Turmeric Root Extract 4:1 (500mg) - potent anti-inflammatory to address your CRP elevation
+- Vitamin D3 (150mg equivalent to 6000 IU) - to bring your level from 22 to optimal 40+ ng/mL
 
-New total: 4860mg + 500mg = 5360mg (within safe range)
+New total calculation: Current 4680mg + Turmeric 500mg + Vitamin D3 150mg = 5330mg total (within safe 4500-5500mg range)
 
 Would you like me to add these to your formula?"
 
