@@ -56,9 +56,11 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <h1 className="text-2xl font-serif font-bold text-primary" data-testid="text-logo">
-              Ones
-            </h1>
+            <Link href="/">
+              <h1 className="text-2xl font-serif font-bold text-primary cursor-pointer hover:opacity-80 transition-opacity" data-testid="text-logo">
+                Ones
+              </h1>
+            </Link>
           </div>
 
           {/* Desktop Navigation */}
