@@ -175,7 +175,7 @@ export default function PersonalizationShowcase() {
                     alt={activePersona.name}
                     className="w-full h-full object-cover transition-all duration-700"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-transparent to-transparent dark:from-background dark:via-background/50 dark:to-transparent"></div>
                   
                   {/* Person Info Overlay */}
                   <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
