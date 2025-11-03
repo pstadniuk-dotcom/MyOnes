@@ -1810,7 +1810,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const labReports = await storage.getLabReportsByUser(userId!);
       let labDataContext = '';
       
+      console.log('🔬 DEBUG: Lab reports found:', labReports.length);
+      
       if (labReports.length > 0) {
+        console.log('🔬 DEBUG: Lab reports statuses:', labReports.map(r => r.labReportData?.analysisStatus || 'no status'));
+        
         const processedReports = labReports
           .filter(report => report.labReportData?.analysisStatus === 'completed' && report.labReportData?.extractedData)
           .map(report => {
@@ -1826,8 +1830,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return `📋 Lab Report from ${data.testDate || 'unknown date'} (${data.labName || 'unknown lab'}):\n${tableRows}`;
           });
         
+        console.log('🔬 DEBUG: Processed reports count:', processedReports.length);
+        
         if (processedReports.length > 0) {
           labDataContext = processedReports.join('\n\n');
+          console.log('🔬 DEBUG: Lab data context length:', labDataContext.length, 'chars');
+        } else {
+          console.log('⚠️ DEBUG: No lab reports with completed analysis and extracted data');
         }
       }
       
@@ -1841,28 +1850,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Match actual database schema: ingredient, amount, unit
         const bases = activeFormula.bases as Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
         const additions = (activeFormula.additions || []) as Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
+        const customizations = activeFormula.userCustomizations as {
+          addedBases?: Array<{ingredient: string, amount: number, unit: string}>;
+          addedIndividuals?: Array<{ingredient: string, amount: number, unit: string}>;
+        };
         
         console.log('🔍 DEBUG: Bases count:', bases.length, 'Additions count:', additions.length);
+        console.log('🔍 DEBUG: User customizations:', customizations ? JSON.stringify(customizations) : 'none');
         
         const basesText = bases.map(b => `  • ${b.ingredient} (${b.amount}${b.unit}) - ${b.purpose || 'No description'}`).join('\n');
         const additionsText = additions.length > 0 
           ? additions.map(a => `  • ${a.ingredient} (${a.amount}${a.unit}) - ${a.purpose || 'No description'}`).join('\n')
           : '  (none)';
         
+        // Include user customizations if they exist
+        let customizationsText = '';
+        if (customizations) {
+          const customBases = customizations.addedBases || [];
+          const customIndividuals = customizations.addedIndividuals || [];
+          
+          if (customBases.length > 0 || customIndividuals.length > 0) {
+            const allCustomizations = [
+              ...customBases.map(c => `  • ${c.ingredient} (${c.amount}${c.unit}) - User added base formula`),
+              ...customIndividuals.map(c => `  • ${c.ingredient} (${c.amount}${c.unit}) - User added individual ingredient`)
+            ];
+            customizationsText = `\n\nUser Manual Customizations:\n${allCustomizations.join('\n')}`;
+          }
+        }
+        
         currentFormulaContext = `
 📦 CURRENT ACTIVE FORMULA: "${activeFormula.name || 'Unnamed'}" (Version ${activeFormula.version || 1})
 
-Base Formulas:
+Base Formulas (AI-Recommended):
 ${basesText}
 
-Individual Additions:
-${additionsText}
+Individual Additions (AI-Recommended):
+${additionsText}${customizationsText}
 
 Total Daily Dose: ${activeFormula.totalMg}mg
 Target Range: 4500-5500mg (00 capsule capacity)
 
 ⚠️ IMPORTANT: When analyzing blood tests and making recommendations:
-- Review this current formula FIRST
+- Review this COMPLETE formula FIRST (including all base formulas, additions, AND user customizations)
 - Identify what's working and what might need adjustment
 - Calculate the gap: Current ${activeFormula.totalMg}mg → Target 4500-5500mg = ${Math.max(0, 4500 - activeFormula.totalMg)}mg minimum addition needed (${5500 - activeFormula.totalMg}mg maximum capacity available)
 - Suggest specific base formulas or individual ingredients from the approved catalog to ADD
