@@ -1188,6 +1188,12 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    
    🔴🔴🔴 MANDATORY: You MUST copy this exact format below. Replace the example data with your formula, but keep the JSON structure identical. 🔴🔴🔴
    
+   ⚠️ CRITICAL CATEGORIZATION RULES:
+   - "bases" array = ONLY the 32 approved BASE FORMULAS (Heart Support, Alpha Gest III, Liver Support, etc.)
+   - "additions" array = ONLY the 29 approved INDIVIDUAL INGREDIENTS (Magnesium, Omega 3 algae omega, Turmeric, etc.)
+   - NEVER put individual ingredients in "bases" array
+   - NEVER put base formulas in "additions" array
+   
    Format it EXACTLY like this with triple backticks and "json" tag (replace \` with actual backticks):
    
    \`\`\`json
@@ -1206,6 +1212,11 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
      "disclaimers": ["This is supplement support, not medical advice", "Always consult your healthcare provider before starting new supplements"]
    }
    \`\`\`
+   
+   🔍 QUICK CHECK BEFORE SUBMITTING:
+   - Verify all "bases" items are from the 32 BASE FORMULAS list (scroll up to check)
+   - Verify all "additions" items are from the 29 INDIVIDUAL INGREDIENTS list (scroll up to check)
+   - Verify totalMg is between 4500-5500mg (not 2000mg or 3000mg - that's too low!)
    
    REQUIRED FIELDS:
    - bases: array of base formulas (MUST use exact names from approved 32 base formulas)
