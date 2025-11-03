@@ -22,7 +22,11 @@ import { calculateDosage } from '@/lib/utils';
 
 interface DashboardData {
   metrics: {
-    healthScore: number;
+    profileCompleteness: number;
+    completedFields: number;
+    totalFields: number;
+    nextAction: string;
+    nextActionDetail: string;
     formulaVersion: number;
     consultationsSessions: number;
   };
@@ -75,21 +79,22 @@ export default function HomePage() {
 
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-3">
-        {/* Health Score */}
-        <Card data-testid="card-health-score" className="hover-elevate">
-          <CardHeader className="space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Health Score</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-semibold text-green-600 mb-1">
-              {metrics?.healthScore || 0}%
-            </div>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />
-              In Range
-            </p>
-            <Progress value={metrics?.healthScore || 0} className="mt-2 h-1" />
-          </CardContent>
+        {/* Profile Completeness */}
+        <Card data-testid="card-profile-completeness" className="hover-elevate cursor-pointer">
+          <Link href="/dashboard/consultation">
+            <CardHeader className="space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Profile Completeness</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-semibold text-primary mb-1">
+                {metrics?.profileCompleteness || 0}%
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {metrics?.nextAction || 'Complete your profile'}
+              </p>
+              <Progress value={metrics?.profileCompleteness || 0} className="mt-2 h-1" />
+            </CardContent>
+          </Link>
         </Card>
 
         {/* Formula Version */}

@@ -2338,12 +2338,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       
       // Fetch all dashboard data in parallel
-      const [currentFormula, healthProfile, chatSessions, orders, subscription] = await Promise.all([
+      const [currentFormula, healthProfile, chatSessions, orders, subscription, labReports] = await Promise.all([
         storage.getCurrentFormulaByUser(userId),
         storage.getHealthProfile(userId),
         storage.listChatSessionsByUser(userId),
         storage.listOrdersByUser(userId),
-        storage.getSubscription(userId)
+        storage.getSubscription(userId),
+        storage.listFileUploadsByUser(userId, 'lab_report') // Get uploaded lab reports
       ]);
 
       // Calculate metrics
@@ -2356,169 +2357,78 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         Math.min(...chatSessions.map(s => s.createdAt.getTime())) : Date.now();
       const daysActive = Math.floor((Date.now() - oldestSession) / (1000 * 60 * 60 * 24));
       
-      // Comprehensive Health Score Calculation (0-100)
-      let healthScore = 0;
-      const scoreBreakdown: Record<string, {score: number, max: number, status: string}> = {};
-      
-      // 1. BMI Score (20 points max)
-      if (healthProfile?.weightKg && healthProfile?.heightCm) {
-        const heightM = healthProfile.heightCm / 100;
-        const bmi = healthProfile.weightKg / (heightM * heightM);
-        let bmiScore = 0;
-        let bmiStatus = '';
-        
-        if (bmi >= 18.5 && bmi <= 24.9) {
-          bmiScore = 20;
-          bmiStatus = 'Healthy weight';
-        } else if ((bmi >= 17 && bmi < 18.5) || (bmi >= 25 && bmi <= 29.9)) {
-          bmiScore = 15;
-          bmiStatus = bmi < 18.5 ? 'Slightly underweight' : 'Slightly overweight';
-        } else if ((bmi >= 15 && bmi < 17) || (bmi >= 30 && bmi <= 34.9)) {
-          bmiScore = 10;
-          bmiStatus = bmi < 17 ? 'Underweight' : 'Overweight';
-        } else {
-          bmiScore = 5;
-          bmiStatus = bmi < 15 ? 'Severely underweight' : 'Obese';
-        }
-        
-        healthScore += bmiScore;
-        scoreBreakdown['bmi'] = { score: bmiScore, max: 20, status: `${bmi.toFixed(1)} - ${bmiStatus}` };
-      }
-      
-      // 2. Blood Pressure Score (20 points max)
-      if (healthProfile?.bloodPressureSystolic && healthProfile?.bloodPressureDiastolic) {
-        const sys = healthProfile.bloodPressureSystolic;
-        const dia = healthProfile.bloodPressureDiastolic;
-        let bpScore = 0;
-        let bpStatus = '';
-        
-        if (sys < 120 && dia < 80) {
-          bpScore = 20;
-          bpStatus = 'Optimal';
-        } else if (sys >= 120 && sys <= 129 && dia < 80) {
-          bpScore = 15;
-          bpStatus = 'Elevated';
-        } else if ((sys >= 130 && sys <= 139) || (dia >= 80 && dia <= 89)) {
-          bpScore = 10;
-          bpStatus = 'Stage 1 Hypertension';
-        } else {
-          bpScore = 5;
-          bpStatus = 'Stage 2+ Hypertension';
-        }
-        
-        healthScore += bpScore;
-        scoreBreakdown['bloodPressure'] = { score: bpScore, max: 20, status: `${sys}/${dia} - ${bpStatus}` };
-      }
-      
-      // 3. Lifestyle Factors (30 points max)
-      let lifestyleScore = 0;
-      
-      // Sleep (10 points)
-      if (healthProfile?.sleepHoursPerNight) {
-        const sleep = healthProfile.sleepHoursPerNight;
-        let sleepScore = 0;
-        if (sleep >= 7 && sleep <= 9) sleepScore = 10;
-        else if (sleep === 6 || sleep === 10) sleepScore = 7;
-        else sleepScore = 3;
-        lifestyleScore += sleepScore;
-        scoreBreakdown['sleep'] = { score: sleepScore, max: 10, status: `${sleep} hours/night` };
-      }
-      
-      // Exercise (10 points)
-      if (healthProfile?.exerciseDaysPerWeek !== null && healthProfile?.exerciseDaysPerWeek !== undefined) {
-        const exercise = healthProfile.exerciseDaysPerWeek;
-        let exerciseScore = 0;
-        if (exercise >= 5) exerciseScore = 10;
-        else if (exercise >= 3) exerciseScore = 7;
-        else if (exercise >= 1) exerciseScore = 4;
-        else exerciseScore = 0;
-        lifestyleScore += exerciseScore;
-        scoreBreakdown['exercise'] = { score: exerciseScore, max: 10, status: `${exercise} days/week` };
-      }
-      
-      // Stress Level (10 points)
-      if (healthProfile?.stressLevel) {
-        const stress = healthProfile.stressLevel;
-        let stressScore = 0;
-        if (stress >= 1 && stress <= 3) stressScore = 10;
-        else if (stress >= 4 && stress <= 6) stressScore = 7;
-        else stressScore = 3;
-        lifestyleScore += stressScore;
-        scoreBreakdown['stress'] = { score: stressScore, max: 10, status: `Level ${stress}/10` };
-      }
-      
-      healthScore += lifestyleScore;
-      
-      // 4. Risk Factors (15 points max)
-      let riskScore = 0;
-      
-      // Smoking (10 points)
-      if (healthProfile?.smokingStatus) {
-        const smoking = healthProfile.smokingStatus;
-        let smokingScore = 0;
-        if (smoking === 'never') smokingScore = 10;
-        else if (smoking === 'former') smokingScore = 7;
-        else smokingScore = 0;
-        riskScore += smokingScore;
-        scoreBreakdown['smoking'] = { score: smokingScore, max: 10, status: smoking.charAt(0).toUpperCase() + smoking.slice(1) };
-      }
-      
-      // Alcohol (5 points)
-      if (healthProfile?.alcoholDrinksPerWeek !== null && healthProfile?.alcoholDrinksPerWeek !== undefined) {
-        const drinks = healthProfile.alcoholDrinksPerWeek;
-        let alcoholScore = 0;
-        if (drinks <= 7) alcoholScore = 5;
-        else if (drinks <= 14) alcoholScore = 3;
-        else alcoholScore = 0;
-        riskScore += alcoholScore;
-        scoreBreakdown['alcohol'] = { score: alcoholScore, max: 5, status: `${drinks} drinks/week` };
-      }
-      
-      healthScore += riskScore;
-      
-      // 5. Heart Health (10 points max)
-      if (healthProfile?.restingHeartRate) {
-        const hr = healthProfile.restingHeartRate;
-        let hrScore = 0;
-        let hrStatus = '';
-        if (hr >= 60 && hr <= 80) {
-          hrScore = 10;
-          hrStatus = 'Excellent';
-        } else if ((hr >= 50 && hr < 60) || (hr > 80 && hr <= 90)) {
-          hrScore = 7;
-          hrStatus = 'Good';
-        } else {
-          hrScore = 3;
-          hrStatus = 'Needs attention';
-        }
-        healthScore += hrScore;
-        scoreBreakdown['heartRate'] = { score: hrScore, max: 10, status: `${hr} bpm - ${hrStatus}` };
-      }
-      
-      // 6. Data Completeness Bonus (5 points)
-      const fieldsProvided = [
-        healthProfile?.age,
-        healthProfile?.weightKg,
-        healthProfile?.heightCm,
-        healthProfile?.bloodPressureSystolic,
-        healthProfile?.sleepHoursPerNight,
-        healthProfile?.exerciseDaysPerWeek,
-        healthProfile?.stressLevel,
-        healthProfile?.smokingStatus,
-        healthProfile?.alcoholDrinksPerWeek,
-        healthProfile?.restingHeartRate
-      ].filter(v => v !== null && v !== undefined).length;
-      
-      const completenessScore = Math.floor((fieldsProvided / 10) * 5);
-      healthScore += completenessScore;
-      scoreBreakdown['completeness'] = { 
-        score: completenessScore, 
-        max: 5, 
-        status: `${fieldsProvided}/10 fields complete` 
+      // Profile Completeness Calculation (0-100%)
+      const profileFields = {
+        // Demographics (2 fields)
+        demographics: [
+          healthProfile?.age,
+          healthProfile?.sex
+        ],
+        // Physical measurements (2 fields)
+        physical: [
+          healthProfile?.weightKg,
+          healthProfile?.heightCm
+        ],
+        // Vital signs (3 fields)
+        vitals: [
+          healthProfile?.bloodPressureSystolic && healthProfile?.bloodPressureDiastolic ? true : null,
+          healthProfile?.restingHeartRate
+        ],
+        // Lifestyle factors (5 fields)
+        lifestyle: [
+          healthProfile?.sleepHoursPerNight,
+          healthProfile?.exerciseDaysPerWeek !== null && healthProfile?.exerciseDaysPerWeek !== undefined ? true : null,
+          healthProfile?.stressLevel,
+          healthProfile?.smokingStatus,
+          healthProfile?.alcoholDrinksPerWeek !== null && healthProfile?.alcoholDrinksPerWeek !== undefined ? true : null
+        ],
+        // Medical history (3 fields - count if arrays have items)
+        medical: [
+          (healthProfile?.conditions && Array.isArray(healthProfile.conditions) && healthProfile.conditions.length > 0) ? true : null,
+          (healthProfile?.medications && Array.isArray(healthProfile.medications) && healthProfile.medications.length > 0) ? true : null,
+          (healthProfile?.allergies && Array.isArray(healthProfile.allergies) && healthProfile.allergies.length > 0) ? true : null
+        ],
+        // Lab reports (1 field)
+        labs: [
+          labReports && labReports.length > 0 ? true : null
+        ]
       };
       
-      // Cap at 100
-      healthScore = Math.min(Math.round(healthScore), 100);
+      // Count completed fields
+      const completedFields = Object.values(profileFields)
+        .flat()
+        .filter(field => field !== null && field !== undefined).length;
+      
+      // Total possible fields
+      const totalFields = Object.values(profileFields)
+        .flat().length;
+      
+      // Calculate percentage
+      const profileCompleteness = Math.round((completedFields / totalFields) * 100);
+      
+      // Determine next action message
+      let nextAction = 'Complete your profile';
+      let nextActionDetail = '';
+      
+      if (!healthProfile || (!healthProfile.age && !healthProfile.sex)) {
+        nextAction = 'Add demographics';
+        nextActionDetail = 'Start with age and gender';
+      } else if (!labReports || labReports.length === 0) {
+        nextAction = 'Upload lab results';
+        nextActionDetail = 'Blood tests help personalize your formula';
+      } else if (!healthProfile.medications || !Array.isArray(healthProfile.medications) || healthProfile.medications.length === 0) {
+        nextAction = 'Add medications';
+        nextActionDetail = 'Avoid dangerous interactions';
+      } else if (!healthProfile.conditions || !Array.isArray(healthProfile.conditions) || healthProfile.conditions.length === 0) {
+        nextAction = 'Add health conditions';
+        nextActionDetail = 'Better formula personalization';
+      } else if (!healthProfile.sleepHoursPerNight || !healthProfile.exerciseDaysPerWeek) {
+        nextAction = 'Add lifestyle data';
+        nextActionDetail = 'Sleep and exercise habits matter';
+      } else {
+        nextAction = 'Profile complete';
+        nextActionDetail = 'All data collected';
+      }
 
       // Get recent activity
       const recentActivity: Array<{
@@ -2562,8 +2472,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
       const dashboardData = {
         metrics: {
-          healthScore,
-          healthScoreBreakdown: scoreBreakdown,
+          profileCompleteness,
+          completedFields,
+          totalFields,
+          nextAction,
+          nextActionDetail,
           formulaVersion: currentFormula?.version || 0,
           consultationsSessions: totalConsultations,
           daysActive: Math.max(daysActive, 0),
