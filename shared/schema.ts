@@ -283,6 +283,9 @@ export const notificationPrefs = pgTable("notification_prefs", {
   emailConsultation: boolean("email_consultation").default(true).notNull(),
   emailShipping: boolean("email_shipping").default(true).notNull(),
   emailBilling: boolean("email_billing").default(true).notNull(),
+  smsConsultation: boolean("sms_consultation").default(false).notNull(),
+  smsShipping: boolean("sms_shipping").default(false).notNull(),
+  smsBilling: boolean("sms_billing").default(false).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

@@ -26,6 +26,9 @@ export default function SettingsPage() {
     emailConsultation: boolean;
     emailShipping: boolean;
     emailBilling: boolean;
+    smsConsultation: boolean;
+    smsShipping: boolean;
+    smsBilling: boolean;
   }>({
     queryKey: ['/api/notification-prefs'],
   });
@@ -35,6 +38,9 @@ export default function SettingsPage() {
     emailConsultation: true,
     emailShipping: true,
     emailBilling: true,
+    smsConsultation: false,
+    smsShipping: false,
+    smsBilling: false,
   });
 
   // Update local state when data is fetched
@@ -44,6 +50,9 @@ export default function SettingsPage() {
         emailConsultation: notificationPrefs.emailConsultation,
         emailShipping: notificationPrefs.emailShipping,
         emailBilling: notificationPrefs.emailBilling,
+        smsConsultation: notificationPrefs.smsConsultation,
+        smsShipping: notificationPrefs.smsShipping,
+        smsBilling: notificationPrefs.smsBilling,
       });
     }
   }, [notificationPrefs]);
@@ -254,59 +263,101 @@ export default function SettingsPage() {
                 <div className="text-center py-8 text-muted-foreground">Loading preferences...</div>
               ) : (
                 <>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Formula & Consultation Updates</Label>
+                  <div className="space-y-6">
+                    {/* Formula & Consultation Updates */}
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-base font-semibold">Formula & Consultation Updates</Label>
                         <p className="text-sm text-muted-foreground">
-                          Get notified about formula updates, consultation reminders, and lab results
+                          Formula updates, consultation reminders, and lab results
                         </p>
                       </div>
-                      <Switch
-                        checked={notifications.emailConsultation}
-                        onCheckedChange={(checked) =>
-                          setNotifications({ ...notifications, emailConsultation: checked })
-                        }
-                        data-testid="switch-email-consultation"
-                      />
+                      <div className="ml-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="font-normal">Email</Label>
+                          <Switch
+                            checked={notifications.emailConsultation}
+                            onCheckedChange={(checked) =>
+                              setNotifications({ ...notifications, emailConsultation: checked })
+                            }
+                            data-testid="switch-email-consultation"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Label className="font-normal">SMS</Label>
+                          <Switch
+                            checked={notifications.smsConsultation}
+                            onCheckedChange={(checked) =>
+                              setNotifications({ ...notifications, smsConsultation: checked })
+                            }
+                            data-testid="switch-sms-consultation"
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Order & Shipping Updates</Label>
+                    {/* Order & Shipping Updates */}
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-base font-semibold">Order & Shipping Updates</Label>
                         <p className="text-sm text-muted-foreground">
-                          Track order status, shipment tracking, and delivery notifications
+                          Order status, shipment tracking, and delivery notifications
                         </p>
                       </div>
-                      <Switch
-                        checked={notifications.emailShipping}
-                        onCheckedChange={(checked) =>
-                          setNotifications({ ...notifications, emailShipping: checked })
-                        }
-                        data-testid="switch-email-shipping"
-                      />
+                      <div className="ml-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="font-normal">Email</Label>
+                          <Switch
+                            checked={notifications.emailShipping}
+                            onCheckedChange={(checked) =>
+                              setNotifications({ ...notifications, emailShipping: checked })
+                            }
+                            data-testid="switch-email-shipping"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Label className="font-normal">SMS</Label>
+                          <Switch
+                            checked={notifications.smsShipping}
+                            onCheckedChange={(checked) =>
+                              setNotifications({ ...notifications, smsShipping: checked })
+                            }
+                            data-testid="switch-sms-shipping"
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Account & Billing</Label>
+                    {/* Account & Billing */}
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-base font-semibold">Account & Billing</Label>
                         <p className="text-sm text-muted-foreground">
-                          Receive account updates, payment reminders, and billing notifications
+                          Account updates, payment reminders, and billing notifications
                         </p>
                       </div>
-                      <Switch
-                        checked={notifications.emailBilling}
-                        onCheckedChange={(checked) =>
-                          setNotifications({ ...notifications, emailBilling: checked })
-                        }
-                        data-testid="switch-email-billing"
-                      />
-                    </div>
-
-                    <div className="border-t pt-4 mt-6">
-                      <p className="text-sm text-muted-foreground italic">
-                        💡 SMS notifications coming soon! We'll use Twilio to send supplement reminders and time-sensitive alerts.
-                      </p>
+                      <div className="ml-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="font-normal">Email</Label>
+                          <Switch
+                            checked={notifications.emailBilling}
+                            onCheckedChange={(checked) =>
+                              setNotifications({ ...notifications, emailBilling: checked })
+                            }
+                            data-testid="switch-email-billing"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Label className="font-normal">SMS</Label>
+                          <Switch
+                            checked={notifications.smsBilling}
+                            onCheckedChange={(checked) =>
+                              setNotifications({ ...notifications, smsBilling: checked })
+                            }
+                            data-testid="switch-sms-billing"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
