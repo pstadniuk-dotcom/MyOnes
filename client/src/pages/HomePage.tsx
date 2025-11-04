@@ -27,11 +27,28 @@ import { useEffect, useState } from 'react';
 // Map next actions to their appropriate routes
 function getNextActionRoute(nextAction: string): string {
   const actionRoutes: Record<string, string> = {
+    // Lab reports
     'Upload lab results': '/dashboard/lab-reports',
+    
+    // Profile tab - demographics & physical
+    'Add age and gender': '/dashboard/profile?tab=profile',
     'Add demographics': '/dashboard/profile?tab=profile',
+    'Add weight and height': '/dashboard/profile?tab=profile',
+    
+    // Health tab - medical & lifestyle
     'Add medications': '/dashboard/profile?tab=health',
     'Add health conditions': '/dashboard/profile?tab=health',
+    'Add allergies': '/dashboard/profile?tab=health',
+    'Add blood pressure': '/dashboard/profile?tab=health',
+    'Add resting heart rate': '/dashboard/profile?tab=health',
+    'Add sleep hours': '/dashboard/profile?tab=health',
+    'Add exercise frequency': '/dashboard/profile?tab=health',
+    'Add stress level': '/dashboard/profile?tab=health',
+    'Add smoking status': '/dashboard/profile?tab=health',
+    'Add alcohol intake': '/dashboard/profile?tab=health',
     'Add lifestyle data': '/dashboard/profile?tab=health',
+    
+    // Complete states
     'Profile complete': '/dashboard/formula',
     'Complete your profile': '/dashboard/chat'
   };

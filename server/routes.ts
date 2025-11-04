@@ -2718,31 +2718,75 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Calculate percentage
       const profileCompleteness = Math.round((completedFields / totalFields) * 100);
       
-      // Determine next action message
+      // Determine next action message - prioritized by importance
       let nextAction = 'Complete your profile';
       let nextActionDetail = '';
       
+      // Priority 1: Critical demographics
       if (!healthProfile || (!healthProfile.age && !healthProfile.sex)) {
-        nextAction = 'Add demographics';
-        nextActionDetail = 'Start with age and gender';
-      } else if (!labReports || labReports.length === 0) {
+        nextAction = 'Add age and gender';
+        nextActionDetail = 'Required for personalized formula';
+      }
+      // Priority 2: Lab reports (highly valuable)
+      else if (!labReports || labReports.length === 0) {
         nextAction = 'Upload lab results';
-        nextActionDetail = 'Blood tests help personalize your formula';
-      } else if (!healthProfile.medications || !Array.isArray(healthProfile.medications) || healthProfile.medications.length === 0) {
+        nextActionDetail = 'Blood tests unlock precision';
+      }
+      // Priority 3: Medications (safety critical)
+      else if (!healthProfile.medications || !Array.isArray(healthProfile.medications) || healthProfile.medications.length === 0) {
         nextAction = 'Add medications';
-        nextActionDetail = 'Avoid dangerous interactions';
-      } else if (!healthProfile.conditions || !Array.isArray(healthProfile.conditions) || healthProfile.conditions.length === 0) {
+        nextActionDetail = 'Prevent dangerous interactions';
+      }
+      // Priority 4: Conditions (personalization critical)
+      else if (!healthProfile.conditions || !Array.isArray(healthProfile.conditions) || healthProfile.conditions.length === 0) {
         nextAction = 'Add health conditions';
-        nextActionDetail = 'Better formula personalization';
-      } else if (!healthProfile.sleepHoursPerNight || healthProfile.exerciseDaysPerWeek === null || healthProfile.exerciseDaysPerWeek === undefined) {
-        nextAction = 'Add lifestyle data';
-        nextActionDetail = 'Sleep and exercise habits matter';
-      } else if (profileCompleteness < 100) {
-        nextAction = 'Complete your profile';
-        nextActionDetail = 'Add remaining health details';
-      } else {
+        nextActionDetail = 'Target your specific needs';
+      }
+      // Priority 5: Physical measurements
+      else if (!healthProfile.weightLbs || !healthProfile.heightCm) {
+        nextAction = 'Add weight and height';
+        nextActionDetail = 'Helps calculate optimal dosages';
+      }
+      // Priority 6: Vital signs
+      else if (!healthProfile.bloodPressureSystolic || !healthProfile.bloodPressureDiastolic) {
+        nextAction = 'Add blood pressure';
+        nextActionDetail = 'Important for cardiovascular support';
+      }
+      else if (!healthProfile.restingHeartRate) {
+        nextAction = 'Add resting heart rate';
+        nextActionDetail = 'Helps assess cardiovascular health';
+      }
+      // Priority 7: Core lifestyle
+      else if (!healthProfile.sleepHoursPerNight) {
+        nextAction = 'Add sleep hours';
+        nextActionDetail = 'Sleep impacts every formula decision';
+      }
+      else if (healthProfile.exerciseDaysPerWeek === null || healthProfile.exerciseDaysPerWeek === undefined) {
+        nextAction = 'Add exercise frequency';
+        nextActionDetail = 'Activity level affects needs';
+      }
+      // Priority 8: Additional lifestyle
+      else if (!healthProfile.stressLevel) {
+        nextAction = 'Add stress level';
+        nextActionDetail = 'Stress impacts nutrient needs';
+      }
+      else if (!healthProfile.smokingStatus) {
+        nextAction = 'Add smoking status';
+        nextActionDetail = 'Affects antioxidant requirements';
+      }
+      else if (healthProfile.alcoholDrinksPerWeek === null || healthProfile.alcoholDrinksPerWeek === undefined) {
+        nextAction = 'Add alcohol intake';
+        nextActionDetail = 'Impacts liver and B-vitamin needs';
+      }
+      // Priority 9: Allergies (safety)
+      else if (!healthProfile.allergies || !Array.isArray(healthProfile.allergies) || healthProfile.allergies.length === 0) {
+        nextAction = 'Add allergies';
+        nextActionDetail = 'Ensure ingredient safety';
+      }
+      // All complete!
+      else {
         nextAction = 'Profile complete';
-        nextActionDetail = 'All data collected';
+        nextActionDetail = 'All health data collected';
       }
 
       // Get recent activity
