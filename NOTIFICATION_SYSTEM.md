@@ -10,30 +10,54 @@
 
 ## 📬 All Notifications (8 Total)
 
-### 1️⃣ DAILY REMINDERS
+### 1️⃣ DAILY REMINDERS (3 per day)
 
-#### **Daily Pill Reminder + Personalized Tip**
+#### **Pill Reminders - Breakfast, Lunch, Dinner**
 - **Channel**: SMS only (no email)
-- **Trigger**: Scheduled daily at user's preferred time (default 9:00 AM)
+- **Trigger**: Scheduled 3x daily at user's preferred times
 - **Status**: ⚠️ NOT IMPLEMENTED
-- **Example**:
-  ```
-  ⚗️ ONES: Time for your 10 capsules!
-  
-  💡 Tip: Your Omega-3 absorbs better with fatty foods like eggs or avocado.
-  ```
+- **Examples**:
+
+**Morning (8:00 AM default):**
+```
+⚗️ ONES: Breakfast time! Take 3 capsules with your meal.
+
+💡 Tip: Your Vitamin D absorbs best with fatty foods like eggs or avocado.
+```
+
+**Afternoon (12:00 PM default):**
+```
+⚗️ ONES: Lunch reminder! Take 3 capsules with your meal.
+```
+
+**Evening (6:00 PM default):**
+```
+⚗️ ONES: Dinner time! Take 3 capsules with your meal.
+
+💡 Tip: Magnesium helps with sleep - perfect timing for tonight's rest.
+```
+
+**Smart Capsule Calculation:**
+- Read user's current formula `totalMg` from database
+- Calculate capsule count: `Math.ceil(totalMg / 500)` (500mg per capsule)
+- Split evenly across 3 doses:
+  - 9 capsules → 3+3+3
+  - 10 capsules → 4+3+3 (larger dose at breakfast)
+  - 11 capsules → 4+4+3
+  - 12 capsules → 4+4+4
 
 **Personalization:**
-- Analyze user's current formula ingredients
-- Generate 1 unique tip daily based on their specific blend:
-  - Absorption tips ("Magnesium glycinate works best with food")
-  - Timing tips ("Vitamin D pairs well with morning sunlight")
-  - Synergy tips ("Your B-Complex supports your CoQ10's energy benefits")
+- **Morning**: Energy/absorption tips (Vitamin D, B-vitamins, Omega-3)
+- **Afternoon**: No tip (keep it short)
+- **Evening**: Sleep/recovery tips (Magnesium, L-Theanine)
 - Rotate tips intelligently (never repeat within 7 days)
 
 **User Controls (Settings Page):**
-- Toggle: "Daily SMS Reminder" (ON/OFF) - maps to `smsConsultation` preference
-- Time Picker: "Reminder Time" (9:00 AM default)
+- Toggle: "Daily SMS Reminders" (ON/OFF) - maps to `smsConsultation` preference
+- Time Pickers:
+  - "Breakfast Reminder" (8:00 AM default)
+  - "Lunch Reminder" (12:00 PM default)
+  - "Dinner Reminder" (6:00 PM default)
 
 ---
 
@@ -224,17 +248,23 @@ Users control notifications via Settings page:
 
 | Category | Email Default | SMS Default | Controls |
 |----------|---------------|-------------|----------|
-| **Daily Reminders** | ❌ OFF | ❌ OFF | Daily pill reminder + tip |
+| **Daily Reminders (3x/day)** | ❌ OFF | ❌ OFF | Breakfast, lunch, dinner pill reminders |
 | **Orders & Shipping** | ✅ ON | ❌ OFF | Order, shipping, delivery, reorder |
 | **Account & Billing** | ✅ ON | ❌ OFF | Password reset, payment issues |
 
-**Database Fields:**
-- `emailConsultation` - Controls daily reminders via email (not used currently)
-- `smsConsultation` - Controls daily reminders via SMS
+**Database Fields (Current):**
+- `emailConsultation` - Controls daily reminders via email (not used)
+- `smsConsultation` - Controls daily reminders via SMS (maps to master toggle)
 - `emailShipping` - Controls order/shipping emails
 - `smsShipping` - Controls order/shipping SMS
 - `emailBilling` - Controls account/billing emails
 - `smsBilling` - Controls account/billing SMS
+
+**New Database Fields Needed:**
+- `dailyRemindersEnabled` - Master toggle (boolean)
+- `reminderBreakfast` - Time in HH:MM format (default "08:00")
+- `reminderLunch` - Time in HH:MM format (default "12:00")
+- `reminderDinner` - Time in HH:MM format (default "18:00")
 
 **Why SMS defaults OFF:**
 - Requires phone number entry
@@ -338,39 +368,101 @@ app.post('/api/checkout/success', async (req, res) => {
 
 ## 📝 Daily Reminder Implementation Notes
 
-### Scheduled Job Requirements
-- **Cron job**: Runs every minute (checks all users)
-- **Logic**:
-  1. Find all users with `smsConsultation = true`
-  2. Check their `reminderTime` preference
-  3. If current time matches their reminder time:
-     - Get user's current formula
-     - Generate personalized tip based on ingredients
-     - Send SMS (not email)
-     - Track last sent date to avoid duplicates
+### Database Schema Updates Needed
 
-### Tip Generation
-Use OpenAI API to generate tips:
+Add to `users` table or `notification_prefs` table:
 ```typescript
-const tipPrompt = `
-User's formula ingredients: ${formula.bases.map(b => b.ingredient).join(', ')}
-
-Generate ONE short, actionable health tip (max 100 chars) about their specific ingredients.
-Focus on absorption, timing, or synergies. Keep it fresh and helpful.
-`;
-
-const tip = await openai.chat.completions.create({
-  model: 'gpt-4o-mini',
-  messages: [{ role: 'user', content: tipPrompt }],
-  max_tokens: 50
+// In shared/schema.ts
+export const users = pgTable("users", {
+  // ... existing fields ...
+  
+  // Daily reminder preferences
+  dailyRemindersEnabled: boolean("daily_reminders_enabled").default(false),
+  reminderBreakfast: text("reminder_breakfast").default("08:00"), // HH:MM format
+  reminderLunch: text("reminder_lunch").default("12:00"),
+  reminderDinner: text("reminder_dinner").default("18:00"),
 });
 ```
 
+### Scheduled Job Requirements
+- **Cron job**: Runs every minute
+- **Logic**:
+  ```typescript
+  // Pseudo-code
+  const users = await storage.getUsersWithRemindersEnabled();
+  const currentTime = getCurrentTimeHHMM(); // e.g., "08:00"
+  
+  for (const user of users) {
+    const formula = await storage.getCurrentFormulaByUser(user.id);
+    if (!formula) continue;
+    
+    // Calculate capsule distribution
+    const totalCapsules = Math.ceil(formula.totalMg / 500);
+    const [breakfast, lunch, dinner] = distributeCapsules(totalCapsules);
+    
+    // Check which meal time it is
+    if (currentTime === user.reminderBreakfast) {
+      await sendBreakfastReminder(user, breakfast, formula);
+    } else if (currentTime === user.reminderLunch) {
+      await sendLunchReminder(user, lunch);
+    } else if (currentTime === user.reminderDinner) {
+      await sendDinnerReminder(user, dinner, formula);
+    }
+  }
+  ```
+
+### Capsule Distribution Algorithm
+```typescript
+function distributeCapsules(total: number): [number, number, number] {
+  const base = Math.floor(total / 3);
+  const remainder = total % 3;
+  
+  // Distribute remainder to earlier meals (breakfast gets priority)
+  if (remainder === 0) return [base, base, base];
+  if (remainder === 1) return [base + 1, base, base];
+  if (remainder === 2) return [base + 1, base + 1, base];
+  
+  return [base, base, base]; // fallback
+}
+
+// Examples:
+// 9 → [3, 3, 3]
+// 10 → [4, 3, 3]
+// 11 → [4, 4, 3]
+// 12 → [4, 4, 4]
+```
+
+### Tip Generation
+```typescript
+async function generateTip(formula: Formula, mealTime: 'breakfast' | 'dinner'): Promise<string> {
+  const ingredients = formula.bases.map(b => b.ingredient).join(', ');
+  
+  const prompt = mealTime === 'breakfast'
+    ? `Generate ONE very short tip (max 80 chars) about energy/absorption for: ${ingredients}`
+    : `Generate ONE very short tip (max 80 chars) about sleep/recovery for: ${ingredients}`;
+  
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: 30
+  });
+  
+  return response.choices[0].message.content;
+}
+```
+
 ### Settings Page Updates Needed
-1. Add "Daily Reminder" section
-2. Add toggle: "Enable Daily SMS Reminder"
-3. Add time picker: "Reminder Time" (default 9:00 AM)
-4. Store in user preferences table
+1. Add "Daily Reminders" section
+2. Add master toggle: "Enable Daily SMS Reminders" (ON/OFF)
+3. Add 3 time pickers:
+   - "Breakfast Time" (8:00 AM default)
+   - "Lunch Time" (12:00 PM default)
+   - "Dinner Time" (6:00 PM default)
+4. Show capsule distribution preview based on current formula:
+   ```
+   Your current formula: 9 capsules daily
+   Distribution: 3 at breakfast, 3 at lunch, 3 at dinner
+   ```
 
 ---
 
