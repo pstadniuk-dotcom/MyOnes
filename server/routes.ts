@@ -75,6 +75,34 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// Helper function to normalize ingredient names for flexible matching
+// Handles variations like "Phosphatidylcholine 40%" vs "Phosphatidylcholine 40% (soy)"
+function normalizeIngredientForMatching(name: string): string {
+  return name.toLowerCase()
+    .replace(/\s*\([^)]*\)/g, '') // Remove parentheses and content
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+}
+
+// Helper function to check if an ingredient is approved (with flexible matching)
+function isIngredientApproved(ingredientName: string, approvedSet: Set<string>): boolean {
+  const normalized = normalizeIngredientForMatching(ingredientName);
+  
+  // Check if any approved ingredient matches
+  for (const approved of approvedSet) {
+    const normalizedApproved = normalizeIngredientForMatching(approved);
+    
+    // Exact match or fuzzy match
+    if (normalizedApproved === normalized || 
+        normalizedApproved.includes(normalized) ||
+        normalized.includes(normalizedApproved)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 // Canonical dose mapping for all supplement bases and additions
 // APPROVED BASE FORMULAS (32 total) - Exact doses from catalog
 const APPROVED_BASE_FORMULAS = new Set([
@@ -2396,19 +2424,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       if (extractedFormula && chatSession && userId) {
         console.log('✅ All conditions met - proceeding to save formula');
         try {
-          // CRITICAL: Validate all ingredients against approved catalog
+          // CRITICAL: Validate all ingredients against approved catalog (with flexible matching)
           // Validate base formulas
           console.log('🔍 Validating', extractedFormula.bases.length, 'base formulas against approved catalog');
           for (const base of extractedFormula.bases) {
-            if (!APPROVED_BASE_FORMULAS.has(base.name)) {
+            if (!isIngredientApproved(base.name, APPROVED_BASE_FORMULAS)) {
               console.error(`VALIDATION ERROR: Unapproved base formula "${base.name}" detected in AI response`);
               throw new Error(`The ingredient "${base.name}" is not in our approved catalog. Please use only approved base formulas.`);
             }
           }
           
-          // Validate individual ingredients
+          // Validate individual ingredients (with flexible matching)
           for (const addition of extractedFormula.additions) {
-            if (!APPROVED_INDIVIDUAL_INGREDIENTS.has(addition.name)) {
+            if (!isIngredientApproved(addition.name, APPROVED_INDIVIDUAL_INGREDIENTS)) {
               console.error(`VALIDATION ERROR: Unapproved ingredient "${addition.name}" detected in AI response`);
               throw new Error(`The ingredient "${addition.name}" is not in our approved catalog. Please use only approved individual ingredients.`);
             }
