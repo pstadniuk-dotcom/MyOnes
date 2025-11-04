@@ -123,9 +123,9 @@ function UserDropdown() {
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile?tab=settings" data-testid="link-account-center">
+            <Link href="/dashboard/settings" data-testid="link-account-center">
               <Settings className="mr-2 h-4 w-4" />
-              <span>Account Center</span>
+              <span>Account Settings</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
@@ -135,9 +135,9 @@ function UserDropdown() {
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile?tab=settings" data-testid="link-notifications">
+            <Link href="/dashboard/settings?tab=notifications" data-testid="link-notifications">
               <Bell className="mr-2 h-4 w-4" />
-              <span>Notification Settings</span>
+              <span>Notifications</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>

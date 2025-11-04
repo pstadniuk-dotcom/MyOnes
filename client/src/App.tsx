@@ -32,6 +32,7 @@ import MyFormulaPage from "@/pages/MyFormulaPage";
 import LabReportsPage from "@/pages/LabReportsPage";
 import OrdersPage from "@/pages/OrdersPage";
 import ProfilePage from "@/pages/ProfilePage";
+import SettingsPage from "@/pages/SettingsPage";
 import SupportPage from "@/pages/SupportPage";
 
 // Import all landing page components
@@ -139,6 +140,13 @@ function MainRouter() {
         <ProtectedRoute>
           <DashboardLayout>
             <ProfilePage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/settings">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <SettingsPage />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

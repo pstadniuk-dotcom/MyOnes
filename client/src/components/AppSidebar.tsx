@@ -5,6 +5,7 @@ import {
   Package,
   User,
   FileText,
+  Settings,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -49,6 +50,11 @@ const menuItems = [
     title: 'Orders',
     url: '/dashboard/orders',
     icon: Package,
+  },
+  {
+    title: 'Settings',
+    url: '/dashboard/settings',
+    icon: Settings,
   },
 ];
 
