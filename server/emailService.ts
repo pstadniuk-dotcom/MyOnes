@@ -1,42 +1,11 @@
 import sgMail from '@sendgrid/mail';
 
-let connectionSettings: any;
+// Initialize SendGrid with API key from environment variables
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL;
 
-async function getCredentials() {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
-  }
-
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=sendgrid',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  if (!connectionSettings || (!connectionSettings.settings.api_key || !connectionSettings.settings.from_email)) {
-    throw new Error('SendGrid not connected');
-  }
-  return {apiKey: connectionSettings.settings.api_key, email: connectionSettings.settings.from_email};
-}
-
-async function getUncachableSendGridClient() {
-  const {apiKey, email} = await getCredentials();
-  sgMail.setApiKey(apiKey);
-  return {
-    client: sgMail,
-    fromEmail: email
-  };
+if (SENDGRID_API_KEY) {
+  sgMail.setApiKey(SENDGRID_API_KEY);
 }
 
 interface EmailNotification {
@@ -179,16 +148,19 @@ function getEmailTemplate(notification: EmailNotification): string {
 
 export async function sendNotificationEmail(notification: EmailNotification): Promise<boolean> {
   try {
-    const { client, fromEmail } = await getUncachableSendGridClient();
+    if (!SENDGRID_API_KEY || !SENDGRID_FROM_EMAIL) {
+      console.error('❌ SendGrid not configured: Missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL environment variables');
+      return false;
+    }
     
     const msg = {
       to: notification.to,
-      from: fromEmail,
+      from: SENDGRID_FROM_EMAIL,
       subject: notification.subject,
       html: getEmailTemplate(notification),
     };
 
-    await client.send(msg);
+    await sgMail.send(msg);
     console.log(`✅ Email sent successfully to ${notification.to} - ${notification.subject}`);
     return true;
   } catch (error) {
