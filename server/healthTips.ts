@@ -1,9 +1,22 @@
 // Daily wellness tips for pill reminders
-// These rotate through morning and evening messages to keep content fresh
+// These can be AI-generated based on user's formula or use static fallbacks
+
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export interface HealthTip {
   message: string;
   timeOfDay: 'morning' | 'evening';
+}
+
+export interface FormulaIngredient {
+  ingredient: string;
+  amount: number;
+  unit: string;
+  purpose?: string;
 }
 
 // MORNING TIPS - Energy, activity, and supplement absorption
@@ -59,16 +72,79 @@ export function getHealthTip(
 }
 
 /**
+ * Generate AI-powered personalized health tip based on user's formula
+ * @param ingredients - Array of ingredients in user's formula
+ * @param timeOfDay - 'morning' or 'evening'
+ * @returns Personalized health tip or null if generation fails
+ */
+export async function generatePersonalizedTip(
+  ingredients: FormulaIngredient[],
+  timeOfDay: 'morning' | 'evening'
+): Promise<string | null> {
+  try {
+    // Extract ingredient names for the prompt
+    const ingredientList = ingredients
+      .map(ing => ing.ingredient)
+      .join(', ');
+
+    const timeContext = timeOfDay === 'morning' 
+      ? 'morning energy, activity, and nutrient absorption'
+      : 'evening recovery, sleep, and relaxation';
+
+    const prompt = `Generate a short, friendly health tip (max 120 characters) for someone taking supplements with these ingredients: ${ingredientList}. 
+
+The tip should be:
+- Focused on ${timeContext}
+- Include ONE simple, actionable health activity (like "walk 10 minutes" or "stretch for 5 minutes")
+- Relate to how the activity enhances their specific supplement ingredients
+- Sound encouraging and personal
+- Be specific about time (e.g., "10 minutes" not "a few minutes")
+
+Examples:
+- "A 10-minute morning walk helps your Omega-3s absorb and boosts energy."
+- "Magnesium works best with 5 minutes of stretching before bed for deeper sleep."
+
+Generate ONE tip:`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a wellness coach creating personalized, actionable health tips for supplement users. Keep tips under 120 characters, specific, and encouraging.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_tokens: 80,
+      temperature: 0.8,
+    });
+
+    const tip = completion.choices[0]?.message?.content?.trim();
+    
+    // Remove quotes if AI wrapped the response
+    return tip ? tip.replace(/^["']|["']$/g, '') : null;
+  } catch (error) {
+    console.error('Error generating personalized health tip:', error);
+    return null;
+  }
+}
+
+/**
  * Format a pill reminder message with optional health tip
  * @param capsuleCount - Number of capsules to take
  * @param mealTime - 'breakfast', 'lunch', or 'dinner'
  * @param includeTip - Whether to include a health tip
+ * @param customTip - Optional custom tip to use instead of random
  * @returns Formatted SMS message
  */
 export function formatPillReminderMessage(
   capsuleCount: number,
   mealTime: 'breakfast' | 'lunch' | 'dinner',
-  includeTip: boolean = false
+  includeTip: boolean = false,
+  customTip?: string
 ): string {
   const mealTimes = {
     breakfast: 'Breakfast time',
@@ -81,10 +157,37 @@ export function formatPillReminderMessage(
   
   // Add health tip for morning and evening
   if (includeTip && (mealTime === 'breakfast' || mealTime === 'dinner')) {
-    const timeOfDay = mealTime === 'breakfast' ? 'morning' : 'evening';
-    const { tip } = getHealthTip(timeOfDay);
+    const tip = customTip || getHealthTip(mealTime === 'breakfast' ? 'morning' : 'evening').tip;
     message += `\n\n💡 Tip: ${tip}`;
   }
   
   return message;
+}
+
+/**
+ * Generate and format a personalized pill reminder with AI-generated tip
+ * @param capsuleCount - Number of capsules to take
+ * @param mealTime - 'breakfast', 'lunch', or 'dinner'
+ * @param ingredients - User's formula ingredients
+ * @returns Promise of formatted SMS message with personalized tip
+ */
+export async function generatePersonalizedReminderMessage(
+  capsuleCount: number,
+  mealTime: 'breakfast' | 'lunch' | 'dinner',
+  ingredients: FormulaIngredient[]
+): Promise<string> {
+  // Only generate tips for breakfast and dinner
+  if (mealTime === 'breakfast' || mealTime === 'dinner') {
+    const timeOfDay = mealTime === 'breakfast' ? 'morning' : 'evening';
+    
+    // Try to generate AI tip
+    const personalizedTip = await generatePersonalizedTip(ingredients, timeOfDay);
+    
+    if (personalizedTip) {
+      return formatPillReminderMessage(capsuleCount, mealTime, true, personalizedTip);
+    }
+  }
+  
+  // Fallback to static tips or no tip for lunch
+  return formatPillReminderMessage(capsuleCount, mealTime, mealTime !== 'lunch');
 }
