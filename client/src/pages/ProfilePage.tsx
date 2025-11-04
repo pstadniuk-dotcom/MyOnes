@@ -31,9 +31,6 @@ import {
 import { 
   User, 
   Activity,
-  Shield,
-  Eye,
-  EyeOff,
   AlertCircle,
   Loader2
 } from 'lucide-react';
@@ -82,7 +79,6 @@ export default function ProfilePage() {
   const searchParams = new URLSearchParams(search);
   const initialTab = searchParams.get('tab') || 'profile';
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [showPassword, setShowPassword] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showConsentDialog, setShowConsentDialog] = useState(false);
@@ -497,75 +493,6 @@ export default function ProfilePage() {
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   )}
                   Save Changes
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Security */}
-          <Card data-testid="section-security">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                Security
-              </CardTitle>
-              <CardDescription>
-                Manage your password and security settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="current-password">Current Password</Label>
-                <div className="relative">
-                  <Input
-                    id="current-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter current password"
-                    data-testid="input-current-password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    placeholder="Enter new password"
-                    data-testid="input-new-password"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="confirm-password">Confirm New Password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    placeholder="Confirm new password"
-                    data-testid="input-confirm-password"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Button 
-                  onClick={() => {
-                    toast({
-                      title: "Feature coming soon",
-                      description: "Password updates will be available once the backend endpoint is implemented.",
-                      variant: "default",
-                    });
-                  }}
-                  data-testid="button-change-password"
-                >
-                  Change Password
                 </Button>
               </div>
             </CardContent>
