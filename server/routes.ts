@@ -4260,6 +4260,43 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Test endpoint for notification system (no auth required for testing)
+  app.post('/api/test-notification', async (req, res) => {
+    try {
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: 'userId is required' });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Create a test notification
+      const testNotification = {
+        userId,
+        type: 'formula_update' as const,
+        title: 'Test Notification System',
+        content: 'Testing your email and SMS notification system! If you receive this via both email and SMS, everything is working perfectly. 🎉',
+        isRead: false,
+      };
+      
+      const created = await storage.createNotification(testNotification);
+      await sendNotificationsForUser(created, user);
+      
+      res.json({ 
+        success: true, 
+        notification: created,
+        message: 'Test notification sent! Check your email and phone.'
+      });
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      res.status(500).json({ error: 'Failed to send test notification', details: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   // Support system API endpoints
   // FAQ endpoints
   app.get('/api/support/faq', async (req, res) => {
