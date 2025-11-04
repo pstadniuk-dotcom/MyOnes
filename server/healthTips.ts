@@ -95,23 +95,40 @@ export async function generatePersonalizedTip(
 
 The tip should be:
 - Focused on ${timeContext}
-- Include ONE simple, actionable health activity (like "walk 10 minutes" or "stretch for 5 minutes")
+- Include ONE simple, actionable health activity from this diverse list:
+  * Walking (10-15 min)
+  * Light jogging/running (5-10 min)
+  * Stretching (5 min)
+  * Deep breathing exercises (2-3 min)
+  * Push-ups or squats (10 reps)
+  * Dancing (10 min)
+  * Jumping jacks (2 min)
+  * Climbing stairs (5 min)
+  * Light strength training (10 min)
+  * Swimming/water activity (15 min)
+  * Bike riding (10-15 min)
+  * Meditation (5-10 min)
+  * Hydrating with water
+  * Getting sunlight (10-15 min)
 - Relate to how the activity enhances their specific supplement ingredients
 - Sound encouraging and personal
 - Be specific about time (e.g., "10 minutes" not "a few minutes")
+- IMPORTANT: Choose a DIFFERENT activity each time - be creative and varied!
 
 Examples:
 - "A 10-minute morning walk helps your Omega-3s absorb and boosts energy."
 - "Magnesium works best with 5 minutes of stretching before bed for deeper sleep."
+- "10 push-ups get your blood flowing, helping B-vitamins energize your cells."
+- "Running for just 10 minutes amplifies Vitamin D production and iron absorption."
 
-Generate ONE tip:`;
+Generate ONE unique tip with a different activity:`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: 'You are a wellness coach creating personalized, actionable health tips for supplement users. Keep tips under 120 characters, specific, and encouraging.'
+          content: 'You are a wellness coach creating personalized, actionable health tips for supplement users. Keep tips under 120 characters, specific, and encouraging. CRITICAL: Use a different activity type every single time - never repeat the same exercise twice in a row!'
         },
         {
           role: 'user',
@@ -119,7 +136,7 @@ Generate ONE tip:`;
         }
       ],
       max_tokens: 80,
-      temperature: 0.8,
+      temperature: 1.0, // Higher temperature for more variety
     });
 
     const tip = completion.choices[0]?.message?.content?.trim();
