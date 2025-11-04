@@ -13,6 +13,8 @@ import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./
 import { ObjectPermission } from "./objectAcl";
 import { analyzeLabReport } from "./fileAnalysis";
 import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDIENTS, BASE_FORMULA_DETAILS } from "@shared/ingredients";
+import { sendNotificationEmail } from "./emailService";
+import type { User, Notification, NotificationPref } from "@shared/schema";
 
 // Extend Express Request interface to include userId property
 declare global {
@@ -3996,6 +3998,65 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
   // Remove duplicate function - already defined above
 
+  // Helper function to send email notifications based on user preferences
+  async function sendEmailForNotification(notification: Notification, user: User): Promise<void> {
+    try {
+      // Get user's notification preferences
+      const prefs = await storage.getNotificationPrefs(user.id);
+      
+      // Determine if we should send email based on notification type and user preferences
+      let shouldSendEmail = false;
+      
+      if (prefs) {
+        switch (notification.type) {
+          case 'order_update':
+            shouldSendEmail = prefs.emailShipping;
+            break;
+          case 'formula_update':
+            shouldSendEmail = prefs.emailConsultation; // Treat formula updates as consultation-related
+            break;
+          case 'consultation_reminder':
+            shouldSendEmail = prefs.emailConsultation;
+            break;
+          case 'system':
+            shouldSendEmail = prefs.emailBilling; // System notifications use billing preference
+            break;
+        }
+      } else {
+        // Default to true if no preferences set (opt-in by default)
+        shouldSendEmail = true;
+      }
+      
+      if (!shouldSendEmail) {
+        console.log(`📧 Email skipped for user ${user.email} - notification type ${notification.type} disabled in preferences`);
+        return;
+      }
+      
+      // Build the full action URL if provided
+      let actionUrl = notification.metadata?.actionUrl;
+      if (actionUrl) {
+        const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0];
+        if (baseUrl && !actionUrl.startsWith('http')) {
+          actionUrl = `https://${baseUrl}${actionUrl}`;
+        }
+      }
+      
+      // Send the email
+      await sendNotificationEmail({
+        to: user.email,
+        subject: notification.title,
+        title: notification.title,
+        content: notification.content,
+        actionUrl,
+        actionText: actionUrl ? 'View Details' : undefined,
+        type: notification.type
+      });
+    } catch (error) {
+      console.error('❌ Error sending email for notification:', error);
+      // Don't throw - we don't want email failures to break notification creation
+    }
+  }
+
   // Notification API routes
   app.get('/api/notifications', requireAuth, async (req, res) => {
     try {
@@ -4053,10 +4114,78 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Notification Preferences API routes
+  app.get('/api/notification-prefs', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      let prefs = await storage.getNotificationPrefs(userId);
+      
+      // Create default preferences if they don't exist
+      if (!prefs) {
+        prefs = await storage.createNotificationPrefs({
+          userId,
+          emailConsultation: true,
+          emailShipping: true,
+          emailBilling: true,
+        });
+      }
+      
+      res.json(prefs);
+    } catch (error) {
+      console.error('Error fetching notification preferences:', error);
+      res.status(500).json({ error: 'Failed to fetch notification preferences' });
+    }
+  });
+
+  app.put('/api/notification-prefs', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { emailConsultation, emailShipping, emailBilling } = req.body;
+      
+      // Validate input
+      if (typeof emailConsultation !== 'boolean' || typeof emailShipping !== 'boolean' || typeof emailBilling !== 'boolean') {
+        return res.status(400).json({ error: 'Invalid preference values' });
+      }
+      
+      let prefs = await storage.getNotificationPrefs(userId);
+      
+      if (!prefs) {
+        // Create if doesn't exist
+        prefs = await storage.createNotificationPrefs({
+          userId,
+          emailConsultation,
+          emailShipping,
+          emailBilling,
+        });
+      } else {
+        // Update existing
+        prefs = await storage.updateNotificationPrefs(userId, {
+          emailConsultation,
+          emailShipping,
+          emailBilling,
+        });
+      }
+      
+      if (!prefs) {
+        return res.status(500).json({ error: 'Failed to update preferences' });
+      }
+      
+      res.json(prefs);
+    } catch (error) {
+      console.error('Error updating notification preferences:', error);
+      res.status(500).json({ error: 'Failed to update notification preferences' });
+    }
+  });
+
   // Helper route to create sample notifications for testing
   app.post('/api/notifications/sample', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
+      const user = await storage.getUserById(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
       
       // Create sample notifications
       const sampleNotifications = [
@@ -4080,6 +4209,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       for (const notification of sampleNotifications) {
         const created = await storage.createNotification(notification);
         createdNotifications.push(created);
+        
+        // Send email notification if user has email preferences enabled
+        await sendEmailForNotification(created, user);
       }
 
       res.json({ notifications: createdNotifications });

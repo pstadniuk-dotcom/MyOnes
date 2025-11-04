@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,8 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Lock, Bell, Shield, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -19,15 +21,32 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Notification settings state
-  const [notifications, setNotifications] = useState({
-    emailUpdates: true,
-    smsReminders: false,
-    formulaChanges: true,
-    labResults: true,
-    orderUpdates: true,
-    promotions: false,
+  // Fetch notification preferences from database
+  const { data: notificationPrefs, isLoading: isLoadingPrefs } = useQuery<{
+    emailConsultation: boolean;
+    emailShipping: boolean;
+    emailBilling: boolean;
+  }>({
+    queryKey: ['/api/notification-prefs'],
   });
+
+  // Notification settings state - initialized from database
+  const [notifications, setNotifications] = useState({
+    emailConsultation: true,
+    emailShipping: true,
+    emailBilling: true,
+  });
+
+  // Update local state when data is fetched
+  useEffect(() => {
+    if (notificationPrefs) {
+      setNotifications({
+        emailConsultation: notificationPrefs.emailConsultation,
+        emailShipping: notificationPrefs.emailShipping,
+        emailBilling: notificationPrefs.emailBilling,
+      });
+    }
+  }, [notificationPrefs]);
 
   // Privacy settings state
   const [privacy, setPrivacy] = useState({
@@ -67,11 +86,31 @@ export default function SettingsPage() {
     setConfirmPassword('');
   };
 
+  // Mutation to save notification preferences
+  const saveNotificationsMutation = useMutation({
+    mutationFn: (prefs: typeof notifications) =>
+      apiRequest('/api/notification-prefs', {
+        method: 'PUT',
+        body: JSON.stringify(prefs),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notification-prefs'] });
+      toast({
+        title: 'Settings saved',
+        description: 'Your notification preferences have been updated.',
+      });
+    },
+    onError: () => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to save notification preferences. Please try again.',
+      });
+    },
+  });
+
   const saveNotificationSettings = () => {
-    toast({
-      title: 'Settings saved',
-      description: 'Your notification preferences have been updated.',
-    });
+    saveNotificationsMutation.mutate(notifications);
   };
 
   const savePrivacySettings = () => {
@@ -211,107 +250,75 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Email Updates</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive general updates via email
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.emailUpdates}
-                    onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, emailUpdates: checked })
-                    }
-                    data-testid="switch-email-updates"
-                  />
-                </div>
+              {isLoadingPrefs ? (
+                <div className="text-center py-8 text-muted-foreground">Loading preferences...</div>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>Formula & Consultation Updates</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Get notified about formula updates, consultation reminders, and lab results
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifications.emailConsultation}
+                        onCheckedChange={(checked) =>
+                          setNotifications({ ...notifications, emailConsultation: checked })
+                        }
+                        data-testid="switch-email-consultation"
+                      />
+                    </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>SMS Reminders</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get text message reminders for your supplements
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.smsReminders}
-                    onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, smsReminders: checked })
-                    }
-                    data-testid="switch-sms-reminders"
-                  />
-                </div>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>Order & Shipping Updates</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Track order status, shipment tracking, and delivery notifications
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifications.emailShipping}
+                        onCheckedChange={(checked) =>
+                          setNotifications({ ...notifications, emailShipping: checked })
+                        }
+                        data-testid="switch-email-shipping"
+                      />
+                    </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Formula Changes</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Notify me when my formula is updated
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.formulaChanges}
-                    onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, formulaChanges: checked })
-                    }
-                    data-testid="switch-formula-changes"
-                  />
-                </div>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>Account & Billing</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Receive account updates, payment reminders, and billing notifications
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifications.emailBilling}
+                        onCheckedChange={(checked) =>
+                          setNotifications({ ...notifications, emailBilling: checked })
+                        }
+                        data-testid="switch-email-billing"
+                      />
+                    </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Lab Results</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Alert me when lab results are analyzed
-                    </p>
+                    <div className="border-t pt-4 mt-6">
+                      <p className="text-sm text-muted-foreground italic">
+                        💡 SMS notifications coming soon! We'll use Twilio to send supplement reminders and time-sensitive alerts.
+                      </p>
+                    </div>
                   </div>
-                  <Switch
-                    checked={notifications.labResults}
-                    onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, labResults: checked })
-                    }
-                    data-testid="switch-lab-results"
-                  />
-                </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Order Updates</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Track shipment and delivery status
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.orderUpdates}
-                    onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, orderUpdates: checked })
-                    }
-                    data-testid="switch-order-updates"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Promotions & Offers</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive special offers and promotions
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.promotions}
-                    onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, promotions: checked })
-                    }
-                    data-testid="switch-promotions"
-                  />
-                </div>
-              </div>
-
-              <Button onClick={saveNotificationSettings} data-testid="button-save-notifications">
-                Save Notification Settings
-              </Button>
+                  <Button 
+                    onClick={saveNotificationSettings} 
+                    disabled={saveNotificationsMutation.isPending}
+                    data-testid="button-save-notifications"
+                  >
+                    {saveNotificationsMutation.isPending ? 'Saving...' : 'Save Notification Settings'}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
