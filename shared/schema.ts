@@ -33,6 +33,14 @@ export const users = pgTable("users", {
   phone: text("phone"),
   password: text("password").notNull(),
   
+  // Address fields
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  city: text("city"),
+  state: text("state"),
+  postalCode: text("postal_code"),
+  country: text("country").default('US'),
+  
   // Email notification preferences
   emailConsultation: boolean("email_consultation").default(true).notNull(),
   emailShipping: boolean("email_shipping").default(true).notNull(),

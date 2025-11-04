@@ -101,6 +101,12 @@ export default function ProfilePage() {
     name: '',
     email: '',
     phone: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: 'US',
   });
 
   const [healthData, setHealthData] = useState({
@@ -128,6 +134,12 @@ export default function ProfilePage() {
         name: userData.user.name || '',
         email: userData.user.email || '',
         phone: userData.user.phone || '',
+        addressLine1: userData.user.addressLine1 || '',
+        addressLine2: userData.user.addressLine2 || '',
+        city: userData.user.city || '',
+        state: userData.user.state || '',
+        postalCode: userData.user.postalCode || '',
+        country: userData.user.country || 'US',
       });
     }
   }, [userData]);
@@ -178,7 +190,17 @@ export default function ProfilePage() {
   });
 
   const updateUserProfileMutation = useMutation({
-    mutationFn: async (data: { name?: string; email?: string; phone?: string | null }) => {
+    mutationFn: async (data: { 
+      name?: string; 
+      email?: string; 
+      phone?: string | null;
+      addressLine1?: string | null;
+      addressLine2?: string | null;
+      city?: string | null;
+      state?: string | null;
+      postalCode?: string | null;
+      country?: string | null;
+    }) => {
       const response = await apiRequest('PATCH', '/api/users/me/profile', data);
       return response.json();
     },
@@ -473,6 +495,79 @@ export default function ProfilePage() {
                   data-testid="input-phone"
                 />
               </div>
+              
+              <Separator />
+              
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium mb-3">Address</h3>
+                </div>
+                <div>
+                  <Label htmlFor="addressLine1">Street Address</Label>
+                  <Input
+                    id="addressLine1"
+                    value={profile.addressLine1}
+                    onChange={(e) => setProfile({...profile, addressLine1: e.target.value})}
+                    placeholder="123 Main Street"
+                    data-testid="input-address-line1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="addressLine2">Apartment, Suite, etc. (Optional)</Label>
+                  <Input
+                    id="addressLine2"
+                    value={profile.addressLine2}
+                    onChange={(e) => setProfile({...profile, addressLine2: e.target.value})}
+                    placeholder="Apt 4B"
+                    data-testid="input-address-line2"
+                  />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      value={profile.city}
+                      onChange={(e) => setProfile({...profile, city: e.target.value})}
+                      placeholder="New York"
+                      data-testid="input-city"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="state">State</Label>
+                    <Input
+                      id="state"
+                      value={profile.state}
+                      onChange={(e) => setProfile({...profile, state: e.target.value})}
+                      placeholder="NY"
+                      data-testid="input-state"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="postalCode">Postal Code</Label>
+                    <Input
+                      id="postalCode"
+                      value={profile.postalCode}
+                      onChange={(e) => setProfile({...profile, postalCode: e.target.value})}
+                      placeholder="10001"
+                      data-testid="input-postal-code"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="country">Country</Label>
+                    <Input
+                      id="country"
+                      value={profile.country}
+                      onChange={(e) => setProfile({...profile, country: e.target.value})}
+                      placeholder="US"
+                      data-testid="input-country"
+                    />
+                  </div>
+                </div>
+              </div>
+              
               <div className="flex justify-end">
                 <Button 
                   onClick={async () => {
@@ -481,6 +576,12 @@ export default function ProfilePage() {
                         name: profile.name,
                         email: profile.email,
                         phone: profile.phone || null,
+                        addressLine1: profile.addressLine1 || null,
+                        addressLine2: profile.addressLine2 || null,
+                        city: profile.city || null,
+                        state: profile.state || null,
+                        postalCode: profile.postalCode || null,
+                        country: profile.country || null,
                       });
                     } catch (error) {
                       // Error handling is done in the mutation
