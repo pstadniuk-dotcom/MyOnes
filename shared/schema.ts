@@ -32,6 +32,17 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   phone: text("phone"),
   password: text("password").notNull(),
+  
+  // Email notification preferences
+  emailConsultation: boolean("email_consultation").default(true).notNull(),
+  emailShipping: boolean("email_shipping").default(true).notNull(),
+  emailBilling: boolean("email_billing").default(true).notNull(),
+  
+  // SMS notification preferences
+  smsConsultation: boolean("sms_consultation").default(false).notNull(),
+  smsShipping: boolean("sms_shipping").default(false).notNull(),
+  smsBilling: boolean("sms_billing").default(false).notNull(),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
