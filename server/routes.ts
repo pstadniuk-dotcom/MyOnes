@@ -2734,9 +2734,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       } else if (!healthProfile.conditions || !Array.isArray(healthProfile.conditions) || healthProfile.conditions.length === 0) {
         nextAction = 'Add health conditions';
         nextActionDetail = 'Better formula personalization';
-      } else if (!healthProfile.sleepHoursPerNight || !healthProfile.exerciseDaysPerWeek) {
+      } else if (!healthProfile.sleepHoursPerNight || healthProfile.exerciseDaysPerWeek === null || healthProfile.exerciseDaysPerWeek === undefined) {
         nextAction = 'Add lifestyle data';
         nextActionDetail = 'Sleep and exercise habits matter';
+      } else if (profileCompleteness < 100) {
+        nextAction = 'Complete your profile';
+        nextActionDetail = 'Add remaining health details';
       } else {
         nextAction = 'Profile complete';
         nextActionDetail = 'All data collected';
