@@ -2826,6 +2826,100 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Sort by time and limit
       recentActivity.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
+      // Build detailed checklist for profile completion
+      const profileChecklist = [
+        {
+          category: 'Demographics & Physical',
+          items: [
+            {
+              label: 'Age and gender',
+              complete: !!(healthProfile?.age && healthProfile?.sex),
+              route: '/dashboard/profile?tab=profile'
+            },
+            {
+              label: 'Weight and height',
+              complete: !!(healthProfile?.weightLbs && healthProfile?.heightCm),
+              route: '/dashboard/profile?tab=profile'
+            }
+          ]
+        },
+        {
+          category: 'Vital Signs',
+          items: [
+            {
+              label: 'Blood pressure',
+              complete: !!(healthProfile?.bloodPressureSystolic && healthProfile?.bloodPressureDiastolic),
+              route: '/dashboard/profile?tab=health'
+            },
+            {
+              label: 'Resting heart rate',
+              complete: !!healthProfile?.restingHeartRate,
+              route: '/dashboard/profile?tab=health'
+            }
+          ]
+        },
+        {
+          category: 'Lifestyle',
+          items: [
+            {
+              label: 'Sleep hours per night',
+              complete: !!healthProfile?.sleepHoursPerNight,
+              route: '/dashboard/profile?tab=health'
+            },
+            {
+              label: 'Exercise frequency',
+              complete: healthProfile?.exerciseDaysPerWeek !== null && healthProfile?.exerciseDaysPerWeek !== undefined,
+              route: '/dashboard/profile?tab=health'
+            },
+            {
+              label: 'Stress level',
+              complete: !!healthProfile?.stressLevel,
+              route: '/dashboard/profile?tab=health'
+            },
+            {
+              label: 'Smoking status',
+              complete: !!healthProfile?.smokingStatus,
+              route: '/dashboard/profile?tab=health'
+            },
+            {
+              label: 'Alcohol consumption',
+              complete: healthProfile?.alcoholDrinksPerWeek !== null && healthProfile?.alcoholDrinksPerWeek !== undefined,
+              route: '/dashboard/profile?tab=health'
+            }
+          ]
+        },
+        {
+          category: 'Medical History',
+          items: [
+            {
+              label: 'Current medications',
+              complete: !!(healthProfile?.medications && Array.isArray(healthProfile.medications) && healthProfile.medications.length > 0),
+              route: '/dashboard/profile?tab=health'
+            },
+            {
+              label: 'Health conditions',
+              complete: !!(healthProfile?.conditions && Array.isArray(healthProfile.conditions) && healthProfile.conditions.length > 0),
+              route: '/dashboard/profile?tab=health'
+            },
+            {
+              label: 'Allergies',
+              complete: !!(healthProfile?.allergies && Array.isArray(healthProfile.allergies) && healthProfile.allergies.length > 0),
+              route: '/dashboard/profile?tab=health'
+            }
+          ]
+        },
+        {
+          category: 'Lab Reports',
+          items: [
+            {
+              label: 'Blood test results',
+              complete: !!(labReports && labReports.length > 0),
+              route: '/dashboard/lab-reports'
+            }
+          ]
+        }
+      ];
+
       // Next delivery calculation
       const nextDelivery = subscription?.renewsAt || null;
 
@@ -2841,6 +2935,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           daysActive: Math.max(daysActive, 0),
           nextDelivery: nextDelivery ? nextDelivery.toISOString().split('T')[0] : null
         },
+        profileChecklist,
         currentFormula,
         healthProfile,
         recentActivity: recentActivity.slice(0, 6),
