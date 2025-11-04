@@ -85,6 +85,7 @@ function normalizeIngredientForMatching(name: string): string {
 }
 
 // Helper function to check if an ingredient is approved (with flexible matching)
+// Checks against BOTH base formulas and individual ingredients to be category-agnostic
 function isIngredientApproved(ingredientName: string, approvedSet: Set<string>): boolean {
   const normalized = normalizeIngredientForMatching(ingredientName);
   
@@ -172,6 +173,17 @@ const APPROVED_INDIVIDUAL_INGREDIENTS = new Set([
   'Vitamin C',
   'Vitamin E (Mixed tocopherols)'
 ]);
+
+// Combined set of ALL approved ingredients (bases + individuals) for category-agnostic validation
+const ALL_APPROVED_INGREDIENTS = new Set([
+  ...Array.from(APPROVED_BASE_FORMULAS),
+  ...Array.from(APPROVED_INDIVIDUAL_INGREDIENTS)
+]);
+
+// Helper to check if ANY ingredient is approved from complete catalog (category-agnostic)
+function isAnyIngredientApproved(ingredientName: string): boolean {
+  return isIngredientApproved(ingredientName, ALL_APPROVED_INGREDIENTS);
+}
 
 const CANONICAL_DOSES_MG = {
   // APPROVED BASE FORMULAS (32 total) - Exact doses from catalog
@@ -2424,21 +2436,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       if (extractedFormula && chatSession && userId) {
         console.log('✅ All conditions met - proceeding to save formula');
         try {
-          // CRITICAL: Validate all ingredients against approved catalog (with flexible matching)
-          // Validate base formulas
-          console.log('🔍 Validating', extractedFormula.bases.length, 'base formulas against approved catalog');
+          // CRITICAL: Validate all ingredients against approved catalog (category-agnostic flexible matching)
+          // This checks ALL ingredients (bases + additions) against the complete catalog
+          // to handle cases where AI might miscategorize a base as an addition or vice versa
+          console.log('🔍 Validating', extractedFormula.bases.length, 'bases +', extractedFormula.additions.length, 'additions against approved catalog');
+          
+          // Validate base formulas (category-agnostic - checks against ALL approved ingredients)
           for (const base of extractedFormula.bases) {
-            if (!isIngredientApproved(base.name, APPROVED_BASE_FORMULAS)) {
-              console.error(`VALIDATION ERROR: Unapproved base formula "${base.name}" detected in AI response`);
-              throw new Error(`The ingredient "${base.name}" is not in our approved catalog. Please use only approved base formulas.`);
+            if (!isAnyIngredientApproved(base.name)) {
+              console.error(`VALIDATION ERROR: Unapproved ingredient "${base.name}" detected in bases array`);
+              throw new Error(`The ingredient "${base.name}" is not in our approved catalog. Please use only approved ingredients from our catalog.`);
             }
           }
           
-          // Validate individual ingredients (with flexible matching)
+          // Validate additions (category-agnostic - checks against ALL approved ingredients)
           for (const addition of extractedFormula.additions) {
-            if (!isIngredientApproved(addition.name, APPROVED_INDIVIDUAL_INGREDIENTS)) {
-              console.error(`VALIDATION ERROR: Unapproved ingredient "${addition.name}" detected in AI response`);
-              throw new Error(`The ingredient "${addition.name}" is not in our approved catalog. Please use only approved individual ingredients.`);
+            if (!isAnyIngredientApproved(addition.name)) {
+              console.error(`VALIDATION ERROR: Unapproved ingredient "${addition.name}" detected in additions array`);
+              throw new Error(`The ingredient "${addition.name}" is not in our approved catalog. Please use only approved ingredients from our catalog.`);
             }
           }
           
