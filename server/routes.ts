@@ -3035,7 +3035,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
-  // Update user profile (name, email, phone)
+  // Update user profile (name, email, phone, address)
   app.patch('/api/users/me/profile', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
@@ -3045,6 +3045,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         name: z.string().min(1).optional(),
         email: z.string().email().optional(),
         phone: z.string().nullable().optional(),
+        addressLine1: z.string().nullable().optional(),
+        addressLine2: z.string().nullable().optional(),
+        city: z.string().nullable().optional(),
+        state: z.string().nullable().optional(),
+        postalCode: z.string().nullable().optional(),
+        country: z.string().nullable().optional(),
       });
       
       // Validate request body
