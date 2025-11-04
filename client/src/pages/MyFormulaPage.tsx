@@ -766,7 +766,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
   
   return (
     <Card 
-      className={`relative transition-all ${
+      className={`relative transition-all flex flex-col ${
         isSelected ? 'ring-2 ring-primary shadow-lg' : 'hover-elevate'
       }`}
       data-testid={`card-formula-${formula.version}`}
@@ -788,7 +788,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
       </div>
       
       <CardHeader className="pb-4">
-        <div className="pr-24">
+        <div className="pr-24 min-h-[56px] flex flex-col justify-start">
           <CardTitle className="text-lg flex items-center gap-1.5 flex-wrap">
             <FlaskConical className="w-4 h-4 flex-shrink-0" />
             <span className="break-words">{formula.name || `Version ${formula.version}`}</span>
@@ -805,8 +805,10 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
               <Pencil className="w-3 h-3" />
             </Button>
           </CardTitle>
-          {formula.name && (
+          {formula.name ? (
             <p className="text-xs text-muted-foreground mt-1.5">Version {formula.version}</p>
+          ) : (
+            <div className="h-[18px]" />
           )}
         </div>
         <CardDescription className="text-xs mt-1.5">
@@ -814,7 +816,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
         </CardDescription>
       </CardHeader>
       
-      <CardContent className="space-y-4">
+      <CardContent className="flex-1 flex flex-col space-y-4">
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col items-center justify-center p-3 bg-muted/30 rounded-lg min-h-[72px]">
@@ -843,6 +845,9 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
             {calculateDosage(formula.totalMg).total} capsules/day • {formula.totalMg}mg total
           </div>
         </div>
+        
+        {/* Spacer to push buttons to bottom */}
+        <div className="flex-1" />
         
         {/* Expandable Details */}
         <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
