@@ -2255,6 +2255,9 @@ export class MemStorage implements IStorage {
       emailConsultation: insertPrefs.emailConsultation ?? true,
       emailShipping: insertPrefs.emailShipping ?? true,
       emailBilling: insertPrefs.emailBilling ?? true,
+      smsConsultation: insertPrefs.smsConsultation ?? false,
+      smsShipping: insertPrefs.smsShipping ?? false,
+      smsBilling: insertPrefs.smsBilling ?? false,
       updatedAt: new Date()
     };
     this.notificationPrefs.set(insertPrefs.userId, prefs);

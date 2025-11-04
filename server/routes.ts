@@ -14,6 +14,7 @@ import { ObjectPermission } from "./objectAcl";
 import { analyzeLabReport } from "./fileAnalysis";
 import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDIENTS, BASE_FORMULA_DETAILS } from "@shared/ingredients";
 import { sendNotificationEmail } from "./emailService";
+import { sendNotificationSms } from "./smsService";
 import type { User, Notification, NotificationPref } from "@shared/schema";
 
 // Extend Express Request interface to include userId property
@@ -3998,38 +3999,39 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
   // Remove duplicate function - already defined above
 
-  // Helper function to send email notifications based on user preferences
-  async function sendEmailForNotification(notification: Notification, user: User): Promise<void> {
+  // Helper function to send email and SMS notifications based on user preferences
+  async function sendNotificationsForUser(notification: Notification, user: User): Promise<void> {
     try {
       // Get user's notification preferences
       const prefs = await storage.getNotificationPrefs(user.id);
       
-      // Determine if we should send email based on notification type and user preferences
+      // Determine if we should send email/SMS based on notification type and user preferences
       let shouldSendEmail = false;
+      let shouldSendSms = false;
       
       if (prefs) {
         switch (notification.type) {
           case 'order_update':
             shouldSendEmail = prefs.emailShipping;
+            shouldSendSms = prefs.smsShipping;
             break;
           case 'formula_update':
             shouldSendEmail = prefs.emailConsultation; // Treat formula updates as consultation-related
+            shouldSendSms = prefs.smsConsultation;
             break;
           case 'consultation_reminder':
             shouldSendEmail = prefs.emailConsultation;
+            shouldSendSms = prefs.smsConsultation;
             break;
           case 'system':
             shouldSendEmail = prefs.emailBilling; // System notifications use billing preference
+            shouldSendSms = prefs.smsBilling;
             break;
         }
       } else {
-        // Default to true if no preferences set (opt-in by default)
+        // Default to email only if no preferences set (opt-in by default for email, opt-out for SMS)
         shouldSendEmail = true;
-      }
-      
-      if (!shouldSendEmail) {
-        console.log(`📧 Email skipped for user ${user.email} - notification type ${notification.type} disabled in preferences`);
-        return;
+        shouldSendSms = false;
       }
       
       // Build the full action URL if provided
@@ -4041,19 +4043,40 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         }
       }
       
-      // Send the email
-      await sendNotificationEmail({
-        to: user.email,
-        subject: notification.title,
-        title: notification.title,
-        content: notification.content,
-        actionUrl,
-        actionText: actionUrl ? 'View Details' : undefined,
-        type: notification.type
-      });
+      // Send email if enabled
+      if (shouldSendEmail) {
+        await sendNotificationEmail({
+          to: user.email,
+          subject: notification.title,
+          title: notification.title,
+          content: notification.content,
+          actionUrl,
+          actionText: actionUrl ? 'View Details' : undefined,
+          type: notification.type
+        });
+      } else {
+        console.log(`📧 Email skipped for user ${user.email} - notification type ${notification.type} disabled in preferences`);
+      }
+      
+      // Send SMS if enabled and user has a phone number
+      if (shouldSendSms && user.phone) {
+        const smsMessage = actionUrl 
+          ? `${notification.content} ${actionUrl}`
+          : notification.content;
+          
+        await sendNotificationSms({
+          to: user.phone,
+          message: smsMessage,
+          type: notification.type
+        });
+      } else if (shouldSendSms && !user.phone) {
+        console.log(`📱 SMS skipped for user ${user.email} - no phone number on file`);
+      } else {
+        console.log(`📱 SMS skipped for user ${user.email} - notification type ${notification.type} disabled in preferences`);
+      }
     } catch (error) {
-      console.error('❌ Error sending email for notification:', error);
-      // Don't throw - we don't want email failures to break notification creation
+      console.error('❌ Error sending notifications:', error);
+      // Don't throw - we don't want notification failures to break notification creation
     }
   }
 
@@ -4127,6 +4150,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           emailConsultation: true,
           emailShipping: true,
           emailBilling: true,
+          smsConsultation: false,
+          smsShipping: false,
+          smsBilling: false,
         });
       }
       
@@ -4140,10 +4166,17 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.put('/api/notification-prefs', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      const { emailConsultation, emailShipping, emailBilling } = req.body;
+      const { emailConsultation, emailShipping, emailBilling, smsConsultation, smsShipping, smsBilling } = req.body;
       
       // Validate input
-      if (typeof emailConsultation !== 'boolean' || typeof emailShipping !== 'boolean' || typeof emailBilling !== 'boolean') {
+      if (
+        typeof emailConsultation !== 'boolean' || 
+        typeof emailShipping !== 'boolean' || 
+        typeof emailBilling !== 'boolean' ||
+        typeof smsConsultation !== 'boolean' || 
+        typeof smsShipping !== 'boolean' || 
+        typeof smsBilling !== 'boolean'
+      ) {
         return res.status(400).json({ error: 'Invalid preference values' });
       }
       
@@ -4156,6 +4189,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           emailConsultation,
           emailShipping,
           emailBilling,
+          smsConsultation,
+          smsShipping,
+          smsBilling,
         });
       } else {
         // Update existing
@@ -4163,6 +4199,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           emailConsultation,
           emailShipping,
           emailBilling,
+          smsConsultation,
+          smsShipping,
+          smsBilling,
         });
       }
       
@@ -4211,7 +4250,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         createdNotifications.push(created);
         
         // Send email notification if user has email preferences enabled
-        await sendEmailForNotification(created, user);
+        await sendNotificationsForUser(created, user);
       }
 
       res.json({ notifications: createdNotifications });
