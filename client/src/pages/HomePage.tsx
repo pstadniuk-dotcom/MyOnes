@@ -23,6 +23,7 @@ import type { Formula } from '@shared/schema';
 import { calculateDosage } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
+import { ProfileCompletionDialog } from '@/components/ProfileCompletionDialog';
 
 // Map next actions to their appropriate routes
 function getNextActionRoute(nextAction: string): string {
@@ -56,6 +57,17 @@ function getNextActionRoute(nextAction: string): string {
   return actionRoutes[nextAction] || '/dashboard/chat';
 }
 
+interface ChecklistItem {
+  label: string;
+  complete: boolean;
+  route: string;
+}
+
+interface ChecklistCategory {
+  category: string;
+  items: ChecklistItem[];
+}
+
 interface DashboardData {
   metrics: {
     profileCompleteness: number;
@@ -66,6 +78,7 @@ interface DashboardData {
     formulaVersion: number;
     consultationsSessions: number;
   };
+  profileChecklist: ChecklistCategory[];
   currentFormula: Formula | null;
   isNewUser: boolean;
 }
@@ -113,6 +126,7 @@ function HomeSkeleton() {
 export default function HomePage() {
   const { user } = useAuth();
   const userName = user?.name?.split(' ')[0] || 'there';
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
 
   const { data: dashboardData, isLoading } = useQuery<DashboardData>({
     queryKey: ['/api', 'dashboard'],
@@ -122,7 +136,7 @@ export default function HomePage() {
     return <HomeSkeleton />;
   }
 
-  const { metrics, currentFormula, isNewUser } = dashboardData || {};
+  const { metrics, profileChecklist, currentFormula, isNewUser } = dashboardData || {};
 
   return (
     <div className="max-w-6xl mx-auto space-y-6" data-testid="page-home">
@@ -145,21 +159,23 @@ export default function HomePage() {
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-3">
         {/* Profile Completeness */}
-        <Card data-testid="card-profile-completeness" className="hover-elevate cursor-pointer">
-          <Link href={getNextActionRoute(metrics?.nextAction || 'Complete your profile')}>
-            <CardHeader className="space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Profile Completeness</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold text-primary mb-1">
-                {metrics?.profileCompleteness || 0}%
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {metrics?.nextAction || 'Complete your profile'}
-              </p>
-              <Progress value={metrics?.profileCompleteness || 0} className="mt-2 h-1" />
-            </CardContent>
-          </Link>
+        <Card 
+          data-testid="card-profile-completeness" 
+          className="hover-elevate cursor-pointer"
+          onClick={() => setShowProfileDialog(true)}
+        >
+          <CardHeader className="space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Profile Completeness</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-semibold text-primary mb-1">
+              {metrics?.profileCompleteness || 0}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {metrics?.nextAction || 'Complete your profile'}
+            </p>
+            <Progress value={metrics?.profileCompleteness || 0} className="mt-2 h-1" />
+          </CardContent>
         </Card>
 
         {/* Formula Version */}
@@ -401,6 +417,14 @@ export default function HomePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Profile Completion Dialog */}
+      <ProfileCompletionDialog
+        open={showProfileDialog}
+        onOpenChange={setShowProfileDialog}
+        profileCompleteness={metrics?.profileCompleteness || 0}
+        checklist={profileChecklist || []}
+      />
     </div>
   );
 }
