@@ -307,31 +307,33 @@ export default function OrdersPage() {
             </CardContent>
           </Card>
 
-          {/* Upcoming Delivery */}
-          <Card data-testid="section-upcoming-delivery">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Truck className="w-5 h-5" />
-                Upcoming Delivery
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
-                  <p className="text-sm text-muted-foreground">
-                    Expected delivery: {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Current Formula • ${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}
-                  </p>
+          {/* Upcoming Delivery - Only show if there's an active subscription with a renewal date */}
+          {subscription?.status === 'active' && subscription?.renewsAt && (
+            <Card data-testid="section-upcoming-delivery">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Truck className="w-5 h-5" />
+                  Upcoming Delivery
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
+                    <p className="text-sm text-muted-foreground">
+                      Expected delivery: {new Date(subscription.renewsAt).toLocaleDateString()}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Current Formula • ${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant="outline">Scheduled</Badge>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <Badge variant="outline">Scheduled</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="orders" className="space-y-6">
