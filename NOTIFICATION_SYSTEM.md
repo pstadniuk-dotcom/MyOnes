@@ -1,125 +1,50 @@
-# ONES Platform - Notification System Overview
+# ONES Notification System - Simple & Essential
 
-## Notification Architecture
-
-### Delivery Channels
-- **Email** (SendGrid) - Always available for all users
-- **SMS** (Twilio) - Optional, requires phone number + user opt-in
-
-### Notification Types & Preference Mapping
-
-| Type | Category | Email Preference | SMS Preference | Use Cases |
-|------|----------|------------------|----------------|-----------|
-| `formula_update` | Consultation | `emailConsultation` | `smsConsultation` | Formula created/updated, lab results analyzed, AI insights |
-| `order_update` | Shipping | `emailShipping` | `smsShipping` | Order confirmed, payment success, shipped, delivered |
-| `system` | Billing | `emailBilling` | `smsBilling` | Account created, password reset, payment issues |
-| `consultation_reminder` | Consultation | `emailConsultation` | `smsConsultation` | Follow-up reminders (not yet implemented) |
+## Philosophy
+**Only send notifications that add real value:**
+1. User is NOT on the platform (no real-time chat notifications)
+2. User needs to take action (payment failed, track shipment)
+3. User benefits from a reminder (daily pills, reorder alert)
 
 ---
 
-## 📋 Complete Notification Catalog
+## 📬 All Notifications (8 Total)
 
-### 1️⃣ FORMULA & CONSULTATION (formula_update)
+### 1️⃣ DAILY REMINDERS
 
-#### ✅ When AI Creates First Formula
-**Trigger**: AI extracts formula from chat response  
-**Timing**: Immediately after formula saved to database  
-**Status**: ⚠️ NOT IMPLEMENTED  
-**Email Subject**: "Your Personalized ONES Formula is Ready! 🎯"  
-**Content**:
-```
-Great news! I've created your personalized supplement formula based on our conversation.
+#### **Daily Pill Reminder + Personalized Tip**
+- **Channel**: SMS only (no email)
+- **Trigger**: Scheduled daily at user's preferred time (default 9:00 AM)
+- **Status**: ⚠️ NOT IMPLEMENTED
+- **Example**:
+  ```
+  ⚗️ ONES: Time for your 10 capsules!
+  
+  💡 Tip: Your Omega-3 absorbs better with fatty foods like eggs or avocado.
+  ```
 
-Formula: Pete V1
-Total Daily Dose: 4,850mg (10 capsules)
-Key Ingredients: Heart Support, Immune Support, Vitamin D3, Omega-3
+**Personalization:**
+- Analyze user's current formula ingredients
+- Generate 1 unique tip daily based on their specific blend:
+  - Absorption tips ("Magnesium glycinate works best with food")
+  - Timing tips ("Vitamin D pairs well with morning sunlight")
+  - Synergy tips ("Your B-Complex supports your CoQ10's energy benefits")
+- Rotate tips intelligently (never repeat within 7 days)
 
-Your formula is ready to review and customize in your dashboard.
-```
-**SMS** (if enabled):
-```
-⚗️ ONES: Your personalized formula V1 is ready! Review & customize: https://ones.app/my-formula
-```
-
----
-
-#### ✅ When AI Updates/Revises Formula
-**Trigger**: AI creates new formula version (V2, V3, etc.)  
-**Timing**: Immediately after new version saved  
-**Status**: ⚠️ NOT IMPLEMENTED  
-**Email Subject**: "Formula Update: ONES V2 Now Available 🔄"  
-**Content**:
-```
-I've updated your supplement formula based on [reason: new lab results / your feedback / symptom changes].
-
-What's New in V2:
-• Added: Magnesium Glycinate (400mg) for better sleep
-• Adjusted: Reduced Vitamin D3 from 5000 IU to 2000 IU
-• Removed: Iron (your levels are optimal)
-
-New Total: 5,100mg (11 capsules daily)
-```
-**SMS**:
-```
-⚗️ ONES: Formula updated to V2! [Key change]. Review: https://ones.app/my-formula
-```
+**User Controls (Settings Page):**
+- Toggle: "Daily SMS Reminder" (ON/OFF) - maps to `smsConsultation` preference
+- Time Picker: "Reminder Time" (9:00 AM default)
 
 ---
 
-#### ✅ When Lab Results Are Analyzed
-**Trigger**: User uploads blood test PDF/image AND AI extracts data  
-**Timing**: Immediately after file analysis completes  
-**Status**: ⚠️ NOT IMPLEMENTED  
-**Email Subject**: "Lab Results Analyzed - Insights Ready 🔬"  
-**Content**:
-```
-I've analyzed your lab results from [date].
+### 2️⃣ ORDERS & SHIPPING
 
-Key Findings:
-• Vitamin D: 28 ng/mL (Low - optimal is 40-60)
-• Ferritin: 45 ng/mL (Borderline - optimal is 50-150)
-• B12: 650 pg/mL (Optimal)
+#### **Order Confirmation**
+- **Channels**: Email + SMS
+- **Trigger**: Stripe checkout completed successfully
+- **Status**: ⚠️ NOT IMPLEMENTED
 
-I recommend updating your formula to address these findings. Ready to discuss?
-```
-**SMS**:
-```
-⚗️ ONES: Lab results analyzed. Found 2 areas to optimize. Chat with me: https://ones.app/chat
-```
-
----
-
-#### ✅ Health Insights / Check-in Reminder
-**Trigger**: 30 days after last formula update  
-**Timing**: Scheduled daily batch job  
-**Status**: ⚠️ NOT IMPLEMENTED  
-**Email Subject**: "How Are You Feeling? Let's Check In 💬"  
-**Content**:
-```
-It's been 30 days since your last formula update. I'd love to hear how you're feeling!
-
-Quick Check-in:
-• How's your energy?
-• Any changes in symptoms?
-• New lab results to share?
-
-Chat with me to optimize your formula.
-```
-**SMS**:
-```
-⚗️ ONES: Time for a check-in! How are you feeling on your current formula? Chat: https://ones.app/chat
-```
-
----
-
-### 2️⃣ ORDER & SHIPPING (order_update)
-
-#### ✅ Order Confirmation
-**Trigger**: Stripe checkout session completed successfully  
-**Timing**: Immediately after payment confirmation  
-**Status**: ⚠️ NOT IMPLEMENTED  
-**Email Subject**: "Order Confirmed - Your ONES Formula is Being Made ✅"  
-**Content**:
+**Email:** "Order Confirmed - Your Formula is Being Made ✅"
 ```
 Thank you for your order!
 
@@ -128,299 +53,343 @@ Formula: Pete V2
 Quantity: 3-month supply (900 capsules)
 Price: $297.00
 
-Your custom blend is being manufactured with pharmaceutical-grade ingredients. We'll notify you when it ships (typically 5-7 business days).
-
-Manufacturing Timeline:
-Day 1-3: Quality ingredient sourcing
-Day 4-6: Precision blending & encapsulation
-Day 7: Quality testing & packaging
+Your custom blend is being manufactured with pharmaceutical-grade ingredients.
+Ships in 5-7 business days.
 ```
-**SMS**:
+
+**SMS:**
 ```
 ✅ ONES Order #12345 confirmed! Your custom formula is being made. Ships in 5-7 days.
 ```
 
 ---
 
-#### ✅ Order Shipped
-**Trigger**: Order status updated to "shipped" in database  
-**Timing**: When admin/system marks order shipped  
-**Status**: ⚠️ NOT IMPLEMENTED  
-**Email Subject**: "Your ONES Formula Has Shipped! 📦"  
-**Content**:
+#### **Order Shipped**
+- **Channels**: Email + SMS
+- **Trigger**: Order status → "shipped" in database
+- **Status**: ⚠️ NOT IMPLEMENTED
+
+**Email:** "Your Formula Has Shipped! 📦"
 ```
-Great news! Your personalized formula is on its way.
+Your personalized formula is on its way.
 
 Order #12345
-Tracking: [USPS/UPS tracking number]
-Estimated Delivery: [Date]
+Tracking: [tracking link]
+Estimated Delivery: [date]
 
 What's Inside:
 • 900 capsules (3-month supply)
 • Formula card with ingredient breakdown
-• Dosage instructions: 10 capsules daily with meals
+• Dosage instructions
+```
 
-Track your package: [tracking URL]
+**SMS:**
 ```
-**SMS**:
-```
-📦 ONES: Your formula shipped! Track: [tracking URL]
+📦 ONES: Your formula shipped! Track: [short URL]
 ```
 
 ---
 
-#### ✅ Order Delivered
-**Trigger**: Shipping carrier confirms delivery  
-**Timing**: Via shipping webhook or daily sync  
-**Status**: ⚠️ NOT IMPLEMENTED  
-**Email Subject**: "Your ONES Formula Has Arrived! 🎉"  
-**Content**:
+#### **Order Delivered**
+- **Channels**: Email + SMS
+- **Trigger**: Shipping carrier confirms delivery (webhook or daily sync)
+- **Status**: ⚠️ NOT IMPLEMENTED
+
+**Email:** "Your Formula Has Arrived! 🎉"
 ```
 Your personalized supplement formula has been delivered!
 
 Getting Started:
 1. Take 10 capsules daily with food
 2. Best split: 5 with breakfast, 5 with dinner
-3. Set a reminder to stay consistent
-4. Check in with me in 2 weeks
+3. Enable daily SMS reminders in Settings
+```
 
-Questions? I'm here to help optimize your routine.
+**SMS:**
 ```
-**SMS**:
-```
-🎉 ONES: Formula delivered! Start taking 10 capsules daily. Questions? Chat: https://ones.app/chat
+🎉 ONES: Formula delivered! Start 10 capsules daily (5 breakfast, 5 dinner).
 ```
 
 ---
 
-### 3️⃣ ACCOUNT & BILLING (system)
+#### **Reorder Reminder - Standard**
+- **Channels**: Email + SMS
+- **Trigger**: 75 days after 3-month order delivered (15 days remaining)
+- **Status**: ⚠️ NOT IMPLEMENTED
 
-#### ✅ Welcome Email
-**Trigger**: New user completes registration  
-**Timing**: Immediately after account created  
-**Status**: ⚠️ NOT IMPLEMENTED  
-**Email Subject**: "Welcome to ONES - Let's Build Your Formula 🚀"  
-**Content**:
-```
-Welcome to ONES, [Name]!
-
-I'm your AI supplement consultant. My job is to create a personalized formula tailored to YOUR unique health profile.
-
-Getting Started:
-1. Chat with me about your health goals
-2. Share your latest lab results (optional but recommended)
-3. Get your custom formula in minutes
-4. Order when you're ready
-
-Let's start: [Chat Now button]
-```
-**SMS**: Not sent for welcome (avoid spam)
-
----
-
-#### ✅ Password Reset
-**Trigger**: User requests password reset  
-**Timing**: Immediately  
-**Status**: ✅ LIKELY IMPLEMENTED (standard auth flow)  
-**Email Subject**: "Reset Your ONES Password 🔐"  
-**Content**:
-```
-You requested to reset your password.
-
-Click here to reset: [Reset link - expires in 1 hour]
-
-If you didn't request this, ignore this email.
-```
-**SMS**: Not sent for security reasons
-
----
-
-#### ✅ Payment Failed
-**Trigger**: Stripe payment fails  
-**Timing**: Immediately after failed charge  
-**Status**: ⚠️ NOT IMPLEMENTED  
-**Email Subject**: "Payment Issue - Update Your Card 💳"  
-**Content**:
-```
-We couldn't process your payment for Order #12345.
-
-Amount: $297.00
-Reason: [Card declined / Insufficient funds / Expired card]
-
-Please update your payment method to complete your order.
-
-Update Payment: [Link to update card]
-```
-**SMS**:
-```
-⚠️ ONES: Payment failed for order #12345. Update card: https://ones.app/orders/12345
-```
-
----
-
-#### ✅ Re-order Reminder (3-Month Supply Running Low)
-**Trigger**: 75 days after previous 3-month order delivered  
-**Timing**: Scheduled daily batch job  
-**Status**: ⚠️ NOT IMPLEMENTED  
-**Email Subject**: "Time to Restock Your ONES Formula 📦"  
-**Content**:
+**Email:** "Time to Restock Your Formula 📦"
 ```
 You're running low on your 3-month supply!
 
 Current Formula: Pete V2
-Last Order: [Date]
+Last Order: [date]
 Estimated Remaining: ~15 days
 
-Want to reorder the same formula or update it based on how you're feeling?
+[Reorder V2 Button] [Update Formula Button]
+```
 
-[Reorder V2] [Chat to Update Formula]
+**SMS:**
 ```
-**SMS**:
-```
-⚗️ ONES: Running low on your formula! Reorder or update: https://ones.app/reorder
+⚗️ ONES: ~15 days of formula left! Reorder V2: [link]
 ```
 
 ---
 
-## 🔧 Implementation Status
+#### **🔮 FUTURE: AI-Optimized Reorder (with Oura Ring)**
+- **Trigger**: 7-10 days before reorder needed
+- **Process**:
+  1. Pull 3 months of Oura Ring data (sleep, HRV, activity, recovery)
+  2. AI analyzes trends + current formula
+  3. Generate updated formula if beneficial changes identified
+  4. Notify user: "Updated formula ready based on your Oura data"
+- **Status**: 🚀 FUTURE FEATURE (requires Oura API integration)
 
-### ✅ Currently Working
-- Notification database schema (4 types)
-- Email delivery via SendGrid
-- SMS delivery via Twilio
-- User preference controls (email + SMS toggles)
-- Test notification endpoint
+**Email:** "Updated Formula Ready - Personalized with Your Oura Data 🔬"
+```
+I've analyzed 3 months of your Oura Ring data and optimized your formula:
 
-### ⚠️ Not Yet Implemented
-- Formula creation notifications
-- Formula update notifications
-- Lab analysis notifications
-- Order confirmation notifications
-- Shipping notifications
-- Delivery notifications
-- Welcome email
-- Payment failure notifications
-- Reorder reminders
-- Check-in reminders
+Key Insights from Your Data:
+• Sleep quality improving (+12% deep sleep)
+• HRV trending up (stress decreasing)
+• Recovery scores strong (avg 82/100)
+
+Recommended Changes for Pete V3:
+✅ Keep: Heart Support, Omega-3 (supporting your great HRV)
+➕ Add: L-Theanine 200mg (to enhance your improving sleep)
+➖ Reduce: Ashwagandha 300mg→150mg (stress already improving)
+
+New Formula: Pete V3 (5,200mg / 11 capsules)
+[Review & Order V3] [Keep Current V2]
+```
+
+**SMS:**
+```
+⚗️ ONES: Formula V3 ready! Optimized based on your Oura data (sleep +12%, HRV improving). Review: [link]
+```
+
+**Technical Requirements:**
+- Oura Ring API integration
+- Scheduled job: Check all users 7-10 days before reorder due
+- If user has connected Oura:
+  - Pull past 90 days of data
+  - Send to AI with current formula + health profile
+  - AI generates updated formula if warranted
+  - Create notification with data-driven insights
+- If no Oura or no beneficial changes: Send standard reorder reminder
 
 ---
 
-## 📊 Notification Preferences (User Control)
+### 3️⃣ ACCOUNT & BILLING
 
-Users control notifications via Settings page with 3 categories × 2 channels = 6 toggles:
+#### **Password Reset**
+- **Channel**: Email only (security)
+- **Trigger**: User requests password reset
+- **Status**: ✅ PROBABLY IMPLEMENTED (standard auth)
 
-| Category | Email Default | SMS Default |
-|----------|---------------|-------------|
-| **Formula & Consultations** | ✅ ON | ❌ OFF |
-| **Orders & Shipping** | ✅ ON | ❌ OFF |
-| **Account & Billing** | ✅ ON | ❌ OFF |
+**Email:** "Reset Your ONES Password 🔐"
+```
+Click to reset your password: [link - expires in 1 hour]
 
-**Why SMS defaults to OFF:**
+If you didn't request this, ignore this email.
+```
+
+---
+
+#### **Payment Failed**
+- **Channels**: Email + SMS
+- **Trigger**: Stripe payment failure webhook
+- **Status**: ⚠️ NOT IMPLEMENTED
+
+**Email:** "Payment Issue - Update Your Card 💳"
+```
+We couldn't process your payment for Order #12345.
+
+Amount: $297.00
+Reason: [Card declined / Insufficient funds]
+
+Update your payment method to complete your order.
+[Update Payment Button]
+```
+
+**SMS:**
+```
+⚠️ ONES: Payment failed for order #12345. Update card: [link]
+```
+
+---
+
+## 🎛️ User Preference Controls
+
+Users control notifications via Settings page:
+
+| Category | Email Default | SMS Default | Controls |
+|----------|---------------|-------------|----------|
+| **Daily Reminders** | ❌ OFF | ❌ OFF | Daily pill reminder + tip |
+| **Orders & Shipping** | ✅ ON | ❌ OFF | Order, shipping, delivery, reorder |
+| **Account & Billing** | ✅ ON | ❌ OFF | Password reset, payment issues |
+
+**Database Fields:**
+- `emailConsultation` - Controls daily reminders via email (not used currently)
+- `smsConsultation` - Controls daily reminders via SMS
+- `emailShipping` - Controls order/shipping emails
+- `smsShipping` - Controls order/shipping SMS
+- `emailBilling` - Controls account/billing emails
+- `smsBilling` - Controls account/billing SMS
+
+**Why SMS defaults OFF:**
 - Requires phone number entry
-- Toll-free verification required (3-5 days)
-- Users opt-in explicitly for SMS
+- Requires user opt-in
+- Twilio toll-free verification pending (3-5 days)
+
+---
+
+## 📊 What's NOT Notified (By Design)
+
+### ❌ Formula Created/Updated During Chat
+**Why**: User is already on the platform watching it happen in real-time. Sending an email/SMS would be redundant noise.
+
+### ❌ Lab Results Analyzed
+**Why**: Happens in real-time during chat. User sees results immediately.
+
+### ❌ Welcome Email
+**Why**: Will be handled by Klaviyo for better marketing automation + onboarding sequences.
+
+### ❌ Health Check-ins
+**Why**: Unnecessary noise. Users can chat anytime. Let them initiate, don't nag.
+
+### ❌ "Formula Insights" or "Proactive Tips"
+**Why**: Too spammy. Daily reminder tip is enough personalization.
 
 ---
 
 ## 🚀 Implementation Priority
 
-### Phase 1 (Critical - Revenue Impact)
-1. **Order Confirmation** - Customer expects immediate confirmation
-2. **Order Shipped** - Reduces "where's my order" support
-3. **Formula Created (First Time)** - Core product experience
+### **Phase 1: Core Transactions** (Do First)
+1. Order confirmation - Customer expects this immediately
+2. Order shipped - Reduces "where is it?" support tickets
+3. Payment failed - Recovers revenue
 
-### Phase 2 (High Value)
-4. **Formula Updated** - Keeps users engaged
-5. **Lab Results Analyzed** - Unique value prop
-6. **Welcome Email** - Sets expectations
+### **Phase 2: Retention**
+4. Order delivered - Encourages first dose
+5. Reorder reminder (standard) - Drives repeat purchases
+6. Daily pill reminder - Habit formation
 
-### Phase 3 (Retention)
-7. **Reorder Reminder** - Drives repeat purchases
-8. **Delivery Confirmation** - Encourages first use
-9. **Payment Failed** - Recovers lost revenue
-
-### Phase 4 (Nice to Have)
-10. **Check-in Reminders** - Increases engagement
-11. **Health Insights** - Proactive recommendations
+### **Phase 3: Future Innovation**
+7. AI-optimized reorder with Oura Ring integration
 
 ---
 
-## 🛠️ Technical Implementation Guide
+## 🛠️ Technical Implementation
+
+### Existing Infrastructure
+✅ SendGrid configured & working  
+✅ Twilio configured & working (pending toll-free verification)  
+✅ `sendNotificationsForUser()` helper function  
+✅ Preference checking logic  
+✅ Database schema supports all notification types  
 
 ### Adding a New Notification
 
-1. **Trigger Point** (in routes.ts):
+Example: Order Confirmation
+
 ```typescript
-// After creating formula
-const formula = await storage.createFormula(formulaData);
-
-// Create notification
-const notification = await storage.createNotification({
-  userId,
-  type: 'formula_update',
-  title: `Your Personalized Formula V${formula.version} is Ready!`,
-  content: `I've created your custom blend with ${formula.bases.length} ingredients...`,
-  formulaId: formula.id,
-  metadata: { 
-    actionUrl: '/my-formula',
-    icon: 'beaker',
-    priority: 'high'
-  }
+// In routes.ts - After Stripe checkout success
+app.post('/api/checkout/success', async (req, res) => {
+  const { sessionId } = req.body;
+  
+  // ... create order in database ...
+  
+  const order = await storage.createOrder({
+    userId,
+    formulaId,
+    quantity,
+    price,
+    status: 'processing'
+  });
+  
+  // Create notification
+  const notification = await storage.createNotification({
+    userId,
+    type: 'order_update',
+    title: 'Order Confirmed',
+    content: `Thank you for your order! Your custom formula is being made. Ships in 5-7 days.`,
+    orderId: order.id,
+    metadata: { 
+      actionUrl: `/orders/${order.id}`,
+      orderNumber: order.orderNumber
+    }
+  });
+  
+  // Send email + SMS (based on user preferences)
+  const user = await storage.getUser(userId);
+  await sendNotificationsForUser(notification, user);
+  
+  res.json({ success: true });
 });
-
-// Send via email/SMS based on user preferences
-const user = await storage.getUser(userId);
-await sendNotificationsForUser(notification, user);
 ```
 
-2. **Helper Function Handles Everything**:
-   - Checks user preferences (email/SMS toggles)
-   - Maps notification type to preference category
-   - Sends email if enabled
-   - Sends SMS if enabled + phone number exists
-   - Logs skipped channels
-
-3. **No Additional Code Needed** - Just call `sendNotificationsForUser()`
+**That's it!** The `sendNotificationsForUser()` function handles:
+- Fetching user preferences
+- Checking if email/SMS enabled for `order_update` type
+- Sending via SendGrid/Twilio
+- Logging what was sent/skipped
 
 ---
 
-## 📱 SMS Delivery Notes
+## 📝 Daily Reminder Implementation Notes
 
-- **Toll-Free Number**: +18553890981 (requires verification)
-- **Verification Status**: Pending (3-5 business days)
-- **Character Limit**: 160 chars (or 1600 for concatenated)
-- **Emoji Support**: ✅ Supported
-- **Formatting**: Plain text only, include URL at end
-- **Branding**: Always start with "⚗️ ONES:" for recognition
+### Scheduled Job Requirements
+- **Cron job**: Runs every minute (checks all users)
+- **Logic**:
+  1. Find all users with `smsConsultation = true`
+  2. Check their `reminderTime` preference
+  3. If current time matches their reminder time:
+     - Get user's current formula
+     - Generate personalized tip based on ingredients
+     - Send SMS (not email)
+     - Track last sent date to avoid duplicates
 
-**SMS Best Practices:**
-- Keep under 160 characters
-- Include clear action + short URL
-- Use emojis sparingly (1-2 max)
-- Don't send more than 1 SMS per hour per user
-- Always include opt-out language in Settings page
+### Tip Generation
+Use OpenAI API to generate tips:
+```typescript
+const tipPrompt = `
+User's formula ingredients: ${formula.bases.map(b => b.ingredient).join(', ')}
 
----
+Generate ONE short, actionable health tip (max 100 chars) about their specific ingredients.
+Focus on absorption, timing, or synergies. Keep it fresh and helpful.
+`;
 
-## 🎨 Email Template Guidelines
+const tip = await openai.chat.completions.create({
+  model: 'gpt-4o-mini',
+  messages: [{ role: 'user', content: tipPrompt }],
+  max_tokens: 50
+});
+```
 
-All emails use the same branded template with:
-- ONES logo/branding
-- Clean, minimal design
-- Mobile-responsive
-- Clear CTA button
-- Footer with: Unsubscribe | Settings | Support
-
-**Tone**: Friendly, conversational, health-focused  
-**From**: ONES <notifications@ones.com>  
-**Reply-To**: support@ones.com
+### Settings Page Updates Needed
+1. Add "Daily Reminder" section
+2. Add toggle: "Enable Daily SMS Reminder"
+3. Add time picker: "Reminder Time" (default 9:00 AM)
+4. Store in user preferences table
 
 ---
 
 ## Next Steps
 
-1. Implement Phase 1 notifications (order + formula creation)
-2. Add Stripe webhook handlers for payment events
-3. Create scheduled jobs for reminders
-4. Add admin interface to trigger manual notifications
-5. Build notification analytics dashboard
+**To implement Phase 1 (Core Transactions):**
+1. Add Stripe webhook handlers
+2. Hook into order creation flow
+3. Hook into shipping status updates
+4. Test with real Stripe test mode transactions
+
+**To implement Daily Reminders:**
+1. Set up cron job (node-cron or external scheduler)
+2. Add tip generation logic
+3. Update Settings UI with time picker
+4. Test SMS delivery (once Twilio verified)
+
+**For Oura Integration (Future):**
+1. Research Oura Ring API
+2. Add OAuth flow for connecting Oura account
+3. Build data sync + analysis pipeline
+4. Integrate into reorder logic
