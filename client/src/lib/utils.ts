@@ -21,8 +21,11 @@ export function calculateDosage(totalMg: number): {
   const totalCapsules = Math.ceil(totalMg / CAPSULE_CAPACITY_MG);
   const capsulesPerMeal = Math.ceil(totalCapsules / MEALS_PER_DAY);
   
+  // Total should match what's shown in display: perMeal * MEALS_PER_DAY
+  const actualTotal = capsulesPerMeal * MEALS_PER_DAY;
+  
   return {
-    total: totalCapsules,
+    total: actualTotal,
     perMeal: capsulesPerMeal,
     display: `🌅 ${capsulesPerMeal} • ☀️ ${capsulesPerMeal} • 🌙 ${capsulesPerMeal}`,
   };
