@@ -772,30 +772,30 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
       data-testid={`card-formula-${formula.version}`}
     >
       {/* Badges */}
-      <div className="absolute top-2 right-2 flex gap-2">
+      <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end z-10">
         {isNewest && (
-          <Badge variant="default" className="text-xs">
+          <Badge variant="default" className="text-xs shadow-sm">
             <Star className="w-3 h-3 mr-1" />
             Newest
           </Badge>
         )}
         {isSelected && (
-          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 shadow-sm">
             <CheckCircle className="w-3 h-3 mr-1" />
             Selected
           </Badge>
         )}
       </div>
       
-      <CardHeader className="pb-3">
-        <div className="pr-20 pt-2">
-          <CardTitle className="text-lg flex items-center gap-1.5">
-            <FlaskConical className="w-4 h-4" />
-            <span>{formula.name || `Version ${formula.version}`}</span>
+      <CardHeader className="pb-4">
+        <div className="pr-24">
+          <CardTitle className="text-lg flex items-center gap-1.5 flex-wrap">
+            <FlaskConical className="w-4 h-4 flex-shrink-0" />
+            <span className="break-words">{formula.name || `Version ${formula.version}`}</span>
             <Button
               variant="ghost"
               size="icon"
-              className="h-5 w-5 shrink-0 ml-0.5"
+              className="h-5 w-5 flex-shrink-0"
               onClick={(e) => {
                 e.stopPropagation();
                 onRename(formula.id, formula.name);
@@ -806,40 +806,40 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
             </Button>
           </CardTitle>
           {formula.name && (
-            <p className="text-xs text-muted-foreground mt-1">Version {formula.version}</p>
+            <p className="text-xs text-muted-foreground mt-1.5">Version {formula.version}</p>
           )}
         </div>
-        <CardDescription className="text-xs">
+        <CardDescription className="text-xs mt-1.5">
           {createdDate} • {totalIngredients} ingredients
         </CardDescription>
       </CardHeader>
       
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="text-center p-2 bg-muted/30 rounded">
-            <div className="font-bold text-primary">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col items-center justify-center p-3 bg-muted/30 rounded-lg min-h-[72px]">
+            <div className="font-bold text-lg text-primary leading-none mb-1.5">
               {formula.bases.length + (formula.userCustomizations?.addedBases?.length || 0)}
             </div>
-            <div className="text-xs text-muted-foreground">Base Formulas</div>
+            <div className="text-xs text-muted-foreground text-center leading-tight">Base Formulas</div>
           </div>
-          <div className="text-center p-2 bg-muted/30 rounded">
-            <div className="font-bold text-blue-600">
+          <div className="flex flex-col items-center justify-center p-3 bg-muted/30 rounded-lg min-h-[72px]">
+            <div className="font-bold text-lg text-blue-600 leading-none mb-1.5">
               {formula.additions.length + (formula.userCustomizations?.addedIndividuals?.length || 0)}
             </div>
-            <div className="text-xs text-muted-foreground">Additions</div>
+            <div className="text-xs text-muted-foreground text-center leading-tight">Additions</div>
           </div>
         </div>
         
         {/* Daily Dosage */}
-        <div className="space-y-1.5 p-2 bg-muted/20 rounded">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Daily Dosage:</span>
-            <span className="font-medium text-sm" data-testid={`text-formula-dosage-${formula.version}`}>
+        <div className="space-y-2 p-3 bg-muted/20 rounded-lg">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm text-muted-foreground whitespace-nowrap">Daily Dosage:</span>
+            <span className="font-medium text-sm tabular-nums" data-testid={`text-formula-dosage-${formula.version}`}>
               {calculateDosage(formula.totalMg).display}
             </span>
           </div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground text-center tabular-nums">
             {calculateDosage(formula.totalMg).total} capsules/day • {formula.totalMg}mg total
           </div>
         </div>
