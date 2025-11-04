@@ -297,39 +297,14 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
   const errors: string[] = [];
   let calculatedTotal = 0;
   
-  // Normalize ingredient names for flexible matching
-  // Handles variations like "Phosphatidylcholine 40%" vs "Phosphatidylcholine 40% (soy)"
-  // Also handles "Garlic" vs "Garlic (powder)", etc.
-  const normalizeIngredientName = (name: string) => {
-    return name.toLowerCase()
-      .replace(/\s*\([^)]*\)/g, '') // Remove parentheses and their content
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .trim();
-  };
-  
-  // Get approved base formula names (first 32 entries in CANONICAL_DOSES_MG)
-  const approvedBases = Object.keys(CANONICAL_DOSES_MG).slice(0, 32);
-  
-  // Get approved individual ingredient names (last 29 entries in CANONICAL_DOSES_MG)
-  const approvedIngredients = Object.keys(CANONICAL_DOSES_MG).slice(32);
-  
-  // Validate bases with flexible matching
+  // Validate bases with CATEGORY-AGNOSTIC flexible matching
   if (!formula.bases || formula.bases.length === 0) {
     errors.push('Formula must include at least one base formula');
   } else {
     for (const base of formula.bases) {
-      const normalizedBaseName = normalizeIngredientName(base.name);
-      
-      // Check if base is in approved list (flexible fuzzy match)
-      const isApproved = approvedBases.some(approved => {
-        const normalizedApproved = normalizeIngredientName(approved);
-        return normalizedApproved === normalizedBaseName || 
-               normalizedApproved.includes(normalizedBaseName) ||
-               normalizedBaseName.includes(normalizedApproved);
-      });
-      
-      if (!isApproved) {
-        errors.push(`UNAUTHORIZED BASE FORMULA: "${base.name}" is not in the approved catalog. Formula REJECTED.`);
+      // Use category-agnostic validation - checks against ALL approved ingredients
+      if (!isAnyIngredientApproved(base.name)) {
+        errors.push(`UNAUTHORIZED INGREDIENT: "${base.name}" is not in the approved catalog. Formula REJECTED.`);
         continue;
       }
       
@@ -341,20 +316,11 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
     }
   }
   
-  // Validate additions with flexible matching
+  // Validate additions with CATEGORY-AGNOSTIC flexible matching
   if (formula.additions) {
     for (const addition of formula.additions) {
-      const normalizedAdditionName = normalizeIngredientName(addition.name);
-      
-      // Check if addition is in approved list (flexible fuzzy match)
-      const isApproved = approvedIngredients.some(approved => {
-        const normalizedApproved = normalizeIngredientName(approved);
-        return normalizedApproved === normalizedAdditionName || 
-               normalizedApproved.includes(normalizedAdditionName) ||
-               normalizedAdditionName.includes(normalizedApproved);
-      });
-      
-      if (!isApproved) {
+      // Use category-agnostic validation - checks against ALL approved ingredients
+      if (!isAnyIngredientApproved(addition.name)) {
         errors.push(`UNAUTHORIZED INGREDIENT: "${addition.name}" is not in the approved catalog. Formula REJECTED.`);
         continue;
       }
