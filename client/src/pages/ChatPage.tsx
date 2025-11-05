@@ -286,7 +286,7 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50 backdrop-blur">
+      <header className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card/50 backdrop-blur">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
             <span className="text-sm font-semibold text-primary-foreground">Ones</span>
@@ -429,7 +429,7 @@ export default function ChatPage() {
       <Separator />
 
       {/* Enhanced Input Area */}
-      <div className="px-4 py-2 bg-card/50 backdrop-blur">
+      <div className="px-4 py-1.5 bg-card/50 backdrop-blur">
         <div className="flex space-x-3 items-end">
           <div className="flex-1">
             <Input
