@@ -927,6 +927,9 @@ export default function ConsultationPage() {
     );
   }, [messages, searchTerm]);
 
+  // Debug: Log render state
+  console.log('🔍 RENDER STATE - isTyping:', isTyping, 'thinkingMessage:', thinkingMessage);
+
   return (
     <div className="flex h-full max-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
       {/* History Sidebar */}
