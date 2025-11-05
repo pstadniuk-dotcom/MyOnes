@@ -51,6 +51,12 @@ export const users = pgTable("users", {
   smsShipping: boolean("sms_shipping").default(false).notNull(),
   smsBilling: boolean("sms_billing").default(false).notNull(),
   
+  // Daily pill reminder preferences
+  dailyRemindersEnabled: boolean("daily_reminders_enabled").default(false).notNull(),
+  reminderBreakfast: text("reminder_breakfast").default('08:00').notNull(),
+  reminderLunch: text("reminder_lunch").default('12:00').notNull(),
+  reminderDinner: text("reminder_dinner").default('18:00').notNull(),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -305,6 +311,10 @@ export const notificationPrefs = pgTable("notification_prefs", {
   smsConsultation: boolean("sms_consultation").default(false).notNull(),
   smsShipping: boolean("sms_shipping").default(false).notNull(),
   smsBilling: boolean("sms_billing").default(false).notNull(),
+  dailyRemindersEnabled: boolean("daily_reminders_enabled").default(false).notNull(),
+  reminderBreakfast: text("reminder_breakfast").default('08:00').notNull(),
+  reminderLunch: text("reminder_lunch").default('12:00').notNull(),
+  reminderDinner: text("reminder_dinner").default('18:00').notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
