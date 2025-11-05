@@ -8,7 +8,8 @@ let pdfParse: any;
 async function loadPdfParse() {
   if (!pdfParse) {
     const module = await import('pdf-parse');
-    pdfParse = (module as any).default || module;
+    // Try multiple levels of default export
+    pdfParse = (module as any).default?.default || (module as any).default || module;
   }
   return pdfParse;
 }
