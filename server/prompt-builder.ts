@@ -1,4 +1,39 @@
-import type { HealthProfile, Formula } from "./storage";
+// Define types directly to avoid circular dependencies
+export interface HealthProfile {
+  id: string;
+  userId: string;
+  age?: number | null;
+  sex?: string | null;
+  weightLbs?: number | null;
+  heightCm?: number | null;
+  bloodPressureSystolic?: number | null;
+  bloodPressureDiastolic?: number | null;
+  restingHeartRate?: number | null;
+  sleepHoursPerNight?: number | null;
+  exerciseDaysPerWeek?: number | null;
+  stressLevel?: number | null;
+  smokingStatus?: string | null;
+  alcoholDrinksPerWeek?: number | null;
+  conditions?: string[];
+  medications?: string[];
+  allergies?: string[];
+  updatedAt: Date;
+}
+
+export interface Formula {
+  id: string;
+  userId: string;
+  version?: number;
+  name?: string | null;
+  bases: Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
+  additions?: Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
+  totalMg: number;
+  userCustomizations?: {
+    addedBases?: Array<{ingredient: string, amount: number, unit: string}>;
+    addedIndividuals?: Array<{ingredient: string, amount: number, unit: string}>;
+  };
+  createdAt: Date;
+}
 
 export interface PromptContext {
   healthProfile?: HealthProfile;
