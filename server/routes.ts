@@ -3103,6 +3103,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       
+      console.log('🔧 Profile update request body:', JSON.stringify(req.body, null, 2));
+      
       // Create validation schema for profile updates
       const updateProfileSchema = z.object({
         name: z.string().min(1).optional(),
@@ -3119,6 +3121,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Validate request body
       const validatedData = updateProfileSchema.parse(req.body);
       
+      console.log('✅ Validated data:', JSON.stringify(validatedData, null, 2));
+      
       // If email is being changed, check if it's already in use
       if (validatedData.email) {
         const existingUser = await storage.getUserByEmail(validatedData.email);
@@ -3129,6 +3133,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       
       // Update user profile
       const updatedUser = await storage.updateUser(userId, validatedData);
+      
+      console.log('💾 Updated user address fields:', {
+        addressLine1: updatedUser?.addressLine1,
+        addressLine2: updatedUser?.addressLine2,
+        city: updatedUser?.city,
+        state: updatedUser?.state,
+        postalCode: updatedUser?.postalCode,
+        country: updatedUser?.country
+      });
       
       if (!updatedUser) {
         return res.status(404).json({ error: 'User not found' });
