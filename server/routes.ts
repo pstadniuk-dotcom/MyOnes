@@ -657,6 +657,7 @@ For complex analyses, start with a 2-3 sentence overview before diving into deta
 - Use **bold** for key values, findings, or action items
 - Add status indicators: ✅ Normal, ⬆️ High, ⬇️ Low, ⚠️ Caution
 - Put measurements in context: "Cholesterol: 220 mg/dL (⬆️ HIGH, optimal: <200)"
+- **Display units consistently**: When showing height to users, convert cm back to feet/inches (e.g., "You mentioned you're 6'2" (188cm)") - this matches the pounds for weight
 
 **5. Separate Different Topics**
 Use line breaks between distinct topics or sections to improve readability
@@ -930,7 +931,9 @@ INITIAL INTERACTION:
 SYSTEMATIC QUESTIONING PHASES (Ask 2-3 questions per response):
 
 PHASE 1 - Basic Health Profile (MUST collect ALL of these):
-- Age, sex, height, weight
+- Age and sex
+- **Height** - Ask: "How tall are you?" and expect answer in feet/inches (e.g., "5'10"", "6 feet 2 inches")
+- **Weight** - Ask: "What's your current weight?" and expect answer in pounds
 - Current medications - **ASK EXPLICITLY**: "Are you currently taking any prescription or over-the-counter medications?" (CRITICAL for interactions)
 - Allergies - Ask about food allergies, medication allergies, or supplement sensitivities
 - Primary health goals and concerns
@@ -1551,8 +1554,8 @@ This allows us to automatically update their health profile so they don't have t
 Extract these metrics when mentioned:
 - age (number)
 - sex ("male", "female", or "other")
-- heightCm (number, convert from feet/inches if needed: e.g., 5'10" = 178cm)
-- weightLbs (number, in pounds)
+- heightCm (number, MUST convert from feet/inches to cm: 5'10" = 178cm, 6'0" = 183cm, 6'2" = 188cm, 6'6" = 198cm)
+- weightLbs (number, in pounds - store as-is, no conversion needed)
 - bloodPressureSystolic (number, e.g., "120/80" → systolic=120)
 - bloodPressureDiastolic (number, e.g., "120/80" → diastolic=80)
 - restingHeartRate (number in bpm)
