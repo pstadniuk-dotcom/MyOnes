@@ -371,8 +371,10 @@ export default function ConsultationPage() {
                 } else if (data.type === 'thinking') {
                   // Update thinking status message
                   console.log('🧠 SSE: Thinking status received:', data.message);
+                  console.log('🧠 Setting isTyping=false, thinkingMessage=', data.message);
                   setIsTyping(false);
                   setThinkingMessage(data.message);
+                  console.log('🧠 State updated');
                 } else if (data.type === 'chunk') {
                   // Clear thinking status when content starts arriving
                   setThinkingMessage(null);

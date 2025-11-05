@@ -7,6 +7,8 @@ interface ThinkingIndicatorProps {
 
 export default function ThinkingIndicator({ message }: ThinkingIndicatorProps) {
   const [dots, setDots] = useState('');
+  
+  console.log('🎨 ThinkingIndicator RENDER - message:', message);
 
   useEffect(() => {
     const interval = setInterval(() => {
