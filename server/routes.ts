@@ -1943,6 +1943,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send initial connection confirmation
       sendSSE({ type: 'connected', message: 'Stream established' });
+      
+      // Send initial thinking status
+      sendSSE({ type: 'thinking', message: 'Analyzing your health profile...' });
 
       // Get or create chat session
       let chatSession;
@@ -2043,6 +2046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fetch user's lab reports with extracted data and format as structured table
+      sendSSE({ type: 'thinking', message: 'Reviewing health data...' });
       const labReports = await storage.getLabReportsByUser(userId!);
       let labDataContext = '';
       
@@ -2107,12 +2111,20 @@ ${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sorted
         } else {
           console.log('⚠️ DEBUG: No lab reports with completed analysis and extracted data');
         }
+        
+        if (processedReports.length > 0) {
+          sendSSE({ type: 'thinking', message: 'Analyzing blood test results...' });
+        }
       }
       
       // Fetch user's current active formula
       const activeFormula = await storage.getCurrentFormulaByUser(userId!);
       
       console.log('🔍 DEBUG: Active formula fetched:', activeFormula ? `YES - ${activeFormula.name} (${activeFormula.totalMg}mg)` : 'NO FORMULA FOUND');
+      
+      if (activeFormula) {
+        sendSSE({ type: 'thinking', message: 'Reviewing current formula...' });
+      }
       
       let currentFormulaContext = '';
       if (activeFormula) {
@@ -2271,6 +2283,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       console.log('📤 DEBUG: System prompt length:', fullSystemPrompt.length, 'chars');
       console.log('📤 DEBUG: Current formula in prompt?', fullSystemPrompt.includes('CURRENT ACTIVE FORMULA'));
       console.log('📤 DEBUG: Lab data in prompt?', fullSystemPrompt.includes('LABORATORY TEST RESULTS'));
+      
+      // Send status indicating we're about to call AI
+      sendSSE({ type: 'thinking', message: 'Researching optimal recommendations...' });
       
       const conversationHistory: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
         { role: 'system', content: fullSystemPrompt },
