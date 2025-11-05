@@ -286,14 +286,14 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card/50 backdrop-blur">
+      <header className="flex items-center justify-between px-4 py-1 border-b border-border bg-card/50 backdrop-blur">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-            <span className="text-sm font-semibold text-primary-foreground">Ones</span>
+          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+            <span className="text-xs font-semibold text-primary-foreground">Ones</span>
           </div>
           <div>
-            <h1 className="text-xl font-semibold" data-testid="text-chat-title">Ones AI</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-lg font-semibold" data-testid="text-chat-title">Ones AI</h1>
+            <p className="text-xs text-muted-foreground">
               Your personalized supplement consultant
               {isConnected && <span className="ml-2 text-green-600">• Connected</span>}
               {sessionId && <span className="ml-2 text-blue-600">• Session Active</span>}
@@ -429,15 +429,15 @@ export default function ChatPage() {
       <Separator />
 
       {/* Enhanced Input Area */}
-      <div className="px-4 py-1.5 bg-card/50 backdrop-blur">
-        <div className="flex space-x-3 items-end">
+      <div className="px-4 py-1 bg-card/50 backdrop-blur">
+        <div className="flex space-x-2 items-end">
           <div className="flex-1">
             <Input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Continue your health consultation..."
-              className="min-h-[44px] resize-none"
+              className="min-h-[40px] resize-none"
               data-testid="input-chat-message"
             />
           </div>
@@ -468,7 +468,7 @@ export default function ChatPage() {
           className="hidden"
           data-testid="input-file-upload"
         />
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-xs text-muted-foreground mt-1">
           Upload blood tests (PDF/image) or continue describing your health goals
         </p>
       </div>
