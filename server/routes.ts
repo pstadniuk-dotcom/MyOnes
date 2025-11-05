@@ -4635,6 +4635,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // TEST ENDPOINT: Manually trigger SMS reminder check (protected)
+  app.post('/api/test/sms-reminder', requireAuth, async (req, res) => {
+    try {
+      const { checkAndSendReminders } = await import('./smsReminderScheduler');
+      
+      console.log('🧪 Manual SMS reminder test triggered by user:', req.userId);
+      await checkAndSendReminders();
+      
+      res.json({ 
+        success: true, 
+        message: 'SMS reminder check completed. Check server logs for results.' 
+      });
+    } catch (error) {
+      console.error('Test SMS reminder error:', error);
+      res.status(500).json({ error: 'Failed to test SMS reminders' });
+    }
+  });
+
   // Newsletter subscription endpoint (public)
   app.post('/api/newsletter/subscribe', async (req, res) => {
     try {

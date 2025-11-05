@@ -18,10 +18,7 @@ export function useTimezoneSync() {
         }
         
         // Save to backend
-        await apiRequest('/api/users/me/timezone', {
-          method: 'PATCH',
-          body: JSON.stringify({ timezone }),
-        });
+        await apiRequest('PATCH', '/api/users/me/timezone', { timezone });
         
         console.log(`✅ Timezone synced: ${timezone}`);
       } catch (error) {

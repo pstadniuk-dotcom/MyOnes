@@ -52,26 +52,38 @@ function getCurrentTimeInTimezone(timezone: string): { hours: number; minutes: n
 
 async function checkAndSendReminders() {
   try {
+    console.log('⏰ Checking for reminders to send...');
+    
     // Get all users with daily reminders enabled
     const allUsers = await storage.listAllUsers?.() || [];
+    console.log(`📋 Found ${allUsers.length} total users`);
     
     for (const user of allUsers) {
       // Get notification preferences to check if daily reminders are enabled
       const prefs = await storage.getNotificationPrefs(user.id);
       
-      if (!prefs?.dailyRemindersEnabled || !user.phone) {
-        continue; // Skip if reminders disabled or no phone number
+      if (!prefs?.dailyRemindersEnabled) {
+        console.log(`⏭️  Skipping user ${user.id} - reminders disabled`);
+        continue;
+      }
+      
+      if (!user.phone) {
+        console.log(`⏭️  Skipping user ${user.id} - no phone number`);
+        continue;
       }
       
       const timezone = user.timezone || 'America/New_York';
       const currentTime = getCurrentTimeInTimezone(timezone);
+      
+      console.log(`👤 Checking user ${user.id} - Local time: ${currentTime.hours}:${currentTime.minutes.toString().padStart(2, '0')} (${timezone})`);
       
       // Get user's active formula to determine capsule count and ingredients
       const formulas = await storage.getFormulaHistory(user.id);
       const activeFormula = formulas[0]; // Most recent formula
       
       if (!activeFormula) {
-        continue; // Skip if user has no formula
+        console.log(`⏭️  Skipping user ${user.id} - no formula`);
+        continue;
       }
       
       // Calculate total capsule count from formula
@@ -94,13 +106,15 @@ async function checkAndSendReminders() {
       for (const { mealType, time } of reminders) {
         const [targetHours, targetMinutes] = time.split(':').map(Number);
         
+        const timeMatches = currentTime.hours === targetHours && currentTime.minutes === targetMinutes;
+        const alreadySent = hasReminderBeenSent(user.id, mealType);
+        
+        console.log(`  ${mealType}: ${targetHours}:${targetMinutes.toString().padStart(2, '0')} - Match: ${timeMatches}, Sent: ${alreadySent}`);
+        
         // Check if current time matches reminder time (within 1 minute window)
-        if (
-          currentTime.hours === targetHours && 
-          currentTime.minutes === targetMinutes &&
-          !hasReminderBeenSent(user.id, mealType)
-        ) {
+        if (timeMatches && !alreadySent) {
           // Time to send reminder!
+          console.log(`🔔 SENDING ${mealType} reminder to user ${user.id}!`);
           await sendReminderSms({
             userId: user.id,
             phone: user.phone,
