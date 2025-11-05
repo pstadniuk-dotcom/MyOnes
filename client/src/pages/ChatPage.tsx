@@ -287,13 +287,13 @@ export default function ChatPage() {
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-1 border-b border-border bg-card/50 backdrop-blur">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <span className="text-xs font-semibold text-primary-foreground">Ones</span>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center">
+            <span className="text-xs font-semibold text-primary-foreground">O</span>
           </div>
           <div>
-            <h1 className="text-lg font-semibold" data-testid="text-chat-title">Ones AI</h1>
-            <p className="text-xs text-muted-foreground">
+            <h1 className="text-base font-semibold leading-tight" data-testid="text-chat-title">Ones AI</h1>
+            <p className="text-xs text-muted-foreground leading-tight">
               Your personalized supplement consultant
               {isConnected && <span className="ml-2 text-green-600">• Connected</span>}
               {sessionId && <span className="ml-2 text-blue-600">• Session Active</span>}

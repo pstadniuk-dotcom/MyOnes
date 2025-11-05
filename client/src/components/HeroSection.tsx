@@ -2,9 +2,20 @@ import { Button } from '@/components/ui/button';
 import AIChat from './AIChat';
 import heroImage from '@assets/generated_images/Diverse_wellness_lifestyle_hero_a1825347.png';
 import { Link } from 'wouter';
+import { useState, useEffect } from 'react';
 
 export default function HeroSection() {
-  // Hero button now navigates to signup instead of scrolling to AIChat
+  const [showScrollIndicator, setShowScrollIndicator] = useState(true);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Hide scroll indicator once user scrolls past 80vh
+      setShowScrollIndicator(window.scrollY < window.innerHeight * 0.8);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
     <section className="min-h-screen bg-premium-gradient relative overflow-hidden">
@@ -91,12 +102,14 @@ export default function HeroSection() {
         </div>
       </div>
 
-      {/* Scroll Indicator - Fixed to viewport */}
-      <div className="fixed bottom-4 md:bottom-6 lg:bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce z-20">
-        <div className="w-6 h-10 border-2 border-muted-foreground rounded-full flex justify-center">
-          <div className="w-1 h-3 bg-muted-foreground rounded-full mt-2 animate-pulse"></div>
+      {/* Scroll Indicator - Fixed to viewport, hidden on scroll */}
+      {showScrollIndicator && (
+        <div className="fixed bottom-4 md:bottom-6 lg:bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce z-20 transition-opacity duration-300">
+          <div className="w-6 h-10 border-2 border-muted-foreground rounded-full flex justify-center">
+            <div className="w-1 h-3 bg-muted-foreground rounded-full mt-2 animate-pulse"></div>
+          </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }
