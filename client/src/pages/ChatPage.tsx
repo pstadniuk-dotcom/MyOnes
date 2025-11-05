@@ -23,18 +23,12 @@ interface Message {
 }
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: "Welcome back! I'm Ones AI, your personalized supplement consultant. I'm here to help you create the perfect supplement formula based on your unique health profile.\n\n⚕️ Important: I provide personalized supplement recommendations, not medical advice. Always consult your healthcare provider before starting any new supplement regimen, especially if you have medical conditions or take medications.",
-      sender: 'ai',
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -48,8 +42,60 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
+  // Load most recent chat session on mount
+  useEffect(() => {
+    const loadRecentSession = async () => {
+      try {
+        const response = await fetch('/api/consultations/history');
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Check if there's an active session with messages
+          if (data.sessions && data.sessions.length > 0) {
+            const recentSession = data.sessions[0]; // Most recent session
+            
+            if (recentSession.id && recentSession.messages && recentSession.messages.length > 0) {
+              console.log('Auto-restored session:', recentSession.id);
+              
+              // Set the session ID
+              setSessionId(recentSession.id);
+              
+              // Load the messages
+              const loadedMessages: Message[] = recentSession.messages.map((msg: any) => ({
+                id: msg.id,
+                content: msg.content,
+                sender: msg.role === 'user' ? 'user' : 'ai',
+                timestamp: new Date(msg.createdAt)
+              }));
+              
+              setMessages(loadedMessages);
+              setIsLoadingHistory(false);
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading recent session:', error);
+      }
+      
+      // If no session found or error, show welcome message
+      setMessages([{
+        id: '1',
+        content: "Welcome back! I'm Ones AI, your personalized supplement consultant. I'm here to help you create the perfect supplement formula based on your unique health profile.\n\n⚕️ Important: I provide personalized supplement recommendations, not medical advice. Always consult your healthcare provider before starting any new supplement regimen, especially if you have medical conditions or take medications.",
+        sender: 'ai',
+        timestamp: new Date()
+      }]);
+      setIsLoadingHistory(false);
+    };
+
+    loadRecentSession();
+  }, []);
+
   // Check for preserved message on component mount
   useEffect(() => {
+    // Only proceed if history has finished loading
+    if (isLoadingHistory) return;
+    
     const preservedMessage = localStorage.getItem('preAuthMessage');
     if (preservedMessage) {
       // Remove from localStorage immediately
@@ -63,7 +109,7 @@ export default function ChatPage() {
         handleSendMessage(preservedMessage);
       }, 1000);
     }
-  }, []);
+  }, [isLoadingHistory]);
 
   const handleSendMessage = useCallback(async (messageText?: string) => {
     const currentMessage = messageText || inputValue;
