@@ -27,7 +27,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { FormulaCustomizationDialog } from '@/components/FormulaCustomizationDialog';
+import { ResearchCitationCard } from '@/components/ResearchCitationCard';
 import { calculateDosage } from '@/lib/utils';
+import type { ResearchCitation } from '@shared/schema';
 
 // Types for Formula data matching backend schema
 interface FormulaIngredient {
@@ -1287,6 +1289,12 @@ function IngredientCard({
     enabled: ingredient.type === 'base' && isExpanded
   });
 
+  // Fetch research citations for this ingredient
+  const { data: researchCitations, isLoading: isLoadingResearch } = useQuery<ResearchCitation[]>({
+    queryKey: ['/api/ingredients', encodeURIComponent(ingredient.ingredient), 'research'],
+    enabled: isExpanded
+  });
+
   const formulaBreakdown = baseFormulaData?.baseFormulaDetails.find(
     f => f.name === ingredient.ingredient
   );
@@ -1451,10 +1459,12 @@ function IngredientCard({
                           <BookOpen className="w-4 h-4 text-purple-500" />
                           Research
                         </h4>
-                        <div className="space-y-1 text-sm">
-                          <p>Studies: {ingredientDetail.researchBacking.studyCount}+</p>
-                          <p>Evidence: {ingredientDetail.researchBacking.evidenceLevel}</p>
-                        </div>
+                        {ingredientDetail.researchBacking && (
+                          <div className="space-y-1 text-sm">
+                            <p>Studies: {ingredientDetail.researchBacking.studyCount}+</p>
+                            <p>Evidence: {ingredientDetail.researchBacking.evidenceLevel}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1511,6 +1521,29 @@ function IngredientCard({
                       </div>
                     )}
                   </>
+                )}
+
+                {/* Research Citations - Real studies from PubMed */}
+                {researchCitations && researchCitations.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-blue-500" />
+                      Published Research
+                    </h4>
+                    <div className="space-y-3" data-testid={`research-citations-${ingredient.ingredient}`}>
+                      {researchCitations.map((citation) => (
+                        <ResearchCitationCard key={citation.id} citation={citation} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Loading state for research citations */}
+                {isLoadingResearch && (
+                  <div className="space-y-3">
+                    <Skeleton className="h-32 w-full" />
+                    <Skeleton className="h-32 w-full" />
+                  </div>
                 )}
               </div>
             )}
