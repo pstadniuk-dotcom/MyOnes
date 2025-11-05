@@ -1,11 +1,17 @@
 import OpenAI from 'openai';
-import { createRequire } from 'module';
 import { ObjectStorageService } from './objectStorage';
 
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
-
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Load pdf-parse dynamically to handle CommonJS module
+let pdfParse: any;
+async function loadPdfParse() {
+  if (!pdfParse) {
+    const module = await import('pdf-parse');
+    pdfParse = (module as any).default || module;
+  }
+  return pdfParse;
+}
 
 export interface LabDataExtraction {
   testDate?: string;
@@ -55,7 +61,8 @@ export async function extractTextFromTextFile(buffer: Buffer): Promise<string> {
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    const data = await pdfParse(buffer);
+    const parser = await loadPdfParse();
+    const data = await parser(buffer);
     return data.text;
   } catch (error) {
     console.error('PDF parsing error:', error);
