@@ -3099,6 +3099,29 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Update user's timezone (for SMS reminder scheduling)
+  app.patch('/api/users/me/timezone', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { timezone } = req.body;
+      
+      if (!timezone || typeof timezone !== 'string') {
+        return res.status(400).json({ error: 'Valid timezone required' });
+      }
+      
+      const updatedUser = await storage.updateUser(userId, { timezone });
+      
+      if (!updatedUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      res.json({ timezone: updatedUser.timezone });
+    } catch (error) {
+      console.error('Update timezone error:', error);
+      res.status(500).json({ error: 'Failed to update timezone' });
+    }
+  });
+
   // Get user's subscription
   app.get('/api/users/me/subscription', requireAuth, async (req, res) => {
     try {
