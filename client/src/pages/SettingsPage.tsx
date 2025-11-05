@@ -111,10 +111,7 @@ export default function SettingsPage() {
   // Mutation to save notification preferences
   const saveNotificationsMutation = useMutation({
     mutationFn: (prefs: typeof notifications) =>
-      apiRequest('/api/notification-prefs', {
-        method: 'PUT',
-        body: JSON.stringify(prefs),
-      }),
+      apiRequest('PUT', '/api/notification-prefs', prefs),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notification-prefs'] });
       toast({
@@ -467,37 +464,13 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
-                    <Button 
-                      onClick={saveNotificationSettings} 
-                      disabled={saveNotificationsMutation.isPending}
-                      data-testid="button-save-notifications"
-                    >
-                      {saveNotificationsMutation.isPending ? 'Saving...' : 'Save Notification Settings'}
-                    </Button>
-                    
-                    <Button 
-                      variant="outline"
-                      onClick={async () => {
-                        try {
-                          await apiRequest('POST', '/api/test/sms-reminder', {});
-                          toast({
-                            title: "Test Triggered",
-                            description: "Checking if it's time to send reminders. If now matches your reminder times, you'll receive an SMS!",
-                          });
-                        } catch (error) {
-                          toast({
-                            title: "Test Failed",
-                            description: "Could not trigger test. Please try again.",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      data-testid="button-test-sms"
-                    >
-                      Test SMS System
-                    </Button>
-                  </div>
+                  <Button 
+                    onClick={saveNotificationSettings} 
+                    disabled={saveNotificationsMutation.isPending}
+                    data-testid="button-save-notifications"
+                  >
+                    {saveNotificationsMutation.isPending ? 'Saving...' : 'Save Notification Settings'}
+                  </Button>
                 </>
               )}
             </CardContent>
