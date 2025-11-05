@@ -1953,8 +1953,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send initial connection confirmation
       sendSSE({ type: 'connected', message: 'Stream established' });
       
-      // Send initial thinking status
-      sendSSE({ type: 'thinking', message: 'Analyzing your health profile...' });
+      // Send single thinking status that stays visible until content arrives
+      sendSSE({ type: 'thinking', message: 'Analyzing your health data and researching personalized recommendations...' });
 
       // Get or create chat session
       let chatSession;
@@ -1971,9 +1971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const previousMessages = chatSession ? 
         (await storage.listMessagesBySession(chatSession.id)).slice(-10) : [];
       
-      // Update thinking status after session work
-      await new Promise(resolve => setTimeout(resolve, 100));
-      sendSSE({ type: 'thinking', message: 'Reviewing health data...' });
+      // (Removed - using single thinking message)
 
       // Get user's health profile to check for missing information
       let healthProfile;
@@ -2125,10 +2123,7 @@ ${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sorted
           console.log('⚠️ DEBUG: No lab reports with completed analysis and extracted data');
         }
         
-        if (processedReports.length > 0) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-          sendSSE({ type: 'thinking', message: 'Analyzing blood test results...' });
-        }
+        // (Removed - using single thinking message)
       }
       
       // Fetch user's current active formula
@@ -2136,10 +2131,7 @@ ${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sorted
       
       console.log('🔍 DEBUG: Active formula fetched:', activeFormula ? `YES - ${activeFormula.name} (${activeFormula.totalMg}mg)` : 'NO FORMULA FOUND');
       
-      if (activeFormula) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        sendSSE({ type: 'thinking', message: 'Reviewing current formula...' });
-      }
+      // (Removed - using single thinking message)
       
       let currentFormulaContext = '';
       if (activeFormula) {
@@ -2299,9 +2291,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       console.log('📤 DEBUG: Current formula in prompt?', fullSystemPrompt.includes('CURRENT ACTIVE FORMULA'));
       console.log('📤 DEBUG: Lab data in prompt?', fullSystemPrompt.includes('LABORATORY TEST RESULTS'));
       
-      // Send status indicating we're about to call AI
-      await new Promise(resolve => setTimeout(resolve, 300));
-      sendSSE({ type: 'thinking', message: 'Researching optimal recommendations...' });
+      // (Removed - using single thinking message that was sent at the start)
       
       const conversationHistory: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
         { role: 'system', content: fullSystemPrompt },
