@@ -4314,9 +4314,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.put('/api/notification-prefs', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      const { emailConsultation, emailShipping, emailBilling, smsConsultation, smsShipping, smsBilling } = req.body;
+      const { 
+        emailConsultation, 
+        emailShipping, 
+        emailBilling, 
+        smsConsultation, 
+        smsShipping, 
+        smsBilling,
+        dailyRemindersEnabled,
+        reminderBreakfast,
+        reminderLunch,
+        reminderDinner
+      } = req.body;
       
-      // Validate input
+      // Validate boolean input
       if (
         typeof emailConsultation !== 'boolean' || 
         typeof emailShipping !== 'boolean' || 
@@ -4326,6 +4337,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         typeof smsBilling !== 'boolean'
       ) {
         return res.status(400).json({ error: 'Invalid preference values' });
+      }
+      
+      // Validate daily reminder fields if provided
+      if (dailyRemindersEnabled !== undefined && typeof dailyRemindersEnabled !== 'boolean') {
+        return res.status(400).json({ error: 'Invalid dailyRemindersEnabled value' });
       }
       
       let prefs = await storage.getNotificationPrefs(userId);
@@ -4340,6 +4356,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           smsConsultation,
           smsShipping,
           smsBilling,
+          dailyRemindersEnabled: dailyRemindersEnabled ?? false,
+          reminderBreakfast: reminderBreakfast ?? '08:00',
+          reminderLunch: reminderLunch ?? '12:00',
+          reminderDinner: reminderDinner ?? '18:00',
         });
       } else {
         // Update existing
@@ -4350,6 +4370,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           smsConsultation,
           smsShipping,
           smsBilling,
+          dailyRemindersEnabled: dailyRemindersEnabled ?? prefs.dailyRemindersEnabled,
+          reminderBreakfast: reminderBreakfast ?? prefs.reminderBreakfast,
+          reminderLunch: reminderLunch ?? prefs.reminderLunch,
+          reminderDinner: reminderDinner ?? prefs.reminderDinner,
         });
       }
       

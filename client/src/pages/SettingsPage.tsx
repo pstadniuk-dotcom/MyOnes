@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Lock, Bell, Shield, Moon, Sun } from 'lucide-react';
+import { Lock, Bell, Shield, Moon, Sun, Clock, Pill } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -29,6 +29,10 @@ export default function SettingsPage() {
     smsConsultation: boolean;
     smsShipping: boolean;
     smsBilling: boolean;
+    dailyRemindersEnabled?: boolean;
+    reminderBreakfast?: string;
+    reminderLunch?: string;
+    reminderDinner?: string;
   }>({
     queryKey: ['/api/notification-prefs'],
   });
@@ -41,6 +45,10 @@ export default function SettingsPage() {
     smsConsultation: false,
     smsShipping: false,
     smsBilling: false,
+    dailyRemindersEnabled: false,
+    reminderBreakfast: '08:00',
+    reminderLunch: '12:00',
+    reminderDinner: '18:00',
   });
 
   // Update local state when data is fetched
@@ -53,6 +61,10 @@ export default function SettingsPage() {
         smsConsultation: notificationPrefs.smsConsultation,
         smsShipping: notificationPrefs.smsShipping,
         smsBilling: notificationPrefs.smsBilling,
+        dailyRemindersEnabled: notificationPrefs.dailyRemindersEnabled ?? false,
+        reminderBreakfast: notificationPrefs.reminderBreakfast ?? '08:00',
+        reminderLunch: notificationPrefs.reminderLunch ?? '12:00',
+        reminderDinner: notificationPrefs.reminderDinner ?? '18:00',
       });
     }
   }, [notificationPrefs]);
@@ -358,6 +370,92 @@ export default function SettingsPage() {
                           />
                         </div>
                       </div>
+                    </div>
+
+                    {/* Daily Pill Reminders */}
+                    <div className="space-y-4 pt-4 border-t">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Pill className="w-4 h-4" />
+                            <Label className="text-base font-semibold">Daily Pill Reminders (SMS)</Label>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Get personalized SMS reminders to take your supplements
+                          </p>
+                        </div>
+                        <Switch
+                          checked={notifications.dailyRemindersEnabled}
+                          onCheckedChange={(checked) =>
+                            setNotifications({ ...notifications, dailyRemindersEnabled: checked })
+                          }
+                          data-testid="switch-daily-reminders"
+                        />
+                      </div>
+
+                      {notifications.dailyRemindersEnabled && (
+                        <div className="ml-6 space-y-4 pl-4 border-l-2 border-primary/20">
+                          <p className="text-sm text-muted-foreground">
+                            Set your preferred reminder times. You'll receive AI-powered health tips with each reminder!
+                          </p>
+                          
+                          <div className="grid gap-4 sm:grid-cols-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="breakfast-time" className="flex items-center gap-2">
+                                <Clock className="w-3 h-3" />
+                                Breakfast
+                              </Label>
+                              <Input
+                                id="breakfast-time"
+                                type="time"
+                                value={notifications.reminderBreakfast}
+                                onChange={(e) =>
+                                  setNotifications({ ...notifications, reminderBreakfast: e.target.value })
+                                }
+                                data-testid="input-breakfast-time"
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor="lunch-time" className="flex items-center gap-2">
+                                <Clock className="w-3 h-3" />
+                                Lunch
+                              </Label>
+                              <Input
+                                id="lunch-time"
+                                type="time"
+                                value={notifications.reminderLunch}
+                                onChange={(e) =>
+                                  setNotifications({ ...notifications, reminderLunch: e.target.value })
+                                }
+                                data-testid="input-lunch-time"
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor="dinner-time" className="flex items-center gap-2">
+                                <Clock className="w-3 h-3" />
+                                Dinner
+                              </Label>
+                              <Input
+                                id="dinner-time"
+                                type="time"
+                                value={notifications.reminderDinner}
+                                onChange={(e) =>
+                                  setNotifications({ ...notifications, reminderDinner: e.target.value })
+                                }
+                                data-testid="input-dinner-time"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
+                            <p className="text-sm text-muted-foreground">
+                              💡 <strong>Preview:</strong> "⚗️ ONES: Breakfast time! Take 3 capsules with your meal. 💡 Tip: A 10-minute walk helps your Omega-3s absorb and boosts energy!"
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

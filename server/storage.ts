@@ -2258,6 +2258,10 @@ export class MemStorage implements IStorage {
       smsConsultation: insertPrefs.smsConsultation ?? false,
       smsShipping: insertPrefs.smsShipping ?? false,
       smsBilling: insertPrefs.smsBilling ?? false,
+      dailyRemindersEnabled: insertPrefs.dailyRemindersEnabled ?? false,
+      reminderBreakfast: insertPrefs.reminderBreakfast ?? '08:00',
+      reminderLunch: insertPrefs.reminderLunch ?? '12:00',
+      reminderDinner: insertPrefs.reminderDinner ?? '18:00',
       updatedAt: new Date()
     };
     this.notificationPrefs.set(insertPrefs.userId, prefs);
