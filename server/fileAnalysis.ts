@@ -1,18 +1,8 @@
 import OpenAI from 'openai';
 import { ObjectStorageService } from './objectStorage';
+import { pdf } from 'pdf-to-img';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// Load pdf-parse dynamically to handle CommonJS module
-let pdfParse: any;
-async function loadPdfParse() {
-  if (!pdfParse) {
-    const module = await import('pdf-parse');
-    // Try multiple levels of default export
-    pdfParse = (module as any).default?.default || (module as any).default || module;
-  }
-  return pdfParse;
-}
 
 export interface LabDataExtraction {
   testDate?: string;
@@ -58,13 +48,57 @@ export async function extractTextFromTextFile(buffer: Buffer): Promise<string> {
 }
 
 /**
- * Extracts text from PDF files
+ * Extracts text from PDF files using OpenAI Vision API
+ * Converts PDF pages to images and processes them with GPT-4o Vision
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    const parser = await loadPdfParse();
-    const data = await parser(buffer);
-    return data.text;
+    console.log('📄 Converting PDF to images...');
+    const document = await pdf(buffer, { scale: 2.0 });
+    const extractedTexts: string[] = [];
+    
+    let pageNum = 1;
+    for await (const page of document) {
+      console.log(`📄 Processing PDF page ${pageNum}...`);
+      
+      // Convert page to base64
+      const base64Image = page.toString('base64');
+      const dataUrl = `data:image/png;base64,${base64Image}`;
+      
+      // Extract text using OpenAI Vision
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Extract all text from this lab report page. Include test names, values, units, reference ranges, and any other relevant information. Preserve the structure and formatting as much as possible.'
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: dataUrl,
+                  detail: 'high'
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 2000
+      });
+      
+      const pageText = response.choices[0]?.message?.content || '';
+      if (pageText) {
+        extractedTexts.push(`--- Page ${pageNum} ---\n${pageText}`);
+      }
+      
+      pageNum++;
+    }
+    
+    console.log(`✅ Successfully extracted text from ${pageNum - 1} PDF page(s)`);
+    return extractedTexts.join('\n\n');
   } catch (error) {
     console.error('PDF parsing error:', error);
     throw new Error('Failed to extract text from PDF');
