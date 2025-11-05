@@ -1876,6 +1876,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Helper function to send SSE data
     const sendSSE = (data: any) => {
       if (!res.destroyed) {
+        if (data.type === 'thinking') {
+          console.log('📤 Sending thinking status:', data.message);
+        }
         res.write(`data: ${JSON.stringify(data)}\n\n`);
       }
     };
