@@ -114,6 +114,8 @@ export default function ProfilePage() {
     sex: '',
     weightLbs: '',
     heightCm: '',
+    heightFeet: '',
+    heightInches: '',
     bloodPressureSystolic: '',
     bloodPressureDiastolic: '',
     restingHeartRate: '',
@@ -146,11 +148,22 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (healthProfile) {
+      // Convert cm to feet and inches
+      let feet = '';
+      let inches = '';
+      if (healthProfile.heightCm) {
+        const totalInches = healthProfile.heightCm / 2.54;
+        feet = Math.floor(totalInches / 12).toString();
+        inches = Math.round(totalInches % 12).toString();
+      }
+      
       setHealthData({
         age: healthProfile.age?.toString() || '',
         sex: healthProfile.sex || '',
         weightLbs: healthProfile.weightLbs?.toString() || '',
         heightCm: healthProfile.heightCm?.toString() || '',
+        heightFeet: feet,
+        heightInches: inches,
         bloodPressureSystolic: healthProfile.bloodPressureSystolic?.toString() || '',
         bloodPressureDiastolic: healthProfile.bloodPressureDiastolic?.toString() || '',
         restingHeartRate: healthProfile.restingHeartRate?.toString() || '',
@@ -651,19 +664,37 @@ export default function ProfilePage() {
                     </Select>
                   )}
                 </div>
-                <div>
-                  <Label htmlFor="height">Height (cm)</Label>
+                <div className="space-y-2">
+                  <Label>Height</Label>
                   {healthLoading ? (
                     <Skeleton className="h-10 w-full" />
                   ) : (
-                    <Input
-                      id="height"
-                      type="number"
-                      value={healthData.heightCm}
-                      onChange={(e) => setHealthData({...healthData, heightCm: e.target.value})}
-                      placeholder="Enter height in cm"
-                      data-testid="input-height"
-                    />
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <Input
+                          id="height-feet"
+                          type="number"
+                          value={healthData.heightFeet}
+                          onChange={(e) => setHealthData({...healthData, heightFeet: e.target.value})}
+                          placeholder="Feet"
+                          min="3"
+                          max="8"
+                          data-testid="input-height-feet"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Input
+                          id="height-inches"
+                          type="number"
+                          value={healthData.heightInches}
+                          onChange={(e) => setHealthData({...healthData, heightInches: e.target.value})}
+                          placeholder="Inches"
+                          min="0"
+                          max="11"
+                          data-testid="input-height-inches"
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -942,11 +973,20 @@ export default function ProfilePage() {
                 <Button 
                   onClick={async () => {
                     try {
+                      // Convert feet and inches to cm
+                      let heightCm = null;
+                      if (healthData.heightFeet || healthData.heightInches) {
+                        const feet = parseInt(healthData.heightFeet) || 0;
+                        const inches = parseInt(healthData.heightInches) || 0;
+                        const totalInches = (feet * 12) + inches;
+                        heightCm = Math.round(totalInches * 2.54);
+                      }
+                      
                       const healthProfileData = {
                         age: healthData.age ? parseInt(healthData.age) : null,
                         sex: healthData.sex || null,
                         weightLbs: healthData.weightLbs ? parseInt(healthData.weightLbs) : null,
-                        heightCm: healthData.heightCm ? parseInt(healthData.heightCm) : null,
+                        heightCm: heightCm,
                         bloodPressureSystolic: healthData.bloodPressureSystolic ? parseInt(healthData.bloodPressureSystolic) : null,
                         bloodPressureDiastolic: healthData.bloodPressureDiastolic ? parseInt(healthData.bloodPressureDiastolic) : null,
                         restingHeartRate: healthData.restingHeartRate ? parseInt(healthData.restingHeartRate) : null,
