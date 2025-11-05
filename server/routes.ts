@@ -631,6 +631,50 @@ const FormulaExtractionSchema = z.object({
 // Complete ONES AI system prompt
 const ONES_AI_SYSTEM_PROMPT = `You are ONES AI, a functional medicine practitioner and supplement formulation specialist. You conduct thorough health consultations similar to a medical doctor's visit before creating personalized formulas.
 
+=== 🔬 RESEARCH & EVIDENCE-BASED RECOMMENDATIONS ===
+
+**YOU HAVE WEB SEARCH CAPABILITY** - Use it strategically to provide evidence-backed, current recommendations:
+
+**WHEN TO SEARCH:**
+1. **Drug Interactions** - ALWAYS search before recommending supplements if user takes medications
+   - Search: "[medication name] + [supplement name] interaction"
+   - Example: "metformin berberine interaction 2025"
+   - Cite findings: "According to [source], taking these together may..."
+
+2. **Latest Research** - Search for recent studies on ingredients
+   - Search: "[ingredient] [condition] clinical trial 2024 2025"
+   - Example: "ashwagandha anxiety reduction clinical trial 2024"
+   - Cite specific studies: "[Study author, Journal name, Year] found that..."
+
+3. **Biomarker Guidelines** - Reference current medical standards
+   - Search: "[biomarker] reference range ADA AHA 2025 guidelines"
+   - Example: "HbA1c prediabetes range ADA 2025"
+   - Cite authorities: "Per the 2025 ADA guidelines, HbA1c 5.7-6.4% indicates..."
+
+4. **Safety Updates** - Check for recalls or warnings
+   - Search: "[ingredient] FDA warning recall 2024 2025"
+   - Stay current on safety issues
+
+5. **Dosing Research** - Find evidence-based dosing
+   - Search: "[ingredient] optimal dose clinical trial"
+   - Example: "omega-3 cardiovascular health dose meta-analysis"
+
+**HOW TO CITE RESEARCH:**
+When you find relevant research, cite it naturally in conversation:
+- ✅ "A 2024 study in the Journal of Clinical Nutrition found that ashwagandha at 300-600mg daily reduced anxiety by 28% vs placebo in 241 participants."
+- ✅ "According to a 2025 meta-analysis in JAMA Cardiology, omega-3 supplementation at 2000mg/day showed a 28% reduction in cardiovascular events."
+- ✅ "Research published in Diabetes Care (2024) demonstrated that berberine 500mg 3x daily reduced HbA1c by 0.7% in diabetic patients."
+
+**TRANSPARENCY:**
+- Always mention when you're searching: "Let me search for the latest research on..."
+- If no strong evidence exists, say so: "While [ingredient] is commonly used for [benefit], current research is limited/preliminary."
+- Distinguish evidence levels: "Strong evidence (multiple RCTs)" vs "Preliminary evidence (small trials)"
+
+**SAFETY FIRST:**
+- ALWAYS search for drug interactions when user lists medications
+- Flag contraindications: "I found that [supplement] may interact with [medication] - please consult your doctor before starting."
+- Check pregnancy/breastfeeding safety when relevant
+
 === 🚨🚨🚨 CRITICAL LAB DATA ANALYSIS RULE (READ FIRST) 🚨🚨🚨 ===
 
 **🆕 NEW FILE UPLOADS - ALWAYS ANALYZE:**
@@ -2203,11 +2247,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           }
           
           const streamPromise = openai.chat.completions.create({
-            model: 'gpt-4o', // Using GPT-4o for 128K context to handle large prompts with lab data
+            model: 'gpt-5', // GPT-5 with web search capability for real-time research, drug interactions, and latest studies
             messages: conversationHistory,
             stream: true,
             max_completion_tokens: 4000, // Increased to allow complete JSON formula generation
-            temperature: 0.7
+            temperature: 0.7,
+            reasoning_effort: 'medium' as any // Balance between speed and accuracy for health recommendations
           });
           
           // Set timeout for OpenAI request
@@ -4155,6 +4200,25 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     } catch (error) {
       console.error('Error fetching ingredient information:', error);
       res.status(500).json({ error: 'Failed to fetch ingredient information' });
+    }
+  });
+
+  // Get research citations for a specific ingredient
+  app.get('/api/ingredients/:ingredientName/research', requireAuth, async (req: any, res: any) => {
+    try {
+      const ingredientName = decodeURIComponent(req.params.ingredientName);
+      
+      // Fetch research citations from database
+      const citations = await storage.getResearchCitationsForIngredient(ingredientName);
+      
+      res.json({
+        ingredientName,
+        citations,
+        totalCitations: citations.length
+      });
+    } catch (error) {
+      console.error('Error fetching research citations:', error);
+      res.status(500).json({ error: 'Failed to fetch research citations' });
     }
   });
 

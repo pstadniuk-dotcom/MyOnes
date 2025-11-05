@@ -24,6 +24,8 @@ export const fileTypeEnum = pgEnum('file_type', ['lab_report', 'medical_document
 export const auditActionEnum = pgEnum('audit_action', ['upload', 'view', 'download', 'delete', 'share', 'access_denied']);
 export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing']);
 export const notificationTypeEnum = pgEnum('notification_type', ['order_update', 'formula_update', 'consultation_reminder', 'system']);
+export const evidenceLevelEnum = pgEnum('evidence_level', ['strong', 'moderate', 'preliminary', 'limited']);
+export const studyTypeEnum = pgEnum('study_type', ['rct', 'meta_analysis', 'systematic_review', 'observational', 'case_study', 'review']);
 
 // Users table - updated with name, email, phone, password
 export const users = pgTable("users", {
@@ -557,6 +559,24 @@ export const helpArticles = pgTable("help_articles", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Research citations table - stores scientific evidence for ingredients
+export const researchCitations = pgTable("research_citations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ingredientName: text("ingredient_name").notNull(), // Name of supplement/formula
+  citationTitle: text("citation_title").notNull(), // Study title
+  journal: text("journal").notNull(), // Journal name (e.g., "JAMA Cardiology")
+  publicationYear: integer("publication_year").notNull(),
+  authors: text("authors"), // First author et al.
+  findings: text("findings").notNull(), // Key results in plain language
+  sampleSize: integer("sample_size"), // Number of participants
+  pubmedUrl: text("pubmed_url"), // Link to PubMed or study
+  evidenceLevel: evidenceLevelEnum("evidence_level").notNull(),
+  studyType: studyTypeEnum("study_type").notNull(),
+  isActive: boolean("is_active").default(true).notNull(), // For soft delete
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Insert schemas for support system
 export const insertFaqItemSchema = createInsertSchema(faqItems).omit({
   id: true,
@@ -603,3 +623,13 @@ export const insertNewsletterSubscriberSchema = createInsertSchema(newsletterSub
 
 export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSubscriberSchema>;
 export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;
+
+// Research citations schema
+export const insertResearchCitationSchema = createInsertSchema(researchCitations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertResearchCitation = z.infer<typeof insertResearchCitationSchema>;
+export type ResearchCitation = typeof researchCitations.$inferSelect;
