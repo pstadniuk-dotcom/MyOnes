@@ -6,6 +6,7 @@ import {
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
   notifications, notificationPrefs, auditLogs, userConsents, labAnalyses,
   faqItems, supportTickets, supportTicketResponses, helpArticles, newsletterSubscribers,
+  researchCitations,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -26,7 +27,8 @@ import {
   type SupportTicket, type InsertSupportTicket,
   type SupportTicketResponse, type InsertSupportTicketResponse,
   type HelpArticle, type InsertHelpArticle,
-  type NewsletterSubscriber, type InsertNewsletterSubscriber
+  type NewsletterSubscriber, type InsertNewsletterSubscriber,
+  type ResearchCitation, type InsertResearchCitation
 } from "@shared/schema";
 
 export interface IStorage {
@@ -168,6 +170,10 @@ export interface IStorage {
   getNewsletterSubscriberByEmail(email: string): Promise<NewsletterSubscriber | undefined>;
   createNewsletterSubscriber(subscriber: InsertNewsletterSubscriber): Promise<NewsletterSubscriber>;
   reactivateNewsletterSubscriber(email: string): Promise<boolean>;
+  
+  // Research citations operations
+  getResearchCitationsForIngredient(ingredientName: string): Promise<ResearchCitation[]>;
+  createResearchCitation(citation: InsertResearchCitation): Promise<ResearchCitation>;
 }
 
 export class DrizzleStorage implements IStorage {
@@ -1144,6 +1150,39 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error reactivating newsletter subscriber:', error);
       return false;
+    }
+  }
+
+  // Research citations operations
+  async getResearchCitationsForIngredient(ingredientName: string): Promise<ResearchCitation[]> {
+    try {
+      // Normalize ingredient name for case-insensitive matching
+      const normalizedName = ingredientName.trim();
+      const citations = await db
+        .select()
+        .from(researchCitations)
+        .where(and(
+          eq(researchCitations.ingredientName, normalizedName),
+          eq(researchCitations.isActive, true)
+        ))
+        .orderBy(desc(researchCitations.publicationYear));
+      return citations;
+    } catch (error) {
+      console.error('Error getting research citations:', error);
+      return [];
+    }
+  }
+
+  async createResearchCitation(citation: InsertResearchCitation): Promise<ResearchCitation> {
+    try {
+      const [newCitation] = await db
+        .insert(researchCitations)
+        .values(citation)
+        .returning();
+      return newCitation;
+    } catch (error) {
+      console.error('Error creating research citation:', error);
+      throw error;
     }
   }
 }
@@ -2565,6 +2604,27 @@ export class MemStorage implements IStorage {
     };
     this.newsletterSubscribers.set(subscriber.id, updated);
     return true;
+  }
+
+  // Research citations operations (stub for in-memory storage)
+  private researchCitations: Map<string, ResearchCitation> = new Map();
+
+  async getResearchCitationsForIngredient(ingredientName: string): Promise<ResearchCitation[]> {
+    return Array.from(this.researchCitations.values())
+      .filter(citation => citation.ingredientName === ingredientName && citation.isActive);
+  }
+
+  async createResearchCitation(citation: InsertResearchCitation): Promise<ResearchCitation> {
+    const id = randomUUID();
+    const newCitation: ResearchCitation = {
+      id,
+      ...citation,
+      isActive: citation.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.researchCitations.set(id, newCitation);
+    return newCitation;
   }
 }
 
