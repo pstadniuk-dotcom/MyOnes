@@ -2173,6 +2173,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const classification = classifyQuery(message, sessionContext);
       console.log(`🔀 MODEL ROUTING: Selected ${classification.model} - ${classification.reason}`);
       
+      // Check if using o1 model (needed for various config options)
+      const isO1Model = classification.model === 'o1-mini';
+      
       // Send model-specific thinking message
       sendSSE({ type: 'thinking', message: classification.thinkingMessage });
       
@@ -2226,7 +2229,6 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           }
           
           // Configure model-specific parameters
-          const isO1Model = classification.model === 'o1-mini';
           const modelConfig: any = {
             model: classification.model,
             messages: conversationHistory,
