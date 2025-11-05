@@ -70,12 +70,6 @@ export default function SettingsPage() {
     }
   }, [notificationPrefs]);
 
-  // Privacy settings state
-  const [privacy, setPrivacy] = useState({
-    dataSharing: false,
-    analyticsOptIn: true,
-    thirdPartyResearch: false,
-  });
 
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,13 +126,6 @@ export default function SettingsPage() {
     saveNotificationsMutation.mutate(notifications);
   };
 
-  const savePrivacySettings = () => {
-    toast({
-      title: 'Privacy settings saved',
-      description: 'Your privacy preferences have been updated.',
-    });
-  };
-
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
@@ -151,7 +138,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="account" data-testid="tab-account">
             <Lock className="w-4 h-4 mr-2" />
             Account
@@ -159,10 +146,6 @@ export default function SettingsPage() {
           <TabsTrigger value="notifications" data-testid="tab-notifications">
             <Bell className="w-4 h-4 mr-2" />
             Notifications
-          </TabsTrigger>
-          <TabsTrigger value="privacy" data-testid="tab-privacy">
-            <Shield className="w-4 h-4 mr-2" />
-            Privacy
           </TabsTrigger>
         </TabsList>
 
@@ -251,6 +234,25 @@ export default function SettingsPage() {
                   onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
                   data-testid="switch-dark-mode"
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Privacy & Security Notice */}
+          <Card data-testid="section-privacy">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5" />
+                Privacy & Security
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-muted/30 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Your health data is encrypted and stored securely. We never sell or share your personal 
+                  information with third parties. You can request to download or delete your data at 
+                  any time by contacting support.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -477,83 +479,6 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Privacy Tab */}
-        <TabsContent value="privacy" className="space-y-6">
-          <Card data-testid="section-privacy">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                Privacy & Data
-              </CardTitle>
-              <CardDescription>
-                Control how your data is used and shared
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Data Sharing</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Share anonymized health data to improve our AI
-                    </p>
-                  </div>
-                  <Switch
-                    checked={privacy.dataSharing}
-                    onCheckedChange={(checked) =>
-                      setPrivacy({ ...privacy, dataSharing: checked })
-                    }
-                    data-testid="switch-data-sharing"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Analytics</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Help us improve by collecting usage analytics
-                    </p>
-                  </div>
-                  <Switch
-                    checked={privacy.analyticsOptIn}
-                    onCheckedChange={(checked) =>
-                      setPrivacy({ ...privacy, analyticsOptIn: checked })
-                    }
-                    data-testid="switch-analytics"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Third-Party Research</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Allow anonymized data for health research studies
-                    </p>
-                  </div>
-                  <Switch
-                    checked={privacy.thirdPartyResearch}
-                    onCheckedChange={(checked) =>
-                      setPrivacy({ ...privacy, thirdPartyResearch: checked })
-                    }
-                    data-testid="switch-research"
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 bg-muted/30 rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  Your health data is encrypted and stored securely. We never sell your personal 
-                  information to third parties. You can request to download or delete your data at 
-                  any time by contacting support.
-                </p>
-              </div>
-
-              <Button onClick={savePrivacySettings} data-testid="button-save-privacy">
-                Save Privacy Settings
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
