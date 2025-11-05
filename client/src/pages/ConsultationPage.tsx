@@ -286,8 +286,7 @@ export default function ConsultationPage() {
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     initialInputRef.current = ''; // Clear voice input reference
-    setIsTyping(false);
-    setThinkingMessage('Analyzing your health data and researching personalized recommendations...');
+    setIsTyping(true);
     setUploadedFiles([]);
     
     const abortController = new AbortController();
@@ -370,7 +369,12 @@ export default function ConsultationPage() {
                   setIsConnected(true);
                   console.log('✅ SSE: Connected');
                 } else if (data.type === 'thinking') {
-                  // Thinking message already set before fetch - ignore SSE event
+                  // Update thinking status message
+                  console.log('🧠 SSE: Thinking status received:', data.message);
+                  console.log('🧠 Setting isTyping=false, thinkingMessage=', data.message);
+                  setIsTyping(false);
+                  setThinkingMessage(data.message);
+                  console.log('🧠 State updated');
                 } else if (data.type === 'chunk') {
                   // Clear thinking status when content starts arriving
                   setThinkingMessage(null);
