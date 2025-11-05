@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { Link } from 'wouter';
+import ThinkingIndicator from '@/components/ThinkingIndicator';
 
 interface Message {
   id: string;
@@ -98,6 +99,7 @@ export default function ConsultationPage() {
   // Input and interaction state
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [thinkingMessage, setThinkingMessage] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -365,7 +367,13 @@ export default function ConsultationPage() {
                 if (data.type === 'connected') {
                   connected = true;
                   setIsConnected(true);
+                } else if (data.type === 'thinking') {
+                  // Update thinking status message
+                  setThinkingMessage(data.message);
                 } else if (data.type === 'chunk') {
+                  // Clear thinking status when content starts arriving
+                  setThinkingMessage(null);
+                  
                   setMessages(prev => prev.map(msg => 
                     msg.id === aiMessageId 
                       ? { ...msg, content: msg.content + data.content }
@@ -386,6 +394,7 @@ export default function ConsultationPage() {
                   }]);
                 } else if (data.type === 'complete') {
                   completed = true;
+                  setThinkingMessage(null); // Clear thinking status
                   if (data.formula) {
                     setMessages(prev => prev.map(msg => 
                       msg.id === aiMessageId 
@@ -1285,8 +1294,15 @@ export default function ConsultationPage() {
             );
           })}
             
-            {/* Modern Typing Indicator */}
-            {isTyping && (
+            {/* Thinking Indicator with Status */}
+            {isTyping && thinkingMessage && (
+              <div className="flex justify-start max-w-[85%]" data-testid="indicator-thinking">
+                <ThinkingIndicator message={thinkingMessage} />
+              </div>
+            )}
+            
+            {/* Modern Typing Indicator (fallback when no thinking message) */}
+            {isTyping && !thinkingMessage && (
               <div className="flex justify-start" data-testid="indicator-typing">
                 <div className="bg-background/80 backdrop-blur-sm rounded-2xl rounded-tl-sm p-5 max-w-[85%] border shadow-md">
                   <div className="flex items-center space-x-4">
