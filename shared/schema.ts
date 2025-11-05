@@ -120,6 +120,7 @@ export const messages = pgTable("messages", {
   sessionId: varchar("session_id").notNull().references(() => chatSessions.id, { onDelete: "cascade" }),
   role: messageRoleEnum("role").notNull(),
   content: text("content").notNull(),
+  model: text("model"), // Track which AI model responded (gpt-4, gpt-5, etc.)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
