@@ -3,9 +3,8 @@ import {
   MessageSquare,
   FlaskConical,
   Package,
-  User,
   FileText,
-  Settings,
+  HelpCircle,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -19,42 +18,39 @@ import {
 } from '@/components/ui/sidebar';
 import { Link, useLocation } from 'wouter';
 
-// Simplified menu items for cleaner navigation
-const menuItems = [
+const healthJourneyItems = [
   {
-    title: 'Home',
+    title: 'Dashboard',
     url: '/dashboard',
     icon: Home,
   },
   {
-    title: 'Chat',
+    title: 'Consultation',
     url: '/dashboard/chat',
     icon: MessageSquare,
   },
   {
-    title: 'Formula',
+    title: 'Formulation',
     url: '/dashboard/formula',
     icon: FlaskConical,
   },
   {
-    title: 'Lab Reports',
+    title: 'Labs',
     url: '/dashboard/lab-reports',
     icon: FileText,
   },
-  {
-    title: 'Profile',
-    url: '/dashboard/profile',
-    icon: User,
-  },
+];
+
+const accountItems = [
   {
     title: 'Orders',
     url: '/dashboard/orders',
     icon: Package,
   },
   {
-    title: 'Settings',
-    url: '/dashboard/settings',
-    icon: Settings,
+    title: 'Support',
+    url: '/dashboard/support',
+    icon: HelpCircle,
   },
 ];
 
@@ -72,10 +68,32 @@ export function AppSidebar() {
     <Sidebar data-testid="sidebar-main">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Ones AI</SidebarGroupLabel>
+          <SidebarGroupLabel>Your Health Journey</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {healthJourneyItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    data-testid={`nav-${item.title.toLowerCase().replace(' ', '-')}`}
+                  >
+                    <Link href={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Account</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {accountItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
