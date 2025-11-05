@@ -1880,6 +1880,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('📤 Sending thinking status:', data.message);
         }
         res.write(`data: ${JSON.stringify(data)}\n\n`);
+        
+        // CRITICAL: Flush the response immediately to prevent buffering
+        // This ensures thinking indicators appear in real-time
+        if (typeof (res as any).flush === 'function') {
+          (res as any).flush();
+        }
       }
     };
     
