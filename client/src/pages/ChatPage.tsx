@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { Send, Upload, User, AlertTriangle, CheckCircle, Menu } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
+import ThinkingIndicator from '@/components/ThinkingIndicator';
 
 interface Message {
   id: string;
@@ -26,6 +27,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [thinkingMessage, setThinkingMessage] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
@@ -202,7 +204,13 @@ export default function ChatPage() {
                   connected = true;
                   setIsConnected(true);
                   console.log('Stream connected');
+                } else if (data.type === 'thinking') {
+                  // Update thinking status message
+                  setThinkingMessage(data.message);
                 } else if (data.type === 'chunk') {
+                  // Clear thinking status when content starts arriving
+                  setThinkingMessage(null);
+                  
                   // Update the current AI message with new content
                   setMessages(prev => prev.map(msg => 
                     msg.id === aiMessageId 
@@ -216,6 +224,7 @@ export default function ChatPage() {
                   }
                 } else if (data.type === 'complete') {
                   completed = true;
+                  setThinkingMessage(null); // Clear thinking status
                   // Add formula data if extracted
                   if (data.formula) {
                     setMessages(prev => prev.map(msg => 
@@ -452,7 +461,13 @@ export default function ChatPage() {
           </div>
         ))}
         
-        {isTyping && (
+        {isTyping && thinkingMessage && (
+          <div className="flex justify-start max-w-[80%]" data-testid="indicator-thinking">
+            <ThinkingIndicator message={thinkingMessage} />
+          </div>
+        )}
+        
+        {isTyping && !thinkingMessage && (
           <div className="flex justify-start" data-testid="indicator-typing">
             <div className="bg-muted rounded-lg p-4 max-w-[80%] border">
               <div className="flex items-center space-x-3">
