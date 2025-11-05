@@ -1,9 +1,9 @@
 import OpenAI from 'openai';
-import * as pdfParseModule from 'pdf-parse';
+import { createRequire } from 'module';
 import { ObjectStorageService } from './objectStorage';
 
-// Handle both CommonJS and ESM exports
-const pdfParse = (pdfParseModule as any).default || pdfParseModule;
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
