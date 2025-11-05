@@ -9,8 +9,8 @@ export default function HeroSection() {
 
   useEffect(() => {
     const handleScroll = () => {
-      // Hide scroll indicator once user scrolls past 80vh
-      setShowScrollIndicator(window.scrollY < window.innerHeight * 0.8);
+      // Hide scroll indicator almost immediately when scrolling starts
+      setShowScrollIndicator(window.scrollY < 100);
     };
 
     window.addEventListener('scroll', handleScroll);
