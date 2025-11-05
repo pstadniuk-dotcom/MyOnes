@@ -1,3 +1,5 @@
+import { BASE_FORMULAS, INDIVIDUAL_INGREDIENTS } from "@shared/ingredients";
+
 // Define types directly to avoid circular dependencies
 export interface HealthProfile {
   id: string;
@@ -116,19 +118,18 @@ You have access to real-time web search to cite current medical research. Always
 
 **YOU CAN ONLY RECOMMEND INGREDIENTS FROM THIS APPROVED CATALOG:**
 
-**Base Formulas (32 available):**
-Heart Support, Metabolic Health, Inflammation Control, Liver Support, Brain Health, Bone & Joint, Immune Boost, Energy & Vitality, Sleep Support, Stress Relief, Digestive Health, Antioxidant Defense, Vision Support, Skin Health, Thyroid Support, Adrenal Support, Detox Support, Blood Sugar Balance, Cardiovascular Health, Men's Health, Women's Health, Prenatal Support, Senior Vitality, Athletic Performance, Mood Support, Focus & Clarity, Gut Microbiome, Hormone Balance, Kidney Support, Respiratory Health, Nerve Support, Weight Management
+**Base Formulas (${BASE_FORMULAS.length} available):**
+${BASE_FORMULAS.map(f => `${f.name} (${f.doseMg}mg)`).join(', ')}
 
-**Individual Ingredients (29 available):**
-Vitamin A, Vitamin B-Complex, Vitamin B12, Vitamin C, Vitamin D3, Vitamin E, Vitamin K2, Calcium, Iron, Magnesium, Zinc, Selenium, Copper, Chromium, Iodine, Omega-3 (Fish Oil), CoQ10 (Coenzyme Q10), Probiotics, Glucosamine, Curcumin (Turmeric), Ashwagandha, Rhodiola, L-Theanine, 5-HTP, Melatonin, Alpha-Lipoic Acid (ALA), N-Acetyl Cysteine (NAC), Ginko Biloba, Phosphatidylcholine
+**Individual Ingredients (${INDIVIDUAL_INGREDIENTS.length} available):**
+${INDIVIDUAL_INGREDIENTS.map(i => `${i.name} (${i.doseMg}mg)`).join(', ')}
 
 **STRICT ENFORCEMENT:**
-- ❌ NEVER make up formula names like "Brain Support", "Cognitive Support", etc.
-- ❌ NEVER add unapproved ingredients - only use exact names from lists above
+- ❌ NEVER make up formula names - only use EXACT names from the lists above
+- ❌ NEVER add unapproved ingredients - every ingredient MUST be from the approved catalog
 - ✅ User's current supplements are REFERENCE ONLY - do NOT include them in formulas
-- ✅ For brain/cognitive needs, use individual ingredients (Ginko Biloba, Phosphatidylcholine, Omega-3)
 - ✅ Always validate every ingredient against the approved catalog before creating formula
-- ✅ If user requests unavailable ingredient, explain it's not in our catalog and suggest alternatives
+- ✅ If user requests unavailable ingredient, explain it's not in our catalog and suggest alternatives from the approved list
 
 === 💊 FORMULA CREATION SYSTEM ===
 
@@ -142,24 +143,31 @@ Vitamin A, Vitamin B-Complex, Vitamin B12, Vitamin C, Vitamin D3, Vitamin E, Vit
 \`\`\`json
 {
   "bases": [
-    {"name": "Heart Support", "dose": "450mg", "purpose": "Supports cardiovascular function"}
+    {"ingredient": "Heart Support", "amount": 450, "unit": "mg", "purpose": "Supports cardiovascular function"}
   ],
   "additions": [
-    {"name": "Omega-3 (Fish Oil)", "dose": "1000mg", "purpose": "Anti-inflammatory and heart health"},
-    {"name": "CoQ10 (Coenzyme Q10)", "dose": "200mg", "purpose": "Cellular energy production"}
+    {"ingredient": "Omega 3 (algae omega)", "amount": 300, "unit": "mg", "purpose": "Anti-inflammatory and heart health"},
+    {"ingredient": "CoEnzyme Q10", "amount": 200, "unit": "mg", "purpose": "Cellular energy production"}
   ],
-  "totalMg": 1650,
+  "totalMg": 950,
   "warnings": ["Consult doctor if on blood thinners"],
   "rationale": "Based on your cardiovascular needs and lab results...",
   "disclaimers": ["Not FDA evaluated", "Consult healthcare provider"]
 }
 \`\`\`
 
+**CRITICAL FIELD REQUIREMENTS:**
+- Use "ingredient" (NOT "name") for ingredient names
+- Use "amount" as a NUMBER (e.g., 450, not "450mg")
+- Use "unit" as a STRING (always "mg")
+- Use EXACT ingredient names from the approved catalog above
+
 **FORMULA VALIDATION CHECKLIST (Check EVERY time before sending):**
+✓ Did I use "ingredient", "amount", "unit" fields (NOT "name", "dose")?
 ✓ Did I use ONLY approved base formula names from the list?
 ✓ Did I use ONLY approved individual ingredient names?
 ✓ Is total dosage ≤ 5500mg?
-✓ Are all doses multiples of 50mg?
+✓ Are all amounts multiples of 50?
 ✓ Did I include rationale and warnings?
 
 If NO to any question, STOP and FIX before sending. The formula will be LOST otherwise.`;
@@ -198,13 +206,13 @@ If NO to any question, STOP and FIX before sending. The formula will be LOST oth
   if (context.activeFormula) {
     const formula = context.activeFormula;
     prompt += `\n\n=== 💊 CURRENT ACTIVE FORMULA ===\n\n`;
-    prompt += `Version: ${formula.version}\n`;
-    prompt += `Total Dosage: ${formula.totalDoseMg}mg\n\n`;
+    prompt += `Version: ${formula.version || 1}\n`;
+    prompt += `Total Dosage: ${formula.totalMg}mg\n\n`;
     
     if (formula.bases && formula.bases.length > 0) {
       prompt += `Base Formulas:\n`;
-      formula.bases.forEach((base: any) => {
-        prompt += `- ${base.name} - ${base.dose}`;
+      formula.bases.forEach((base) => {
+        prompt += `- ${base.ingredient} - ${base.amount}${base.unit}`;
         if (base.purpose) prompt += ` (${base.purpose})`;
         prompt += `\n`;
       });
@@ -212,8 +220,8 @@ If NO to any question, STOP and FIX before sending. The formula will be LOST oth
     
     if (formula.additions && formula.additions.length > 0) {
       prompt += `\nAdditional Ingredients:\n`;
-      formula.additions.forEach((add: any) => {
-        prompt += `- ${add.name} - ${add.dose}`;
+      formula.additions.forEach((add) => {
+        prompt += `- ${add.ingredient} - ${add.amount}${add.unit}`;
         if (add.purpose) prompt += ` (${add.purpose})`;
         prompt += `\n`;
       });

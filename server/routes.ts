@@ -109,75 +109,10 @@ function isIngredientApproved(ingredientName: string, approvedSet: Set<string>):
   return false;
 }
 
-// Canonical dose mapping for all supplement bases and additions
-// APPROVED BASE FORMULAS (32 total) - Exact doses from catalog
-const APPROVED_BASE_FORMULAS = new Set([
-  'Adrenal Support',
-  'Alpha Gest III',
-  'Alpha Green II',
-  'Alpha Oxyme',
-  'Alpha Zyme III',
-  'Beta Max',
-  'Br-SP Plus',
-  'C Boost',
-  'Circu Plus',
-  'Colostrum Powder',
-  'Chola Plus',
-  'Dia Zyme',
-  'Diadren Forte',
-  'Endocrine Support',
-  'Heart Support',
-  'Histamine Support',
-  'Immune-C',
-  'Intestinal Formula',
-  'Ligament Support',
-  'LSK Plus',
-  'Liver Support',
-  'Lung Support',
-  'MG/K',
-  'Mold RX',
-  'Spleen Support',
-  'Ovary Uterus Support',
-  'Para X',
-  'Para Thy',
-  'Pitui Plus',
-  'Prostate Support',
-  'Kidney & Bladder Support',
-  'Thyroid Support'
-]);
-
-// APPROVED INDIVIDUAL INGREDIENTS (29 total) - Exact names from catalog
-const APPROVED_INDIVIDUAL_INGREDIENTS = new Set([
-  'Aloe Vera Powder',
-  'Ahswaganda',
-  'Astragalus',
-  'Black Currant Extract',
-  'Broccoli Powder',
-  'Camu Camu',
-  'Cape Aloe',
-  'Cats Claw',
-  'Chaga',
-  'Cinnamon 20:1',
-  'CoEnzyme Q10',
-  'Gaba',
-  'Garlic (powder)',
-  'Ginger Root',
-  'Ginko Biloba Extract 24%',
-  'Graviola',
-  'Hawthorn Berry PE 1/8% Flavones',
-  'Lutein',
-  'Maca Root .6%',
-  'Magnesium',
-  'Omega 3 (algae omega)',
-  'Phosphatidylcholine 40% (soy)',
-  'Resveratrol',
-  'Saw Palmetto Extract 45% Fatty Acid (GC)',
-  'Stinging Nettle',
-  'Sumar Root',
-  'Turmeric Root Extract 4:1',
-  'Vitamin C',
-  'Vitamin E (Mixed tocopherols)'
-]);
+// SINGLE SOURCE OF TRUTH: Use shared ingredient catalog for validation
+// This ensures prompts and validation are always in sync
+const APPROVED_BASE_FORMULAS = new Set(BASE_FORMULAS.map(f => f.name));
+const APPROVED_INDIVIDUAL_INGREDIENTS = new Set(INDIVIDUAL_INGREDIENTS.map(i => i.name));
 
 // Combined set of ALL approved ingredients (bases + individuals) for category-agnostic validation
 const ALL_APPROVED_INGREDIENTS = new Set([
@@ -190,72 +125,10 @@ function isAnyIngredientApproved(ingredientName: string): boolean {
   return isIngredientApproved(ingredientName, ALL_APPROVED_INGREDIENTS);
 }
 
-const CANONICAL_DOSES_MG = {
-  // APPROVED BASE FORMULAS (32 total) - Exact doses from catalog
-  'Adrenal Support': 420,
-  'Alpha Gest III': 636,
-  'Alpha Green II': 400,
-  'Alpha Oxyme': 350,
-  'Alpha Zyme III': 400,
-  'Beta Max': 2500,
-  'Br-SP Plus': 400,
-  'C Boost': 1680,
-  'Circu Plus': 540,
-  'Colostrum Powder': 1000,
-  'Chola Plus': 350,
-  'Dia Zyme': 494,
-  'Diadren Forte': 400,
-  'Endocrine Support': 350,
-  'Heart Support': 450,
-  'Histamine Support': 190,
-  'Immune-C': 430,
-  'Intestinal Formula': 400,
-  'Ligament Support': 400,
-  'LSK Plus': 450,
-  'Liver Support': 480,
-  'Lung Support': 250,
-  'MG/K': 500,
-  'Mold RX': 525,
-  'Spleen Support': 400,
-  'Ovary Uterus Support': 300,
-  'Para X': 500,
-  'Para Thy': 335,
-  'Pitui Plus': 495,
-  'Prostate Support': 300,
-  'Kidney & Bladder Support': 400,
-  'Thyroid Support': 470,
-  
-  // APPROVED INDIVIDUAL INGREDIENTS (29 total) - Exact names from catalog
-  'Aloe Vera Powder': 250,
-  'Ahswaganda': 600,
-  'Astragalus': 300,
-  'Black Currant Extract': 300,
-  'Broccoli Powder': 300,
-  'Camu Camu': 300,
-  'Cape Aloe': 300,
-  'Cats Claw': 30,
-  'Chaga': 300,
-  'Cinnamon 20:1': 1000,
-  'CoEnzyme Q10': 200,
-  'Gaba': 300,
-  'Garlic (powder)': 200,
-  'Ginger Root': 500,
-  'Ginko Biloba Extract 24%': 100,
-  'Graviola': 300,
-  'Hawthorn Berry PE 1/8% Flavones': 300,
-  'Lutein': 10,
-  'Maca Root .6%': 300,
-  'Magnesium': 320,
-  'Omega 3 (algae omega)': 300,
-  'Phosphatidylcholine 40% (soy)': 300,
-  'Resveratrol': 300,
-  'Saw Palmetto Extract 45% Fatty Acid (GC)': 300,
-  'Stinging Nettle': 300,
-  'Sumar Root': 300,
-  'Turmeric Root Extract 4:1': 500,
-  'Vitamin C': 90,
-  'Vitamin E (Mixed tocopherols)': 15
-};
+// SINGLE SOURCE OF TRUTH: Build canonical doses from shared ingredient catalog
+const CANONICAL_DOSES_MG = Object.fromEntries(
+  [...BASE_FORMULAS, ...INDIVIDUAL_INGREDIENTS].map(ing => [ing.name, ing.doseMg])
+);
 
 // Dose parsing utility that converts string doses to numeric mg
 function parseDoseToMg(doseString: string, ingredientName: string): number {
@@ -308,14 +181,15 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
   } else {
     for (const base of formula.bases) {
       // Use category-agnostic validation - checks against ALL approved ingredients
-      if (!isAnyIngredientApproved(base.name)) {
-        errors.push(`UNAUTHORIZED INGREDIENT: "${base.name}" is not in the approved catalog. Formula REJECTED.`);
+      if (!isAnyIngredientApproved(base.ingredient)) {
+        errors.push(`UNAUTHORIZED INGREDIENT: "${base.ingredient}" is not in the approved catalog. Formula REJECTED.`);
         continue;
       }
       
-      const mgAmount = parseDoseToMg(base.dose, base.name);
+      const doseString = `${base.amount}${base.unit}`;
+      const mgAmount = parseDoseToMg(doseString, base.ingredient);
       if (mgAmount === 0) {
-        errors.push(`Cannot determine mg amount for base: ${base.name} with dose: ${base.dose}`);
+        errors.push(`Cannot determine mg amount for base: ${base.ingredient} with dose: ${doseString}`);
       }
       calculatedTotal += mgAmount;
     }
@@ -325,14 +199,15 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
   if (formula.additions) {
     for (const addition of formula.additions) {
       // Use category-agnostic validation - checks against ALL approved ingredients
-      if (!isAnyIngredientApproved(addition.name)) {
-        errors.push(`UNAUTHORIZED INGREDIENT: "${addition.name}" is not in the approved catalog. Formula REJECTED.`);
+      if (!isAnyIngredientApproved(addition.ingredient)) {
+        errors.push(`UNAUTHORIZED INGREDIENT: "${addition.ingredient}" is not in the approved catalog. Formula REJECTED.`);
         continue;
       }
       
-      const mgAmount = parseDoseToMg(addition.dose, addition.name);
+      const doseString = `${addition.amount}${addition.unit}`;
+      const mgAmount = parseDoseToMg(doseString, addition.ingredient);
       if (mgAmount === 0) {
-        errors.push(`Cannot determine mg amount for addition: ${addition.name} with dose: ${addition.dose}`);
+        errors.push(`Cannot determine mg amount for addition: ${addition.ingredient} with dose: ${doseString}`);
       }
       calculatedTotal += mgAmount;
     }
@@ -374,8 +249,8 @@ async function validateSupplementInteractions(formula: any, medications: string[
   
   // Get all ingredients from formula
   const allIngredients = [
-    ...formula.bases.map((b: any) => b.name),
-    ...formula.additions.map((a: any) => a.name)
+    ...formula.bases.map((b: any) => b.ingredient),
+    ...formula.additions.map((a: any) => a.ingredient)
   ];
   
   // Check for general supplement warnings regardless of medications
@@ -615,13 +490,15 @@ async function checkKnownInteractions(supplement: string, medication: string): P
 // Schema for formula extraction
 const FormulaExtractionSchema = z.object({
   bases: z.array(z.object({
-    name: z.string(),
-    dose: z.string(),
+    ingredient: z.string(),
+    amount: z.number(),
+    unit: z.string(),
     purpose: z.string()
   })),
   additions: z.array(z.object({
-    name: z.string(),
-    dose: z.string(),
+    ingredient: z.string(),
+    amount: z.number(),
+    unit: z.string(),
     purpose: z.string()
   })),
   totalMg: z.number(),
