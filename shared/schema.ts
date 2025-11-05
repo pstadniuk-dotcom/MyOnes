@@ -41,6 +41,9 @@ export const users = pgTable("users", {
   postalCode: text("postal_code"),
   country: text("country").default('US'),
   
+  // Timezone for scheduling reminders (e.g., 'America/New_York', 'America/Los_Angeles')
+  timezone: text("timezone").default('America/New_York'),
+  
   // Email notification preferences
   emailConsultation: boolean("email_consultation").default(true).notNull(),
   emailShipping: boolean("email_shipping").default(true).notNull(),

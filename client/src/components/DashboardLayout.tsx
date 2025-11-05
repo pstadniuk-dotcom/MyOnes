@@ -30,6 +30,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'wouter';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
+import { useTimezoneSync } from '@/hooks/use-timezone';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -171,6 +172,9 @@ function UserDropdown() {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
+  // Auto-sync user's timezone for SMS reminder scheduling
+  useTimezoneSync();
+
   // Custom sidebar width for dashboard
   const style = {
     "--sidebar-width": "18rem",       // 288px for better content

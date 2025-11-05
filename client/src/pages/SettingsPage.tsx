@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Lock, Bell, Shield, Moon, Sun, Clock, Pill } from 'lucide-react';
+import { Lock, Bell, Shield, Moon, Sun, Clock, Pill, Globe } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { getCurrentTimezone } from '@/hooks/use-timezone';
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -395,6 +396,13 @@ export default function SettingsPage() {
 
                       {notifications.dailyRemindersEnabled && (
                         <div className="ml-6 space-y-4 pl-4 border-l-2 border-primary/20">
+                          <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
+                            <Globe className="w-4 h-4 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">
+                              <strong>Your timezone:</strong> {getCurrentTimezone()} - Reminders will be sent at your local time
+                            </p>
+                          </div>
+                          
                           <p className="text-sm text-muted-foreground">
                             Set your preferred reminder times. You'll receive AI-powered health tips with each reminder!
                           </p>
