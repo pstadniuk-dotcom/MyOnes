@@ -2301,9 +2301,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             reasoning_effort: 'medium' as any // Balance between speed and accuracy for health recommendations
           });
           
-          // Set timeout for OpenAI request
+          // Set timeout for OpenAI request (3 minutes for GPT-5 with large prompts)
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('OpenAI request timeout')), 60000); // 60 second timeout
+            setTimeout(() => reject(new Error('OpenAI request timeout')), 180000); // 180 second (3 minute) timeout for GPT-5
           });
           
           stream = await Promise.race([streamPromise, timeoutPromise]);
