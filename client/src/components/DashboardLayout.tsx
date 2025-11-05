@@ -20,11 +20,8 @@ import {
   User, 
   Settings, 
   LogOut, 
-  Heart, 
-  CreditCard, 
   Bell, 
-  HelpCircle,
-  Activity 
+  Shield
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'wouter';
@@ -105,14 +102,6 @@ function UserDropdown() {
                 <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs" data-testid="badge-plan">
-                Free Plan
-              </Badge>
-              <Badge variant="outline" className="text-xs" data-testid="badge-status">
-                Active
-              </Badge>
-            </div>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -120,19 +109,7 @@ function UserDropdown() {
           <DropdownMenuItem asChild>
             <Link href="/dashboard/profile" data-testid="link-profile-settings">
               <User className="mr-2 h-4 w-4" />
-              <span>Profile Settings</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/dashboard/settings" data-testid="link-account-center">
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Account Settings</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile?tab=health" data-testid="link-health-profile">
-              <Heart className="mr-2 h-4 w-4" />
-              <span>Health Profile</span>
+              <span>Profile & Settings</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
@@ -141,19 +118,10 @@ function UserDropdown() {
               <span>Notifications</span>
             </Link>
           </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/orders?tab=billing" data-testid="link-billing">
-              <CreditCard className="mr-2 h-4 w-4" />
-              <span>Billing & Subscription</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/dashboard/support" data-testid="link-support">
-              <HelpCircle className="mr-2 h-4 w-4" />
-              <span>Help & Support</span>
+            <Link href="/dashboard/settings?tab=privacy" data-testid="link-privacy">
+              <Shield className="mr-2 h-4 w-4" />
+              <span>Privacy</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
@@ -164,7 +132,7 @@ function UserDropdown() {
           data-testid="button-logout"
         >
           <LogOut className="mr-2 h-4 w-4" />
-          <span>Log out</span>
+          <span>Sign Out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
