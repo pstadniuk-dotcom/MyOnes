@@ -1761,6 +1761,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        addressLine1: user.addressLine1,
+        addressLine2: user.addressLine2,
+        city: user.city,
+        state: user.state,
+        postalCode: user.postalCode,
+        country: user.country,
         createdAt: user.createdAt.toISOString()
       };
 
