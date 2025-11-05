@@ -2201,8 +2201,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         console.log('📤 Lab data in prompt?', fullSystemPrompt.includes('LABORATORY TEST RESULTS'));
       }
       
-      const conversationHistory: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
-        { role: 'system', content: fullSystemPrompt },
+      // o1 models use 'developer' role instead of 'system'
+      const systemRole = isO1Model ? 'developer' : 'system';
+      
+      const conversationHistory: Array<{role: 'system' | 'developer' | 'user' | 'assistant', content: string}> = [
+        { role: systemRole as any, content: fullSystemPrompt },
         ...previousMessages.slice(classification.model === 'o1-mini' ? -10 : -5).map(msg => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content
