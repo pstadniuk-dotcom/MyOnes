@@ -206,6 +206,7 @@ export default function ChatPage() {
                   console.log('Stream connected');
                 } else if (data.type === 'thinking') {
                   // Update thinking status message
+                  setIsTyping(false);
                   setThinkingMessage(data.message);
                 } else if (data.type === 'chunk') {
                   // Clear thinking status when content starts arriving
