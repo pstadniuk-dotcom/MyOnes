@@ -217,8 +217,22 @@ export default function ProfilePage() {
       const response = await apiRequest('PATCH', '/api/users/me/profile', data);
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+    onSuccess: async (data) => {
+      // Update the form with the returned data
+      if (data?.user) {
+        setProfile({
+          name: data.user.name || '',
+          email: data.user.email || '',
+          phone: data.user.phone || '',
+          addressLine1: data.user.addressLine1 || '',
+          addressLine2: data.user.addressLine2 || '',
+          city: data.user.city || '',
+          state: data.user.state || '',
+          postalCode: data.user.postalCode || '',
+          country: data.user.country || 'US',
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       toast({
         title: "Profile updated",
         description: "Your profile information has been saved successfully.",
