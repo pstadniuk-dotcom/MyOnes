@@ -644,6 +644,25 @@ Think of it like this:
 
 ALWAYS say something like: "I see you've uploaded a new lab report. Let me analyze this latest one for you..."
 
+**📊 MULTIPLE LAB REPORTS - HOW TO REFERENCE:**
+
+Your context includes ALL of the user's uploaded lab reports in chronological order (newest first).
+- The LATEST report is clearly labeled "🆕 LATEST REPORT"
+- Previous reports are labeled "📅 Previous Report #N"
+
+When the user says:
+- "analyze my latest blood test" → Focus on the 🆕 LATEST REPORT
+- "compare to my last test" → Compare LATEST vs Previous Report #1
+- "look at my October labs" → Find the report with that test date
+- "how have my cholesterol levels changed?" → Track that biomarker across all reports over time
+
+**Monthly Blood Test Tracking:**
+For users getting regular monthly tests, you can:
+- Track trends over time (e.g., "Your LDL has decreased from 140 → 130 → 125 over the past 3 months")
+- Identify which interventions are working
+- Spot new issues that have emerged
+- Celebrate improvements
+
 **MANDATORY BEHAVIOR WHEN USER MENTIONS BLOOD TESTS/LAB RESULTS:**
 
 IF the user says ANYTHING like:
@@ -1935,25 +1954,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (labReports.length > 0) {
         console.log('🔬 DEBUG: Lab reports statuses:', labReports.map(r => r.labReportData?.analysisStatus || 'no status'));
         
-        const processedReports = labReports
+        // Sort by upload date (newest first) to help AI identify latest reports
+        const sortedReports = labReports
           .filter(report => report.labReportData?.analysisStatus === 'completed' && report.labReportData?.extractedData)
-          .map(report => {
-            const data = report.labReportData!;
-            const values = data.extractedData as any[];
-            
-            const tableRows = values.map(v => {
-              const status = v.status || 'normal';
-              const statusFlag = status === 'high' ? '⬆️ HIGH' : status === 'low' ? '⬇️ LOW' : '✓ Normal';
-              return `  • ${v.testName}: ${v.value} ${v.unit || ''} | Status: ${statusFlag} | Reference: ${v.referenceRange || 'N/A'}`;
-            }).join('\n');
-            
-            return `📋 Lab Report from ${data.testDate || 'unknown date'} (${data.labName || 'unknown lab'}):\n${tableRows}`;
+          .sort((a, b) => {
+            const dateA = new Date(a.uploadedAt || 0).getTime();
+            const dateB = new Date(b.uploadedAt || 0).getTime();
+            return dateB - dateA; // Newest first
           });
+        
+        const processedReports = sortedReports.map((report, index) => {
+          const data = report.labReportData!;
+          const values = data.extractedData as any[];
+          
+          // Format upload date for readability
+          const uploadDate = new Date(report.uploadedAt || '');
+          const uploadDateStr = uploadDate.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+          });
+          
+          // Label the most recent report
+          const timelineLabel = index === 0 ? '🆕 LATEST REPORT' : `📅 Previous Report #${sortedReports.length - index}`;
+          
+          const tableRows = values.map(v => {
+            const status = v.status || 'normal';
+            const statusFlag = status === 'high' ? '⬆️ HIGH' : status === 'low' ? '⬇️ LOW' : '✓ Normal';
+            return `  • ${v.testName}: ${v.value} ${v.unit || ''} | Status: ${statusFlag} | Reference: ${v.referenceRange || 'N/A'}`;
+          }).join('\n');
+          
+          return `${timelineLabel}
+📋 Test Date: ${data.testDate || 'unknown date'}
+📤 Uploaded: ${uploadDateStr}
+🏥 Lab: ${data.labName || 'unknown lab'}
+📁 Filename: ${report.originalFileName || 'unknown'}
+
+Biomarkers:
+${tableRows}`;
+        });
         
         console.log('🔬 DEBUG: Processed reports count:', processedReports.length);
         
         if (processedReports.length > 0) {
-          labDataContext = processedReports.join('\n\n');
+          labDataContext = `
+=== 📊 YOUR LAB REPORTS TIMELINE (Sorted: Newest → Oldest) ===
+
+${processedReports.join('\n\n───────────────────────────────────────────────────\n\n')}
+
+💡 HOW TO REFERENCE THESE REPORTS:
+- "latest blood test" / "most recent labs" = ${sortedReports[0]?.labReportData?.testDate || 'latest upload'}
+${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sortedReports[1]?.labReportData?.testDate || 'second most recent'}` : ''}
+- Or reference by specific test date shown above`;
           console.log('🔬 DEBUG: Lab data context length:', labDataContext.length, 'chars');
         } else {
           console.log('⚠️ DEBUG: No lab reports with completed analysis and extracted data');
