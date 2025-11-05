@@ -16,7 +16,7 @@ import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDI
 import { sendNotificationEmail } from "./emailService";
 import { sendNotificationSms } from "./smsService";
 import type { User, Notification, NotificationPref } from "@shared/schema";
-import { classifyQuery, type SessionContext } from "./model-router";
+// Removed hybrid routing - now using GPT-4o only
 import { buildGPT4Prompt, buildO1MiniPrompt, type PromptContext } from "./prompt-builder";
 
 // Extend Express Request interface to include userId property
@@ -2162,54 +2162,28 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         messageWithFileContext = `[User has attached files: ${fileDescriptions}] ${message}`;
       }
 
-      // HYBRID MODEL ROUTING: Classify query to determine which model to use
-      const sessionContext: SessionContext = {
-        hasLabReports: labReports.length > 0,
-        hasActiveFormula: !!activeFormula,
-        messageCount: previousMessages.length,
-        recentMessages: previousMessages.slice(-5)
+      // Use GPT-4o for all requests - fast and reliable
+      const model = 'gpt-4o';
+      console.log(`🤖 Using model: ${model}`);
+      
+      // Send thinking message
+      sendSSE({ type: 'thinking', message: 'Analyzing your health data...' });
+      
+      // Build comprehensive prompt with all context
+      const promptContext: PromptContext = {
+        healthProfile: healthProfile || undefined,
+        activeFormula: activeFormula || undefined,
+        labDataContext: labDataContext || undefined,
+        recentMessages: previousMessages
       };
+      const fullSystemPrompt = buildO1MiniPrompt(promptContext) + healthContextMessage;
+      console.log('📤 Prompt length:', fullSystemPrompt.length, 'chars');
+      console.log('📤 Current formula in prompt?', fullSystemPrompt.includes('CURRENT ACTIVE FORMULA'));
+      console.log('📤 Lab data in prompt?', fullSystemPrompt.includes('LABORATORY TEST RESULTS'));
       
-      const classification = classifyQuery(message, sessionContext);
-      console.log(`🔀 MODEL ROUTING: Selected ${classification.model} - ${classification.reason}`);
-      
-      // Check if using o1 model (needed for various config options)
-      const isO1Model = classification.model === 'o1-mini';
-      
-      // Send model-specific thinking message
-      sendSSE({ type: 'thinking', message: classification.thinkingMessage });
-      
-      // Build prompt based on model
-      let fullSystemPrompt: string;
-      
-      if (classification.model === 'gpt-4' || classification.model === 'gpt-4o') {
-        // Lightweight prompt for simple questions
-        const promptContext: PromptContext = {
-          healthProfile: healthProfile || undefined,
-          recentMessages: previousMessages.slice(-5)
-        };
-        fullSystemPrompt = buildGPT4Prompt(promptContext);
-        console.log('📤 GPT-4 Prompt length:', fullSystemPrompt.length, 'chars');
-      } else {
-        // Comprehensive o1-mini prompt for complex consultations
-        const promptContext: PromptContext = {
-          healthProfile: healthProfile || undefined,
-          activeFormula: activeFormula || undefined,
-          labDataContext: labDataContext || undefined,
-          recentMessages: previousMessages
-        };
-        fullSystemPrompt = buildO1MiniPrompt(promptContext) + healthContextMessage;
-        console.log('📤 o1-mini Prompt length:', fullSystemPrompt.length, 'chars');
-        console.log('📤 Current formula in prompt?', fullSystemPrompt.includes('CURRENT ACTIVE FORMULA'));
-        console.log('📤 Lab data in prompt?', fullSystemPrompt.includes('LABORATORY TEST RESULTS'));
-      }
-      
-      // o1 models use 'developer' role instead of 'system'
-      const systemRole = isO1Model ? 'developer' : 'system';
-      
-      const conversationHistory: Array<{role: 'system' | 'developer' | 'user' | 'assistant', content: string}> = [
-        { role: systemRole as any, content: fullSystemPrompt },
-        ...previousMessages.slice(classification.model === 'o1-mini' ? -10 : -5).map(msg => ({
+      const conversationHistory: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
+        { role: 'system', content: fullSystemPrompt },
+        ...previousMessages.slice(-10).map(msg => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content
         })),
@@ -2228,22 +2202,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             throw new Error('OpenAI API key not configured');
           }
           
-          // Configure model-specific parameters
+          // Configure GPT-4o parameters
           const modelConfig: any = {
-            model: classification.model,
+            model: model,
             messages: conversationHistory,
-            stream: true
+            stream: true,
+            max_tokens: 3000,
+            temperature: 0.7
           };
-          
-          // o1-mini specific config
-          if (isO1Model) {
-            modelConfig.max_completion_tokens = 4000;
-            modelConfig.reasoning_effort = 'medium';
-          } else {
-            // GPT-4/4o config
-            modelConfig.max_tokens = 2000;
-            modelConfig.temperature = 0.7;
-          }
           
           const streamPromise = openai.chat.completions.create(modelConfig);
           
@@ -2386,7 +2352,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                 sessionId: chatSession.id,
                 role: 'assistant',
                 content: fullResponse,
-                model: classification.model
+                model: model
               });
             }
             
@@ -2620,7 +2586,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             sessionId: chatSession.id,
             role: 'assistant',
             content: fullResponse,
-            model: classification.model
+            model: model
           });
         } catch (messageError) {
           console.error('Error saving messages:', messageError);
