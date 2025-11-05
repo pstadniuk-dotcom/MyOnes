@@ -367,8 +367,10 @@ export default function ConsultationPage() {
                 if (data.type === 'connected') {
                   connected = true;
                   setIsConnected(true);
+                  console.log('✅ SSE: Connected');
                 } else if (data.type === 'thinking') {
                   // Update thinking status message
+                  console.log('🧠 SSE: Thinking status received:', data.message);
                   setThinkingMessage(data.message);
                 } else if (data.type === 'chunk') {
                   // Clear thinking status when content starts arriving
