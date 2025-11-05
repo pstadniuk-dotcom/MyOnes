@@ -2363,8 +2363,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               chunkIndex: chunkCount
             });
             
-            // Prevent infinite streams
-            if (chunkCount > 1000) {
+            // Prevent infinite streams (increased for GPT-5's longer, more detailed responses)
+            if (chunkCount > 3000) {
               console.warn('Stream exceeded chunk limit, terminating');
               break;
             }
@@ -2630,6 +2630,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           // Don't throw - just log the error and continue without saving invalid formula
         }
       }
+      
+      // CRITICAL: Strip ALL remaining code blocks from response before showing to user
+      // This ensures customer never sees any technical/code content (```anything```)
+      // We've already extracted formula JSON and health-data, so anything left is unwanted
+      fullResponse = fullResponse.replace(/```[\s\S]*?```/g, '').trim();
+      
+      // Also clean up any stray code markers that might remain
+      fullResponse = fullResponse.replace(/`{1,3}/g, '').trim();
       
       // Send health data update notification if applicable
       if (healthDataUpdated) {
