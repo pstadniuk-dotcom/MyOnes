@@ -2251,7 +2251,6 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             messages: conversationHistory,
             stream: true,
             max_completion_tokens: 4000, // Increased to allow complete JSON formula generation
-            temperature: 0.7,
             reasoning_effort: 'medium' as any // Balance between speed and accuracy for health recommendations
           });
           
