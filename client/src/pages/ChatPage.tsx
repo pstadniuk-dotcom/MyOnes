@@ -462,7 +462,7 @@ export default function ChatPage() {
           </div>
         ))}
         
-        {isTyping && thinkingMessage && (
+        {thinkingMessage && (
           <div className="flex justify-start max-w-[80%]" data-testid="indicator-thinking">
             <ThinkingIndicator message={thinkingMessage} />
           </div>
