@@ -16,6 +16,8 @@ import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDI
 import { sendNotificationEmail } from "./emailService";
 import { sendNotificationSms } from "./smsService";
 import type { User, Notification, NotificationPref } from "@shared/schema";
+import { classifyQuery, type SessionContext } from "./model-router";
+import { buildGPT4Prompt, buildO1MiniPrompt, type PromptContext } from "./prompt-builder";
 
 // Extend Express Request interface to include userId property
 declare global {
@@ -1952,9 +1954,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send initial connection confirmation
       sendSSE({ type: 'connected', message: 'Stream established' });
-      
-      // Send single thinking status that stays visible until content arrives
-      sendSSE({ type: 'thinking', message: 'Analyzing your health data and researching personalized recommendations...' });
 
       // Get or create chat session
       let chatSession;
@@ -2286,16 +2285,48 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         messageWithFileContext = `[User has attached files: ${fileDescriptions}] ${message}`;
       }
 
-      const fullSystemPrompt = ONES_AI_SYSTEM_PROMPT + healthContextMessage;
-      console.log('📤 DEBUG: System prompt length:', fullSystemPrompt.length, 'chars');
-      console.log('📤 DEBUG: Current formula in prompt?', fullSystemPrompt.includes('CURRENT ACTIVE FORMULA'));
-      console.log('📤 DEBUG: Lab data in prompt?', fullSystemPrompt.includes('LABORATORY TEST RESULTS'));
+      // HYBRID MODEL ROUTING: Classify query to determine which model to use
+      const sessionContext: SessionContext = {
+        hasLabReports: labReports.length > 0,
+        hasActiveFormula: !!activeFormula,
+        messageCount: previousMessages.length,
+        recentMessages: previousMessages.slice(-5)
+      };
       
-      // (Removed - using single thinking message that was sent at the start)
+      const classification = classifyQuery(message, sessionContext);
+      console.log(`🔀 MODEL ROUTING: Selected ${classification.model} - ${classification.reason}`);
+      
+      // Send model-specific thinking message
+      sendSSE({ type: 'thinking', message: classification.thinkingMessage });
+      
+      // Build prompt based on model
+      let fullSystemPrompt: string;
+      
+      if (classification.model === 'gpt-4' || classification.model === 'gpt-4o') {
+        // Lightweight prompt for simple questions
+        const promptContext: PromptContext = {
+          healthProfile: healthProfile || undefined,
+          recentMessages: previousMessages.slice(-5)
+        };
+        fullSystemPrompt = buildGPT4Prompt(promptContext);
+        console.log('📤 GPT-4 Prompt length:', fullSystemPrompt.length, 'chars');
+      } else {
+        // Comprehensive o1-mini prompt for complex consultations
+        const promptContext: PromptContext = {
+          healthProfile: healthProfile || undefined,
+          activeFormula: activeFormula || undefined,
+          labDataContext: labDataContext || undefined,
+          recentMessages: previousMessages
+        };
+        fullSystemPrompt = buildO1MiniPrompt(promptContext) + healthContextMessage;
+        console.log('📤 o1-mini Prompt length:', fullSystemPrompt.length, 'chars');
+        console.log('📤 Current formula in prompt?', fullSystemPrompt.includes('CURRENT ACTIVE FORMULA'));
+        console.log('📤 Lab data in prompt?', fullSystemPrompt.includes('LABORATORY TEST RESULTS'));
+      }
       
       const conversationHistory: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
         { role: 'system', content: fullSystemPrompt },
-        ...previousMessages.map(msg => ({
+        ...previousMessages.slice(classification.model === 'o1-mini' ? -10 : -5).map(msg => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content
         })),
@@ -2314,13 +2345,25 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             throw new Error('OpenAI API key not configured');
           }
           
-          const streamPromise = openai.chat.completions.create({
-            model: 'gpt-5', // GPT-5 with web search capability for real-time research, drug interactions, and latest studies
+          // Configure model-specific parameters
+          const isO1Model = classification.model === 'o1-mini';
+          const modelConfig: any = {
+            model: classification.model,
             messages: conversationHistory,
-            stream: true,
-            max_completion_tokens: 4000, // Increased to allow complete JSON formula generation
-            reasoning_effort: 'medium' as any // Balance between speed and accuracy for health recommendations
-          });
+            stream: true
+          };
+          
+          // o1-mini specific config
+          if (isO1Model) {
+            modelConfig.max_completion_tokens = 4000;
+            modelConfig.reasoning_effort = 'medium';
+          } else {
+            // GPT-4/4o config
+            modelConfig.max_tokens = 2000;
+            modelConfig.temperature = 0.7;
+          }
+          
+          const streamPromise = openai.chat.completions.create(modelConfig);
           
           // Set timeout for OpenAI request (3 minutes for GPT-5 with large prompts)
           const timeoutPromise = new Promise((_, reject) => {
@@ -2453,13 +2496,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               await storage.createMessage({
                 sessionId: chatSession.id,
                 role: 'user',
-                content: message
+                content: message,
+                model: null
               });
               
               await storage.createMessage({
                 sessionId: chatSession.id,
                 role: 'assistant',
-                content: fullResponse
+                content: fullResponse,
+                model: classification.model
               });
             }
             
@@ -2685,13 +2730,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           await storage.createMessage({
             sessionId: chatSession.id,
             role: 'user',
-            content: message
+            content: message,
+            model: null
           });
           
           await storage.createMessage({
             sessionId: chatSession.id,
             role: 'assistant',
-            content: fullResponse
+            content: fullResponse,
+            model: classification.model
           });
         } catch (messageError) {
           console.error('Error saving messages:', messageError);

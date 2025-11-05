@@ -1,4 +1,11 @@
-import type { Message } from "./storage";
+export interface Message {
+  id: string;
+  sessionId: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  model?: string | null;
+  createdAt: Date;
+}
 
 export interface ClassificationResult {
   model: 'gpt-4' | 'gpt-4o' | 'o1-mini';
