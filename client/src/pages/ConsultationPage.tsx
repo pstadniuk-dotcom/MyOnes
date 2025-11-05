@@ -1298,7 +1298,7 @@ export default function ConsultationPage() {
           })}
             
             {/* Thinking Indicator with Status */}
-            {isTyping && thinkingMessage && (
+            {thinkingMessage && (
               <div className="flex justify-start max-w-[85%]" data-testid="indicator-thinking">
                 <ThinkingIndicator message={thinkingMessage} />
               </div>
