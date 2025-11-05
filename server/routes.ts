@@ -1970,6 +1970,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get previous messages for context (last 10 messages)
       const previousMessages = chatSession ? 
         (await storage.listMessagesBySession(chatSession.id)).slice(-10) : [];
+      
+      // Update thinking status after session work
+      await new Promise(resolve => setTimeout(resolve, 100));
+      sendSSE({ type: 'thinking', message: 'Reviewing health data...' });
 
       // Get user's health profile to check for missing information
       let healthProfile;
@@ -2055,7 +2059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fetch user's lab reports with extracted data and format as structured table
-      sendSSE({ type: 'thinking', message: 'Reviewing health data...' });
+      await new Promise(resolve => setTimeout(resolve, 200));
       const labReports = await storage.getLabReportsByUser(userId!);
       let labDataContext = '';
       
@@ -2122,6 +2126,7 @@ ${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sorted
         }
         
         if (processedReports.length > 0) {
+          await new Promise(resolve => setTimeout(resolve, 200));
           sendSSE({ type: 'thinking', message: 'Analyzing blood test results...' });
         }
       }
@@ -2132,6 +2137,7 @@ ${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sorted
       console.log('🔍 DEBUG: Active formula fetched:', activeFormula ? `YES - ${activeFormula.name} (${activeFormula.totalMg}mg)` : 'NO FORMULA FOUND');
       
       if (activeFormula) {
+        await new Promise(resolve => setTimeout(resolve, 200));
         sendSSE({ type: 'thinking', message: 'Reviewing current formula...' });
       }
       
@@ -2294,6 +2300,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       console.log('📤 DEBUG: Lab data in prompt?', fullSystemPrompt.includes('LABORATORY TEST RESULTS'));
       
       // Send status indicating we're about to call AI
+      await new Promise(resolve => setTimeout(resolve, 300));
       sendSSE({ type: 'thinking', message: 'Researching optimal recommendations...' });
       
       const conversationHistory: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
