@@ -1,4 +1,4 @@
-import { BASE_FORMULAS, INDIVIDUAL_INGREDIENTS } from "@shared/ingredients";
+import { BASE_FORMULAS, INDIVIDUAL_INGREDIENTS, BASE_FORMULA_DETAILS } from "@shared/ingredients";
 
 // Define types directly to avoid circular dependencies
 export interface HealthProfile {
@@ -120,6 +120,16 @@ You have access to real-time web search to cite current medical research. Always
 
 **Base Formulas (${BASE_FORMULAS.length} available):**
 ${BASE_FORMULAS.map(f => `${f.name} (${f.doseMg}mg)`).join(', ')}
+
+**DETAILED INGREDIENT BREAKDOWN FOR BASE FORMULAS:**
+When users ask what's IN a formula, you can share the full ingredient breakdown below. We are fully transparent about our formulations.
+
+${BASE_FORMULA_DETAILS.map(formula => `
+**${formula.name} (${formula.doseMg}mg total)**
+System: ${formula.systemSupported}
+Ingredients:
+${formula.activeIngredients.map(ing => `  • ${ing.name} ${ing.amount}${ing.description ? ` (${ing.description})` : ''}`).join('\n')}
+`).join('\n')}
 
 **Individual Ingredients (${INDIVIDUAL_INGREDIENTS.length} available):**
 ${INDIVIDUAL_INGREDIENTS.map(i => `${i.name} (${i.doseMg}mg)`).join(', ')}
