@@ -83,6 +83,10 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 // Helper function to normalize ingredient names for flexible matching
 // Handles variations like "Phosphatidylcholine 40%" vs "Phosphatidylcholine 40% (soy)"
 function normalizeIngredientForMatching(name: string): string {
+  if (!name || typeof name !== 'string') {
+    console.warn('normalizeIngredientForMatching received invalid name:', name);
+    return '';
+  }
   return name.toLowerCase()
     .replace(/\s*\([^)]*\)/g, '') // Remove parentheses and content
     .replace(/\s+/g, ' ') // Normalize whitespace
@@ -2489,17 +2493,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           
           // Validate base formulas (category-agnostic - checks against ALL approved ingredients)
           for (const base of extractedFormula.bases) {
-            if (!isAnyIngredientApproved(base.name)) {
-              console.error(`VALIDATION ERROR: Unapproved ingredient "${base.name}" detected in bases array`);
-              throw new Error(`The ingredient "${base.name}" is not in our approved catalog. Please use only approved ingredients from our catalog.`);
+            const ingredientName = base.ingredient || base.name;
+            if (!ingredientName || !isAnyIngredientApproved(ingredientName)) {
+              console.error(`VALIDATION ERROR: Unapproved ingredient "${ingredientName}" detected in bases array`);
+              throw new Error(`The ingredient "${ingredientName}" is not in our approved catalog. Please use only approved ingredients from our catalog.`);
             }
           }
           
           // Validate additions (category-agnostic - checks against ALL approved ingredients)
           for (const addition of extractedFormula.additions) {
-            if (!isAnyIngredientApproved(addition.name)) {
-              console.error(`VALIDATION ERROR: Unapproved ingredient "${addition.name}" detected in additions array`);
-              throw new Error(`The ingredient "${addition.name}" is not in our approved catalog. Please use only approved ingredients from our catalog.`);
+            const ingredientName = addition.ingredient || addition.name;
+            if (!ingredientName || !isAnyIngredientApproved(ingredientName)) {
+              console.error(`VALIDATION ERROR: Unapproved ingredient "${ingredientName}" detected in additions array`);
+              throw new Error(`The ingredient "${ingredientName}" is not in our approved catalog. Please use only approved ingredients from our catalog.`);
             }
           }
           
