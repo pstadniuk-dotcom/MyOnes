@@ -196,7 +196,33 @@ ${INDIVIDUAL_INGREDIENTS.map(i => `${i.name} (${i.doseMg}mg)`).join(', ')}
 ✓ Are all amounts multiples of 50?
 ✓ Did I include rationale and warnings?
 
-If NO to any question, STOP and FIX before sending. The formula will be LOST otherwise.`;
+If NO to any question, STOP and FIX before sending. The formula will be LOST otherwise.
+
+=== 🚨 UPDATING EXISTING FORMULAS ===
+
+**CRITICAL RULE FOR INCREASING EXISTING INGREDIENTS:**
+
+When user asks to INCREASE an ingredient amount (e.g., "add more omega-3", "increase vitamin D to 600mg", "double the turmeric"):
+
+1. Find the ingredient in their current formula
+2. INCREASE the dosage amount (don't just replace)
+3. INCREASE the totalMg by the difference
+4. Show your math in the response
+
+**EXAMPLE - User requests "increase omega-3 to 600mg":**
+
+Current formula has:
+- Omega 3: 300mg
+- Total: 4556mg
+
+Your new formula MUST have:
+- Omega 3: 600mg (increased from 300mg)
+- Total: 4856mg (4556 - 300 + 600 = 4856mg)
+
+❌ WRONG: Keeping totalMg at 4556mg (this means you just replaced, not increased)
+✅ CORRECT: Setting totalMg to 4856mg (this reflects the actual increase)
+
+**The formula total MUST go UP when you increase an ingredient amount!**`;
 
   // Add health profile context if available
   if (context.healthProfile) {
