@@ -136,6 +136,12 @@ const CANONICAL_DOSES_MG = Object.fromEntries(
 
 // Dose parsing utility that converts string doses to numeric mg
 function parseDoseToMg(doseString: string, ingredientName: string): number {
+  // Safety checks
+  if (!doseString || !ingredientName) {
+    console.warn('parseDoseToMg received invalid parameters:', { doseString, ingredientName });
+    return 0;
+  }
+  
   // Handle canonical mapping first
   const canonicalName = Object.keys(CANONICAL_DOSES_MG).find(key => 
     key.toLowerCase() === ingredientName.toLowerCase() ||
@@ -2517,14 +2523,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           const formulaData = {
             userId,
             bases: extractedFormula.bases.map((b: any) => ({
-              ingredient: b.name,
-              amount: parseDoseToMg(b.dose, b.name),
+              ingredient: b.ingredient || b.name,
+              amount: typeof b.amount === 'number' ? b.amount : parseDoseToMg(b.dose || `${b.amount}mg`, b.ingredient || b.name),
               unit: 'mg',
               purpose: b.purpose
             })),
             additions: extractedFormula.additions.map((a: any) => ({
-              ingredient: a.name,
-              amount: parseDoseToMg(a.dose, a.name),
+              ingredient: a.ingredient || a.name,
+              amount: typeof a.amount === 'number' ? a.amount : parseDoseToMg(a.dose || `${a.amount}mg`, a.ingredient || a.name),
               unit: 'mg',
               purpose: a.purpose
             })),
@@ -2571,10 +2577,31 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         });
       }
       
-      // Send completion event with any extracted formula
+      // Transform formula for frontend display (convert ingredient/amount to name/dose format)
+      let formulaForDisplay = null;
+      if (extractedFormula) {
+        formulaForDisplay = {
+          bases: extractedFormula.bases.map((b: any) => ({
+            name: b.ingredient || b.name,
+            dose: typeof b.amount === 'number' ? `${b.amount}mg` : (b.dose || `${b.amount}mg`),
+            purpose: b.purpose
+          })),
+          additions: extractedFormula.additions.map((a: any) => ({
+            name: a.ingredient || a.name,
+            dose: typeof a.amount === 'number' ? `${a.amount}mg` : (a.dose || `${a.amount}mg`),
+            purpose: a.purpose
+          })),
+          totalMg: extractedFormula.totalMg,
+          warnings: extractedFormula.warnings || [],
+          rationale: extractedFormula.rationale,
+          disclaimers: extractedFormula.disclaimers || []
+        };
+      }
+      
+      // Send completion event with transformed formula for frontend
       sendSSE({
         type: 'complete',
-        formula: extractedFormula,
+        formula: formulaForDisplay,
         sessionId: chatSession?.id,
         formulaId: savedFormula?.id,
         responseLength: fullResponse.length,
