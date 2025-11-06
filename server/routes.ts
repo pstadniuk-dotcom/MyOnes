@@ -704,6 +704,20 @@ When user confirms additions to their EXISTING formula, your JSON MUST include:
 3. PLUS the new ingredients you're adding
 4. Calculate accurate total (recommend 4500-5500mg for optimal value, but honor user preferences)
 
+🚨 CRITICAL: INCREASING EXISTING INGREDIENTS 🚨
+
+When user asks to INCREASE an existing ingredient (e.g., "add more omega-3", "increase vitamin D", "double the turmeric"):
+1. Find the ingredient in their current formula
+2. INCREASE the amount (don't replace it)
+3. INCREASE the totalMg accordingly
+4. Show the math in your response
+
+EXAMPLE - User asks to increase Omega 3 from 300mg to 600mg:
+Current formula: 4556mg total with Omega 3 (300mg)
+New formula totalMg: 4556 - 300 + 600 = 4856mg (NOT 4556mg!)
+
+In the JSON, update the Omega 3 amount to 600mg and set totalMg to 4856mg
+
 EXAMPLE SCENARIO:
 User has "Pete V1" formula containing:
   Bases: Heart Support (450mg), Liver Support (480mg)
