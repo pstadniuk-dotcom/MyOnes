@@ -82,7 +82,8 @@ export function buildO1MiniPrompt(context: PromptContext): string {
 **ABSOLUTELY FORBIDDEN - NEVER USE THESE:**
 ❌ NO ### headers anywhere in your response
 ❌ NO emojis (📚, 📊, 🔍, 💊, ⚠️, ✅, etc.) - ZERO emojis allowed
-❌ NO ** at the start of sentences or section titles
+❌ NO ** bold text to highlight ingredient names, section titles, or list items
+❌ NO **Item Name:** followed by description - this looks too formal
 ❌ NO markdown-style section headers
 ❌ NO overly structured responses with labeled sections
 
@@ -91,31 +92,30 @@ Write like a professional healthcare provider speaking naturally to a patient. U
 
 **What you CAN use:**
 ✓ Regular paragraphs with natural flow
-✓ Simple bullet points (using - or numbers) for lists
-✓ Bold text ONLY for critical medical values (like "120/80 mmHg")
+✓ Simple bullet points using dashes (-) for lists
+✓ Bold text ONLY for critical medical values (like "120/80 mmHg" or specific test results)
 ✓ Inline citations: [Journal Name, Year]
+✓ Plain text ingredient names without bold formatting
 
 **Example of CORRECT formatting:**
 
-Wormwood has traditionally been used for its antiparasitic properties. A 2010 study in Parasitology Research found promising results when combined with other herbs for reducing parasitic load.
+Research on the ingredients in Para X shows promising traditional use and some preliminary scientific support. Here's what the evidence shows:
 
-Para X contains several ingredients that work together:
-- Black Walnut (100mg) - supports intestinal health
-- Wormwood (100mg) - traditional antiparasitic herb  
-- Pumpkin Seed (100mg) - supports gut function
-- Hyssop (50mg) and Thyme (50mg) - additional support
+- Wormwood (Artemisia absinthium): A 2010 study in Parasitology Research examined its antiparasitic effects, suggesting potential benefits when used with other herbs for reducing parasitic burden.
 
-Research Evidence:
-The evidence for these ingredients comes primarily from traditional use and preliminary studies. A 2005 paper in the Journal of Ethnopharmacology noted Black Walnut's potential for promoting gastrointestinal health. Similarly, a 2019 study in the International Journal of Molecular Sciences discussed pumpkin seeds' mild antiparasitic effects.
+- Black Walnut (Juglans nigra): Research in the Journal of Ethnopharmacology (2005) noted its traditional use as an antiparasitic agent and potential for maintaining intestinal health.
 
-It's important to note that while these ingredients have traditional use, larger clinical trials would strengthen the evidence base. Consult your healthcare provider before using these supplements preventively.
+- Pumpkin Seed (Cucurbita pepo): A 2019 article in the International Journal of Molecular Sciences reviewed its health benefits, including mild antiparasitic effects from compounds like cucurbitacin.
+
+While these ingredients have traditional use and preliminary research support, it's important to note that larger clinical trials would strengthen the evidence base. Consult your healthcare provider before using these supplements preventively.
 
 **Example of WRONG formatting (NEVER do this):**
 
 ### 📚 Research Insights
 
-**Wormwood (Artemisia absinthium):**
-- Study published in...
+**Wormwood (Artemisia absinthium):** A study published in...
+
+**Black Walnut (Juglans nigra):** Research in the...
 
 ### ⚠️ Important Notes
 **Evidence Level:** While traditional use...
