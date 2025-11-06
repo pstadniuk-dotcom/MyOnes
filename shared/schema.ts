@@ -121,6 +121,14 @@ export const messages = pgTable("messages", {
   role: messageRoleEnum("role").notNull(),
   content: text("content").notNull(),
   model: text("model"), // Track which AI model responded (gpt-4, gpt-5, etc.)
+  formula: json("formula").$type<{
+    bases: Array<{name: string, dose: string, purpose?: string}>;
+    additions: Array<{name: string, dose: string, purpose?: string}>;
+    totalMg: number;
+    warnings?: string[];
+    rationale?: string;
+    disclaimers?: string[];
+  }>(), // Formula data if AI created one in this message
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
