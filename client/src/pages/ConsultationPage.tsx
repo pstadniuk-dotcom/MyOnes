@@ -59,7 +59,7 @@ interface ChatSession {
   status: 'active' | 'completed' | 'archived';
 }
 
-// Utility function to remove JSON code blocks from AI messages for clean display
+// Utility function to remove JSON code blocks and markdown formatting from AI messages for clean display
 const removeJsonBlocks = (content: string): string => {
   if (!content) return '';
   
@@ -68,6 +68,19 @@ const removeJsonBlocks = (content: string): string => {
   
   // Remove ```health-data blocks (health profile updates)
   cleaned = cleaned.replace(/```health-data\s*[\s\S]*?```/g, '');
+  
+  // Remove markdown headers (### Header)
+  cleaned = cleaned.replace(/^#{1,6}\s+(.+)$/gm, '$1');
+  
+  // Remove bold markdown (**text** or __text__)
+  cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
+  cleaned = cleaned.replace(/__([^_]+)__/g, '$1');
+  
+  // Remove most common emojis that might appear in responses
+  cleaned = cleaned.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+  
+  // Clean up any resulting multiple blank lines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
   
   // Trim extra whitespace that might result from removal
   return cleaned.trim();
