@@ -104,46 +104,49 @@ TOTAL DOSAGE: ${formula.totalMg}mg
       });
     }
 
-    // CRITICAL UPDATE RULES - Right after showing current formula
-    prompt += `\n=== 🚨 MODIFYING THIS FORMULA ===
+    // ULTRA-CRITICAL: MANDATORY CALCULATION TEMPLATE
+    prompt += `\n=== ⚠️ ⚠️ ⚠️  CRITICAL: FORMULA MODIFICATION RULES ⚠️ ⚠️ ⚠️  ===
 
-**WHEN USER ASKS TO CHANGE AN INGREDIENT (add/increase/decrease/remove):**
+**IF USER ASKS TO MODIFY AN INGREDIENT, YOU MUST FOLLOW THIS EXACT PROCESS:**
 
-STEP 1: Identify the specific ingredient and current amount
-STEP 2: Calculate the new amount
-STEP 3: Calculate new totalMg = (current totalMg) - (old amount) + (new amount)
-STEP 4: Show your math in the response
+BEFORE you create the JSON, SHOW THIS CALCULATION IN YOUR RESPONSE:
 
-**CRITICAL EXAMPLES:**
+Modification Calculation:
+- Current Formula Total: ${formula.totalMg}mg
+- Ingredient being changed: [NAME]
+- Current amount: [X]mg
+- New amount: [Y]mg
+- Difference: [Y - X]mg
+- NEW TOTAL: ${formula.totalMg} + [Y - X] = [RESULT]mg
 
-Example 1 - INCREASE Omega 3 from 300mg to 600mg:
-- Old total: ${formula.totalMg}mg
-- Calculation: ${formula.totalMg} - 300 + 600 = ${formula.totalMg + 300}mg
-- New Omega 3 amount: 600
-- New totalMg: ${formula.totalMg + 300}
-- ✅ The totalMg MUST INCREASE by 300mg
+Then in your JSON, set "totalMg": [RESULT]
 
-Example 2 - ADD new ingredient (CoQ10 200mg):
-- Old total: ${formula.totalMg}mg
-- Calculation: ${formula.totalMg} + 200 = ${formula.totalMg + 200}mg
-- New totalMg: ${formula.totalMg + 200}
-- ✅ The totalMg MUST INCREASE by 200mg
+**THE totalMg FIELD IN YOUR JSON MUST MATCH YOUR CALCULATED [RESULT]**
 
-Example 3 - REMOVE ingredient (Vitamin D 100mg):
-- Old total: ${formula.totalMg}mg
-- Calculation: ${formula.totalMg} - 100 = ${formula.totalMg - 100}mg
-- New totalMg: ${formula.totalMg - 100}
-- ✅ The totalMg MUST DECREASE by 100mg
+**MANDATORY STEPS:**
+1. Show the calculation above in plain text BEFORE the JSON
+2. Calculate: NEW TOTAL = Current Total + (New Amount - Old Amount)
+3. Put the calculated NEW TOTAL in the "totalMg" field of your JSON
+4. NEVER keep totalMg at ${formula.totalMg}mg if you changed any ingredients!
 
-**VALIDATION BEFORE SENDING:**
-✓ Did I recalculate totalMg correctly?
-✓ Did I show the math in my response?
-✓ Does the change in totalMg match the change in ingredient amounts?
+**EXAMPLE - User says "increase omega-3 to 900mg":**
 
-**Common mistakes to avoid:**
-❌ Keeping totalMg the same when increasing an ingredient
-❌ Not showing the calculation in the response
-❌ Forgetting to update totalMg when adding/removing ingredients
+Your response MUST include:
+
+Modification Calculation:
+- Current Formula Total: ${formula.totalMg}mg
+- Ingredient being changed: Omega 3 (algae omega)
+- Current amount: 300mg
+- New amount: 900mg
+- Difference: 600mg
+- NEW TOTAL: ${formula.totalMg} + 600 = ${formula.totalMg + 600}mg
+
+Then your JSON must have "totalMg": ${formula.totalMg + 600}
+
+❌ WRONG: "totalMg": ${formula.totalMg}  (this ignores the 600mg increase!)
+✅ CORRECT: "totalMg": ${formula.totalMg + 600}  (this reflects the increase!)
+
+**IF YOU DON'T SHOW THE CALCULATION AND UPDATE totalMg CORRECTLY, THE FORMULA WILL BE LOST!**
 `;
   }
 
