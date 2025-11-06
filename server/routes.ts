@@ -2629,14 +2629,16 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             sessionId: chatSession.id,
             role: 'user',
             content: message,
-            model: null
+            model: null,
+            formula: undefined
           });
           
           await storage.createMessage({
             sessionId: chatSession.id,
             role: 'assistant',
             content: fullResponse,
-            model: model
+            model: model,
+            formula: formulaForDisplay || undefined // Save the formula with the message
           });
         } catch (messageError) {
           console.error('Error saving messages:', messageError);
