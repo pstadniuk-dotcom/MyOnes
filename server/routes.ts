@@ -2338,17 +2338,34 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           const jsonData = JSON.parse(jsonMatch[1]);
           console.log('✅ JSON parsed successfully');
           console.log('📊 Parsed data keys:', Object.keys(jsonData));
+          console.log('📊 AI Formula Details:');
+          console.log('  - totalMg from AI:', jsonData.totalMg);
+          if (jsonData.bases) {
+            console.log('  - Bases:', jsonData.bases.map((b: any) => `${b.ingredient}: ${b.amount}${b.unit}`).join(', '));
+          }
+          if (jsonData.additions) {
+            console.log('  - Additions:', jsonData.additions.map((a: any) => `${a.ingredient}: ${a.amount}${a.unit}`).join(', '));
+          }
           
           console.log('🔄 Validating against FormulaExtractionSchema...');
           let validatedFormula = FormulaExtractionSchema.parse(jsonData);
           console.log('✅ Schema validation passed');
           console.log('📊 Validated formula has', validatedFormula.bases?.length || 0, 'bases and', validatedFormula.additions?.length || 0, 'additions');
           
-          // CRITICAL: Server-side validation and 800mg enforcement
-          console.log('🔄 Validating formula mg calculations...');
+          // CRITICAL: Server-side validation and ingredient approval
+          console.log('🔄 Validating formula ingredients and calculations...');
           const validation = validateAndCalculateFormula(validatedFormula);
-          console.log('📊 Validation result:', validation.isValid ? 'VALID' : 'INVALID', '- Total mg:', validation.calculatedTotalMg);
+          console.log('📊 AI provided totalMg:', validatedFormula.totalMg);
+          console.log('📊 Backend calculated total:', validation.calculatedTotalMg);
+          console.log('📊 Difference:', Math.abs(validatedFormula.totalMg - validation.calculatedTotalMg), 'mg');
           console.log('📊 Validation errors:', validation.errors);
+          
+          // Check for major discrepancies between AI's total and calculated total
+          const totalDifference = Math.abs(validatedFormula.totalMg - validation.calculatedTotalMg);
+          if (totalDifference > 50) {
+            console.warn(`⚠️ TOTAL MG MISMATCH: AI said ${validatedFormula.totalMg}mg but ingredients sum to ${validation.calculatedTotalMg}mg`);
+            validation.errors.push(`Total mismatch: AI specified ${validatedFormula.totalMg}mg but ingredients sum to ${validation.calculatedTotalMg}mg. Please recalculate.`);
+          }
           
           if (!validation.isValid) {
             // Formula is invalid - reject it and send error to client
@@ -2387,8 +2404,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             return;
           }
           
-          // Update formula with server-calculated totalMg
-          validatedFormula.totalMg = validation.calculatedTotalMg;
+          // TRUST the AI's totalMg (don't override it) - only validate it's within reason
+          console.log('✅ Formula validation passed - using AI totalMg:', validatedFormula.totalMg);
           extractedFormula = validatedFormula;
           
           // Add validation warnings
