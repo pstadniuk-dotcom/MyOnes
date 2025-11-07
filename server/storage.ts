@@ -1185,6 +1185,258 @@ export class DrizzleStorage implements IStorage {
       throw error;
     }
   }
+
+  // FAQ operations
+  async getFaqItem(id: string): Promise<FaqItem | undefined> {
+    try {
+      const [item] = await db.select().from(faqItems).where(eq(faqItems.id, id));
+      return item || undefined;
+    } catch (error) {
+      console.error('Error getting FAQ item:', error);
+      return undefined;
+    }
+  }
+
+  async listFaqItems(category?: string): Promise<FaqItem[]> {
+    try {
+      const items = await db
+        .select()
+        .from(faqItems)
+        .where(
+          and(
+            eq(faqItems.isPublished, true),
+            category ? eq(faqItems.category, category) : undefined
+          )
+        )
+        .orderBy(faqItems.displayOrder);
+      return items;
+    } catch (error) {
+      console.error('Error listing FAQ items:', error);
+      return [];
+    }
+  }
+
+  async createFaqItem(insertFaqItem: InsertFaqItem): Promise<FaqItem> {
+    try {
+      const [item] = await db
+        .insert(faqItems)
+        .values(insertFaqItem)
+        .returning();
+      return item;
+    } catch (error) {
+      console.error('Error creating FAQ item:', error);
+      throw error;
+    }
+  }
+
+  async updateFaqItem(id: string, updates: Partial<InsertFaqItem>): Promise<FaqItem | undefined> {
+    try {
+      const [item] = await db
+        .update(faqItems)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(faqItems.id, id))
+        .returning();
+      return item || undefined;
+    } catch (error) {
+      console.error('Error updating FAQ item:', error);
+      return undefined;
+    }
+  }
+
+  async deleteFaqItem(id: string): Promise<boolean> {
+    try {
+      await db.delete(faqItems).where(eq(faqItems.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting FAQ item:', error);
+      return false;
+    }
+  }
+
+  // Help article operations
+  async getHelpArticle(id: string): Promise<HelpArticle | undefined> {
+    try {
+      const [article] = await db.select().from(helpArticles).where(eq(helpArticles.id, id));
+      return article || undefined;
+    } catch (error) {
+      console.error('Error getting help article:', error);
+      return undefined;
+    }
+  }
+
+  async listHelpArticles(category?: string): Promise<HelpArticle[]> {
+    try {
+      const articles = await db
+        .select()
+        .from(helpArticles)
+        .where(
+          and(
+            eq(helpArticles.isPublished, true),
+            category ? eq(helpArticles.category, category) : undefined
+          )
+        )
+        .orderBy(helpArticles.displayOrder);
+      return articles;
+    } catch (error) {
+      console.error('Error listing help articles:', error);
+      return [];
+    }
+  }
+
+  async createHelpArticle(insertArticle: InsertHelpArticle): Promise<HelpArticle> {
+    try {
+      const [article] = await db
+        .insert(helpArticles)
+        .values(insertArticle)
+        .returning();
+      return article;
+    } catch (error) {
+      console.error('Error creating help article:', error);
+      throw error;
+    }
+  }
+
+  async updateHelpArticle(id: string, updates: Partial<InsertHelpArticle>): Promise<HelpArticle | undefined> {
+    try {
+      const [article] = await db
+        .update(helpArticles)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(helpArticles.id, id))
+        .returning();
+      return article || undefined;
+    } catch (error) {
+      console.error('Error updating help article:', error);
+      return undefined;
+    }
+  }
+
+  async deleteHelpArticle(id: string): Promise<boolean> {
+    try {
+      await db.delete(helpArticles).where(eq(helpArticles.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting help article:', error);
+      return false;
+    }
+  }
+
+  async incrementHelpArticleViewCount(id: string): Promise<boolean> {
+    try {
+      await db
+        .update(helpArticles)
+        .set({ viewCount: sql`${helpArticles.viewCount} + 1` })
+        .where(eq(helpArticles.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error incrementing view count:', error);
+      return false;
+    }
+  }
+
+  // Support ticket operations
+  async getSupportTicket(id: string): Promise<SupportTicket | undefined> {
+    try {
+      const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, id));
+      return ticket || undefined;
+    } catch (error) {
+      console.error('Error getting support ticket:', error);
+      return undefined;
+    }
+  }
+
+  async listSupportTicketsByUser(userId: string): Promise<SupportTicket[]> {
+    try {
+      const tickets = await db
+        .select()
+        .from(supportTickets)
+        .where(eq(supportTickets.userId, userId))
+        .orderBy(desc(supportTickets.createdAt));
+      return tickets;
+    } catch (error) {
+      console.error('Error listing support tickets:', error);
+      return [];
+    }
+  }
+
+  async createSupportTicket(insertTicket: InsertSupportTicket): Promise<SupportTicket> {
+    try {
+      const [ticket] = await db
+        .insert(supportTickets)
+        .values(insertTicket)
+        .returning();
+      return ticket;
+    } catch (error) {
+      console.error('Error creating support ticket:', error);
+      throw error;
+    }
+  }
+
+  async updateSupportTicket(id: string, updates: Partial<InsertSupportTicket>): Promise<SupportTicket | undefined> {
+    try {
+      const [ticket] = await db
+        .update(supportTickets)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(supportTickets.id, id))
+        .returning();
+      return ticket || undefined;
+    } catch (error) {
+      console.error('Error updating support ticket:', error);
+      return undefined;
+    }
+  }
+
+  async getSupportTicketWithResponses(id: string, userId: string): Promise<{ticket: SupportTicket, responses: SupportTicketResponse[]} | undefined> {
+    try {
+      const [ticket] = await db
+        .select()
+        .from(supportTickets)
+        .where(and(
+          eq(supportTickets.id, id),
+          eq(supportTickets.userId, userId)
+        ));
+      
+      if (!ticket) return undefined;
+
+      const responses = await db
+        .select()
+        .from(supportTicketResponses)
+        .where(eq(supportTicketResponses.ticketId, id))
+        .orderBy(supportTicketResponses.createdAt);
+
+      return { ticket, responses };
+    } catch (error) {
+      console.error('Error getting support ticket with responses:', error);
+      return undefined;
+    }
+  }
+
+  // Support ticket response operations
+  async createSupportTicketResponse(insertResponse: InsertSupportTicketResponse): Promise<SupportTicketResponse> {
+    try {
+      const [response] = await db
+        .insert(supportTicketResponses)
+        .values(insertResponse)
+        .returning();
+      return response;
+    } catch (error) {
+      console.error('Error creating support ticket response:', error);
+      throw error;
+    }
+  }
+
+  async listSupportTicketResponses(ticketId: string): Promise<SupportTicketResponse[]> {
+    try {
+      const responses = await db
+        .select()
+        .from(supportTicketResponses)
+        .where(eq(supportTicketResponses.ticketId, ticketId))
+        .orderBy(supportTicketResponses.createdAt);
+      return responses;
+    } catch (error) {
+      console.error('Error listing support ticket responses:', error);
+      return [];
+    }
+  }
 }
 
 export class MemStorage implements IStorage {
