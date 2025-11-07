@@ -1,17 +1,21 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'wouter';
 import { 
   Users, 
   DollarSign, 
   Activity, 
   Package,
   TrendingUp,
-  UserCheck
+  UserCheck,
+  Clock
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useEffect } from 'react';
+import { format } from 'date-fns';
 
 // Types for API responses
 interface DashboardStats {
@@ -35,20 +39,65 @@ interface RevenueDataPoint {
   revenue: number;
 }
 
+interface TodaysOrder {
+  id: string;
+  status: string;
+  placedAt: string;
+  amountCents: number | null;
+  supplyMonths: number | null;
+  user: { id: string; name: string; email: string };
+  formula?: { totalMg: number; bases: Array<{ ingredient: string; amount: number }> };
+}
+
 // Stat Card Component
 function StatCard({ 
   title, 
   value, 
   description, 
   icon: Icon, 
-  trend 
+  trend,
+  onClick
 }: { 
   title: string; 
   value: string | number; 
   description: string; 
   icon: typeof Users;
   trend?: string;
+  onClick?: () => void;
 }) {
+  if (onClick) {
+    return (
+      <Card 
+        data-testid={`stat-card-${title.toLowerCase().replace(/\s/g, '-')}`}
+        className="hover-elevate cursor-pointer transition-all"
+        onClick={onClick}
+      >
+        <div className="w-full text-left p-0">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              {title}
+            </CardTitle>
+            <Icon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid={`stat-value-${title.toLowerCase().replace(/\s/g, '-')}`}>
+              {value}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {description}
+            </p>
+            {trend && (
+              <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 mt-1">
+                <TrendingUp className="h-3 w-3" />
+                <span>{trend}</span>
+              </div>
+            )}
+          </CardContent>
+        </div>
+      </Card>
+    );
+  }
+  
   return (
     <Card data-testid={`stat-card-${title.toLowerCase().replace(/\s/g, '-')}`}>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
@@ -123,6 +172,7 @@ function DashboardSkeleton() {
 
 export default function AdminDashboardPage() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   // Fetch dashboard stats
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<DashboardStats>({
@@ -137,6 +187,11 @@ export default function AdminDashboardPage() {
   // Fetch revenue data
   const { data: revenueData, isLoading: revenueLoading, error: revenueError } = useQuery<RevenueDataPoint[]>({
     queryKey: ['/api/admin/analytics/revenue?days=30'],
+  });
+
+  // Fetch today's orders
+  const { data: todaysOrders } = useQuery<TodaysOrder[]>({
+    queryKey: ['/api/admin/orders/today'],
   });
 
   // Show error toast if any query fails
@@ -188,20 +243,23 @@ export default function AdminDashboardPage() {
           <StatCard
             title="Total Users"
             value={stats?.totalUsers || 0}
-            description="All registered users"
+            description="Click to view all users"
             icon={Users}
+            onClick={() => setLocation('/admin/users?filter=all')}
           />
           <StatCard
             title="Paid Users"
             value={stats?.totalPaidUsers || 0}
-            description="Users with active subscriptions"
+            description="Click to view paid users"
             icon={UserCheck}
+            onClick={() => setLocation('/admin/users?filter=paid')}
           />
           <StatCard
             title="Active Users"
             value={stats?.activeUsers || 0}
-            description="Users active in last 30 days"
+            description="Click to view active users"
             icon={Activity}
+            onClick={() => setLocation('/admin/users?filter=active')}
           />
           <StatCard
             title="Total Orders"
@@ -222,6 +280,51 @@ export default function AdminDashboardPage() {
             icon={DollarSign}
           />
         </div>
+
+        {/* Today's Orders */}
+        {todaysOrders && todaysOrders.length > 0 && (
+          <Card data-testid="card-todays-orders">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Today's Orders
+              </CardTitle>
+              <CardDescription>
+                Orders placed today ({format(new Date(), 'MMMM dd, yyyy')})
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {todaysOrders.map((order) => (
+                  <Card key={order.id} className="hover-elevate cursor-pointer" onClick={() => setLocation(`/admin/users/${order.user.id}`)}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <p className="font-medium" data-testid={`text-order-user-${order.id}`}>{order.user.name}</p>
+                          <p className="text-sm text-muted-foreground">{order.user.email}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(order.placedAt), 'h:mm a')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          {order.amountCents && (
+                            <p className="font-bold font-mono">${(order.amountCents / 100).toFixed(2)}</p>
+                          )}
+                          {order.supplyMonths && (
+                            <p className="text-sm text-muted-foreground">{order.supplyMonths} month{order.supplyMonths !== 1 ? 's' : ''}</p>
+                          )}
+                          <Badge variant={order.status === 'pending' ? 'secondary' : 'default'} className="mt-1">
+                            {order.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Charts */}
         <div className="grid gap-6 lg:grid-cols-2">

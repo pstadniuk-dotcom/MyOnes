@@ -14,8 +14,8 @@ import {
 } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { useLocation } from 'wouter';
-import { Search, ChevronLeft, ChevronRight, Users, Shield } from 'lucide-react';
+import { useLocation, useSearch } from 'wouter';
+import { Search as SearchIcon, ChevronLeft, ChevronRight, Users, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 
 // Types
@@ -67,22 +67,27 @@ function UserTableSkeleton() {
 
 export default function UserManagementPage() {
   const [, setLocation] = useLocation();
+  const searchParams = useSearch();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
   const limit = 20;
 
+  // Get filter from URL query parameter
+  const urlParams = new URLSearchParams(searchParams);
+  const filter = urlParams.get('filter') || 'all';
+
   // Debounce search query
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // Reset to first page when search changes
+  // Reset to first page when search or filter changes
   useEffect(() => {
     setCurrentPage(0);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, filter]);
 
   // Fetch users
   const { data, isLoading, error } = useQuery<UsersResponse>({
-    queryKey: ['/api/admin/users', { q: debouncedSearch, limit, offset: currentPage * limit }],
+    queryKey: ['/api/admin/users', { q: debouncedSearch, limit, offset: currentPage * limit, filter }],
   });
 
   // Show error toast
@@ -132,15 +137,33 @@ export default function UserManagementPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Users</CardTitle>
-            <CardDescription>
-              {total} total user{total !== 1 ? 's' : ''} registered
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>
+                  {filter === 'paid' ? 'Paid Users' : filter === 'active' ? 'Active Users' : 'All Users'}
+                </CardTitle>
+                <CardDescription>
+                  {total} total user{total !== 1 ? 's' : ''} 
+                  {filter === 'paid' && ' with orders'}
+                  {filter === 'active' && ' with formulas'}
+                </CardDescription>
+              </div>
+              {filter !== 'all' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLocation('/admin/users')}
+                  data-testid="button-view-all-users"
+                >
+                  View All Users
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Search Input */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name, email, or phone..."
                 value={searchQuery}
