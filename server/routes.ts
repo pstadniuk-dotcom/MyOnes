@@ -5040,8 +5040,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const query = (req.query.q as string) || '';
       const limit = parseInt(req.query.limit as string) || 20;
       const offset = parseInt(req.query.offset as string) || 0;
+      const filter = (req.query.filter as string) || 'all'; // 'all', 'paid', 'active'
       
-      const result = await storage.searchUsers(query, limit, offset);
+      const result = await storage.searchUsers(query, limit, offset, filter);
       
       // Sanitize users to remove sensitive fields
       const sanitizedUsers = result.users.map(({ password, ...user }) => user);
@@ -5070,6 +5071,17 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     } catch (error) {
       console.error('Error fetching user details:', error);
       res.status(500).json({ error: 'Failed to fetch user details' });
+    }
+  });
+  
+  // Admin: Get today's orders
+  app.get('/api/admin/orders/today', requireAdmin, async (req, res) => {
+    try {
+      const orders = await storage.getTodaysOrders();
+      res.json(orders);
+    } catch (error) {
+      console.error('Error fetching today\'s orders:', error);
+      res.status(500).json({ error: 'Failed to fetch today\'s orders' });
     }
   });
   
