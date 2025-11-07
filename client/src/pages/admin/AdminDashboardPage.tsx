@@ -131,12 +131,12 @@ export default function AdminDashboardPage() {
 
   // Fetch user growth data
   const { data: growthData, isLoading: growthLoading, error: growthError } = useQuery<GrowthDataPoint[]>({
-    queryKey: ['/api/admin/analytics/growth', { days: 30 }],
+    queryKey: ['/api/admin/analytics/growth?days=30'],
   });
 
   // Fetch revenue data
   const { data: revenueData, isLoading: revenueLoading, error: revenueError } = useQuery<RevenueDataPoint[]>({
-    queryKey: ['/api/admin/analytics/revenue', { days: 30 }],
+    queryKey: ['/api/admin/analytics/revenue?days=30'],
   });
 
   // Show error toast if any query fails

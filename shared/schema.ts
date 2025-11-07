@@ -184,6 +184,8 @@ export const orders = pgTable("orders", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   formulaVersion: integer("formula_version").notNull(),
   status: orderStatusEnum("status").default('pending').notNull(),
+  amountCents: integer("amount_cents"), // Order total in cents (e.g., 12000 = $120.00)
+  supplyMonths: integer("supply_months"), // 3, 6, or 12 month supply
   trackingUrl: text("tracking_url"),
   placedAt: timestamp("placed_at").defaultNow().notNull(),
   shippedAt: timestamp("shipped_at"),

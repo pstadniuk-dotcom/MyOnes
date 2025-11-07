@@ -191,7 +191,7 @@ export interface IStorage {
     user: User;
     healthProfile?: HealthProfile;
     formulas: Formula[];
-    orders: Order[];
+    orders: Array<Order & { formula?: Formula }>;
     chatSessions: ChatSession[];
     fileUploads: FileUpload[];
   }>;
@@ -1627,7 +1627,7 @@ export class DrizzleStorage implements IStorage {
     user: User;
     healthProfile?: HealthProfile;
     formulas: Formula[];
-    orders: Order[];
+    orders: Array<Order & { formula?: Formula }>;
     chatSessions: ChatSession[];
     fileUploads: FileUpload[];
   }> {
@@ -1643,11 +1643,27 @@ export class DrizzleStorage implements IStorage {
       const userChatSessions = await db.select().from(chatSessions).where(eq(chatSessions.userId, userId)).orderBy(desc(chatSessions.createdAt));
       const userFileUploads = await db.select().from(fileUploads).where(eq(fileUploads.userId, userId)).orderBy(desc(fileUploads.uploadedAt));
       
+      // Enrich orders with formula details
+      const enrichedOrders = await Promise.all(
+        userOrders.map(async (order) => {
+          const [formula] = await db
+            .select()
+            .from(formulas)
+            .where(
+              and(
+                eq(formulas.userId, userId),
+                eq(formulas.version, order.formulaVersion)
+              )
+            );
+          return { ...order, formula };
+        })
+      );
+      
       return {
         user,
         healthProfile: healthProfile || undefined,
         formulas: userFormulas,
-        orders: userOrders,
+        orders: enrichedOrders,
         chatSessions: userChatSessions,
         fileUploads: userFileUploads
       };
@@ -3152,7 +3168,7 @@ export class MemStorage implements IStorage {
     user: User;
     healthProfile?: HealthProfile;
     formulas: Formula[];
-    orders: Order[];
+    orders: Array<Order & { formula?: Formula }>;
     chatSessions: ChatSession[];
     fileUploads: FileUpload[];
   }> {
@@ -3167,11 +3183,17 @@ export class MemStorage implements IStorage {
     const userChatSessions = Array.from(this.chatSessions.values()).filter(cs => cs.userId === userId);
     const userFileUploads = Array.from(this.fileUploads.values()).filter(fu => fu.userId === userId);
     
+    // Enrich orders with formula details
+    const enrichedOrders = userOrders.map(order => {
+      const formula = userFormulas.find(f => f.version === order.formulaVersion);
+      return { ...order, formula };
+    });
+    
     return {
       user,
       healthProfile,
       formulas: userFormulas,
-      orders: userOrders,
+      orders: enrichedOrders,
       chatSessions: userChatSessions,
       fileUploads: userFileUploads
     };
