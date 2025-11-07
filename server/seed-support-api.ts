@@ -6,21 +6,25 @@ const helpArticlesData = [
   {
     category: 'Getting Started',
     title: 'Creating Your Account and Setting Up Your Profile',
-    content: `# Creating Your Account and Setting Up Your Profile
+    content: `Welcome to Ones AI! Creating your account takes just a few minutes. The more complete your profile, the better your personalized supplement recommendations will be.
 
-Welcome to Ones AI! This comprehensive guide will walk you through creating your account and setting up your complete health profile for personalized supplement recommendations. The more thorough you are during setup, the more accurate your AI-generated formula will be.
+CREATING YOUR ACCOUNT
 
-## Why Your Profile Matters
+Visit ones.ai and click "Get Started". You'll need to provide your name, email address, and create a password. We recommend adding your phone number for order tracking and optional pill reminders.
 
-Your health profile is the foundation for all recommendations. Our AI uses this information to:
-- Create safe, personalized supplement formulas
-- Avoid interactions with your medications
-- Account for your allergies and sensitivities
-- Target your specific health goals
-- Optimize dosages based on your age, weight, and biological sex
-- Consider your lifestyle factors (sleep, exercise, stress)
+After signing up, check your email for a verification link. Click it to activate your account. If you don't see the email within a few minutes, check your spam folder.
 
-The AI will NEVER recommend anything that conflicts with your health conditions or medications. Accuracy during setup ensures safety and effectiveness.
+SETTING UP YOUR HEALTH PROFILE
+
+Once logged in, the AI will guide you through a conversational health assessment. This typically takes 10-15 minutes and covers several important areas.
+
+The AI will ask about your basic information like age, sex, height, and weight. This helps calculate safe dosages specific to your body.
+
+You'll share lifestyle details including sleep hours, exercise frequency, stress levels, smoking status, and alcohol consumption. These factors directly affect your nutritional needs.
+
+The AI needs to know about any medications you take, allergies you have, and current health conditions. This is critical for safety - the AI will never recommend anything that could interact with your medications or trigger allergies.
+
+Finally, you'll describe your health goals and any symptoms you want to address. Be specific about what you hope to achieve, whether it's more energy, better sleep, reduced stress, or supporting specific body systems.
 
 ## Step 1: Sign Up for Your Account
 
