@@ -257,10 +257,11 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
         continue;
       }
       
-      const doseString = `${base.amount}${base.unit}`;
-      const mgAmount = parseDoseToMg(doseString, base.ingredient);
+      // 🔧 FIX: Use amount directly (it's already a number in mg)
+      // Don't call parseDoseToMg which looks up catalog dosages
+      const mgAmount = typeof base.amount === 'number' ? base.amount : 0;
       if (mgAmount === 0) {
-        errors.push(`Cannot determine mg amount for base: ${base.ingredient} with dose: ${doseString}`);
+        errors.push(`Invalid amount for base: ${base.ingredient}`);
       }
       calculatedTotal += mgAmount;
     }
@@ -275,10 +276,11 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
         continue;
       }
       
-      const doseString = `${addition.amount}${addition.unit}`;
-      const mgAmount = parseDoseToMg(doseString, addition.ingredient);
+      // 🔧 FIX: Use amount directly (it's already a number in mg)
+      // Don't call parseDoseToMg which looks up catalog dosages  
+      const mgAmount = typeof addition.amount === 'number' ? addition.amount : 0;
       if (mgAmount === 0) {
-        errors.push(`Cannot determine mg amount for addition: ${addition.ingredient} with dose: ${doseString}`);
+        errors.push(`Invalid amount for addition: ${addition.ingredient}`);
       }
       calculatedTotal += mgAmount;
     }
