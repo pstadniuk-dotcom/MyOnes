@@ -12,10 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   HelpCircle, 
   MessageCircle, 
-  Phone, 
   Mail, 
   Book, 
-  ExternalLink,
   Search,
   ChevronRight,
   Clock,
@@ -272,82 +270,37 @@ export default function SupportPage() {
                   <h3 className="font-medium mb-2">Failed to load FAQs</h3>
                   <p className="text-sm text-muted-foreground">Please try again later.</p>
                 </div>
+              ) : filteredFAQs.length > 0 ? (
+                <Accordion type="single" collapsible className="w-full">
+                  {filteredFAQs.map((item) => (
+                    <AccordionItem key={item.id} value={item.id} data-testid={`faq-${item.id}`}>
+                      <AccordionTrigger className="text-left">{item.question}</AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground leading-relaxed">
+                        {item.answer}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              ) : searchQuery ? (
+                <div className="text-center py-8">
+                  <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="font-medium mb-2">No results found</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Try different keywords or contact support for personalized help
+                  </p>
+                  <Button variant="outline" onClick={() => setActiveTab('contact')} data-testid="button-contact-support">
+                    Contact Support
+                  </Button>
+                </div>
               ) : (
-                <>
-                  <Accordion type="single" collapsible className="w-full">
-                    {filteredFAQs.map((item) => (
-                      <AccordionItem key={item.id} value={item.id} data-testid={`faq-${item.id}`}>
-                        <AccordionTrigger className="text-left">{item.question}</AccordionTrigger>
-                        <AccordionContent className="text-muted-foreground leading-relaxed">
-                          {item.answer}
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
-
-                  {filteredFAQs.length === 0 && searchQuery && (
-                    <div className="text-center py-8">
-                      <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="font-medium mb-2">No results found</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Try different keywords or contact support for personalized help
-                      </p>
-                      <Button variant="outline" onClick={() => setActiveTab('contact')} data-testid="button-contact-support">
-                        Contact Support
-                      </Button>
-                    </div>
-                  )}
-                </>
+                <div className="text-center py-8">
+                  <HelpCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="font-medium mb-2">No FAQs available yet</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Check back soon for helpful answers to common questions
+                  </p>
+                </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Links */}
-          <Card data-testid="section-quick-links">
-            <CardHeader>
-              <CardTitle>Quick Links</CardTitle>
-              <CardDescription>
-                Common actions and helpful resources
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 md:grid-cols-2">
-                <Button variant="outline" className="justify-start h-auto p-4" asChild data-testid="link-ai-consultation">
-                  <Link href="/dashboard/consultation">
-                    <div>
-                      <div className="font-medium">Ask Ones AI</div>
-                      <div className="text-sm text-muted-foreground">Get instant help from our AI assistant</div>
-                    </div>
-                  </Link>
-                </Button>
-                
-                <Button variant="outline" className="justify-start h-auto p-4" asChild data-testid="link-formula-help">
-                  <Link href="/dashboard/formula">
-                    <div>
-                      <div className="font-medium">Understand My Formula</div>
-                      <div className="text-sm text-muted-foreground">Learn about your supplement formula</div>
-                    </div>
-                  </Link>
-                </Button>
-
-                <Button variant="outline" className="justify-start h-auto p-4" asChild data-testid="link-upload-labs">
-                  <Link href="/dashboard/profile?tab=reports">
-                    <div>
-                      <div className="font-medium">Upload Lab Results</div>
-                      <div className="text-sm text-muted-foreground">Add blood work for better recommendations</div>
-                    </div>
-                  </Link>
-                </Button>
-
-                <Button variant="outline" className="justify-start h-auto p-4" asChild data-testid="link-billing-help">
-                  <Link href="/dashboard/orders">
-                    <div>
-                      <div className="font-medium">Billing & Orders</div>
-                      <div className="text-sm text-muted-foreground">Manage subscription and payments</div>
-                    </div>
-                  </Link>
-                </Button>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -436,42 +389,24 @@ export default function SupportPage() {
             <div className="space-y-6">
               <Card data-testid="section-contact-info">
                 <CardHeader>
-                  <CardTitle>Other Ways to Reach Us</CardTitle>
+                  <CardTitle>Email Support</CardTitle>
                   <CardDescription>
-                    Multiple channels for getting help and support
+                    Prefer email? Send us a message and we'll respond within 24 hours
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-3 p-3 border rounded-lg">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Mail className="w-4 h-4 text-primary" />
+                <CardContent>
+                  <div className="flex items-start gap-4 p-4 bg-primary/5 border rounded-lg">
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                      <Mail className="w-6 h-6 text-primary" />
                     </div>
-                    <div>
-                      <div className="font-medium">Email Support</div>
-                      <div className="text-sm text-muted-foreground">support@ones.ai</div>
-                      <div className="text-xs text-muted-foreground">Response within 24 hours</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-3 border rounded-lg">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Phone className="w-4 h-4 text-primary" />
-                    </div>
-                    <div>
-                      <div className="font-medium">Phone Support</div>
-                      <div className="text-sm text-muted-foreground">1-800-ONES-AI</div>
-                      <div className="text-xs text-muted-foreground">Mon-Fri, 9AM-6PM EST</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-3 border rounded-lg">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <MessageCircle className="w-4 h-4 text-primary" />
-                    </div>
-                    <div>
-                      <div className="font-medium">Live Chat</div>
-                      <div className="text-sm text-muted-foreground">Available on website</div>
-                      <div className="text-xs text-muted-foreground">Mon-Fri, 9AM-6PM EST</div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-lg mb-1">support@ones.ai</div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Our support team typically responds within 24 hours during business days
+                      </p>
+                      <div className="text-xs text-muted-foreground">
+                        <strong>Note:</strong> For faster assistance, we recommend submitting a support ticket using the form above
+                      </div>
                     </div>
                   </div>
                 </CardContent>
