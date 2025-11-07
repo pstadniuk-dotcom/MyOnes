@@ -55,21 +55,18 @@ function StatCard({
   value, 
   description, 
   icon: Icon, 
-  trend,
-  onClick
+  trend
 }: { 
   title: string; 
   value: string | number; 
   description: string; 
   icon: typeof Users;
   trend?: string;
-  onClick?: () => void;
 }) {
   return (
     <Card 
       data-testid={`stat-card-${title.toLowerCase().replace(/\s/g, '-')}`}
-      className={onClick ? 'hover-elevate cursor-pointer transition-all' : ''}
-      onClick={onClick}
+      className="hover-elevate"
     >
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">
@@ -211,27 +208,39 @@ export default function AdminDashboardPage() {
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="section-stats-cards">
-          <StatCard
-            title="Total Users"
-            value={stats?.totalUsers || 0}
-            description="Click to view all users"
-            icon={Users}
+          <div 
+            className="cursor-pointer transition-all"
             onClick={() => setLocation('/admin/users?filter=all')}
-          />
-          <StatCard
-            title="Paid Users"
-            value={stats?.totalPaidUsers || 0}
-            description="Click to view paid users"
-            icon={UserCheck}
+          >
+            <StatCard
+              title="Total Users"
+              value={stats?.totalUsers || 0}
+              description="Click to view all users"
+              icon={Users}
+            />
+          </div>
+          <div 
+            className="cursor-pointer transition-all"
             onClick={() => setLocation('/admin/users?filter=paid')}
-          />
-          <StatCard
-            title="Active Users"
-            value={stats?.activeUsers || 0}
-            description="Click to view active users"
-            icon={Activity}
+          >
+            <StatCard
+              title="Paid Users"
+              value={stats?.totalPaidUsers || 0}
+              description="Click to view paid users"
+              icon={UserCheck}
+            />
+          </div>
+          <div 
+            className="cursor-pointer transition-all"
             onClick={() => setLocation('/admin/users?filter=active')}
-          />
+          >
+            <StatCard
+              title="Active Users"
+              value={stats?.activeUsers || 0}
+              description="Click to view active users"
+              icon={Activity}
+            />
+          </div>
           <StatCard
             title="Total Orders"
             value={stats?.totalOrders || 0}
