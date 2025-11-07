@@ -6,7 +6,7 @@ import {
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
   notifications, notificationPrefs, auditLogs, userConsents, labAnalyses,
   faqItems, supportTickets, supportTicketResponses, helpArticles, newsletterSubscribers,
-  researchCitations,
+  researchCitations, wearableConnections,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -28,7 +28,8 @@ import {
   type SupportTicketResponse, type InsertSupportTicketResponse,
   type HelpArticle, type InsertHelpArticle,
   type NewsletterSubscriber, type InsertNewsletterSubscriber,
-  type ResearchCitation, type InsertResearchCitation
+  type ResearchCitation, type InsertResearchCitation,
+  type WearableConnection, type InsertWearableConnection
 } from "@shared/schema";
 
 export interface IStorage {
@@ -196,6 +197,12 @@ export interface IStorage {
     chatSessions: ChatSession[];
     fileUploads: FileUpload[];
   }>;
+  
+  // Wearable device connection operations
+  getWearableConnections(userId: string): Promise<WearableConnection[]>;
+  createWearableConnection(connection: InsertWearableConnection): Promise<WearableConnection>;
+  updateWearableConnection(id: string, updates: Partial<InsertWearableConnection>): Promise<WearableConnection | undefined>;
+  disconnectWearableDevice(id: string, userId: string): Promise<boolean>;
 }
 
 export class DrizzleStorage implements IStorage {
@@ -3296,6 +3303,70 @@ export class MemStorage implements IStorage {
       chatSessions: userChatSessions,
       fileUploads: userFileUploads
     };
+  }
+  
+  // Wearable device connection operations
+  async getWearableConnections(userId: string): Promise<WearableConnection[]> {
+    try {
+      const connections = await db
+        .select()
+        .from(wearableConnections)
+        .where(eq(wearableConnections.userId, userId))
+        .orderBy(desc(wearableConnections.connectedAt));
+      return connections;
+    } catch (error) {
+      console.error('Error getting wearable connections:', error);
+      return [];
+    }
+  }
+  
+  async createWearableConnection(connection: InsertWearableConnection): Promise<WearableConnection> {
+    try {
+      const [newConnection] = await db
+        .insert(wearableConnections)
+        .values(connection)
+        .returning();
+      return newConnection;
+    } catch (error) {
+      console.error('Error creating wearable connection:', error);
+      throw new Error('Failed to create wearable connection');
+    }
+  }
+  
+  async updateWearableConnection(id: string, updates: Partial<InsertWearableConnection>): Promise<WearableConnection | undefined> {
+    try {
+      const [updatedConnection] = await db
+        .update(wearableConnections)
+        .set(updates)
+        .where(eq(wearableConnections.id, id))
+        .returning();
+      return updatedConnection || undefined;
+    } catch (error) {
+      console.error('Error updating wearable connection:', error);
+      return undefined;
+    }
+  }
+  
+  async disconnectWearableDevice(id: string, userId: string): Promise<boolean> {
+    try {
+      const [connection] = await db
+        .update(wearableConnections)
+        .set({ 
+          status: 'disconnected',
+          disconnectedAt: new Date()
+        })
+        .where(
+          and(
+            eq(wearableConnections.id, id),
+            eq(wearableConnections.userId, userId)
+          )
+        )
+        .returning();
+      return !!connection;
+    } catch (error) {
+      console.error('Error disconnecting wearable device:', error);
+      return false;
+    }
   }
 }
 
