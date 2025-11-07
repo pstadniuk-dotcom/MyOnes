@@ -111,13 +111,13 @@ const JWT_SECRET_FINAL: string = JWT_SECRET;
 const JWT_EXPIRES_IN = '7d'; // 7 days
 
 // JWT Utilities
-function generateToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET_FINAL, { expiresIn: JWT_EXPIRES_IN });
+function generateToken(userId: string, isAdmin: boolean = false): string {
+  return jwt.sign({ userId, isAdmin }, JWT_SECRET_FINAL, { expiresIn: JWT_EXPIRES_IN });
 }
 
-function verifyToken(token: string): { userId: string } | null {
+function verifyToken(token: string): { userId: string; isAdmin?: boolean } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET_FINAL) as { userId: string };
+    const decoded = jwt.verify(token, JWT_SECRET_FINAL) as { userId: string; isAdmin?: boolean };
     return decoded;
   } catch (error) {
     return null;
@@ -1729,7 +1729,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Generate JWT token
       console.log('📋 SIGNUP: Generating JWT token...');
-      const token = generateToken(user.id);
+      const token = generateToken(user.id, user.isAdmin || false);
       console.log('✅ SIGNUP: JWT token generated');
 
       // Return user data without password
@@ -1739,7 +1739,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          createdAt: user.createdAt.toISOString()
+          createdAt: user.createdAt.toISOString(),
+          isAdmin: user.isAdmin || false
         },
         token
       };
@@ -1803,7 +1804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate JWT token
-      const token = generateToken(user.id);
+      const token = generateToken(user.id, user.isAdmin || false);
 
       // Return user data without password
       const authResponse: AuthResponse = {
@@ -1812,7 +1813,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          createdAt: user.createdAt.toISOString()
+          createdAt: user.createdAt.toISOString(),
+          isAdmin: user.isAdmin || false
         },
         token
       };
@@ -1858,7 +1860,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         state: user.state,
         postalCode: user.postalCode,
         country: user.country,
-        createdAt: user.createdAt.toISOString()
+        createdAt: user.createdAt.toISOString(),
+        isAdmin: user.isAdmin || false
       };
 
       res.json({ user: userData });
