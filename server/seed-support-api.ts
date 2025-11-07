@@ -10,7 +10,7 @@ const helpArticlesData = [
 
 CREATING YOUR ACCOUNT
 
-Visit ones.ai and click "Get Started". Enter your name, email address, and create a password. We recommend adding your phone number for order tracking and optional pill reminders.
+Visit myones.ai and click "Get Started". Enter your name, email address, and create a password. We recommend adding your phone number for order tracking and optional pill reminders.
 
 After signing up, check your email for a verification link. Click it to activate your account. If you don't see the email, check your spam folder.
 
@@ -34,7 +34,7 @@ If you don't have recent labs, you can ask your doctor or use direct-to-consumer
 
 NEED HELP?
 
-Email support@ones.ai for assistance with account setup or profile questions.`,
+Email support@myones.ai for assistance with account setup or profile questions.`,
     displayOrder: 1,
     isPublished: true
   },
@@ -79,7 +79,7 @@ You can return to the consultation anytime to request formula adjustments or ask
 
 NEED HELP?
 
-Email support@ones.ai if you have trouble with the consultation process.`,
+Email support@myones.ai if you have trouble with the consultation process.`,
     displayOrder: 2,
     isPublished: true
   },
@@ -122,7 +122,7 @@ The AI continuously monitors for medication interactions and contraindications. 
 
 QUESTIONS ABOUT YOUR FORMULA?
 
-Ask the AI to explain any ingredient or dosage. You can also email support@ones.ai with specific questions.`,
+Ask the AI to explain any ingredient or dosage. You can also email support@myones.ai with specific questions.`,
     displayOrder: 1,
     isPublished: true
   },
@@ -165,7 +165,7 @@ All lab data is encrypted and stored securely. We never share your health inform
 
 QUESTIONS?
 
-Email support@ones.ai for help with lab uploads or questions about your results.`,
+Email support@myones.ai for help with lab uploads or questions about your results.`,
     displayOrder: 2,
     isPublished: true
   },
@@ -206,11 +206,11 @@ Share your formula details with your healthcare provider. You can download a com
 
 REPORTING ISSUES
 
-If you experience any side effects, stop taking your formula and contact support@ones.ai immediately. The AI can adjust your formula to remove problematic ingredients.
+If you experience any side effects, stop taking your formula and contact support@myones.ai immediately. The AI can adjust your formula to remove problematic ingredients.
 
 QUESTIONS?
 
-Email support@ones.ai for detailed ingredient information or safety questions.`,
+Email support@myones.ai for detailed ingredient information or safety questions.`,
     displayOrder: 3,
     isPublished: true
   },
@@ -255,7 +255,7 @@ Every formula adjustment goes through the same safety checks as your original fo
 
 QUESTIONS ABOUT ADJUSTMENTS?
 
-Email support@ones.ai for guidance on when and how to adjust your formula.`,
+Email support@myones.ai for guidance on when and how to adjust your formula.`,
     displayOrder: 4,
     isPublished: true
   },
@@ -296,7 +296,7 @@ Results take time. Most ingredients require 30-60 days of consistent use to prod
 
 QUESTIONS ABOUT THE SCIENCE?
 
-Ask the AI to explain the research for any recommendation. You can also email support@ones.ai for detailed scientific references.`,
+Ask the AI to explain the research for any recommendation. You can also email support@myones.ai for detailed scientific references.`,
     displayOrder: 5,
     isPublished: true
   },
@@ -321,7 +321,7 @@ WHEN TO STOP
 
 Stop taking your formula immediately if you experience severe allergic reactions, persistent nausea or vomiting, unusual bleeding or bruising, or any severe or concerning symptoms.
 
-Contact your doctor if symptoms are serious. Email support@ones.ai to report the issue and request formula adjustments.
+Contact your doctor if symptoms are serious. Email support@myones.ai to report the issue and request formula adjustments.
 
 MEDICATION INTERACTIONS
 
@@ -343,7 +343,7 @@ Your doctor can help monitor how supplements affect your health conditions and m
 
 QUESTIONS OR CONCERNS?
 
-Email support@ones.ai to report side effects or ask about ingredient concerns. We take all safety issues seriously.`,
+Email support@myones.ai to report side effects or ask about ingredient concerns. We take all safety issues seriously.`,
     displayOrder: 6,
     isPublished: true
   },
@@ -394,7 +394,7 @@ If you change your formula, the price may change depending on which ingredients 
 
 QUESTIONS ABOUT PRICING?
 
-Email support@ones.ai for help understanding your formula pricing or payment options.`,
+Email support@myones.ai for help understanding your formula pricing or payment options.`,
     displayOrder: 1,
     isPublished: true
   },
@@ -431,13 +431,13 @@ DELIVERY ISSUES
 
 If your package shows delivered but you didn't receive it, check with neighbors or your building's mail room. Sometimes carriers mark packages delivered before they actually arrive.
 
-Contact support@ones.ai within 7 days if your package doesn't arrive. We'll investigate and send a replacement if needed.
+Contact support@myones.ai within 7 days if your package doesn't arrive. We'll investigate and send a replacement if needed.
 
 ADDRESS CHANGES
 
 You can update your shipping address before your order ships. Go to your profile settings to change your default address.
 
-If your order already shipped, contact support@ones.ai immediately. We may be able to redirect it.
+If your order already shipped, contact support@myones.ai immediately. We may be able to redirect it.
 
 INTERNATIONAL SHIPPING
 
@@ -445,7 +445,7 @@ Currently we only ship within the United States. International shipping may be a
 
 QUESTIONS?
 
-Email support@ones.ai for help tracking your order or delivery questions.`,
+Email support@myones.ai for help tracking your order or delivery questions.`,
     displayOrder: 2,
     isPublished: true
   },
@@ -462,7 +462,7 @@ However, we provide full refunds for manufacturing defects, shipping errors wher
 
 DAMAGED OR DEFECTIVE PRODUCTS
 
-If you receive damaged capsules, defective packaging, missing doses, or products with quality issues, contact support@ones.ai within 30 days.
+If you receive damaged capsules, defective packaging, missing doses, or products with quality issues, contact support@myones.ai within 30 days.
 
 Provide your order number and photos of the issue. We'll send a free replacement immediately. No return shipping needed.
 
@@ -474,7 +474,7 @@ The AI can modify your formula to better address your needs. We're committed to 
 
 REPLACEMENT PROCESS
 
-Email support@ones.ai with your order number and description of the issue. Include photos if relevant.
+Email support@myones.ai with your order number and description of the issue. Include photos if relevant.
 
 We typically respond within 24 hours. Approved replacements ship within 2-3 business days.
 
@@ -490,7 +490,7 @@ While we can't refund custom orders, we're committed to creating formulas that w
 
 QUESTIONS ABOUT OUR POLICY?
 
-Email support@ones.ai to discuss specific situations or concerns.`,
+Email support@myones.ai to discuss specific situations or concerns.`,
     displayOrder: 3,
     isPublished: true
   },
@@ -511,11 +511,11 @@ EMAIL NOT RECOGNIZED
 
 If the system says your email isn't found, check for typos in the email address. Try any alternate email addresses you might have used.
 
-If you're sure the email is correct but it's not recognized, you may need to create a new account. Contact support@ones.ai if you believe you have an existing account but can't access it.
+If you're sure the email is correct but it's not recognized, you may need to create a new account. Contact support@myones.ai if you believe you have an existing account but can't access it.
 
 RESET EMAIL NOT ARRIVING
 
-Check your spam and junk folders. Add support@ones.ai to your contacts to prevent future emails from being filtered.
+Check your spam and junk folders. Add support@myones.ai to your contacts to prevent future emails from being filtered.
 
 Wait 5-10 minutes before requesting another reset. If still no email, try a different browser or device.
 
@@ -523,7 +523,7 @@ ACCOUNT LOCKED
 
 After 5 failed login attempts, your account locks for 30 minutes as a security measure.
 
-Wait 30 minutes and try again, use the password reset feature, or contact support@ones.ai if you need immediate access.
+Wait 30 minutes and try again, use the password reset feature, or contact support@myones.ai if you need immediate access.
 
 BROWSER ISSUES
 
@@ -535,11 +535,11 @@ TWO-FACTOR AUTHENTICATION
 
 If you enabled two-factor authentication, you'll need your authentication code to log in. Use your authenticator app to get the current code.
 
-Lost access to your authenticator? Contact support@ones.ai for help recovering your account.
+Lost access to your authenticator? Contact support@myones.ai for help recovering your account.
 
 STILL CAN'T LOG IN?
 
-Email support@ones.ai with your email address and description of the problem. Include any error messages you're seeing. We'll respond within 24 hours.`,
+Email support@myones.ai with your email address and description of the problem. Include any error messages you're seeing. We'll respond within 24 hours.`,
     displayOrder: 1,
     isPublished: true
   },
@@ -594,7 +594,7 @@ Take clear photos of each page separately if you have multi-page results.
 
 STILL HAVING PROBLEMS?
 
-Email support@ones.ai with a screenshot of any error message. Include details about your file type, size, and what browser you're using.
+Email support@myones.ai with a screenshot of any error message. Include details about your file type, size, and what browser you're using.
 
 We'll help troubleshoot the issue and may be able to process your labs manually if needed.`,
     displayOrder: 2,
@@ -662,7 +662,7 @@ Try an incognito or private browsing window to rule out cache or extension issue
 
 NEED HELP?
 
-Email support@ones.ai if you're having browser-related problems. Let us know which browser and version you're using.`,
+Email support@myones.ai if you're having browser-related problems. Let us know which browser and version you're using.`,
     displayOrder: 3,
     isPublished: true
   },
@@ -699,7 +699,7 @@ YOUR PRIVACY RIGHTS
 
 You can view all data we have about you, request corrections to your data, download your complete data file, or delete your account and all associated data anytime.
 
-To exercise these rights, email privacy@ones.ai.
+To exercise these rights, email privacy@myones.ai.
 
 ACCOUNT SECURITY BEST PRACTICES
 
@@ -713,7 +713,7 @@ Be cautious of phishing emails. We'll never ask for your password via email.
 
 REPORTING SECURITY CONCERNS
 
-If you notice suspicious activity on your account or suspect a security issue, email security@ones.ai immediately.
+If you notice suspicious activity on your account or suspect a security issue, email security@myones.ai immediately.
 
 We take all security reports seriously and investigate promptly.
 
@@ -723,7 +723,7 @@ We maintain SOC 2 Type II certification, GDPR compliance for EU users, CCPA comp
 
 QUESTIONS ABOUT PRIVACY?
 
-Email privacy@ones.ai for questions about how we handle your data or to exercise your privacy rights.`,
+Email privacy@myones.ai for questions about how we handle your data or to exercise your privacy rights.`,
     displayOrder: 4,
     isPublished: true
   }
@@ -804,13 +804,13 @@ const faqData = [
   {
     category: 'Technical Support',
     question: 'I\'m having trouble uploading my lab results. What should I do?',
-    answer: 'Common solutions: (1) Ensure file is PDF, JPG, or PNG format under 10MB, (2) Try a different browser (Chrome works best), (3) Clear your browser cache, (4) For images, ensure good lighting and the text is readable. If issues persist, contact support@ones.ai with a screenshot of the error.',
+    answer: 'Common solutions: (1) Ensure file is PDF, JPG, or PNG format under 10MB, (2) Try a different browser (Chrome works best), (3) Clear your browser cache, (4) For images, ensure good lighting and the text is readable. If issues persist, contact support@myones.ai with a screenshot of the error.',
     displayOrder: 2
   },
   {
     category: 'Technical Support',
     question: 'How do I reset my password?',
-    answer: 'On the login page, click "Forgot Password?" Enter your email address and check your inbox (and spam folder) for a reset link. Click the link to create a new password. If you don\'t receive the email within 10 minutes, try requesting again or contact support@ones.ai.',
+    answer: 'On the login page, click "Forgot Password?" Enter your email address and check your inbox (and spam folder) for a reset link. Click the link to create a new password. If you don\'t receive the email within 10 minutes, try requesting again or contact support@myones.ai.',
     displayOrder: 3
   },
   {
