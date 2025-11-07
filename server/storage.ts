@@ -1488,7 +1488,11 @@ export class DrizzleStorage implements IStorage {
         .from(formulas);
       const activeUsers = usersWithFormulas.length;
       
-      const totalRevenue = 0;
+      // Calculate total revenue from orders
+      const [revenueStats] = await db
+        .select({ totalRevenueCents: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+        .from(orders);
+      const totalRevenue = Number(revenueStats?.totalRevenueCents || 0) / 100;
       
       return {
         totalUsers,
@@ -1566,7 +1570,8 @@ export class DrizzleStorage implements IStorage {
       const revenueData = await db
         .select({
           date: sql<string>`DATE(placed_at)`,
-          orders: count()
+          orders: count(),
+          revenueCents: sql<number>`COALESCE(SUM(amount_cents), 0)`
         })
         .from(orders)
         .where(gte(orders.placedAt, startDate))
@@ -1575,7 +1580,7 @@ export class DrizzleStorage implements IStorage {
       
       return revenueData.map(row => ({
         date: row.date,
-        revenue: 0,
+        revenue: Number(row.revenueCents || 0) / 100,
         orders: Number(row.orders)
       }));
     } catch (error) {
