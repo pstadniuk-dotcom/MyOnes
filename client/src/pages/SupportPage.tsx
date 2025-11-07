@@ -472,8 +472,8 @@ export default function SupportPage() {
                 <Accordion type="single" collapsible className="w-full">
                   {filteredFAQs.map((item) => (
                     <AccordionItem key={item.id} value={item.id} data-testid={`faq-${item.id}`}>
-                      <AccordionTrigger className="text-left">{item.question}</AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground leading-relaxed">
+                      <AccordionTrigger className="text-left text-sm">{item.question}</AccordionTrigger>
+                      <AccordionContent className="text-sm text-muted-foreground leading-relaxed">
                         {item.answer}
                       </AccordionContent>
                     </AccordionItem>
