@@ -85,9 +85,17 @@ export default function UserManagementPage() {
     setCurrentPage(0);
   }, [debouncedSearch, filter]);
 
+  // Build query string for users API
+  const queryParams = new URLSearchParams({
+    ...(debouncedSearch && { q: debouncedSearch }),
+    limit: limit.toString(),
+    offset: (currentPage * limit).toString(),
+    filter: filter,
+  });
+
   // Fetch users
   const { data, isLoading, error } = useQuery<UsersResponse>({
-    queryKey: ['/api/admin/users', { q: debouncedSearch, limit, offset: currentPage * limit, filter }],
+    queryKey: [`/api/admin/users?${queryParams.toString()}`],
   });
 
   // Show error toast
