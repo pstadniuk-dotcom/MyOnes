@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { eq, desc, and, isNull, gte, lte, or, ilike, sql, count, inArray } from "drizzle-orm";
 import { db } from "./db";
+import { encryptToken, decryptToken } from "./tokenEncryption";
 import {
   users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
@@ -3313,7 +3314,23 @@ export class MemStorage implements IStorage {
         .from(wearableConnections)
         .where(eq(wearableConnections.userId, userId))
         .orderBy(desc(wearableConnections.connectedAt));
-      return connections;
+      
+      // Decrypt tokens for active connections
+      return connections.map(conn => {
+        if (conn.status === 'connected' && conn.accessToken) {
+          try {
+            return {
+              ...conn,
+              accessToken: decryptToken(conn.accessToken),
+              refreshToken: conn.refreshToken ? decryptToken(conn.refreshToken) : null
+            };
+          } catch (error) {
+            console.error('Error decrypting tokens for connection:', conn.id, error);
+            return conn;
+          }
+        }
+        return conn;
+      });
     } catch (error) {
       console.error('Error getting wearable connections:', error);
       return [];
@@ -3322,11 +3339,24 @@ export class MemStorage implements IStorage {
   
   async createWearableConnection(connection: InsertWearableConnection): Promise<WearableConnection> {
     try {
+      // Encrypt tokens before storing
+      const encryptedConnection = {
+        ...connection,
+        accessToken: connection.accessToken ? encryptToken(connection.accessToken) : null,
+        refreshToken: connection.refreshToken ? encryptToken(connection.refreshToken) : null
+      };
+      
       const [newConnection] = await db
         .insert(wearableConnections)
-        .values(connection)
+        .values(encryptedConnection)
         .returning();
-      return newConnection;
+      
+      // Return connection with decrypted tokens
+      return {
+        ...newConnection,
+        accessToken: connection.accessToken,
+        refreshToken: connection.refreshToken
+      };
     } catch (error) {
       console.error('Error creating wearable connection:', error);
       throw new Error('Failed to create wearable connection');
@@ -3335,12 +3365,36 @@ export class MemStorage implements IStorage {
   
   async updateWearableConnection(id: string, updates: Partial<InsertWearableConnection>): Promise<WearableConnection | undefined> {
     try {
+      // Encrypt tokens if present in updates
+      const encryptedUpdates = {
+        ...updates,
+        accessToken: updates.accessToken ? encryptToken(updates.accessToken) : updates.accessToken,
+        refreshToken: updates.refreshToken ? encryptToken(updates.refreshToken) : updates.refreshToken
+      };
+      
       const [updatedConnection] = await db
         .update(wearableConnections)
-        .set(updates)
+        .set(encryptedUpdates)
         .where(eq(wearableConnections.id, id))
         .returning();
-      return updatedConnection || undefined;
+      
+      if (!updatedConnection) return undefined;
+      
+      // Decrypt tokens before returning
+      if (updatedConnection.accessToken) {
+        try {
+          return {
+            ...updatedConnection,
+            accessToken: decryptToken(updatedConnection.accessToken),
+            refreshToken: updatedConnection.refreshToken ? decryptToken(updatedConnection.refreshToken) : null
+          };
+        } catch (error) {
+          console.error('Error decrypting tokens after update:', error);
+          return updatedConnection;
+        }
+      }
+      
+      return updatedConnection;
     } catch (error) {
       console.error('Error updating wearable connection:', error);
       return undefined;
@@ -3349,11 +3403,15 @@ export class MemStorage implements IStorage {
   
   async disconnectWearableDevice(id: string, userId: string): Promise<boolean> {
     try {
+      // Null out tokens to prevent credential reuse
       const [connection] = await db
         .update(wearableConnections)
         .set({ 
           status: 'disconnected',
-          disconnectedAt: new Date()
+          disconnectedAt: new Date(),
+          accessToken: null,
+          refreshToken: null,
+          tokenExpiresAt: null
         })
         .where(
           and(
