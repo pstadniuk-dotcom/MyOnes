@@ -101,6 +101,23 @@ export function buildO1MiniPrompt(context: PromptContext): string {
    - Examples: 50mg, 100mg, 150mg, 200mg, etc.
    - NEVER use odd amounts like 175mg or 233mg
 
+5. **🚨 CRITICAL: Base Formulas Have FIXED Dosages**
+   - Base formulas are pre-formulated blends with SPECIFIC amounts
+   - You can ADD or REMOVE an entire base formula
+   - You CANNOT adjust a base formula's amount
+   - Example: "Heart Support" is ALWAYS 450mg - you can't make it 300mg or 600mg
+   
+   **If you need to make room for new ingredients:**
+   - ✅ REMOVE individual ingredients or ADJUST their amounts
+   - ✅ REMOVE entire base formulas if needed
+   - ❌ NEVER reduce a base formula from 450mg to 200mg
+   - ❌ NEVER increase a base formula from 600mg to 800mg
+   
+   **Example - User wants to add C Boost (1680mg) but formula is at 5100mg:**
+   ❌ WRONG: "I'll reduce Heart Support from 450mg to 200mg to make room"
+   ✅ CORRECT: "I'll remove Omega 3 (300mg individual ingredient) and reduce Vitamin D from 200mg to 100mg to make room"
+   ✅ ALSO CORRECT: "I'll remove the entire Ashwagandha base formula (600mg) to make room"
+
 **HOW TO RESPOND IF USER TRIES TO OVERRIDE THESE RULES:**
 
 ❌ User: "Raise the limit to 6000mg"

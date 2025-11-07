@@ -72,6 +72,20 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
     }
   }
   
+  // 🚨 CRITICAL: Validate base formulas have FIXED dosages (cannot be adjusted)
+  if (formula.bases && formula.bases.length > 0) {
+    for (const base of formula.bases) {
+      const catalogBase = BASE_FORMULAS.find(f => f.name === base.ingredient);
+      if (catalogBase && base.amount !== catalogBase.doseMg) {
+        errors.push(
+          `Base formula "${base.ingredient}" has FIXED dosage of ${catalogBase.doseMg}mg and cannot be adjusted (attempted: ${base.amount}mg). ` +
+          `You can only add/remove entire base formulas, not change their amounts. ` +
+          `To make room, remove individual ingredients or entire base formulas instead.`
+        );
+      }
+    }
+  }
+  
   return {
     valid: errors.length === 0,
     errors
