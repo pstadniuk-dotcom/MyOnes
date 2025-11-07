@@ -1,7 +1,3 @@
-import './db';
-import { db } from './db';
-import { helpArticles, faqItems } from '../shared/schema';
-
 const helpArticlesData = [
   {
     category: 'Getting Started',
