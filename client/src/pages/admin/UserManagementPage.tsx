@@ -15,7 +15,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation, useSearch } from 'wouter';
-import { Search as SearchIcon, ChevronLeft, ChevronRight, Users, Shield } from 'lucide-react';
+import { Search as SearchIcon, ChevronLeft, ChevronRight, Users, Shield, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 
 // Types
@@ -126,10 +126,21 @@ export default function UserManagementPage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="heading-user-management">
-            <Users className="h-8 w-8" />
-            User Management
-          </h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="heading-user-management">
+              <Users className="h-8 w-8" />
+              User Management
+            </h1>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setLocation('/admin')}
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
           <p className="text-muted-foreground">
             Manage and view all platform users
           </p>
