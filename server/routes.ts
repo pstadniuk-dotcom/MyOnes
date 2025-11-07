@@ -141,6 +141,37 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// Admin middleware for admin-only routes
+async function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  try {
+    const user = await storage.getUserById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    if (!user.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    req.userId = decoded.userId;
+    next();
+  } catch (error) {
+    console.error('Admin verification error:', error);
+    return res.status(500).json({ error: 'Failed to verify admin status' });
+  }
+}
+
 // Helper function to normalize ingredient names for flexible matching
 // Handles variations like "Phosphatidylcholine 40%" vs "Phosphatidylcholine 40% (soy)"
 function normalizeIngredientForMatching(name: string): string {
@@ -4960,6 +4991,103 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       
       console.error('Newsletter subscription error:', error);
       res.status(500).json({ error: 'Failed to subscribe to newsletter' });
+    }
+  });
+
+  // ========== ADMIN ROUTES (Protected with requireAdmin middleware) ==========
+  
+  // Admin: Get dashboard statistics
+  app.get('/api/admin/stats', requireAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getAdminStats();
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching admin stats:', error);
+      res.status(500).json({ error: 'Failed to fetch admin statistics' });
+    }
+  });
+  
+  // Admin: Get user growth data
+  app.get('/api/admin/analytics/growth', requireAdmin, async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 30;
+      const growthData = await storage.getUserGrowthData(days);
+      res.json(growthData);
+    } catch (error) {
+      console.error('Error fetching growth data:', error);
+      res.status(500).json({ error: 'Failed to fetch growth data' });
+    }
+  });
+  
+  // Admin: Get revenue data
+  app.get('/api/admin/analytics/revenue', requireAdmin, async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 30;
+      const revenueData = await storage.getRevenueData(days);
+      res.json(revenueData);
+    } catch (error) {
+      console.error('Error fetching revenue data:', error);
+      res.status(500).json({ error: 'Failed to fetch revenue data' });
+    }
+  });
+  
+  // Admin: Search and list users
+  app.get('/api/admin/users', requireAdmin, async (req, res) => {
+    try {
+      const query = (req.query.q as string) || '';
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const result = await storage.searchUsers(query, limit, offset);
+      
+      // Sanitize users to remove sensitive fields
+      const sanitizedUsers = result.users.map(({ password, ...user }) => user);
+      
+      res.json({
+        users: sanitizedUsers,
+        total: result.total
+      });
+    } catch (error) {
+      console.error('Error searching users:', error);
+      res.status(500).json({ error: 'Failed to search users' });
+    }
+  });
+  
+  // Admin: Get detailed user information
+  app.get('/api/admin/users/:id', requireAdmin, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Sanitize user to remove sensitive fields
+      const { password, ...sanitizedUser } = user;
+      res.json(sanitizedUser);
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      res.status(500).json({ error: 'Failed to fetch user details' });
+    }
+  });
+  
+  // Admin: Get user timeline (complete activity history)
+  app.get('/api/admin/users/:id/timeline', requireAdmin, async (req, res) => {
+    try {
+      const timeline = await storage.getUserTimeline(req.params.id);
+      
+      // Sanitize user to remove sensitive fields
+      const { password, ...sanitizedUser } = timeline.user;
+      
+      res.json({
+        ...timeline,
+        user: sanitizedUser
+      });
+    } catch (error) {
+      console.error('Error fetching user timeline:', error);
+      if (error instanceof Error && error.message === 'User not found') {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.status(500).json({ error: 'Failed to fetch user timeline' });
     }
   });
 

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { eq, desc, and, isNull, gte, lte } from "drizzle-orm";
+import { eq, desc, and, isNull, gte, lte, or, ilike, sql, count } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
@@ -32,7 +32,7 @@ import {
 } from "@shared/schema";
 
 export interface IStorage {
-  // User operations
+  // User operations  
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
@@ -174,6 +174,27 @@ export interface IStorage {
   // Research citations operations
   getResearchCitationsForIngredient(ingredientName: string): Promise<ResearchCitation[]>;
   createResearchCitation(citation: InsertResearchCitation): Promise<ResearchCitation>;
+  
+  // Admin operations
+  getAdminStats(): Promise<{
+    totalUsers: number;
+    totalPaidUsers: number;
+    totalRevenue: number;
+    activeUsers: number;
+    totalOrders: number;
+    totalFormulas: number;
+  }>;
+  getUserGrowthData(days: number): Promise<Array<{ date: string; users: number; paidUsers: number }>>;
+  getRevenueData(days: number): Promise<Array<{ date: string; revenue: number; orders: number }>>;
+  searchUsers(query: string, limit: number, offset: number): Promise<{ users: User[]; total: number }>;
+  getUserTimeline(userId: string): Promise<{
+    user: User;
+    healthProfile?: HealthProfile;
+    formulas: Formula[];
+    orders: Order[];
+    chatSessions: ChatSession[];
+    fileUploads: FileUpload[];
+  }>;
 }
 
 export class DrizzleStorage implements IStorage {
@@ -1435,6 +1456,204 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error listing support ticket responses:', error);
       return [];
+    }
+  }
+  
+  // Admin operations
+  async getAdminStats(): Promise<{
+    totalUsers: number;
+    totalPaidUsers: number;
+    totalRevenue: number;
+    activeUsers: number;
+    totalOrders: number;
+    totalFormulas: number;
+  }> {
+    try {
+      const [userStats] = await db.select({ count: count() }).from(users);
+      const totalUsers = Number(userStats?.count || 0);
+      
+      const [formulaStats] = await db.select({ count: count() }).from(formulas);
+      const totalFormulas = Number(formulaStats?.count || 0);
+      
+      const [orderStats] = await db.select({ count: count() }).from(orders);
+      const totalOrders = Number(orderStats?.count || 0);
+      
+      const paidUsersResult = await db
+        .selectDistinct({ userId: orders.userId })
+        .from(orders);
+      const totalPaidUsers = paidUsersResult.length;
+      
+      const usersWithFormulas = await db
+        .selectDistinct({ userId: formulas.userId })
+        .from(formulas);
+      const activeUsers = usersWithFormulas.length;
+      
+      const totalRevenue = 0;
+      
+      return {
+        totalUsers,
+        totalPaidUsers,
+        totalRevenue,
+        activeUsers,
+        totalOrders,
+        totalFormulas
+      };
+    } catch (error) {
+      console.error('Error getting admin stats:', error);
+      return {
+        totalUsers: 0,
+        totalPaidUsers: 0,
+        totalRevenue: 0,
+        activeUsers: 0,
+        totalOrders: 0,
+        totalFormulas: 0
+      };
+    }
+  }
+  
+  async getUserGrowthData(days: number): Promise<Array<{ date: string; users: number; paidUsers: number }>> {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      
+      // Get daily new user signups
+      const dailyUsers = await db
+        .select({
+          date: sql<string>`DATE(created_at)`,
+          count: count()
+        })
+        .from(users)
+        .where(gte(users.createdAt, startDate))
+        .groupBy(sql`DATE(created_at)`)
+        .orderBy(sql`DATE(created_at)`);
+      
+      // Get distinct paid users (users who have placed orders)
+      const paidUserIds = await db
+        .selectDistinct({ userId: orders.userId, orderDate: sql<string>`DATE(placed_at)` })
+        .from(orders)
+        .where(gte(orders.placedAt, startDate));
+      
+      // Build cumulative growth data
+      let cumulativeUsers = 0;
+      let cumulativePaid = 0;
+      
+      const paidByDate = new Map<string, number>();
+      paidUserIds.forEach(({ orderDate }) => {
+        paidByDate.set(orderDate, (paidByDate.get(orderDate) || 0) + 1);
+      });
+      
+      return dailyUsers.map(row => {
+        cumulativeUsers += Number(row.count);
+        cumulativePaid += (paidByDate.get(row.date) || 0);
+        
+        return {
+          date: row.date,
+          users: cumulativeUsers,
+          paidUsers: cumulativePaid
+        };
+      });
+    } catch (error) {
+      console.error('Error getting user growth data:', error);
+      return [];
+    }
+  }
+  
+  async getRevenueData(days: number): Promise<Array<{ date: string; revenue: number; orders: number }>> {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      
+      const revenueData = await db
+        .select({
+          date: sql<string>`DATE(placed_at)`,
+          orders: count()
+        })
+        .from(orders)
+        .where(gte(orders.placedAt, startDate))
+        .groupBy(sql`DATE(placed_at)`)
+        .orderBy(sql`DATE(placed_at)`);
+      
+      return revenueData.map(row => ({
+        date: row.date,
+        revenue: 0,
+        orders: Number(row.orders)
+      }));
+    } catch (error) {
+      console.error('Error getting revenue data:', error);
+      return [];
+    }
+  }
+  
+  async searchUsers(query: string, limit: number, offset: number): Promise<{ users: User[]; total: number }> {
+    try {
+      const searchPattern = `%${query}%`;
+      
+      const foundUsers = await db
+        .select()
+        .from(users)
+        .where(
+          or(
+            ilike(users.email, searchPattern),
+            ilike(users.name, searchPattern),
+            ilike(users.phone, searchPattern)
+          )
+        )
+        .limit(limit)
+        .offset(offset)
+        .orderBy(desc(users.createdAt));
+      
+      const [totalResult] = await db
+        .select({ count: count() })
+        .from(users)
+        .where(
+          or(
+            ilike(users.email, searchPattern),
+            ilike(users.name, searchPattern),
+            ilike(users.phone, searchPattern)
+          )
+        );
+      
+      return {
+        users: foundUsers,
+        total: Number(totalResult?.count || 0)
+      };
+    } catch (error) {
+      console.error('Error searching users:', error);
+      return { users: [], total: 0 };
+    }
+  }
+  
+  async getUserTimeline(userId: string): Promise<{
+    user: User;
+    healthProfile?: HealthProfile;
+    formulas: Formula[];
+    orders: Order[];
+    chatSessions: ChatSession[];
+    fileUploads: FileUpload[];
+  }> {
+    try {
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user) {
+        throw new Error('User not found');
+      }
+      
+      const [healthProfile] = await db.select().from(healthProfiles).where(eq(healthProfiles.userId, userId));
+      const userFormulas = await db.select().from(formulas).where(eq(formulas.userId, userId)).orderBy(desc(formulas.createdAt));
+      const userOrders = await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.placedAt));
+      const userChatSessions = await db.select().from(chatSessions).where(eq(chatSessions.userId, userId)).orderBy(desc(chatSessions.createdAt));
+      const userFileUploads = await db.select().from(fileUploads).where(eq(fileUploads.userId, userId)).orderBy(desc(fileUploads.uploadedAt));
+      
+      return {
+        user,
+        healthProfile: healthProfile || undefined,
+        formulas: userFormulas,
+        orders: userOrders,
+        chatSessions: userChatSessions,
+        fileUploads: userFileUploads
+      };
+    } catch (error) {
+      console.error('Error getting user timeline:', error);
+      throw error;
     }
   }
 }
@@ -2877,6 +3096,85 @@ export class MemStorage implements IStorage {
     };
     this.researchCitations.set(id, newCitation);
     return newCitation;
+  }
+  
+  // Admin operations (in-memory stubs for MemStorage)
+  async getAdminStats(): Promise<{
+    totalUsers: number;
+    totalPaidUsers: number;
+    totalRevenue: number;
+    activeUsers: number;
+    totalOrders: number;
+    totalFormulas: number;
+  }> {
+    const totalUsers = this.users.size;
+    const totalFormulas = this.formulas.size;
+    const totalOrders = this.orders.size;
+    const uniquePaidUserIds = new Set(Array.from(this.orders.values()).map(o => o.userId));
+    const totalPaidUsers = uniquePaidUserIds.size;
+    const uniqueActiveUserIds = new Set(Array.from(this.formulas.values()).map(f => f.userId));
+    const activeUsers = uniqueActiveUserIds.size;
+    
+    return {
+      totalUsers,
+      totalPaidUsers,
+      totalRevenue: 0,
+      activeUsers,
+      totalOrders,
+      totalFormulas
+    };
+  }
+  
+  async getUserGrowthData(days: number): Promise<Array<{ date: string; users: number; paidUsers: number }>> {
+    return [];
+  }
+  
+  async getRevenueData(days: number): Promise<Array<{ date: string; revenue: number; orders: number }>> {
+    return [];
+  }
+  
+  async searchUsers(query: string, limit: number, offset: number): Promise<{ users: User[]; total: number }> {
+    const lowerQuery = query.toLowerCase();
+    const matchedUsers = Array.from(this.users.values()).filter(user => 
+      user.email.toLowerCase().includes(lowerQuery) ||
+      user.name.toLowerCase().includes(lowerQuery) ||
+      (user.phone && user.phone.toLowerCase().includes(lowerQuery))
+    );
+    
+    const paginatedUsers = matchedUsers.slice(offset, offset + limit);
+    return {
+      users: paginatedUsers,
+      total: matchedUsers.length
+    };
+  }
+  
+  async getUserTimeline(userId: string): Promise<{
+    user: User;
+    healthProfile?: HealthProfile;
+    formulas: Formula[];
+    orders: Order[];
+    chatSessions: ChatSession[];
+    fileUploads: FileUpload[];
+  }> {
+    const user = this.users.get(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    
+    const healthProfile = Array.from(this.healthProfiles.values()).find(hp => hp.userId === userId);
+    const userFormulas = Array.from(this.formulas.values()).filter(f => f.userId === userId);
+    const userOrders = Array.from(this.orders.values()).filter(o => o.userId === userId);
+    const userChatSessions = Array.from(this.chatSessions.values()).filter(cs => cs.userId === userId);
+    const userFileUploads = Array.from(this.fileUploads.values()).filter(fu => fu.userId === userId);
+    
+    return {
+      user,
+      healthProfile,
+      formulas: userFormulas,
+      orders: userOrders,
+      chatSessions: userChatSessions,
+      fileUploads: userFileUploads
+    };
   }
 }
 

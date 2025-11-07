@@ -35,6 +35,10 @@ export const users = pgTable("users", {
   phone: text("phone"),
   password: text("password").notNull(),
   
+  // Admin and access tracking
+  isAdmin: boolean("is_admin").default(false).notNull(),
+  lastLoginAt: timestamp("last_login_at"),
+  
   // Address fields
   addressLine1: text("address_line1"),
   addressLine2: text("address_line2"),

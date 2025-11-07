@@ -9,6 +9,7 @@ interface User {
   email: string;
   phone: string | null;
   createdAt: string;
+  isAdmin: boolean;
 }
 
 interface AuthContextType {
