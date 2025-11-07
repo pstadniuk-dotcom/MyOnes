@@ -186,7 +186,8 @@ export interface IStorage {
   }>;
   getUserGrowthData(days: number): Promise<Array<{ date: string; users: number; paidUsers: number }>>;
   getRevenueData(days: number): Promise<Array<{ date: string; revenue: number; orders: number }>>;
-  searchUsers(query: string, limit: number, offset: number): Promise<{ users: User[]; total: number }>;
+  searchUsers(query: string, limit: number, offset: number, filter?: string): Promise<{ users: User[]; total: number }>;
+  getTodaysOrders(): Promise<Array<Order & { user: { id: string; name: string; email: string }; formula?: Formula }>>;
   getUserTimeline(userId: string): Promise<{
     user: User;
     healthProfile?: HealthProfile;
@@ -1589,34 +1590,55 @@ export class DrizzleStorage implements IStorage {
     }
   }
   
-  async searchUsers(query: string, limit: number, offset: number): Promise<{ users: User[]; total: number }> {
+  async searchUsers(query: string, limit: number, offset: number, filter: string = 'all'): Promise<{ users: User[]; total: number }> {
     try {
       const searchPattern = `%${query}%`;
       
-      const foundUsers = await db
-        .select()
-        .from(users)
-        .where(
-          or(
-            ilike(users.email, searchPattern),
-            ilike(users.name, searchPattern),
-            ilike(users.phone, searchPattern)
-          )
-        )
+      let userQuery = db.select().from(users);
+      let countQuery = db.select({ count: count() }).from(users);
+      
+      // Apply text search filter
+      const searchCondition = or(
+        ilike(users.email, searchPattern),
+        ilike(users.name, searchPattern),
+        ilike(users.phone, searchPattern)
+      );
+      
+      // Apply user type filter
+      if (filter === 'paid') {
+        // Users who have placed orders
+        const paidUserIds = await db.selectDistinct({ userId: orders.userId }).from(orders);
+        const paidIds = paidUserIds.map(p => p.userId);
+        
+        if (paidIds.length === 0) {
+          return { users: [], total: 0 };
+        }
+        
+        userQuery = userQuery.where(and(searchCondition, sql`${users.id} = ANY(${paidIds})`));
+        countQuery = countQuery.where(and(searchCondition, sql`${users.id} = ANY(${paidIds})`));
+      } else if (filter === 'active') {
+        // Users who have created formulas
+        const activeUserIds = await db.selectDistinct({ userId: formulas.userId }).from(formulas);
+        const activeIds = activeUserIds.map(a => a.userId);
+        
+        if (activeIds.length === 0) {
+          return { users: [], total: 0 };
+        }
+        
+        userQuery = userQuery.where(and(searchCondition, sql`${users.id} = ANY(${activeIds})`));
+        countQuery = countQuery.where(and(searchCondition, sql`${users.id} = ANY(${activeIds})`));
+      } else {
+        // All users
+        userQuery = userQuery.where(searchCondition);
+        countQuery = countQuery.where(searchCondition);
+      }
+      
+      const foundUsers = await userQuery
         .limit(limit)
         .offset(offset)
         .orderBy(desc(users.createdAt));
       
-      const [totalResult] = await db
-        .select({ count: count() })
-        .from(users)
-        .where(
-          or(
-            ilike(users.email, searchPattern),
-            ilike(users.name, searchPattern),
-            ilike(users.phone, searchPattern)
-          )
-        );
+      const [totalResult] = await countQuery;
       
       return {
         users: foundUsers,
@@ -1625,6 +1647,47 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error searching users:', error);
       return { users: [], total: 0 };
+    }
+  }
+  
+  async getTodaysOrders(): Promise<Array<Order & { user: { id: string; name: string; email: string }; formula?: Formula }>> {
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      
+      const todayOrders = await db
+        .select()
+        .from(orders)
+        .where(gte(orders.placedAt, todayStart))
+        .orderBy(desc(orders.placedAt));
+      
+      // Enrich orders with user and formula details
+      const enrichedOrders = await Promise.all(
+        todayOrders.map(async (order) => {
+          const [user] = await db.select({
+            id: users.id,
+            name: users.name,
+            email: users.email
+          }).from(users).where(eq(users.id, order.userId));
+          
+          const [formula] = await db
+            .select()
+            .from(formulas)
+            .where(
+              and(
+                eq(formulas.userId, order.userId),
+                eq(formulas.version, order.formulaVersion)
+              )
+            );
+          
+          return { ...order, user, formula };
+        })
+      );
+      
+      return enrichedOrders;
+    } catch (error) {
+      console.error('Error getting today\'s orders:', error);
+      return [];
     }
   }
   
@@ -3154,19 +3217,50 @@ export class MemStorage implements IStorage {
     return [];
   }
   
-  async searchUsers(query: string, limit: number, offset: number): Promise<{ users: User[]; total: number }> {
+  async searchUsers(query: string, limit: number, offset: number, filter: string = 'all'): Promise<{ users: User[]; total: number }> {
     const lowerQuery = query.toLowerCase();
-    const matchedUsers = Array.from(this.users.values()).filter(user => 
+    let matchedUsers = Array.from(this.users.values()).filter(user => 
       user.email.toLowerCase().includes(lowerQuery) ||
       user.name.toLowerCase().includes(lowerQuery) ||
       (user.phone && user.phone.toLowerCase().includes(lowerQuery))
     );
+    
+    // Apply filter
+    if (filter === 'paid') {
+      const paidUserIds = new Set(Array.from(this.orders.values()).map(o => o.userId));
+      matchedUsers = matchedUsers.filter(u => paidUserIds.has(u.id));
+    } else if (filter === 'active') {
+      const activeUserIds = new Set(Array.from(this.formulas.values()).map(f => f.userId));
+      matchedUsers = matchedUsers.filter(u => activeUserIds.has(u.id));
+    }
     
     const paginatedUsers = matchedUsers.slice(offset, offset + limit);
     return {
       users: paginatedUsers,
       total: matchedUsers.length
     };
+  }
+  
+  async getTodaysOrders(): Promise<Array<Order & { user: { id: string; name: string; email: string }; formula?: Formula }>> {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    
+    const todayOrders = Array.from(this.orders.values()).filter(order => 
+      new Date(order.placedAt) >= todayStart
+    );
+    
+    return todayOrders.map(order => {
+      const user = this.users.get(order.userId);
+      const formula = Array.from(this.formulas.values()).find(
+        f => f.userId === order.userId && f.version === order.formulaVersion
+      );
+      
+      return {
+        ...order,
+        user: user ? { id: user.id, name: user.name, email: user.email } : { id: '', name: '', email: '' },
+        formula
+      };
+    });
   }
   
   async getUserTimeline(userId: string): Promise<{
