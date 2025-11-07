@@ -31,6 +31,53 @@ declare global {
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// SECURITY: Immutable formula limits - CANNOT be changed by user requests or AI prompts
+const FORMULA_LIMITS = {
+  MAX_TOTAL_DOSAGE: 5500,        // Maximum total daily dosage in mg
+  MIN_INGREDIENT_DOSE: 50,       // Minimum dose per ingredient in mg
+  MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
+} as const;
+
+// Validation function to enforce immutable limits
+function validateFormulaLimits(formula: any): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  // Check total dosage limit
+  if (formula.totalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
+    errors.push(`Formula exceeds maximum dosage limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (attempted: ${formula.totalMg}mg)`);
+  }
+  
+  // Check minimum ingredient dose
+  const allIngredients = [...(formula.bases || []), ...(formula.additions || [])];
+  for (const ingredient of allIngredients) {
+    if (ingredient.amount < FORMULA_LIMITS.MIN_INGREDIENT_DOSE) {
+      errors.push(`Ingredient "${ingredient.ingredient}" below minimum dose of ${FORMULA_LIMITS.MIN_INGREDIENT_DOSE}mg (attempted: ${ingredient.amount}mg)`);
+    }
+  }
+  
+  // Check total ingredient count
+  if (allIngredients.length > FORMULA_LIMITS.MAX_INGREDIENT_COUNT) {
+    errors.push(`Formula exceeds maximum ingredient count of ${FORMULA_LIMITS.MAX_INGREDIENT_COUNT} (attempted: ${allIngredients.length})`);
+  }
+  
+  // Verify all ingredients are approved
+  const approvedNames = new Set([
+    ...BASE_FORMULAS.map(f => f.name),
+    ...INDIVIDUAL_INGREDIENTS.map(i => i.name)
+  ]);
+  
+  for (const ingredient of allIngredients) {
+    if (!approvedNames.has(ingredient.ingredient)) {
+      errors.push(`Unapproved ingredient: "${ingredient.ingredient}"`);
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
 // JWT Configuration
 let JWT_SECRET: string = process.env.JWT_SECRET || '';
 
@@ -2571,6 +2618,30 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             disclaimers: extractedFormula.disclaimers || [],
             version: nextVersion
           };
+          
+          // 🔒 SECURITY: Validate formula against immutable limits
+          const limitValidation = validateFormulaLimits(formulaData);
+          if (!limitValidation.valid) {
+            console.error('🚨 SECURITY: Formula rejected - violates immutable limits!');
+            console.error('🚨 Validation errors:', limitValidation.errors);
+            console.error('🚨 Attempted totalMg:', formulaData.totalMg);
+            console.error('🚨 Max allowed:', FORMULA_LIMITS.MAX_TOTAL_DOSAGE);
+            
+            // Log potential prompt injection attempt
+            console.warn('⚠️ SECURITY ALERT: Possible prompt injection attempt detected!');
+            console.warn('User may have tried to override system limits via AI prompt');
+            
+            // Notify user via SSE
+            sendSSE({
+              type: 'error',
+              error: `⚠️ Formula Safety Check Failed:\n\n${limitValidation.errors.join('\n')}\n\nOur platform has strict safety limits to protect your health. The maximum total dosage is ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg per day.\n\nWould you like me to optimize your formula within safe limits?`
+            });
+            
+            // Don't save the formula - throw error to stop processing
+            throw new Error('Formula exceeds safety limits');
+          }
+          
+          console.log('✅ Security validation passed - formula within safe limits');
           
           savedFormula = await storage.createFormula(formulaData);
           console.log(`Formula v${nextVersion} saved successfully for user ${userId}`);
