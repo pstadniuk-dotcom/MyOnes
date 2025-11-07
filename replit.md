@@ -10,6 +10,25 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### November 7, 2025 - Wearable Integration Foundation (IN PROGRESS)
+- **Database Schema**: Added tables for wearable device integrations:
+  - `wearable_connections`: Stores OAuth tokens and connection status for Fitbit, Oura, WHOOP
+  - `biometric_data`: Daily aggregated metrics (sleep, HRV, recovery, activity)
+  - `biometric_trends`: Weekly/monthly aggregations for faster analysis
+  - `reorder_recommendations`: AI-generated formula adjustments based on biometric trends
+- **OAuth Routes**: Implemented OAuth 2.0 flows for Fitbit, Oura, and WHOOP:
+  - `/api/wearables/connect/:provider` - Initiate OAuth flow
+  - `/api/wearables/callback/:provider` - Handle OAuth callback
+  - `/api/wearables/connections` - Get user's connected devices
+  - `/api/wearables/disconnect/:connectionId` - Disconnect device
+- **Automated Reorder System Design**: 3-month supply reorder with AI analysis:
+  - Background job checks orders approaching 90-day mark
+  - AI analyzes biometric trends (sleep, HRV, recovery, activity)
+  - Generates personalized formula recommendations
+  - Multi-channel notifications (email, SMS, in-app)
+  - User approval flow before reordering
+- **Status**: Schema complete and pushed to database. Routes implemented but need storage layer completion.
+
 ### November 7, 2025 - Enhanced Admin Dashboard
 - **Clickable Stat Cards**: All user-related stat cards (Total Users, Paid Users, Active Users) are now clickable and navigate to filtered user lists
 - **Filtered User Lists**: Admin can view users filtered by type:

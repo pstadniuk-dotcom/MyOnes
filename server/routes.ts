@@ -7,6 +7,7 @@ import { createInsertSchema } from "drizzle-zod";
 import type { InsertMessage, InsertChatSession } from "@shared/schema";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import type { SignupData, LoginData, AuthResponse } from "@shared/schema";
 import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, insertHealthProfileSchema, insertSupportTicketSchema, insertSupportTicketResponseSchema, insertNewsletterSubscriberSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
@@ -25,6 +26,15 @@ declare global {
     interface Request {
       userId?: string;
     }
+  }
+}
+
+// Extend express-session SessionData to include OAuth properties
+declare module 'express-session' {
+  interface SessionData {
+    oauthState?: string;
+    oauthUserId?: string;
+    oauthProvider?: string;
   }
 }
 
@@ -5103,6 +5113,262 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         return res.status(404).json({ error: 'User not found' });
       }
       res.status(500).json({ error: 'Failed to fetch user timeline' });
+    }
+  });
+
+  // ===== WEARABLE DEVICE INTEGRATION ROUTES =====
+  
+  // Get user's connected wearable devices
+  app.get('/api/wearables/connections', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const connections = await storage.getWearableConnections(userId);
+      res.json(connections);
+    } catch (error) {
+      console.error('Error fetching wearable connections:', error);
+      res.status(500).json({ error: 'Failed to fetch wearable connections' });
+    }
+  });
+
+  // Initiate OAuth flow for a wearable device
+  app.get('/api/wearables/connect/:provider', requireAuth, async (req, res) => {
+    try {
+      const { provider } = req.params;
+      const userId = req.userId!;
+      
+      if (!['fitbit', 'oura', 'whoop'].includes(provider)) {
+        return res.status(400).json({ error: 'Invalid provider' });
+      }
+
+      // Generate state token for CSRF protection
+      const state = crypto.randomBytes(32).toString('hex');
+      
+      // Store state in session
+      if (!req.session) {
+        req.session = {} as any;
+      }
+      (req.session as any).oauthState = state;
+      (req.session as any).oauthUserId = userId;
+      (req.session as any).oauthProvider = provider;
+
+      let authUrl = '';
+      const redirectUri = `${process.env.REPL_URL || 'http://localhost:5000'}/api/wearables/callback/${provider}`;
+
+      if (provider === 'fitbit') {
+        const clientId = process.env.FITBIT_CLIENT_ID;
+        if (!clientId) {
+          return res.status(500).json({ error: 'Fitbit credentials not configured' });
+        }
+        
+        const scopes = [
+          'activity', 'heartrate', 'sleep', 'profile', 'oxygen_saturation',
+          'respiratory_rate', 'temperature', 'cardio_fitness'
+        ];
+        
+        authUrl = `https://www.fitbit.com/oauth2/authorize?` +
+          `response_type=code&` +
+          `client_id=${clientId}&` +
+          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+          `scope=${encodeURIComponent(scopes.join(' '))}&` +
+          `state=${state}`;
+      }
+      else if (provider === 'oura') {
+        const clientId = process.env.OURA_CLIENT_ID;
+        if (!clientId) {
+          return res.status(500).json({ error: 'Oura credentials not configured' });
+        }
+        
+        authUrl = `https://cloud.ouraring.com/oauth/authorize?` +
+          `response_type=code&` +
+          `client_id=${clientId}&` +
+          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+          `state=${state}`;
+      }
+      else if (provider === 'whoop') {
+        const clientId = process.env.WHOOP_CLIENT_ID;
+        if (!clientId) {
+          return res.status(500).json({ error: 'WHOOP credentials not configured' });
+        }
+        
+        const scopes = ['read:recovery', 'read:cycles', 'read:sleep', 'read:workout', 'offline'];
+        
+        authUrl = `https://api.prod.whoop.com/oauth/oauth2/auth?` +
+          `response_type=code&` +
+          `client_id=${clientId}&` +
+          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+          `scope=${encodeURIComponent(scopes.join(' '))}&` +
+          `state=${state}`;
+      }
+
+      res.json({ authUrl });
+    } catch (error) {
+      console.error('Error initiating OAuth flow:', error);
+      res.status(500).json({ error: 'Failed to initiate OAuth flow' });
+    }
+  });
+
+  // OAuth callback handler
+  app.get('/api/wearables/callback/:provider', async (req, res) => {
+    try {
+      const { provider } = req.params;
+      const { code, state, error: oauthError } = req.query;
+
+      if (oauthError) {
+        console.error(`OAuth error from ${provider}:`, oauthError);
+        return res.redirect(`/dashboard?error=${encodeURIComponent(`Failed to connect ${provider}`)}`);
+      }
+
+      // Verify state for CSRF protection
+      const sessionState = (req.session as any)?.oauthState;
+      if (!sessionState || sessionState !== state) {
+        console.error('OAuth state mismatch');
+        return res.redirect('/dashboard?error=invalid_state');
+      }
+
+      const userId = (req.session as any)?.oauthUserId;
+      if (!userId) {
+        console.error('No user ID in session');
+        return res.redirect('/dashboard?error=session_expired');
+      }
+
+      // Exchange code for tokens
+      let tokenData: any = null;
+      const redirectUri = `${process.env.REPL_URL || 'http://localhost:5000'}/api/wearables/callback/${provider}`;
+
+      if (provider === 'fitbit') {
+        const clientId = process.env.FITBIT_CLIENT_ID;
+        const clientSecret = process.env.FITBIT_CLIENT_SECRET;
+        
+        if (!clientId || !clientSecret) {
+          throw new Error('Fitbit credentials not configured');
+        }
+
+        const tokenResponse = await fetch('https://api.fitbit.com/oauth2/token', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: code as string,
+            redirect_uri: redirectUri
+          }).toString()
+        });
+
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          console.error('Fitbit token exchange error:', errorText);
+          throw new Error('Failed to exchange code for tokens');
+        }
+
+        tokenData = await tokenResponse.json();
+      }
+      else if (provider === 'oura') {
+        const clientId = process.env.OURA_CLIENT_ID;
+        const clientSecret = process.env.OURA_CLIENT_SECRET;
+        
+        if (!clientId || !clientSecret) {
+          throw new Error('Oura credentials not configured');
+        }
+
+        const tokenResponse = await fetch('https://api.ouraring.com/oauth/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: code as string,
+            redirect_uri: redirectUri,
+            client_id: clientId,
+            client_secret: clientSecret
+          }).toString()
+        });
+
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          console.error('Oura token exchange error:', errorText);
+          throw new Error('Failed to exchange code for tokens');
+        }
+
+        tokenData = await tokenResponse.json();
+      }
+      else if (provider === 'whoop') {
+        const clientId = process.env.WHOOP_CLIENT_ID;
+        const clientSecret = process.env.WHOOP_CLIENT_SECRET;
+        
+        if (!clientId || !clientSecret) {
+          throw new Error('WHOOP credentials not configured');
+        }
+
+        const tokenResponse = await fetch('https://api.prod.whoop.com/oauth/oauth2/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: code as string,
+            redirect_uri: redirectUri,
+            client_id: clientId,
+            client_secret: clientSecret
+          }).toString()
+        });
+
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          console.error('WHOOP token exchange error:', errorText);
+          throw new Error('Failed to exchange code for tokens');
+        }
+
+        tokenData = await tokenResponse.json();
+      }
+
+      // Calculate token expiration
+      const expiresAt = tokenData.expires_in 
+        ? new Date(Date.now() + tokenData.expires_in * 1000) 
+        : null;
+
+      // Save connection to database
+      await storage.createWearableConnection({
+        userId,
+        provider: provider as 'fitbit' | 'oura' | 'whoop',
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token || null,
+        tokenExpiresAt: expiresAt,
+        providerUserId: tokenData.user_id || null,
+        scopes: tokenData.scope ? tokenData.scope.split(' ') : [],
+        status: 'connected'
+      });
+
+      // Clear session OAuth data
+      delete (req.session as any).oauthState;
+      delete (req.session as any).oauthUserId;
+      delete (req.session as any).oauthProvider;
+
+      // Redirect to dashboard with success message
+      res.redirect('/dashboard?success=device_connected');
+    } catch (error) {
+      console.error('Error in OAuth callback:', error);
+      res.redirect(`/dashboard?error=${encodeURIComponent('Failed to connect device')}`);
+    }
+  });
+
+  // Disconnect a wearable device
+  app.post('/api/wearables/disconnect/:connectionId', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { connectionId } = req.params;
+
+      await storage.disconnectWearableDevice(userId, connectionId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error disconnecting wearable:', error);
+      if (error instanceof Error && error.message === 'Connection not found') {
+        return res.status(404).json({ error: 'Connection not found' });
+      }
+      res.status(500).json({ error: 'Failed to disconnect device' });
     }
   });
 
