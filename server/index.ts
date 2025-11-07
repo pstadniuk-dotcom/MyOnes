@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import fileUpload from "express-fileupload";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startSmsReminderScheduler } from "./smsReminderScheduler";
@@ -7,6 +8,19 @@ import { startSmsReminderScheduler } from "./smsReminderScheduler";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Configure session middleware for OAuth state management
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'wearable-oauth-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true,
+    maxAge: 10 * 60 * 1000, // 10 minutes (OAuth flow should complete quickly)
+    sameSite: 'lax'
+  }
+}));
 
 // Configure file upload middleware
 app.use(fileUpload({

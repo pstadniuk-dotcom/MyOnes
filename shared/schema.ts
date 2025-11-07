@@ -521,9 +521,145 @@ export const userConsentSchema = z.object({
 export type LabReportUploadData = z.infer<typeof labReportUploadSchema>;
 export type UserConsentData = z.infer<typeof userConsentSchema>;
 
+// Wearable device enums
+export const wearableProviderEnum = pgEnum('wearable_provider', ['fitbit', 'oura', 'whoop']);
+export const wearableConnectionStatusEnum = pgEnum('wearable_connection_status', ['connected', 'disconnected', 'error', 'token_expired']);
+
 // Support system schemas
 export const supportTicketStatusEnum = pgEnum('support_ticket_status', ['open', 'in_progress', 'resolved', 'closed']);
 export const supportTicketPriorityEnum = pgEnum('support_ticket_priority', ['low', 'medium', 'high', 'urgent']);
+
+// Wearable device connections - stores OAuth tokens and connection status
+export const wearableConnections = pgTable("wearable_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: wearableProviderEnum("provider").notNull(),
+  status: wearableConnectionStatusEnum("status").default('connected').notNull(),
+  
+  // OAuth credentials (encrypted in storage layer)
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  
+  // Provider-specific user ID
+  providerUserId: text("provider_user_id"),
+  
+  // Connection metadata
+  scopes: json("scopes").$type<string[]>().default([]),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSyncError: text("last_sync_error"),
+  
+  connectedAt: timestamp("connected_at").defaultNow().notNull(),
+  disconnectedAt: timestamp("disconnected_at"),
+});
+
+// Daily biometric data from wearable devices
+export const biometricData = pgTable("biometric_data", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  connectionId: varchar("connection_id").notNull().references(() => wearableConnections.id, { onDelete: "cascade" }),
+  provider: wearableProviderEnum("provider").notNull(),
+  dataDate: timestamp("data_date").notNull(), // The day this data represents
+  
+  // Sleep metrics
+  sleepScore: integer("sleep_score"), // 0-100 (Oura, WHOOP)
+  sleepHours: integer("sleep_hours"), // Total sleep in minutes
+  deepSleepMinutes: integer("deep_sleep_minutes"),
+  remSleepMinutes: integer("rem_sleep_minutes"),
+  lightSleepMinutes: integer("light_sleep_minutes"),
+  
+  // Heart metrics
+  hrvMs: integer("hrv_ms"), // Heart rate variability in milliseconds
+  restingHeartRate: integer("resting_heart_rate"), // BPM
+  averageHeartRate: integer("average_heart_rate"),
+  maxHeartRate: integer("max_heart_rate"),
+  
+  // Recovery and readiness
+  recoveryScore: integer("recovery_score"), // 0-100 (WHOOP, Oura)
+  readinessScore: integer("readiness_score"), // 0-100 (Oura)
+  strainScore: integer("strain_score"), // 0-21 (WHOOP)
+  
+  // Activity metrics
+  steps: integer("steps"),
+  caloriesBurned: integer("calories_burned"),
+  activeMinutes: integer("active_minutes"),
+  
+  // Additional metrics
+  spo2Percentage: integer("spo2_percentage"), // Blood oxygen 0-100
+  skinTempCelsius: integer("skin_temp_celsius"), // Multiplied by 10 for decimal precision
+  respiratoryRate: integer("respiratory_rate"), // Breaths per minute
+  
+  // Raw data from provider (for reference)
+  rawData: json("raw_data").$type<Record<string, any>>(),
+  
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+});
+
+// Aggregated biometric trends for faster analysis
+export const biometricTrends = pgTable("biometric_trends", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  periodType: text("period_type").notNull(), // 'week' or 'month'
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  
+  // Averaged metrics over the period
+  avgSleepScore: integer("avg_sleep_score"),
+  avgSleepHours: integer("avg_sleep_hours"),
+  avgHrvMs: integer("avg_hrv_ms"),
+  avgRestingHeartRate: integer("avg_resting_heart_rate"),
+  avgRecoveryScore: integer("avg_recovery_score"),
+  avgStrainScore: integer("avg_strain_score"),
+  avgSteps: integer("avg_steps"),
+  
+  // Trend indicators (positive/negative/stable)
+  sleepTrend: text("sleep_trend"), // 'improving', 'declining', 'stable'
+  hrvTrend: text("hrv_trend"),
+  recoveryTrend: text("recovery_trend"),
+  
+  // Data quality metrics
+  daysWithData: integer("days_with_data").notNull(),
+  totalDaysInPeriod: integer("total_days_in_period").notNull(),
+  
+  calculatedAt: timestamp("calculated_at").defaultNow().notNull(),
+});
+
+// Reorder recommendations - AI-generated formula adjustments before reorder
+export const reorderRecommendations = pgTable("reorder_recommendations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orderId: varchar("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  currentFormulaId: varchar("current_formula_id").notNull().references(() => formulas.id),
+  
+  // AI analysis results
+  analysisStatus: text("analysis_status").default('pending').notNull(), // pending, analyzing, completed, error
+  biometricSummary: json("biometric_summary").$type<{
+    sleepChange?: string;
+    hrvChange?: string;
+    recoveryChange?: string;
+    activityChange?: string;
+    dataQuality?: string;
+  }>(),
+  
+  // Recommended formula changes
+  recommendedFormula: json("recommended_formula").$type<{
+    bases: Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
+    additions: Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
+    totalMg: number;
+  }>(),
+  
+  changeRationale: text("change_rationale"), // AI explanation of why changes were made
+  confidence: integer("confidence"), // 0-100 how confident AI is in recommendations
+  
+  // User action tracking
+  userApproved: boolean("user_approved"),
+  userReviewedAt: timestamp("user_reviewed_at"),
+  adminReviewRequired: boolean("admin_review_required").default(false).notNull(),
+  adminReviewedBy: varchar("admin_reviewed_by").references(() => users.id),
+  adminReviewedAt: timestamp("admin_reviewed_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 // FAQ items table
 export const faqItems = pgTable("faq_items", {
@@ -649,3 +785,37 @@ export const insertResearchCitationSchema = createInsertSchema(researchCitations
 
 export type InsertResearchCitation = z.infer<typeof insertResearchCitationSchema>;
 export type ResearchCitation = typeof researchCitations.$inferSelect;
+
+// Wearable integration schemas
+export const insertWearableConnectionSchema = createInsertSchema(wearableConnections).omit({
+  id: true,
+  connectedAt: true,
+});
+
+export const insertBiometricDataSchema = createInsertSchema(biometricData).omit({
+  id: true,
+  syncedAt: true,
+});
+
+export const insertBiometricTrendSchema = createInsertSchema(biometricTrends).omit({
+  id: true,
+  calculatedAt: true,
+});
+
+export const insertReorderRecommendationSchema = createInsertSchema(reorderRecommendations).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Wearable integration types
+export type InsertWearableConnection = z.infer<typeof insertWearableConnectionSchema>;
+export type WearableConnection = typeof wearableConnections.$inferSelect;
+
+export type InsertBiometricData = z.infer<typeof insertBiometricDataSchema>;
+export type BiometricData = typeof biometricData.$inferSelect;
+
+export type InsertBiometricTrend = z.infer<typeof insertBiometricTrendSchema>;
+export type BiometricTrend = typeof biometricTrends.$inferSelect;
+
+export type InsertReorderRecommendation = z.infer<typeof insertReorderRecommendationSchema>;
+export type ReorderRecommendation = typeof reorderRecommendations.$inferSelect;
