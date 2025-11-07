@@ -67,6 +67,9 @@ interface Order {
   placedAt: string;
   shippedAt: string | null;
   trackingUrl: string | null;
+  amountCents: number | null;
+  supplyMonths: number | null;
+  formula?: Formula;
 }
 
 interface ChatSession {
@@ -408,43 +411,100 @@ export default function UserDetailPage() {
                   orders.map((order) => (
                     <Card key={order.id} data-testid={`card-order-${order.id}`}>
                       <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-base">Order #{order.id.slice(0, 8)}</CardTitle>
-                          <Badge 
-                            variant={
-                              order.status === 'delivered' ? 'default' :
-                              order.status === 'shipped' ? 'default' :
-                              order.status === 'cancelled' ? 'destructive' :
-                              'secondary'
-                            }
-                          >
-                            {order.status}
-                          </Badge>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex-1">
+                            <CardTitle className="text-base">Order #{order.id.slice(0, 8)}</CardTitle>
+                            <CardDescription>
+                              Placed {format(new Date(order.placedAt), 'MMM dd, yyyy')}
+                            </CardDescription>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {order.amountCents && (
+                              <Badge variant="outline" className="font-mono">
+                                ${(order.amountCents / 100).toFixed(2)}
+                              </Badge>
+                            )}
+                            <Badge 
+                              variant={
+                                order.status === 'delivered' ? 'default' :
+                                order.status === 'shipped' ? 'default' :
+                                order.status === 'cancelled' ? 'destructive' :
+                                'secondary'
+                              }
+                            >
+                              {order.status}
+                            </Badge>
+                          </div>
                         </div>
-                        <CardDescription>
-                          Placed {format(new Date(order.placedAt), 'MMM dd, yyyy')}
-                        </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="space-y-2">
-                          <p className="text-sm">
-                            Formula version: <span className="font-medium">v{order.formulaVersion}</span>
-                          </p>
-                          {order.shippedAt && (
-                            <p className="text-sm">
-                              Shipped: {format(new Date(order.shippedAt), 'MMM dd, yyyy')}
-                            </p>
+                        <div className="space-y-3">
+                          {/* Order Details */}
+                          <div className="grid grid-cols-2 gap-4 pb-3 border-b">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Formula Version</p>
+                              <p className="text-sm font-medium" data-testid={`text-formula-version-${order.id}`}>v{order.formulaVersion}</p>
+                            </div>
+                            {order.supplyMonths && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Supply Duration</p>
+                                <p className="text-sm font-medium" data-testid={`text-supply-months-${order.id}`}>
+                                  {order.supplyMonths} month{order.supplyMonths !== 1 ? 's' : ''}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Formula Ingredients */}
+                          {order.formula && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-2">Formula Composition</p>
+                              <div className="space-y-1">
+                                <p className="text-sm">
+                                  <span className="font-medium">{order.formula.bases.length}</span> ingredients • 
+                                  <span className="font-medium ml-1">{order.formula.totalMg}mg</span> total
+                                </p>
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {order.formula.bases.slice(0, 5).map((base, i) => (
+                                    <Badge 
+                                      key={i} 
+                                      variant="secondary" 
+                                      className="text-xs"
+                                      data-testid={`badge-ingredient-${order.id}-${i}`}
+                                    >
+                                      {base.ingredient} - {base.amount}mg
+                                    </Badge>
+                                  ))}
+                                  {order.formula.bases.length > 5 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      +{order.formula.bases.length - 5} more
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
                           )}
-                          {order.trackingUrl && (
-                            <a 
-                              href={order.trackingUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-sm text-primary hover:underline"
-                              data-testid={`link-tracking-${order.id}`}
-                            >
-                              Track shipment
-                            </a>
+
+                          {/* Shipping Details */}
+                          {(order.shippedAt || order.trackingUrl) && (
+                            <div className="pt-2 border-t">
+                              {order.shippedAt && (
+                                <p className="text-sm text-muted-foreground">
+                                  Shipped: {format(new Date(order.shippedAt), 'MMM dd, yyyy')}
+                                </p>
+                              )}
+                              {order.trackingUrl && (
+                                <a 
+                                  href={order.trackingUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary hover:underline inline-block mt-1"
+                                  data-testid={`link-tracking-${order.id}`}
+                                >
+                                  Track shipment →
+                                </a>
+                              )}
+                            </div>
                           )}
                         </div>
                       </CardContent>
