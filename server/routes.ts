@@ -2696,23 +2696,25 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
       
       // Transform formula for frontend display (convert ingredient/amount to name/dose format)
+      // 🔒 CRITICAL: Only show formula if it was actually saved (passed validation)
       let formulaForDisplay = null;
-      if (extractedFormula) {
+      if (savedFormula) {
+        // Use savedFormula data which includes the corrected totalMg and validated ingredients
         formulaForDisplay = {
-          bases: extractedFormula.bases.map((b: any) => ({
+          bases: savedFormula.bases.map((b: any) => ({
             name: b.ingredient || b.name,
             dose: typeof b.amount === 'number' ? `${b.amount}mg` : (b.dose || `${b.amount}mg`),
             purpose: b.purpose
           })),
-          additions: extractedFormula.additions.map((a: any) => ({
+          additions: savedFormula.additions.map((a: any) => ({
             name: a.ingredient || a.name,
             dose: typeof a.amount === 'number' ? `${a.amount}mg` : (a.dose || `${a.amount}mg`),
             purpose: a.purpose
           })),
-          totalMg: extractedFormula.totalMg,
-          warnings: extractedFormula.warnings || [],
-          rationale: extractedFormula.rationale,
-          disclaimers: extractedFormula.disclaimers || []
+          totalMg: savedFormula.totalMg,
+          warnings: savedFormula.warnings || [],
+          rationale: savedFormula.rationale,
+          disclaimers: savedFormula.disclaimers || []
         };
       }
       
