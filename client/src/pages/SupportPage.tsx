@@ -239,6 +239,7 @@ export default function SupportPage() {
                     onClick={() => {
                       setSelectedArticle(null);
                       setSelectedCategory(null);
+                      setSearchQuery('');
                     }}
                     className="hover:text-foreground transition-colors"
                     data-testid="breadcrumb-home"
@@ -249,6 +250,8 @@ export default function SupportPage() {
                   <button
                     onClick={() => {
                       setSelectedArticle(null);
+                      setSelectedCategory(selectedArticle.category);
+                      setSearchQuery('');
                     }}
                     className="hover:text-foreground transition-colors"
                     data-testid="breadcrumb-category"
@@ -299,7 +302,10 @@ export default function SupportPage() {
                 {/* Breadcrumbs */}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6" data-testid="breadcrumbs">
                   <button
-                    onClick={() => setSelectedCategory(null)}
+                    onClick={() => {
+                      setSelectedCategory(null);
+                      setSearchQuery('');
+                    }}
                     className="hover:text-foreground transition-colors"
                     data-testid="breadcrumb-home"
                   >
@@ -328,7 +334,10 @@ export default function SupportPage() {
                         <Card
                           key={article.id}
                           className="hover-elevate cursor-pointer transition-all"
-                          onClick={() => setSelectedArticle(article)}
+                          onClick={() => {
+                            setSelectedArticle(article);
+                            setSelectedCategory(article.category);
+                          }}
                           data-testid={`article-card-${article.id}`}
                         >
                           <CardContent className="pt-6">
@@ -372,7 +381,10 @@ export default function SupportPage() {
                         <Card
                           key={article.id}
                           className="hover-elevate cursor-pointer transition-all"
-                          onClick={() => setSelectedArticle(article)}
+                          onClick={() => {
+                            setSelectedArticle(article);
+                            setSelectedCategory(article.category);
+                          }}
                           data-testid={`search-result-${article.id}`}
                         >
                           <CardContent className="pt-6">
