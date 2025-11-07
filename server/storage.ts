@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { eq, desc, and, isNull, gte, lte, or, ilike, sql, count } from "drizzle-orm";
+import { eq, desc, and, isNull, gte, lte, or, ilike, sql, count, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
@@ -1614,8 +1614,8 @@ export class DrizzleStorage implements IStorage {
           return { users: [], total: 0 };
         }
         
-        userQuery = userQuery.where(and(searchCondition, sql`${users.id} = ANY(${paidIds})`));
-        countQuery = countQuery.where(and(searchCondition, sql`${users.id} = ANY(${paidIds})`));
+        userQuery = userQuery.where(and(searchCondition, inArray(users.id, paidIds)));
+        countQuery = countQuery.where(and(searchCondition, inArray(users.id, paidIds)));
       } else if (filter === 'active') {
         // Users who have created formulas
         const activeUserIds = await db.selectDistinct({ userId: formulas.userId }).from(formulas);
@@ -1625,8 +1625,8 @@ export class DrizzleStorage implements IStorage {
           return { users: [], total: 0 };
         }
         
-        userQuery = userQuery.where(and(searchCondition, sql`${users.id} = ANY(${activeIds})`));
-        countQuery = countQuery.where(and(searchCondition, sql`${users.id} = ANY(${activeIds})`));
+        userQuery = userQuery.where(and(searchCondition, inArray(users.id, activeIds)));
+        countQuery = countQuery.where(and(searchCondition, inArray(users.id, activeIds)));
       } else {
         // All users
         userQuery = userQuery.where(searchCondition);
