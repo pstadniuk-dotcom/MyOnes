@@ -8,6 +8,17 @@ ONES is a personalized AI supplement platform that creates custom supplement for
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### November 7, 2025 - Enhanced Admin Dashboard
+- **Clickable Stat Cards**: All user-related stat cards (Total Users, Paid Users, Active Users) are now clickable and navigate to filtered user lists
+- **Filtered User Lists**: Admin can view users filtered by type:
+  - All Users: Complete user list
+  - Paid Users: Users who have placed at least one order
+  - Active Users: Users who have created at least one formula
+- **Today's Orders Section**: Admin dashboard displays all orders placed today with user details, amounts, and supply duration
+- **Filter UI Improvements**: UserManagementPage shows active filter in header with option to clear filter and return to all users
+
 ## System Architecture
 
 ### Frontend Architecture
