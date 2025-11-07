@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Menu, X, User, Moon, Sun } from 'lucide-react';
+import { Menu, X, User, Moon, Sun, Shield } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from 'next-themes';
@@ -99,6 +99,14 @@ export default function Header() {
                     Dashboard
                   </Button>
                 </Link>
+                {user?.isAdmin && (
+                  <Link href="/admin">
+                    <Button variant="outline" data-testid="button-admin">
+                      <Shield className="w-4 h-4 mr-2" />
+                      Admin
+                    </Button>
+                  </Link>
+                )}
                 <span className="text-sm text-muted-foreground">
                   Welcome, {user?.name}
                 </span>
@@ -162,12 +170,22 @@ export default function Header() {
                 Pricing
               </button>
               {isAuthenticated ? (
-                <Link href="/dashboard" className="w-full">
-                  <Button className="w-full mt-4" data-testid="button-mobile-dashboard">
-                    <User className="w-4 h-4 mr-2" />
-                    Dashboard
-                  </Button>
-                </Link>
+                <>
+                  <Link href="/dashboard" className="w-full">
+                    <Button className="w-full mt-4" data-testid="button-mobile-dashboard">
+                      <User className="w-4 h-4 mr-2" />
+                      Dashboard
+                    </Button>
+                  </Link>
+                  {user?.isAdmin && (
+                    <Link href="/admin" className="w-full">
+                      <Button variant="outline" className="w-full mt-2" data-testid="button-mobile-admin">
+                        <Shield className="w-4 h-4 mr-2" />
+                        Admin
+                      </Button>
+                    </Link>
+                  )}
+                </>
               ) : (
                 <>
                   <Link href="/login" className="w-full">
