@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import ProtectedAdminRoute from "@/components/ProtectedAdminRoute";
 import NotFound from "@/pages/not-found";
 import SignupPage from "@/pages/SignupPage";
 import LoginPage from "@/pages/LoginPage";
@@ -34,6 +35,11 @@ import OrdersPage from "@/pages/OrdersPage";
 import ProfilePage from "@/pages/ProfilePage";
 import SettingsPage from "@/pages/SettingsPage";
 import SupportPage from "@/pages/SupportPage";
+
+// Import admin components
+import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
+import UserManagementPage from "@/pages/admin/UserManagementPage";
+import UserDetailPage from "@/pages/admin/UserDetailPage";
 
 // Import all landing page components
 import Header from "@/components/Header";
@@ -163,6 +169,23 @@ function MainRouter() {
         <ProtectedRoute>
           <ConsultationPage />
         </ProtectedRoute>
+      </Route>
+      
+      {/* Admin Routes */}
+      <Route path="/admin">
+        <ProtectedAdminRoute>
+          <AdminDashboardPage />
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/users">
+        <ProtectedAdminRoute>
+          <UserManagementPage />
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/users/:id">
+        <ProtectedAdminRoute>
+          <UserDetailPage />
+        </ProtectedAdminRoute>
       </Route>
       
       <Route component={NotFound} />
