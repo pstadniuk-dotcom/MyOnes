@@ -1,4 +1,5 @@
 import { storage } from './storage';
+import './db';
 
 // Comprehensive help articles with screenshot placeholders
 const helpArticles = [
@@ -1839,4 +1840,17 @@ export async function seedSupportData() {
     console.error('❌ Error seeding support data:', error);
     throw error;
   }
+}
+
+// Run the seeding if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  seedSupportData()
+    .then(() => {
+      console.log('✨ Seeding completed successfully');
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('💥 Seeding failed:', error);
+      process.exit(1);
+    });
 }
