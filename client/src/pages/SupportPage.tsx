@@ -120,12 +120,15 @@ export default function SupportPage() {
   
   // Create support ticket mutation
   const createTicketMutation = useMutation({
-    mutationFn: (ticketData: typeof newTicket) => 
-      apiRequest('/api/support/tickets', {
+    mutationFn: async (ticketData: typeof newTicket) => {
+      const response = await fetch('/api/support/tickets', {
         method: 'POST',
         body: JSON.stringify(ticketData),
         headers: { 'Content-Type': 'application/json' },
-      }),
+      });
+      if (!response.ok) throw new Error('Failed to create ticket');
+      return response.json();
+    },
     onSuccess: () => {
       toast({
         title: 'Support ticket created',
