@@ -485,6 +485,7 @@ export const authResponseSchema = z.object({
     email: z.string(),
     phone: z.string().nullable(),
     createdAt: z.string(),
+    isAdmin: z.boolean().optional(),
   }),
   token: z.string(),
 });
