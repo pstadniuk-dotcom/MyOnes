@@ -1698,6 +1698,12 @@ async function seedData() {
   console.log('🌱 Starting support data seeding...');
   
   try {
+    // Clear existing data
+    console.log('🗑️  Clearing existing data...');
+    await db.delete(faqItems);
+    await db.delete(helpArticles);
+    console.log('  ✓ Cleared existing help articles and FAQ items');
+    
     // Seed help articles
     console.log('📚 Creating help articles...');
     for (const article of helpArticlesData) {
