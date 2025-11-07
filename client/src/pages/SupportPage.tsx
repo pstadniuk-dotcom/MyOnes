@@ -227,6 +227,29 @@ export default function SupportPage() {
             </CardContent>
           </Card>
 
+          {/* Help Categories */}
+          {!searchQuery && (
+            <div className="grid gap-4 md:grid-cols-2">
+              {helpCategories.map((category, idx) => (
+                <Card key={idx} className="hover-elevate transition-colors cursor-pointer" data-testid={`help-category-${idx}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <category.icon className="w-5 h-5 text-primary" />
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    <h3 className="font-medium mb-2">{category.title}</h3>
+                    <p className="text-sm text-muted-foreground mb-2">{category.description}</p>
+                    <Badge variant="secondary" className="text-xs">
+                      {category.articles} articles
+                    </Badge>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
           {/* Help Articles Section */}
           {searchQuery && filteredArticles.length > 0 && (
             <Card data-testid="section-help-articles">
