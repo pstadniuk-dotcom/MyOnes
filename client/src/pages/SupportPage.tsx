@@ -158,6 +158,13 @@ export default function SupportPage() {
     item.answer.toLowerCase().includes(searchQuery.toLowerCase())
   );
   
+  // Filter help articles based on search query
+  const filteredArticles = helpArticles.filter(article =>
+    article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    article.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    article.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
   // Generate help categories with article counts
   const helpCategories = helpCategoryConfigs.map(config => {
     const articlesInCategory = helpArticles.filter(article => 
@@ -241,6 +248,88 @@ export default function SupportPage() {
                 </Card>
               ))}
             </div>
+          )}
+
+          {/* Help Articles Section */}
+          {searchQuery && filteredArticles.length > 0 && (
+            <Card data-testid="section-help-articles">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Book className="w-5 h-5" />
+                  Help Articles
+                </CardTitle>
+                <CardDescription>
+                  {filteredArticles.length} article{filteredArticles.length !== 1 ? 's' : ''} found
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Accordion type="single" collapsible className="w-full">
+                  {filteredArticles.map((article) => (
+                    <AccordionItem key={article.id} value={article.id} data-testid={`article-${article.id}`}>
+                      <AccordionTrigger className="text-left">
+                        <div>
+                          <div className="font-medium">{article.title}</div>
+                          <div className="text-sm text-muted-foreground">{article.category}</div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                        {article.content}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* All Articles by Category (when not searching) */}
+          {!searchQuery && helpArticles.length > 0 && (
+            <Card data-testid="section-all-articles">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Book className="w-5 h-5" />
+                  Browse All Help Articles
+                </CardTitle>
+                <CardDescription>
+                  {helpArticles.length} articles across {helpCategories.length} categories
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {helpCategoryConfigs.map((categoryConfig) => {
+                  const categoryArticles = helpArticles.filter(
+                    article => article.category === categoryConfig.category
+                  );
+                  
+                  if (categoryArticles.length === 0) return null;
+                  
+                  return (
+                    <div key={categoryConfig.category} className="mb-6 last:mb-0">
+                      <div className="flex items-center gap-2 mb-3">
+                        <categoryConfig.icon className="w-4 h-4 text-primary" />
+                        <h3 className="font-semibold">{categoryConfig.title}</h3>
+                        <Badge variant="secondary" className="text-xs ml-auto">
+                          {categoryArticles.length}
+                        </Badge>
+                      </div>
+                      <Accordion type="single" collapsible className="w-full">
+                        {categoryArticles
+                          .sort((a, b) => a.displayOrder - b.displayOrder)
+                          .map((article) => (
+                            <AccordionItem key={article.id} value={article.id} data-testid={`article-${article.id}`}>
+                              <AccordionTrigger className="text-left hover:no-underline">
+                                {article.title}
+                              </AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                                {article.content}
+                              </AccordionContent>
+                            </AccordionItem>
+                          ))}
+                      </Accordion>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
           )}
 
           {/* FAQ Section */}
