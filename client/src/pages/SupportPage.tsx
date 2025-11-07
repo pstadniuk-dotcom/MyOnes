@@ -89,6 +89,8 @@ const getStatusColor = (status: string) => {
 export default function SupportPage() {
   const [activeTab, setActiveTab] = useState('help');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedArticle, setSelectedArticle] = useState<HelpArticle | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -227,11 +229,188 @@ export default function SupportPage() {
             </CardContent>
           </Card>
 
-          {/* Help Categories */}
-          {!searchQuery && (
-            <div className="grid gap-4 md:grid-cols-2">
+          {/* Article Detail View */}
+          {selectedArticle ? (
+            <Card data-testid="section-article-detail">
+              <CardContent className="pt-6">
+                {/* Breadcrumbs */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6" data-testid="breadcrumbs">
+                  <button
+                    onClick={() => {
+                      setSelectedArticle(null);
+                      setSelectedCategory(null);
+                    }}
+                    className="hover:text-foreground transition-colors"
+                    data-testid="breadcrumb-home"
+                  >
+                    Help Center
+                  </button>
+                  <ChevronRight className="w-4 h-4" />
+                  <button
+                    onClick={() => {
+                      setSelectedArticle(null);
+                    }}
+                    className="hover:text-foreground transition-colors"
+                    data-testid="breadcrumb-category"
+                  >
+                    {selectedArticle.category}
+                  </button>
+                  <ChevronRight className="w-4 h-4" />
+                  <span className="text-foreground">{selectedArticle.title}</span>
+                </div>
+
+                {/* Back Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedArticle(null)}
+                  className="mb-6"
+                  data-testid="button-back"
+                >
+                  <ChevronRight className="w-4 h-4 rotate-180 mr-2" />
+                  Back to Articles
+                </Button>
+
+                {/* Article Content */}
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-2" data-testid="article-title">
+                      {selectedArticle.title}
+                    </h2>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <Badge variant="secondary">{selectedArticle.category}</Badge>
+                      <span>•</span>
+                      <span>Last updated {new Date(selectedArticle.updatedAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <div 
+                    className="prose prose-sm dark:prose-invert max-w-none leading-relaxed whitespace-pre-wrap"
+                    data-testid="article-content"
+                  >
+                    {selectedArticle.content}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : selectedCategory ? (
+            /* Category Article List View */
+            <Card data-testid="section-category-articles">
+              <CardContent className="pt-6">
+                {/* Breadcrumbs */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6" data-testid="breadcrumbs">
+                  <button
+                    onClick={() => setSelectedCategory(null)}
+                    className="hover:text-foreground transition-colors"
+                    data-testid="breadcrumb-home"
+                  >
+                    Help Center
+                  </button>
+                  <ChevronRight className="w-4 h-4" />
+                  <span className="text-foreground">{selectedCategory}</span>
+                </div>
+
+                {/* Category Title */}
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold mb-2">{selectedCategory}</h2>
+                  <p className="text-muted-foreground">
+                    {helpArticles.filter(a => a.category === selectedCategory).length} articles
+                  </p>
+                </div>
+
+                {/* Article Cards Grid */}
+                <div className="grid gap-4 md:grid-cols-2" data-testid="article-cards-grid">
+                  {helpArticles
+                    .filter(article => article.category === selectedCategory)
+                    .sort((a, b) => a.displayOrder - b.displayOrder)
+                    .map((article) => {
+                      const excerpt = article.content.slice(0, 150) + (article.content.length > 150 ? '...' : '');
+                      return (
+                        <Card
+                          key={article.id}
+                          className="hover-elevate cursor-pointer transition-all"
+                          onClick={() => setSelectedArticle(article)}
+                          data-testid={`article-card-${article.id}`}
+                        >
+                          <CardContent className="pt-6">
+                            <h3 className="font-semibold mb-2 line-clamp-2">
+                              {article.title}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
+                              {excerpt}
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <Badge variant="outline" className="text-xs">
+                                Updated {new Date(article.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </Badge>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                </div>
+              </CardContent>
+            </Card>
+          ) : searchQuery ? (
+            /* Search Results - Article Cards */
+            filteredArticles.length > 0 ? (
+              <Card data-testid="section-search-results">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Search className="w-5 h-5" />
+                    Search Results
+                  </CardTitle>
+                  <CardDescription>
+                    Found {filteredArticles.length} article{filteredArticles.length !== 1 ? 's' : ''}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {filteredArticles.map((article) => {
+                      const excerpt = article.content.slice(0, 150) + (article.content.length > 150 ? '...' : '');
+                      return (
+                        <Card
+                          key={article.id}
+                          className="hover-elevate cursor-pointer transition-all"
+                          onClick={() => setSelectedArticle(article)}
+                          data-testid={`search-result-${article.id}`}
+                        >
+                          <CardContent className="pt-6">
+                            <div className="mb-2">
+                              <Badge variant="secondary" className="text-xs mb-2">
+                                {article.category}
+                              </Badge>
+                            </div>
+                            <h3 className="font-semibold mb-2 line-clamp-2">
+                              {article.title}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
+                              {excerpt}
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground">
+                                Updated {new Date(article.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </span>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null
+          ) : (
+            /* Default View - Category Cards */
+            <div className="grid gap-4 md:grid-cols-2" data-testid="category-cards-grid">
               {helpCategories.map((category, idx) => (
-                <Card key={idx} className="hover-elevate transition-colors cursor-pointer" data-testid={`help-category-${idx}`}>
+                <Card
+                  key={idx}
+                  className="hover-elevate transition-all cursor-pointer"
+                  onClick={() => setSelectedCategory(category.category)}
+                  data-testid={`category-card-${category.category.toLowerCase().replace(/\s+/g, '-')}`}
+                >
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between mb-3">
                       <div className="p-2 bg-primary/10 rounded-lg">
@@ -248,88 +427,6 @@ export default function SupportPage() {
                 </Card>
               ))}
             </div>
-          )}
-
-          {/* Help Articles Section */}
-          {searchQuery && filteredArticles.length > 0 && (
-            <Card data-testid="section-help-articles">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Book className="w-5 h-5" />
-                  Help Articles
-                </CardTitle>
-                <CardDescription>
-                  {filteredArticles.length} article{filteredArticles.length !== 1 ? 's' : ''} found
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Accordion type="single" collapsible className="w-full">
-                  {filteredArticles.map((article) => (
-                    <AccordionItem key={article.id} value={article.id} data-testid={`article-${article.id}`}>
-                      <AccordionTrigger className="text-left">
-                        <div>
-                          <div className="font-medium">{article.title}</div>
-                          <div className="text-sm text-muted-foreground">{article.category}</div>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                        {article.content}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* All Articles by Category (when not searching) */}
-          {!searchQuery && helpArticles.length > 0 && (
-            <Card data-testid="section-all-articles">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Book className="w-5 h-5" />
-                  Browse All Help Articles
-                </CardTitle>
-                <CardDescription>
-                  {helpArticles.length} articles across {helpCategories.length} categories
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {helpCategoryConfigs.map((categoryConfig) => {
-                  const categoryArticles = helpArticles.filter(
-                    article => article.category === categoryConfig.category
-                  );
-                  
-                  if (categoryArticles.length === 0) return null;
-                  
-                  return (
-                    <div key={categoryConfig.category} className="mb-6 last:mb-0">
-                      <div className="flex items-center gap-2 mb-3">
-                        <categoryConfig.icon className="w-4 h-4 text-primary" />
-                        <h3 className="font-semibold">{categoryConfig.title}</h3>
-                        <Badge variant="secondary" className="text-xs ml-auto">
-                          {categoryArticles.length}
-                        </Badge>
-                      </div>
-                      <Accordion type="single" collapsible className="w-full">
-                        {categoryArticles
-                          .sort((a, b) => a.displayOrder - b.displayOrder)
-                          .map((article) => (
-                            <AccordionItem key={article.id} value={article.id} data-testid={`article-${article.id}`}>
-                              <AccordionTrigger className="text-left hover:no-underline">
-                                {article.title}
-                              </AccordionTrigger>
-                              <AccordionContent className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                                {article.content}
-                              </AccordionContent>
-                            </AccordionItem>
-                          ))}
-                      </Accordion>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
           )}
 
           {/* FAQ Section */}
