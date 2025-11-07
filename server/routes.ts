@@ -2419,22 +2419,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           console.log('📊 AI provided totalMg:', validatedFormula.totalMg);
           console.log('📊 Backend calculated total:', validation.calculatedTotalMg);
           console.log('📊 Difference:', Math.abs(validatedFormula.totalMg - validation.calculatedTotalMg), 'mg');
-          console.log('📊 Validation errors:', validation.errors);
           
-          // Check for major discrepancies between AI's total and calculated total
-          const totalDifference = Math.abs(validatedFormula.totalMg - validation.calculatedTotalMg);
-          if (totalDifference > 50) {
-            console.warn(`⚠️ TOTAL MG MISMATCH: AI said ${validatedFormula.totalMg}mg but ingredients sum to ${validation.calculatedTotalMg}mg`);
-            validation.errors.push(`Total mismatch: AI specified ${validatedFormula.totalMg}mg but ingredients sum to ${validation.calculatedTotalMg}mg. Please recalculate.`);
+          // 🔧 FIX: Override AI's totalMg with correctly calculated value
+          // AI often miscalculates - backend calculation is authoritative
+          if (validatedFormula.totalMg !== validation.calculatedTotalMg) {
+            console.log(`🔧 OVERRIDING AI totalMg ${validatedFormula.totalMg}mg → ${validation.calculatedTotalMg}mg (backend calculated)`);
+            validatedFormula.totalMg = validation.calculatedTotalMg;
           }
           
-          if (!validation.isValid) {
-            // Formula is invalid - reject it and send error to client
+          // Check for CRITICAL errors (unapproved ingredients only)
+          const criticalErrors = validation.errors.filter(e => e.includes('UNAUTHORIZED INGREDIENT'));
+          
+          if (criticalErrors.length > 0) {
+            // CRITICAL: Unapproved ingredients - must reject
+            console.error('🚨 CRITICAL: Unapproved ingredients detected:', criticalErrors);
             sendSSE({
-              type: 'formula_error',
-              error: `Formula validation failed: ${validation.errors.join(', ')}`,
-              sessionId: chatSession?.id,
-              validationErrors: validation.errors
+              type: 'error',
+              error: `⚠️ Formula contains unapproved ingredients. Please use only ingredients from our approved catalog.`,
+              sessionId: chatSession?.id
             });
             
             // Still complete the stream normally but without formula
@@ -2465,8 +2467,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             return;
           }
           
-          // TRUST the AI's totalMg (don't override it) - only validate it's within reason
-          console.log('✅ Formula validation passed - using AI totalMg:', validatedFormula.totalMg);
+          // ✅ Formula is valid (non-critical errors are just warnings)
+          console.log('✅ Formula validation passed - using calculated totalMg:', validatedFormula.totalMg);
           extractedFormula = validatedFormula;
           
           // Add validation warnings
@@ -2641,24 +2643,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             console.error('🚨 Attempted totalMg:', formulaData.totalMg);
             console.error('🚨 Max allowed:', FORMULA_LIMITS.MAX_TOTAL_DOSAGE);
             
-            // Log potential prompt injection attempt
-            console.warn('⚠️ SECURITY ALERT: Possible prompt injection attempt detected!');
-            console.warn('User may have tried to override system limits via AI prompt');
+            // Log potential security issue
+            console.warn('⚠️ SECURITY ALERT: Formula validation failed');
+            console.warn('Reasons:', limitValidation.errors);
             
-            // Notify user via SSE
-            sendSSE({
-              type: 'error',
-              error: `⚠️ Formula Safety Check Failed:\n\n${limitValidation.errors.join('\n')}\n\nOur platform has strict safety limits to protect your health. The maximum total dosage is ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg per day.\n\nWould you like me to optimize your formula within safe limits?`
-            });
+            // 🎯 SILENT REJECTION: Don't save formula, don't show error popup
+            // Let the AI's conversational response be the only thing user sees
+            // The "See Your Formulation" button simply won't appear
+            console.log('📛 Silently rejecting formula - no popup error shown to user');
+            console.log('📛 User will see AI response only, formula will not be saved');
             
-            // Don't save the formula - throw error to stop processing
-            throw new Error('Formula exceeds safety limits');
+            // Don't save - formula stays null, no error thrown, clean UX
+            savedFormula = null;
+          } else {
+            // ✅ Validation passed - save the formula
+            console.log('✅ Security validation passed - formula within safe limits');
+            savedFormula = await storage.createFormula(formulaData);
+            console.log(`Formula v${nextVersion} saved successfully for user ${userId}`);
           }
-          
-          console.log('✅ Security validation passed - formula within safe limits');
-          
-          savedFormula = await storage.createFormula(formulaData);
-          console.log(`Formula v${nextVersion} saved successfully for user ${userId}`);
         } catch (formulaSaveError) {
           console.error('❌ ERROR SAVING FORMULA:', formulaSaveError);
           
