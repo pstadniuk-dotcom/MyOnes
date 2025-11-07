@@ -259,12 +259,26 @@ ${formula.activeIngredients.map(ing => `  • ${ing.name} ${ing.amount}${ing.des
 - "totalMg" as NUMBER (sum of all amounts)
 - Use EXACT ingredient names from approved catalog
 
+**MANDATORY: SHOW YOUR MATH IN YOUR RESPONSE**
+Before creating the JSON formula, you MUST list all ingredients with amounts in your conversational response.
+This helps you verify your math is correct and prevents calculation errors.
+
+Example format in your response:
+"Here's your updated formula:
+- Heart Support: 450mg
+- Alpha Gest III: 636mg
+- Omega 3: 300mg
+- C Boost: 1680mg
+Total: 3066mg ✓ (under 5500mg limit)"
+
 **PRE-SEND VALIDATION CHECKLIST:**
+✓ Listed all ingredients with amounts in conversational response?
+✓ Manually calculated total in response?
+✓ Verified total ≤ 5500mg?
 ✓ Used "ingredient", "amount", "unit" fields (NOT "name", "dose")?
 ✓ Used ONLY approved ingredient names?
-✓ Total ≤ 5500mg?
 ✓ All amounts multiples of 50?
-✓ totalMg = sum of all ingredient amounts?
+✓ totalMg in JSON = sum shown in response?
 ✓ Included rationale and warnings?
 
 If ANY answer is NO, STOP and FIX before sending.
