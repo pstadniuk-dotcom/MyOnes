@@ -24,6 +24,29 @@ Preferred communication style: Simple, everyday language.
 - **Test Coverage**: Comprehensive data-testid attributes on all dynamic elements (status badges, dates, buttons)
 - **Status**: Dashboard architect-approved and ready for OAuth testing with real device credentials
 
+### November 8, 2025 - Automatic Token Refresh System (COMPLETED)
+- **Token Refresh Service** (`server/wearableTokenRefresh.ts`):
+  - Provider-specific refresh functions for Fitbit, Oura, and WHOOP
+  - `refreshExpiredTokens()`: Checks connections expiring within 60 minutes
+  - Auto-refreshes access tokens using refresh tokens via provider OAuth endpoints
+  - Updates database with new tokens and expiry times (maintains encryption)
+  - Marks connections as "error" status if refresh fails
+- **Token Refresh Scheduler** (`server/tokenRefreshScheduler.ts`):
+  - **Immediate execution on startup**: Eliminates blind spot after server restarts
+  - **Hourly cron job** (schedule: `0 * * * *`): Ongoing proactive refresh checks
+  - Comprehensive logging for monitoring and debugging
+  - Error handling prevents scheduler crashes
+  - Integrated with server startup via `server/index.ts`
+- **Storage Layer Updates**:
+  - Added `getAllWearableConnectionsNearingExpiry(threshold)` to IStorage
+  - Implemented in DrizzleStorage with proper `lt` operator for expiry queries
+  - Stub implementation in MemStorage
+- **Architecture Benefits**:
+  - Zero-downtime token management (no user intervention)
+  - Prevents connection breakage due to expired tokens
+  - Automatic error detection visible to users on dashboard
+  - Production-ready with encrypted token handling
+
 ### November 7, 2025 - Wearable Integration OAuth Infrastructure (COMPLETED)
 - **Database Schema**: Production-ready tables for wearable device integrations:
   - `wearable_connections`: OAuth tokens (encrypted), connection status, provider metadata
