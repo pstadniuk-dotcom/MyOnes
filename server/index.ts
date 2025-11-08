@@ -4,6 +4,7 @@ import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startSmsReminderScheduler } from "./smsReminderScheduler";
+import { startTokenRefreshScheduler } from "./tokenRefreshScheduler";
 
 const app = express();
 app.use(express.json());
@@ -95,5 +96,8 @@ app.use((req, res, next) => {
     
     // Start SMS reminder scheduler
     startSmsReminderScheduler();
+    
+    // Start wearable token refresh scheduler
+    startTokenRefreshScheduler();
   });
 })();

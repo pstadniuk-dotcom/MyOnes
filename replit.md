@@ -10,6 +10,20 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### November 8, 2025 - Wearables Dashboard (COMPLETED)
+- **User Dashboard**: Full-featured wearable device management interface at `/wearables`
+  - **Device Cards**: Visual cards for Fitbit, Oura, and WHOOP with brand colors and icons
+  - **Complete State Handling**: All connection states visible (connected, error, disconnected)
+  - **Status Visibility**: Color-coded badges (green=connected, red=error, gray=disconnected)
+  - **Contextual Actions**: Connect/Reconnect/Disconnect buttons based on current state
+  - **Error Messages**: Clear error messaging with reconnect prompts when sync fails
+  - **Connection Metadata**: Displays connected date, last synced date, and provider info
+  - **Educational Content**: "How It Works" section explaining automated biometric tracking
+  - **Navigation Integration**: Added to main sidebar between "Formulation" and "Labs"
+- **API Integration**: Uses apiRequest helper for consistent error handling across all mutations
+- **Test Coverage**: Comprehensive data-testid attributes on all dynamic elements (status badges, dates, buttons)
+- **Status**: Dashboard architect-approved and ready for OAuth testing with real device credentials
+
 ### November 7, 2025 - Wearable Integration OAuth Infrastructure (COMPLETED)
 - **Database Schema**: Production-ready tables for wearable device integrations:
   - `wearable_connections`: OAuth tokens (encrypted), connection status, provider metadata
@@ -31,7 +45,6 @@ Preferred communication style: Simple, everyday language.
   - `createWearableConnection(connection)`: Encrypts tokens before DB insertion
   - `updateWearableConnection(id, updates)`: Handles token refresh updates
   - `disconnectWearableDevice(id, userId)`: Nulls all tokens on disconnect
-- **Status**: OAuth infrastructure complete and architect-approved. Next: Token refresh automation + frontend UI.
 
 ### November 7, 2025 - Enhanced Admin Dashboard
 - **Clickable Stat Cards**: All user-related stat cards (Total Users, Paid Users, Active Users) are now clickable and navigate to filtered user lists
