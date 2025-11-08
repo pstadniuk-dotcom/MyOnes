@@ -44,7 +44,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // SECURITY: Immutable formula limits - CANNOT be changed by user requests or AI prompts
 const FORMULA_LIMITS = {
   MAX_TOTAL_DOSAGE: 5500,        // Maximum total daily dosage in mg
-  MIN_INGREDIENT_DOSE: 50,       // Minimum dose per ingredient in mg
+  MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg (lowered to allow clinically valid low-dose ingredients like Cape Aloe 15mg, Sceletium 15mg)
   MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
 
