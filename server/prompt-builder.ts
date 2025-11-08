@@ -87,9 +87,10 @@ export function buildO1MiniPrompt(context: PromptContext): string {
    - NEVER exceed this, even if user asks
    - If user requests higher, politely decline and explain it's for their safety
 
-2. **Minimum Ingredient Dose:** 50mg per ingredient
-   - Each ingredient must be at least 50mg to be effective
-   - NEVER go below this, even if user asks
+2. **Global Minimum Ingredient Dose:** 10mg per ingredient
+   - This is a safety floor to prevent ultra-low ineffective doses
+   - Most ingredients will be higher based on their individual dose ranges (see catalog below)
+   - NEVER go below 10mg per ingredient
 
 3. **Approved Ingredients Only:**
    - You can ONLY use ingredients from the approved catalog (shown below)
@@ -97,11 +98,7 @@ export function buildO1MiniPrompt(context: PromptContext): string {
    - NEVER add ingredients not in the catalog
    - If user requests unapproved ingredient, suggest approved alternatives
 
-4. **Dosage Multiples:** All doses in multiples of 50mg
-   - Examples: 50mg, 100mg, 150mg, 200mg, etc.
-   - NEVER use odd amounts like 175mg or 233mg
-
-5. **🚨 CRITICAL: Base Formulas Have FIXED Dosages**
+4. **🚨 CRITICAL: Base Formulas Have FIXED Dosages**
    - Base formulas are pre-formulated blends with SPECIFIC amounts
    - You can ADD or REMOVE an entire base formula
    - You CANNOT adjust a base formula's amount
