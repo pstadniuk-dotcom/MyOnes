@@ -205,16 +205,76 @@ Then your JSON must have "totalMg": ${formula.totalMg + 600}
 `;
   }
 
-  // PRIORITY 2: APPROVED INGREDIENT CATALOG (condensed)
+  // PRIORITY 2: APPROVED INGREDIENT CATALOG (with dose ranges and clinical metadata)
   prompt += `\n=== APPROVED INGREDIENT CATALOG ===
 
 **YOU CAN ONLY USE THESE INGREDIENTS:**
 
-**Base Formulas (${BASE_FORMULAS.length} available):**
-${BASE_FORMULAS.map(f => `${f.name} (${f.doseMg}mg)`).join(', ')}
+**Base Formulas (${BASE_FORMULAS.length} available) - FIXED DOSES:**
+${BASE_FORMULAS.map(f => `${f.name} (${f.doseMg}mg - FIXED, cannot adjust)`).join(', ')}
 
-**Individual Ingredients (${INDIVIDUAL_INGREDIENTS.length} available):**
-${INDIVIDUAL_INGREDIENTS.map(i => `${i.name} (${i.doseMg}mg)`).join(', ')}
+**Individual Ingredients (${INDIVIDUAL_INGREDIENTS.length} available) - ADJUSTABLE WITHIN RANGES:**
+
+`;
+
+  // Group individual ingredients with enhanced metadata
+  INDIVIDUAL_INGREDIENTS.forEach(ingredient => {
+    const doseInfo = ingredient.doseRangeMin && ingredient.doseRangeMax 
+      ? `${ingredient.doseRangeMin}-${ingredient.doseRangeMax}mg (standard ${ingredient.doseMg}mg)`
+      : `${ingredient.doseMg}mg (fixed)`;
+    
+    prompt += `• ${ingredient.name}: ${doseInfo}`;
+    if (ingredient.type) {
+      prompt += `\n  Type: ${ingredient.type}`;
+    }
+    if (ingredient.suggestedUse) {
+      prompt += `\n  Use: ${ingredient.suggestedUse}`;
+    }
+    prompt += `\n\n`;
+  });
+
+  prompt += `
+**🩺 CLINICAL DOSING DISCRETION:**
+
+You are a trained functional medicine practitioner. Use your clinical judgment to adjust individual ingredient doses within approved ranges based on:
+
+1. **Individual Health Needs:**
+   - Age, sex, weight, and health status
+   - Severity of symptoms or deficiencies
+   - Lab values and biomarkers
+   - Overall health goals
+
+2. **Medication Interactions:**
+   - If user takes medications that deplete certain nutrients, increase those within safe ranges
+   - If user takes blood thinners, be cautious with Vitamin E, Garlic, Ginger
+   - Consider absorption interference (e.g., PPIs reduce B12/magnesium absorption)
+
+3. **Safety Considerations:**
+   - Start lower for elderly, pregnant/nursing, or those with chronic conditions
+   - Consider cumulative effects if multiple ingredients target same system
+   - Watch for ingredients with overlapping functions (don't over-supplement)
+
+4. **Evidence-Based Dosing:**
+   - Higher doses may be justified for therapeutic purposes (e.g., Turmeric 800mg for inflammation)
+   - Lower doses may be appropriate for maintenance/prevention
+   - Consider research-backed dosing for specific conditions
+
+**EXAMPLES OF CLINICAL DISCRETION:**
+
+✅ User has severe inflammation + arthritis → Turmeric 800mg (vs standard 400mg)
+✅ User on PPIs for GERD → Magnesium 320mg (vs lower dose) to offset depletion
+✅ User requests brain support → Phosphatidylcholine 1000mg (vs standard 250mg) for cognitive enhancement
+✅ Elderly user with mild symptoms → Start NAD+ at 100mg (vs 300mg max) for safety
+✅ User with heavy metal exposure → Cilantro 500mg (vs 200mg standard) for detox support
+
+❌ User has no inflammation → Don't max out Turmeric at 1000mg unnecessarily
+❌ User already takes fish oil → Don't add max Omega-3 to avoid over-thinning blood
+
+**REMEMBER:**
+- Base formulas = FIXED doses (add/remove entire formula only)
+- Individual ingredients = FLEXIBLE within ranges (adjust based on clinical needs)
+- Always stay within approved min/max ranges
+- Use your medical knowledge to determine optimal dose for each person
 
 **STRICT RULES:**
 - NEVER make up ingredient names - use EXACT names from above
