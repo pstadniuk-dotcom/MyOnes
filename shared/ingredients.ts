@@ -2,17 +2,21 @@
 
 export interface IngredientInfo {
   name: string;
-  doseMg: number;
+  doseMg: number; // Default/standard dose
+  doseRangeMin?: number; // Minimum allowed dose (for AI flexibility)
+  doseRangeMax?: number; // Maximum allowed dose (for AI flexibility)
   category: 'base' | 'individual';
-  description?: string;  // Helpful description for user selection
-  benefits?: string[];  // Health benefits of this ingredient
+  type?: string; // Use case categories (e.g., "Hormonal Support, Antioxidant")
+  description?: string; // Helpful description for user selection
+  suggestedUse?: string; // When/how to use this ingredient
+  benefits?: string[]; // Health benefits of this ingredient
 }
 
 export interface SubIngredient {
   name: string;
-  amount: string;  // e.g., "20mg", "75 IU", "250mcg"
+  amount: string; // e.g., "20mg", "75 IU", "250mcg"
   description?: string;
-  benefits?: string[];  // Health benefits of this specific ingredient
+  benefits?: string[];
 }
 
 export interface BaseFormulaDetails {
@@ -24,148 +28,805 @@ export interface BaseFormulaDetails {
   description: string;
 }
 
+// ============================================================================
+// BASE FORMULAS (19 total) - FIXED dosages, cannot be adjusted
+// ============================================================================
+
 export const BASE_FORMULAS: IngredientInfo[] = [
-  { name: 'Adrenal Support', doseMg: 420, category: 'base', description: 'Supports adrenal gland function and stress response' },
-  { name: 'Alpha Gest III', doseMg: 636, category: 'base', description: 'Supports digestive enzyme production and gut health' },
-  { name: 'Alpha Green II', doseMg: 400, category: 'base', description: 'Provides greens and phytonutrients for detoxification' },
-  { name: 'Alpha Oxyme', doseMg: 350, category: 'base', description: 'Supports cellular oxygen utilization and energy' },
-  { name: 'Alpha Zyme III', doseMg: 400, category: 'base', description: 'Digestive enzyme blend for protein, fat, and carb breakdown' },
-  { name: 'Beta Max', doseMg: 2500, category: 'base', description: 'Immune system support with beta-glucans' },
-  { name: 'Br-SP Plus', doseMg: 400, category: 'base', description: 'Supports brain and spinal cord health' },
-  { name: 'C Boost', doseMg: 1680, category: 'base', description: 'High-dose vitamin C for immune and antioxidant support' },
-  { name: 'Circu Plus', doseMg: 540, category: 'base', description: 'Supports healthy circulation and vascular function' },
-  { name: 'Colostrum Powder', doseMg: 1000, category: 'base', description: 'Immune factors and gut lining support' },
-  { name: 'Chola Plus', doseMg: 350, category: 'base', description: 'Supports bile production and gallbladder function' },
-  { name: 'Dia Zyme', doseMg: 494, category: 'base', description: 'Comprehensive digestive enzyme formula' },
-  { name: 'Diadren Forte', doseMg: 400, category: 'base', description: 'Advanced adrenal and stress hormone support' },
-  { name: 'Endocrine Support', doseMg: 350, category: 'base', description: 'Supports overall hormonal balance and endocrine function' },
-  { name: 'Heart Support', doseMg: 450, category: 'base', description: 'Supports cardiovascular health and heart function' },
-  { name: 'Histamine Support', doseMg: 190, category: 'base', description: 'Helps manage histamine response and allergies' },
-  { name: 'Immune-C', doseMg: 430, category: 'base', description: 'Vitamin C plus immune-boosting herbs' },
-  { name: 'Intestinal Formula', doseMg: 400, category: 'base', description: 'Supports gut lining integrity and intestinal health' },
-  { name: 'Ligament Support', doseMg: 400, category: 'base', description: 'Supports connective tissue and joint health' },
-  { name: 'LSK Plus', doseMg: 450, category: 'base', description: 'Supports liver, spleen, and kidney function' },
-  { name: 'Liver Support', doseMg: 480, category: 'base', description: 'Supports liver detoxification and function' },
-  { name: 'Lung Support', doseMg: 250, category: 'base', description: 'Supports respiratory health and lung function' },
-  { name: 'MG/K', doseMg: 500, category: 'base', description: 'Magnesium and potassium for muscle and heart health' },
-  { name: 'Mold RX', doseMg: 525, category: 'base', description: 'Supports body\'s response to mold exposure' },
-  { name: 'Spleen Support', doseMg: 400, category: 'base', description: 'Supports spleen and immune function' },
-  { name: 'Ovary Uterus Support', doseMg: 300, category: 'base', description: 'Supports female reproductive health' },
-  { name: 'Para X', doseMg: 500, category: 'base', description: 'Supports body\'s response to parasites' },
-  { name: 'Para Thy', doseMg: 335, category: 'base', description: 'Supports parathyroid and calcium metabolism' },
-  { name: 'Pitui Plus', doseMg: 495, category: 'base', description: 'Supports pituitary gland and master hormone regulation' },
-  { name: 'Prostate Support', doseMg: 300, category: 'base', description: 'Supports male prostate health and urinary function' },
-  { name: 'Kidney & Bladder Support', doseMg: 400, category: 'base', description: 'Supports urinary tract and kidney function' },
-  { name: 'Thyroid Support', doseMg: 470, category: 'base', description: 'Supports thyroid function and metabolism' },
+  {
+    name: 'Adrenal Support',
+    doseMg: 420,
+    category: 'base',
+    description: 'Supports adrenal gland function and stress response. This complex of vitamins and herbs may help to alleviate signs of Adrenal Fatigue.',
+  },
+  {
+    name: 'Beta Max',
+    doseMg: 2500,
+    category: 'base',
+    description: 'Supports liver, gallbladder, and pancreas. Helps regulate multiple hepatic functions such as lipid and carbohydrate metabolism and proper liver functions.',
+  },
+  {
+    name: 'C Boost',
+    doseMg: 1680,
+    category: 'base',
+    description: 'Vitamin C and bioflavonoids blend with antioxidant and anti-inflammatory properties. Helps the body fight against viral infections.',
+  },
+  {
+    name: 'Chaga Mix',
+    doseMg: 3600,
+    category: 'base',
+    description: 'Chaga mushrooms may be beneficial for lowering cholesterol levels, slowing cancer growth, supporting immune function, and reducing blood pressure.',
+  },
+  {
+    name: 'Endocrine Support',
+    doseMg: 350,
+    category: 'base',
+    description: 'Supports the endocrine system with pantothenic acid, manganese, and glandular sources. Helps utilize vitamins, improve energy production and ensure proper liver function.',
+  },
+  {
+    name: 'Heart Support',
+    doseMg: 450,
+    category: 'base',
+    description: 'Supports heart function with magnesium, l-carnitine and l-taurine. Aids in blood pressure, nervous system, heart failure, oxidative stress, and myocardial contractions.',
+  },
+  {
+    name: 'Histamine Support',
+    doseMg: 190,
+    category: 'base',
+    description: 'Important for immune system support when compromised. Helps stabilize mast cell membranes and reduce histamine reactions.',
+  },
+  {
+    name: 'Immune-C',
+    doseMg: 430,
+    category: 'base',
+    description: 'Powerful immune support formulation with Graviola, vitamin C, Camu Camu berry, and Cats Claw.',
+  },
+  {
+    name: 'Kidney & Bladder Support',
+    doseMg: 400,
+    category: 'base',
+    description: 'Supports kidney and bladder function. May improve blood pressure and blood sugar; helps flush kidney stones and stop inflammatory diseases of the urinary tract.',
+  },
+  {
+    name: 'Ligament Support',
+    doseMg: 400,
+    category: 'base',
+    description: 'Supports muscles and connective tissue. Helps improve stiffness, inflammation, arthritis, joint support, and soreness.',
+  },
+  {
+    name: 'Liver Support',
+    doseMg: 480,
+    category: 'base',
+    description: 'For individuals experiencing decreased liver functions. Helps reduce fatty necrosis, reduce stress on liver, support bile production, and improve liver function.',
+  },
+  {
+    name: 'Lung Support',
+    doseMg: 250,
+    category: 'base',
+    description: 'Supports lungs and immune system. Combination of vitamins and antioxidants support lungs, lymph nodes and thymus.',
+  },
+  {
+    name: 'MG/K',
+    doseMg: 540,
+    category: 'base',
+    description: 'Concentrated blend of seven forms of magnesium bound in potassium. Supports autonomic nervous system, adrenal glands, muscles, blood sugar, bone and DNA.',
+  },
+  {
+    name: 'Mold RX',
+    doseMg: 525,
+    category: 'base',
+    description: 'Detoxification of molds. Oregano, Chaga, Sage produce powerful antifungal, antibacterial and anti-inflammatory effects against mold.',
+  },
+  {
+    name: 'Ovary Uterus Support',
+    doseMg: 300,
+    category: 'base',
+    description: 'Supports female reproductive system. Helps regulate women\'s cycles, alleviate muscle spasms and may reduce risk for certain cancers.',
+  },
+  {
+    name: 'Para X',
+    doseMg: 500,
+    category: 'base',
+    description: 'Eliminates parasites from the body through detox. Black walnut and wormwood treat parasitic worm infections naturally.',
+  },
+  {
+    name: 'Prostate Support',
+    doseMg: 300,
+    category: 'base',
+    description: 'Supports prostate and male reproductive systems. Encourages anti-inflammation and proper function.',
+  },
+  {
+    name: 'Spleen Support',
+    doseMg: 400,
+    category: 'base',
+    description: 'Supports liver, kidney, and spleen. Dandelion and nettle help the endocrine system including the spleen.',
+  },
+  {
+    name: 'Thyroid Support',
+    doseMg: 470,
+    category: 'base',
+    description: 'Provides necessary nutrients for proper thyroid function. Combines iodine and glandular concentrates.',
+  },
 ];
 
+// ============================================================================
+// INDIVIDUAL INGREDIENTS (42 total) - ADJUSTABLE within dose ranges
+// ============================================================================
+
 export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
-  { name: 'Aloe Vera Powder', doseMg: 250, category: 'individual', benefits: ['Soothes and heals digestive tract lining', 'Anti-inflammatory properties support gut health', 'Contains polysaccharides that boost immune function', 'May help regulate blood sugar levels'] },
-  { name: 'Ahswaganda', doseMg: 600, category: 'individual', benefits: ['Adaptogen that helps body manage stress and anxiety', 'Supports healthy cortisol levels and adrenal function', 'May improve sleep quality and reduce insomnia', 'Enhances cognitive function and memory'] },
-  { name: 'Astragalus', doseMg: 300, category: 'individual', benefits: ['Powerful immune system booster and modulator', 'Adaptogenic properties support stress resilience', 'May improve heart health and reduce inflammation', 'Traditional use for increasing energy and vitality'] },
-  { name: 'Black Currant Extract', doseMg: 300, category: 'individual', benefits: ['Rich in anthocyanins with powerful antioxidant effects', 'Supports eye health and may improve night vision', 'Anti-inflammatory benefits for joint health', 'High in gamma-linolenic acid (GLA) for hormonal balance'] },
-  { name: 'Broccoli Powder', doseMg: 300, category: 'individual', benefits: ['Contains sulforaphane with potent anti-cancer properties', 'Supports Phase II liver detoxification pathways', 'Rich in vitamins C, K, and folate', 'May support cardiovascular and brain health'] },
-  { name: 'Camu Camu', doseMg: 300, category: 'individual', benefits: ['One of the richest natural sources of vitamin C', 'Powerful antioxidant and immune system support', 'May improve mood and reduce inflammation', 'Supports collagen production and skin health'] },
-  { name: 'Cape Aloe', doseMg: 300, category: 'individual', benefits: ['Natural laxative that supports bowel regularity', 'May help cleanse digestive system', 'Contains anthraquinones with antimicrobial properties', 'Traditional use for constipation relief'] },
-  { name: 'Cats Claw', doseMg: 30, category: 'individual', benefits: ['Powerful immune system modulator and enhancer', 'Anti-inflammatory benefits for joint pain and arthritis', 'May support gut health and reduce leaky gut', 'Antioxidant properties protect against cellular damage'] },
-  { name: 'Chaga', doseMg: 300, category: 'individual', benefits: ['Exceptionally high in antioxidants (ORAC value)', 'Supports immune system function and may fight cancer', 'Anti-inflammatory properties benefit overall health', 'May support healthy blood sugar and cholesterol levels'] },
-  { name: 'Cinnamon 20:1', doseMg: 1000, category: 'individual', benefits: ['Helps regulate blood sugar and improve insulin sensitivity', 'Powerful antioxidant and anti-inflammatory effects', 'May support heart health and reduce cholesterol', 'Antimicrobial properties fight infections'] },
-  { name: 'CoEnzyme Q10', doseMg: 200, category: 'individual', benefits: ['Essential for cellular energy production (ATP)', 'Powerful antioxidant protecting heart and brain', 'Supports cardiovascular health and blood pressure', 'May improve exercise performance and reduce fatigue'] },
-  { name: 'Gaba', doseMg: 300, category: 'individual', benefits: ['Neurotransmitter that promotes relaxation and calm', 'May reduce anxiety and improve sleep quality', 'Supports mental clarity and focus', 'May help regulate blood pressure'] },
-  { name: 'Garlic (powder)', doseMg: 200, category: 'individual', benefits: ['Supports cardiovascular health and blood pressure', 'Natural antimicrobial and immune system booster', 'May help reduce cholesterol and triglycerides', 'Anti-inflammatory and antioxidant properties'] },
-  { name: 'Ginger Root', doseMg: 500, category: 'individual', benefits: ['Powerful anti-nausea effects for digestive comfort', 'Anti-inflammatory properties reduce pain and soreness', 'Supports digestive health and reduces bloating', 'May help reduce menstrual pain and cramping'] },
-  { name: 'Ginko Biloba Extract 24%', doseMg: 100, category: 'individual', benefits: ['Improves blood circulation, especially to the brain', 'Supports cognitive function, memory, and focus', 'Antioxidant properties protect brain cells', 'May help with anxiety and depression symptoms'] },
-  { name: 'Graviola', doseMg: 300, category: 'individual', benefits: ['Traditional use for immune support and fighting infections', 'Contains compounds studied for anti-cancer properties', 'May help reduce inflammation and oxidative stress', 'Supports digestive health and reduces parasites'] },
-  { name: 'Hawthorn Berry PE 1/8% Flavones', doseMg: 300, category: 'individual', benefits: ['Supports heart health and cardiovascular function', 'May improve blood flow and reduce blood pressure', 'Rich in antioxidants that protect heart tissue', 'Traditional use for heart failure and chest pain'] },
-  { name: 'Lutein', doseMg: 10, category: 'individual', benefits: ['Essential for eye health and protecting macula', 'Filters harmful blue light from screens and sun', 'May reduce risk of age-related macular degeneration', 'Antioxidant properties protect eye tissues'] },
-  { name: 'Maca Root .6%', doseMg: 300, category: 'individual', benefits: ['Adaptogen that increases energy and stamina', 'May improve libido and sexual function', 'Supports hormonal balance in men and women', 'May enhance mood and reduce anxiety'] },
-  { name: 'Magnesium', doseMg: 320, category: 'individual', benefits: ['Essential for over 300 enzymatic reactions in body', 'Supports muscle relaxation and reduces cramping', 'Important for bone health and calcium absorption', 'May improve sleep quality and reduce anxiety'] },
-  { name: 'Omega 3 (algae omega)', doseMg: 300, category: 'individual', benefits: ['Supports heart health and reduces inflammation', 'Essential for brain function and mental health', 'May reduce risk of chronic diseases', 'Plant-based source suitable for vegetarians'] },
-  { name: 'Phosphatidylcholine 40% (soy)', doseMg: 300, category: 'individual', benefits: ['Essential component of cell membranes', 'Supports brain health, memory, and cognition', 'Important for liver function and fat metabolism', 'Precursor to acetylcholine neurotransmitter'] },
-  { name: 'Resveratrol', doseMg: 300, category: 'individual', benefits: ['Powerful antioxidant with anti-aging properties', 'May support heart health and healthy blood vessels', 'Activates longevity genes (sirtuins)', 'Anti-inflammatory benefits throughout the body'] },
-  { name: 'Saw Palmetto Extract 45% Fatty Acid (GC)', doseMg: 300, category: 'individual', benefits: ['Supports prostate health and urinary function in men', 'May reduce symptoms of benign prostatic hyperplasia', 'Anti-inflammatory properties', 'May help balance hormone levels'] },
-  { name: 'Stinging Nettle', doseMg: 300, category: 'individual', benefits: ['May reduce inflammation in joints and arthritis', 'Supports prostate health and urinary flow', 'Rich in vitamins and minerals including iron', 'Traditional use for seasonal allergies and hay fever'] },
-  { name: 'Sumar Root', doseMg: 300, category: 'individual', benefits: ['Adaptogen that helps body cope with stress', 'May support hormonal balance and vitality', 'Traditional use for enhancing energy and stamina', 'Supports overall wellness and resilience'] },
-  { name: 'Turmeric Root Extract 4:1', doseMg: 500, category: 'individual', benefits: ['Contains curcumin with powerful anti-inflammatory effects', 'Supports joint health and reduces arthritis pain', 'May improve brain function and reduce depression', 'Antioxidant properties protect against chronic disease'] },
-  { name: 'Vitamin C', doseMg: 90, category: 'individual', benefits: ['Essential for immune system function', 'Powerful antioxidant that protects cells', 'Required for collagen synthesis and wound healing', 'Enhances iron absorption from plant foods'] },
-  { name: 'Vitamin E (Mixed tocopherols)', doseMg: 15, category: 'individual', benefits: ['Fat-soluble antioxidant protecting cell membranes', 'Supports immune function and skin health', 'May reduce risk of heart disease', 'Protects against oxidative stress and aging'] },
+  {
+    name: 'Alfalfa',
+    doseMg: 200,
+    doseRangeMin: 100,
+    doseRangeMax: 1000,
+    category: 'individual',
+    type: 'Hormonal Support, Antioxidant, Blood Health, Anti-inflammatory',
+    suggestedUse: 'May support hormonal balance, antioxidant activity, blood health, and help with inflammation.',
+    benefits: [
+      'May help lower cholesterol levels',
+      'Offers benefits for blood sugar management',
+      'Commonly used to relieve symptoms of menopause',
+      'Rich in antioxidants and essential nutrients like vitamin K, copper, folate, and magnesium'
+    ]
+  },
+  {
+    name: 'Aloe Vera Powder',
+    doseMg: 250,
+    category: 'individual',
+    type: 'Antioxidant, Digestive Health, Anti-inflammatory',
+    suggestedUse: 'May support digestive health, help manage blood sugar levels, and provide antioxidant and anti-inflammatory benefits.',
+    benefits: [
+      'Known for antibacterial and antioxidant properties',
+      'May help relieve symptoms associated with diabetes by lowering blood sugar',
+      'Supports skin health and gastrointestinal movement',
+      'May aid in managing inflammatory conditions within digestive system'
+    ]
+  },
+  {
+    name: 'Ashwagandha',
+    doseMg: 600,
+    category: 'individual',
+    type: 'Stress Relief, Antioxidant, Anti-inflammatory',
+    suggestedUse: 'May support stress relief, help manage anxiety levels, and offer antioxidant and anti-inflammatory benefits.',
+    benefits: [
+      'Commonly used to help alleviate anxiety and stress',
+      'Provides anti-inflammatory and antioxidant effects',
+      'Could support blood sugar regulation',
+      'May improve respiratory health'
+    ]
+  },
+  {
+    name: 'Astragalus',
+    doseMg: 300,
+    category: 'individual',
+    type: 'Immune Support, Antioxidant, Organ Health',
+    suggestedUse: 'May support immune function, help manage blood sugar levels, and provide antioxidant protection. Could assist in promoting heart, kidney, and liver health.',
+    benefits: [
+      'Commonly used to protect and support immune system through antioxidant properties',
+      'May help improve heart, kidney, and liver function',
+      'Widely used to assist in controlling blood sugar levels'
+    ]
+  },
+  {
+    name: 'Blackcurrant Extract',
+    doseMg: 500,
+    category: 'individual',
+    type: 'Immune Support, Heart Health, Anti-inflammatory',
+    suggestedUse: 'May support immune system, help improve blood flow to heart, and provide anti-inflammatory benefits.',
+    benefits: [
+      'Rich in anti-inflammatory, antiviral, antiseptic, antimicrobial, and antitoxic properties',
+      'May boost immune system function and protect against heart disease',
+      'Omega fats and flavonoids may improve blood flow to heart and support cardiovascular health'
+    ]
+  },
+  {
+    name: 'Broccoli Concentrate',
+    doseMg: 200,
+    doseRangeMin: 100,
+    doseRangeMax: 400,
+    category: 'individual',
+    type: 'Antioxidant & Detox Support',
+    suggestedUse: 'Provides concentrated sulforaphane that activates detoxification pathways and supports cellular health. Used for antioxidant and hormone-balancing effects.',
+    benefits: [
+      'Rich in sulforaphane - supports natural detoxification processes',
+      'Helps balance estrogen levels',
+      'Promotes cellular protection',
+      'May contribute to overall immune resilience and long-term health'
+    ]
+  },
+  {
+    name: 'Camu Camu',
+    doseMg: 2500,
+    category: 'individual',
+    type: 'Immune Support, Anti-inflammatory, Blood Sugar Support',
+    suggestedUse: 'May help fight inflammation, improve blood sugar levels, and support overall immune function.',
+    benefits: [
+      'Rich in ascorbic acid (vitamin C)',
+      'Often used to combat viral infections',
+      'May support weight loss by controlling blood sugar levels',
+      'Helps reduce inflammation'
+    ]
+  },
+  {
+    name: 'Cape Aloe',
+    doseMg: 15,
+    doseRangeMin: 15,
+    doseRangeMax: 30,
+    category: 'individual',
+    type: 'Digestive Health, Wound Healing, Anti-inflammatory',
+    suggestedUse: 'May support wound healing, digestive health, and provide antioxidant and anti-inflammatory benefits.',
+    benefits: [
+      'Primarily used to treat wounds, burns, eczema, and psoriasis',
+      'Functions as herbal laxative that may regulate bowel movements',
+      'Supports overall digestive health',
+      'Sometimes referred to as intestinal cleanser'
+    ]
+  },
+  {
+    name: 'Cats Claw',
+    doseMg: 30,
+    doseRangeMin: 30,
+    doseRangeMax: 500,
+    category: 'individual',
+    type: 'Immune Support, Anti-inflammatory, Antibacterial',
+    suggestedUse: 'May support immune health, relieve inflammation, and fight off infections.',
+    benefits: [
+      'Commonly used for anti-inflammatory properties, especially for arthritis and GI inflammation',
+      'Exhibits antibacterial, antifungal, and antiviral properties',
+      'Useful in helping body fight off persistent infections'
+    ]
+  },
+  {
+    name: 'Chaga',
+    doseMg: 2000,
+    doseRangeMin: 1000,
+    doseRangeMax: 2000,
+    category: 'individual',
+    type: 'Antioxidant, Blood Sugar Support, Anti-inflammatory',
+    suggestedUse: 'May help support healthy blood sugar levels, lower cholesterol, and manage blood pressure.',
+    benefits: [
+      'Commonly used for antioxidant and anti-inflammatory properties',
+      'May help lower blood sugar and cholesterol levels',
+      'Supports healthy blood pressure',
+      'Often used in managing arthritis symptoms',
+      'May play role in slowing progression of cancer cells'
+    ]
+  },
+  {
+    name: 'Cilantro',
+    doseMg: 200,
+    doseRangeMin: 200,
+    doseRangeMax: 500,
+    category: 'individual',
+    type: 'Detox, Antimicrobial, Anti-inflammatory',
+    suggestedUse: 'May help with detoxification by removing heavy metals from body. May support immune health by reducing harmful bacteria.',
+    benefits: [
+      'Known for ability to help remove metals like mercury, lead, and aluminum',
+      'May improve effectiveness of antibiotics and antiviral medicines',
+      'May support heart health and boost energy levels',
+      'Offers benefits for individuals with diabetes'
+    ]
+  },
+  {
+    name: 'Cinnamon 20:1',
+    doseMg: 1000,
+    doseRangeMin: 500,
+    doseRangeMax: 1000,
+    category: 'individual',
+    type: 'Antioxidant, Anti-inflammatory, Blood Sugar Support',
+    suggestedUse: 'May help lower blood sugar levels and improve insulin sensitivity. May offer support for heart health and act as powerful antioxidant.',
+    benefits: [
+      'Well-known for antioxidant properties',
+      'Supports blood sugar regulation',
+      'May reduce risk of heart disease',
+      'Improves insulin sensitivity',
+      'Anti-inflammatory effects may help lower risk of neurodegenerative diseases'
+    ]
+  },
+  {
+    name: 'CoEnzyme Q10',
+    doseMg: 200,
+    doseRangeMin: 100,
+    doseRangeMax: 200,
+    category: 'individual',
+    type: 'Heart Health, Antioxidant',
+    suggestedUse: 'May support heart health, improve exercise performance, and assist with migraines. Believed to reduce oxidative damage and may play role in cancer prevention.',
+    benefits: [
+      'Potential to improve heart health',
+      'May enhance exercise performance',
+      'Helps reduce frequency and intensity of migraines',
+      'Antioxidant properties protect against oxidative damage',
+      'Supports overall cellular health'
+    ]
+  },
+  {
+    name: 'Colostrum Powder',
+    doseMg: 1000,
+    doseRangeMin: 500,
+    doseRangeMax: 1000,
+    category: 'individual',
+    type: 'Immune Support, Gut Health',
+    suggestedUse: 'May support immune system function and improve gut health. Rich in immunoglobulin G (IgG), powerful antibody that enhances immune response.',
+    benefits: [
+      'High in IgG antibody that supports immune system',
+      'Shown to help with gut health',
+      'Potentially improves body\'s ability to repair tissue',
+      'Supports growth factors'
+    ]
+  },
+  {
+    name: 'Fulvic Acid',
+    doseMg: 250,
+    doseRangeMin: 250,
+    doseRangeMax: 500,
+    category: 'individual',
+    type: 'Allergy Support, Anti-Inflammatory, Brain Health',
+    suggestedUse: 'May help with reducing inflammation, improving brain function, and supporting overall immune health. Might aid in blocking reactions that cause allergy symptoms.',
+    benefits: [
+      'May help alleviate allergy symptoms by blocking triggering reactions',
+      'Shown to have potential benefits for brain health',
+      'Possibly slows or prevents progression of neurodegenerative diseases',
+      'May help reduce swelling',
+      'Explored for potential anticancer properties'
+    ]
+  },
+  {
+    name: 'GABA',
+    doseMg: 100,
+    doseRangeMin: 100,
+    doseRangeMax: 300,
+    category: 'individual',
+    type: 'Stress Management, Mood Support, Sleep',
+    suggestedUse: 'May support relaxation, mood regulation, and muscle tone while helping stabilize blood pressure. Explored for calming effects on anxiety and sleep support.',
+    benefits: [
+      'Naturally occurring amino acid that promotes sleep',
+      'Helps alleviate anxiety and protect brain',
+      'Produces calming effect',
+      'May help reduce symptoms of PMS and ADHD',
+      'Supports lean muscle growth',
+      'May aid in stabilizing blood pressure and relieving pain'
+    ]
+  },
+  {
+    name: 'Garlic',
+    doseMg: 200,
+    category: 'individual',
+    type: 'Antioxidant, Digestive Health, Anti-inflammatory',
+    suggestedUse: 'Supports cardiovascular health and immune function.',
+    benefits: [
+      'Known to help regulate blood pressure',
+      'May lower cholesterol levels',
+      'Improves immune system',
+      'May reduce risk of certain cancers',
+      'Aids in digestion',
+      'Nutrient rich with many beneficial bioactive compounds'
+    ]
+  },
+  {
+    name: 'Ginger Root',
+    doseMg: 500,
+    doseRangeMin: 500,
+    doseRangeMax: 2000,
+    category: 'individual',
+    type: 'Digestive Support, Anti-inflammatory, Blood Sugar Support',
+    suggestedUse: 'May support digestive health, aid in weight loss, and help maintain healthy cholesterol and insulin levels.',
+    benefits: [
+      'Widely known for anti-nausea properties',
+      'May help with digestion',
+      'Supports weight loss',
+      'Exhibits antibacterial and anti-inflammatory effects',
+      'Shown to help slow growth of some cancers',
+      'Supports healthy insulin and cholesterol levels'
+    ]
+  },
+  {
+    name: 'Graviola',
+    doseMg: 500,
+    doseRangeMin: 500,
+    doseRangeMax: 1500,
+    category: 'individual',
+    type: 'Antioxidant, Anti-inflammatory, Immune Support',
+    suggestedUse: 'May support antioxidant activity, help maintain healthy blood sugar and blood pressure levels, and promote overall immune health.',
+    benefits: [
+      'Rich in antioxidants that may help prevent and fight cancer',
+      'May kill certain cancer cells',
+      'Helps reduce inflammation',
+      'Fights off bacteria',
+      'Studied for potential to improve stomach ailments',
+      'Supports immune system',
+      'May aid in treating parasitic infections and hypertension'
+    ]
+  },
+  {
+    name: 'Green Tea',
+    doseMg: 676,
+    category: 'individual',
+    type: 'Antioxidant, Metabolism Support, Cognitive Function',
+    suggestedUse: 'May help support cognitive function, boost metabolism, and aid in cardiovascular health.',
+    benefits: [
+      'Known for high levels of polyphenols',
+      'May improve cognitive function',
+      'Boosts metabolism',
+      'May decrease risk of cardiovascular disease',
+      'Supports weight loss',
+      'Aids digestion',
+      'Improves heart health',
+      'Potentially supports management of type 2 diabetes and Alzheimer\'s'
+    ]
+  },
+  {
+    name: 'Glutathione',
+    doseMg: 600,
+    category: 'individual',
+    type: 'Antioxidant, Immune Support, Liver Health',
+    suggestedUse: 'May support immune system, assist in detoxification, and contribute to liver health by metabolizing toxins.',
+    benefits: [
+      'Tripeptide with various functions - acts as powerful antioxidant',
+      'Breaks down free radicals',
+      'Supports immune function',
+      'Regenerates vitamins C and E',
+      'Activates certain enzymes',
+      'Aids liver and gallbladder in processing fats',
+      'Helps metabolize toxins',
+      'Plays role in DNA creation and repair'
+    ]
+  },
+  {
+    name: 'Hawthorn Berry',
+    doseMg: 50,
+    doseRangeMin: 50,
+    doseRangeMax: 100,
+    category: 'individual',
+    type: 'Heart Health, Circulation',
+    suggestedUse: 'Supports cardiovascular health by enhancing blood flow and reducing symptoms of heart disease, high blood pressure, and high cholesterol.',
+    benefits: [
+      'Rich in antioxidants',
+      'Commonly used to protect against heart disease',
+      'Supports heart health',
+      'May help manage high blood pressure',
+      'Reduces symptoms of heart failure',
+      'Improves circulation in swollen legs and feet',
+      'May support better sleep by alleviating insomnia',
+      'Human studies suggest increases coronary artery blood flow'
+    ]
+  },
+  {
+    name: 'InnoSlim',
+    doseMg: 250,
+    category: 'individual',
+    type: 'Blood Sugar and Lipid Metabolism',
+    suggestedUse: 'Supports healthy blood sugar regulation and lipid metabolism by enhancing adiponectin levels and increasing AMPK activity.',
+    benefits: [
+      'Compound extracted from Panax notoginseng and Astragalus membranaceus',
+      'Only nutraceutical shown to increase adiponectin levels',
+      'Increases AMPK activity',
+      'Lowers glucose levels in healthy obese and pre-diabetic individuals with hyperlipidemia'
+    ]
+  },
+  {
+    name: 'Lions Mane',
+    doseMg: 200,
+    category: 'individual',
+    type: 'Cognitive and Mental Health',
+    suggestedUse: 'Supports brain health, reduces anxiety and depression symptoms, and provides anti-inflammatory and antioxidant benefits.',
+    benefits: [
+      'May protect against dementia',
+      'May reduce mild symptoms of anxiety and depression',
+      'Helps repair nerve damage',
+      'Strong anti-inflammatory and antioxidant properties',
+      'Immune-boosting properties',
+      'Animal studies suggest may lower risk of heart disease, cancer, ulcers, and diabetes'
+    ]
+  },
+  {
+    name: 'L-Theanine',
+    doseMg: 200,
+    doseRangeMin: 200,
+    doseRangeMax: 400,
+    category: 'individual',
+    type: 'Antioxidant / Wellbeing',
+    suggestedUse: 'Supports stress relief, anxiety reduction, boosts focus, enhances immunity, and may help support blood pressure and improve sleep.',
+    benefits: [
+      'Known for promoting relaxation and reducing stress and anxiety',
+      'Boosts focus',
+      'Enhances immunity by reducing inflammation',
+      'May help support healthy blood pressure levels',
+      'Improves sleep quality',
+      'Often added as powerful antioxidant'
+    ]
+  },
+  {
+    name: 'Milk Thistle',
+    doseMg: 420,
+    doseRangeMin: 200,
+    doseRangeMax: 420,
+    category: 'individual',
+    type: 'Liver Health / Detox',
+    suggestedUse: 'Supports liver and gallbladder health, promotes detoxification.',
+    benefits: [
+      'Historically used for liver disorders and gallbladder problems',
+      'Promoted as dietary supplement for hepatitis, cirrhosis, jaundice',
+      'May help with indigestion',
+      'Beneficial for liver protection and detoxification'
+    ]
+  },
+  {
+    name: 'NAD+',
+    doseMg: 100,
+    doseRangeMin: 100,
+    doseRangeMax: 300,
+    category: 'individual',
+    type: 'Anti-Aging / Cellular Health',
+    suggestedUse: 'Supports DNA repair, cell rejuvenation, and anti-aging processes.',
+    benefits: [
+      'Plays crucial role in many biological processes',
+      'Activates reactions within cells',
+      'Facilitates DNA repair',
+      'Helps with cosmetic aspects of aging and cell rejuvenation',
+      'Can reduce risks of age-related diseases'
+    ]
+  },
+  {
+    name: 'NMN',
+    doseMg: 250,
+    category: 'individual',
+    type: 'Anti-Aging / Cellular Health',
+    suggestedUse: 'Supports high blood pressure regulation, liver health, and metabolism.',
+    benefits: [
+      'Stimulates activity of mitochondria (vital to metabolism)',
+      'Mitochondria transform glucose and oxygen into cellular energy',
+      'Essential for mitochondrial health',
+      'Supports overall cellular function'
+    ]
+  },
+  {
+    name: 'Red Ginseng',
+    doseMg: 200,
+    doseRangeMin: 200,
+    doseRangeMax: 400,
+    category: 'individual',
+    type: 'Immune Support / Energy',
+    suggestedUse: 'Supports immune system function, enhances energy levels, and promotes blood sugar regulation.',
+    benefits: [
+      'May help increase insulin production',
+      'Enhances blood sugar uptake in cells',
+      'Provides powerful antioxidant protection',
+      'May improve energy production',
+      'Boosts overall immune system health'
+    ]
+  },
+  {
+    name: 'Red Propolis',
+    doseMg: 500,
+    category: 'individual',
+    type: 'Immune & Inflammatory Support',
+    suggestedUse: 'Resin from Brazilian red bees with powerful antioxidant and anti-inflammatory properties. May support immune function, reduce inflammation, and promote cellular health.',
+    benefits: [
+      'May assist in boosting immune system',
+      'Helps reduce inflammation throughout body',
+      'Could support skin health',
+      'Combats oxidative stress',
+      'Promotes general wellness',
+      'Antioxidant properties protect cells from damage',
+      'Supports body\'s natural healing processes'
+    ]
+  },
+  {
+    name: 'Rosemary',
+    doseMg: 100,
+    doseRangeMin: 100,
+    doseRangeMax: 600,
+    category: 'individual',
+    type: 'Brain Health / Skin & Hair Support',
+    suggestedUse: 'Supports brain health, improves memory, and promotes healthy skin and hair growth.',
+    benefits: [
+      'Used in traditional medicine for astringent, tonic, and antispasmodic properties',
+      'One of oldest known medicinal herbs',
+      'Historically used to enhance mental function and memory',
+      'May be beneficial for skin health',
+      'Promotes hair growth'
+    ]
+  },
+  {
+    name: 'Parsley',
+    doseMg: 100,
+    doseRangeMin: 200,
+    doseRangeMax: 800,
+    category: 'individual',
+    type: 'Bone Health / Antioxidant, Blood Health, High in Vitamin K',
+    suggestedUse: 'Diuretic, Anti-Inflammatory, Bone Health, Antioxidant.',
+    benefits: [
+      'Works as powerful natural diuretic',
+      'Helps reduce bloating and blood pressure',
+      'Rich in vitamin K - supports bone growth and mineral density',
+      'Contains high levels of beta carotene, folate, and vitamin B12',
+      'Contributes to antioxidant properties'
+    ]
+  },
+  {
+    name: 'Phosphatidylcholine',
+    doseMg: 250,
+    doseRangeMin: 250,
+    doseRangeMax: 1200,
+    category: 'individual',
+    type: 'Brain & Liver Support',
+    suggestedUse: 'Major component of cell membranes used to support cognitive function, liver detoxification, and fat metabolism. May help maintain healthy lipid levels.',
+    benefits: [
+      'Known for role in supporting brain function and memory',
+      'Aids in liver regeneration and fat metabolism',
+      'Contributes to maintaining healthy cell membranes',
+      'Supports production of neurotransmitters like acetylcholine'
+    ]
+  },
+  {
+    name: 'Quercetin',
+    doseMg: 50,
+    doseRangeMin: 50,
+    doseRangeMax: 500,
+    category: 'individual',
+    type: 'Antioxidant / Heart Support, Immune System',
+    suggestedUse: 'Supports heart health, reduces inflammation, and stabilizes histamine release for antihistamine benefits.',
+    benefits: [
+      'May help protect against heart disease and cancer',
+      'Stabilizes cells that release histamine',
+      'Provides anti-inflammatory and antihistamine effects',
+      'Powerful antioxidant - supports overall health and reduces oxidative stress'
+    ]
+  },
+  {
+    name: 'Saw Palmetto Extract',
+    doseMg: 320,
+    category: 'individual',
+    type: 'Prostate Health / Anti-inflammatory',
+    suggestedUse: 'Supports prostate health, reduces inflammation, and promotes urinary tract function. May aid in hair loss and increase testosterone levels.',
+    benefits: [
+      'Used for improving prostate health',
+      'Reduces inflammation',
+      'Aids in urinary tract function',
+      'May help increase testosterone levels',
+      'May reduce hair loss',
+      'Often used as natural alternative to estrogen-based medications'
+    ]
+  },
+  {
+    name: 'Sceletium',
+    doseMg: 15,
+    doseRangeMin: 15,
+    doseRangeMax: 40,
+    category: 'individual',
+    type: 'Mood Support / Neurocognitive',
+    suggestedUse: 'Supports anxiety relief, mood enhancement, and may improve cognitive function. May assist in alleviating symptoms of depression.',
+    benefits: [
+      'Traditionally used for mood-altering purposes',
+      'Especially for anxiety and depression relief',
+      'Clinical trials suggest potential anxiolytic (anxiety-relieving) benefits',
+      'Antidepressant properties',
+      'Neurocognitive benefits'
+    ]
+  },
+  {
+    name: 'Shilajit',
+    doseMg: 300,
+    category: 'individual',
+    type: 'Energy & Immunity Support',
+    suggestedUse: 'Supports healthy testosterone levels, boosts energy, and promotes overall vitality. May aid in combating chronic fatigue and signs of aging.',
+    benefits: [
+      'Contains fulvic acid and over 84 minerals',
+      'Serves as potent antioxidant to boost immunity',
+      'Improves memory',
+      'Reduces inflammation',
+      'Increases energy',
+      'Acts as diuretic to help remove excess fluid'
+    ]
+  },
+  {
+    name: 'Stinging Nettle',
+    doseMg: 500,
+    doseRangeMin: 500,
+    doseRangeMax: 1500,
+    category: 'individual',
+    type: 'Antioxidant, Digestive Health, Anti-inflammatory',
+    suggestedUse: 'Supports overall health and may help with inflammation, sore muscles and joints, enlarged prostate and more.',
+    benefits: [
+      'Used for many years to help treat inflammation',
+      'Helps with sore muscles and joints',
+      'May help with enlarged prostate',
+      'May help control blood sugar',
+      'Supports healthy blood pressure',
+      'May help with anemia, gout, and urinary tract health'
+    ]
+  },
+  {
+    name: 'Suma Root',
+    doseMg: 500,
+    doseRangeMin: 500,
+    doseRangeMax: 1500,
+    category: 'individual',
+    type: 'Adaptogen & Anti-Inflammatory',
+    suggestedUse: 'May support body in managing chronic inflammation, high cortisol levels, and cognitive function. Acts as adaptogen to fight stressors like bacteria, toxins, and mental stress.',
+    benefits: [
+      'Known for adaptogenic properties',
+      'Helps body handle stressors like bacteria, toxins, and mental stress',
+      'May provide relief from chronic inflammation',
+      'Helps with high cortisol levels',
+      'Linked to potential benefits in cancer treatments',
+      'May improve sexual dysfunction'
+    ]
+  },
+  {
+    name: 'Turmeric Root Extract 4:1',
+    doseMg: 400,
+    doseRangeMin: 400,
+    doseRangeMax: 1000,
+    category: 'individual',
+    type: 'Anti-inflammatory & Antioxidant Support',
+    suggestedUse: 'Concentrated form of curcuminoids with powerful anti-inflammatory and antioxidant properties. Often used to support joint health, digestion, and inflammation balance.',
+    benefits: [
+      'Commonly used for managing inflammation',
+      'Reduces joint pain',
+      'Supports liver health',
+      'Antioxidant properties help neutralize free radicals',
+      'Anti-inflammatory actions may benefit arthritis and digestive discomfort'
+    ]
+  },
+  {
+    name: 'Vitamin C',
+    doseMg: 90,
+    category: 'individual',
+    type: 'Antioxidant & Immune Support',
+    suggestedUse: 'Potent antioxidant that supports immune function, may reduce risk of chronic diseases, and helps body absorb iron. Beneficial in managing high blood pressure and reducing risk of heart disease.',
+    benefits: [
+      'Widely known for ability to boost immune system',
+      'Prevents iron deficiency',
+      'May help reduce risk of chronic diseases like heart disease',
+      'Manages high blood pressure',
+      'May lower uric acid levels and prevent gout attacks',
+      'Plays role in body\'s overall antioxidant defense system'
+    ]
+  },
+  {
+    name: 'Vitamin E',
+    doseMg: 2000,
+    category: 'individual',
+    type: 'Antioxidant & Skin Nourishment',
+    suggestedUse: 'Powerful antioxidant commonly used to support skin health, reduce oxidative stress, and maintain healthy cell function. Balances oil production in skin.',
+    benefits: [
+      'Known for antioxidant properties',
+      'Helps protect cells from oxidative damage',
+      'May improve skin health by nourishing and balancing oil production',
+      'May contribute to longer cell life',
+      'Potential benefits for overall skin care'
+    ]
+  },
 ];
+
+// ============================================================================
+// DETAILED BREAKDOWN OF BASE FORMULAS
+// ============================================================================
 
 export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
   {
     name: 'Adrenal Support',
     doseMg: 420,
     systemSupported: 'Endocrine, Metabolism',
-    suggestedDosage: '1x daily',
-    description: 'Supports adrenal gland function and stress response',
+    suggestedDosage: '1-3x daily',
+    description: 'Supports adrenal gland function and stress response. Complex of vitamins and herbs may help alleviate signs of Adrenal Fatigue.',
     activeIngredients: [
-      { name: 'Vitamin C', amount: '20mg', description: 'from Camu Camu Berry', benefits: ['Supports adrenal cortex function and cortisol production', 'Powerful antioxidant that reduces oxidative stress', 'Essential for immune system function', 'Aids in collagen synthesis and wound healing'] },
-      { name: 'Pantothenic Acid', amount: '50mg', description: 'as Calcium Pantothenate', benefits: ['Critical for adrenal hormone synthesis including cortisol', 'Helps convert food into energy (ATP production)', 'Supports healthy skin and wound healing', 'May reduce stress-related fatigue and exhaustion'] },
-      { name: 'Adrenal', amount: '250mg', description: 'of bovine source, not an extract', benefits: ['Provides glandular support for adrenal function', 'Contains natural cofactors and nutrients found in adrenal tissue', 'May help rebuild depleted adrenal reserves'] },
-      { name: 'Licorice', amount: '50mg', description: 'root', benefits: ['Slows breakdown of cortisol, extending its effects', 'Anti-inflammatory properties support adrenal recovery', 'May help balance cortisol levels naturally', 'Traditional use for fatigue and stress support'] },
-      { name: 'Ginger', amount: '25mg', description: 'rhizome', benefits: ['Powerful anti-inflammatory compound (gingerol)', 'Supports digestive health and reduces nausea', 'May improve circulation and reduce oxidative stress', 'Helps modulate stress response'] },
-      { name: 'Kelp', amount: '25mg', description: 'entire plant', benefits: ['Rich source of natural iodine for thyroid function', 'Thyroid health directly impacts adrenal function', 'Provides trace minerals and antioxidants', 'Supports metabolic rate and energy production'] },
-    ]
-  },
-  {
-    name: 'Alpha Gest III',
-    doseMg: 636,
-    systemSupported: 'Digestion',
-    suggestedDosage: '1x daily',
-    description: 'Supports digestive enzyme production and gut health',
-    activeIngredients: [
-      { name: 'Betaine', amount: '496mg', description: 'from 650mg Betaine HCl', benefits: ['Increases stomach acid production for better protein digestion', 'Supports breakdown of food and nutrient absorption', 'Acts as methyl donor for liver detoxification', 'May improve digestive symptoms like bloating and gas'] },
-      { name: 'Pepsin', amount: '140mg', description: '1:10,000', benefits: ['Digestive enzyme that breaks down protein into peptides', 'Works best in acidic stomach environment', 'Supports complete protein digestion', 'May reduce digestive discomfort after protein-rich meals'] },
-    ]
-  },
-  {
-    name: 'Alpha Green II',
-    doseMg: 400,
-    systemSupported: 'Spleen, Lymphatic system',
-    suggestedDosage: '1x daily',
-    description: 'Provides greens and phytonutrients for detoxification',
-    activeIngredients: [
-      { name: 'Vitamin E', amount: '75 IU', description: 'as dl-alpha Tocopheryl Acetate', benefits: ['Powerful fat-soluble antioxidant protecting cell membranes', 'Supports immune system function and antibody production', 'May improve skin health and wound healing', 'Protects against oxidative stress and inflammation'] },
-      { name: 'Bovine Spleen Concentrate', amount: '250mcg', benefits: ['Provides glandular support for spleen function', 'Spleen filters blood and supports immune response', 'Contains natural cofactors found in spleen tissue'] },
-      { name: 'Dandelion', amount: '75mg', description: 'aerial parts', benefits: ['Supports liver detoxification and bile production', 'Natural diuretic that reduces water retention', 'Rich in vitamins A, C, and K plus minerals', 'May support healthy blood sugar levels'] },
-      { name: 'Nettle', amount: '75mg', description: 'root', benefits: ['Anti-inflammatory properties support joint health', 'May support prostate health and urinary function', 'Rich in minerals including iron and calcium', 'Traditional use for seasonal allergies'] },
-    ]
-  },
-  {
-    name: 'Alpha Oxyme',
-    doseMg: 350,
-    systemSupported: 'Antioxidant',
-    suggestedDosage: '1x daily',
-    description: 'Supports cellular oxygen utilization and energy',
-    activeIngredients: [
-      { name: 'Vitamin A', amount: '1500 IU', description: 'as Beta-Carotene', benefits: ['Essential for vision, immune function, and cellular growth', 'Powerful antioxidant that protects against free radical damage', 'Supports healthy skin and mucous membranes', 'Important for reproductive health and gene expression'] },
-      { name: 'Selenium', amount: '5mcg', description: 'Amino Acid Chelate', benefits: ['Critical component of antioxidant enzymes like glutathione peroxidase', 'Protects cells from oxidative damage', 'Supports thyroid hormone metabolism', 'Important for immune system function and DNA synthesis'] },
-      { name: 'Superoxide Dismutase (SOD)', amount: 'blend', description: 'Supplying Aloe Vera leaf, Rosemary Leaf Extract, and L-Cysteine', benefits: ['Powerful antioxidant enzyme that neutralizes superoxide radicals', 'Reduces oxidative stress and cellular aging', 'May support joint health and reduce inflammation', 'Helps protect against UV radiation damage'] },
-    ]
-  },
-  {
-    name: 'Alpha Zyme III',
-    doseMg: 400,
-    systemSupported: 'Pancreas, Nutrition',
-    suggestedDosage: '1x daily',
-    description: 'Digestive enzyme blend for protein, fat, and carb breakdown',
-    activeIngredients: [
-      { name: 'Magnesium', amount: '23mg', description: 'as Aspartate, Oxide' },
-      { name: 'Potassium', amount: '23mg', description: 'as Aspartate, Chloride' },
-      { name: 'Pancreatin 8X', amount: '78mg' },
-      { name: 'Ox Bile', amount: '63mg' },
-      { name: 'L-Lysine', amount: '63mg' },
-      { name: 'Pepsin', amount: '42mg', description: '1:10,000' },
-      { name: 'Proprietary Blend', amount: '125mg', description: 'Barley Grass, Alfalfa, Celery, Parsley, Spirulina, Spinach, Watercress' },
-      { name: 'Bromelain', amount: '0.2mg', description: '600 GDU/mg' },
+      { name: 'Vitamin C', amount: '20mg', description: 'from Camu Camu Berry' },
+      { name: 'Pantothenic Acid', amount: '50mg', description: 'as Calcium Pantothenate' },
+      { name: 'Adrenal', amount: '250mg', description: 'of bovine source, not an extract' },
+      { name: 'Licorice', amount: '50mg', description: 'root' },
+      { name: 'Ginger', amount: '25mg', description: 'rhizome' },
+      { name: 'Kelp', amount: '25mg', description: 'entire plant' },
+      { name: 'Rhodiola', amount: '20mg' },
     ]
   },
   {
     name: 'Beta Max',
     doseMg: 2500,
     systemSupported: 'Liver, Gallbladder, Pancreas',
-    suggestedDosage: '4x daily',
-    description: 'Supports liver detoxification and bile production',
+    suggestedDosage: '1-3x daily',
+    description: 'Helps support liver, gallbladder, and pancreas. Regulates hepatic functions such as lipid and carbohydrate metabolism.',
     activeIngredients: [
       { name: 'Calcium', amount: '220mg', description: 'as dicalcium phosphate' },
       { name: 'Niacin', amount: '10mg', description: 'as niacinamide' },
@@ -182,26 +843,11 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     ]
   },
   {
-    name: 'Br-SP Plus',
-    doseMg: 400,
-    systemSupported: 'Digestion, Immune',
-    suggestedDosage: '1x daily',
-    description: 'Supports digestive health and immune function',
-    activeIngredients: [
-      { name: 'Black Radish', amount: 'blend', description: 'root', benefits: ['Supports liver detoxification and bile flow', 'Contains glucosinolates that support Phase II detox pathways', 'May help dissolve gallstones and support gallbladder function', 'Traditional remedy for digestive complaints'] },
-      { name: 'Green Cabbage', amount: 'blend', description: 'leaf', benefits: ['Rich in vitamin K for blood clotting and bone health', 'Contains sulforaphane and other cancer-protective compounds', 'Supports gut lining health and may reduce ulcers', 'Anti-inflammatory properties benefit digestive tract'] },
-      { name: 'Alfalfa', amount: 'blend', description: 'leaf', benefits: ['Nutrient-dense source of vitamins A, C, E, and K', 'Rich in minerals including calcium, potassium, and iron', 'Contains chlorophyll with detoxifying properties', 'May support healthy cholesterol levels'] },
-      { name: 'Pepsin', amount: 'blend', description: '100,000 FCC', benefits: ['Digestive enzyme that breaks down protein into peptides', 'Works best in acidic stomach environment', 'Supports complete protein digestion', 'May reduce digestive discomfort after protein-rich meals'] },
-      { name: 'Pituitary', amount: 'blend', description: 'of bovine source, not an extract', benefits: ['Provides glandular support for pituitary function', 'Pituitary is the "master gland" regulating other hormones', 'Contains natural cofactors found in pituitary tissue', 'May support overall hormonal balance'] },
-      { name: 'Duodenum and Stomach', amount: 'blend', description: 'of porcine source, not an extract', benefits: ['Provides glandular support for digestive tract health', 'Contains natural digestive factors and enzymes', 'May support gut lining integrity and healing', 'Traditional use for digestive system restoration'] },
-    ]
-  },
-  {
     name: 'C Boost',
     doseMg: 1680,
-    systemSupported: 'Soft tissue, Capillaries',
-    suggestedDosage: '3x daily',
-    description: 'High-dose vitamin C for immune and antioxidant support',
+    systemSupported: 'Immune system',
+    suggestedDosage: '1-3x daily',
+    description: 'Vitamin C and bioflavonoids blend. Bioflavonoids enhance action and absorption of vitamin C. Used for antioxidant and anti-inflammatory properties.',
     activeIngredients: [
       { name: 'Vitamin C', amount: '80mg', description: 'as Ascorbic Acid' },
       { name: 'Citrus bioflavonoid Complex', amount: '1100mg' },
@@ -209,116 +855,32 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     ]
   },
   {
-    name: 'Circu Plus',
-    doseMg: 540,
-    systemSupported: 'Circulation',
-    suggestedDosage: '1x daily',
-    description: 'Supports healthy circulation and vascular function',
+    name: 'Chaga Mix',
+    doseMg: 3600,
+    systemSupported: 'Immune system',
+    suggestedDosage: '1 daily',
+    description: 'Chaga mushrooms may lower cholesterol, slow cancer growth, support immune function, and reduce blood pressure.',
     activeIngredients: [
-      { name: 'Calcium', amount: '20mg', description: 'as Calcium Carbonate' },
-      { name: 'Ginkgo Biloba', amount: '166mg', description: 'leaf' },
-      { name: 'Siberian Ginseng', amount: '166mg', description: 'root' },
-      { name: "Butcher's Broom", amount: '166mg', description: 'root' },
-      { name: 'Pancreatin', amount: '25mg', description: '8X' },
-    ]
-  },
-  {
-    name: 'Colostrum Powder',
-    doseMg: 1000,
-    systemSupported: 'Immune, growth and tissue repair factors',
-    suggestedDosage: '1000mg daily dose',
-    description: 'Immune factors and gut lining support',
-    activeIngredients: [
-      { name: 'Colostrum powder', amount: '1000mg' },
-    ]
-  },
-  {
-    name: 'Chola Plus',
-    doseMg: 350,
-    systemSupported: 'Stomach, Liver, Gallbladder, Pancreas',
-    suggestedDosage: '1x daily',
-    description: 'Supports bile production and gallbladder function',
-    activeIngredients: [
-      { name: 'Niacin', amount: '0.4mg' },
-      { name: 'Chromium', amount: '40mg', description: 'as Polynicotinate' },
-      { name: 'Lecithin', amount: '100mg', description: 'from soy' },
-      { name: 'Flax seed', amount: '100mg' },
-      { name: 'Pancreatin', amount: '40mg', description: '8X' },
-      { name: 'Choline Bitartrate', amount: '50mg' },
-      { name: 'Ginkgo Biloba', amount: '17mg', description: 'leaf' },
-      { name: 'Eleuthero', amount: '17mg', description: 'root' },
-      { name: "Butcher's Broom", amount: '17mg' },
-      { name: 'Inositol', amount: '6mg' },
-      { name: 'Sage', amount: '4mg', description: 'leaf' },
-      { name: 'DL-Methionine', amount: '2mg' },
-      { name: 'Betaine HCL', amount: '2mg' },
-      { name: 'Artichoke', amount: '2mg', description: 'leaf' },
-      { name: 'Dandelion', amount: '2mg', description: 'leaf' },
-      { name: 'Milk Thistle', amount: '2mg', description: 'seed' },
-      { name: 'Turmeric', amount: '2mg', description: 'root' },
-      { name: 'Bromelain', amount: '2mg' },
-    ]
-  },
-  {
-    name: 'Dia Zyme',
-    doseMg: 494,
-    systemSupported: 'Digestion, Pancreas',
-    suggestedDosage: '1x daily',
-    description: 'Comprehensive digestive enzyme formula',
-    activeIngredients: [
-      { name: 'Calcium', amount: '25mg', description: 'as Dicalcium Phosphate' },
-      { name: 'Phosphorus', amount: '19mg', description: 'as Dicalcium Phosphate' },
-      { name: 'Pancreatin', amount: '420mcg', description: '8X' },
-      { name: 'Trypsin', amount: '30mg' },
-      { name: 'Chymotrypsin', amount: '30mcg' },
-    ]
-  },
-  {
-    name: 'Diadren Forte',
-    doseMg: 400,
-    systemSupported: 'Liver, Gall Bladder, Pancreas, Adrenal Glands',
-    suggestedDosage: '1x daily',
-    description: 'Advanced adrenal and stress hormone support',
-    activeIngredients: [
-      { name: 'Vitamin C', amount: '25mg', description: 'Ascorbic Acid' },
-      { name: 'Niacin', amount: '0.5mg', description: 'as Niacinamide' },
-      { name: 'Pantothenic Acid', amount: '25mg', description: 'as Pantothenate' },
-      { name: 'Chromium', amount: '50mcg', description: 'as Chromium GTF' },
-      { name: 'Pancreatin 8X', amount: 'blend', description: 'Supplying Amylase 2,500 USP, Protease 2,500 USP, Lipase 200 USP' },
-      { name: 'Adrenal', amount: '50mg', description: 'of bovine, not extract' },
-      { name: 'Licorice', amount: '25mg', description: 'root' },
-      { name: 'Ginger', amount: '12.5mg', description: 'rhizome' },
-      { name: 'Choline', amount: '10mg' },
-      { name: 'Inositol', amount: '7.5mg' },
-      { name: 'Lecithin granules', amount: '5mg', description: 'soy' },
-      { name: 'Sage', amount: '5mg', description: 'leaf & stem' },
-      { name: 'L-Methionine', amount: '2.5mg' },
-      { name: 'Betaine', amount: '2mg', description: 'from 2.5mg Betaine HCl' },
-      { name: 'Dandelion', amount: '2.5mg', description: 'leaf' },
-      { name: 'Turmeric', amount: '2.5mg', description: 'rhizome' },
-      { name: 'Milk Thistle', amount: '2.5mg', description: 'herb, providing Silymarin' },
-      { name: 'Artichoke', amount: '2.5mg', description: 'leaf' },
-      { name: 'Bromelain', amount: '2.5mcu' },
-      { name: 'Sea Kelp', amount: '12.5mcg', description: 'entire plant' },
+      { name: 'Chaga mushroom', amount: '3600mg' },
     ]
   },
   {
     name: 'Endocrine Support',
     doseMg: 350,
-    systemSupported: 'Endocrine (female)',
-    suggestedDosage: '1x daily',
-    description: 'Supports overall hormonal balance and endocrine function',
+    systemSupported: 'Endocrine',
+    suggestedDosage: '1-3x daily',
+    description: 'Supports endocrine system. Helps utilize vitamins, improve energy production and ensure proper liver function. Pantothenic acid supports health and function of adrenal glands.',
     activeIngredients: [
       { name: 'Pantothenic Acid', amount: '4.5mg', description: 'as Ca Pantothenate' },
       { name: 'Zinc', amount: '5.3mg', description: 'as Amino Acid Chelate' },
       { name: 'Manganese', amount: '1.8mg', description: 'as Sulfate' },
-      { name: 'Ovary & Adrenal', amount: 'blend', description: 'Of a bovine source-not an extract' },
-      { name: 'Goldenseal', amount: 'blend', description: 'leaf' },
-      { name: 'Kelp', amount: 'blend', description: 'entire plant' },
-      { name: 'Pituitary', amount: 'blend' },
-      { name: 'Hypothalamus', amount: 'blend' },
-      { name: 'Dulse', amount: 'blend' },
-      { name: 'Yarrow Flower', amount: 'blend' },
+      { name: 'Ovary & Adrenal', amount: 'proprietary', description: 'of bovine source-not an extract' },
+      { name: 'Goldenseal', amount: 'proprietary', description: 'leaf' },
+      { name: 'Kelp', amount: 'proprietary', description: 'entire plant' },
+      { name: 'Pituitary', amount: 'proprietary' },
+      { name: 'Hypothalamus', amount: 'proprietary' },
+      { name: 'Dulse', amount: 'proprietary' },
+      { name: 'Yarrow Flower', amount: 'proprietary' },
     ]
   },
   {
@@ -326,26 +888,27 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     doseMg: 450,
     systemSupported: 'Heart',
     suggestedDosage: '1-3x daily',
-    description: 'Supports cardiovascular health and heart function',
+    description: 'Supports heart function. Combining magnesium, l-carnitine and l-taurine aids in blood pressure, nervous system, heart failure, oxidative stress, and myocardial contractions.',
     activeIngredients: [
       { name: 'Magnesium', amount: '126mg', description: 'from Magnesium Amino Acid Chelate' },
-      { name: 'Heart', amount: 'blend', description: 'of bovine source, not an extract' },
-      { name: 'Inulin', amount: 'blend', description: 'from Chicory' },
+      { name: 'Heart', amount: 'proprietary', description: 'of bovine source, not an extract' },
+      { name: 'Inulin', amount: 'proprietary', description: 'from Chicory' },
       { name: 'L-Carnitine', amount: '175mg' },
       { name: 'L-Taurine', amount: '87mg' },
       { name: 'Coenzyme Q10', amount: '21mg' },
+      { name: 'Sumac', amount: '70mg' },
     ]
   },
   {
     name: 'Histamine Support',
     doseMg: 190,
     systemSupported: 'Immune, Histamine control',
-    suggestedDosage: '1x daily',
-    description: 'Helps manage histamine response and allergies',
+    suggestedDosage: '1-3x daily',
+    description: 'Important for immune system when compromised by environmental or intrinsic factors. Helps stabilize mast cell membranes and reduce histamine reactions.',
     activeIngredients: [
       { name: 'Calcium', amount: '38mg', description: 'as dicalcium phosphate' },
       { name: 'Iron', amount: '1.95mg', description: 'as Ferrous Fumarate' },
-      { name: 'Vitamin B12', amount: '10mcg', description: 'as cyanocobalamin' },
+      { name: 'Vitamin B12 Methylcobalamin', amount: '10mcg', description: 'as cyanocobalamin' },
       { name: 'Phosphorus', amount: '29mg', description: 'as dicalcium phosphate' },
       { name: 'Chromium', amount: '1mcg', description: 'as polynicotinate' },
       { name: 'Liver', amount: '80mg', description: 'of bovine source, not an extract' },
@@ -356,31 +919,32 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     name: 'Immune-C',
     doseMg: 430,
     systemSupported: 'Immune',
-    suggestedDosage: '3x daily',
-    description: 'Vitamin C plus immune-boosting herbs',
+    suggestedDosage: '1-3x daily',
+    description: 'Powerful formulation with Graviola, vitamin C, Camu Camu berry, and Cats Claw. Combined to offer great support to immune system.',
     activeIngredients: [
       { name: 'Vitamin C', amount: '8.4mg', description: 'from Camu Camu' },
-      { name: 'Soursop', amount: '70mg', description: 'leaf (Graviola)' },
+      { name: 'Soursop (Graviola)', amount: '70mg', description: 'leaf' },
       { name: 'Cats Claw', amount: '70mg', description: 'bark' },
-      { name: "Dragon's Blood Croton", amount: '70mg', description: 'sap' },
+      { name: 'Dragon\'s Blood Croton', amount: '70mg', description: 'sap' },
       { name: 'Astragalus', amount: '70mg', description: 'root' },
       { name: 'Camu Camu', amount: '70mg', description: 'berry' },
     ]
   },
   {
-    name: 'Intestinal Formula',
+    name: 'Kidney & Bladder Support',
     doseMg: 400,
-    systemSupported: 'Digestion, Elimination',
-    suggestedDosage: '1x daily',
-    description: 'Supports gut lining integrity and intestinal health',
+    systemSupported: 'Kidneys, Bladder',
+    suggestedDosage: '1-3x daily',
+    description: 'Designed for kidney and bladder support. May improve blood pressure and blood sugar; helps flush kidney stones and stop inflammatory diseases of urinary tract.',
     activeIngredients: [
-      { name: 'Cape Aloe', amount: 'blend', description: 'leaf' },
-      { name: 'Senna', amount: 'blend', description: 'leaf' },
-      { name: 'Cascara Sagrada', amount: 'blend', description: 'bark' },
-      { name: 'Ginger', amount: 'blend', description: 'root' },
-      { name: 'Barberry', amount: 'blend', description: 'root' },
-      { name: 'Garlic', amount: 'blend', description: 'bulb' },
-      { name: 'Cayenne', amount: 'blend', description: 'fruit' },
+      { name: 'Raw Kidney concentrate', amount: 'proprietary', description: 'of bovine source, not an extract' },
+      { name: 'Raw Liver Concentrate', amount: 'proprietary', description: 'of bovine source, not an extract' },
+      { name: 'Uva-Ursi', amount: 'proprietary', description: 'leaf' },
+      { name: 'Echinacea purpurea', amount: 'proprietary', description: 'root' },
+      { name: 'Goldenrod', amount: 'proprietary', description: 'aerial parts (Solidago)' },
+      { name: 'Disodium Phosphate', amount: 'proprietary' },
+      { name: 'Juniper', amount: 'proprietary', description: 'berry' },
+      { name: 'Dicalcium phosphate', amount: 'proprietary' },
     ]
   },
   {
@@ -388,76 +952,55 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     doseMg: 400,
     systemSupported: 'Muscles, Connective Tissues',
     suggestedDosage: '1-3x daily',
-    description: 'Supports connective tissue and joint health',
+    description: 'Supports muscles and connective tissue. Ideal to help improve stiffness, inflammation, arthritis, joint support, and soreness.',
     activeIngredients: [
       { name: 'Calcium', amount: '4mg', description: 'as Lactate, Dicalcium Phosphate' },
       { name: 'Phosphorus', amount: '29mg', description: 'as Dicalcium Phosphate' },
       { name: 'Magnesium', amount: '2mg', description: 'as Citrate' },
       { name: 'Manganese', amount: '11mg', description: 'as Sulfate' },
       { name: 'Citrus Bioflavonoids', amount: '50mg' },
-      { name: 'Pancreatin', amount: '12mg', description: '8X' },
+      { name: 'Pancreatin (8X)', amount: '12mg' },
       { name: 'L-Lysine', amount: '5mg' },
       { name: 'Ox Bile', amount: '5mg' },
-      { name: 'Spleen', amount: '5mg', description: 'Bovine' },
-      { name: 'Thymus', amount: '5mg', description: 'Bovine' },
+      { name: 'Spleen (Bovine)', amount: '5mg' },
+      { name: 'Thymus (Bovine)', amount: '5mg' },
       { name: 'Betaine HCI', amount: '2mg' },
       { name: 'Boron', amount: '100mcg', description: 'as Amino Acid Chelate' },
       { name: 'Bromelain', amount: '0.3mg', description: '600 GDU/mg' },
     ]
   },
   {
-    name: 'LSK Plus',
-    doseMg: 450,
-    systemSupported: 'Liver, Kidneys, Spleen',
-    suggestedDosage: '1x daily',
-    description: 'Supports liver, spleen, and kidney function',
-    activeIngredients: [
-      { name: 'Dandelion', amount: 'blend', description: 'root' },
-      { name: 'Stinging Nettle', amount: 'blend', description: 'leaf' },
-      { name: 'Uva Ursi', amount: 'blend', description: 'leaf' },
-      { name: 'Artichoke', amount: 'blend', description: 'leaf' },
-      { name: 'Goldenrod', amount: 'blend', description: 'aerial parts' },
-      { name: 'Marshmallow', amount: 'blend', description: 'root' },
-      { name: 'Milk Thistle', amount: 'blend', description: 'herb' },
-      { name: 'Yellow Dock', amount: 'blend', description: 'root' },
-      { name: 'Yarrow', amount: 'blend', description: 'flower' },
-      { name: 'Agrimony', amount: 'blend', description: 'aerial parts' },
-      { name: 'Oat Straw', amount: 'blend', description: 'aerial parts' },
-      { name: 'Meadowsweet', amount: 'blend', description: 'herb' },
-      { name: 'Liver', amount: '5mg', description: 'Bovine source, not an extract' },
-      { name: 'Spleen & Kidney', amount: '5mg', description: 'Bovine source, not an extract' },
-    ]
-  },
-  {
     name: 'Liver Support',
     doseMg: 480,
     systemSupported: 'Liver',
-    suggestedDosage: '1x daily',
-    description: 'Supports liver detoxification and function',
+    suggestedDosage: '1-3x daily',
+    description: 'For individuals experiencing decreased liver functions. May reduce fatty necrosis, reduce stress on liver, support bile production, and improve liver function.',
     activeIngredients: [
       { name: 'Vitamin A', amount: '1,000 IU', description: '100% as Beta-Carotene' },
-      { name: 'Liver', amount: '350mg', description: 'of a bovine source, not an extract' },
+      { name: 'Liver', amount: '350mg', description: 'of bovine source, not an extract' },
       { name: 'Dandelion', amount: '50mg', description: 'root' },
       { name: 'Oregon Grape', amount: '50mg', description: 'root' },
       { name: 'Barberry', amount: '50mg', description: 'root' },
       { name: 'Choline Bitartrate', amount: '10mg' },
       { name: 'Inositol', amount: '10mg' },
       { name: 'Betaine HCl', amount: '10mg' },
+      { name: 'Disodium Phosphate', amount: 'proprietary' },
+      { name: 'Calcium', amount: 'proprietary' },
     ]
   },
   {
     name: 'Lung Support',
     doseMg: 250,
     systemSupported: 'Lungs, Immune',
-    suggestedDosage: '1x daily',
-    description: 'Supports respiratory health and lung function',
+    suggestedDosage: '1-3x daily',
+    description: 'Supports lungs and immune system. Combination of vitamins and antioxidants support lungs, lymph nodes and thymus.',
     activeIngredients: [
       { name: 'Vitamin A', amount: '8,000 IU', description: 'as palmitate' },
       { name: 'Vitamin C', amount: '16mg', description: 'Ascorbic Acid' },
       { name: 'Vitamin B', amount: '15mg', description: 'as Calcium Pantothenate' },
-      { name: 'Lung', amount: '75mg', description: 'bovine source, not from an extract' },
-      { name: 'Adrenal', amount: '55mg', description: 'bovine source' },
-      { name: 'Lymph', amount: '30mg', description: 'bovine source' },
+      { name: 'Lung', amount: '75mg', description: 'of bovine source, not from extract' },
+      { name: 'Adrenal', amount: '55mg', description: 'of bovine source, not from extract' },
+      { name: 'Lymph', amount: '30mg', description: 'of bovine source, not from extract' },
       { name: 'Eucalyptus', amount: '30mg' },
       { name: 'Thymus', amount: '20mg' },
       { name: 'Psyllium husk', amount: '1mg' },
@@ -465,64 +1008,54 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
   },
   {
     name: 'MG/K',
-    doseMg: 500,
-    systemSupported: 'Autonomic Nervous System, Adrenal Glands',
-    suggestedDosage: '1x daily',
-    description: 'Magnesium and potassium for muscle and heart health',
+    doseMg: 540,
+    systemSupported: 'Autonomic Nervous System, Adrenal Glands, Muscles, Blood Sugar, Bone and DNA',
+    suggestedDosage: '2 capsules daily',
+    description: 'Concentrated blend of seven forms of magnesium ingeniously bound in potassium. Provides enhanced support for cells promoting overall cellular health.',
     activeIngredients: [
-      { name: 'Magnesium', amount: '90mg', description: 'from 250mg Magnesium Aspartate Complex' },
-      { name: 'Potassium', amount: '90mg', description: 'from 250mg Potassium Aspartate Complex' },
+      { name: 'Magnesium', amount: '500mg', description: 'from Aspartate, Taurate, Orotate, Glycinate, Malate, Chelate, Citrate' },
+      { name: 'Potassium', amount: '39mg', description: 'from Potassium Aspartate Complex' },
+      { name: 'Colostrum', amount: '40mg' },
     ]
   },
   {
     name: 'Mold RX',
     doseMg: 525,
     systemSupported: 'Detox - Mold',
-    suggestedDosage: '1x daily',
-    description: "Supports body's response to mold exposure",
+    suggestedDosage: '1-3x daily',
+    description: 'Detoxification of molds. Oregano, Chaga, Sage and other ingredients produce powerful antifungal, antibacterial and anti-inflammatory effect against mold.',
     activeIngredients: [
       { name: 'Wild oregano extract', amount: '200mg' },
-      { name: "Pau D'Arco", amount: '100mg', description: 'bark' },
+      { name: 'Pau D\'Arco', amount: '100mg', description: 'bark' },
       { name: 'Chaga Mushroom', amount: '75mg' },
       { name: 'Sage Leaf', amount: '50mg' },
       { name: 'Mullein Leaf', amount: '50mg' },
       { name: 'Stinging Nettle', amount: '50mg' },
-    ]
-  },
-  {
-    name: 'Spleen Support',
-    doseMg: 400,
-    systemSupported: 'Lymphatic, Blood',
-    suggestedDosage: '1x daily',
-    description: 'Supports spleen and immune function',
-    activeIngredients: [
-      { name: 'Vitamin E', amount: '75 IU', description: 'as dl-alpha Tocopheryl Acetate' },
-      { name: 'Bovine Spleen Concentrate', amount: '250mcg' },
-      { name: 'Dandelion', amount: '75mg', description: 'aerial parts' },
-      { name: 'Nettle', amount: '75mg', description: 'root' },
+      { name: 'Oxbile', amount: '25mg' },
+      { name: 'Fulvic/Humic', amount: '35mg' },
     ]
   },
   {
     name: 'Ovary Uterus Support',
     doseMg: 300,
     systemSupported: 'Female Reproductive System',
-    suggestedDosage: '1x daily',
-    description: 'Supports female reproductive health',
+    suggestedDosage: '1-3x daily',
+    description: 'Supports female reproductive system. Helps regulate women\'s cycles, alleviate muscle spasms and may reduce risk for certain cancers.',
     activeIngredients: [
       { name: 'Calcium', amount: '26mg', description: 'as Dicalcium Phosphate' },
       { name: 'Phosphorus', amount: '21mg', description: 'as Dicalcium Phosphate' },
       { name: 'Zinc', amount: '5mg', description: 'as Citrate' },
-      { name: 'Ovary', amount: '100mg', description: 'Bovine' },
-      { name: 'Uterus', amount: '100mg', description: 'Bovine' },
+      { name: 'Ovary (Bovine)', amount: '100mg' },
+      { name: 'Uterus (Bovine)', amount: '100mg' },
       { name: 'Blue Cohosh Root', amount: '1mg' },
     ]
   },
   {
     name: 'Para X',
     doseMg: 500,
-    systemSupported: 'Parasites',
-    suggestedDosage: '1x daily',
-    description: "Supports body's response to parasites",
+    systemSupported: 'Detox - Parasites',
+    suggestedDosage: '1-3x daily',
+    description: 'Eliminates parasites from body through detox. Black walnut and wormwood treat parasitic worm infections naturally.',
     activeIngredients: [
       { name: 'Black Walnut', amount: '100mg', description: 'hull' },
       { name: 'Pumpkin Powder', amount: '100mg', description: 'seed' },
@@ -535,50 +1068,22 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
       { name: 'Pepsin', amount: '17mg' },
       { name: 'Cellulase', amount: '2mg' },
       { name: 'Bromelain', amount: '84 MCU' },
-    ]
-  },
-  {
-    name: 'Para Thy',
-    doseMg: 335,
-    systemSupported: 'Parathyroid, Thyroid',
-    suggestedDosage: '1x daily',
-    description: 'Supports parathyroid and calcium metabolism',
-    activeIngredients: [
-      { name: 'Calcium', amount: '100mg', description: 'as calcium citrate' },
-      { name: 'Iodine', amount: '225mcg', description: 'from sea kelp' },
-      { name: 'Bovine Parathyroid Concentrate', amount: '500mcg' },
-      { name: 'Bovine Thyroid Concentrate', amount: '25mg', description: 'thyroxin free' },
-      { name: 'Papain', amount: '10mg', description: '525 TU/mg' },
-    ]
-  },
-  {
-    name: 'Pitui Plus',
-    doseMg: 495,
-    systemSupported: 'Pituitary Gland',
-    suggestedDosage: '1-3x daily',
-    description: 'Supports pituitary gland and master hormone regulation',
-    activeIngredients: [
-      { name: 'Calcium', amount: '219mg', description: 'from dicalcium phosphate' },
-      { name: 'Phosphorous', amount: '170mg', description: 'from dicalcium phosphate' },
-      { name: 'Manganese', amount: '11mg', description: 'from Manganese Sulfate' },
-      { name: 'Pituitary', amount: '135mg' },
-      { name: 'Hypothalamus', amount: '75mg' },
-      { name: 'Yarrow', amount: '45mg', description: 'flower' },
+      { name: 'Neem leaf powder', amount: '50mg' },
     ]
   },
   {
     name: 'Prostate Support',
     doseMg: 300,
     systemSupported: 'Prostate',
-    suggestedDosage: '1x daily',
-    description: 'Supports male prostate health and urinary function',
+    suggestedDosage: '1-3x daily',
+    description: 'Supports prostate and male reproductive systems. Encourages anti-inflammation and proper function.',
     activeIngredients: [
       { name: 'Magnesium', amount: '3mg', description: 'as Citrate' },
       { name: 'Zinc', amount: '15mg', description: 'as Amino Acid Chelate' },
       { name: 'Molybdenum', amount: '50mcg', description: 'as Amino Acid Chelate' },
       { name: 'Potassium', amount: '4mg', description: 'as Aspartate' },
       { name: 'Boron', amount: '250mcg', description: 'as Amino Acid Chelate' },
-      { name: 'Prostate', amount: '90mg', description: 'Bovine' },
+      { name: 'Prostate (Bovine)', amount: '90mg' },
       { name: 'Juniper Berry', amount: '50mg' },
       { name: 'Chaga Mushroom', amount: '20mg' },
       { name: 'Betaine HCI', amount: '5mg' },
@@ -586,18 +1091,16 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     ]
   },
   {
-    name: 'Kidney & Bladder Support',
+    name: 'Spleen Support',
     doseMg: 400,
-    systemSupported: 'Kidneys, Bladder',
+    systemSupported: 'Lymphatic, Blood',
     suggestedDosage: '1x daily',
-    description: 'Supports urinary tract and kidney function',
+    description: 'Supports liver, kidney, and spleen. Dandelion and nettle help the endocrine system including the spleen.',
     activeIngredients: [
-      { name: 'Raw Kidney concentrate', amount: 'blend', description: 'bovine source, not an extract' },
-      { name: 'Raw Liver Concentrate', amount: 'blend', description: 'bovine source, not an extract' },
-      { name: 'Uva-Ursi', amount: 'blend', description: 'leaf' },
-      { name: 'Echinacea purpurea', amount: 'blend', description: 'root' },
-      { name: 'Goldenrod', amount: 'blend', description: 'aerial parts (Solidago)' },
-      { name: 'Juniper', amount: 'blend', description: 'berry' },
+      { name: 'Vitamin E', amount: '75 IU', description: 'as dl-alpha Tocopheryl Acetate' },
+      { name: 'Bovine Spleen Concentrate', amount: '250mcg' },
+      { name: 'Dandelion', amount: '75mg', description: 'aerial parts' },
+      { name: 'Nettle', amount: '75mg', description: 'root' },
     ]
   },
   {
@@ -605,7 +1108,7 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
     doseMg: 470,
     systemSupported: 'Thyroid, Adrenal Glands',
     suggestedDosage: '1-3x daily',
-    description: 'Supports thyroid function and metabolism',
+    description: 'Provides necessary nutrients for proper thyroid function. Combines iodine and glandular concentrates.',
     activeIngredients: [
       { name: 'Iodine', amount: '900mcg', description: 'from Kelp' },
       { name: 'Raw Bovine Thyroid Concentrate', amount: '60mg', description: 'Thyroxine free' },
@@ -617,7 +1120,12 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
   },
 ];
 
+// Combined catalog of ALL approved ingredients
 export const ALL_INGREDIENTS = [...BASE_FORMULAS, ...INDIVIDUAL_INGREDIENTS];
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
 export function getIngredientDose(name: string): number | undefined {
   const ingredient = ALL_INGREDIENTS.find(ing => ing.name === name);
