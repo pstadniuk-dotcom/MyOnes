@@ -5,6 +5,7 @@ import {
   Package,
   FileText,
   HelpCircle,
+  Watch,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -33,6 +34,11 @@ const healthJourneyItems = [
     title: 'Formulation',
     url: '/dashboard/formula',
     icon: FlaskConical,
+  },
+  {
+    title: 'Wearables',
+    url: '/dashboard/wearables',
+    icon: Watch,
   },
   {
     title: 'Labs',

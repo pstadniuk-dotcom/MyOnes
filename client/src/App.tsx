@@ -30,6 +30,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import HomePage from "@/pages/HomePage";
 import ConsultationPage from "@/pages/ConsultationPage";
 import MyFormulaPage from "@/pages/MyFormulaPage";
+import WearablesPage from "@/pages/WearablesPage";
 import LabReportsPage from "@/pages/LabReportsPage";
 import OrdersPage from "@/pages/OrdersPage";
 import ProfilePage from "@/pages/ProfilePage";
@@ -125,6 +126,13 @@ function MainRouter() {
         <ProtectedRoute>
           <DashboardLayout>
             <MyFormulaPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/wearables">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <WearablesPage />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
