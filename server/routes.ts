@@ -57,11 +57,31 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
     errors.push(`Formula exceeds maximum dosage limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (attempted: ${formula.totalMg}mg)`);
   }
   
-  // Check minimum ingredient dose
+  // Validate all ingredients (bases + additions)
   const allIngredients = [...(formula.bases || []), ...(formula.additions || [])];
+  
   for (const ingredient of allIngredients) {
+    // Check minimum ingredient dose (global minimum)
     if (ingredient.amount < FORMULA_LIMITS.MIN_INGREDIENT_DOSE) {
       errors.push(`Ingredient "${ingredient.ingredient}" below minimum dose of ${FORMULA_LIMITS.MIN_INGREDIENT_DOSE}mg (attempted: ${ingredient.amount}mg)`);
+    }
+    
+    // 🆕 Validate dose ranges for individual ingredients
+    const individualIngredient = INDIVIDUAL_INGREDIENTS.find(i => i.name === ingredient.ingredient);
+    if (individualIngredient) {
+      // Check if ingredient has dose range constraints (min/max)
+      if (individualIngredient.doseRangeMin && ingredient.amount < individualIngredient.doseRangeMin) {
+        errors.push(
+          `"${ingredient.ingredient}" below allowed minimum of ${individualIngredient.doseRangeMin}mg (attempted: ${ingredient.amount}mg). ` +
+          `Allowed range: ${individualIngredient.doseRangeMin}-${individualIngredient.doseRangeMax}mg`
+        );
+      }
+      if (individualIngredient.doseRangeMax && ingredient.amount > individualIngredient.doseRangeMax) {
+        errors.push(
+          `"${ingredient.ingredient}" exceeds allowed maximum of ${individualIngredient.doseRangeMax}mg (attempted: ${ingredient.amount}mg). ` +
+          `Allowed range: ${individualIngredient.doseRangeMin}-${individualIngredient.doseRangeMax}mg`
+        );
+      }
     }
   }
   
