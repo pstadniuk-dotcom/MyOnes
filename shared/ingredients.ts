@@ -172,6 +172,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Aloe Vera Powder',
     doseMg: 250,
+    doseRangeMin: 250,
+    doseRangeMax: 250,
     category: 'individual',
     type: 'Antioxidant, Digestive Health, Anti-inflammatory',
     suggestedUse: 'May support digestive health, help manage blood sugar levels, and provide antioxidant and anti-inflammatory benefits.',
@@ -185,6 +187,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Ashwagandha',
     doseMg: 600,
+    doseRangeMin: 600,
+    doseRangeMax: 600,
     category: 'individual',
     type: 'Stress Relief, Antioxidant, Anti-inflammatory',
     suggestedUse: 'May support stress relief, help manage anxiety levels, and offer antioxidant and anti-inflammatory benefits.',
@@ -198,6 +202,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Astragalus',
     doseMg: 300,
+    doseRangeMin: 300,
+    doseRangeMax: 500,
     category: 'individual',
     type: 'Immune Support, Antioxidant, Organ Health',
     suggestedUse: 'May support immune function, help manage blood sugar levels, and provide antioxidant protection. Could assist in promoting heart, kidney, and liver health.',
@@ -210,6 +216,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Blackcurrant Extract',
     doseMg: 500,
+    doseRangeMin: 500,
+    doseRangeMax: 500,
     category: 'individual',
     type: 'Immune Support, Heart Health, Anti-inflammatory',
     suggestedUse: 'May support immune system, help improve blood flow to heart, and provide anti-inflammatory benefits.',
@@ -237,6 +245,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Camu Camu',
     doseMg: 2500,
+    doseRangeMin: 2500,
+    doseRangeMax: 2500,
     category: 'individual',
     type: 'Immune Support, Anti-inflammatory, Blood Sugar Support',
     suggestedUse: 'May help fight inflammation, improve blood sugar levels, and support overall immune function.',
@@ -390,6 +400,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Garlic',
     doseMg: 200,
+    doseRangeMin: 200,
+    doseRangeMax: 200,
     category: 'individual',
     type: 'Antioxidant, Digestive Health, Anti-inflammatory',
     suggestedUse: 'Supports cardiovascular health and immune function.',
@@ -440,6 +452,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Green Tea',
     doseMg: 676,
+    doseRangeMin: 676,
+    doseRangeMax: 676,
     category: 'individual',
     type: 'Antioxidant, Metabolism Support, Cognitive Function',
     suggestedUse: 'May help support cognitive function, boost metabolism, and aid in cardiovascular health.',
@@ -457,6 +471,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Glutathione',
     doseMg: 600,
+    doseRangeMin: 600,
+    doseRangeMax: 600,
     category: 'individual',
     type: 'Antioxidant, Immune Support, Liver Health',
     suggestedUse: 'May support immune system, assist in detoxification, and contribute to liver health by metabolizing toxins.',
@@ -493,6 +509,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'InnoSlim',
     doseMg: 250,
+    doseRangeMin: 250,
+    doseRangeMax: 250,
     category: 'individual',
     type: 'Blood Sugar and Lipid Metabolism',
     suggestedUse: 'Supports healthy blood sugar regulation and lipid metabolism by enhancing adiponectin levels and increasing AMPK activity.',
@@ -506,6 +524,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Lions Mane',
     doseMg: 200,
+    doseRangeMin: 200,
+    doseRangeMax: 200,
     category: 'individual',
     type: 'Cognitive and Mental Health',
     suggestedUse: 'Supports brain health, reduces anxiety and depression symptoms, and provides anti-inflammatory and antioxidant benefits.',
@@ -569,6 +589,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'NMN',
     doseMg: 250,
+    doseRangeMin: 250,
+    doseRangeMax: 250,
     category: 'individual',
     type: 'Anti-Aging / Cellular Health',
     suggestedUse: 'Supports high blood pressure regulation, liver health, and metabolism.',
@@ -598,6 +620,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Red Propolis',
     doseMg: 500,
+    doseRangeMin: 500,
+    doseRangeMax: 500,
     category: 'individual',
     type: 'Immune & Inflammatory Support',
     suggestedUse: 'Resin from Brazilian red bees with powerful antioxidant and anti-inflammatory properties. May support immune function, reduce inflammation, and promote cellular health.',
@@ -676,6 +700,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Saw Palmetto Extract',
     doseMg: 320,
+    doseRangeMin: 320,
+    doseRangeMax: 320,
     category: 'individual',
     type: 'Prostate Health / Anti-inflammatory',
     suggestedUse: 'Supports prostate health, reduces inflammation, and promotes urinary tract function. May aid in hair loss and increase testosterone levels.',
@@ -707,6 +733,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Shilajit',
     doseMg: 300,
+    doseRangeMin: 300,
+    doseRangeMax: 300,
     category: 'individual',
     type: 'Energy & Immunity Support',
     suggestedUse: 'Supports healthy testosterone levels, boosts energy, and promotes overall vitality. May aid in combating chronic fatigue and signs of aging.',
@@ -772,6 +800,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Vitamin C',
     doseMg: 90,
+    doseRangeMin: 90,
+    doseRangeMax: 90,
     category: 'individual',
     type: 'Antioxidant & Immune Support',
     suggestedUse: 'Potent antioxidant that supports immune function, may reduce risk of chronic diseases, and helps body absorb iron. Beneficial in managing high blood pressure and reducing risk of heart disease.',
@@ -787,6 +817,8 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
     name: 'Vitamin E',
     doseMg: 2000,
+    doseRangeMin: 2000,
+    doseRangeMax: 2000,
     category: 'individual',
     type: 'Antioxidant & Skin Nourishment',
     suggestedUse: 'Powerful antioxidant commonly used to support skin health, reduce oxidative stress, and maintain healthy cell function. Balances oil production in skin.',
