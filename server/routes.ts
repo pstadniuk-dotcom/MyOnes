@@ -13,7 +13,7 @@ import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, in
 import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { analyzeLabReport } from "./fileAnalysis";
-import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDIENTS, BASE_FORMULA_DETAILS } from "@shared/ingredients";
+import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDIENTS, BASE_FORMULA_DETAILS, normalizeIngredientName, findIngredientByName } from "@shared/ingredients";
 import { sendNotificationEmail } from "./emailService";
 import { sendNotificationSms } from "./smsService";
 import type { User, Notification, NotificationPref } from "@shared/schema";
@@ -4375,19 +4375,23 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const ingredientName = decodeURIComponent(req.params.ingredientName);
       
-      // This would normally query a comprehensive ingredient database
-      // For now, return structured data based on ingredient name
+      // Use unified lookup function to pull from INDIVIDUAL_INGREDIENTS and BASE_FORMULA_DETAILS
+      const comprehensiveInfo = getComprehensiveIngredientInfo(ingredientName);
+      
       const ingredientInfo = {
         name: ingredientName,
-        dosage: CANONICAL_DOSES_MG[ingredientName as keyof typeof CANONICAL_DOSES_MG] || 0,
-        benefits: getIngredientBenefits(ingredientName),
-        interactions: await getIngredientInteractions(ingredientName),
-        category: getIngredientCategory(ingredientName),
-        dailyValuePercentage: getDailyValuePercentage(ingredientName),
-        sources: getIngredientSources(ingredientName),
-        qualityIndicators: getQualityIndicators(ingredientName),
-        alternatives: getAlternatives(ingredientName),
-        researchBacking: getResearchBacking(ingredientName)
+        dosage: comprehensiveInfo.standardDose || CANONICAL_DOSES_MG[ingredientName as keyof typeof CANONICAL_DOSES_MG] || 0,
+        benefits: comprehensiveInfo.benefits,
+        interactions: comprehensiveInfo.interactions,
+        category: comprehensiveInfo.category,
+        type: comprehensiveInfo.type,
+        suggestedUse: comprehensiveInfo.suggestedUse,
+        doseRange: comprehensiveInfo.doseRange,
+        dailyValuePercentage: comprehensiveInfo.dailyValuePercentage,
+        sources: comprehensiveInfo.sources,
+        qualityIndicators: comprehensiveInfo.qualityIndicators,
+        alternatives: comprehensiveInfo.alternatives,
+        researchBacking: comprehensiveInfo.researchBacking
       };
 
       res.json(ingredientInfo);
@@ -4416,72 +4420,145 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
-  // Helper functions for ingredient information (these would be more comprehensive in production)
-  function getIngredientBenefits(ingredient: string): string[] {
-    const benefits: Record<string, string[]> = {
-      'BRAIN HEALTH': ['Supports cognitive function', 'Enhances memory', 'Improves focus and concentration'],
-      'IMMUNE': ['Boosts immune system', 'Supports natural defenses', 'Helps fight infections'],
-      'ENERGY': ['Increases natural energy', 'Reduces fatigue', 'Supports cellular energy production'],
-      'Vitamin D3': ['Supports bone health', 'Immune system support', 'Mood regulation'],
-      'Magnesium': ['Muscle and nerve function', 'Bone health', 'Energy metabolism'],
-      'Omega-3': ['Heart health', 'Brain function', 'Anti-inflammatory effects']
-    };
+  // Unified ingredient lookup function - sources from INDIVIDUAL_INGREDIENTS and BASE_FORMULA_DETAILS
+  // Uses shared normalizeIngredientName and findIngredientByName from @shared/ingredients
+  function getComprehensiveIngredientInfo(ingredientName: string): {
+    benefits: string[];
+    category: string;
+    type?: string;
+    suggestedUse?: string;
+    doseRange?: { min: number; max: number };
+    standardDose?: number;
+    interactions: string[];
+    dailyValuePercentage: number | null;
+    sources: string[];
+    qualityIndicators: string[];
+    alternatives: string[];
+    researchBacking: { studyCount: number; evidenceLevel: string };
+  } {
+    // IMPORTANT: Normalize name once and use canonical name throughout for consistent metadata lookup
+    const canonicalName = normalizeIngredientName(ingredientName);
     
-    return benefits[ingredient] || ['General health support'];
-  }
+    // 1. First check INDIVIDUAL_INGREDIENTS catalog using shared helper
+    const individualIngredient = findIngredientByName(ingredientName);
 
-  function getIngredientCategory(ingredient: string): string {
-    if (Object.keys(CANONICAL_DOSES_MG).includes(ingredient) && 
-        !['Vitamin D3', 'Vitamin C', 'Magnesium', 'Zinc', 'Iron'].includes(ingredient)) {
-      return 'Formula Base';
+    if (individualIngredient) {
+      return {
+        benefits: individualIngredient.benefits || ['Supports overall health and wellness'],
+        category: individualIngredient.type || 'Dietary Supplement',
+        type: individualIngredient.type,
+        suggestedUse: individualIngredient.suggestedUse,
+        doseRange: individualIngredient.doseRangeMin && individualIngredient.doseRangeMax ? {
+          min: individualIngredient.doseRangeMin,
+          max: individualIngredient.doseRangeMax
+        } : undefined,
+        standardDose: individualIngredient.doseMg,
+        interactions: getInteractionsForIngredient(canonicalName),
+        dailyValuePercentage: getDailyValuePercentageForIngredient(canonicalName),
+        sources: getSourcesForIngredient(canonicalName),
+        qualityIndicators: getQualityIndicatorsForIngredient(),
+        alternatives: getAlternativesForIngredient(canonicalName),
+        researchBacking: getResearchBackingForIngredient(canonicalName)
+      };
     }
-    return 'Individual Supplement';
+
+    // 2. Check if it's an active ingredient in a base formula (use canonical name)
+    for (const formula of BASE_FORMULA_DETAILS) {
+      const activeIngredient = formula.activeIngredients?.find(
+        ai => ai.name.toLowerCase() === canonicalName.toLowerCase()
+      );
+      
+      if (activeIngredient) {
+        return {
+          benefits: activeIngredient.benefits || ['Supports overall health and wellness'],
+          category: 'Active Ingredient in ' + formula.name,
+          type: formula.systemSupported,
+          suggestedUse: `Part of ${formula.name} - ${formula.description}`,
+          interactions: getInteractionsForIngredient(canonicalName),
+          dailyValuePercentage: getDailyValuePercentageForIngredient(canonicalName),
+          sources: getSourcesForIngredient(canonicalName),
+          qualityIndicators: getQualityIndicatorsForIngredient(),
+          alternatives: getAlternativesForIngredient(canonicalName),
+          researchBacking: getResearchBackingForIngredient(canonicalName)
+        };
+      }
+    }
+
+    // 3. Check if it's a base formula itself (use canonical name)
+    const baseFormula = BASE_FORMULAS.find(
+      ing => ing.name.toLowerCase() === canonicalName.toLowerCase()
+    );
+
+    if (baseFormula) {
+      const formulaDetails = BASE_FORMULA_DETAILS.find(
+        f => f.name.toLowerCase() === canonicalName.toLowerCase()
+      );
+      
+      return {
+        benefits: formulaDetails?.description ? [formulaDetails.description] : ['Comprehensive base formula'],
+        category: 'Base Formula',
+        type: formulaDetails?.systemSupported || 'Multi-System Support',
+        suggestedUse: formulaDetails?.suggestedDosage || '1x daily',
+        standardDose: baseFormula.doseMg,
+        interactions: getInteractionsForIngredient(canonicalName),
+        dailyValuePercentage: null,
+        sources: ['Proprietary blend of active ingredients'],
+        qualityIndicators: getQualityIndicatorsForIngredient(),
+        alternatives: getAlternativesForIngredient(canonicalName),
+        researchBacking: getResearchBackingForIngredient(canonicalName)
+      };
+    }
+
+    // 4. Fallback for unknown ingredients
+    return {
+      benefits: ['Supports overall health and wellness'],
+      category: 'Dietary Supplement',
+      interactions: [],
+      dailyValuePercentage: null,
+      sources: ['Natural sources'],
+      qualityIndicators: getQualityIndicatorsForIngredient(),
+      alternatives: [],
+      researchBacking: { studyCount: 0, evidenceLevel: 'Limited' }
+    };
   }
 
-  async function getIngredientInteractions(ingredient: string): Promise<string[]> {
-    const interactions: string[] = [];
-    
-    // Check for known interactions
+  // Helper functions with pragmatic fallbacks
+  function getInteractionsForIngredient(ingredient: string): string[] {
     const knownInteractions: Record<string, string[]> = {
       'Vitamin D3': ['May enhance calcium absorption - monitor calcium levels'],
       'Magnesium': ['May reduce absorption of some antibiotics - take separately'],
       'Iron': ['May reduce absorption with calcium - take separately'],
       'Omega-3': ['May enhance blood-thinning effects of warfarin'],
-      'IMMUNE': ['May enhance immune response - consult doctor if on immunosuppressants'],
-      'BRAIN HEALTH': ['May interact with cognitive medications - consult healthcare provider']
+      'CoEnzyme Q10': ['May interact with blood pressure medications - consult healthcare provider'],
+      'Hawthorn Berry': ['May interact with heart medications - consult healthcare provider']
     };
     
-    if (knownInteractions[ingredient]) {
-      interactions.push(...knownInteractions[ingredient]);
-    }
-    
-    return interactions;
+    return knownInteractions[ingredient] || [];
   }
 
-  function getDailyValuePercentage(ingredient: string): number | null {
-    // This would query a comprehensive nutrient database
+  function getDailyValuePercentageForIngredient(ingredient: string): number | null {
     const dvValues: Record<string, number> = {
-      'Vitamin D3': 500, // 1000 IU = 500% DV
-      'Vitamin C': 278,  // 250mg = 278% DV
-      'Magnesium': 48,   // 200mg = 48% DV
-      'Zinc': 136       // 15mg = 136% DV
+      'Vitamin D3': 500,
+      'Vitamin C': 278,
+      'Magnesium': 48,
+      'Zinc': 136
     };
     
     return dvValues[ingredient] || null;
   }
 
-  function getIngredientSources(ingredient: string): string[] {
+  function getSourcesForIngredient(ingredient: string): string[] {
     const sources: Record<string, string[]> = {
       'Vitamin D3': ['Lichen extract', 'Lanolin (sheep wool)'],
       'Magnesium': ['Magnesium glycinate', 'Magnesium citrate'],
-      'Omega-3': ['Fish oil', 'Algae oil'],
-      'BRAIN HEALTH': ['Lion\'s Mane mushroom', 'Bacopa monnieri', 'Ginkgo biloba']
+      'CoEnzyme Q10': ['Fermented yeast', 'Natural synthesis'],
+      'Hawthorn Berry': ['Hawthorn fruit and leaf extract']
     };
     
-    return sources[ingredient] || ['Natural sources'];
+    return sources[ingredient] || ['Premium natural sources'];
   }
 
-  function getQualityIndicators(ingredient: string): string[] {
+  function getQualityIndicatorsForIngredient(): string[] {
     return [
       'Third-party tested',
       'USP verified',
@@ -4490,21 +4567,21 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     ];
   }
 
-  function getAlternatives(ingredient: string): string[] {
+  function getAlternativesForIngredient(ingredient: string): string[] {
     const alternatives: Record<string, string[]> = {
       'Vitamin D3': ['Vitamin D2', 'Sunlight exposure'],
-      'Magnesium': ['Magnesium oxide', 'Magnesium malate'],
-      'ENERGY': ['ENDURANCE', 'ADRENAL SUPPORT']
+      'Magnesium': ['Magnesium oxide', 'Magnesium malate']
     };
     
     return alternatives[ingredient] || [];
   }
 
-  function getResearchBacking(ingredient: string): { studyCount: number, evidenceLevel: string } {
-    // This would query a research database
+  function getResearchBackingForIngredient(ingredient: string): { studyCount: number; evidenceLevel: string } {
+    // This would query a research database in production
+    // For now, return reasonable defaults
     return {
-      studyCount: Math.floor(Math.random() * 100) + 50,
-      evidenceLevel: 'Strong'
+      studyCount: Math.floor(Math.random() * 50) + 30,
+      evidenceLevel: 'Moderate to Strong'
     };
   }
 
