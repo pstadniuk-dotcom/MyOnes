@@ -45,6 +45,13 @@ Preferred communication style: Simple, everyday language.
 - **Formula Selection & History**: Grid view of formula versions with selection mechanism, synchronizing tabs to reflect the selected formula. Users can review and order any previous version.
 - **Formula Extraction & Validation System**: Server-side detection and user notification for AI formula output failures or unapproved ingredients.
 - **Ingredient Validation System**: Strict enforcement that AI only recommends ingredients from an approved catalog, with critical rules embedded in the AI prompt.
+- **AI Prompt Engineering** (Updated Nov 10, 2025):
+  - **Exact Ingredient Name Enforcement**: AI must use character-for-character catalog matches (no variations like "Alpha Gest III" → must be "Alpha Gest")
+  - **Medical Practitioner Communication Style**: Mandatory detailed clinical explanations BEFORE JSON output
+  - **Base Formula Composition Breakdown**: AI explains what active ingredients are IN each base formula and WHY they're chosen
+  - **Individualized Reasoning**: Connects lab values, biomarkers, conditions, and medications to specific ingredient choices
+  - **Preflight Verification Checklist**: AI validates exact name matching and dose ranges before sending formulas
+  - **Updated Dosing Rules**: 10mg minimum per ingredient (no multiples-of-50 requirement)
 - **Progress Tracking**: User journey monitoring with iterative formula optimization.
 - **Business Model**: One-time purchases for 3/6/12 month supplies; no refunds on custom orders unless damaged/defective.
 - **Wearable Integration**: Production-ready database schema (`wearable_connections`, `biometric_data`, `biometric_trends`), secure OAuth implementation with AES-256-GCM token encryption, and automated token refresh system.
