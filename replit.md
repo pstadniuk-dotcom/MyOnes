@@ -55,9 +55,17 @@ Preferred communication style: Simple, everyday language.
 - **Ingredient Catalog** (Updated Nov 10, 2025):
   - **22 Base Formulas**: Expanded from 19 to 22 formulas by adding Alpha Gest III, Alpha Green II, and Alpha Oxyme
   - **All Active Ingredients Expandable**: All 130+ active ingredients across all base formulas have comprehensive benefits arrays (2-4 benefits each)
-  - Enables expandable ingredient details in MyFormulaPage UI for all base formulas
+  - **42 Individual Ingredients**: Complete catalog with comprehensive metadata (type, suggestedUse, benefits, dose ranges)
+  - Enables expandable ingredient details in MyFormulaPage UI for all base formulas and individual ingredients
   - Benefits include evidence-based descriptions for vitamins, minerals, herbs, glandulars, and proprietary ingredients
   - Ensures consistent user experience across all formula visualizations
+- **Ingredient Information System** (Added Nov 10, 2025):
+  - **Unified Backend Lookup**: `/api/ingredients/:ingredientName` endpoint sources from INDIVIDUAL_INGREDIENTS and BASE_FORMULA_DETAILS
+  - **Name Normalization**: Handles 20+ common ingredient aliases (CoQ10 → CoEnzyme Q10, PC → Phosphatidylcholine, etc.)
+  - **Centralized Alias Map**: INGREDIENT_ALIASES in shared/ingredients.ts ensures consistent naming across frontend/backend
+  - **Comprehensive Metadata**: Returns benefits, type, suggestedUse, doseRange, interactions, sources, quality indicators
+  - **Smart Fallbacks**: Gracefully handles unknown ingredients with sensible defaults
+  - **UI Integration**: Ingredient dropdowns show detailed, ingredient-specific benefits instead of generic "General health support"
 - **Progress Tracking**: User journey monitoring with iterative formula optimization.
 - **Business Model**: One-time purchases for 3/6/12 month supplies; no refunds on custom orders unless damaged/defective.
 - **Wearable Integration**: Production-ready database schema (`wearable_connections`, `biometric_data`, `biometric_trends`), secure OAuth implementation with AES-256-GCM token encryption, and automated token refresh system.
