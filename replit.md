@@ -66,6 +66,24 @@ Preferred communication style: Simple, everyday language.
   - **Comprehensive Metadata**: Returns benefits, type, suggestedUse, doseRange, interactions, sources, quality indicators
   - **Smart Fallbacks**: Gracefully handles unknown ingredients with sensible defaults
   - **UI Integration**: Ingredient dropdowns show detailed, ingredient-specific benefits instead of generic "General health support"
+- **Ingredient Normalization System** (Fixed Nov 10, 2025):
+  - **URI Encoding Fix**: Removed double URL decoding in ingredient lookup endpoints to prevent 500 errors on special characters (%, /, etc.)
+  - **Conservative Normalization**: Smart stripping of AI-added qualifiers while preserving canonical name components:
+    - **PRESERVES**: "Root", "Leaf", "Extract", extraction ratios (e.g., "Ginger Root", "Blackcurrant Extract", "Turmeric Root Extract 4:1")
+    - **STRIPS**: PE qualifiers (e.g., "PE 1/8%"), percentages (e.g., "40%"), parenthetical sources (e.g., "(soy)", "(bovine)")
+  - **Comprehensive Alias System**: 20+ aliases handle common variations:
+    - "cboost" → "C Boost", "coq10" → "CoEnzyme Q10"
+    - "curcumin/turmeric/turmeric root/turmeric extract" → "Turmeric Root Extract 4:1"
+    - "ginko" → "Ginkgo Biloba", "ahswaganda" → "Ashwagandha"
+    - "alpha gest" → "Alpha Gest III", "pc" → "Phosphatidylcholine"
+  - **5-Step Normalization Process**:
+    1. Check alias map with raw name
+    2. Check catalog with raw name (catches exact matches)
+    3. Strip conservative qualifiers (PE, %, parentheses only)
+    4. Check alias map with stripped name
+    5. Check catalog with stripped name
+  - **Formula Storage Normalization**: All ingredient names normalized before database persistence, ensuring canonical names in storage
+  - **Aligned AI Prompt**: Prompt updated to reflect catalog structure, clarifying which names include "Root", "Extract", ratios as canonical components
 - **Progress Tracking**: User journey monitoring with iterative formula optimization.
 - **Business Model**: One-time purchases for 3/6/12 month supplies; no refunds on custom orders unless damaged/defective.
 - **Wearable Integration**: Production-ready database schema (`wearable_connections`, `biometric_data`, `biometric_trends`), secure OAuth implementation with AES-256-GCM token encryption, and automated token refresh system.

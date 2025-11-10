@@ -1927,6 +1927,33 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'dha': 'Algae Omega',
   'epa': 'Algae Omega',
   
+  // Base Formula spacing variations
+  'cboost': 'C Boost',
+  'c-boost': 'C Boost',
+  'alpha gest': 'Alpha Gest III',
+  'alphagest': 'Alpha Gest III',
+  'alpha-gest': 'Alpha Gest III',
+  'oxy gest': 'Alpha Oxyme',
+  'oxygest': 'Alpha Oxyme',
+  'alpha green': 'Alpha Green II',
+  'alphagreen': 'Alpha Green II',
+  
+  // Ginkgo variations (common misspelling)
+  'ginko': 'Ginkgo Biloba',
+  'ginko biloba': 'Ginkgo Biloba',
+  'gingko': 'Ginkgo Biloba',
+  'gingko biloba': 'Ginkgo Biloba',
+  
+  // Ashwagandha variations (common misspelling)
+  'ahswaganda': 'Ashwagandha',
+  'aswagandha': 'Ashwagandha',
+  
+  // Curcumin/Turmeric variations
+  'curcumin': 'Turmeric Root Extract 4:1',
+  'turmeric': 'Turmeric Root Extract 4:1',
+  'turmeric root': 'Turmeric Root Extract 4:1',
+  'turmeric extract': 'Turmeric Root Extract 4:1',
+  
   // Common abbreviations and variations
   'vit d': 'Vitamin D3',
   'vit c': 'Vitamin C',
@@ -1943,26 +1970,58 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
 
 /**
  * Normalizes ingredient names to handle aliases and variations
- * Uses automatic slug-based matching + explicit alias overrides
+ * CRITICAL: Check catalog FIRST to avoid corrupting canonical ingredient names
+ * Only strip qualifiers if no direct match found (for AI-added extras)
  */
 export function normalizeIngredientName(name: string): string {
-  const normalizedInput = name.toLowerCase().trim();
+  const trimmed = name.trim();
+  const trimmedLower = trimmed.toLowerCase();
   
-  // 1. Check explicit alias map first
-  if (INGREDIENT_ALIASES[normalizedInput]) {
-    return INGREDIENT_ALIASES[normalizedInput];
+  // STEP 1: Check explicit alias map FIRST (exact match)
+  if (INGREDIENT_ALIASES[trimmedLower]) {
+    return INGREDIENT_ALIASES[trimmedLower];
   }
   
-  // 2. Try case-insensitive exact match in catalog
+  // STEP 2: Try case-insensitive exact match in catalog (preserves canonical names)
   const exactMatch = ALL_INGREDIENTS.find(
-    ing => ing.name.toLowerCase() === normalizedInput
+    ing => ing.name.toLowerCase() === trimmedLower
   );
   if (exactMatch) {
     return exactMatch.name;
   }
   
-  // 3. Return original name if no match found
-  return name;
+  // STEP 3: ONLY if no match found, strip AI-added qualifiers and try again
+  // CONSERVATIVE STRIPPING - Only remove things that are NEVER part of canonical names
+  // Preserves: "Root", "Leaf", "Extract" (because they ARE in canonical names like "Ginger Root", "Blackcurrant Extract")
+  // Removes: PE qualifiers, percentages, extraction ratios, parenthetical sources
+  let stripped = trimmed
+    // Remove PE (Plant Extract) qualifiers (e.g., "PE 1/8% Flavones", "PE 1/8%")
+    .replace(/\s*PE\s+\d+\/\d+%?\s*\w*/gi, ' ')
+    // Remove standalone percentage potencies (e.g., " 40%", " 24%", " 95%")
+    .replace(/\s+\d+%\s*/g, ' ')
+    // Remove parenthetical descriptors (e.g., "(soy)", "(powder)", "(bovine)")
+    .replace(/\s*\([^)]+\)/g, '')
+    // Normalize multiple spaces
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  const strippedLower = stripped.toLowerCase();
+  
+  // STEP 4: Check alias map with stripped name
+  if (INGREDIENT_ALIASES[strippedLower]) {
+    return INGREDIENT_ALIASES[strippedLower];
+  }
+  
+  // STEP 5: Try catalog match with stripped name
+  const strippedMatch = ALL_INGREDIENTS.find(
+    ing => ing.name.toLowerCase() === strippedLower
+  );
+  if (strippedMatch) {
+    return strippedMatch.name;
+  }
+  
+  // STEP 6: Return stripped name if no match found (best effort cleanup)
+  return stripped;
 }
 
 /**

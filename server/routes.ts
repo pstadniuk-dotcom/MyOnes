@@ -202,32 +202,22 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-// Helper function to normalize ingredient names for flexible matching
-// Handles variations like "Phosphatidylcholine 40%" vs "Phosphatidylcholine 40% (soy)"
-function normalizeIngredientForMatching(name: string): string {
-  if (!name || typeof name !== 'string') {
-    console.warn('normalizeIngredientForMatching received invalid name:', name);
-    return '';
-  }
-  return name.toLowerCase()
-    .replace(/\s*\([^)]*\)/g, '') // Remove parentheses and content
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .trim();
-}
-
-// Helper function to check if an ingredient is approved (with flexible matching)
+// Helper function to check if an ingredient is approved (uses shared normalization)
 // Checks against BOTH base formulas and individual ingredients to be category-agnostic
 function isIngredientApproved(ingredientName: string, approvedSet: Set<string>): boolean {
-  const normalized = normalizeIngredientForMatching(ingredientName);
+  // Use shared normalizeIngredientName which strips potency qualifiers, extraction ratios, etc.
+  const normalized = normalizeIngredientName(ingredientName);
   
-  // Check if any approved ingredient matches
+  // Check if normalized name exists in approved set
+  // The approved set is already normalized, so we can do direct lookups
+  if (approvedSet.has(normalized)) {
+    return true;
+  }
+  
+  // Defensive fallback: check if any approved ingredient matches (preserves backward compat)
+  const normalizedLower = normalized.toLowerCase();
   for (const approved of approvedSet) {
-    const normalizedApproved = normalizeIngredientForMatching(approved);
-    
-    // Exact match or fuzzy match
-    if (normalizedApproved === normalized || 
-        normalizedApproved.includes(normalized) ||
-        normalized.includes(normalizedApproved)) {
+    if (approved.toLowerCase() === normalizedLower) {
       return true;
     }
   }
@@ -2679,21 +2669,31 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           const currentFormula = await storage.getCurrentFormulaByUser(userId);
           const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
           
-          // Convert formula to storage format
+          // Convert formula to storage format with normalized ingredient names
           const formulaData = {
             userId,
-            bases: extractedFormula.bases.map((b: any) => ({
-              ingredient: b.ingredient || b.name,
-              amount: typeof b.amount === 'number' ? b.amount : parseDoseToMg(b.dose || `${b.amount}mg`, b.ingredient || b.name),
-              unit: 'mg',
-              purpose: b.purpose
-            })),
-            additions: extractedFormula.additions.map((a: any) => ({
-              ingredient: a.ingredient || a.name,
-              amount: typeof a.amount === 'number' ? a.amount : parseDoseToMg(a.dose || `${a.amount}mg`, a.ingredient || a.name),
-              unit: 'mg',
-              purpose: a.purpose
-            })),
+            bases: extractedFormula.bases.map((b: any) => {
+              const rawName = b.ingredient || b.name;
+              const normalizedName = normalizeIngredientName(rawName);
+              console.log(`🔄 Normalizing base: "${rawName}" → "${normalizedName}"`);
+              return {
+                ingredient: normalizedName,
+                amount: typeof b.amount === 'number' ? b.amount : parseDoseToMg(b.dose || `${b.amount}mg`, rawName),
+                unit: 'mg',
+                purpose: b.purpose
+              };
+            }),
+            additions: extractedFormula.additions.map((a: any) => {
+              const rawName = a.ingredient || a.name;
+              const normalizedName = normalizeIngredientName(rawName);
+              console.log(`🔄 Normalizing addition: "${rawName}" → "${normalizedName}"`);
+              return {
+                ingredient: normalizedName,
+                amount: typeof a.amount === 'number' ? a.amount : parseDoseToMg(a.dose || `${a.amount}mg`, rawName),
+                unit: 'mg',
+                purpose: a.purpose
+              };
+            }),
             totalMg: extractedFormula.totalMg,
             rationale: extractedFormula.rationale,
             warnings: extractedFormula.warnings || [],
@@ -4373,7 +4373,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   // Get ingredient detailed information
   app.get('/api/ingredients/:ingredientName', requireAuth, async (req: any, res: any) => {
     try {
-      const ingredientName = decodeURIComponent(req.params.ingredientName);
+      const ingredientName = req.params.ingredientName;
       
       // Use unified lookup function to pull from INDIVIDUAL_INGREDIENTS and BASE_FORMULA_DETAILS
       const comprehensiveInfo = getComprehensiveIngredientInfo(ingredientName);
@@ -4404,7 +4404,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   // Get research citations for a specific ingredient
   app.get('/api/ingredients/:ingredientName/research', requireAuth, async (req: any, res: any) => {
     try {
-      const ingredientName = decodeURIComponent(req.params.ingredientName);
+      const ingredientName = req.params.ingredientName;
       
       // Fetch research citations from database
       const citations = await storage.getResearchCitationsForIngredient(ingredientName);
