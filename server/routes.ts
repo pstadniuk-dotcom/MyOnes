@@ -4159,6 +4159,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         return res.status(404).json({ error: 'Formula not found or access denied' });
       }
 
+      // Validate that reverting to this formula doesn't exceed maximum dosage
+      if (originalFormula.totalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
+        return res.status(400).json({ 
+          error: `Cannot revert to this formula as it exceeds the maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (this version has ${originalFormula.totalMg}mg). This formula was created before dosage limits were enforced. Please create a new formula instead.` 
+        });
+      }
+
       // Get current highest version for user
       const currentFormula = await storage.getCurrentFormulaByUser(userId);
       const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
@@ -4234,6 +4241,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             newTotalMg += dose;
           }
         }
+      }
+
+      // Validate that new total doesn't exceed maximum
+      if (newTotalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
+        const addedMg = newTotalMg - formula.totalMg;
+        return res.status(400).json({ 
+          error: `Adding these ingredients would exceed the maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg. Current formula: ${formula.totalMg}mg, Adding: ${addedMg}mg, New total would be: ${newTotalMg}mg. Please remove some ingredients first or add fewer ingredients.` 
+        });
       }
 
       // Update formula with customizations
