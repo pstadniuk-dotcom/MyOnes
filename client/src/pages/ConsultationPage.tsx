@@ -433,6 +433,11 @@ export default function ConsultationPage() {
                   });
                   setIsTyping(false);
                   completed = true;
+                } else if (data.type === 'info') {
+                  toast({
+                    description: data.message,
+                    variant: "default"
+                  });
                 } else if (data.type === 'error') {
                   toast({
                     title: "AI Response Error",
