@@ -1901,18 +1901,92 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
 export const ALL_INGREDIENTS = [...BASE_FORMULAS, ...INDIVIDUAL_INGREDIENTS];
 
 // ============================================================================
+// INGREDIENT NAME ALIASES - Maps common variations to canonical names
+// ============================================================================
+
+export const INGREDIENT_ALIASES: Record<string, string> = {
+  // CoEnzyme Q10 variations
+  'coq10': 'CoEnzyme Q10',
+  'co q10': 'CoEnzyme Q10',
+  'coenzyme q10': 'CoEnzyme Q10',
+  'ubiquinone': 'CoEnzyme Q10',
+  'co-q10': 'CoEnzyme Q10',
+  
+  // Hawthorn variations
+  'hawthorn': 'Hawthorn Berry',
+  
+  // Phosphatidylcholine variations
+  'pc': 'Phosphatidylcholine',
+  'phosphocholine': 'Phosphatidylcholine',
+  
+  // Omega-3 / Fish oil variations
+  'omega 3': 'Algae Omega',
+  'omega-3': 'Algae Omega',
+  'omega3': 'Algae Omega',
+  'fish oil': 'Algae Omega',
+  'dha': 'Algae Omega',
+  'epa': 'Algae Omega',
+  
+  // Common abbreviations and variations
+  'vit d': 'Vitamin D3',
+  'vit c': 'Vitamin C',
+  'vit b12': 'Vitamin B12',
+  'b12': 'Vitamin B12',
+  'magnesium': 'Magnesium',
+  'mag': 'Magnesium',
+  'zinc': 'Zinc'
+};
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
+/**
+ * Normalizes ingredient names to handle aliases and variations
+ * Uses automatic slug-based matching + explicit alias overrides
+ */
+export function normalizeIngredientName(name: string): string {
+  const normalizedInput = name.toLowerCase().trim();
+  
+  // 1. Check explicit alias map first
+  if (INGREDIENT_ALIASES[normalizedInput]) {
+    return INGREDIENT_ALIASES[normalizedInput];
+  }
+  
+  // 2. Try case-insensitive exact match in catalog
+  const exactMatch = ALL_INGREDIENTS.find(
+    ing => ing.name.toLowerCase() === normalizedInput
+  );
+  if (exactMatch) {
+    return exactMatch.name;
+  }
+  
+  // 3. Return original name if no match found
+  return name;
+}
+
+/**
+ * Finds an ingredient by name (with alias support)
+ */
+export function findIngredientByName(name: string): IngredientInfo | undefined {
+  const normalizedName = normalizeIngredientName(name);
+  return ALL_INGREDIENTS.find(
+    ing => ing.name.toLowerCase() === normalizedName.toLowerCase()
+  );
+}
+
 export function getIngredientDose(name: string): number | undefined {
-  const ingredient = ALL_INGREDIENTS.find(ing => ing.name === name);
+  const ingredient = findIngredientByName(name);
   return ingredient?.doseMg;
 }
 
 export function isValidIngredient(name: string): boolean {
-  return ALL_INGREDIENTS.some(ing => ing.name === name);
+  return findIngredientByName(name) !== undefined;
 }
 
 export function getBaseFormulaDetails(name: string): BaseFormulaDetails | undefined {
-  return BASE_FORMULA_DETAILS.find(formula => formula.name === name);
+  const normalizedName = normalizeIngredientName(name);
+  return BASE_FORMULA_DETAILS.find(
+    formula => formula.name.toLowerCase() === normalizedName.toLowerCase()
+  );
 }
