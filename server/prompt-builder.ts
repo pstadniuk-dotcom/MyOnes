@@ -203,12 +203,27 @@ Then your JSON must have "totalMg": ${formula.totalMg + 600}
   }
 
   // PRIORITY 2: APPROVED INGREDIENT CATALOG (with dose ranges and clinical metadata)
-  prompt += `\n=== APPROVED INGREDIENT CATALOG ===
+  prompt += `\n=== 🚨 APPROVED INGREDIENT CATALOG - USE EXACT NAMES ONLY 🚨 ===
 
-**YOU CAN ONLY USE THESE INGREDIENTS:**
+**⚠️ CRITICAL RULES - YOUR FORMULA WILL BE REJECTED IF YOU VIOLATE THESE:**
+
+1. **ONLY use ingredients from THIS catalog** - Never invent new ingredients
+2. **COPY names EXACTLY character-by-character** - No modifications, abbreviations, or qualifiers
+3. **NEVER add parentheses, percentages, or PE modifiers** - Unless they're in the catalog name
+4. **CHECK the catalog EVERY TIME** before writing JSON - Don't rely on memory
+
+**🔴 COMMON MISTAKES THAT CAUSE REJECTION:**
+- Using "Omega 3", "Omega-3", "Omega 3 (algae omega)" → MUST use "Algae Omega"
+- Using "CoQ10", "Co-Q10" → MUST use "CoEnzyme Q10"  
+- Using "Magnesium Glycinate", "Mag Glycinate" → MUST use "Magnesium" (individual) OR "Magnesium Support" (base formula)
+- Using "Resveratrol", "Berberine", "Quercetin" → NOT IN CATALOG! Don't use!
+- Using "Turmeric", "Curcumin" → MUST use "Turmeric Root Extract 4:1"
+- Using "Alpha Gest", "Oxy Gest" → MUST use "Alpha Gest III", "Alpha Oxyme"
+
+**✅ THESE ARE THE ONLY APPROVED INGREDIENTS:**
 
 **Base Formulas (${BASE_FORMULAS.length} available) - FIXED DOSES:**
-${BASE_FORMULAS.map(f => `${f.name} (${f.doseMg}mg - FIXED, cannot adjust)`).join(', ')}
+${BASE_FORMULAS.map(f => `"${f.name}" (${f.doseMg}mg - FIXED)`).join(', ')}
 
 **Individual Ingredients (${INDIVIDUAL_INGREDIENTS.length} available) - ADJUSTABLE WITHIN RANGES:**
 
@@ -300,15 +315,30 @@ You are a trained functional medicine practitioner. Use your clinical judgment t
 ❌ REJECTED: "Oxy Gest" → ✅ USE: "Alpha Oxyme"
 ❌ REJECTED: "C-Boost" → ✅ USE: "C Boost"
 
-**MANDATORY PREFLIGHT VERIFICATION - CHECK BEFORE SENDING JSON:**
+**🚨 MANDATORY PREFLIGHT VERIFICATION - DO THIS BEFORE SENDING JSON 🚨**
 
-□ Step 1: Did I copy each ingredient name EXACTLY from the catalog sections above?
-□ Step 2: Did I preserve "Root", "Extract", and ratios when they ARE in the catalog?
-□ Step 3: Did I remove potency modifiers NOT in the catalog (PE 1/8%, 24%, 40%)?
-□ Step 4: Did I remove parenthetical sources ((soy), (powder))?
-□ Step 5: Did I check BOTH base formulas AND individual ingredients sections?
+**STOP! Before you write the JSON block, VERIFY EVERY INGREDIENT NAME:**
 
-**IF YOU ANSWER "NO" TO ANY QUESTION, YOUR FORMULA WILL BE REJECTED. STOP AND FIX IMMEDIATELY.**
+For EACH ingredient in your formula:
+
+□ Step 1: **Find it in the catalog above** - Scroll up and locate the EXACT name
+□ Step 2: **Copy it CHARACTER-BY-CHARACTER** - Don't paraphrase, abbreviate, or modify
+□ Step 3: **Remove any additions YOU made** - No parentheses, percentages, PE qualifiers unless in catalog
+□ Step 4: **Double-check base vs individual** - Make sure you're using the right category
+□ Step 5: **Verify it EXISTS** - If you can't find it in the catalog, DON'T USE IT!
+
+**EXAMPLE VERIFICATION PROCESS:**
+
+❌ WRONG: "I need omega-3 fatty acids... I'll use 'Omega 3 (algae omega)'"
+✅ CORRECT: "I need omega-3... Let me find it in catalog... Found: 'Algae Omega' - I'll use that exact name"
+
+❌ WRONG: "Patient needs resveratrol... I'll add it at 300mg"
+✅ CORRECT: "Patient needs antioxidant support... Resveratrol not in catalog... I'll use Grapeseed Extract instead"
+
+❌ WRONG: "I'll use 'CoQ10' since everyone knows what that is"
+✅ CORRECT: "I need CoQ10... Let me check catalog... Found: 'CoEnzyme Q10' - I'll use that exact name"
+
+**IF YOU ANSWER "NO" TO ANY VERIFICATION STEP, YOUR FORMULA WILL BE REJECTED. STOP AND FIX IMMEDIATELY.**
 
 **CONSEQUENCES OF INCORRECT NAMES:**
 - Your entire formula will be rejected by the backend

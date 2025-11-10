@@ -631,6 +631,69 @@ const FormulaExtractionSchema = z.object({
   disclaimers: z.array(z.string())
 });
 
+/**
+ * Post-generation ingredient validator
+ * Automatically corrects AI-generated ingredient names to match catalog
+ * Returns: { success: boolean, correctedFormula: Formula, errors: string[] }
+ */
+function validateAndCorrectIngredientNames(formula: any): {
+  success: boolean;
+  correctedFormula: any;
+  errors: string[];
+  warnings: string[];
+} {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const correctedFormula = JSON.parse(JSON.stringify(formula)); // deep clone
+  
+  console.log('🔍 POST-GENERATION VALIDATOR: Checking ingredient names...');
+  
+  // Validate and correct base formulas
+  for (let i = 0; i < correctedFormula.bases.length; i++) {
+    const base = correctedFormula.bases[i];
+    const originalName = base.ingredient;
+    const normalizedName = normalizeIngredientName(originalName);
+    const catalogBase = BASE_FORMULAS.find(f => f.name.toLowerCase() === normalizedName.toLowerCase());
+    
+    if (!catalogBase) {
+      errors.push(`❌ BASE FORMULA NOT FOUND: "${originalName}" (normalized to "${normalizedName}") is not in the approved catalog. Available base formulas: ${BASE_FORMULAS.map(f => f.name).join(', ')}`);
+      console.log(`❌ Invalid base formula: "${originalName}"`);
+    } else if (originalName !== catalogBase.name) {
+      warnings.push(`⚠️ AUTO-CORRECTED: "${originalName}" → "${catalogBase.name}"`);
+      correctedFormula.bases[i].ingredient = catalogBase.name;
+      console.log(`✅ AUTO-CORRECTED base: "${originalName}" → "${catalogBase.name}"`);
+    } else {
+      console.log(`✅ VALID base: "${originalName}"`);
+    }
+  }
+  
+  // Validate and correct individual ingredients
+  for (let i = 0; i < correctedFormula.additions.length; i++) {
+    const addition = correctedFormula.additions[i];
+    const originalName = addition.ingredient;
+    const normalizedName = normalizeIngredientName(originalName);
+    const catalogIngredient = INDIVIDUAL_INGREDIENTS.find(ing => ing.name.toLowerCase() === normalizedName.toLowerCase());
+    
+    if (!catalogIngredient) {
+      errors.push(`❌ INDIVIDUAL INGREDIENT NOT FOUND: "${originalName}" (normalized to "${normalizedName}") is not in the approved catalog. Available individual ingredients: ${INDIVIDUAL_INGREDIENTS.slice(0, 10).map(i => i.name).join(', ')}... (${INDIVIDUAL_INGREDIENTS.length} total)`);
+      console.log(`❌ Invalid individual ingredient: "${originalName}"`);
+    } else if (originalName !== catalogIngredient.name) {
+      warnings.push(`⚠️ AUTO-CORRECTED: "${originalName}" → "${catalogIngredient.name}"`);
+      correctedFormula.additions[i].ingredient = catalogIngredient.name;
+      console.log(`✅ AUTO-CORRECTED ingredient: "${originalName}" → "${catalogIngredient.name}"`);
+    } else {
+      console.log(`✅ VALID ingredient: "${originalName}"`);
+    }
+  }
+  
+  return {
+    success: errors.length === 0,
+    correctedFormula,
+    errors,
+    warnings
+  };
+}
+
 // Complete ONES AI system prompt
 const ONES_AI_SYSTEM_PROMPT = `You are ONES AI, a functional medicine practitioner and supplement formulation specialist. You conduct thorough health consultations similar to a medical doctor's visit before creating personalized formulas.
 
@@ -2468,6 +2531,38 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           let validatedFormula = FormulaExtractionSchema.parse(jsonData);
           console.log('✅ Schema validation passed');
           console.log('📊 Validated formula has', validatedFormula.bases?.length || 0, 'bases and', validatedFormula.additions?.length || 0, 'additions');
+          
+          // 🔍 POST-GENERATION VALIDATOR: Check and auto-correct ingredient names
+          console.log('🔍 Running post-generation ingredient validator...');
+          const ingredientValidation = validateAndCorrectIngredientNames(validatedFormula);
+          
+          if (!ingredientValidation.success) {
+            console.error('❌ POST-GENERATION VALIDATION FAILED:', ingredientValidation.errors);
+            // Send error with specific ingredient issues
+            sendSSE({
+              type: 'error',
+              error: `⚠️ Formula contains unapproved ingredients:\n\n${ingredientValidation.errors.join('\n\n')}\n\nPlease create the formula again using ONLY ingredients from the approved catalog.`
+            });
+            
+            // Skip formula processing by throwing error that will be caught below
+            throw new Error('Formula validation failed: ' + ingredientValidation.errors.join(', '));
+          }
+          
+          // Log and send auto-corrections to client
+          if (ingredientValidation.warnings.length > 0) {
+            console.log('⚠️ AUTO-CORRECTIONS MADE:', ingredientValidation.warnings);
+            ingredientValidation.warnings.forEach(warning => console.log(`  ${warning}`));
+            
+            // Notify user about auto-corrections via SSE
+            sendSSE({
+              type: 'info',
+              message: `✓ Auto-corrected ${ingredientValidation.warnings.length} ingredient name(s) to match catalog`
+            });
+          }
+          
+          // Use the corrected formula for validation
+          validatedFormula = ingredientValidation.correctedFormula;
+          console.log('✅ Post-generation validation passed - using corrected formula');
           
           // CRITICAL: Server-side validation and ingredient approval
           console.log('🔄 Validating formula ingredients and calculations...');
