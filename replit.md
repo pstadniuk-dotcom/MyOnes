@@ -46,14 +46,15 @@ Preferred communication style: Simple, everyday language.
 - **Formula Extraction & Validation System**: Server-side detection and user notification for AI formula output failures or unapproved ingredients.
 - **Ingredient Validation System**: Strict enforcement that AI only recommends ingredients from an approved catalog, with critical rules embedded in the AI prompt.
 - **AI Prompt Engineering** (Updated Nov 10, 2025):
-  - **Exact Ingredient Name Enforcement**: AI must use character-for-character catalog matches (no variations like "Alpha Gest III" → must be "Alpha Gest")
+  - **Exact Ingredient Name Enforcement**: AI must use character-for-character catalog matches (e.g., "Alpha Gest" → must be "Alpha Gest III")
   - **Medical Practitioner Communication Style**: Mandatory detailed clinical explanations BEFORE JSON output
   - **Base Formula Composition Breakdown**: AI explains what active ingredients are IN each base formula and WHY they're chosen
   - **Individualized Reasoning**: Connects lab values, biomarkers, conditions, and medications to specific ingredient choices
   - **Preflight Verification Checklist**: AI validates exact name matching and dose ranges before sending formulas
   - **Updated Dosing Rules**: 10mg minimum per ingredient (no multiples-of-50 requirement)
-- **Ingredient Expandability System** (Updated Nov 10, 2025):
-  - All 116 active ingredients across 19 base formulas now have comprehensive benefits arrays (2-4 benefits each)
+- **Ingredient Catalog** (Updated Nov 10, 2025):
+  - **22 Base Formulas**: Expanded from 19 to 22 formulas by adding Alpha Gest III, Alpha Green II, and Alpha Oxyme
+  - **All Active Ingredients Expandable**: All 130+ active ingredients across all base formulas have comprehensive benefits arrays (2-4 benefits each)
   - Enables expandable ingredient details in MyFormulaPage UI for all base formulas
   - Benefits include evidence-based descriptions for vitamins, minerals, herbs, glandulars, and proprietary ingredients
   - Ensures consistent user experience across all formula visualizations
