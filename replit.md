@@ -52,6 +52,11 @@ Preferred communication style: Simple, everyday language.
   - **Individualized Reasoning**: Connects lab values, biomarkers, conditions, and medications to specific ingredient choices
   - **Preflight Verification Checklist**: AI validates exact name matching and dose ranges before sending formulas
   - **Updated Dosing Rules**: 10mg minimum per ingredient (no multiples-of-50 requirement)
+- **Ingredient Expandability System** (Updated Nov 10, 2025):
+  - All 116 active ingredients across 19 base formulas now have comprehensive benefits arrays (2-4 benefits each)
+  - Enables expandable ingredient details in MyFormulaPage UI for all base formulas
+  - Benefits include evidence-based descriptions for vitamins, minerals, herbs, glandulars, and proprietary ingredients
+  - Ensures consistent user experience across all formula visualizations
 - **Progress Tracking**: User journey monitoring with iterative formula optimization.
 - **Business Model**: One-time purchases for 3/6/12 month supplies; no refunds on custom orders unless damaged/defective.
 - **Wearable Integration**: Production-ready database schema (`wearable_connections`, `biometric_data`, `biometric_trends`), secure OAuth implementation with AES-256-GCM token encryption, and automated token refresh system.
