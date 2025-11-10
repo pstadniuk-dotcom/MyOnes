@@ -147,6 +147,24 @@ export const BASE_FORMULAS: IngredientInfo[] = [
     category: 'base',
     description: 'Provides necessary nutrients for proper thyroid function. Combines iodine and glandular concentrates.',
   },
+  {
+    name: 'Alpha Gest III',
+    doseMg: 636,
+    category: 'base',
+    description: 'Supports digestive function with Betaine HCl and Pepsin. Helps break down proteins and improve stomach acid levels for optimal digestion.',
+  },
+  {
+    name: 'Alpha Green II',
+    doseMg: 184,
+    category: 'base',
+    description: 'Supports spleen and lymphatic system function. Combines glandular support with detoxifying herbs for immune and circulatory health.',
+  },
+  {
+    name: 'Alpha Oxyme',
+    doseMg: 350,
+    category: 'base',
+    description: 'Comprehensive antioxidant formula combining vitamins, minerals, and herbal extracts. Supports cellular protection and fights oxidative stress.',
+  },
 ];
 
 // ============================================================================
@@ -1794,6 +1812,86 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
         name: 'Kelp', 
         amount: '180mg',
         benefits: ['Rich in iodine and minerals', 'Supports thyroid function', 'Aids metabolism']
+      },
+    ]
+  },
+  {
+    name: 'Alpha Gest III',
+    doseMg: 636,
+    systemSupported: 'Digestion',
+    suggestedDosage: '1x daily',
+    description: 'Supports digestive function with Betaine HCl and Pepsin. Helps break down proteins and improve stomach acid levels for optimal digestion.',
+    activeIngredients: [
+      { 
+        name: 'Betaine', 
+        amount: '496mg', 
+        description: 'from 650mg Betaine HCl',
+        benefits: ['Supports digestive function', 'Aids protein digestion', 'Helps maintain stomach pH']
+      },
+      { 
+        name: 'Pepsin', 
+        amount: '140mg', 
+        description: '1:10,000',
+        benefits: ['Breaks down dietary proteins', 'Supports protein digestion', 'Aids nutrient absorption']
+      },
+    ]
+  },
+  {
+    name: 'Alpha Green II',
+    doseMg: 184,
+    systemSupported: 'Spleen, Lymphatic',
+    suggestedDosage: '1x daily',
+    description: 'Supports spleen and lymphatic system function. Combines glandular support with detoxifying herbs for immune and circulatory health.',
+    activeIngredients: [
+      { 
+        name: 'Vitamin E', 
+        amount: '75 IU', 
+        description: 'as dl-alpha Tocopheryl Acetate',
+        benefits: ['Powerful antioxidant', 'Protects cells from oxidative damage', 'Supports immune function']
+      },
+      { 
+        name: 'Bovine Spleen Concentrate', 
+        amount: '250mcg',
+        benefits: ['Supports spleen function', 'Aids lymphatic health', 'Provides glandular support']
+      },
+      { 
+        name: 'Dandelion', 
+        amount: '75mg', 
+        description: 'aerial parts',
+        benefits: ['Supports liver and kidney function', 'Natural diuretic properties', 'Aids detoxification']
+      },
+      { 
+        name: 'Nettle', 
+        amount: '75mg', 
+        description: 'root',
+        benefits: ['Supports urinary health', 'Anti-inflammatory properties', 'Rich in minerals']
+      },
+    ]
+  },
+  {
+    name: 'Alpha Oxyme',
+    doseMg: 350,
+    systemSupported: 'Antioxidant',
+    suggestedDosage: '1x daily',
+    description: 'Comprehensive antioxidant formula combining vitamins, minerals, and herbal extracts. Supports cellular protection and fights oxidative stress.',
+    activeIngredients: [
+      { 
+        name: 'Vitamin A', 
+        amount: '1500 IU', 
+        description: 'as Beta-Carotene',
+        benefits: ['Powerful antioxidant', 'Supports vision health', 'Aids immune function']
+      },
+      { 
+        name: 'Selenium', 
+        amount: '5mcg', 
+        description: 'Amino Acid Chelate',
+        benefits: ['Essential trace mineral', 'Supports thyroid function', 'Powerful antioxidant']
+      },
+      { 
+        name: 'Superoxide Dismutase (SOD)', 
+        amount: 'proprietary',
+        description: 'supplying Aloe Vera (leaf), Rosemary Leaf Extract, and L-Cysteine',
+        benefits: ['Potent antioxidant enzyme', 'Protects against free radical damage', 'Supports cellular longevity']
       },
     ]
   },
