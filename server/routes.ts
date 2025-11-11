@@ -2578,17 +2578,33 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             validatedFormula.totalMg = validation.calculatedTotalMg;
           }
           
-          // Check for CRITICAL errors (unapproved ingredients only)
-          const criticalErrors = validation.errors.filter(e => e.includes('UNAUTHORIZED INGREDIENT'));
+          // Check for CRITICAL errors (unapproved ingredients AND dosage violations)
+          const criticalErrors = validation.errors.filter(e => 
+            e.includes('UNAUTHORIZED INGREDIENT') || 
+            e.includes('Formula total too high') ||
+            e.includes('exceeds maximum dosage limit')
+          );
           
           if (criticalErrors.length > 0) {
-            // CRITICAL: Unapproved ingredients - must reject
-            console.error('🚨 CRITICAL: Unapproved ingredients detected:', criticalErrors);
-            sendSSE({
-              type: 'error',
-              error: `⚠️ Formula contains unapproved ingredients. Please use only ingredients from our approved catalog.`,
-              sessionId: chatSession?.id
-            });
+            // CRITICAL: Unapproved ingredients or dosage violations - must reject
+            console.error('🚨 CRITICAL: Formula validation failed:', criticalErrors);
+            
+            // Check if it's a dosage violation
+            const isDosageError = criticalErrors.some(e => e.includes('total too high') || e.includes('exceeds maximum'));
+            
+            if (isDosageError) {
+              sendSSE({
+                type: 'error',
+                error: `⚠️ Formula exceeds maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg.\n\nCalculated total: ${validation.calculatedTotalMg}mg\n\nPlease create a smaller formula by:\n- Using fewer base formulas\n- Reducing individual ingredient doses\n- Focusing on your top priority health goals`,
+                sessionId: chatSession?.id
+              });
+            } else {
+              sendSSE({
+                type: 'error',
+                error: `⚠️ Formula contains unapproved ingredients. Please use only ingredients from our approved catalog.`,
+                sessionId: chatSession?.id
+              });
+            }
             
             // Still complete the stream normally but without formula
             sendSSE({
@@ -2622,9 +2638,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           console.log('✅ Formula validation passed - using calculated totalMg:', validatedFormula.totalMg);
           extractedFormula = validatedFormula;
           
-          // Add validation warnings
-          if (validation.errors.length > 0) {
-            extractedFormula.warnings.push(...validation.errors);
+          // Add validation warnings (for non-critical issues like capsule sizing)
+          const nonCriticalErrors = validation.errors.filter(e => 
+            !e.includes('UNAUTHORIZED INGREDIENT') && 
+            !e.includes('Formula total too high') &&
+            !e.includes('exceeds maximum dosage limit')
+          );
+          if (nonCriticalErrors.length > 0) {
+            extractedFormula.warnings.push(...nonCriticalErrors);
           }
           
           // Get user's health profile for medication validation
