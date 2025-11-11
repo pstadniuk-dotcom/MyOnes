@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import techFounder from '@assets/pstad_34-year-old_tech_founder_--stylize_50_--v_7_5025fbd0-a43a-41b1-baad-11d6e6551719_3_1762187852224.png';
 import triathlete from '@assets/pstad_41-year-old_triathlete_training_for_Ironman_--stylize_5_e6168110-f9ee-4e01-9beb-50344db0ecaf_3_1762188020759.png';
 import pregnantWoman from '@assets/pstad_28_year_old_pregnant_woman_--stylize_50_--v_7_9b49bd6d-18e2-40ec-b1ec-00ed13aad376_3_1762188075768.png';
@@ -152,7 +152,6 @@ export default function PersonalizationShowcase() {
           {/* Header */}
           <div className="text-center py-8 px-4">
             <div className="inline-flex items-center gap-2 bg-primary/10 px-4 py-1.5 rounded-full mb-4">
-              <Sparkles className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium text-primary">AI-Powered Personalization</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-semibold mb-3">
@@ -195,8 +194,8 @@ export default function PersonalizationShowcase() {
                 <div className="p-6">
                   {/* Chat Header */}
                   <div className="flex items-center gap-3 pb-4 border-b border-border/50">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                      <Sparkles className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-lg">
+                      AI
                     </div>
                     <div>
                       <div className="font-semibold">Ones AI</div>
