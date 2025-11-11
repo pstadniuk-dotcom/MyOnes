@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, MessageSquare, Target, X, Check, AlertTriangle, Sparkles } from 'lucide-react';
+import { Users, MessageSquare, Target, X, Check, AlertTriangle } from 'lucide-react';
 import ag1Image from '@assets/ag1_1760387996934.jpg';
 import blueprintImage from '@assets/blueprint_1760380986912.webp';
 import ritualImage from '@assets/Ritual_1760380986912.avif';
@@ -226,7 +226,6 @@ export default function ScienceSection() {
           <div className="relative inline-block max-w-3xl">
             <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 blur-3xl"></div>
             <Card className="relative px-12 py-10 bg-background/90 backdrop-blur-sm border-primary/20">
-              <Sparkles className="w-10 h-10 text-primary mx-auto mb-6" />
               <blockquote className="text-2xl md:text-3xl font-serif font-bold text-primary leading-relaxed" data-testid="text-final-quote">
                 "You wouldn't take someone else's prescription. Why take their vitamins?"
               </blockquote>
