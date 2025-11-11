@@ -1,8 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Menu, X, User, Shield } from 'lucide-react';
+import { Menu, X, User, Moon, Sun, Shield } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from 'next-themes';
+
+function ThemeToggle() {
+  const { setTheme, theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <Button variant="ghost" size="icon" className="w-9 h-9"><Sun className="h-4 w-4" /></Button>;
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+      className="w-9 h-9"
+      data-testid="button-theme-toggle"
+    >
+      {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+      <span className="sr-only">Toggle theme</span>
+    </Button>
+  );
+}
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -30,8 +57,8 @@ export default function Header() {
           {/* Logo */}
           <div className="flex-shrink-0">
             <Link href="/">
-              <h1 className="text-2xl font-sans font-normal text-foreground cursor-pointer hover:opacity-80 transition-opacity" data-testid="text-logo">
-                Ones.
+              <h1 className="text-2xl font-serif font-bold text-primary cursor-pointer hover:opacity-80 transition-opacity" data-testid="text-logo">
+                Ones
               </h1>
             </Link>
           </div>
@@ -63,6 +90,7 @@ export default function Header() {
 
           {/* Auth & CTA Buttons */}
           <div className="hidden md:flex items-center space-x-3">
+            <ThemeToggle />
             {isAuthenticated ? (
               <>
                 <Link href="/dashboard">
@@ -92,7 +120,7 @@ export default function Header() {
                 </Link>
                 <Link href="/signup">
                   <Button 
-                    className="bg-foreground text-background hover:bg-foreground/90 micro-bounce transition-all duration-300"
+                    className="micro-bounce micro-glow transition-all duration-300"
                     data-testid="button-start-consultation"
                   >
                     Start Consultation
@@ -104,6 +132,7 @@ export default function Header() {
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center gap-2">
+            <ThemeToggle />
             <Button
               variant="ghost"
               size="icon"
