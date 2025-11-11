@@ -186,12 +186,15 @@ export default function AIChat() {
   }, [toast, isListening, inputValue]);
 
   return (
-    <Card className="w-full max-w-md h-[500px] flex flex-col glass shadow-premium-lg border-none" data-testid="card-ai-chat">
+    <Card className="w-full max-w-md h-[500px] flex flex-col bg-card border-border shadow-sm" data-testid="card-ai-chat">
       {/* Chat Header */}
-      <div className="p-4 border-b border-card-border">
-        <div>
-          <h3 className="font-medium text-sm" data-testid="text-ai-name">Ones AI</h3>
-          <p className="text-xs text-muted-foreground">Your health consultant</p>
+      <div className="p-4 border-b border-border bg-muted/30">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🧬</span>
+          <div>
+            <h3 className="font-medium text-sm" data-testid="text-ai-name">Ones AI</h3>
+            <p className="text-xs text-muted-foreground">Your health consultant</p>
+          </div>
         </div>
       </div>
 
@@ -207,7 +210,7 @@ export default function AIChat() {
               className={`max-w-[80%] rounded-lg p-3 space-y-3 ${
                 message.sender === 'user'
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground'
+                  : 'bg-[hsl(50_50%_92%)] text-foreground'
               }`}
             >
               <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -299,7 +302,7 @@ export default function AIChat() {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 border-t border-card-border">
+      <div className="p-4 border-t border-border">
         <div className="flex space-x-2">
           <Input
             value={inputValue}
@@ -313,7 +316,7 @@ export default function AIChat() {
             variant="outline"
             size="icon"
             onClick={handleVoiceInput}
-            className={`micro-bounce transition-all duration-300 ${isListening ? 'bg-red-500 text-white border-red-600 animate-pulse' : ''}`}
+            className={`transition-all duration-300 ${isListening ? 'bg-red-500 text-white border-red-600 animate-pulse' : ''}`}
             data-testid="button-voice-input"
           >
             {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -322,7 +325,7 @@ export default function AIChat() {
             onClick={handleSendMessage}
             size="icon"
             disabled={!inputValue.trim() || isTyping}
-            className="micro-bounce micro-glow transition-all duration-300"
+            className="bg-foreground text-background hover:bg-foreground/90 transition-all duration-300"
             data-testid="button-send-message"
           >
             <Send className="w-4 h-4" />
