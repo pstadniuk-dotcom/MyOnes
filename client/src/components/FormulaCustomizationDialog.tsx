@@ -189,7 +189,7 @@ export function FormulaCustomizationDialog({
             <h3 className="font-medium text-sm">Add Base Formulas</h3>
             <div className="flex gap-2">
               <Select value={selectedBase} onValueChange={setSelectedBase}>
-                <SelectTrigger className="flex-1" data-testid="select-base-formula">
+                <SelectTrigger className="flex-1 h-auto min-h-[2.5rem] py-2" data-testid="select-base-formula">
                   <SelectValue placeholder="Select a base formula..." />
                 </SelectTrigger>
                 <SelectContent className="select-wide-dropdown max-h-[500px] overflow-y-auto">
