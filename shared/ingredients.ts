@@ -1919,14 +1919,6 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'pc': 'Phosphatidylcholine',
   'phosphocholine': 'Phosphatidylcholine',
   
-  // Omega-3 / Fish oil variations
-  'omega 3': 'Algae Omega',
-  'omega-3': 'Algae Omega',
-  'omega3': 'Algae Omega',
-  'fish oil': 'Algae Omega',
-  'dha': 'Algae Omega',
-  'epa': 'Algae Omega',
-  
   // Base Formula spacing variations
   'cboost': 'C Boost',
   'c-boost': 'C Boost',
