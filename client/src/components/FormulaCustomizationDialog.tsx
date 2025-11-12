@@ -192,7 +192,7 @@ export function FormulaCustomizationDialog({
                 <SelectTrigger className="flex-1" data-testid="select-base-formula">
                   <SelectValue placeholder="Select a base formula..." />
                 </SelectTrigger>
-                <SelectContent className="max-w-[600px]">
+                <SelectContent className="select-wide-dropdown max-h-[500px] overflow-y-auto">
                   {availableBases.map(base => (
                     <SelectItem key={base.name} value={base.name} className="py-4 h-auto">
                       <div className="flex flex-col gap-1.5 min-w-0">
