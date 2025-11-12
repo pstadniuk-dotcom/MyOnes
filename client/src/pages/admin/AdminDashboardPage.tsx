@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { 
@@ -14,8 +14,20 @@ import {
   Clock
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { 
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue
+} from '@/components/ui/select';
+import { Settings2, ArrowRight } from 'lucide-react';
+import { apiRequest } from '@/lib/queryClient';
 
 // Types for API responses
 interface DashboardStats {
@@ -141,6 +153,7 @@ function DashboardSkeleton() {
 export default function AdminDashboardPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
 
   // Fetch dashboard stats
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<DashboardStats>({
@@ -197,14 +210,27 @@ export default function AdminDashboardPage() {
     <div className="p-8" data-testid="page-admin-dashboard">
       <div className="space-y-8">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="heading-admin-dashboard">
-            Admin Dashboard
-          </h1>
-          <p className="text-muted-foreground">
-            Overview of platform metrics and user activity
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight" data-testid="heading-admin-dashboard">
+              Admin Dashboard
+            </h1>
+            <p className="text-muted-foreground">
+              Overview of platform metrics and user activity
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setLocation('/dashboard')} data-testid="button-go-to-dashboard">
+              Go to Dashboard
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
         </div>
+
+        {/* AI Settings */}
+        <AISettingsCard onChanged={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/admin/ai-settings'] });
+        }} />
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="section-stats-cards">
@@ -400,5 +426,181 @@ export default function AdminDashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ---- AI Settings Card ----
+function AISettingsCard({ onChanged }: { onChanged?: () => void }) {
+  const { toast } = useToast();
+  const { data: aiSettings, isLoading } = useQuery<{
+    provider: 'openai' | 'anthropic';
+    model: string;
+    source: 'override' | 'env';
+    updatedAt: string | null;
+  }>({
+    queryKey: ['/api/admin/ai-settings'],
+  });
+
+  const [provider, setProvider] = useState<'openai' | 'anthropic'>(aiSettings?.provider || 'openai');
+  const [model, setModel] = useState<string>(aiSettings?.model || '');
+
+  const MODEL_OPTIONS: Record<'openai' | 'anthropic', { value: string; label: string }[]> = {
+    openai: [
+      { value: 'gpt-4o', label: 'GPT-4o' },
+      { value: 'gpt-5', label: 'GPT-5 (latest)' },
+    ],
+    anthropic: [
+      { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 (Sep 2025) 🔥' },
+      { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (Oct 2025)' },
+      { value: 'claude-opus-4-1', label: 'Claude Opus 4.1 (Aug 2025)' },
+      { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (legacy)' },
+      { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (legacy)' },
+    ],
+  };
+
+  useEffect(() => {
+    if (aiSettings) {
+      setProvider(aiSettings.provider);
+      setModel(aiSettings.model || '');
+    }
+  }, [aiSettings]);
+
+  // When provider changes, set a sensible default model for that provider
+  useEffect(() => {
+    const options = MODEL_OPTIONS[provider];
+    if (!options.find(o => o.value === model)) {
+      setModel(options[0]?.value || '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider]);
+
+  const mutation = useMutation({
+    mutationFn: async (body: any) => {
+      const res = await apiRequest('POST', '/api/admin/ai-settings', body);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'AI settings updated' });
+      onChanged?.();
+    },
+    onError: (e: any) => {
+      toast({ title: 'Failed to update AI settings', description: e?.message || 'Please try again', variant: 'destructive' });
+    }
+  });
+
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      const token = localStorage.getItem('authToken');
+      const res = await fetch('/api/admin/ai-settings/test', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include'
+      });
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // Return structured info so UI can show better diagnostics
+        return { _raw: text, _status: res.status, ok: false } as any;
+      }
+      return data as { ok: boolean; provider: string; model: string; sample?: string; error?: string };
+    },
+    onSuccess: (data: any) => {
+      if (data && typeof data.ok === 'boolean') {
+        if (data.ok) {
+          toast({ title: 'AI test succeeded', description: `Using ${data.provider} / ${data.model}` });
+        } else {
+          toast({ title: 'AI test failed', description: data.error || 'Unknown error', variant: 'destructive' });
+        }
+      } else {
+        const snippet = (data?._raw || '').slice(0, 160) || '(empty body)';
+        const status = data?._status ? `HTTP ${data._status}` : 'Unknown status';
+        toast({ title: 'AI test response was not JSON', description: `${status}: ${snippet}`, variant: 'destructive' });
+      }
+    },
+    onError: (e: any) => {
+      toast({ title: 'AI test failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+    }
+  });
+
+  const handleSave = () => {
+    mutation.mutate({ provider, model });
+  };
+
+  const handleReset = () => {
+    mutation.mutate({ reset: true });
+  };
+
+  return (
+    <Card data-testid="card-ai-settings">
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <CardTitle className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5" />
+            AI Settings
+          </CardTitle>
+          <CardDescription>
+            Control which AI provider and model power consultations (override environment defaults).
+          </CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-full border px-3 py-1 text-xs">
+            <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+            <span>
+              Active: {aiSettings?.provider || 'openai'} / {aiSettings?.model || 'gpt-4o'}
+            </span>
+          </div>
+          <Badge variant={aiSettings?.source === 'override' ? 'default' : 'secondary'}>
+            Source: {aiSettings?.source || 'env'}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            <Skeleton className="h-9" />
+            <Skeleton className="h-9" />
+            <div className="flex items-center gap-2 justify-end">
+              <Skeleton className="h-9 w-24" />
+              <Skeleton className="h-9 w-24" />
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3 items-end">
+            <div className="space-y-1">
+              <Label>Provider</Label>
+              <Select value={provider} onValueChange={(v: 'openai' | 'anthropic') => setProvider(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="anthropic">Anthropic</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Model</Label>
+              <Select value={model} onValueChange={(v) => setModel(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder={provider === 'anthropic' ? 'Select Claude model' : 'Select GPT model'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODEL_OPTIONS[provider].map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 justify-end">
+              <Button variant="outline" onClick={handleReset} disabled={mutation.isPending} data-testid="button-reset-ai-settings">Reset to Defaults</Button>
+              <Button variant="outline" onClick={() => testMutation.mutate()} disabled={testMutation.isPending} data-testid="button-test-ai-settings">Test Provider</Button>
+              <Button onClick={handleSave} disabled={mutation.isPending} data-testid="button-save-ai-settings">Save Changes</Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
