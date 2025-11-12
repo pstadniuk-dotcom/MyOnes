@@ -88,6 +88,10 @@ Preferred communication style: Simple, everyday language.
 - **Business Model**: One-time purchases for 3/6/12 month supplies; no refunds on custom orders unless damaged/defective.
 - **Wearable Integration**: Production-ready database schema (`wearable_connections`, `biometric_data`, `biometric_trends`), secure OAuth implementation with AES-256-GCM token encryption, and automated token refresh system.
 - **Admin Dashboard**: Enhanced dashboard with clickable stat cards, filtered user lists (All, Paid, Active), and "Today's Orders" section.
+- **UI Optimizations** (Added Nov 12, 2025):
+  - **Dialog Responsiveness**: Increased dialog card dimensions (max-w-2xl) to accommodate base formula descriptions with proper scrolling
+  - **SelectContent Width Override**: Custom CSS class `.select-wide-dropdown` with `!important` rules to override Radix UI's inline min-width constraint
+  - **Dropdown Sizing**: Formula customization dropdowns now expand up to min(90vw, 800px) to prevent description truncation across all viewport sizes
 
 ## External Dependencies
 
