@@ -322,6 +322,15 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Application settings (key-value store) for persistent runtime configuration (e.g., AI provider/model)
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key").primaryKey(),
+  // Arbitrary JSON value
+  value: json("value").$type<Record<string, any>>().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedBy: varchar("updated_by").references(() => users.id, { onDelete: "set null" })
+});
+
 // User notification preferences
 export const notificationPrefs = pgTable("notification_prefs", {
   userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
@@ -414,6 +423,11 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true,
 });
 
+// App settings insert schema
+export const insertAppSettingSchema = createInsertSchema(appSettings).omit({
+  updatedAt: true,
+});
+
 export const insertNotificationPrefSchema = createInsertSchema(notificationPrefs).omit({
   updatedAt: true,
 });
@@ -466,6 +480,10 @@ export type Notification = typeof notifications.$inferSelect;
 
 export type InsertNotificationPref = z.infer<typeof insertNotificationPrefSchema>;
 export type NotificationPref = typeof notificationPrefs.$inferSelect;
+
+// App settings types
+export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;
+export type AppSetting = typeof appSettings.$inferSelect;
 
 // Auth-specific schemas
 export const signupSchema = z.object({

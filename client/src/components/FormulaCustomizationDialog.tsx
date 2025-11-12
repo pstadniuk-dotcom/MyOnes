@@ -192,13 +192,15 @@ export function FormulaCustomizationDialog({
                 <SelectTrigger className="flex-1" data-testid="select-base-formula">
                   <SelectValue placeholder="Select a base formula..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-w-[600px]">
                   {availableBases.map(base => (
-                    <SelectItem key={base.name} value={base.name}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{base.name} - {base.doseMg}mg</span>
+                    <SelectItem key={base.name} value={base.name} className="py-4 h-auto">
+                      <div className="flex flex-col gap-1.5 min-w-0">
+                        <span className="font-medium text-sm">{base.name} - {base.doseMg}mg</span>
                         {base.description && (
-                          <span className="text-xs text-muted-foreground">{base.description}</span>
+                          <span className="text-xs text-muted-foreground leading-relaxed whitespace-normal">
+                            {base.description}
+                          </span>
                         )}
                       </div>
                     </SelectItem>

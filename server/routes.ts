@@ -41,9 +41,201 @@ declare module 'express-session' {
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// In-memory admin-set AI settings (preferred over env when present)
+const aiRuntimeSettings: { provider?: 'openai' | 'anthropic'; model?: string; updatedAt?: string; source?: 'override' | 'env' } = {};
+
+// Allowed/canonical models per provider and a normalizer for common aliases/typos
+const ALLOWED_MODELS: Record<'openai'|'anthropic', string[]> = {
+  openai: ['gpt-4o', 'gpt-5'],
+  anthropic: [
+    'claude-sonnet-4-5-20250929',
+    'claude-sonnet-4-5',
+    'claude-haiku-4-5-20251001',
+    'claude-haiku-4-5',
+    'claude-opus-4-1-20250805',
+    'claude-opus-4-1',
+    // Legacy 3.x models
+    'claude-3-5-sonnet-20241022',
+    'claude-3-5-haiku-20241022'
+  ]
+};
+
+function normalizeModel(provider: 'openai'|'anthropic', model: string | undefined | null): string | null {
+  if (!model) return null;
+  let m = String(model).trim();
+  // Normalize separators
+  m = m.replace(/\s+/g, '-');
+  // Common Anthropic aliases
+  if (provider === 'anthropic') {
+    const lower = m.toLowerCase();
+    // Map "claude 4.5" or "sonnet 4.5" variants to the alias
+    if (/claude-?4[\.-]?5(-sonnet)?(-latest)?/i.test(lower) || /sonnet-?4[\.-]?5/i.test(lower)) {
+      return 'claude-sonnet-4-5';
+    }
+    // Map "haiku 4.5" variants
+    if (/haiku-?4[\.-]?5/i.test(lower)) {
+      return 'claude-haiku-4-5';
+    }
+    // Map "opus 4.1" variants
+    if (/opus-?4[\.-]?1/i.test(lower)) {
+      return 'claude-opus-4-1';
+    }
+    // Legacy 3.x model normalization
+    if (/claude-3[\.-]?5(-sonnet)?/i.test(lower)) {
+      return 'claude-3-5-sonnet-20241022';
+    }
+    if (/haiku.*3[\.-]?5/i.test(lower)) {
+      return 'claude-3-5-haiku-20241022';
+    }
+  }
+  // Common OpenAI aliases
+  if (provider === 'openai') {
+    const lower = m.toLowerCase();
+    if (/^gpt5|gpt-5|gpt_5/.test(lower)) return 'gpt-5';
+    if (/^gpt4o|gpt-4o|gpt_4o/.test(lower)) return 'gpt-4o';
+  }
+  return m;
+}
+
+// Simple Anthropic Messages API caller (non-streaming). We simulate streaming by chunking the final text.
+function buildCreateFormulaTool() {
+  const approvedNames = [
+    ...BASE_FORMULAS.map(b => b.name),
+    ...INDIVIDUAL_INGREDIENTS.map(i => i.name)
+  ];
+  return {
+    name: 'create_formula',
+    description: 'Create a supplement formula using only approved ingredients. Use exact catalog names and mg units.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        bases: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              ingredient: { type: 'string', enum: approvedNames },
+              amount: { type: 'number', minimum: 10 },
+              unit: { type: 'string', enum: ['mg'] },
+              purpose: { type: 'string' }
+            },
+            required: ['ingredient','amount','unit']
+          }
+        },
+        additions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              ingredient: { type: 'string', enum: approvedNames },
+              amount: { type: 'number', minimum: 10 },
+              unit: { type: 'string', enum: ['mg'] },
+              purpose: { type: 'string' }
+            },
+            required: ['ingredient','amount','unit']
+          }
+        },
+        totalMg: { type: 'number', minimum: 10 },
+        rationale: { type: 'string' },
+        warnings: { type: 'array', items: { type: 'string' } },
+        disclaimers: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['totalMg']
+    }
+  };
+}
+
+async function callAnthropic(
+  systemPrompt: string,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  model: string,
+  temperature = 0.7,
+  maxTokens = 3000,
+  useTools = true
+): Promise<{ text: string; toolJsonBlock?: string }> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('Anthropic API key not configured');
+  }
+
+  const tools = useTools ? [buildCreateFormulaTool()] : undefined;
+
+  // helper for retry/backoff
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const payload = {
+    model: model || 'claude-sonnet-4-5',
+    max_tokens: maxTokens,
+    temperature,
+    system: systemPrompt,
+    messages,
+    tools,
+    tool_choice: useTools ? { type: 'auto' } : undefined,
+  } as any;
+
+  let lastErr: any = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY!,
+          // If Anthropic requires a newer version header update here centrally
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        let parsed: any = text;
+        try { parsed = JSON.parse(text || 'null'); } catch {}
+        console.error(`❌ Anthropic API Error (attempt ${attempt}): HTTP ${res.status}`, parsed);
+
+        if (res.status >= 500 || res.status === 429) {
+          lastErr = new Error(`Anthropic API HTTP ${res.status}: ${JSON.stringify(parsed)}`);
+          const backoff = 200 * Math.pow(2, attempt - 1);
+          await sleep(backoff);
+          continue;
+        }
+
+        throw new Error(`Anthropic API HTTP ${res.status}: ${typeof parsed === 'string' ? parsed : JSON.stringify(parsed)}`);
+      }
+
+      const data = await res.json().catch(() => null);
+      // content: [{type:'text'|'tool_use', ...}]
+      let text = '';
+      let toolJsonBlock: string | undefined;
+      if (Array.isArray(data?.content)) {
+        for (const c of data.content) {
+          if (c?.type === 'text' && typeof c.text === 'string') {
+            text += c.text;
+          } else if (c?.type === 'tool_use' && c.name === 'create_formula') {
+            try {
+              toolJsonBlock = '```json\n' + JSON.stringify(c.input ?? c.parameters ?? {}, null, 2) + '\n```';
+            } catch {}
+          }
+        }
+      }
+
+      return { text: text || '', toolJsonBlock };
+    } catch (err: any) {
+      lastErr = err;
+      console.error(`❌ Anthropic request failed (attempt ${attempt}):`, err?.message || err);
+      if (attempt === 3) {
+        throw new Error(`Anthropic request failed after ${attempt} attempts: ${err?.message || String(err)}`);
+      }
+      const backoff = 200 * Math.pow(2, attempt - 1);
+      await sleep(backoff);
+    }
+  }
+  throw lastErr || new Error('Anthropic request failed');
+}
+
 // SECURITY: Immutable formula limits - CANNOT be changed by user requests or AI prompts
 const FORMULA_LIMITS = {
   MAX_TOTAL_DOSAGE: 5500,        // Maximum total daily dosage in mg
+  DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance (0.9%) for rounding/calculation differences
   MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg (lowered to allow clinically valid low-dose ingredients like Cape Aloe 15mg, Sceletium 15mg)
   MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
@@ -52,9 +244,10 @@ const FORMULA_LIMITS = {
 function validateFormulaLimits(formula: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
-  // Check total dosage limit
-  if (formula.totalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
-    errors.push(`Formula exceeds maximum dosage limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (attempted: ${formula.totalMg}mg)`);
+  // Check total dosage limit (with tolerance)
+  const maxWithTolerance = FORMULA_LIMITS.MAX_TOTAL_DOSAGE + FORMULA_LIMITS.DOSAGE_TOLERANCE;
+  if (formula.totalMg > maxWithTolerance) {
+    errors.push(`Formula exceeds maximum dosage limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (${maxWithTolerance}mg with tolerance) (attempted: ${formula.totalMg}mg)`);
   }
   
   // Validate all ingredients (bases + additions)
@@ -337,9 +530,10 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
     }
   }
   
-  // Validate daily total doesn't exceed maximum for 00 capsule size safety
-  if (calculatedTotal > 5500) {
-    errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum 5500mg for 00 capsule safety limit.`);
+  // Validate daily total doesn't exceed maximum for 00 capsule size safety (with tolerance)
+  const maxWithTolerance = FORMULA_LIMITS.MAX_TOTAL_DOSAGE + FORMULA_LIMITS.DOSAGE_TOLERANCE;
+  if (calculatedTotal > maxWithTolerance) {
+    errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (${maxWithTolerance}mg with tolerance) for 00 capsule safety limit.`);
   }
   
   // Validate capsule sizing if provided (00 capsules hold approximately 700-850mg)
@@ -1755,6 +1949,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: 'ok' });
   });
 
+  // Load persisted AI settings (if any) from DB at startup
+  try {
+    const saved = await storage.getAppSetting('ai_settings');
+    const val = saved?.value as any;
+    if (val && (val.provider || val.model)) {
+      const provider = String(val.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai'|'anthropic';
+      let model = String(val.model || (provider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o'));
+      const normalized = normalizeModel(provider, model) || model;
+      const allowed = ALLOWED_MODELS[provider] || [];
+      if (!allowed.includes(normalized)) {
+        const fallback = allowed[0] || model;
+        console.warn(`⚠️ Persisted model '${model}' not allowed for provider '${provider}'. Falling back to '${fallback}'.`);
+        model = fallback;
+      } else {
+        model = normalized;
+      }
+      aiRuntimeSettings.provider = provider;
+      aiRuntimeSettings.model = model;
+      aiRuntimeSettings.updatedAt = new Date().toISOString();
+      aiRuntimeSettings.source = 'override';
+      console.log(`🔧 Loaded persisted AI settings: ${provider} / ${model}`);
+    }
+  } catch (e) {
+    console.warn('⚠️ Failed to load persisted AI settings, using env defaults:', (e as Error)?.message || e);
+  }
+
   // Authentication routes
   app.post('/api/auth/signup', async (req, res) => {
     const startTime = Date.now();
@@ -2268,6 +2488,16 @@ Target Range: 4500-5500mg (00 capsule capacity)
 - Suggest specific base formulas or individual ingredients from the approved catalog to ADD
 - Explain which current ingredients to keep, increase, or remove based on lab results
 - Show your math: "Current XYZ 450mg + Adding ABC 300mg = 750mg total for cardiovascular support"
+
+🔧 WHEN USER ASKS TO REMOVE INGREDIENTS:
+- If user says "remove Vitamin C" or "take out X ingredient", ONLY remove that specific ingredient
+- DO NOT remove other ingredients unless explicitly asked
+- MAINTAIN OR INCREASE the total dosage by adding new ingredients to fill the gap
+- Example: If removing Vitamin C (90mg) from a 4110mg formula:
+  - New base = 4020mg (4110mg - 90mg)
+  - Add 480-1480mg of new beneficial ingredients to reach 4500-5500mg target
+  - Result: Formula should be 4500-5500mg, not 2270mg!
+- Always aim for 4500-5500mg total unless user explicitly requests a smaller formula
 `;
 
         console.log('📦 DEBUG: Formula context built, length:', currentFormulaContext.length, 'chars');
@@ -2320,12 +2550,55 @@ ${labDataContext}
 🔬 MANDATORY BLOOD TEST ANALYSIS PROTOCOL:
 When blood test results are provided, you MUST follow this structured analysis approach:
 
-STEP 1 - BIOMARKER INTERPRETATION TABLE
-Create a clear table analyzing EACH abnormal biomarker:
-- Biomarker name and actual value
-- Reference range and how far out of range
-- Clinical significance (what this means for health)
-- Which approved base formula or individual ingredient addresses it
+STEP 1 - KEY FINDINGS FROM YOUR BLOOD TEST
+Present abnormal biomarkers using this EXACT clean format with proper spacing:
+
+"I've analyzed your blood test results. Here's what stands out:
+
+**🔴 CARDIOVASCULAR HEALTH** (Priority: High)
+
+**LDL-Cholesterol:** 151 mg/dL ⬆️ HIGH
+Target: <100 mg/dL
+Elevated LDL increases atherosclerosis risk and cardiovascular disease.
+
+**Triglycerides:** 180 mg/dL ⬆️ HIGH  
+Target: <150 mg/dL
+High levels contribute to cardiovascular disease risk.
+
+**Total Cholesterol/HDL Ratio:** 5.8 ⬆️ HIGH
+Target: <5.0
+Indicates increased heart disease risk.
+
+**Apolipoprotein B (ApoB):** 147 mg/dL ⬆️ HIGH
+Linked to increased cardiovascular disease risk.
+
+---
+
+**🟡 BLOOD & METABOLIC MARKERS**
+
+**Hematocrit:** 54.2% ⬆️ HIGH
+Elevated levels can increase blood viscosity affecting cardiovascular health.
+
+**Platelet Count:** 526 K/uL ⬆️ HIGH
+High counts can affect clotting and increase cardiovascular risk.
+
+**Homocysteine:** 13.7 umol/L ⬆️ HIGH
+Target: <10 umol/L
+Known risk factor for cardiovascular disease.
+
+**Omega-3 Total:** 2.6% ⬇️ LOW
+Target: >8%
+Low levels impact heart and brain health. Consider increasing omega-3 rich foods or external supplementation."
+
+FORMATTING REQUIREMENTS:
+- Use **bold** for biomarker names
+- Put value and direction on same line as name
+- "Target:" on separate line when needed
+- Explanation on separate line
+- Blank line between each biomarker
+- Use horizontal rule (---) between category sections
+- NO bullet points or dashes before biomarker names
+- Clean spacing and visual hierarchy
 
 STEP 2 - CURRENT FORMULA REVIEW
 ${activeFormula ? `Analyze the user's current ${activeFormula.totalMg}mg formula:
@@ -2333,25 +2606,30 @@ ${activeFormula ? `Analyze the user's current ${activeFormula.totalMg}mg formula
 - What's missing based on lab results?
 - Calculate capacity remaining: ${Math.max(0, 5500 - activeFormula.totalMg)}mg available for additions (max 5500mg total)` : 'User has no current formula - create comprehensive first formula based on labs'}
 
-STEP 3 - SPECIFIC CATALOG-BASED RECOMMENDATIONS
-For EACH abnormal biomarker, specify:
-- Exact base formula or individual ingredient from approved catalog (NO generic suggestions)
-- Exact mg dosage
-- Scientific rationale tied to their specific lab value
-- Example: "Total Cholesterol 220 mg/dL (⬆️ HIGH, ref: <200) → ADD Heart Support 450mg (contains L-Carnitine 175mg, CoQ10 21mg, Magnesium 126mg which support cardiovascular health and cholesterol metabolism)"
+STEP 3 - SPECIFIC RECOMMENDATIONS
+For EACH abnormal biomarker, explain in clean paragraph format:
 
-STEP 4 - DOSAGE CALCULATIONS
-Show explicit math:
-- Current total: ${activeFormula ? `${activeFormula.totalMg}mg` : '0mg'}
-- Additions recommended: [calculate sum of new ingredients]
-- New total: [show calculation]
-- Verify: 4500mg ≤ New Total ≤ 5500mg
+"For your elevated LDL (151 mg/dL), I'm adding **Heart Support (450mg)** which contains L-Carnitine, CoQ10, and Magnesium - these work synergistically to support cardiovascular health and healthy cholesterol metabolism."
 
-🚨 YOU MUST DEMONSTRATE EXPERTISE:
-- Reference specific lab values (not "your cholesterol is high" but "your total cholesterol of 220 mg/dL")
-- Explain why each ingredient targets that specific biomarker
+Use **bold** for ingredient names and dosages. Keep explanations conversational and clear.
+
+STEP 4 - DOSAGE SUMMARY
+Show the math in clean format:
+
+Current formula: ${activeFormula ? `${activeFormula.totalMg}mg` : '0mg'}
+New ingredients: [list with amounts]
+**New total: [calculated amount]**
+
+Verify: 4500mg ≤ New Total ≤ 5500mg
+
+🚨 CRITICAL FORMATTING RULES:
+- NO markdown tables or bullet lists for biomarkers
+- Use proper spacing (blank lines between items)
+- Bold biomarker names and ingredient names
+- Group related markers under category headers
+- Use horizontal rules (---) to separate sections
+- Keep it scannable and clean
 - Only use ingredients from the approved 32 base formulas + 29 individual ingredients
-- Show dosage math explicitly
 ` : ''}
 
 INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
@@ -2369,9 +2647,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         messageWithFileContext = `[User has attached files: ${fileDescriptions}] ${message}`;
       }
 
-      // Use GPT-4o for all requests - fast and reliable
-      const model = 'gpt-4o';
-      console.log(`🤖 Using model: ${model}`);
+  // Choose AI provider and model (admin override > env) with normalization/guardrails
+  const aiProvider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai'|'anthropic';
+  let model = aiRuntimeSettings.model || process.env.AI_MODEL || (aiProvider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o');
+  const normalizedModel = normalizeModel(aiProvider, model) || model;
+  const allowedForProvider = ALLOWED_MODELS[aiProvider] || [];
+  if (!allowedForProvider.includes(normalizedModel)) {
+    const fallback = allowedForProvider[0] || model;
+    console.warn(`⚠️ Unrecognized model '${model}' for provider '${aiProvider}'. Using fallback '${fallback}'.`);
+    model = fallback;
+  } else {
+    model = normalizedModel;
+  }
+  const source = aiRuntimeSettings.provider || aiRuntimeSettings.model ? 'override' : 'env';
+  console.log(`🤖 Using provider: ${aiProvider} | model: ${model} | source: ${source}`);
       
       // Send thinking message
       sendSSE({ type: 'thinking', message: 'Analyzing your health data...' });
@@ -2397,59 +2686,103 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         { role: 'user', content: messageWithFileContext }
       ];
 
-      // Enhanced OpenAI request with retry logic and circuit breaker
-      let stream: any;
+  // Enhanced AI request with retry logic and circuit breaker
+  let stream: any;
+  // Collect full response text here (used by Anthropic path or after OpenAI streaming)
+  let fullResponse: string = '';
       let retryCount = 0;
       const maxRetries = 2;
       
       while (retryCount <= maxRetries) {
         try {
-          // Check if OpenAI API key is available
-          if (!process.env.OPENAI_API_KEY) {
-            throw new Error('OpenAI API key not configured');
+          if (aiProvider === 'anthropic') {
+            if (!process.env.ANTHROPIC_API_KEY) throw new Error('Anthropic API key not configured');
+
+            // Anthropic expects system separately and no 'system' items in messages
+            const systemPrompt = conversationHistory[0]?.content || '';
+            const msgs = conversationHistory.slice(1).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+            // Non-streaming call, will simulate streaming below
+            const { text: fullText, toolJsonBlock } = await callAnthropic(systemPrompt, msgs, model, 0.7, 3000, true);
+
+            // Simulate streaming by splitting into chunks
+            let fullResponseLocal = '';
+            let chunkIndex = 0;
+            const chunkSize = 400;
+            for (let i = 0; i < fullText.length; i += chunkSize) {
+              const content = fullText.slice(i, i + chunkSize);
+              fullResponseLocal += content;
+              chunkIndex++;
+              sendSSE({ type: 'chunk', content, sessionId: chatSession?.id, chunkIndex });
+            }
+
+            // If a tool result provided structured JSON, append it as final chunk
+            if (toolJsonBlock) {
+              fullResponseLocal += '\n\n' + toolJsonBlock + '\n\n';
+              chunkIndex++;
+              sendSSE({ type: 'chunk', content: toolJsonBlock, sessionId: chatSession?.id, chunkIndex });
+            }
+
+            // Reuse downstream extraction/validation by assigning fullResponse
+            fullResponse = fullResponseLocal;
+            // Skip OpenAI streaming loop and jump to extraction block below
+            // Use a labeled block to break out cleanly
+            // eslint-disable-next-line no-labels
+            break;
+          } else {
+            // OpenAI path (streaming)
+            if (!process.env.OPENAI_API_KEY) {
+              throw new Error('OpenAI API key not configured');
+            }
+            const modelConfig: any = {
+              model: model,
+              messages: conversationHistory,
+              stream: true,
+              max_tokens: 3000,
+              temperature: 0.7
+            };
+            const streamPromise = openai.chat.completions.create(modelConfig);
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('OpenAI request timeout')), 180000);
+            });
+            stream = await Promise.race([streamPromise, timeoutPromise]);
+            break; // Success, exit retry loop
           }
           
-          // Configure GPT-4o parameters
-          const modelConfig: any = {
-            model: model,
-            messages: conversationHistory,
-            stream: true,
-            max_tokens: 3000,
-            temperature: 0.7
-          };
-          
-          const streamPromise = openai.chat.completions.create(modelConfig);
-          
-          // Set timeout for OpenAI request (3 minutes for GPT-5 with large prompts)
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('OpenAI request timeout')), 180000); // 180 second (3 minute) timeout for GPT-5
-          });
-          
-          stream = await Promise.race([streamPromise, timeoutPromise]);
-          break; // Success, exit retry loop
-          
-        } catch (openaiError: any) {
+        } catch (aiError: any) {
           retryCount++;
-          console.error(`OpenAI request attempt ${retryCount} failed:`, openaiError.message);
+          console.error(`❌ AI request attempt ${retryCount} failed (${aiProvider}):`, aiError.message || aiError);
+          console.error('Full error details:', JSON.stringify(aiError, null, 2));
           
           if (retryCount > maxRetries) {
-            // Send specific error based on OpenAI error type
-            if (openaiError.status === 429) {
+            // Send specific error based on AI error type
+            const errorMessage = aiError.message || String(aiError);
+            const statusCode = aiError.status || (errorMessage.match(/HTTP (\d+)/) ? parseInt(errorMessage.match(/HTTP (\d+)/)[1]) : null);
+            
+            console.error(`🔴 FINAL ERROR after ${retryCount} attempts:`, { provider: aiProvider, model, statusCode, message: errorMessage });
+            
+            if (statusCode === 429) {
               sendSSE({
                 type: 'error',
                 error: 'AI service is currently overloaded. Please try again in a few minutes.',
                 code: 'RATE_LIMITED'
               });
-            } else if (openaiError.status === 401) {
+            } else if (statusCode === 401 || statusCode === 403) {
               sendSSE({
                 type: 'error',
-                error: 'AI service authentication failed. Please contact support.',
+                error: `AI service authentication failed (${aiProvider}). Please contact support.`,
                 code: 'AUTH_FAILED'
+              });
+            } else if (statusCode === 400) {
+              sendSSE({
+                type: 'error',
+                error: `Invalid request to AI service: ${errorMessage.substring(0, 200)}`,
+                code: 'BAD_REQUEST'
               });
             } else {
               sendSSE({
                 type: 'error',
-                error: 'AI service is temporarily unavailable. Please try again later.',
+                error: `AI service (${aiProvider}/${model}) temporarily unavailable: ${errorMessage.substring(0, 150)}`,
                 code: 'SERVICE_UNAVAILABLE'
               });
             }
@@ -2462,42 +2795,31 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         }
       }
 
-      let fullResponse = '';
+  // Note: for Anthropic path above, fullResponse is already set.
       let extractedFormula = null;
       let chunkCount = 0;
 
-      // Stream the response with proper error handling
-      try {
-        for await (const chunk of stream) {
-          const content = chunk.choices[0]?.delta?.content || '';
-          if (content) {
-            fullResponse += content;
-            chunkCount++;
-            
-            // Send chunk to client with proper SSE format
-            sendSSE({ 
-              type: 'chunk', 
-              content,
-              sessionId: chatSession?.id,
-              chunkIndex: chunkCount
-            });
-            
-            // Prevent infinite streams (increased for GPT-5's longer, more detailed responses)
-            if (chunkCount > 3000) {
-              console.warn('Stream exceeded chunk limit, terminating');
-              break;
+      if (aiProvider !== 'anthropic') {
+        // OpenAI streaming path
+        try {
+          for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            if (content) {
+              fullResponse += content;
+              chunkCount++;
+              sendSSE({ type: 'chunk', content, sessionId: chatSession?.id, chunkIndex: chunkCount });
+              if (chunkCount > 3000) {
+                console.warn('Stream exceeded chunk limit, terminating');
+                break;
+              }
             }
           }
+        } catch (streamError) {
+          console.error('AI streaming error:', streamError);
+          sendSSE({ type: 'error', error: 'AI response generation failed', sessionId: chatSession?.id });
+          endStream();
+          return;
         }
-      } catch (streamError) {
-        console.error('OpenAI streaming error:', streamError);
-        sendSSE({
-          type: 'error',
-          error: 'AI response generation failed',
-          sessionId: chatSession?.id
-        });
-        endStream();
-        return;
       }
 
       // Extract formula data from response if present
@@ -2576,6 +2898,80 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           if (validatedFormula.totalMg !== validation.calculatedTotalMg) {
             console.log(`🔧 OVERRIDING AI totalMg ${validatedFormula.totalMg}mg → ${validation.calculatedTotalMg}mg (backend calculated)`);
             validatedFormula.totalMg = validation.calculatedTotalMg;
+          }
+          
+          // 🔧 AUTO-CORRECT: If formula exceeds 5500mg by a small amount, remove largest additions
+          const maxWithTolerance = FORMULA_LIMITS.MAX_TOTAL_DOSAGE + FORMULA_LIMITS.DOSAGE_TOLERANCE;
+          if (validation.calculatedTotalMg > maxWithTolerance) {
+            const overage = validation.calculatedTotalMg - FORMULA_LIMITS.MAX_TOTAL_DOSAGE;
+            const overagePercent = (overage / validation.calculatedTotalMg) * 100;
+            
+            // Only auto-correct if overage is < 10% (e.g., 5700mg → 5500mg is 3.6% overage)
+            if (overagePercent <= 10) {
+              console.log(`🔧 AUTO-TRIMMING: Formula is ${overage}mg over limit (${overagePercent.toFixed(1)}% overage). Removing smallest additions...`);
+              
+              // Sort additions by amount (ascending) and remove smallest until under limit
+              const sortedAdditions = [...validatedFormula.additions].sort((a, b) => a.amount - b.amount);
+              let removedMg = 0;
+              const removedIngredients: string[] = [];
+              
+              for (let i = 0; i < sortedAdditions.length && removedMg < overage; i++) {
+                const add = sortedAdditions[i];
+                removedMg += add.amount;
+                removedIngredients.push(`${add.ingredient} (${add.amount}mg)`);
+                // Remove from validatedFormula.additions
+                validatedFormula.additions = validatedFormula.additions.filter((a: any) => a.ingredient !== add.ingredient);
+              }
+              
+              // Recalculate total
+              const newValidation = validateAndCalculateFormula(validatedFormula);
+              validatedFormula.totalMg = newValidation.calculatedTotalMg;
+              
+              console.log(`✅ AUTO-TRIMMED: Removed ${removedIngredients.length} ingredients (${removedMg}mg): ${removedIngredients.join(', ')}`);
+              console.log(`✅ New total: ${validation.calculatedTotalMg}mg → ${newValidation.calculatedTotalMg}mg`);
+              
+              // Update validation object
+              validation.calculatedTotalMg = newValidation.calculatedTotalMg;
+              validation.errors = newValidation.errors;
+              validation.isValid = newValidation.isValid;
+              
+              // 🔧 ADDITIONAL CHECK: Remove ingredients that violate catalog dosage minimums (e.g., Glutathione at 300mg when min is 600mg)
+              const dosageViolations = validation.errors.filter(e => e.includes('below allowed minimum'));
+              if (dosageViolations.length > 0) {
+                console.log(`🔧 REMOVING DOSAGE VIOLATIONS: Found ${dosageViolations.length} ingredients with invalid dosages`);
+                const additionalRemovals: string[] = [];
+                
+                for (const error of dosageViolations) {
+                  // Extract ingredient name from error message: '"Glutathione" below allowed minimum...'
+                  const match = error.match(/"([^"]+)"/);
+                  if (match) {
+                    const ingredientName = match[1];
+                    const removed = validatedFormula.additions.find((a: any) => a.ingredient === ingredientName);
+                    if (removed) {
+                      validatedFormula.additions = validatedFormula.additions.filter((a: any) => a.ingredient !== ingredientName);
+                      additionalRemovals.push(`${ingredientName} (${removed.amount}mg - below minimum)`);
+                      console.log(`  ❌ Removed ${ingredientName} (${removed.amount}mg) - below catalog minimum`);
+                    }
+                  }
+                }
+                
+                // Recalculate again after removing dosage violations
+                const finalValidation = validateAndCalculateFormula(validatedFormula);
+                validatedFormula.totalMg = finalValidation.calculatedTotalMg;
+                validation.calculatedTotalMg = finalValidation.calculatedTotalMg;
+                validation.errors = finalValidation.errors;
+                validation.isValid = finalValidation.isValid;
+                
+                removedIngredients.push(...additionalRemovals);
+                console.log(`✅ Final total after removing dosage violations: ${finalValidation.calculatedTotalMg}mg`);
+              }
+              
+              // Add warning to user about removed ingredients
+              validatedFormula.warnings = validatedFormula.warnings || [];
+              validatedFormula.warnings.push(`Note: Removed ${removedIngredients.length} lower-priority ingredients (${removedMg}mg total) to fit within the 5500mg maximum capsule capacity: ${removedIngredients.join(', ')}`);
+            } else {
+              console.log(`⚠️ Overage too large (${overagePercent.toFixed(1)}%), cannot auto-correct. Rejecting formula.`);
+            }
           }
           
           // Check for CRITICAL errors (unapproved ingredients AND dosage violations)
@@ -5236,6 +5632,110 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   });
 
   // ========== ADMIN ROUTES (Protected with requireAdmin middleware) ==========
+  
+  // Admin: Test current AI settings by making a tiny provider call
+  app.post('/api/admin/ai-settings/test', requireAdmin, async (req, res) => {
+    try {
+      const provider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai').toLowerCase();
+      const model = aiRuntimeSettings.model || process.env.AI_MODEL || (provider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o');
+      const system = 'You are a helpful health consultation assistant.';
+      const userMsg = 'ping';
+      if (provider === 'anthropic') {
+        const hasKey = !!process.env.ANTHROPIC_API_KEY;
+        const { text } = await callAnthropic(system, [{ role: 'user', content: userMsg }], model, 0, 50, false);
+        return res.json({ ok: true, provider, model, hasKey, sample: (text || '').slice(0, 60) });
+      } else {
+        if (!process.env.OPENAI_API_KEY) {
+          return res.status(500).json({ ok: false, provider, model, error: 'OpenAI API key not configured' });
+        }
+        const completion = await openai.chat.completions.create({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: userMsg }
+          ],
+          max_tokens: 10,
+          temperature: 0
+        });
+        const content = completion.choices?.[0]?.message?.content || '';
+        return res.json({ ok: true, provider, model, hasKey: !!process.env.OPENAI_API_KEY, sample: content.slice(0, 60) });
+      }
+    } catch (error: any) {
+      console.error('AI settings test error:', error);
+      // Ensure JSON response even on unexpected failures
+      try {
+        return res.status(500).json({ ok: false, error: error?.message || String(error) });
+      } catch {
+        res.setHeader('content-type', 'application/json');
+        return res.status(500).end(JSON.stringify({ ok: false, error: 'Unknown error' }));
+      }
+    }
+  });
+  
+  // Admin: Get/set AI runtime settings (provider/model override)
+  app.get('/api/admin/ai-settings', requireAdmin, async (req, res) => {
+    try {
+      const current = {
+        provider: aiRuntimeSettings.provider || (process.env.AI_PROVIDER || 'openai'),
+        model: aiRuntimeSettings.model || process.env.AI_MODEL || ((process.env.AI_PROVIDER || 'openai').toLowerCase() === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o'),
+        source: aiRuntimeSettings.provider || aiRuntimeSettings.model ? 'override' : 'env',
+        updatedAt: aiRuntimeSettings.updatedAt || null
+      };
+      res.json(current);
+    } catch (error) {
+      console.error('Error fetching AI settings:', error);
+      res.status(500).json({ error: 'Failed to fetch AI settings' });
+    }
+  });
+
+  app.post('/api/admin/ai-settings', requireAdmin, async (req, res) => {
+    try {
+      const { provider, model, reset } = req.body || {};
+      if (reset) {
+        aiRuntimeSettings.provider = undefined;
+        aiRuntimeSettings.model = undefined;
+        aiRuntimeSettings.updatedAt = new Date().toISOString();
+        aiRuntimeSettings.source = 'env';
+        // Remove persisted settings to revert to env defaults
+        try { await storage.deleteAppSetting('ai_settings'); } catch {}
+        return res.json({ success: true, message: 'AI settings reset to environment defaults', settings: aiRuntimeSettings });
+      }
+      if (provider && !['openai','anthropic'].includes(String(provider).toLowerCase())) {
+        return res.status(400).json({ error: 'Invalid provider. Must be "openai" or "anthropic".' });
+      }
+      const effectiveProvider: 'openai'|'anthropic' = (provider ? String(provider).toLowerCase() : (aiRuntimeSettings.provider || (process.env.AI_PROVIDER as any) || 'openai')) as 'openai'|'anthropic';
+      if (provider) aiRuntimeSettings.provider = effectiveProvider;
+
+      if (model) {
+        const normalized = normalizeModel(effectiveProvider, String(model));
+        const allowed = ALLOWED_MODELS[effectiveProvider];
+        if (!normalized || !allowed.includes(normalized)) {
+          return res.status(400).json({
+            error: `Invalid model for provider '${effectiveProvider}'. Allowed: ${allowed.join(', ')}`,
+            suggestion: allowed[0]
+          });
+        }
+        aiRuntimeSettings.model = normalized;
+      }
+      aiRuntimeSettings.updatedAt = new Date().toISOString();
+      aiRuntimeSettings.source = 'override';
+      // Persist settings to DB
+      try {
+        await storage.upsertAppSetting('ai_settings', {
+          provider: aiRuntimeSettings.provider,
+          model: aiRuntimeSettings.model,
+          updatedAt: aiRuntimeSettings.updatedAt
+        }, req.userId || null);
+      } catch (e) {
+        console.error('Error persisting AI settings:', e);
+        // Non-fatal; continue with in-memory override
+      }
+      res.json({ success: true, settings: aiRuntimeSettings });
+    } catch (error) {
+      console.error('Error updating AI settings:', error);
+      res.status(500).json({ error: 'Failed to update AI settings' });
+    }
+  });
   
   // Admin: Get dashboard statistics
   app.get('/api/admin/stats', requireAdmin, async (req, res) => {

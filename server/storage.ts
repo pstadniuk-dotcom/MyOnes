@@ -7,7 +7,7 @@ import {
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
   notifications, notificationPrefs, auditLogs, userConsents, labAnalyses,
   faqItems, supportTickets, supportTicketResponses, helpArticles, newsletterSubscribers,
-  researchCitations, wearableConnections,
+  researchCitations, wearableConnections, appSettings,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -30,7 +30,8 @@ import {
   type HelpArticle, type InsertHelpArticle,
   type NewsletterSubscriber, type InsertNewsletterSubscriber,
   type ResearchCitation, type InsertResearchCitation,
-  type WearableConnection, type InsertWearableConnection
+  type WearableConnection, type InsertWearableConnection,
+  type AppSetting, type InsertAppSetting
 } from "@shared/schema";
 
 export interface IStorage {
@@ -205,6 +206,11 @@ export interface IStorage {
   createWearableConnection(connection: InsertWearableConnection): Promise<WearableConnection>;
   updateWearableConnection(id: string, updates: Partial<InsertWearableConnection>): Promise<WearableConnection | undefined>;
   disconnectWearableDevice(id: string, userId: string): Promise<boolean>;
+
+  // App settings operations (key-value store)
+  getAppSetting(key: string): Promise<AppSetting | undefined>;
+  upsertAppSetting(key: string, value: Record<string, any>, updatedBy?: string | null): Promise<AppSetting>;
+  deleteAppSetting(key: string): Promise<boolean>;
 }
 
 export class DrizzleStorage implements IStorage {
@@ -1904,6 +1910,48 @@ export class DrizzleStorage implements IStorage {
       return false;
     }
   }
+
+  // App settings operations
+  async getAppSetting(key: string): Promise<AppSetting | undefined> {
+    try {
+      const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, key));
+      return setting || undefined;
+    } catch (error) {
+      console.error('Error getting app setting:', key, error);
+      return undefined;
+    }
+  }
+
+  async upsertAppSetting(key: string, value: Record<string, any>, updatedBy?: string | null): Promise<AppSetting> {
+    try {
+      // Try update first
+      const [updated] = await db
+        .update(appSettings)
+        .set({ value, updatedAt: new Date(), updatedBy: updatedBy ?? null })
+        .where(eq(appSettings.key, key))
+        .returning();
+      if (updated) return updated;
+      // Insert if not exists
+      const [inserted] = await db
+        .insert(appSettings)
+        .values({ key, value, updatedBy: updatedBy ?? null })
+        .returning();
+      return inserted;
+    } catch (error) {
+      console.error('Error upserting app setting:', key, error);
+      throw new Error('Failed to persist app setting');
+    }
+  }
+
+  async deleteAppSetting(key: string): Promise<boolean> {
+    try {
+      const result = await db.delete(appSettings).where(eq(appSettings.key, key));
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error deleting app setting:', key, error);
+      return false;
+    }
+  }
 }
 
 export class MemStorage implements IStorage {
@@ -1928,6 +1976,7 @@ export class MemStorage implements IStorage {
   private supportTickets: Map<string, SupportTicket> = new Map();
   private supportTicketResponses: Map<string, SupportTicketResponse> = new Map();
   private helpArticles: Map<string, HelpArticle> = new Map();
+  private appSettings: Map<string, AppSetting> = new Map();
 
   constructor() {
     // Initialize with mock data for development testing
@@ -3489,6 +3538,26 @@ export class MemStorage implements IStorage {
 
   async disconnectWearableDevice(id: string, userId: string): Promise<boolean> {
     return false;
+  }
+
+  // App settings (in-memory)
+  async getAppSetting(key: string): Promise<AppSetting | undefined> {
+    return this.appSettings.get(key);
+  }
+
+  async upsertAppSetting(key: string, value: Record<string, any>, updatedBy?: string | null): Promise<AppSetting> {
+    const setting: AppSetting = {
+      key,
+      value,
+      updatedAt: new Date(),
+      updatedBy: updatedBy ?? null
+    } as AppSetting;
+    this.appSettings.set(key, setting);
+    return setting;
+  }
+
+  async deleteAppSetting(key: string): Promise<boolean> {
+    return this.appSettings.delete(key);
   }
 }
 
