@@ -142,6 +142,7 @@ export const formulas = pgTable("formulas", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   version: integer("version").default(1).notNull(),
   name: text("name"), // Custom name for the formula
+  userCreated: boolean("user_created").default(false).notNull(), // True if user built it manually
   bases: json("bases").$type<Array<{ingredient: string, amount: number, unit: string, purpose?: string}>>().notNull(),
   additions: json("additions").$type<Array<{ingredient: string, amount: number, unit: string, purpose?: string}>>().default([]),
   userCustomizations: json("user_customizations").$type<{
