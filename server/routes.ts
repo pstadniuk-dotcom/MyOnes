@@ -1123,16 +1123,24 @@ DEFAULT BEHAVIOR:
 When a user has an existing formula, you will see it in your context like this:
 
 📦 CURRENT ACTIVE FORMULA (Version X):
+[CUSTOM BUILT] or [AI-GENERATED] - indicates if user manually created it or AI created it
 Base Formulas:
 - Formula Name (dose)
 Individual Additions:
 - Ingredient Name (dose)
 Total Daily Dose: XXXXmg
 
+**IMPORTANT: Custom Built Formulas**
+- If you see [CUSTOM BUILT], the user manually created this formula without AI assistance
+- When user asks for your opinion, provide detailed analysis: what's good, what's missing, suggestions for optimization
+- Respect their choices but offer evidence-based improvements
+- Example: "I see you built this formula yourself! It's a solid start. You've included Heart Support which is great for cardiovascular health. However, I notice you might benefit from adding..."
+
 YOU MUST:
 1. ✅ Extract the ACTUAL formula data from the context above (real names, real doses, real mg totals)
 2. ✅ Extract the ACTUAL lab test values from the "LABORATORY TEST RESULTS" section if present
 3. ✅ Use these REAL values in your response
+4. ✅ Note whether formula is CUSTOM BUILT or AI-GENERATED and adjust your tone accordingly
 
 YOU MUST NOT:
 1. ❌ Use placeholders like "Undefined", "[specific finding]", "XXXmg"
@@ -2471,11 +2479,12 @@ ${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sorted
         
         currentFormulaContext = `
 📦 CURRENT ACTIVE FORMULA: "${activeFormula.name || 'Unnamed'}" (Version ${activeFormula.version || 1})
+${activeFormula.userCreated ? '[CUSTOM BUILT] - User manually created this formula without AI assistance' : '[AI-GENERATED] - AI created and optimized this formula'}
 
-Base Formulas (AI-Recommended):
+Base Formulas${activeFormula.userCreated ? '' : ' (AI-Recommended)'}:
 ${basesText}
 
-Individual Additions (AI-Recommended):
+Individual Additions${activeFormula.userCreated ? '' : ' (AI-Recommended)'}:
 ${additionsText}${customizationsText}
 
 Total Daily Dose: ${activeFormula.totalMg}mg
@@ -4778,6 +4787,99 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     } catch (error) {
       console.error('Error customizing formula:', error);
       res.status(500).json({ error: 'Failed to customize formula' });
+    }
+  });
+
+  // Create custom formula from scratch
+  app.post('/api/users/me/formula/custom', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId;
+      const { name, bases, individuals } = req.body;
+
+      // Validate that at least one ingredient is provided
+      if ((!bases || bases.length === 0) && (!individuals || individuals.length === 0)) {
+        return res.status(400).json({ 
+          error: 'At least one ingredient is required to create a formula' 
+        });
+      }
+
+      // Validate that all ingredients are valid catalog ingredients
+      const allIngredients = [...(bases || []), ...(individuals || [])];
+      for (const item of allIngredients) {
+        if (!isValidIngredient(item.ingredient)) {
+          return res.status(400).json({ 
+            error: `Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.` 
+          });
+        }
+      }
+
+      // Calculate total mg
+      let totalMg = 0;
+      
+      if (bases) {
+        for (const base of bases) {
+          const dose = getIngredientDose(base.ingredient);
+          if (dose) {
+            totalMg += dose;
+          }
+        }
+      }
+      
+      if (individuals) {
+        for (const individual of individuals) {
+          const dose = getIngredientDose(individual.ingredient);
+          if (dose) {
+            totalMg += dose;
+          }
+        }
+      }
+
+      // Validate dosage limits
+      if (totalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
+        return res.status(400).json({ 
+          error: `Total dosage of ${totalMg}mg exceeds the maximum safe limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg. Please remove some ingredients.` 
+        });
+      }
+
+      if (totalMg < 100) {
+        return res.status(400).json({ 
+          error: `Total dosage of ${totalMg}mg is too low. Please add more ingredients (minimum 100mg recommended).` 
+        });
+      }
+
+      // Get user's current formula count to determine version number
+      const history = await storage.getFormulaHistory(userId);
+      const nextVersion = (history?.length || 0) + 1;
+
+      // Create new formula marked as user-created
+      const newFormula = await storage.createFormula({
+        userId,
+        version: nextVersion,
+        name: name?.trim() || undefined,
+        userCreated: true,
+        bases: bases || [],
+        additions: individuals || [],
+        userCustomizations: {},
+        totalMg,
+        rationale: 'Custom formula built by user',
+        warnings: [],
+        disclaimers: [
+          'This formula was built manually without AI analysis.',
+          'Consider discussing with AI for optimization and safety review.',
+          'Always consult your healthcare provider before starting any new supplement regimen.'
+        ],
+        notes: null
+      });
+
+      // Invalidate queries to refresh UI
+      res.json({ 
+        success: true,
+        formula: newFormula,
+        message: 'Custom formula created successfully'
+      });
+    } catch (error) {
+      console.error('Error creating custom formula:', error);
+      res.status(500).json({ error: 'Failed to create custom formula' });
     }
   });
 

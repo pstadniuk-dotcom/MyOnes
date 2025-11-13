@@ -1,0 +1,1 @@
+ALTER TABLE "formulas" ADD COLUMN "user_created" boolean DEFAULT false NOT NULL;

@@ -27,6 +27,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { FormulaCustomizationDialog } from '@/components/FormulaCustomizationDialog';
+import { CustomFormulaBuilderDialog } from '@/components/CustomFormulaBuilderDialog';
 import { ResearchCitationCard } from '@/components/ResearchCitationCard';
 import { calculateDosage } from '@/lib/utils';
 import type { ResearchCitation } from '@shared/schema';
@@ -44,6 +45,7 @@ interface Formula {
   userId: string;
   version: number;
   name?: string;
+  userCreated?: boolean;
   bases: FormulaIngredient[];
   additions: FormulaIngredient[];
   userCustomizations?: {
@@ -121,6 +123,7 @@ export default function MyFormulaPage() {
   const [expandedFormulaId, setExpandedFormulaId] = useState<string | null>(null);
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
+  const [showCustomBuilderDialog, setShowCustomBuilderDialog] = useState(false);
   const [renamingFormulaId, setRenamingFormulaId] = useState<string | null>(null);
   const [newFormulaName, setNewFormulaName] = useState('');
   const [expandedIndividualIngredients, setExpandedIndividualIngredients] = useState<Record<string, boolean>>({});
@@ -342,6 +345,15 @@ export default function MyFormulaPage() {
             </Badge>
           )}
           <Button 
+            variant="outline"
+            className="gap-2 border-purple-600 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20" 
+            data-testid="button-custom-formula"
+            onClick={() => setShowCustomBuilderDialog(true)}
+          >
+            <Beaker className="w-4 h-4" />
+            Custom Formula
+          </Button>
+          <Button 
             variant="default" 
             className="gap-2 bg-primary hover:bg-primary/90" 
             data-testid="button-order-formula"
@@ -485,9 +497,12 @@ export default function MyFormulaPage() {
               {/* Formula Summary */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
+                  <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
                     <FlaskConical className="w-5 h-5" />
                     Formula Version {selectedFormula.version}
+                    {selectedFormula.userCreated && (
+                      <Badge className="ml-2 bg-purple-600 text-white">Custom Built</Badge>
+                    )}
                     {selectedFormula.id === currentFormula?.id && (
                       <Badge variant="secondary" className="ml-2">Newest</Badge>
                     )}
@@ -689,6 +704,12 @@ export default function MyFormulaPage() {
         />
       )}
 
+      {/* Custom Formula Builder Dialog */}
+      <CustomFormulaBuilderDialog
+        open={showCustomBuilderDialog}
+        onOpenChange={setShowCustomBuilderDialog}
+      />
+
       {/* Rename Dialog */}
       <Dialog open={!!renamingFormulaId} onOpenChange={(open) => {
         if (!open) {
@@ -775,6 +796,12 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
     >
       {/* Badges */}
       <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end z-10">
+        {formula.userCreated && (
+          <Badge className="text-xs shadow-sm bg-purple-600 hover:bg-purple-700 text-white">
+            <Beaker className="w-3 h-3 mr-1" />
+            Custom Built
+          </Badge>
+        )}
         {isNewest && (
           <Badge variant="default" className="text-xs shadow-sm">
             <Star className="w-3 h-3 mr-1" />
@@ -1658,8 +1685,13 @@ function HistorySection({
                 </div>
                 <div className="flex-1 pb-8">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <h4 className="font-medium">Version {formula.version}</h4>
+                      {formula.userCreated && (
+                        <Badge className="bg-purple-600 text-white" data-testid={`badge-custom-${formula.version}`}>
+                          Custom Built
+                        </Badge>
+                      )}
                       {idx === 0 && <Badge data-testid={`badge-current-${formula.version}`}>Current</Badge>}
                       {selectedVersions.includes(formula.id) && (
                         <Badge variant="outline" data-testid={`badge-selected-${formula.version}`}>Selected</Badge>
