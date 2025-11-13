@@ -492,7 +492,7 @@
   }
 
   /* Override Radix Select min-width constraint for wide dropdowns */
-  .select-wide-dropdown [data-radix-select-viewport] {
+  .select-wide-dropdown {
     min-width: min(90vw, 800px) !important;
     width: min(90vw, 800px) !important;
   }
