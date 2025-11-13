@@ -376,13 +376,22 @@ export function FormulaCustomizationDialog({
             <h3 className="font-medium text-sm">Add Individual Ingredients</h3>
             <div className="flex gap-2">
               <Select value={selectedIndividual} onValueChange={setSelectedIndividual}>
-                <SelectTrigger className="flex-1" data-testid="select-individual-ingredient">
+                <SelectTrigger className="flex-1 h-auto min-h-[2.5rem] py-2" data-testid="select-individual-ingredient">
                   <SelectValue placeholder="Select an individual ingredient..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="select-wide-dropdown max-h-[500px] overflow-y-auto">
                   {availableIndividuals.map(ingredient => (
-                    <SelectItem key={ingredient.name} value={ingredient.name}>
-                      {ingredient.name} - {ingredient.doseMg}mg
+                    <SelectItem key={ingredient.name} value={ingredient.name} className="py-4 h-auto">
+                      <div className="flex flex-col gap-1.5 min-w-0">
+                        <span className="font-medium text-sm">{ingredient.name} - {ingredient.doseMg}mg</span>
+                        {ingredient.benefits && ingredient.benefits.length > 0 && (
+                          <div className="text-xs text-muted-foreground leading-relaxed space-y-1">
+                            {ingredient.benefits.slice(0, 2).map((benefit, idx) => (
+                              <p key={idx} className="whitespace-normal text-left">• {benefit}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>

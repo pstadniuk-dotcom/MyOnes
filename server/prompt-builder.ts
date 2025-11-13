@@ -260,8 +260,19 @@ Total: ${formula.totalMg}mg
    - Vitamin D3: 125mg
    Total: 1,175mg ✓"
 
-3. **Output the JSON formula** 🚨 CRITICAL: WITHOUT THIS JSON BLOCK, NO FORMULA WILL BE CREATED! 🚨
-   Use this exact structure:
+3. **ASK IF THEY WANT TO CREATE IT, THEN IMMEDIATELY OUTPUT THE JSON** 
+   
+   🚨 CRITICAL: After explaining the formula, you MUST either:
+   A) Ask "Would you like me to create this formula for you?" and include the JSON block right away
+   B) Say "I'll create this formula for you now:" and include the JSON block
+   
+   DO NOT just explain the formula and stop. Users won't know to ask "create it".
+   
+   Example pattern:
+   
+   [Your explanation of formula]
+   
+   Would you like me to create this formula for you?
    
    \`\`\`json
    {
@@ -281,6 +292,8 @@ Total: ${formula.totalMg}mg
 
 🚨 CRITICAL: The user will ONLY see a "Create Formula" button if you output the \`\`\`json block above!
 Without it, they'll just see text and cannot create the formula!
+If you explain a formula but don't include the JSON, the user has no way to create it except to ask you again.
+ALWAYS include the JSON block immediately after your explanation.
 
 **Field Requirements:**
 - Use "ingredient" (NOT "name")
