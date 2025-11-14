@@ -185,9 +185,9 @@ export default function SharedFormulaPage() {
                               <div className="mt-3 pt-3 border-t">
                                 <div className="text-sm font-medium mb-2">Active Ingredients:</div>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {baseFormula.activeIngredients.map((ing: string, i: number) => (
+                                  {baseFormula.activeIngredients.map((ing, i) => (
                                     <Badge key={i} variant="outline" className="text-xs">
-                                      {ing}
+                                      {typeof ing === 'string' ? ing : ing.name}
                                     </Badge>
                                   ))}
                                 </div>
