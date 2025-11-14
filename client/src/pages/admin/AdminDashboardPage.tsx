@@ -94,7 +94,7 @@ function StatCard({
           {description}
         </p>
         {trend && (
-          <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 mt-1">
+          <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
             <TrendingUp className="h-3 w-3" />
             <span>{trend}</span>
           </div>

@@ -5748,6 +5748,176 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Review Schedule endpoints
+  
+  // Get review schedule for a formula
+  app.get('/api/formulas/:formulaId/review-schedule', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { formulaId } = req.params;
+      
+      // Verify the formula belongs to the user
+      const formula = await storage.getFormula(formulaId);
+      if (!formula || formula.userId !== userId) {
+        return res.status(404).json({ error: 'Formula not found' });
+      }
+      
+      const schedule = await storage.getReviewSchedule(userId, formulaId);
+      res.json(schedule);
+    } catch (error) {
+      console.error('Error fetching review schedule:', error);
+      res.status(500).json({ error: 'Failed to fetch review schedule' });
+    }
+  });
+  
+  // Create or update review schedule
+  app.put('/api/formulas/:formulaId/review-schedule', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { formulaId } = req.params;
+      const {
+        frequency,
+        daysBefore,
+        emailReminders,
+        smsReminders,
+        calendarIntegration,
+      } = req.body;
+      
+      // Verify the formula belongs to the user
+      const formula = await storage.getFormula(formulaId);
+      if (!formula || formula.userId !== userId) {
+        return res.status(404).json({ error: 'Formula not found' });
+      }
+      
+      // Validate frequency
+      if (!['monthly', 'bimonthly', 'quarterly'].includes(frequency)) {
+        return res.status(400).json({ error: 'Invalid frequency. Must be monthly, bimonthly, or quarterly' });
+      }
+      
+      // Validate daysBefore
+      if (typeof daysBefore !== 'number' || daysBefore < 1 || daysBefore > 14) {
+        return res.status(400).json({ error: 'daysBefore must be between 1 and 14' });
+      }
+      
+      // Calculate next review date based on frequency and formula creation date
+      const frequencyDays: Record<string, number> = {
+        monthly: 30,
+        bimonthly: 60,
+        quarterly: 90,
+      };
+      
+      const days = frequencyDays[frequency];
+      
+      const formulaDate = new Date(formula.createdAt);
+      const nextReviewDate = new Date(formulaDate);
+      nextReviewDate.setDate(nextReviewDate.getDate() + days - daysBefore);
+      
+      // If the calculated date is in the past, add another cycle
+      if (nextReviewDate < new Date()) {
+        nextReviewDate.setDate(nextReviewDate.getDate() + days);
+      }
+      
+      // Check if schedule already exists
+      const existingSchedule = await storage.getReviewSchedule(userId, formulaId);
+      
+      let schedule;
+      if (existingSchedule) {
+        // Update existing
+        schedule = await storage.updateReviewSchedule(existingSchedule.id, {
+          frequency,
+          daysBefore,
+          nextReviewDate,
+          emailReminders: emailReminders ?? true,
+          smsReminders: smsReminders ?? false,
+          calendarIntegration: calendarIntegration ?? null,
+          isActive: true,
+        });
+      } else {
+        // Create new
+        schedule = await storage.createReviewSchedule({
+          userId,
+          formulaId,
+          frequency,
+          daysBefore,
+          nextReviewDate,
+          lastReviewDate: null,
+          emailReminders: emailReminders ?? true,
+          smsReminders: smsReminders ?? false,
+          calendarIntegration: calendarIntegration ?? null,
+          isActive: true,
+        });
+      }
+      
+      res.json(schedule);
+    } catch (error) {
+      console.error('Error saving review schedule:', error);
+      res.status(500).json({ error: 'Failed to save review schedule' });
+    }
+  });
+  
+  // Delete review schedule
+  app.delete('/api/formulas/:formulaId/review-schedule', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { formulaId } = req.params;
+      
+      // Verify the formula belongs to the user
+      const formula = await storage.getFormula(formulaId);
+      if (!formula || formula.userId !== userId) {
+        return res.status(404).json({ error: 'Formula not found' });
+      }
+      
+      const schedule = await storage.getReviewSchedule(userId, formulaId);
+      if (!schedule) {
+        return res.status(404).json({ error: 'Review schedule not found' });
+      }
+      
+      await storage.deleteReviewSchedule(schedule.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting review schedule:', error);
+      res.status(500).json({ error: 'Failed to delete review schedule' });
+    }
+  });
+  
+  // Download .ics calendar file for review schedule
+  app.get('/api/formulas/:formulaId/review-schedule/calendar', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { formulaId } = req.params;
+      
+      // Verify the formula belongs to the user
+      const formula = await storage.getFormula(formulaId);
+      if (!formula || formula.userId !== userId) {
+        return res.status(404).json({ error: 'Formula not found' });
+      }
+      
+      // Get review schedule
+      const schedule = await storage.getReviewSchedule(userId, formulaId);
+      if (!schedule) {
+        return res.status(404).json({ error: 'Review schedule not found. Please set up your review schedule first.' });
+      }
+      
+      // Get user for calendar event
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Generate .ics file
+      const { generateReviewCalendarEvent } = await import('./calendarGenerator');
+      const icsContent = generateReviewCalendarEvent(schedule, user.name);
+      
+      // Send as downloadable file
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="ones-review.ics"');
+      res.send(icsContent);
+    } catch (error) {
+      console.error('Error generating calendar file:', error);
+      res.status(500).json({ error: 'Failed to generate calendar file' });
+    }
+  });
+
   // Helper route to create sample notifications for testing
   app.post('/api/notifications/sample', requireAuth, async (req, res) => {
     try {
@@ -6490,6 +6660,39 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         return res.status(404).json({ error: 'Connection not found' });
       }
       res.status(500).json({ error: 'Failed to disconnect device' });
+    }
+  });
+
+  // Manual sync endpoint - trigger data sync for user's wearables
+  app.post('/api/wearables/sync', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { syncOuraData } = await import('./wearableDataSync');
+      
+      const connections = await storage.getWearableConnections(userId);
+      const ouraConnection = connections.find(c => c.provider === 'oura' && c.status === 'connected');
+      
+      if (!ouraConnection) {
+        return res.status(404).json({ error: 'No Oura Ring connected' });
+      }
+      
+      const result = await syncOuraData(userId, ouraConnection, storage, 7); // Sync last 7 days
+      
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          message: `Synced ${result.daysSynced} days of data`,
+          daysSynced: result.daysSynced 
+        });
+      } else {
+        res.status(500).json({ 
+          error: 'Sync failed', 
+          details: result.error 
+        });
+      }
+    } catch (error) {
+      console.error('Error in manual sync:', error);
+      res.status(500).json({ error: 'Failed to sync data' });
     }
   });
 

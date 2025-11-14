@@ -7,7 +7,7 @@ import {
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
   notifications, notificationPrefs, auditLogs, userConsents, labAnalyses,
   faqItems, supportTickets, supportTicketResponses, helpArticles, newsletterSubscribers,
-  researchCitations, wearableConnections, appSettings,
+  researchCitations, wearableConnections, appSettings, reviewSchedules,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -31,7 +31,8 @@ import {
   type NewsletterSubscriber, type InsertNewsletterSubscriber,
   type ResearchCitation, type InsertResearchCitation,
   type WearableConnection, type InsertWearableConnection,
-  type AppSetting, type InsertAppSetting
+  type AppSetting, type InsertAppSetting,
+  type ReviewSchedule, type InsertReviewSchedule
 } from "@shared/schema";
 
 export interface IStorage {
@@ -202,15 +203,53 @@ export interface IStorage {
   
   // Wearable device connection operations
   getWearableConnections(userId: string): Promise<WearableConnection[]>;
+  getAllWearableConnections(): Promise<WearableConnection[]>;
   getAllWearableConnectionsNearingExpiry(expiryThreshold: Date): Promise<WearableConnection[]>;
   createWearableConnection(connection: InsertWearableConnection): Promise<WearableConnection>;
   updateWearableConnection(id: string, updates: Partial<InsertWearableConnection>): Promise<WearableConnection | undefined>;
   disconnectWearableDevice(id: string, userId: string): Promise<boolean>;
+  
+  // Biometric data operations
+  saveBiometricData(data: {
+    userId: string;
+    connectionId: string;
+    provider: 'fitbit' | 'oura' | 'whoop';
+    dataDate: Date;
+    sleepScore?: number | null;
+    sleepHours?: number | null;
+    deepSleepMinutes?: number | null;
+    remSleepMinutes?: number | null;
+    lightSleepMinutes?: number | null;
+    hrvMs?: number | null;
+    restingHeartRate?: number | null;
+    averageHeartRate?: number | null;
+    maxHeartRate?: number | null;
+    recoveryScore?: number | null;
+    readinessScore?: number | null;
+    strainScore?: number | null;
+    steps?: number | null;
+    caloriesBurned?: number | null;
+    activeMinutes?: number | null;
+    spo2Percentage?: number | null;
+    skinTempCelsius?: number | null;
+    respiratoryRate?: number | null;
+    rawData?: Record<string, any>;
+  }): Promise<void>;
+  getBiometricData(userId: string, days?: number): Promise<any[]>;
+  getBiometricTrends(userId: string, periodType: 'week' | 'month'): Promise<any | null>;
 
   // App settings operations (key-value store)
   getAppSetting(key: string): Promise<AppSetting | undefined>;
   upsertAppSetting(key: string, value: Record<string, any>, updatedBy?: string | null): Promise<AppSetting>;
   deleteAppSetting(key: string): Promise<boolean>;
+  
+  // Review schedule operations
+  getReviewSchedule(userId: string, formulaId: string): Promise<ReviewSchedule | undefined>;
+  createReviewSchedule(schedule: InsertReviewSchedule): Promise<ReviewSchedule>;
+  updateReviewSchedule(id: string, updates: Partial<InsertReviewSchedule>): Promise<ReviewSchedule | undefined>;
+  deleteReviewSchedule(id: string): Promise<boolean>;
+  getActiveReviewSchedules(): Promise<ReviewSchedule[]>;
+  getUpcomingReviews(daysAhead: number): Promise<ReviewSchedule[]>;
 }
 
 export class DrizzleStorage implements IStorage {
@@ -424,55 +463,25 @@ export class DrizzleStorage implements IStorage {
         .select()
         .from(formulas)
         .where(eq(formulas.userId, userId))
-        .orderBy(desc(formulas.version))
+        .orderBy(desc(formulas.createdAt))
         .limit(1);
       return formula || undefined;
     } catch (error) {
-      console.error('Error getting current formula:', error);
+      console.error('Error getting current formula by user:', error);
       return undefined;
     }
   }
 
   async getFormulaHistory(userId: string): Promise<Formula[]> {
     try {
-      return await db.select().from(formulas).where(eq(formulas.userId, userId)).orderBy(desc(formulas.version));
-    } catch (error) {
-      console.error('Error getting formula history:', error);
-      return [];
-    }
-  }
-
-  async updateFormulaVersion(userId: string, updates: Partial<InsertFormula>): Promise<Formula> {
-    try {
-      // Get the current highest version for this user
-      const [currentFormula] = await db
+      return await db
         .select()
         .from(formulas)
         .where(eq(formulas.userId, userId))
-        .orderBy(desc(formulas.version))
-        .limit(1);
-
-      const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
-      
-      const safeUpdates: any = {
-        ...updates,
-        userId,
-        version: nextVersion
-      };
-      
-      // Only set bases and additions if provided (data is pre-validated by Zod schemas)
-      if (updates.bases !== undefined) {
-        safeUpdates.bases = updates.bases;
-      }
-      
-      if (updates.additions !== undefined) {
-        safeUpdates.additions = updates.additions;
-      }
-      const [formula] = await db.insert(formulas).values([safeUpdates]).returning();
-      return formula;
+        .orderBy(desc(formulas.createdAt));
     } catch (error) {
-      console.error('Error updating formula version:', error);
-      throw new Error('Failed to update formula version');
+      console.error('Error getting formula history:', error);
+      return [];
     }
   }
 
@@ -481,7 +490,8 @@ export class DrizzleStorage implements IStorage {
       const [formula] = await db
         .select()
         .from(formulas)
-        .where(and(eq(formulas.userId, userId), eq(formulas.version, version)));
+        .where(and(eq(formulas.userId, userId), eq(formulas.version, version)))
+        .limit(1);
       return formula || undefined;
     } catch (error) {
       console.error('Error getting formula by user and version:', error);
@@ -489,71 +499,12 @@ export class DrizzleStorage implements IStorage {
     }
   }
 
-  async updateFormulaCustomizations(formulaId: string, customizations: { addedBases?: any[], addedIndividuals?: any[] }, newTotalMg: number): Promise<Formula> {
-    try {
-      const [updated] = await db
-        .update(formulas)
-        .set({
-          userCustomizations: customizations,
-          totalMg: newTotalMg
-        })
-        .where(eq(formulas.id, formulaId))
-        .returning();
-      
-      if (!updated) {
-        throw new Error('Formula not found');
-      }
-      
-      return updated;
-    } catch (error) {
-      console.error('Error updating formula customizations:', error);
-      throw new Error('Failed to update formula customizations');
-    }
-  }
-
-  async updateFormulaName(formulaId: string, name: string): Promise<Formula> {
-    try {
-      const [updated] = await db
-        .update(formulas)
-        .set({ name })
-        .where(eq(formulas.id, formulaId))
-        .returning();
-      
-      if (!updated) {
-        throw new Error('Formula not found');
-      }
-      
-      return updated;
-    } catch (error) {
-      console.error('Error updating formula name:', error);
-      throw new Error('Failed to update formula name');
-    }
-  }
-
-  // Formula Version Change operations
-  async createFormulaVersionChange(insertChange: InsertFormulaVersionChange): Promise<FormulaVersionChange> {
-    try {
-      const [change] = await db.insert(formulaVersionChanges).values(insertChange).returning();
-      return change;
-    } catch (error) {
-      console.error('Error creating formula version change:', error);
-      throw new Error('Failed to create formula version change');
-    }
-  }
-
-  async listFormulaVersionChanges(formulaId: string): Promise<FormulaVersionChange[]> {
-    try {
-      return await db.select().from(formulaVersionChanges).where(eq(formulaVersionChanges.formulaId, formulaId)).orderBy(desc(formulaVersionChanges.createdAt));
-    } catch (error) {
-      console.error('Error listing formula version changes:', error);
-      return [];
-    }
-  }
-
-  // Subscription operations
   async getSubscription(userId: string): Promise<Subscription | undefined> {
     try {
-      const [subscription] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId));
+      const [subscription] = await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, userId));
       return subscription || undefined;
     } catch (error) {
       console.error('Error getting subscription:', error);
@@ -1911,6 +1862,36 @@ export class DrizzleStorage implements IStorage {
     }
   }
 
+  async getAllWearableConnections(): Promise<WearableConnection[]> {
+    try {
+      const connections = await db
+        .select()
+        .from(wearableConnections)
+        .where(eq(wearableConnections.status, 'connected'))
+        .orderBy(desc(wearableConnections.connectedAt));
+      
+      // Decrypt tokens for active connections
+      return connections.map(conn => {
+        if (conn.accessToken) {
+          try {
+            return {
+              ...conn,
+              accessToken: decryptToken(conn.accessToken),
+              refreshToken: conn.refreshToken ? decryptToken(conn.refreshToken) : null
+            };
+          } catch (error) {
+            console.error('Error decrypting tokens for connection:', conn.id, error);
+            return conn;
+          }
+        }
+        return conn;
+      });
+    } catch (error) {
+      console.error('Error getting all wearable connections:', error);
+      return [];
+    }
+  }
+
   // App settings operations
   async getAppSetting(key: string): Promise<AppSetting | undefined> {
     try {
@@ -1950,6 +1931,131 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error deleting app setting:', key, error);
       return false;
+    }
+  }
+
+  // Biometric data operations
+  async saveBiometricData(data: {
+    userId: string;
+    connectionId: string;
+    provider: 'fitbit' | 'oura' | 'whoop';
+    dataDate: Date;
+    sleepScore?: number | null;
+    sleepHours?: number | null;
+    deepSleepMinutes?: number | null;
+    remSleepMinutes?: number | null;
+    lightSleepMinutes?: number | null;
+    hrvMs?: number | null;
+    restingHeartRate?: number | null;
+    averageHeartRate?: number | null;
+    maxHeartRate?: number | null;
+    recoveryScore?: number | null;
+    readinessScore?: number | null;
+    strainScore?: number | null;
+    steps?: number | null;
+    caloriesBurned?: number | null;
+    activeMinutes?: number | null;
+    spo2Percentage?: number | null;
+    skinTempCelsius?: number | null;
+    respiratoryRate?: number | null;
+    rawData?: Record<string, any>;
+  }): Promise<void> {
+    try {
+      const { biometricData } = await import('@shared/schema');
+      
+      // Upsert - update if exists, insert if not
+      await db.insert(biometricData).values({
+        userId: data.userId,
+        connectionId: data.connectionId,
+        provider: data.provider,
+        dataDate: data.dataDate,
+        sleepScore: data.sleepScore,
+        sleepHours: data.sleepHours,
+        deepSleepMinutes: data.deepSleepMinutes,
+        remSleepMinutes: data.remSleepMinutes,
+        lightSleepMinutes: data.lightSleepMinutes,
+        hrvMs: data.hrvMs,
+        restingHeartRate: data.restingHeartRate,
+        averageHeartRate: data.averageHeartRate,
+        maxHeartRate: data.maxHeartRate,
+        recoveryScore: data.recoveryScore,
+        readinessScore: data.readinessScore,
+        strainScore: data.strainScore,
+        steps: data.steps,
+        caloriesBurned: data.caloriesBurned,
+        activeMinutes: data.activeMinutes,
+        spo2Percentage: data.spo2Percentage,
+        skinTempCelsius: data.skinTempCelsius,
+        respiratoryRate: data.respiratoryRate,
+        rawData: data.rawData || null,
+      }).onConflictDoUpdate({
+        target: [biometricData.userId, biometricData.dataDate, biometricData.provider],
+        set: {
+          sleepScore: data.sleepScore,
+          sleepHours: data.sleepHours,
+          deepSleepMinutes: data.deepSleepMinutes,
+          remSleepMinutes: data.remSleepMinutes,
+          lightSleepMinutes: data.lightSleepMinutes,
+          hrvMs: data.hrvMs,
+          restingHeartRate: data.restingHeartRate,
+          averageHeartRate: data.averageHeartRate,
+          maxHeartRate: data.maxHeartRate,
+          recoveryScore: data.recoveryScore,
+          readinessScore: data.readinessScore,
+          strainScore: data.strainScore,
+          steps: data.steps,
+          caloriesBurned: data.caloriesBurned,
+          activeMinutes: data.activeMinutes,
+          spo2Percentage: data.spo2Percentage,
+          skinTempCelsius: data.skinTempCelsius,
+          respiratoryRate: data.respiratoryRate,
+          rawData: data.rawData || null,
+          syncedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error('Error saving biometric data:', error);
+      throw new Error('Failed to save biometric data');
+    }
+  }
+
+  async getBiometricData(userId: string, days: number = 30): Promise<any[]> {
+    try {
+      const { biometricData } = await import('@shared/schema');
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      
+      return await db
+        .select()
+        .from(biometricData)
+        .where(and(
+          eq(biometricData.userId, userId),
+          gte(biometricData.dataDate, startDate)
+        ))
+        .orderBy(desc(biometricData.dataDate));
+    } catch (error) {
+      console.error('Error getting biometric data:', error);
+      return [];
+    }
+  }
+
+  async getBiometricTrends(userId: string, periodType: 'week' | 'month'): Promise<any | null> {
+    try {
+      const { biometricTrends } = await import('@shared/schema');
+      const [trend] = await db
+        .select()
+        .from(biometricTrends)
+        .where(and(
+          eq(biometricTrends.userId, userId),
+          eq(biometricTrends.periodType, periodType)
+        ))
+        .orderBy(desc(biometricTrends.periodEnd))
+        .limit(1);
+      
+      return trend || null;
+    } catch (error) {
+      console.error('Error getting biometric trends:', error);
+      return null;
     }
   }
 }
@@ -3558,6 +3664,224 @@ export class MemStorage implements IStorage {
 
   async deleteAppSetting(key: string): Promise<boolean> {
     return this.appSettings.delete(key);
+  }
+  
+  // Review schedule operations
+  async getReviewSchedule(userId: string, formulaId: string): Promise<ReviewSchedule | undefined> {
+    try {
+      const [schedule] = await db
+        .select()
+        .from(reviewSchedules)
+        .where(and(
+          eq(reviewSchedules.userId, userId),
+          eq(reviewSchedules.formulaId, formulaId)
+        ));
+      return schedule || undefined;
+    } catch (error) {
+      console.error('Error getting review schedule:', error);
+      return undefined;
+    }
+  }
+
+  async createReviewSchedule(insertSchedule: InsertReviewSchedule): Promise<ReviewSchedule> {
+    try {
+      const [schedule] = await db.insert(reviewSchedules).values(insertSchedule).returning();
+      return schedule;
+    } catch (error) {
+      console.error('Error creating review schedule:', error);
+      throw new Error('Failed to create review schedule');
+    }
+  }
+
+  async updateReviewSchedule(id: string, updates: Partial<InsertReviewSchedule>): Promise<ReviewSchedule | undefined> {
+    try {
+      const [schedule] = await db
+        .update(reviewSchedules)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(reviewSchedules.id, id))
+        .returning();
+      return schedule || undefined;
+    } catch (error) {
+      console.error('Error updating review schedule:', error);
+      return undefined;
+    }
+  }
+
+  async deleteReviewSchedule(id: string): Promise<boolean> {
+    try {
+      await db.delete(reviewSchedules).where(eq(reviewSchedules.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting review schedule:', error);
+      return false;
+    }
+  }
+
+  async getActiveReviewSchedules(): Promise<ReviewSchedule[]> {
+    try {
+      return await db
+        .select()
+        .from(reviewSchedules)
+        .where(eq(reviewSchedules.isActive, true));
+    } catch (error) {
+      console.error('Error getting active review schedules:', error);
+      return [];
+    }
+  }
+
+  async getUpcomingReviews(daysAhead: number): Promise<ReviewSchedule[]> {
+    try {
+      const today = new Date();
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + daysAhead);
+      
+      return await db
+        .select()
+        .from(reviewSchedules)
+        .where(and(
+          eq(reviewSchedules.isActive, true),
+          gte(reviewSchedules.nextReviewDate, today),
+          lte(reviewSchedules.nextReviewDate, futureDate)
+        ))
+        .orderBy(reviewSchedules.nextReviewDate);
+    } catch (error) {
+      console.error('Error getting upcoming reviews:', error);
+      return [];
+    }
+  }
+  
+  // Biometric data operations
+  async saveBiometricData(data: {
+    userId: string;
+    connectionId: string;
+    provider: 'fitbit' | 'oura' | 'whoop';
+    dataDate: Date;
+    sleepScore?: number | null;
+    sleepHours?: number | null;
+    deepSleepMinutes?: number | null;
+    remSleepMinutes?: number | null;
+    lightSleepMinutes?: number | null;
+    hrvMs?: number | null;
+    restingHeartRate?: number | null;
+    averageHeartRate?: number | null;
+    maxHeartRate?: number | null;
+    recoveryScore?: number | null;
+    readinessScore?: number | null;
+    strainScore?: number | null;
+    steps?: number | null;
+    caloriesBurned?: number | null;
+    activeMinutes?: number | null;
+    spo2Percentage?: number | null;
+    skinTempCelsius?: number | null;
+    respiratoryRate?: number | null;
+    rawData?: Record<string, any>;
+  }): Promise<void> {
+    try {
+      const { biometricData } = await import('@shared/schema');
+      
+      // Upsert - update if exists, insert if not
+      await db.insert(biometricData).values({
+        userId: data.userId,
+        connectionId: data.connectionId,
+        provider: data.provider,
+        dataDate: data.dataDate,
+        sleepScore: data.sleepScore,
+        sleepHours: data.sleepHours,
+        deepSleepMinutes: data.deepSleepMinutes,
+        remSleepMinutes: data.remSleepMinutes,
+        lightSleepMinutes: data.lightSleepMinutes,
+        hrvMs: data.hrvMs,
+        restingHeartRate: data.restingHeartRate,
+        averageHeartRate: data.averageHeartRate,
+        maxHeartRate: data.maxHeartRate,
+        recoveryScore: data.recoveryScore,
+        readinessScore: data.readinessScore,
+        strainScore: data.strainScore,
+        steps: data.steps,
+        caloriesBurned: data.caloriesBurned,
+        activeMinutes: data.activeMinutes,
+        spo2Percentage: data.spo2Percentage,
+        skinTempCelsius: data.skinTempCelsius,
+        respiratoryRate: data.respiratoryRate,
+        rawData: data.rawData || null,
+      }).onConflictDoUpdate({
+        target: [biometricData.userId, biometricData.dataDate, biometricData.provider],
+        set: {
+          sleepScore: data.sleepScore,
+          sleepHours: data.sleepHours,
+          deepSleepMinutes: data.deepSleepMinutes,
+          remSleepMinutes: data.remSleepMinutes,
+          lightSleepMinutes: data.lightSleepMinutes,
+          hrvMs: data.hrvMs,
+          restingHeartRate: data.restingHeartRate,
+          averageHeartRate: data.averageHeartRate,
+          maxHeartRate: data.maxHeartRate,
+          recoveryScore: data.recoveryScore,
+          readinessScore: data.readinessScore,
+          strainScore: data.strainScore,
+          steps: data.steps,
+          caloriesBurned: data.caloriesBurned,
+          activeMinutes: data.activeMinutes,
+          spo2Percentage: data.spo2Percentage,
+          skinTempCelsius: data.skinTempCelsius,
+          respiratoryRate: data.respiratoryRate,
+          rawData: data.rawData || null,
+          syncedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error('Error saving biometric data:', error);
+      throw new Error('Failed to save biometric data');
+    }
+  }
+
+  async getBiometricData(userId: string, days: number = 30): Promise<any[]> {
+    try {
+      const { biometricData } = await import('@shared/schema');
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      
+      return await db
+        .select()
+        .from(biometricData)
+        .where(and(
+          eq(biometricData.userId, userId),
+          gte(biometricData.dataDate, startDate)
+        ))
+        .orderBy(desc(biometricData.dataDate));
+    } catch (error) {
+      console.error('Error getting biometric data:', error);
+      return [];
+    }
+  }
+
+  async getBiometricTrends(userId: string, periodType: 'week' | 'month'): Promise<any | null> {
+    try {
+      const { biometricTrends } = await import('@shared/schema');
+      const [trend] = await db
+        .select()
+        .from(biometricTrends)
+        .where(and(
+          eq(biometricTrends.userId, userId),
+          eq(biometricTrends.periodType, periodType)
+        ))
+        .orderBy(desc(biometricTrends.periodEnd))
+        .limit(1);
+      
+      return trend || null;
+    } catch (error) {
+      console.error('Error getting biometric trends:', error);
+      return null;
+    }
+  }
+
+  async getAllWearableConnections(): Promise<WearableConnection[]> {
+    try {
+      return await db.select().from(wearableConnections);
+    } catch (error) {
+      console.error('Error getting all wearable connections:', error);
+      return [];
+    }
   }
 }
 

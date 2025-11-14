@@ -164,7 +164,7 @@ export default function SharedFormulaPage() {
                       Base Formulas
                     </h3>
                     <div className="space-y-3">
-                      {formula.bases.map((base: { ingredient: string; mg: number }, idx: number) => {
+                      {formula.bases.map((base: { ingredient: string; amount: number }, idx: number) => {
                         const baseFormula = Object.values(BASE_FORMULA_DETAILS).find(
                           (f) => f.name === base.ingredient
                         );
@@ -179,7 +179,7 @@ export default function SharedFormulaPage() {
                                   </div>
                                 )}
                               </div>
-                              <Badge variant="secondary">{base.mg} mg</Badge>
+                              <Badge variant="secondary">{base.amount} mg</Badge>
                             </div>
                             {baseFormula?.activeIngredients && baseFormula.activeIngredients.length > 0 && (
                               <div className="mt-3 pt-3 border-t">
@@ -210,7 +210,7 @@ export default function SharedFormulaPage() {
                         Individual Ingredients
                       </h3>
                       <div className="space-y-2">
-                        {formula.additions.map((addition: { ingredient: string; mg: number }, idx: number) => {
+                        {formula.additions.map((addition: { ingredient: string; amount: number }, idx: number) => {
                           const ingDetails = findIngredientByName(addition.ingredient);
                           return (
                             <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
@@ -222,7 +222,7 @@ export default function SharedFormulaPage() {
                                   </div>
                                 )}
                               </div>
-                              <Badge variant="secondary">{addition.mg} mg</Badge>
+                              <Badge variant="secondary">{addition.amount} mg</Badge>
                             </div>
                           );
                         })}

@@ -668,7 +668,6 @@ export function generateFormulaPDF(
     pageMargins: [40, 50, 40, 50],
     content,
     defaultStyle: {
-      font: 'Helvetica',
       fontSize: 10,
     },
     styles: {

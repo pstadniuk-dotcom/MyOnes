@@ -26,6 +26,7 @@ export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'a
 export const notificationTypeEnum = pgEnum('notification_type', ['order_update', 'formula_update', 'consultation_reminder', 'system']);
 export const evidenceLevelEnum = pgEnum('evidence_level', ['strong', 'moderate', 'preliminary', 'limited']);
 export const studyTypeEnum = pgEnum('study_type', ['rct', 'meta_analysis', 'systematic_review', 'observational', 'case_study', 'review']);
+export const reviewFrequencyEnum = pgEnum('review_frequency', ['monthly', 'bimonthly', 'quarterly']);
 
 // Users table - updated with name, email, phone, password
 export const users = pgTable("users", {
@@ -348,6 +349,34 @@ export const notificationPrefs = pgTable("notification_prefs", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Review schedules - for tracking formula review cadence
+export const reviewSchedules = pgTable("review_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  formulaId: varchar("formula_id").notNull().references(() => formulas.id, { onDelete: "cascade" }),
+  
+  // Review frequency settings
+  frequency: reviewFrequencyEnum("frequency").notNull(), // monthly, bimonthly, quarterly
+  daysBefore: integer("days_before").default(5).notNull(), // Days before shipment to start review
+  
+  // Calculated dates
+  nextReviewDate: timestamp("next_review_date").notNull(), // When the next review should happen
+  lastReviewDate: timestamp("last_review_date"), // When the last review was completed
+  
+  // Notification preferences for this specific review schedule
+  emailReminders: boolean("email_reminders").default(true).notNull(),
+  smsReminders: boolean("sms_reminders").default(false).notNull(),
+  
+  // Calendar integration
+  calendarIntegration: text("calendar_integration"), // 'google', 'apple', 'outlook', null
+  
+  // Active status
+  isActive: boolean("is_active").default(true).notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Insert schemas for each table
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -433,6 +462,12 @@ export const insertNotificationPrefSchema = createInsertSchema(notificationPrefs
   updatedAt: true,
 });
 
+export const insertReviewScheduleSchema = createInsertSchema(reviewSchedules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // TypeScript types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -481,6 +516,9 @@ export type Notification = typeof notifications.$inferSelect;
 
 export type InsertNotificationPref = z.infer<typeof insertNotificationPrefSchema>;
 export type NotificationPref = typeof notificationPrefs.$inferSelect;
+
+export type InsertReviewSchedule = z.infer<typeof insertReviewScheduleSchema>;
+export type ReviewSchedule = typeof reviewSchedules.$inferSelect;
 
 // App settings types
 export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;

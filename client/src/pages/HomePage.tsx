@@ -13,16 +13,14 @@ import {
   Sparkles,
   PlayCircle,
   Activity,
-  Moon,
-  Sun
+  
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import type { Formula } from '@shared/schema';
 import { calculateDosage } from '@/lib/utils';
-import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ProfileCompletionDialog } from '@/components/ProfileCompletionDialog';
 
 // Map next actions to their appropriate routes
@@ -83,31 +81,7 @@ interface DashboardData {
   isNewUser: boolean;
 }
 
-function ThemeToggle() {
-  const { setTheme, theme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return <Button variant="ghost" size="icon" className="w-9 h-9"><Sun className="h-4 w-4" /></Button>;
-  }
-
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-      className="w-9 h-9"
-      data-testid="button-theme-toggle"
-    >
-      {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-      <span className="sr-only">Toggle theme</span>
-    </Button>
-  );
-}
+// Theme toggling removed: app is light-only
 
 function HomeSkeleton() {
   return (
@@ -140,7 +114,7 @@ export default function HomePage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6" data-testid="page-home">
-      {/* Personal Greeting with Theme Toggle */}
+      {/* Personal Greeting */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold text-foreground mb-1" data-testid="text-greeting">
@@ -153,7 +127,6 @@ export default function HomePage() {
             }
           </p>
         </div>
-        <ThemeToggle />
       </div>
 
       {/* Quick Stats */}

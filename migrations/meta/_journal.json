@@ -15,6 +15,13 @@
       "when": 1762989906863,
       "tag": "0001_stiff_morgan_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1763148117149,
+      "tag": "0002_far_turbo",
+      "breakpoints": true
     }
   ]
 }
