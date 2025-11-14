@@ -31,6 +31,7 @@ import { CustomFormulaBuilderDialog } from '@/components/CustomFormulaBuilderDia
 import { ResearchCitationCard } from '@/components/ResearchCitationCard';
 import { calculateDosage } from '@/lib/utils';
 import type { ResearchCitation } from '@shared/schema';
+import { generateFormulaPDF, type FormulaForPDF } from '@shared/pdf-generator';
 
 // Types for Formula data matching backend schema
 interface FormulaIngredient {
@@ -511,7 +512,7 @@ export default function MyFormulaPage() {
                 </CardContent>
               </Card>
               
-              <ActionsSection formula={selectedFormula} />
+              <ActionsSection formula={selectedFormula} onOrderClick={() => setShowOrderConfirmation(true)} />
             </>
           )}
         </TabsContent>
@@ -1895,69 +1896,123 @@ function FormulaComparison({ comparison }: { comparison: FormulaComparison }) {
 }
 
 // Actions Section Component
-function ActionsSection({ formula }: { formula: Formula }) {
+function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderClick: () => void }) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareEmail, setShareEmail] = useState('');
 
-  const handleDownload = () => {
-    // In a real implementation, this would generate and download a PDF
-    toast({
-      title: 'Download started',
-      description: 'Your formula report is being generated and will download shortly.'
-    });
+  const handleDownload = async () => {
+    try {
+      const pdfMake = (await import('pdfmake/build/pdfmake')).default;
+      const pdfFonts = (await import('pdfmake/build/vfs_fonts')).default;
+      pdfMake.vfs = pdfFonts.pdfMake.vfs;
+
+      const pdfFormula: FormulaForPDF = {
+        id: formula.id,
+        version: formula.version,
+        name: formula.name,
+        createdAt: formula.createdAt.toString(),
+        totalMg: formula.totalMg,
+        bases: formula.bases,
+        additions: formula.additions,
+        userCustomizations: formula.userCustomizations,
+        warnings: formula.warnings,
+        userCreated: formula.userCreated,
+      };
+
+      const docDefinition = generateFormulaPDF(pdfFormula, {
+        userName: user?.fullName || user?.email || 'ONES User',
+        userEmail: user?.email || '',
+      });
+
+      const fileName = formula.name
+        ? `${formula.name.replace(/[^a-z0-9]/gi, '_')}_v${formula.version}.pdf`
+        : `ONES_Formula_v${formula.version}.pdf`;
+
+      pdfMake.createPdf(docDefinition).download(fileName);
+
+      toast({
+        title: 'PDF Downloaded',
+        description: `Your formula report "${fileName}" has been downloaded successfully.`,
+      });
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast({
+        title: 'Download Failed',
+        description: 'There was an error generating your PDF. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleShare = () => {
-    // In a real implementation, this would generate a shareable link or PDF
-    navigator.clipboard?.writeText(`https://ones.ai/formula/${formula.id}`);
+    setShareDialogOpen(true);
+  };
+
+  const handleCopyLink = () => {
+    const shareLink = `${window.location.origin}/shared/formula/${formula.id}`;
+    navigator.clipboard?.writeText(shareLink);
     toast({
-      title: 'Link copied',
-      description: 'Shareable formula link copied to clipboard.'
+      title: 'Link Copied',
+      description: 'Shareable formula link copied to clipboard.',
     });
   };
 
+  const handleEmailShare = () => {
+    if (!shareEmail.trim()) {
+      toast({
+        title: 'Email Required',
+        description: 'Please enter an email address to share with.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Share Feature Coming Soon',
+      description: `Email sharing to ${shareEmail} will be available soon.`,
+    });
+    setShareDialogOpen(false);
+    setShareEmail('');
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Primary Actions */}
-      <Card data-testid="section-primary-actions">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="w-5 h-5" />
-            Quick Actions
-          </CardTitle>
-          <CardDescription>
-            Common actions for your current formula
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Button asChild className="gap-2 h-auto p-4 flex-col" data-testid="button-action-update">
-              <Link href="/dashboard/consultation">
-                <MessageSquare className="w-6 h-6 mb-2" />
-                <span className="font-medium">Update Formula</span>
-                <span className="text-xs opacity-80">Chat with AI</span>
-              </Link>
-            </Button>
-            
-            <Button variant="outline" className="gap-2 h-auto p-4 flex-col" data-testid="button-action-order">
-              <ShoppingCart className="w-6 h-6 mb-2" />
-              <span className="font-medium">Order Now</span>
-              <span className="text-xs opacity-80">Monthly supply</span>
-            </Button>
-            
-            <Button variant="outline" onClick={handleDownload} className="gap-2 h-auto p-4 flex-col" data-testid="button-action-download">
-              <Download className="w-6 h-6 mb-2" />
-              <span className="font-medium">Download</span>
-              <span className="text-xs opacity-80">PDF Report</span>
-            </Button>
-            
-            <Button variant="outline" onClick={handleShare} className="gap-2 h-auto p-4 flex-col" data-testid="button-action-share">
-              <Share2 className="w-6 h-6 mb-2" />
-              <span className="font-medium">Share</span>
-              <span className="text-xs opacity-80">With provider</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+    <>
+      <div className="space-y-6">
+        {/* Primary Actions */}
+        <Card data-testid="section-primary-actions">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5" />
+              Quick Actions
+            </CardTitle>
+            <CardDescription>
+              Common actions for your current formula
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              <Button onClick={onOrderClick} className="gap-2 h-auto p-4 flex-col" data-testid="button-action-order">
+                <ShoppingCart className="w-6 h-6 mb-2" />
+                <span className="font-medium">Order Now</span>
+                <span className="text-xs opacity-80">Monthly supply</span>
+              </Button>
+              
+              <Button variant="outline" onClick={handleDownload} className="gap-2 h-auto p-4 flex-col" data-testid="button-action-download">
+                <Download className="w-6 h-6 mb-2" />
+                <span className="font-medium">Download</span>
+                <span className="text-xs opacity-80">PDF Report</span>
+              </Button>
+              
+              <Button variant="outline" onClick={handleShare} className="gap-2 h-auto p-4 flex-col" data-testid="button-action-share">
+                <Share2 className="w-6 h-6 mb-2" />
+                <span className="font-medium">Share</span>
+                <span className="text-xs opacity-80">With provider</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
       {/* Management Actions */}
       <Card data-testid="section-management-actions">
@@ -2008,38 +2063,95 @@ function ActionsSection({ formula }: { formula: Formula }) {
         </CardContent>
       </Card>
 
-      {/* Support Information */}
-      <Card data-testid="section-support-info">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Info className="w-5 h-5" />
-            Support & Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-sm">Formula last reviewed: {new Date(formula.createdAt).toLocaleDateString()}</span>
+        {/* Support Information */}
+        <Card data-testid="section-support-info">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Info className="w-5 h-5" />
+              Support & Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-sm">Formula last reviewed: {new Date(formula.createdAt).toLocaleDateString()}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span className="text-sm">All ingredients are third-party tested</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                <span className="text-sm">Need help? Contact our support team</span>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-sm">All ingredients are third-party tested</span>
+            
+            <Button asChild variant="ghost" className="mt-4 p-0 h-auto justify-start" data-testid="button-contact-support">
+              <Link href="/dashboard/support">
+                Questions about your formula? Get help →
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Share Dialog */}
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="w-5 h-5" />
+              Share Formula
+            </DialogTitle>
+            <DialogDescription>
+              Share your formula with your healthcare provider or family
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Share via Link</label>
+              <div className="flex gap-2">
+                <Input 
+                  value={`${window.location.origin}/shared/formula/${formula.id}`}
+                  readOnly 
+                  className="flex-1"
+                />
+                <Button variant="outline" onClick={handleCopyLink} data-testid="button-copy-share-link">
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Anyone with this link can view (but not edit) your formula
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-              <span className="text-sm">Need help? Contact our support team</span>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Share via Email (Coming Soon)</label>
+              <Input 
+                type="email"
+                placeholder="doctor@example.com"
+                value={shareEmail}
+                onChange={(e) => setShareEmail(e.target.value)}
+                data-testid="input-share-email"
+              />
+              <Button 
+                onClick={handleEmailShare} 
+                className="w-full"
+                disabled
+                data-testid="button-send-email-share"
+              >
+                Send Formula via Email
+              </Button>
             </div>
           </div>
-          
-          <Button asChild variant="ghost" className="mt-4 p-0 h-auto justify-start" data-testid="button-contact-support">
-            <Link href="/dashboard/support">
-              Questions about your formula? Get help →
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
