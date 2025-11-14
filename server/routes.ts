@@ -4853,9 +4853,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         return res.status(404).json({ error: 'No formula found for user' });
       }
 
-      // Get the latest version changes for context
-      const versionChanges = await storage.listFormulaVersionChanges(currentFormula.id);
-      
+      // Get the latest version changes for context (non-fatal)
+      let versionChanges: any[] = [];
+      try {
+        versionChanges = await storage.listFormulaVersionChanges(currentFormula.id);
+      } catch (e) {
+        console.warn('Non-fatal: unable to load version changes for formula', currentFormula.id, e);
+      }
+
       res.json({
         formula: currentFormula,
         versionChanges: versionChanges.slice(0, 1) // Latest change only
@@ -6442,8 +6447,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       (req.session as any).oauthUserId = userId;
       (req.session as any).oauthProvider = provider;
 
-      let authUrl = '';
-      const redirectUri = `${process.env.REPL_URL || 'http://localhost:5000'}/api/wearables/callback/${provider}`;
+  let authUrl = '';
+  // Build redirect URI dynamically from the incoming request to avoid env mismatches
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const redirectUri = `${baseUrl}/api/wearables/callback/${provider}`;
 
       if (provider === 'fitbit') {
         const clientId = process.env.FITBIT_CLIENT_ID;
@@ -6523,8 +6530,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
 
       // Exchange code for tokens
-      let tokenData: any = null;
-      const redirectUri = `${process.env.REPL_URL || 'http://localhost:5000'}/api/wearables/callback/${provider}`;
+  let tokenData: any = null;
+  // Build redirect URI dynamically from the incoming request to avoid env mismatches
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const redirectUri = `${baseUrl}/api/wearables/callback/${provider}`;
 
       if (provider === 'fitbit') {
         const clientId = process.env.FITBIT_CLIENT_ID;

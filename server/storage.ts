@@ -499,6 +499,30 @@ export class DrizzleStorage implements IStorage {
     }
   }
 
+  // Formula Version Change operations
+  async createFormulaVersionChange(insertChange: InsertFormulaVersionChange): Promise<FormulaVersionChange> {
+    try {
+      const [change] = await db.insert(formulaVersionChanges).values(insertChange).returning();
+      return change;
+    } catch (error) {
+      console.error('Error creating formula version change:', error);
+      throw new Error('Failed to create formula version change');
+    }
+  }
+
+  async listFormulaVersionChanges(formulaId: string): Promise<FormulaVersionChange[]> {
+    try {
+      return await db
+        .select()
+        .from(formulaVersionChanges)
+        .where(eq(formulaVersionChanges.formulaId, formulaId))
+        .orderBy(desc(formulaVersionChanges.createdAt));
+    } catch (error) {
+      console.error('Error listing formula version changes:', error);
+      return [];
+    }
+  }
+
   async getSubscription(userId: string): Promise<Subscription | undefined> {
     try {
       const [subscription] = await db

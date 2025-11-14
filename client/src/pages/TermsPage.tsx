@@ -89,7 +89,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Contact Information</h2>
             <p className="text-muted-foreground">
-              Questions about these Terms of Service should be sent to legal@ones.health.
+              Questions about these Terms of Service should be sent to info@myones.ai.
             </p>
           </section>
         </div>

@@ -160,9 +160,8 @@ export default function WearablesPage() {
     }
 
     try {
-      const res = await fetch(`/api/wearables/connect/${provider}`, {
-        credentials: 'include',
-      });
+      // Use apiRequest so the Authorization header is included from localStorage
+      const res = await apiRequest('GET', `/api/wearables/connect/${provider}`);
 
       if (res.status === 401) {
         toast({
@@ -175,7 +174,7 @@ export default function WearablesPage() {
         return;
       }
 
-      const data = await res.json();
+  const data = await res.json();
       if (data?.authUrl) {
         window.location.href = data.authUrl;
       } else {

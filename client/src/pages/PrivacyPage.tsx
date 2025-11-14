@@ -85,7 +85,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-serif font-bold text-foreground mb-4">Contact Us</h2>
             <p className="text-muted-foreground">
-              If you have questions about this Privacy Policy or our data practices, please contact us at privacy@ones.health.
+              If you have questions about this Privacy Policy or our data practices, please contact us at info@myones.ai.
             </p>
           </section>
         </div>
