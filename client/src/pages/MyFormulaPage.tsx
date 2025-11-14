@@ -342,7 +342,7 @@ export default function MyFormulaPage() {
           {selectedFormula && (
             <Badge variant="secondary" className="text-sm" data-testid="badge-formula-version">
               <FlaskConical className="w-3 h-3 mr-1" />
-              Version {selectedFormula.version}
+              {selectedFormula.name || `Version ${selectedFormula.version}`}
               {selectedFormula.id === currentFormula?.id && ' (Newest)'}
             </Badge>
           )}
@@ -539,7 +539,7 @@ export default function MyFormulaPage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
                     <FlaskConical className="w-5 h-5" />
-                    Formula Version {selectedFormula.version}
+                    {selectedFormula.name || `Formula Version ${selectedFormula.version}`}
                     {selectedFormula.userCreated && (
                       <Badge className="ml-2 bg-purple-600 text-white">Custom Built</Badge>
                     )}
@@ -548,6 +548,7 @@ export default function MyFormulaPage() {
                     )}
                   </CardTitle>
                   <CardDescription>
+                    {selectedFormula.name && `Version ${selectedFormula.version} • `}
                     Created {new Date(selectedFormula.createdAt).toLocaleDateString()} • 
                     {selectedFormula.bases.length + selectedFormula.additions.length + (selectedFormula.userCustomizations?.addedBases?.length || 0) + (selectedFormula.userCustomizations?.addedIndividuals?.length || 0)} ingredients • 
                     {selectedFormula.totalMg}mg total
@@ -1726,7 +1727,12 @@ function HistorySection({
                 <div className="flex-1 pb-8">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <h4 className="font-medium">Version {formula.version}</h4>
+                      <div className="flex flex-col">
+                        <h4 className="font-medium">{formula.name || `Version ${formula.version}`}</h4>
+                        {formula.name && (
+                          <p className="text-xs text-muted-foreground">Version {formula.version}</p>
+                        )}
+                      </div>
                       {formula.userCreated && (
                         <Badge className="bg-purple-600 text-white" data-testid={`badge-custom-${formula.version}`}>
                           Custom Built
@@ -1749,7 +1755,7 @@ function HistorySection({
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Revert to Version {formula.version}?</AlertDialogTitle>
+                              <AlertDialogTitle>Revert to {formula.name || `Version ${formula.version}`}?</AlertDialogTitle>
                               <AlertDialogDescription>
                                 This will create a new version based on the selected formula. 
                                 Please provide a reason for this change.
@@ -1802,14 +1808,20 @@ function FormulaComparison({ comparison }: { comparison: FormulaComparison }) {
       {/* Summary */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="text-center p-4 bg-muted/30 rounded-lg" data-testid={`comparison-version-${formula1.version}`}>
-          <div className="text-lg font-semibold">Version {formula1.version}</div>
+          <div className="text-lg font-semibold">{formula1.name || `Version ${formula1.version}`}</div>
+          {formula1.name && (
+            <div className="text-xs text-muted-foreground">Version {formula1.version}</div>
+          )}
           <div className="text-sm text-muted-foreground">
             {new Date(formula1.createdAt).toLocaleDateString()}
           </div>
           <div className="text-lg font-bold mt-2">{formula1.totalMg}mg</div>
         </div>
         <div className="text-center p-4 bg-muted/30 rounded-lg" data-testid={`comparison-version-${formula2.version}`}>
-          <div className="text-lg font-semibold">Version {formula2.version}</div>
+          <div className="text-lg font-semibold">{formula2.name || `Version ${formula2.version}`}</div>
+          {formula2.name && (
+            <div className="text-xs text-muted-foreground">Version {formula2.version}</div>
+          )}
           <div className="text-sm text-muted-foreground">
             {new Date(formula2.createdAt).toLocaleDateString()}
           </div>
