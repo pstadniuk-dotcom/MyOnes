@@ -150,7 +150,7 @@ export default function WearablesPage() {
     },
   });
 
-  const handleConnect = (provider: 'fitbit' | 'oura' | 'whoop' | 'apple') => {
+  const handleConnect = async (provider: 'fitbit' | 'oura' | 'whoop' | 'apple') => {
     if (provider === 'apple') {
       toast({
         title: 'Coming Soon',
@@ -158,7 +158,41 @@ export default function WearablesPage() {
       });
       return;
     }
-    window.location.href = `/api/wearables/connect/${provider}`;
+
+    try {
+      const res = await fetch(`/api/wearables/connect/${provider}`, {
+        credentials: 'include',
+      });
+
+      if (res.status === 401) {
+        toast({
+          title: 'Authentication required',
+          description: 'Please log in to connect your wearable.',
+          variant: 'destructive',
+        });
+        // Send user to login; after login they can return to Wearables
+        window.location.href = '/login?next=/dashboard/wearables';
+        return;
+      }
+
+      const data = await res.json();
+      if (data?.authUrl) {
+        window.location.href = data.authUrl;
+      } else {
+        toast({
+          title: 'Connection error',
+          description: data?.error || 'Failed to start the OAuth flow.',
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      console.error('Connect error', err);
+      toast({
+        title: 'Network error',
+        description: 'Could not reach the server. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleDisconnect = (connectionId: string) => {
