@@ -510,9 +510,9 @@ export default function ChatPage() {
                       
                       {/* Rationale */}
                       {message.formula.rationale && (
-                        <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded border-l-4 border-blue-400">
-                          <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1">Why This Formula:</p>
-                          <p className="text-sm text-blue-700 dark:text-blue-400">{message.formula.rationale}</p>
+                        <div className="mb-3 p-3 bg-blue-50 rounded border-l-4 border-blue-400">
+                          <p className="text-sm font-medium text-blue-800 mb-1">Why This Formula:</p>
+                          <p className="text-sm text-blue-700">{message.formula.rationale}</p>
                         </div>
                       )}
                       
@@ -525,7 +525,7 @@ export default function ChatPage() {
                           </p>
                           <ul className="space-y-1">
                             {message.formula.warnings.map((warning, idx) => (
-                              <li key={idx} className="flex items-start gap-2 p-2 bg-amber-50 dark:bg-amber-950/30 rounded text-amber-800 dark:text-amber-300">
+                              <li key={idx} className="flex items-start gap-2 p-2 bg-amber-50 rounded text-amber-800">
                                 <span className="text-amber-600 mt-0.5 font-bold">•</span>
                                 <span className="text-sm">{warning}</span>
                               </li>

@@ -375,7 +375,7 @@ export default function FormulaPage() {
                       This is your first personalized formula
                     </p>
                   </div>
-                )}}
+                )}
               </div>
             </CardContent>
           </Card>

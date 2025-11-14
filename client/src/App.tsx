@@ -10,7 +10,7 @@ import NotFound from "@/pages/not-found";
 import SignupPage from "@/pages/SignupPage";
 import LoginPage from "@/pages/LoginPage";
 import SciencePage from "@/pages/SciencePage";
-import { ThemeProvider } from "next-themes";
+// ThemeProvider removed: app is light-only
 
 // Import static pages
 import AboutPage from "@/pages/AboutPage";
@@ -210,19 +210,12 @@ function MainRouter() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="dark"
-        enableSystem
-        disableTransitionOnChange
-      >
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <MainRouter />
-          </TooltipProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <MainRouter />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

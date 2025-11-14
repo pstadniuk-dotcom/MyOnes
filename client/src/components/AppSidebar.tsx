@@ -6,6 +6,8 @@ import {
   FileText,
   HelpCircle,
   Watch,
+  User,
+  Settings,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -48,6 +50,16 @@ const healthJourneyItems = [
 ];
 
 const accountItems = [
+  {
+    title: 'Profile',
+    url: '/dashboard/profile',
+    icon: User,
+  },
+  {
+    title: 'Settings',
+    url: '/dashboard/settings',
+    icon: Settings,
+  },
   {
     title: 'Orders',
     url: '/dashboard/orders',

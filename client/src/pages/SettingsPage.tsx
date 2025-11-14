@@ -6,15 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Lock, Bell, Shield, Moon, Sun, Clock, Pill, Globe } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { Lock, Bell, Shield, Clock, Pill, Globe } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { getCurrentTimezone } from '@/hooks/use-timezone';
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('account');
 
   // Account settings state
@@ -210,33 +208,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Theme Settings */}
-          <Card data-testid="section-theme">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-                Theme Preference
-              </CardTitle>
-              <CardDescription>
-                Choose your preferred color theme
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Dark Mode</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Switch between light and dark themes
-                  </p>
-                </div>
-                <Switch
-                  checked={theme === 'dark'}
-                  onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-                  data-testid="switch-dark-mode"
-                />
-              </div>
-            </CardContent>
-          </Card>
+          {/* Theme settings removed: app is light-only */}
 
           {/* Privacy & Security Notice */}
           <Card data-testid="section-privacy">

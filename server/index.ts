@@ -5,6 +5,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startSmsReminderScheduler } from "./smsReminderScheduler";
 import { startTokenRefreshScheduler } from "./tokenRefreshScheduler";
+import { startWearableDataScheduler } from "./wearableDataScheduler";
 
 const app = express();
 app.use(express.json());
@@ -99,5 +100,8 @@ app.use((req, res, next) => {
     
     // Start wearable token refresh scheduler
     startTokenRefreshScheduler();
+    
+    // Start wearable data sync scheduler
+    startWearableDataScheduler();
   });
 })();

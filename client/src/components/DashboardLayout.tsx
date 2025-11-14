@@ -15,17 +15,12 @@ import { Badge } from '@/components/ui/badge';
 import { NotificationsDropdown } from '@/components/NotificationsDropdown';
 import { 
   ChevronDown, 
-  Moon, 
-  Sun, 
-  User, 
-  Settings, 
   LogOut, 
   Bell, 
   Shield
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'wouter';
-import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { useTimezoneSync } from '@/hooks/use-timezone';
 
@@ -33,31 +28,7 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-function ThemeToggle() {
-  const { setTheme, theme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return <Button variant="ghost" size="icon" className="w-9 h-9"><Sun className="h-4 w-4" /></Button>;
-  }
-
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-      className="w-9 h-9"
-      data-testid="button-theme-toggle"
-    >
-      {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-      <span className="sr-only">Toggle theme</span>
-    </Button>
-  );
-}
+// Theme toggle removed: site is fixed to light mode
 
 function UserDropdown() {
   const { user, logout } = useAuth();
@@ -106,12 +77,6 @@ function UserDropdown() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile" data-testid="link-profile-settings">
-              <User className="mr-2 h-4 w-4" />
-              <span>Profile & Settings</span>
-            </Link>
-          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/dashboard/settings?tab=notifications" data-testid="link-notifications">
               <Bell className="mr-2 h-4 w-4" />
@@ -173,9 +138,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 {/* Notifications Dropdown */}
                 <NotificationsDropdown />
 
-                <ThemeToggle />
-                
-                <div className="h-6 w-px bg-border mx-1" />
+                {/* Theme toggle removed */}
                 
                 <UserDropdown />
               </div>

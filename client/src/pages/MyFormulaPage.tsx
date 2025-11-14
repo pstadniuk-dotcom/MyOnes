@@ -29,6 +29,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { FormulaCustomizationDialog } from '@/components/FormulaCustomizationDialog';
 import { CustomFormulaBuilderDialog } from '@/components/CustomFormulaBuilderDialog';
 import { ResearchCitationCard } from '@/components/ResearchCitationCard';
+import { ReviewScheduleCard } from '@/components/ReviewScheduleCard';
 import { calculateDosage } from '@/lib/utils';
 import type { ResearchCitation } from '@shared/schema';
 import { generateFormulaPDF, type FormulaForPDF } from '@shared/pdf-generator';
@@ -452,7 +453,7 @@ export default function MyFormulaPage() {
                   <CardContent>
                     <Button 
                       variant="outline"
-                      className="w-full gap-2 border-purple-600 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20" 
+                      className="w-full gap-2 border-purple-600 text-purple-600 hover:bg-purple-50" 
                       data-testid="button-custom-formula"
                       onClick={() => setShowCustomBuilderDialog(true)}
                     >
@@ -554,7 +555,7 @@ export default function MyFormulaPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Daily Dosage Instructions */}
-                  <div className="p-3 bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-lg">
+                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold text-sm flex items-center gap-2">
                         <Pill className="w-4 h-4" />
@@ -612,19 +613,19 @@ export default function MyFormulaPage() {
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-2">
                         <Users className="w-4 h-4 text-purple-600" />
-                        <span className="text-purple-600 dark:text-purple-400">Your Customizations ({(selectedFormula.userCustomizations?.addedBases?.length || 0) + (selectedFormula.userCustomizations?.addedIndividuals?.length || 0)})</span>
+                        <span className="text-purple-600">Your Customizations ({(selectedFormula.userCustomizations?.addedBases?.length || 0) + (selectedFormula.userCustomizations?.addedIndividuals?.length || 0)})</span>
                       </h4>
                       <div className="space-y-2">
                         {selectedFormula.userCustomizations?.addedBases?.map((base, idx) => (
-                          <div key={`base-${idx}`} className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded text-sm border border-purple-200 dark:border-purple-800">
-                            <div className="font-medium text-purple-900 dark:text-purple-100">{base.ingredient} - {base.amount}{base.unit}</div>
+                          <div key={`base-${idx}`} className="p-2 bg-purple-50 rounded text-sm border border-purple-200">
+                            <div className="font-medium text-purple-900">{base.ingredient} - {base.amount}{base.unit}</div>
                           </div>
                         ))}
                         {selectedFormula.userCustomizations?.addedIndividuals?.map((ind, idx) => {
                           const ingredientDetails = getIndividualIngredientDetails(ind.ingredient);
                           const expandKey = `order-ind-${idx}`;
                           return (
-                            <div key={`ind-${idx}`} className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded text-sm border border-purple-200 dark:border-purple-800">
+                            <div key={`ind-${idx}`} className="p-2 bg-purple-50 rounded text-sm border border-purple-200">
                               {ingredientDetails?.benefits && ingredientDetails.benefits.length > 0 ? (
                                 <Collapsible
                                   open={expandedIndividualIngredients[expandKey]}
@@ -634,7 +635,7 @@ export default function MyFormulaPage() {
                                 >
                                   <CollapsibleTrigger className="w-full hover-elevate active-elevate-2 rounded p-1 -m-1">
                                     <div className="flex items-center justify-between">
-                                      <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
+                                      <div className="font-medium text-purple-900">{ind.ingredient} - {ind.amount}{ind.unit}</div>
                                       {expandedIndividualIngredients[expandKey] ? (
                                         <ChevronUp className="w-3 h-3 text-purple-600" />
                                       ) : (
@@ -643,7 +644,7 @@ export default function MyFormulaPage() {
                                     </div>
                                   </CollapsibleTrigger>
                                   <CollapsibleContent className="mt-2">
-                                    <div className="bg-primary/5 dark:bg-primary/10 rounded-md p-2 space-y-1">
+                                    <div className="bg-primary/5 rounded-md p-2 space-y-1">
                                       {ingredientDetails.benefits.map((benefit, bidx) => (
                                         <div key={bidx} className="flex items-start gap-2">
                                           <CheckCircle className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
@@ -654,7 +655,7 @@ export default function MyFormulaPage() {
                                   </CollapsibleContent>
                                 </Collapsible>
                               ) : (
-                                <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
+                                <div className="font-medium text-purple-900">{ind.ingredient} - {ind.amount}{ind.unit}</div>
                               )}
                             </div>
                           );
@@ -665,14 +666,14 @@ export default function MyFormulaPage() {
                   
                   {/* Warnings */}
                   {selectedFormula.warnings && selectedFormula.warnings.length > 0 && (
-                    <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded">
-                      <h4 className="font-semibold mb-2 flex items-center gap-2 text-orange-800 dark:text-orange-400">
+                    <div className="p-3 bg-orange-50 border border-orange-200 rounded">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2 text-orange-800">
                         <AlertTriangle className="w-4 h-4" />
                         Important Warnings
                       </h4>
                       <ul className="space-y-1">
                         {selectedFormula.warnings.map((warning, idx) => (
-                          <li key={idx} className="text-sm text-orange-700 dark:text-orange-300">• {warning}</li>
+                          <li key={idx} className="text-sm text-orange-700">• {warning}</li>
                         ))}
                       </ul>
                     </div>
@@ -683,10 +684,10 @@ export default function MyFormulaPage() {
           )}
           
           {/* Medical Disclaimer */}
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-              <div className="text-xs text-amber-800 dark:text-amber-200">
+              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-amber-800">
                 <p className="font-semibold mb-1">Medical Disclaimer</p>
                 <p>
                   This personalized formula is a supplement recommendation, not medical advice. 
@@ -848,7 +849,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
           </Badge>
         )}
         {isSelected && (
-          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 shadow-sm">
+          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 shadow-sm">
             <CheckCircle className="w-3 h-3 mr-1" />
             Selected
           </Badge>
@@ -967,19 +968,19 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
               <div>
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
                   <Users className="w-3 h-3 text-purple-600" />
-                  <span className="text-purple-600 dark:text-purple-400">Your Customizations</span>
+                  <span className="text-purple-600">Your Customizations</span>
                 </h4>
                 <div className="space-y-1">
                   {formula.userCustomizations?.addedBases?.map((base, idx) => (
-                    <div key={`base-${idx}`} className="text-xs p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-800">
-                      <div className="font-medium text-purple-900 dark:text-purple-100">{base.ingredient} - {base.amount}{base.unit}</div>
+                    <div key={`base-${idx}`} className="text-xs p-2 bg-purple-50 rounded border border-purple-200">
+                      <div className="font-medium text-purple-900">{base.ingredient} - {base.amount}{base.unit}</div>
                     </div>
                   ))}
                   {formula.userCustomizations?.addedIndividuals?.map((ind, idx) => {
                     const ingredientDetails = getIndividualIngredientDetails(ind.ingredient);
                     const expandKey = `card-ind-${formula.id}-${idx}`;
                     return (
-                      <div key={`ind-${idx}`} className="text-xs p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-800">
+                      <div key={`ind-${idx}`} className="text-xs p-2 bg-purple-50 rounded border border-purple-200">
                         {ingredientDetails?.benefits && ingredientDetails.benefits.length > 0 ? (
                           <Collapsible
                             open={expandedIndividualIngredients[expandKey]}
@@ -989,7 +990,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
                           >
                             <CollapsibleTrigger className="w-full hover-elevate active-elevate-2 rounded p-1 -m-1">
                               <div className="flex items-center justify-between">
-                                <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
+                                <div className="font-medium text-purple-900">{ind.ingredient} - {ind.amount}{ind.unit}</div>
                                 {expandedIndividualIngredients[expandKey] ? (
                                   <ChevronUp className="w-3 h-3 text-purple-600" />
                                 ) : (
@@ -998,7 +999,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
                               </div>
                             </CollapsibleTrigger>
                             <CollapsibleContent className="mt-2">
-                              <div className="bg-primary/5 dark:bg-primary/10 rounded-md p-2 space-y-1">
+                              <div className="bg-primary/5 rounded-md p-2 space-y-1">
                                 {ingredientDetails.benefits.map((benefit, bidx) => (
                                   <div key={bidx} className="flex items-start gap-2">
                                     <CheckCircle className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
@@ -1009,7 +1010,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
                             </CollapsibleContent>
                           </Collapsible>
                         ) : (
-                          <div className="font-medium text-purple-900 dark:text-purple-100">{ind.ingredient} - {ind.amount}{ind.unit}</div>
+                          <div className="font-medium text-purple-900">{ind.ingredient} - {ind.amount}{ind.unit}</div>
                         )}
                       </div>
                     );
@@ -1038,7 +1039,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
                 </h4>
                 <ul className="space-y-1">
                   {formula.warnings.map((warning, idx) => (
-                    <li key={idx} className="text-xs text-orange-600 dark:text-orange-400">• {warning}</li>
+                    <li key={idx} className="text-xs text-orange-600">• {warning}</li>
                   ))}
                 </ul>
               </div>
@@ -1188,12 +1189,12 @@ function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
           {formula.rationale && (
             <>
               <Separator />
-              <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border-l-4 border-blue-400">
-                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2 text-blue-800 dark:text-blue-300">
+              <div className="p-4 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2 text-blue-800">
                   <Lightbulb className="w-5 h-5" />
                   Why This Formula
                 </h3>
-                <p className="text-sm leading-relaxed text-blue-700 dark:text-blue-400">{formula.rationale}</p>
+                <p className="text-sm leading-relaxed text-blue-700">{formula.rationale}</p>
               </div>
             </>
           )}
@@ -1202,14 +1203,14 @@ function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
           {formula.warnings && formula.warnings.length > 0 && (
             <>
               <Separator />
-              <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border-l-4 border-amber-400">
-                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2 text-amber-800 dark:text-amber-300">
+              <div className="p-4 bg-amber-50 rounded-lg border-l-4 border-amber-400">
+                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2 text-amber-800">
                   <AlertTriangle className="w-5 h-5" />
                   Important Warnings
                 </h3>
                 <ul className="space-y-1">
                   {formula.warnings.map((warning, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400">
+                    <li key={idx} className="flex items-start gap-2 text-sm text-amber-700">
                       <span className="text-amber-600 mt-0.5 font-bold">•</span>
                       <span>{warning}</span>
                     </li>
@@ -1379,7 +1380,7 @@ function IngredientCard({
                     {ingredient.type === 'base' ? 'Base Formula' : 'Addition'}
                   </Badge>
                   {ingredient.source === 'user' && (
-                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100">
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800">
                       <Users className="w-3 h-3 mr-1" />
                       You Added
                     </Badge>
@@ -1564,8 +1565,8 @@ function IngredientCard({
                         </h4>
                         <div className="space-y-2">
                           {ingredientDetail.interactions.map((interaction: string, idx: number) => (
-                            <div key={idx} className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded border-l-4 border-orange-400">
-                              <p className="text-sm text-orange-800 dark:text-orange-300">{interaction}</p>
+                            <div key={idx} className="p-3 bg-orange-50 rounded border-l-4 border-orange-400">
+                              <p className="text-sm text-orange-800">{interaction}</p>
                             </div>
                           ))}
                         </div>
@@ -2026,54 +2027,8 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
           </CardContent>
         </Card>
 
-      {/* Management Actions */}
-      <Card data-testid="section-management-actions">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Archive className="w-5 h-5" />
-            Formula Management
-          </CardTitle>
-          <CardDescription>
-            Advanced formula management and backup options
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <h4 className="font-medium">Export Formula Data</h4>
-                <p className="text-sm text-muted-foreground">Download complete formula history as JSON</p>
-              </div>
-              <Button variant="outline" size="sm" className="gap-2" data-testid="button-export-data">
-                <FileText className="w-4 h-4" />
-                Export
-              </Button>
-            </div>
-            
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <h4 className="font-medium">Schedule Review</h4>
-                <p className="text-sm text-muted-foreground">Set up automatic formula review with AI</p>
-              </div>
-              <Button variant="outline" size="sm" className="gap-2" data-testid="button-schedule-review">
-                <Calendar className="w-4 h-4" />
-                Schedule
-              </Button>
-            </div>
-            
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <h4 className="font-medium">Healthcare Provider Access</h4>
-                <p className="text-sm text-muted-foreground">Generate shareable link for your doctor</p>
-              </div>
-              <Button variant="outline" size="sm" className="gap-2" data-testid="button-provider-access">
-                <ExternalLink className="w-4 h-4" />
-                Generate Link
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Review Schedule */}
+      <ReviewScheduleCard formulaId={formula.id} />
 
         {/* Support Information */}
         <Card data-testid="section-support-info">

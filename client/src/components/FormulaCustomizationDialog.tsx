@@ -430,7 +430,7 @@ export function FormulaCustomizationDialog({
                               )}
                             </CollapsibleTrigger>
                             <CollapsibleContent className="mt-2">
-                              <div className="bg-primary/5 dark:bg-primary/10 rounded-md p-3 space-y-1.5">
+                              <div className="bg-primary/5 rounded-md p-3 space-y-1.5">
                                 {ingredient.benefits.map((benefit, bidx) => (
                                   <div key={bidx} className="flex items-start gap-2">
                                     <CheckCircle className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />

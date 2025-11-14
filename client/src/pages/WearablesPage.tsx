@@ -5,38 +5,118 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Watch, Activity, Heart, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import fitbitIcon from '@assets/Fitbit_app_icon_1763160710769.png';
 
 interface WearableConnection {
   id: string;
   userId: string;
-  provider: 'fitbit' | 'oura' | 'whoop';
+  provider: 'fitbit' | 'oura' | 'whoop' | 'apple';
   status: 'connected' | 'disconnected' | 'error';
   connectedAt: string;
   lastSyncedAt: string | null;
   providerUserId: string | null;
 }
 
+// Real company logos as inline SVG components (used as fallback)
+const WhoopLogo = () => (
+  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
+    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
+    <text x="12" y="16" fontSize="10" fontWeight="bold" textAnchor="middle" fill="currentColor">W</text>
+  </svg>
+);
+
+const OuraLogo = () => (
+  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
+    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" fill="none"/>
+    <rect x="8" y="2" width="8" height="2" fill="currentColor"/>
+  </svg>
+);
+
+// Optional image paths (served from client/public). We try several extensions in order.
+const PROVIDER_IMAGES: Record<'fitbit' | 'oura' | 'whoop' | 'apple', string[] | null> = {
+  fitbit: [fitbitIcon],
+  oura: ['/wearables/oura.png', '/wearables/oura.svg', '/wearables/oura.jpg'],
+  whoop: ['/wearables/whoop.png', '/wearables/whoop.svg', '/wearables/whoop.jpg'],
+  apple: null,
+};
+
+function ProviderLogo({
+  provider,
+  Inline,
+  name,
+}: {
+  provider: 'fitbit' | 'oura' | 'whoop' | 'apple';
+  Inline: React.ComponentType;
+  name: string;
+}) {
+  const [idx, setIdx] = useState(0);
+  const candidates = PROVIDER_IMAGES[provider];
+  const src = candidates?.[idx];
+  if (!src) return <Inline />;
+  return (
+    <img
+      src={src}
+      alt={`${name} logo`}
+      className="h-6 w-6 object-contain rounded-md"
+      onError={() => {
+        // advance to next candidate, or fall back to inline
+        setIdx((i) => i + 1);
+      }}
+      loading="lazy"
+      decoding="async"
+    />
+  );
+}
+
+const FitbitLogo = () => (
+  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
+    <circle cx="6" cy="12" r="1.5"/>
+    <circle cx="9" cy="9" r="1.8"/>
+    <circle cx="9" cy="15" r="1.8"/>
+    <circle cx="12" cy="6" r="2"/>
+    <circle cx="12" cy="12" r="2.2"/>
+    <circle cx="12" cy="18" r="2"/>
+    <circle cx="15" cy="9" r="1.8"/>
+    <circle cx="15" cy="15" r="1.8"/>
+    <circle cx="18" cy="12" r="1.5"/>
+  </svg>
+);
+
+const AppleLogo = () => (
+  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
+    <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+  </svg>
+);
+
 const PROVIDER_INFO = {
   fitbit: {
     name: 'Fitbit',
     description: 'Track steps, heart rate, sleep, and daily activity',
-    icon: Activity,
-    color: 'text-blue-500',
-    bgColor: 'bg-blue-50 dark:bg-blue-950/20',
+    logo: FitbitLogo,
+    color: 'text-[#00B0B9]',
+    bgColor: 'bg-[#00B0B9]/10',
   },
   oura: {
     name: 'Oura Ring',
     description: 'Monitor sleep quality, HRV, and recovery metrics',
-    icon: Watch,
-    color: 'text-purple-500',
-    bgColor: 'bg-purple-50 dark:bg-purple-950/20',
+    logo: OuraLogo,
+    color: 'text-[#0B0F1C]',
+    bgColor: 'bg-slate-100',
   },
   whoop: {
     name: 'WHOOP',
     description: 'Analyze strain, recovery, and sleep performance',
-    icon: Heart,
-    color: 'text-red-500',
-    bgColor: 'bg-red-50 dark:bg-red-950/20',
+    logo: WhoopLogo,
+    color: 'text-[#000000]',
+    bgColor: 'bg-slate-100',
+  },
+  apple: {
+    name: 'Apple Watch',
+    description: 'Sync health data from Apple Health and Apple Watch',
+    logo: AppleLogo,
+    color: 'text-slate-800',
+    bgColor: 'bg-slate-100',
   },
 };
 
@@ -68,7 +148,14 @@ export default function WearablesPage() {
     },
   });
 
-  const handleConnect = (provider: 'fitbit' | 'oura' | 'whoop') => {
+  const handleConnect = (provider: 'fitbit' | 'oura' | 'whoop' | 'apple') => {
+    if (provider === 'apple') {
+      toast({
+        title: 'Coming Soon',
+        description: 'Apple Watch integration will be available soon!',
+      });
+      return;
+    }
     window.location.href = `/api/wearables/connect/${provider}`;
   };
 
@@ -76,7 +163,7 @@ export default function WearablesPage() {
     disconnectMutation.mutate(connectionId);
   };
 
-  const getConnectionStatus = (provider: 'fitbit' | 'oura' | 'whoop') => {
+  const getConnectionStatus = (provider: 'fitbit' | 'oura' | 'whoop' | 'apple') => {
     return connections.find((conn) => conn.provider === provider);
   };
 
@@ -98,10 +185,10 @@ export default function WearablesPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {(Object.keys(PROVIDER_INFO) as Array<'fitbit' | 'oura' | 'whoop'>).map((provider) => {
+        {(Object.keys(PROVIDER_INFO) as Array<'fitbit' | 'oura' | 'whoop' | 'apple'>).map((provider) => {
           const info = PROVIDER_INFO[provider];
           const connection = getConnectionStatus(provider);
-          const Icon = info.icon;
+          const Logo = info.logo;
 
           return (
             <Card key={provider} className="relative overflow-hidden" data-testid={`card-wearable-${provider}`}>
@@ -110,7 +197,9 @@ export default function WearablesPage() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className={`p-3 rounded-lg ${info.bgColor}`}>
-                    <Icon className={`h-6 w-6 ${info.color}`} />
+                    <div className={info.color}>
+                      <ProviderLogo provider={provider} Inline={Logo} name={info.name} />
+                    </div>
                   </div>
                   {connection && (
                     <Badge 
