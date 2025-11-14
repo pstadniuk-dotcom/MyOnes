@@ -1,4 +1,5 @@
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
+import { BASE_FORMULA_DETAILS } from './ingredients';
 
 export interface FormulaForPDF {
   id: string;
@@ -263,6 +264,10 @@ export function generateFormulaPDF(
     });
 
     formula.bases.forEach((base, idx) => {
+      const baseFormula = Object.values(BASE_FORMULA_DETAILS).find(
+        (f) => f.name === base.ingredient
+      );
+
       const baseContent: Content[] = [
         {
           columns: [
@@ -275,7 +280,7 @@ export function generateFormulaPDF(
             },
             {
               width: 'auto',
-              text: `${base.amount}${base.unit}`,
+              text: `${base.amount} ${base.unit}`,
               fontSize: 10,
               color: BRAND_COLORS.primary,
               bold: true,
@@ -294,9 +299,33 @@ export function generateFormulaPDF(
         });
       }
 
+      if (baseFormula?.activeIngredients && baseFormula.activeIngredients.length > 0) {
+        baseContent.push({
+          text: 'Contains:',
+          fontSize: 8,
+          bold: true,
+          color: BRAND_COLORS.gray,
+          margin: [0, 6, 0, 3],
+        });
+
+        const ingredientsList = baseFormula.activeIngredients.map((ing) => {
+          const ingName = typeof ing === 'string' ? ing : ing.name;
+          const ingAmount = typeof ing === 'string' ? '' : ` (${ing.amount || 'various'})`;
+          return `• ${ingName}${ingAmount}`;
+        });
+
+        baseContent.push({
+          text: ingredientsList.join('\n'),
+          fontSize: 8,
+          color: BRAND_COLORS.gray,
+          margin: [10, 0, 0, 0],
+          lineHeight: 1.3,
+        });
+      }
+
       content.push({
         stack: baseContent,
-        margin: [0, 0, 0, idx < formula.bases.length - 1 ? 12 : 0],
+        margin: [0, 0, 0, idx < formula.bases.length - 1 ? 15 : 0],
       });
     });
 
@@ -305,7 +334,7 @@ export function generateFormulaPDF(
 
   if (formula.additions.length > 0) {
     content.push({
-      text: `✨  AI-Recommended Additions (${formula.additions.length})`,
+      text: `✨  Individual Ingredients (${formula.additions.length})`,
       fontSize: 13,
       bold: true,
       color: BRAND_COLORS.dark,
@@ -325,7 +354,7 @@ export function generateFormulaPDF(
             },
             {
               width: 'auto',
-              text: `${addition.amount}${addition.unit}`,
+              text: `${addition.amount} ${addition.unit}`,
               fontSize: 10,
               color: BRAND_COLORS.primary,
               bold: true,

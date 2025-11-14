@@ -1904,27 +1904,35 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
 
   const handleDownload = async () => {
     try {
+      console.log('Starting PDF download...');
       const pdfMake = (await import('pdfmake/build/pdfmake')).default;
-      const pdfFonts = (await import('pdfmake/build/vfs_fonts')).default;
-      pdfMake.vfs = pdfFonts.pdfMake.vfs;
+      const pdfFonts = (await import('pdfmake/build/vfs_fonts')).default as any;
+      
+      if (pdfMake && pdfFonts && pdfFonts.pdfMake && pdfFonts.pdfMake.vfs) {
+        pdfMake.vfs = pdfFonts.pdfMake.vfs;
+      }
 
       const pdfFormula: FormulaForPDF = {
         id: formula.id,
         version: formula.version,
-        name: formula.name,
+        name: formula.name || undefined,
         createdAt: formula.createdAt.toString(),
         totalMg: formula.totalMg,
         bases: formula.bases,
         additions: formula.additions,
         userCustomizations: formula.userCustomizations,
-        warnings: formula.warnings,
+        warnings: formula.warnings || undefined,
         userCreated: formula.userCreated,
       };
 
+      console.log('Generating PDF with formula:', pdfFormula);
+
       const docDefinition = generateFormulaPDF(pdfFormula, {
-        userName: user?.fullName || user?.email || 'ONES User',
+        userName: user?.name || user?.email || 'ONES User',
         userEmail: user?.email || '',
       });
+
+      console.log('PDF definition generated, creating PDF...');
 
       const fileName = formula.name
         ? `${formula.name.replace(/[^a-z0-9]/gi, '_')}_v${formula.version}.pdf`
@@ -1932,15 +1940,19 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
 
       pdfMake.createPdf(docDefinition).download(fileName);
 
+      console.log('PDF download initiated:', fileName);
+
       toast({
         title: 'PDF Downloaded',
         description: `Your formula report "${fileName}" has been downloaded successfully.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('PDF generation error:', error);
+      console.error('Error stack:', error?.stack);
+      console.error('Error message:', error?.message);
       toast({
         title: 'Download Failed',
-        description: 'There was an error generating your PDF. Please try again.',
+        description: error?.message || 'There was an error generating your PDF. Please try again.',
         variant: 'destructive',
       });
     }
