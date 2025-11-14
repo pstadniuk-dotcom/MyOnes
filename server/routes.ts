@@ -4915,6 +4915,45 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Public endpoint - Get shared formula by ID (no auth required)
+  app.get('/api/formulas/shared/:formulaId', async (req, res) => {
+    try {
+      const formulaId = req.params.formulaId;
+      
+      const formula = await storage.getFormula(formulaId);
+      
+      if (!formula) {
+        return res.status(404).json({ error: 'Formula not found' });
+      }
+
+      // Get user info (non-sensitive fields only)
+      const user = await storage.getUser(formula.userId);
+      
+      // Return formula with minimal user info
+      res.json({
+        formula: {
+          id: formula.id,
+          version: formula.version,
+          name: formula.name,
+          createdAt: formula.createdAt,
+          totalMg: formula.totalMg,
+          bases: formula.bases,
+          additions: formula.additions,
+          userCustomizations: formula.userCustomizations,
+          warnings: formula.warnings,
+          userCreated: formula.userCreated,
+        },
+        user: {
+          name: user?.name || 'ONES User',
+          // Don't expose email or other sensitive info
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching shared formula:', error);
+      res.status(500).json({ error: 'Failed to fetch formula' });
+    }
+  });
+
   // Revert to previous formula version
   app.post('/api/users/me/formula/revert', requireAuth, async (req: any, res: any) => {
     try {
