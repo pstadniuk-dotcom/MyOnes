@@ -8,6 +8,7 @@ import { Watch, Activity, Heart, CheckCircle2, XCircle, Loader2 } from 'lucide-r
 import { useState } from 'react';
 import fitbitIcon from '@assets/Fitbit_app_icon_1763160710769.png';
 import ouraIcon from '@assets/ŌURA_idZ5mfVnXd_2_1763160796894.jpeg';
+import whoopIcon from '@assets/WHOOP_idNTL3Ndjp_1_1763160952445.png';
 
 interface WearableConnection {
   id: string;
@@ -38,7 +39,7 @@ const OuraLogo = () => (
 const PROVIDER_IMAGES: Record<'fitbit' | 'oura' | 'whoop' | 'apple', string[] | null> = {
   fitbit: [fitbitIcon],
   oura: [ouraIcon],
-  whoop: ['/wearables/whoop.png', '/wearables/whoop.svg', '/wearables/whoop.jpg'],
+  whoop: [whoopIcon],
   apple: null,
 };
 
