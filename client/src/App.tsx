@@ -42,6 +42,9 @@ import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
 import UserManagementPage from "@/pages/admin/UserManagementPage";
 import UserDetailPage from "@/pages/admin/UserDetailPage";
 
+// Import shared/public components
+import SharedFormulaPage from "@/pages/SharedFormulaPage";
+
 // Import all landing page components
 import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
@@ -195,6 +198,9 @@ function MainRouter() {
           <UserDetailPage />
         </ProtectedAdminRoute>
       </Route>
+      
+      {/* Public Shared Formula View */}
+      <Route path="/shared/formula/:id" component={SharedFormulaPage} />
       
       <Route component={NotFound} />
     </Switch>
