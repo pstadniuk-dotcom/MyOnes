@@ -345,15 +345,6 @@ export default function MyFormulaPage() {
             </Badge>
           )}
           <Button 
-            variant="outline"
-            className="gap-2 border-purple-600 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20" 
-            data-testid="button-custom-formula"
-            onClick={() => setShowCustomBuilderDialog(true)}
-          >
-            <Beaker className="w-4 h-4" />
-            Custom Formula
-          </Button>
-          <Button 
             variant="default" 
             className="gap-2 bg-primary hover:bg-primary/90" 
             data-testid="button-order-formula"
@@ -362,12 +353,6 @@ export default function MyFormulaPage() {
           >
             <ShoppingCart className="w-4 h-4" />
             Order Your Formula
-          </Button>
-          <Button asChild variant="outline" className="gap-2" data-testid="button-discuss-formula">
-            <Link href="/dashboard/consultation">
-              <MessageSquare className="w-4 h-4" />
-              Discuss with AI
-            </Link>
           </Button>
         </div>
       </div>
@@ -450,6 +435,59 @@ export default function MyFormulaPage() {
         <TabsContent value="actions" className="space-y-6">
           {selectedFormula && (
             <>
+              {/* Quick Actions Grid */}
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* Build Custom Formula Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Beaker className="w-5 h-5 text-purple-600" />
+                      Build Custom Formula
+                    </CardTitle>
+                    <CardDescription>
+                      Create a completely custom formula from scratch using our ingredient catalog
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button 
+                      variant="outline"
+                      className="w-full gap-2 border-purple-600 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20" 
+                      data-testid="button-custom-formula"
+                      onClick={() => setShowCustomBuilderDialog(true)}
+                    >
+                      <Beaker className="w-4 h-4" />
+                      Start Building
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Discuss with AI Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageSquare className="w-5 h-5" />
+                      Discuss with AI
+                    </CardTitle>
+                    <CardDescription>
+                      Chat with our AI to refine your formula or ask health-related questions
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button 
+                      asChild 
+                      variant="outline" 
+                      className="w-full gap-2" 
+                      data-testid="button-discuss-formula"
+                    >
+                      <Link href="/dashboard/consultation">
+                        <MessageSquare className="w-4 h-4" />
+                        Open Consultation
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+
               {/* Customization Card */}
               <Card>
                 <CardHeader>

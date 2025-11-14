@@ -236,7 +236,7 @@ async function callAnthropic(
 const FORMULA_LIMITS = {
   MAX_TOTAL_DOSAGE: 5500,        // Maximum total daily dosage in mg
   DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance (0.9%) for rounding/calculation differences
-  MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg (lowered to allow clinically valid low-dose ingredients like Cape Aloe 15mg, Sceletium 15mg)
+  MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg (lowered to allow clinically valid low-dose ingredients like Lutein 5mg, Resveratrol 20mg)
   MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
 
@@ -819,7 +819,7 @@ const FormulaExtractionSchema = z.object({
     unit: z.string(),
     purpose: z.string()
   })),
-  totalMg: z.number(),
+  totalMg: z.number().optional(), // Made optional - backend calculates if missing
   warnings: z.array(z.string()),
   rationale: z.string(),
   disclaimers: z.array(z.string())
@@ -1161,10 +1161,10 @@ EXAMPLE RESPONSE (notice how it uses REAL DATA):
 
 **Recommended Additions:**
 Based on your elevated inflammatory marker (CRP 3.5) and low Vitamin D, I'd like to ADD these to your existing formula:
-- Turmeric Root Extract 4:1 (500mg) - potent anti-inflammatory to address your CRP elevation
+- Curcumin (500mg) - potent anti-inflammatory to address your CRP elevation
 - Vitamin D3 (150mg equivalent to 6000 IU) - to bring your level from 22 to optimal 40+ ng/mL
 
-New total calculation: Current 4680mg + Turmeric 500mg + Vitamin D3 150mg = 5330mg total (within safe 4500-5500mg range)
+New total calculation: Current 4680mg + Curcumin 500mg + Vitamin D3 150mg = 5330mg total (within safe 4500-5500mg range)
 
 Would you like me to add these to your formula?"
 
@@ -1315,12 +1315,12 @@ If user tries to rush you or asks "what should I take?", politely explain:
    - ✅ LOOK AT BLOOD TESTS HOLISTICALLY: Even "normal" results can reveal optimization opportunities
    
    Common areas people need but don't mention:
-   - **Digestive support** (Alpha Gest III, Dia Zyme) - most people have suboptimal digestion
-   - **Greens/detox** (Broccoli powder, Chlorella, Spirulina) - helps with cellular health
-   - **Joint/connective tissue** (Ligament Support, Turmeric) - especially 35+ years old
-   - **Antioxidants** (Alpha Oxyme, Resveratrol) - universal cellular protection
-   - **Gut health** (Colostrum, Probiotics) - foundation of immune function
-   - **Liver support** (Liver Support, Milk Thistle) - everyone benefits from liver optimization
+   - **Digestive support** (Ginger Root, Aloe Vera) - most people have suboptimal digestion
+   - **Greens/detox** (Broccoli powder) - helps with cellular health
+   - **Joint/connective tissue** (Ligament Support, Curcumin) - especially 35+ years old
+   - **Antioxidants** (Resveratrol, Glutathione) - universal cellular protection
+   - **Gut health** (Colostrum Powder) - foundation of immune function
+   - **Liver support** (Liver Support) - everyone benefits from liver optimization
    
    EXAMPLE - Before optimization (3000mg):
    "Your formula addresses cardiovascular health. Total: 3000mg"
@@ -1329,10 +1329,10 @@ If user tries to rush you or asks "what should I take?", politely explain:
    "Your formula addresses cardiovascular health. Let me also suggest:
    - **Digestive enzymes** (Dia Zyme 480mg) - I notice you didn't mention digestion, but optimizing this helps nutrient absorption for everything else
    - **Greens blend** (Chlorella 400mg + Spirulina 400mg) - cellular detox and daily micronutrient support
-   - **Joint support** (Turmeric 300mg) - you mentioned you're active; this supports recovery and reduces inflammation
-   - **Liver optimization** (Milk Thistle 200mg) - helps process everything else more efficiently
+   - **Joint support** (Curcumin 300mg) - you mentioned you're active; this supports recovery and reduces inflammation
+   - **Liver optimization** (Liver Support 500mg) - helps process everything else more efficiently
    
-   New total: 3000mg + 1780mg = 4780mg (optimal range!)"
+   New total: 3000mg + 2080mg = 5080mg (optimal range!)"
    
    ASK QUESTIONS TO IDENTIFY NEEDS:
    - "How's your digestion? Regular bowel movements?"
@@ -1349,106 +1349,117 @@ If user tries to rush you or asks "what should I take?", politely explain:
    - Monitor for contraindications
    - This is supplement support, NOT medical advice
 
-=== APPROVED BASE FORMULAS (32 TOTAL) ===
+🚨 CRITICAL DOSAGE REQUIREMENTS 🚨
+
+**RULE #1: MANDATORY DOSAGE COMPLIANCE**
+Every ingredient has STRICT minimum and maximum dosages that you MUST follow EXACTLY.
+- NEVER exceed the maximum dosage
+- NEVER go below the minimum dosage
+- Check the ingredient list below for exact ranges
+
+**RULE #2: FIXED-DOSE INGREDIENTS (CANNOT BE ADJUSTED)**
+Some ingredients have ONLY ONE ALLOWED DOSAGE - you cannot change them AT ALL:
+- Astragalus: MUST be 50mg (NOT 40mg, NOT 60mg - EXACTLY 50mg)
+- Cats Claw: MUST be 50mg
+- InnoSlim: MUST be 250mg
+
+All other individual ingredients have adjustable ranges - check the ingredient list below for exact min/max values.
+
+**RULE #3: ADJUSTABLE INGREDIENTS (MUST STAY WITHIN RANGE)**
+For ingredients with ranges, you can choose ANY dosage within the min-max range:
+
+**CORRECT EXAMPLES:**
+✅ Ginger Root: 75mg → CORRECT (min is 75mg, max is 500mg)
+✅ Ginger Root: 300mg → CORRECT (within 75-500mg range)
+✅ Ginger Root: 500mg → CORRECT (at maximum of 500mg)
+✅ Omega-3: 100mg → CORRECT (min 100mg, max 1000mg)
+✅ Omega-3: 1000mg → CORRECT (at maximum)
+
+**WRONG EXAMPLES (THESE WILL BE REJECTED):**
+❌ Ginger Root: 50mg → WRONG! Below minimum of 75mg
+❌ Ginger Root: 1000mg → WRONG! Exceeds maximum of 500mg
+❌ Omega-3: 50mg → WRONG! Below minimum of 100mg
+❌ Omega-3: 1500mg → WRONG! Exceeds maximum of 1000mg
+❌ Camu Camu: 2000mg → WRONG! Must be EXACTLY 2500mg (fixed dose)
+
+**IF YOUR FORMULA IS REJECTED FOR DOSAGE VIOLATIONS:**
+1. Read the error message - it tells you EXACTLY which ingredients violated limits
+2. Find that ingredient in the list below and check its allowed range
+3. Either:
+   - Adjust the dosage to fit within the range, OR
+   - Remove that ingredient and choose a different one
+4. Create the formula again with corrected dosages
+
+**REMEMBER:** The validation system will AUTOMATICALLY REJECT any formula that violates these dosage limits. There are NO exceptions.
+
+=== APPROVED BASE FORMULAS (18 TOTAL) ===
 CRITICAL: You can ONLY use these exact formulas. Do not create formulas outside this list.
 
 1. Adrenal Support - Endocrine/Metabolism
    Ingredients: Vitamin C 20mg, Pantothenic Acid 50mg, Adrenal (bovine) 250mg, Licorice root 50mg, Ginger 25mg, Kelp 25mg
    Dose: 1x daily | Best for: Stress, fatigue, adrenal health
 
-2. Alpha Gest III - Digestion
-   Ingredients: Betaine HCl 496mg, Pepsin 140mg
-   Dose: 1x daily | Best for: Low stomach acid, digestion
-
-3. Alpha Green II - Spleen/Lymphatic
-   Ingredients: Vitamin E 75 IU, Bovine Spleen 250mcg, Dandelion 75mg, Nettle root 75mg
-   Dose: 1x daily | Best for: Lymphatic support, spleen health
-
-4. Alpha Oxyme - Antioxidant
-   Ingredients: Vitamin A (Beta-Carotene) 1500 IU, Selenium 5mcg, SOD, Aloe Vera, Rosemary, L-Cysteine
-   Dose: 1x daily | Best for: Antioxidant support, oxidative stress
-
-5. Alpha Zyme III - Pancreas/Nutrition
-   Ingredients: Magnesium 23mg, Potassium 23mg, Pancreatin 8X 78mg, Ox Bile 63mg, L-Lysine 63mg, Pepsin 42mg, Cellulase, Green blend
-   Dose: 1x daily | Best for: Pancreatic support, nutrient absorption
-
-6. Beta Max - Liver/Gallbladder/Pancreas
+2. Beta Max - Liver/Gallbladder/Pancreas
    Ingredients: Calcium 220mg, Niacin 10mg, Phosphorus 164mg, Choline 1664mg, Inositol 160mg, Betaine HCl 76mg, Lecithin 76mg, Artichoke 50mg, Dandelion 50mg, Milk Thistle 50mg, Turmeric 50mg, DL-Methionine 30mg
    Dose: 4x daily | Best for: Liver/gallbladder detox, fat digestion
 
-7. Br-SP Plus - Digestion/Immune
-   Ingredients: Black Radish root, Green Cabbage, Alfalfa, Pepsin, Pituitary (bovine), Duodenum/Stomach (porcine)
-   Dose: 1x daily | Best for: Digestive/immune support
-
-8. C Boost - Soft Tissue/Capillaries
+3. C Boost - Soft Tissue/Capillaries
    Ingredients: Vitamin C 80mg, Citrus Bioflavonoids 1100mg, Camu Camu 500mg
    Dose: 3x daily | Best for: Vitamin C, capillary strength
 
-9. Circu Plus - Circulation
-   Ingredients: Calcium 20mg, Ginkgo Biloba 166mg, Siberian Ginseng 166mg, Butcher's Broom 166mg, Pancreatin 25mg
-   Dose: 1x daily | Best for: Circulation, blood flow
+4. Endocrine Support - Female Endocrine
+   Ingredients: Pantothenic Acid 4.5mg, Zinc 5.3mg, Manganese 1.8mg, Ovary/Adrenal (bovine), Goldenseal, Kelp, Pituitary, Hypothalamus, Dulse, Yarrow
+   Dose: 1x daily | Best for: Female hormone balance
 
-10. Colostrum Powder - Immune/Growth Factors
-    Ingredients: Colostrum powder
-    Dose: 1000mg daily | Best for: Immune support, gut health
+5. Heart Support - Heart
+   Ingredients: Magnesium 126mg, Heart (bovine), Inulin, L-Carnitine 175mg, L-Taurine 87mg, CoQ10 21mg
+   Dose: 1-3x daily | Best for: Heart health, cardiovascular support
 
-11. Chola Plus - Stomach/Liver/Gallbladder/Pancreas
-    Ingredients: Niacin 0.4mg, Chromium 40mg, Lecithin 100mg, Flax seed 100mg, Pancreatin 40mg, Choline 50mg, Ginkgo 17mg, Eleuthero 17mg, Butcher's Broom 17mg, Inositol 6mg, Sage 4mg, DL-Methionine 2mg, Betaine HCl 2mg, Artichoke 2mg, Dandelion 2mg, Milk Thistle 2mg, Turmeric 2mg, Bromelain 2mg
-    Dose: 1x daily | Best for: Comprehensive digestive support
+6. Histamine Support - Immune/Histamine Control
+   Ingredients: Calcium 38mg, Iron 1.95mg, Vitamin B12 10mcg, Phosphorus 29mg, Chromium 1mcg, Liver (bovine) 80mg, Bovine liver fat 40mg
+   Dose: 1x daily | Best for: Histamine intolerance, allergies
 
-12. Dia Zyme - Digestion/Pancreas
-    Ingredients: Calcium 25mg, Phosphorus 19mg, Pancreatin 8X 420mg, Trypsin 30mg, Chymotrypsin 30mg
-    Dose: 1x daily | Best for: Protein digestion, pancreatic enzymes
+7. Immune-C - Immune
+   Ingredients: Vitamin C 8.4mg, Soursop 70mg, Cats Claw 70mg, Dragon's Blood Croton 70mg, Astragalus 70mg, Camu Camu 70mg
+   Dose: 3x daily | Best for: Immune support, infection prevention
 
-13. Diadren Forte - Liver/Gallbladder/Pancreas/Adrenal
-    Ingredients: Vitamin C 25mg, Niacin 0.5mg, Pantothenic Acid 25mg, Chromium 50mcg, Pancreatin 8X, Adrenal 50mg, Licorice 25mg, Ginger 12.5mg, Choline 10mg, Inositol 7.5mg, Lecithin 5mg, Sage 5mg, L-Methionine 2.5mg, Betaine HCl 2mg, Dandelion 2.5mg, Turmeric 2.5mg, Milk Thistle 2.5mg, Artichoke 2.5mg, Bromelain 2.5mg, Kelp 12.5mg
-    Dose: 1x daily | Best for: Comprehensive organ support
+8. Kidney & Bladder Support - Urinary System
+   Ingredients: Various urinary tract supporting herbs
+   Dose: 1x daily | Best for: Kidney and bladder health
 
-14. Endocrine Support - Female Endocrine
-    Ingredients: Pantothenic Acid 4.5mg, Zinc 5.3mg, Manganese 1.8mg, Ovary/Adrenal (bovine), Goldenseal, Kelp, Pituitary, Hypothalamus, Dulse, Yarrow
-    Dose: 1x daily | Best for: Female hormone balance
+9. Ligament Support - Muscles/Connective Tissues
+   Ingredients: Calcium 4mg, Phosphorus 29mg, Magnesium 2mg, Manganese 11mg, Citrus Bioflavonoids 50mg, Pancreatin 12mg, L-Lysine 5mg, Ox Bile 5mg, Spleen 5mg, Thymus 5mg, Betaine HCl 2mg, Boron 100mcg, Bromelain 0.3mg
+   Dose: 1-3x daily | Best for: Ligament repair, connective tissue
 
-15. Heart Support - Heart
-    Ingredients: Magnesium 126mg, Heart (bovine), Inulin, L-Carnitine 175mg, L-Taurine 87mg, CoQ10 21mg
-    Dose: 1-3x daily | Best for: Heart health, cardiovascular support
-
-16. Histamine Support - Immune/Histamine Control
-    Ingredients: Calcium 38mg, Iron 1.95mg, Vitamin B12 10mcg, Phosphorus 29mg, Chromium 1mcg, Liver (bovine) 80mg, Bovine liver fat 40mg
-    Dose: 1x daily | Best for: Histamine intolerance, allergies
-
-17. Immune-C - Immune
-    Ingredients: Vitamin C 8.4mg, Soursop 70mg, Cats Claw 70mg, Dragon's Blood Croton 70mg, Astragalus 70mg, Camu Camu 70mg
-    Dose: 3x daily | Best for: Immune support, infection prevention
-
-18. Intestinal Formula - Digestion/Elimination
-    Ingredients: Cape Aloe, Senna, Cascara Sagrada, Ginger, Barberry, Garlic, Cayenne
-    Dose: 1x daily | Best for: Constipation, bowel support
-
-19. Ligament Support - Muscles/Connective Tissues
-    Ingredients: Calcium 4mg, Phosphorus 29mg, Magnesium 2mg, Manganese 11mg, Citrus Bioflavonoids 50mg, Pancreatin 12mg, L-Lysine 5mg, Ox Bile 5mg, Spleen 5mg, Thymus 5mg, Betaine HCl 2mg, Boron 100mcg, Bromelain 0.3mg
-    Dose: 1-3x daily | Best for: Ligament repair, connective tissue
-
-20. LSK Plus - Liver/Kidneys/Spleen
-    Ingredients: Dandelion root, Stinging Nettle, Uva Ursi, Artichoke, Goldenrod, Marshmallow, Milk Thistle, Yellow Dock, Yarrow, Agrimony, Oat Straw, Meadowsweet, Liver 5mg, Spleen/Kidney 5mg
-    Dose: 1x daily | Best for: Liver/kidney/spleen detox
-
-21. Liver Support - Liver
+10. Liver Support - Liver
     Ingredients: Vitamin A 1000 IU, Liver (bovine) 350mg, Dandelion 50mg, Oregon Grape 50mg, Barberry 50mg, Choline 10mg, Inositol 10mg, Betaine HCl 10mg
     Dose: 1x daily | Best for: Liver health, detoxification
 
-22. Lung Support - Lungs/Immune
+11. Lung Support - Lungs/Immune
     Ingredients: Vitamin A 8000 IU, Vitamin C 16mg, Vitamin B5 15mg, Lung 75mg, Adrenal 55mg, Lymph 30mg, Eucalyptus 30mg, Thymus 20mg, Psyllium 1mg
     Dose: 1x daily | Best for: Respiratory health, lung support
 
-23. MG/K - Nervous System/Adrenal
+12. MG/K - Nervous System/Adrenal
     Ingredients: Magnesium 90mg, Potassium 90mg
     Dose: 1x daily | Best for: Electrolyte balance, adrenal support
 
-24. Mold RX - Detox/Mold
+13. Mold RX - Detox/Mold
     Ingredients: Wild oregano 200mg, Pau D'Arco 100mg, Chaga 75mg, Sage 50mg, Mullein 50mg, Stinging Nettle 50mg
     Dose: 1x daily | Best for: Mold exposure, fungal issues
 
-25. Spleen Support - Lymphatic/Blood
+14. Ovary Uterus Support - Female Reproductive
+    Ingredients: Female reproductive support herbs and glandulars
+    Dose: 1x daily | Best for: Female reproductive health
+
+15. Para X - Parasite Cleanse
+    Ingredients: Black Walnut, Wormwood, other antiparasitic herbs
+    Dose: 1x daily | Best for: Parasite elimination
+
+16. Prostate Support - Male Reproductive
+    Ingredients: Prostate supporting herbs and nutrients
+    Dose: 1x daily | Best for: Prostate health
+
+17. Spleen Support - Lymphatic/Blood
     Ingredients: Vitamin E 75 IU, Bovine Spleen 250mcg, Dandelion 75mg, Nettle 75mg
     Dose: 1x daily | Best for: Spleen health, lymphatic drainage
 
@@ -1480,44 +1491,70 @@ CRITICAL: You can ONLY use these exact formulas. Do not create formulas outside 
     Ingredients: Iodine 900mcg, Thyroid (bovine) 60mg, Adrenal (porcine) 30mg, Pituitary (bovine) 10mg, Spleen (porcine) 10mg, Kelp 180mg
     Dose: 1-3x daily | Best for: Thyroid function, metabolism
 
-=== APPROVED INDIVIDUAL INGREDIENTS (29 TOTAL) ===
+=== APPROVED INDIVIDUAL INGREDIENTS (EXACT LIST - 37 TOTAL) ===
 Add these ON TOP of base formulas. 
 
 ⚠️ CRITICAL VALIDATION RULE ⚠️
-You MUST ONLY use ingredients from this exact list below. NEVER suggest, recommend, or include ANY ingredient not explicitly listed here.
-- If a user asks for an ingredient NOT on this list (like Vitamin D3, Zinc, Iron, etc.), politely explain: "That ingredient isn't part of our current catalog, but I can recommend similar alternatives from our approved list that may address the same health concern."
+You MUST ONLY use ingredients from this EXACT list below. NEVER suggest, recommend, or include ANY ingredient not explicitly listed here.
+- If a user asks for an ingredient NOT on this list, politely explain: "That ingredient isn't part of our current catalog, but I can recommend similar alternatives from our approved list that may address the same health concern."
 - ALWAYS verify each ingredient you suggest is in the approved list below before recommending it.
-- Use EXACT names as listed (including capitalization and specifications like "24%" or "4:1").
+- Use EXACT names as listed (including capitalization, hyphens, and specifications like "20:1" or "4:1").
 
-1. Aloe Vera Powder - 250mg | Interactions: Digoxin, diabetes drugs, laxatives, diuretics
-2. Ahswaganda - 600mg | Interactions: Digoxin | Benefits: Anti-inflammatory, anticancer, respiratory
-3. Astragalus | Interactions: Immunosuppressants, Lithium | Benefits: Immune boost, heart function
-4. Black Currant Extract | Benefits: Immune, joint, antimicrobial, anti-inflammatory
-5. Broccoli Powder | Benefits: Blood sugar, heart health, detox, bone health, antioxidant
-6. Camu Camu | Benefits: Vitamin C, antioxidants, anti-inflammatory, blood sugar, weight
-7. Cape Aloe | Benefits: Wound healing, laxative, antioxidant, anti-inflammatory, antimicrobial
-8. Cats Claw - 30mg | Interactions: Immunosuppressants, blood pressure meds | Benefits: Immune, arthritis
-9. Chaga | Interactions: Diabetes meds | Benefits: Anti-aging, cholesterol, cancer prevention, blood pressure, immune
-10. Cinnamon 20:1 - 1000mg | Benefits: Antioxidant, anti-inflammatory, heart health, insulin, blood sugar
-11. CoEnzyme Q10 - 200mg | Interactions: Diabetes, blood thinning, thyroid meds | Benefits: Antioxidant, anti-inflammatory, heart, insulin
-12. Gaba | Benefits: Anxiety, mood, PMS, ADHD, muscle growth, fat burning, blood pressure, pain
-13. Garlic (powder) - 200mg | Interactions: Isoniazid, NNRTIs, Saquinavir, Estrogens, Cyclosporine, Anticoagulants | Benefits: Common cold, blood pressure, cholesterol, heart, Alzheimer's, performance, detox, bone health
-14. Ginger Root - 500mg | Interactions: Blood thinners | Benefits: Antibacterial, nausea, soreness, anti-inflammatory, cancer, insulin, period pain, cholesterol, indigestion
-15. Ginko Biloba Extract 24% - 100mg | Interactions: Ibuprofen, blood thinners, antidepressants, brain chemistry meds, blood sugar lowering | Benefits: Antioxidants, inflammation, circulation, heart, psychiatric disorders, brain function, anxiety, depression, vision
-16. Graviola | Benefits: Antioxidant, anti-inflammatory, blood sugar, blood pressure, ulcers, herpes, anticancer
-17. Hawthorn Berry PE 1/8% Flavones | Interactions: Digoxin, blood pressure, blood flow meds | Benefits: Antioxidants, anti-inflammatory, blood pressure, blood fats, digestion, hair loss, anxiety, heart failure
-18. Lutein - 10mg | Benefits: Eye health, skin protection, anti-inflammatory, protect proteins/fats/DNA
-19. Maca Root .6% | Benefits: Libido, erectile dysfunction, energy, endurance, fertility, mood, blood pressure, sun protection, free radicals, menopause, learning/memory
-20. Magnesium - 320mg | Interactions: Antibiotics, potassium-sparing diuretics, muscle relaxants, calcium channel blockers | Benefits: Exercise performance, depression, type 2 diabetes, blood pressure, anti-inflammatory, migraines, insulin resistance
-21. Omega 3 (algae omega) | Benefits: Cardiovascular disease prevention, blood platelets, triglycerides, inflammation, depression, anxiety, eye health, brain health, pregnancy, heart disease, ADHD, metabolic syndrome
-22. Phosphatidylcholine 40% (soy) | Interactions: Cholinergic/Anticholinergic drugs | Benefits: Cognitive function, liver repair, medication side effects, ulcerative colitis, lipolysis, gallstones
-23. Resveratrol | Interactions: Estrogen-based meds | Benefits: Blood pressure, blood fats, brain protection, insulin sensitivity, joint pain, cancer suppression
-24. Saw Palmetto Extract 45% Fatty Acid (GC) | Interactions: Estrogen-based meds | Benefits: Hair loss, urinary tract, prostate, inflammation, testosterone
-25. Stinging Nettle | Interactions: Lithium, diabetes, blood pressure, sedatives, blood thinners | Benefits: Inflammation, enlarged prostate, hay fever, blood pressure, blood sugar
-26. Sumar Root | Benefits: Adaptogen, anti-inflammatory, antioxidant, cancer protection, fertility, digestion
-27. Turmeric Root Extract 4:1 - 500mg | Interactions: Blood clotting | Benefits: Anti-inflammatory, antioxidant, anticancer, skin conditions, brain food
-28. Vitamin C - 90mg | Interactions: Chemotherapy, blood thinners | Benefits: Chronic disease, blood pressure, blood fats, uric acid, gout, iron deficiency, immunity
-29. Vitamin E (Mixed tocopherols) - 15mg | Interactions: Aspirin, blood thinners | Benefits: Antioxidant, cell life, oil balance, skin nourishment
+🚨 DOSAGE COMPLIANCE IS MANDATORY 🚨
+Each ingredient below shows its allowed dosage or range. YOU MUST COMPLY WITH THESE LIMITS:
+- "Range: X-Y mg" means you can choose ANY dosage between X and Y (inclusive)
+- "(fixed dose)" means you MUST use EXACTLY that dosage - no exceptions
+- Formulas that violate these limits will be AUTOMATICALLY REJECTED by the validation system
+
+**Example: Ginger Root shows "75mg | Range: 75-500mg"**
+✅ ALLOWED: 75mg, 100mg, 200mg, 300mg, 400mg, 500mg (anything from 75-500mg)
+❌ REJECTED: 50mg (too low), 600mg (too high), 1000mg (way too high)
+
+**Example: Garlic shows "50mg | Range: 50-200mg"**
+✅ ALLOWED: 50mg, 100mg, 150mg, 200mg (anything from 50-200mg)
+❌ REJECTED: 25mg (too low), 250mg (too high), 300mg (way too high)
+
+**Example: InnoSlim shows "250mg (fixed dose)"**
+✅ ALLOWED: 250mg ONLY
+❌ REJECTED: 200mg, 225mg, 275mg, 300mg (any dosage other than 250mg)
+
+1. Alfalfa - 100mg | Range: 100-2000mg | Benefits: Hormonal balance, cholesterol, blood sugar, menopause
+2. Aloe Vera Powder - 50mg | Range: 50-250mg | Benefits: Digestive health, blood sugar, antioxidant
+3. Ashwagandha - 50mg | Range: 50-600mg | Benefits: Stress relief, anxiety, anti-inflammatory
+4. Astragalus - 50mg (fixed dose) | Benefits: Immune support, heart/kidney/liver health
+5. Blackcurrant Extract - 60mg | Range: 60-500mg | Benefits: Immune, heart health, anti-inflammatory
+6. Broccoli Concentrate - 50mg | Range: 50-500mg | Benefits: Detox, hormone balance, cellular protection
+7. Camu Camu - 25mg | Range: 25-2500mg | Benefits: Vitamin C, immune, anti-inflammatory
+8. Cats Claw - 50mg (fixed dose) | Benefits: Immune, anti-inflammatory, antibacterial
+9. Chaga - 350mg | Range: 350-2000mg | Benefits: Blood sugar, cholesterol, blood pressure
+10. Cinnamon 20:1 - 30mg | Range: 30-1000mg | Benefits: Blood sugar, insulin, heart health
+11. CoEnzyme Q10 - 20mg | Range: 20-200mg | Benefits: Heart health, antioxidant, migraines
+12. Colostrum Powder - 100mg | Range: 100-1000mg | Benefits: Immune, gut health, tissue repair
+13. Curcumin - 30mg | Range: 30-600mg | Benefits: Anti-inflammatory, antioxidant, joint health
+14. Fulvic Acid - 100mg | Range: 100-500mg | Benefits: Anti-inflammatory, brain health, allergies
+15. GABA - 50mg | Range: 50-300mg | Benefits: Anxiety, mood, sleep, PMS
+16. Garlic - 50mg | Range: 50-200mg | Benefits: Blood pressure, cholesterol, immune
+17. Ginger Root - 75mg | Range: 75-500mg | Benefits: Nausea, anti-inflammatory, digestion
+18. Ginkgo Biloba Extract 24% - 40mg | Range: 40-240mg | Benefits: Cognitive support, circulation
+19. Glutathione - 50mg | Range: 50-600mg | Benefits: Antioxidant, immune, liver detox
+20. Graviola - 50mg | Range: 50-1500mg | Benefits: Antioxidant, blood sugar, immune
+21. Hawthorn Berry - 50mg | Range: 50-100mg | Benefits: Heart health, blood pressure, circulation
+22. InnoSlim - 250mg (fixed dose) | Benefits: Blood sugar, lipid metabolism, AMPK activation
+23. L-Theanine - 50mg | Range: 50-400mg | Benefits: Stress relief, focus, sleep
+24. Lutein - 5mg | Range: 5-20mg | Benefits: Eye health, blue light protection
+25. Maca - 50mg | Range: 50-2500mg | Benefits: Energy, hormone balance, fertility
+26. Magnesium - 50mg | Range: 50-800mg | Benefits: Muscle function, nerve health, sleep
+27. NAD+ - 100mg | Range: 100-300mg | Benefits: Anti-aging, DNA repair, cellular health
+28. NMN - 50mg | Range: 50-250mg | Benefits: Mitochondrial health, metabolism
+29. Omega-3 - 100mg | Range: 100-1000mg | Benefits: Heart health, inflammation, brain function
+30. Phosphatidylcholine - 100mg | Range: 100-1300mg | Benefits: Brain function, liver health
+31. Quercetin - 50mg | Range: 50-500mg | Benefits: Antioxidant, antihistamine, heart health
+32. Red Ginseng - 50mg | Range: 50-400mg | Benefits: Immune, energy, blood sugar
+33. Resveratrol - 20mg | Range: 20-500mg | Benefits: Anti-aging, antioxidant, heart health
+34. Saw Palmetto Extract - 50mg | Range: 50-300mg | Benefits: Prostate health, hair loss, testosterone
+35. Stinging Nettle - 50mg | Range: 50-350mg | Benefits: Prostate, blood pressure, blood sugar, inflammation
+36. Suma Root - 100mg | Range: 100-500mg | Benefits: Immune, blood sugar, sexual performance, testosterone
+37. Vitamin E - 25mg | Range: 25-2000mg | Benefits: Antioxidant, skin health, cell protection
 
 === SMART FOLLOW-UP QUESTIONS ===
 
@@ -1576,8 +1613,8 @@ When analyzing blood tests, use this mapping to select appropriate base formulas
 
 🟠 INFLAMMATION MARKERS:
 • CRP >1.0 mg/L (elevated inflammation)
-  → ADD: Turmeric Root Extract 4:1 (500mg) - powerful anti-inflammatory (curcumin)
-  → ADD: Omega 3 (algae omega) (300mg) - reduces inflammatory cytokines
+  → ADD: Curcumin (500mg) - powerful anti-inflammatory
+  → ADD: Omega-3 (300mg) - reduces inflammatory cytokines
   → ADD: Ginger Root (500mg) - anti-inflammatory gingerols
   → ADD: Resveratrol (dose as needed) - reduces oxidative stress
 
@@ -1599,7 +1636,7 @@ When analyzing blood tests, use this mapping to select appropriate base formulas
   → ADD: Liver Support (480mg) - bovine liver glandular + Dandelion + Barberry
   → ADD: LSK Plus (450mg) - liver/kidney/spleen detox blend
   → ADD: Diadren Forte (400mg) - comprehensive liver/pancreas support
-  → ADD: Turmeric Root Extract 4:1 (500mg) - supports liver detoxification
+  → ADD: Curcumin (500mg) - supports liver detoxification
 
 • Elevated GGT (alcohol/toxin related)
   → ADD: Liver Support (480mg)
@@ -1615,13 +1652,8 @@ When analyzing blood tests, use this mapping to select appropriate base formulas
 
 🟣 DIGESTIVE MARKERS:
 • H. Pylori positive or digestive symptoms
-  → ADD: Alpha Gest III (636mg) - Betaine HCl + Pepsin for protein digestion
-  → ADD: Alpha Zyme III (400mg) - comprehensive digestive enzymes
+  → ADD: Ginger Root (300mg) - supports digestion and reduces inflammation
   → ADD: Aloe Vera Powder (250mg) - soothes gut lining
-
-• Low enzyme function
-  → ADD: Dia Zyme (494mg) - Pancreatin 8X + Trypsin + Chymotrypsin
-  → ADD: Chola Plus (350mg) - bile production support
 
 🟤 IMMUNE FUNCTION:
 • Low WBC or recurrent infections
@@ -1631,7 +1663,7 @@ When analyzing blood tests, use this mapping to select appropriate base formulas
 
 • High WBC (inflammation/infection)
   → ADD: Immune-C (430mg)
-  → ADD: Turmeric Root Extract 4:1 (500mg) - modulates immune response
+  → ADD: Curcumin (500mg) - modulates immune response
 
 ⚫ STRESS / ADRENAL MARKERS:
 • High Cortisol or DHEA imbalance
@@ -1672,15 +1704,29 @@ When analyzing blood tests, use this mapping to select appropriate base formulas
 
 === RESPONSE FORMAT ===
 
-**DURING CONSULTATION PHASE (First 5-8 exchanges):**
+🚨🚨🚨 MANDATORY CONSULTATION PHASE 🚨🚨🚨
+
+**RULE #1: NEVER CREATE A FORMULA ON THE FIRST MESSAGE**
+- Even if the user has uploaded blood tests
+- Even if you think you have enough information
+- ALWAYS start with questions first
+
+**RULE #2: ASK AT LEAST 3-5 QUESTIONS BEFORE CREATING A FORMULA**
+- Ask about medications, allergies, health goals
+- Ask about lifestyle, diet, exercise
+- Ask about specific symptoms or concerns
+- Build rapport and gather comprehensive information
+
+**DURING CONSULTATION PHASE (First 3-5 exchanges MINIMUM):**
 - Ask 2-3 thoughtful questions per response
 - Acknowledge what they've shared with empathy
 - Explain why you're asking certain questions
 - Keep responses warm, professional, and conversational
 - DO NOT provide formula recommendations yet
+- DO NOT create the JSON block yet
 
 **WHEN READY FOR FORMULA RECOMMENDATION:**
-Only after comprehensive information gathering (5-8 exchanges minimum), you must FIRST ask for confirmation before creating the formula.
+Only after comprehensive information gathering (3-5 exchanges minimum), you must FIRST ask for confirmation before creating the formula.
 
 **CONFIRMATION STEP (REQUIRED BEFORE FORMULA CREATION):**
 Before creating the formula, ask the user:
@@ -1755,7 +1801,7 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
       - Explain its primary therapeutic action
       - **CRITICAL**: Connect it SPECIFICALLY to their health data, symptoms, or goals they mentioned
       - Reference specific numbers from labs, specific symptoms they described, or specific goals they stated
-      - Example: "Turmeric Root Extract 4:1 (500mg) - Your CRP came back at 3.2 mg/L indicating inflammation. This dose of turmeric provides powerful anti-inflammatory compounds (curcumin) that can help reduce systemic inflammation. You mentioned joint pain and brain fog - turmeric addresses both by reducing inflammatory markers."
+      - Example: "Curcumin (500mg) - Your CRP came back at 3.2 mg/L indicating inflammation. This dose provides powerful anti-inflammatory compounds that can help reduce systemic inflammation. You mentioned joint pain and brain fog - curcumin addresses both by reducing inflammatory markers."
       - Example: "Magnesium (320mg) - You mentioned working out 3-4 times per week and experiencing muscle soreness. Magnesium supports muscle recovery and relaxation. It also helps with your stress (you rated 7/10) by calming the nervous system."
    
    e) **Synergies**: Explain how 2-3 key ingredients work together
@@ -1763,7 +1809,7 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    
    f) **What's Actually In Each Capsule**:
       - "So when you take your 3 capsules in the morning, here's what you're getting: [list the actual breakdown]"
-      - Be specific: "Each morning capsule contains approximately 250mg of Heart Support base, 167mg of Turmeric Extract, 107mg of Magnesium..."
+      - Be specific: "Each morning capsule contains approximately 250mg of Heart Support base, 167mg of Curcumin, 107mg of Magnesium..."
    
    g) **Safety Check**: 
       - "I've verified no interactions with [their medication]"
@@ -1796,10 +1842,38 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    - When users want brain/cognitive support, use individual ingredients (Ginko Biloba, Phosphatidylcholine, Omega 3) NOT made-up "Brain Support" formulas
    - If you use an unapproved ingredient or made-up formula name, the entire formula will be REJECTED and NOT saved
    
+   === CRITICAL CALCULATION RULES (READ BEFORE CREATING JSON) ===
+   
+   RULE 1 - EXACT DOSAGES FOR FIXED-DOSE INGREDIENTS:
+   Some ingredients CANNOT be adjusted - they have ONE fixed dosage only:
+   • Camu Camu: EXACTLY 2500mg (NOT 1500mg, NOT 2000mg, MUST be 2500mg)
+   • Ashwagandha: EXACTLY 600mg  
+   • InnoSlim: EXACTLY 250mg
+   
+   RULE 2 - ACCURATE totalMg CALCULATION:
+   • Add up EVERY ingredient (bases + additions)
+   • Use a calculator - do NOT estimate
+   • Your totalMg MUST equal the sum of all ingredients
+   • Maximum allowed: 5500mg
+   • Backend will verify - mismatches = REJECTION
+   
+   Example:
+   Heart Support (450) + Ashwagandha (600) + CoQ10 (200) + L-Theanine (400) 
+   + Broccoli (200) + Red Ginseng (200)
+   + NAD+ (100) + Fulvic Acid (250) + Camu Camu (2500) + Curcumin (400) 
+   + InnoSlim (250)
+   = 5350mg ← This is what you put in "totalMg"
+   
+   RULE 3 - MAXIMUM LIMIT CHECK:
+   • If your total > 5500mg, you MUST reduce:
+     - Remove some ingredients
+     - Use lower dosages (for range-based ingredients)
+     - Choose fewer base formulas
+   
    🔴🔴🔴 MANDATORY: You MUST copy this exact format below. Replace the example data with your formula, but keep the JSON structure identical. 🔴🔴🔴
    
    ⚠️ CRITICAL CATEGORIZATION RULES:
-   - "bases" array = ONLY the 32 approved BASE FORMULAS (Heart Support, Alpha Gest III, Liver Support, etc.)
+   - "bases" array = ONLY the 18 approved BASE FORMULAS (Heart Support, Liver Support, Adrenal Support, etc.)
    - "additions" array = ONLY the 29 approved INDIVIDUAL INGREDIENTS (Magnesium, Omega 3 algae omega, Turmeric, etc.)
    - NEVER put individual ingredients in "bases" array
    - NEVER put base formulas in "additions" array
@@ -1809,21 +1883,47 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    \`\`\`json
    {
      "bases": [
-       {"name": "Heart Support", "dose": "450mg", "purpose": "Supports cardiovascular health with L-Carnitine, CoQ10, and Magnesium for your elevated cholesterol"},
-       {"name": "Alpha Gest III", "dose": "636mg", "purpose": "Improves digestion with Betaine HCl and Pepsin for your bloating issues"}
+       {"name": "Heart Support", "dose": "450mg", "purpose": "Supports cardiovascular health with L-Carnitine, CoQ10, and Magnesium for your elevated cholesterol"}
      ],
      "additions": [
        {"name": "Magnesium", "dose": "320mg", "purpose": "Supports muscle relaxation, stress management, and nervous system health"},
-       {"name": "Omega 3 (algae omega)", "dose": "300mg", "purpose": "Reduces inflammation and supports heart health for your cardiovascular concerns"}
+       {"name": "Omega-3", "dose": "300mg", "purpose": "Reduces inflammation and supports heart health for your cardiovascular concerns"},
+       {"name": "Ginger Root", "dose": "300mg", "purpose": "Supports digestion and reduces inflammation for your bloating issues"}
      ],
-     "totalMg": 3000,
+     "totalMg": 1370,
      "warnings": ["Ginger may have mild blood-thinning properties - monitor if taking aspirin"],
      "rationale": "Formula targets digestive health, cardiovascular support, and stress management based on elevated cholesterol, bloating, and high stress levels",
      "disclaimers": ["This is supplement support, not medical advice", "Always consult your healthcare provider before starting new supplements"]
    }
    \`\`\`
    
-   🔍 QUICK CHECK BEFORE SUBMITTING:
+   � CRITICAL: ACCURATE totalMg CALCULATION 🚨
+   You MUST calculate totalMg correctly by adding ALL ingredient dosages. Common mistakes:
+   - Missing ingredients in calculation
+   - Using wrong units (ensure all doses are in mg)
+   - Rounding errors or typos
+   
+   ❌ WRONG: If you add 13 ingredients but your totalMg only accounts for 10 = REJECTED!
+   ✅ CORRECT: Double-check your math. Add each dosage one by one:
+   
+   Example calculation (with actual ingredients from your formula):
+   Heart Support: 450mg
+   + Ashwagandha: 600mg
+   + CoEnzyme Q10: 200mg
+   + L-Theanine: 400mg
+   + Broccoli Concentrate: 200mg
+   + Red Ginseng: 200mg
+   + NAD+: 100mg
+   + Fulvic Acid: 250mg
+   + Camu Camu: 2500mg
+   + Curcumin: 400mg
+   + InnoSlim: 250mg
+   = 5350mg total ← THIS is the correct totalMg
+   
+   ⚠️ If your totalMg doesn't match your ingredients, the formula will be REJECTED!
+   The backend validates your math and will reject formulas with calculation errors.
+   
+   �🔍 QUICK CHECK BEFORE SUBMITTING:
    - Verify all "bases" items are from the 32 BASE FORMULAS list (scroll up to check)
    - Verify all "additions" items are from the 29 INDIVIDUAL INGREDIENTS list (scroll up to check)
    - Calculate accurate totalMg (recommend suggesting 4500-5500mg range for optimal value)
@@ -2930,19 +3030,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           validatedFormula = ingredientValidation.correctedFormula;
           console.log('✅ Post-generation validation passed - using corrected formula');
           
-          // CRITICAL: Server-side validation and ingredient approval
-          console.log('🔄 Validating formula ingredients and calculations...');
+          // 🔧 ALWAYS CALCULATE totalMg ON BACKEND (AI no longer responsible for math)
+          console.log('🔄 Calculating formula total (backend calculates - not AI)...');
           const validation = validateAndCalculateFormula(validatedFormula);
-          console.log('📊 AI provided totalMg:', validatedFormula.totalMg);
-          console.log('📊 Backend calculated total:', validation.calculatedTotalMg);
-          console.log('📊 Difference:', Math.abs(validatedFormula.totalMg - validation.calculatedTotalMg), 'mg');
           
-          // 🔧 FIX: Override AI's totalMg with correctly calculated value
-          // AI often miscalculates - backend calculation is authoritative
-          if (validatedFormula.totalMg !== validation.calculatedTotalMg) {
-            console.log(`🔧 OVERRIDING AI totalMg ${validatedFormula.totalMg}mg → ${validation.calculatedTotalMg}mg (backend calculated)`);
-            validatedFormula.totalMg = validation.calculatedTotalMg;
+          if (validatedFormula.totalMg) {
+            console.log('📊 AI provided totalMg:', validatedFormula.totalMg, '(will be ignored)');
+          } else {
+            console.log('📊 AI did not provide totalMg (as instructed)');
           }
+          console.log('📊 Backend calculated total:', validation.calculatedTotalMg);
+          
+          // Set totalMg to backend calculation (authoritative source)
+          validatedFormula.totalMg = validation.calculatedTotalMg;
+          console.log('✅ Using backend-calculated totalMg:', validatedFormula.totalMg, 'mg');
           
           // 🔧 AUTO-CORRECT: If formula exceeds 5500mg by a small amount, remove largest additions
           const maxWithTolerance = FORMULA_LIMITS.MAX_TOTAL_DOSAGE + FORMULA_LIMITS.DOSAGE_TOLERANCE;
@@ -3022,29 +3123,74 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           const criticalErrors = validation.errors.filter(e => 
             e.includes('UNAUTHORIZED INGREDIENT') || 
             e.includes('Formula total too high') ||
-            e.includes('exceeds maximum dosage limit')
+            e.includes('exceeds maximum dosage limit') ||
+            e.includes('exceeds allowed maximum') ||  // Individual ingredient max violations
+            e.includes('below allowed minimum')        // Individual ingredient min violations
           );
           
           if (criticalErrors.length > 0) {
             // CRITICAL: Unapproved ingredients or dosage violations - must reject
             console.error('🚨 CRITICAL: Formula validation failed:', criticalErrors);
             
-            // Check if it's a dosage violation
-            const isDosageError = criticalErrors.some(e => e.includes('total too high') || e.includes('exceeds maximum'));
+            // Build error message for AI to see in next turn
+            const hasIngredientDosageViolation = criticalErrors.some(e => e.includes('exceeds allowed maximum') || e.includes('below allowed minimum'));
+            const hasTotalDosageError = criticalErrors.some(e => e.includes('total too high') || e.includes('exceeds maximum dosage limit'));
+            const hasUnapprovedIngredient = criticalErrors.some(e => e.includes('UNAUTHORIZED INGREDIENT'));
             
-            if (isDosageError) {
+            let validationErrorMessage = '\n\n---\n\n⚠️ **VALIDATION ERROR - Formula Rejected**\n\n';
+            
+            if (hasIngredientDosageViolation) {
+              // Specific ingredient violated its allowed dosage range
+              validationErrorMessage += `❌ **Problem:** One or more ingredients violate their allowed dosage ranges.\n\n`;
+              validationErrorMessage += `**Dosage Violations:**\n${criticalErrors.map(e => `- ${e}`).join('\n')}\n\n`;
+              validationErrorMessage += `🚨 **CRITICAL RULE:** Each ingredient has a STRICT minimum and maximum dosage that you MUST follow.\n\n`;
+              validationErrorMessage += `**How to Fix:**\n`;
+              validationErrorMessage += `1. Check the ingredient list above for the EXACT allowed range for each ingredient\n`;
+              validationErrorMessage += `2. Either:\n`;
+              validationErrorMessage += `   - Adjust the dosage to fit within the allowed range, OR\n`;
+              validationErrorMessage += `   - Remove that ingredient entirely and choose a different one\n\n`;
+              validationErrorMessage += `**Example Violations:**\n`;
+              validationErrorMessage += `- Ginger Root: 2000mg ❌ → Max is 500mg (use 500mg or less)\n`;
+              validationErrorMessage += `- Garlic: 300mg ❌ → Max is 200mg (use 50-200mg range)\n\n`;
+              validationErrorMessage += `Please create a corrected formula with VALID dosages for all ingredients.`;
+              
+              sendSSE({
+                type: 'error',
+                error: `⚠️ Ingredient dosage violations detected:\n\n${criticalErrors.map(e => `❌ ${e}`).join('\n\n')}\n\nPlease adjust dosages to fit within allowed ranges or remove violating ingredients.`,
+                sessionId: chatSession?.id
+              });
+            } else if (hasTotalDosageError) {
+              validationErrorMessage += `❌ **Problem:** Your formula totals ${validation.calculatedTotalMg}mg, which exceeds the maximum safe limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg.\n\n`;
+              validationErrorMessage += `🚨 **CRITICAL REMINDER:** When you create a formula, it REPLACES the entire existing formula. You are creating a COMPLETE formula from scratch (0mg → up to 5500mg), NOT adding to an existing formula.\n\n`;
+              validationErrorMessage += `**Required Fix:** Your new COMPLETE formula must total ≤5500mg. Reduce by ${validation.calculatedTotalMg - FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg by:\n`;
+              validationErrorMessage += `- Removing some base formulas (e.g., remove Beta Max saves 2500mg)\n`;
+              validationErrorMessage += `- Removing some individual ingredients\n`;
+              validationErrorMessage += `- Reducing dosages of flexible ingredients (e.g., Curcumin 600mg → 400mg)\n`;
+              validationErrorMessage += `- Prioritizing the most critical health goals\n\n`;
+              validationErrorMessage += `**Example:** If user has cardiovascular concerns + digestion issues:\n`;
+              validationErrorMessage += `✓ CORRECT: Heart Support 450mg + Hawthorn Berry 100mg + Garlic 200mg + CoQ10 200mg + Curcumin 400mg + Ashwagandha 600mg + L-Theanine 400mg + NAD+ 100mg = 2450mg\n`;
+              validationErrorMessage += `✗ WRONG: Trying to fit 13 ingredients totaling 6282mg\n\n`;
+              validationErrorMessage += `Please create a corrected formula with the COMPLETE ingredient list (bases + additions) that totals ≤5500mg.`;
+              
               sendSSE({
                 type: 'error',
                 error: `⚠️ Formula exceeds maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg.\n\nCalculated total: ${validation.calculatedTotalMg}mg\n\nPlease create a smaller formula by:\n- Using fewer base formulas\n- Reducing individual ingredient doses\n- Focusing on your top priority health goals`,
                 sessionId: chatSession?.id
               });
-            } else {
+            } else if (hasUnapprovedIngredient) {
+              validationErrorMessage += `❌ **Problem:** Formula contains unapproved ingredients.\n\n`;
+              validationErrorMessage += `**Errors:**\n${criticalErrors.map(e => `- ${e}`).join('\n')}\n\n`;
+              validationErrorMessage += `Please create a corrected formula using ONLY ingredients from the approved catalog.`;
+              
               sendSSE({
                 type: 'error',
                 error: `⚠️ Formula contains unapproved ingredients. Please use only ingredients from our approved catalog.`,
                 sessionId: chatSession?.id
               });
             }
+            
+            // Append validation error to fullResponse so AI sees it in chat history
+            fullResponse += validationErrorMessage;
             
             // Still complete the stream normally but without formula
             sendSSE({
@@ -3053,7 +3199,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               formula: null
             });
             
-            // Save messages even if formula is invalid
+            // Save messages with validation error appended - AI will see this in next turn
             if (chatSession) {
               await storage.createMessage({
                 sessionId: chatSession.id,
@@ -3065,9 +3211,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               await storage.createMessage({
                 sessionId: chatSession.id,
                 role: 'assistant',
-                content: fullResponse,
+                content: fullResponse, // Includes validation error message
                 model: model
               });
+              
+              console.log('💾 Saved validation error to chat history - AI will see it and self-correct in next turn');
             }
             
             endStream();
@@ -3122,12 +3270,31 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           console.log('🔍 Searching for other patterns...');
           // Check if AI outputted formula without proper formatting
           if (fullResponse.includes('bases') || fullResponse.includes('additions') || 
-              fullResponse.includes('Base Formulas') || fullResponse.includes('Individual Ingredients')) {
+              fullResponse.includes('Base Formulas') || fullResponse.includes('Individual Ingredients') ||
+              fullResponse.includes('optimized formula') || fullResponse.includes('your formula') ||
+              fullResponse.includes('create a formula') || fullResponse.includes('formula that addresses')) {
             console.error('⚠️ CRITICAL: FOUND formula keywords but NOT in ```json block format!');
-            console.error('⚠️ This formula will NOT be saved! User needs to request it again.');
+            console.error('⚠️ This formula will NOT be saved! AI needs to output JSON block.');
             
-            // Append error message to user response
-            fullResponse += '\n\n---\n\n⚠️ **System Notice:** I apologize, but there was a technical issue saving your formula to the database. The formula structure I provided was not in the correct format for our system to save it.\n\nPlease ask me to create your formula again, and I will ensure it\'s saved properly this time. You can say: "Can you create my personalized formula now?"';
+            // Append error message that AI will see in chat history
+            const systemError = '\n\n---\n\n🚨 **SYSTEM ERROR - Formula Not Created**\n\n' +
+              '❌ **Problem:** You discussed a formula but did NOT output the ```json code block.\n\n' +
+              '**What happened:** You said "Here\'s your optimized formula" but then only described it in text. ' +
+              'The system REQUIRES the JSON code block to actually create the formula.\n\n' +
+              '**Required Fix:** Output the complete JSON block immediately:\n\n' +
+              '```json\n' +
+              '{\n' +
+              '  "bases": [{...}],\n' +
+              '  "additions": [{...}],\n' +
+              '  "rationale": "...",\n' +
+              '  "warnings": [...],\n' +
+              '  "disclaimers": [...]\n' +
+              '}\n' +
+              '```\n\n' +
+              '**DO NOT** just describe the formula - you MUST output the actual JSON code block for the formula to be created.';
+            
+            fullResponse += systemError;
+            console.log('💾 Appended JSON missing error to chat history - AI will see it and output JSON next time');
           }
         }
       } catch (e) {
@@ -3269,13 +3436,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             console.warn('⚠️ SECURITY ALERT: Formula validation failed');
             console.warn('Reasons:', limitValidation.errors);
             
-            // 🎯 SILENT REJECTION: Don't save formula, don't show error popup
-            // Let the AI's conversational response be the only thing user sees
-            // The "See Your Formulation" button simply won't appear
-            console.log('📛 Silently rejecting formula - no popup error shown to user');
-            console.log('📛 User will see AI response only, formula will not be saved');
+            // 🎯 SHOW ERROR TO USER: Display validation errors via SSE
+            const errorMessage = `⚠️ **VALIDATION ERROR - Formula Rejected**\n\n${limitValidation.errors.map(e => `❌ ${e}`).join('\n\n')}\n\nPlease create a corrected formula addressing these issues.`;
             
-            // Don't save - formula stays null, no error thrown, clean UX
+            // Send error via SSE (don't try to write to stream directly)
+            sendSSE({
+              type: 'error',
+              error: errorMessage,
+              sessionId: chatSession?.id
+            });
+            
+            console.log('📛 Formula rejected - error shown to user via SSE');
+            console.log('📛 User will see validation errors and can ask AI to fix');
+            
+            // Don't save - formula stays null
             savedFormula = null;
           } else {
             // ✅ Validation passed - save the formula
@@ -3479,6 +3653,49 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     } catch (error) {
       console.error('List chat sessions error:', error);
       res.status(500).json({ error: 'Failed to list chat sessions' });
+    }
+  });
+
+  // Get specific consultation session with messages
+  app.get('/api/consultations/:sessionId', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const sessionId = req.params.sessionId;
+      
+      // Verify session belongs to user
+      const session = await storage.getChatSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      if (session.userId !== userId) {
+        return res.status(403).json({ error: 'Unauthorized access to session' });
+      }
+      
+      // Fetch messages for this session
+      const messages = await storage.listMessagesBySession(sessionId);
+      
+      res.json({
+        session: {
+          id: session.id,
+          userId: session.userId,
+          status: session.status,
+          createdAt: session.createdAt,
+          updatedAt: session.updatedAt
+        },
+        messages: messages.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          role: msg.role,
+          sender: msg.role === 'assistant' ? 'ai' : 'user',
+          timestamp: msg.createdAt,
+          sessionId: msg.sessionId,
+          formula: msg.formula || undefined // Include formula data if present
+        }))
+      });
+    } catch (error) {
+      console.error('Get consultation session error:', error);
+      res.status(500).json({ error: 'Failed to fetch consultation session' });
     }
   });
 
@@ -4160,11 +4377,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         messagesMap[sessionId] = messages.map(msg => ({
           id: msg.id,
           content: msg.content,
+          role: msg.role,
           sender: msg.role === 'assistant' ? 'ai' : 'user',
           timestamp: msg.createdAt,
-          sessionId: msg.sessionId
-          // Note: file attachments and formula data not currently stored in messages schema
-          // These features can be implemented by extending the messages table in the future
+          sessionId: msg.sessionId,
+          formula: msg.formula || undefined // Include formula data if present
         }));
       });
 

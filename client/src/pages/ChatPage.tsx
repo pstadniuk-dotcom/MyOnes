@@ -28,7 +28,10 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [thinkingMessage, setThinkingMessage] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    // Initialize from localStorage if available
+    return localStorage.getItem('currentSessionId') || null;
+  });
   const [isConnected, setIsConnected] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -59,8 +62,9 @@ export default function ChatPage() {
             if (recentSession.id && recentSession.messages && recentSession.messages.length > 0) {
               console.log('Auto-restored session:', recentSession.id);
               
-              // Set the session ID
+              // Set the session ID and persist to localStorage
               setSessionId(recentSession.id);
+              localStorage.setItem('currentSessionId', recentSession.id);
               
               // Load the messages
               const loadedMessages: Message[] = recentSession.messages.map((msg: any) => ({
@@ -92,6 +96,54 @@ export default function ChatPage() {
 
     loadRecentSession();
   }, []);
+
+  // Reload messages when returning to this page (e.g., after viewing formulation tab)
+  useEffect(() => {
+    const reloadMessages = async () => {
+      // Only reload if we have a sessionId and aren't currently loading
+      if (!sessionId || isLoadingHistory || isTyping) return;
+      
+      try {
+        const response = await fetch(`/api/consultations/${sessionId}`);
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.messages && data.messages.length > 0) {
+            const loadedMessages: Message[] = data.messages.map((msg: any) => ({
+              id: msg.id,
+              content: msg.content,
+              sender: msg.role === 'user' ? 'user' : 'ai',
+              timestamp: new Date(msg.createdAt)
+            }));
+            
+            // Only update if message count changed (to avoid unnecessary re-renders)
+            if (loadedMessages.length !== messages.length) {
+              console.log('Reloaded messages - count changed:', messages.length, '→', loadedMessages.length);
+              setMessages(loadedMessages);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error reloading messages:', error);
+      }
+    };
+
+    // Set up visibility change listener to reload when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        reloadMessages();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Also reload on mount/sessionId change
+    reloadMessages();
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [sessionId, isLoadingHistory, isTyping, messages.length]);
 
   // Check for preserved message on component mount
   useEffect(() => {
@@ -222,6 +274,7 @@ export default function ChatPage() {
                   // Set session ID if provided
                   if (data.sessionId && !sessionId) {
                     setSessionId(data.sessionId);
+                    localStorage.setItem('currentSessionId', data.sessionId);
                   }
                 } else if (data.type === 'complete') {
                   completed = true;
@@ -339,6 +392,22 @@ export default function ChatPage() {
     }
   };
 
+  const handleNewConversation = () => {
+    // Clear session and messages
+    setSessionId(null);
+    localStorage.removeItem('currentSessionId');
+    setMessages([{
+      id: '1',
+      content: "Welcome! I'm Ones AI, your personalized supplement consultant. I'm here to help you create the perfect supplement formula based on your unique health profile.\n\n⚕️ Important: I provide personalized supplement recommendations, not medical advice. Always consult your healthcare provider before starting any new supplement regimen, especially if you have medical conditions or take medications.",
+      sender: 'ai',
+      timestamp: new Date()
+    }]);
+    toast({
+      title: "New Conversation Started",
+      description: "Your previous chat is saved in history. Starting fresh!",
+    });
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
@@ -356,9 +425,19 @@ export default function ChatPage() {
             </p>
           </div>
         </div>
-        <Link href="/" className="text-muted-foreground hover:text-primary transition-colors" data-testid="link-home">
-          <Menu className="w-5 h-5" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleNewConversation}
+            className="text-xs"
+          >
+            New Chat
+          </Button>
+          <Link href="/" className="text-muted-foreground hover:text-primary transition-colors" data-testid="link-home">
+            <Menu className="w-5 h-5" />
+          </Link>
+        </div>
       </header>
 
       {/* Messages */}
@@ -381,10 +460,17 @@ export default function ChatPage() {
               {/* Enhanced formula visualization */}
               {message.formula && (
                     <div className="mt-4 p-4 bg-background rounded-lg border">
-                      <h4 className="font-semibold text-base mb-3 flex items-center gap-2 text-primary">
-                        <CheckCircle className="w-5 h-5 text-green-500" />
-                        Your Personalized Formula ({message.formula.totalMg}mg)
-                      </h4>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold text-base flex items-center gap-2 text-primary">
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                          Your Personalized Formula ({message.formula.totalMg}mg)
+                        </h4>
+                        <Link href="/dashboard">
+                          <Button size="sm" variant="default" className="text-xs">
+                            View Full Details →
+                          </Button>
+                        </Link>
+                      </div>
                       
                       {/* Formula Bases */}
                       {message.formula.bases.length > 0 && (
