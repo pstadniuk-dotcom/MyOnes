@@ -264,7 +264,7 @@ export function generateFormulaPDF(
     });
 
     formula.bases.forEach((base, idx) => {
-      const baseFormula = Object.values(BASE_FORMULA_DETAILS).find(
+      const baseFormula = BASE_FORMULA_DETAILS.find(
         (f) => f.name === base.ingredient
       );
 
