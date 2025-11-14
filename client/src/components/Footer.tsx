@@ -15,8 +15,7 @@ export default function Footer() {
     product: [
       { name: 'How it Works', href: '#how-it-works', isSection: true },
       { name: 'Science', href: '#science', isSection: true },
-      { name: 'Pricing', href: '#pricing', isSection: true },
-      { name: 'Ingredients', href: '#ingredients', isSection: true }
+      { name: 'Pricing', href: '#pricing', isSection: true }
     ],
     company: [
       { name: 'About Us', href: '/about', isSection: false },
@@ -27,7 +26,6 @@ export default function Footer() {
     support: [
       { name: 'Help Center', href: '/help', isSection: false },
       { name: 'Contact Us', href: '/contact', isSection: false },
-      { name: 'Returns', href: '/returns', isSection: false },
       { name: 'Shipping', href: '/shipping', isSection: false }
     ],
     legal: [
@@ -44,11 +42,7 @@ export default function Footer() {
 
     setIsSubmitting(true);
     try {
-      await apiRequest('/api/newsletter/subscribe', {
-        method: 'POST',
-        body: JSON.stringify({ email }),
-        headers: { 'Content-Type': 'application/json' }
-      });
+      await apiRequest('POST', '/api/newsletter/subscribe', { email });
       
       toast({
         title: "Subscribed!",

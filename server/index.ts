@@ -8,6 +8,8 @@ import { startTokenRefreshScheduler } from "./tokenRefreshScheduler";
 import { startWearableDataScheduler } from "./wearableDataScheduler";
 
 const app = express();
+// Trust reverse proxy (needed for secure cookies and correct protocol detection in production)
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
