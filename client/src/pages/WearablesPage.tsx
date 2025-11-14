@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Watch, Activity, Heart, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import fitbitIcon from '@assets/Fitbit_app_icon_1763160710769.png';
+import ouraIcon from '@assets/ŌURA_idZ5mfVnXd_2_1763160796894.jpeg';
 
 interface WearableConnection {
   id: string;
@@ -36,7 +37,7 @@ const OuraLogo = () => (
 // Optional image paths (served from client/public). We try several extensions in order.
 const PROVIDER_IMAGES: Record<'fitbit' | 'oura' | 'whoop' | 'apple', string[] | null> = {
   fitbit: [fitbitIcon],
-  oura: ['/wearables/oura.png', '/wearables/oura.svg', '/wearables/oura.jpg'],
+  oura: [ouraIcon],
   whoop: ['/wearables/whoop.png', '/wearables/whoop.svg', '/wearables/whoop.jpg'],
   apple: null,
 };
