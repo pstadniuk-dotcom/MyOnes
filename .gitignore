@@ -4,3 +4,9 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+ 
+# Ignore environment files (never commit secrets)
+.env
+.env.*
+server/.env
+client/.env
