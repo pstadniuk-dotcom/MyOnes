@@ -160,9 +160,10 @@ export default function HomePage() {
             {currentFormula ? (
               <>
                 <div className="text-3xl font-semibold mb-1">
-                  v{currentFormula.version}
+                  {currentFormula.name || `Version ${currentFormula.version}`}
                 </div>
                 <p className="text-xs text-muted-foreground">
+                  {currentFormula.name && `Version ${currentFormula.version} • `}
                   {currentFormula.bases.length + (currentFormula.additions?.length || 0)} ingredients
                 </p>
                 <div className="mt-2">
@@ -255,10 +256,10 @@ export default function HomePage() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <FlaskConical className="w-5 h-5 text-primary" />
-                  Your Formula
+                  {currentFormula.name || `Version ${currentFormula.version}`}
                 </CardTitle>
                 <CardDescription>
-                  Version {currentFormula.version} • {currentFormula.totalMg}mg total
+                  {currentFormula.name && `Version ${currentFormula.version} • `}{currentFormula.totalMg}mg total
                 </CardDescription>
               </div>
               <Button asChild variant="outline" size="sm" data-testid="button-view-full">
