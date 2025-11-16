@@ -1,12 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import { fileURLToPath } from "url";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-// ESM equivalent of __dirname for Node.js 18 compatibility
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Note: __dirname is provided globally by esbuild banner in production
+// For development, we need to define it here
+const __dirname = typeof globalThis.__dirname !== 'undefined' 
+  ? globalThis.__dirname 
+  : import.meta.dirname || path.dirname(new URL(import.meta.url).pathname);
 
 export default defineConfig({
   plugins: [
