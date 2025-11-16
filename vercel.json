@@ -1,8 +1,7 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "client/dist",
+  "outputDirectory": "dist/public",
   "framework": "vite",
-  "ignoreCommand": "echo 'Use Vercel env vars for client only; server runs on Railway'",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
