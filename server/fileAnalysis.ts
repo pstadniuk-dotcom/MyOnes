@@ -1,6 +1,5 @@
 import OpenAI from 'openai';
 import { ObjectStorageService } from './objectStorage';
-import { pdf } from 'pdf-to-img';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -54,6 +53,8 @@ export async function extractTextFromTextFile(buffer: Buffer): Promise<string> {
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
     console.log('📄 Converting PDF to images...');
+    // Dynamic import to avoid loading browser-dependent pdfjs-dist at startup
+    const { pdf } = await import('pdf-to-img');
     const document = await pdf(buffer, { scale: 2.0 });
     const extractedTexts: string[] = [];
     
