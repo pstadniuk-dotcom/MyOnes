@@ -10,6 +10,33 @@ import { startWearableDataScheduler } from "./wearableDataScheduler";
 const app = express();
 // Trust reverse proxy (needed for secure cookies and correct protocol detection in production)
 app.set('trust proxy', 1);
+
+// CORS middleware - allow requests from Vercel frontend
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'https://my-ones.vercel.app',
+    'https://my-ones-210a7gjcx-pstadniuk-dotcoms-projects.vercel.app',
+    'http://localhost:5000',
+    'http://localhost:5173'
+  ];
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
