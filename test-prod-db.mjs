@@ -2,8 +2,13 @@
 import pg from 'pg';
 const { Pool } = pg;
 
+// DO NOT COMMIT DATABASE CREDENTIALS
+// Use environment variable or pass as argument
+const connectionString = process.env.DATABASE_URL || 
+  'postgresql://postgres.aytzwtehxtvoejgcixdn:[PASSWORD]@aws-1-us-east-1.pooler.supabase.com:6543/postgres';
+
 const pool = new Pool({
-  connectionString: 'postgresql://postgres.aytzwtehxtvoejgcixdn:Weshinebright22!@aws-1-us-east-1.pooler.supabase.com:6543/postgres',
+  connectionString,
   ssl: { rejectUnauthorized: false }
 });
 
