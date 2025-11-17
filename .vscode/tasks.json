@@ -1,0 +1,25 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Deploy Vercel",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"npx --yes vercel --prod"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Deploy Railway",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"npx --yes @railway/cli up"
+			],
+			"group": "build"
+		}
+	]
+}
