@@ -11,6 +11,12 @@ vite.config.ts.*
 server/.env
 client/.env
 
+# Editor/runtime metadata
+.cache/
+.config/
+.local/
+.upm/
+
 # Test scripts with potential hardcoded credentials
 test-prod-db.mjs
 test-dev-db.mjs
