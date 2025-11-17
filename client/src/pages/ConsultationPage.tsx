@@ -317,13 +317,15 @@ export default function ConsultationPage() {
         })) || []
       };
       
-      const response = await fetch('/api/chat/stream', {
+      const API_BASE = import.meta.env.VITE_API_BASE || '';
+      const response = await fetch(`${API_BASE}/api/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
         body: JSON.stringify(requestBody),
+        credentials: 'include',
         signal: abortController.signal
       });
 
