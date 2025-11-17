@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { eq, desc, and, isNull, gte, lte, lt, or, ilike, sql, count, inArray } from "drizzle-orm";
 import { db } from "./db";
 import { encryptToken, decryptToken } from "./tokenEncryption";
+import { encryptField, decryptField, encryptFieldSafe, decryptFieldSafe } from "./fieldEncryption";
 import {
   users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
@@ -316,7 +317,21 @@ export class DrizzleStorage implements IStorage {
   async getHealthProfile(userId: string): Promise<HealthProfile | undefined> {
     try {
       const [profile] = await db.select().from(healthProfiles).where(eq(healthProfiles.userId, userId));
-      return profile || undefined;
+      if (!profile) return undefined;
+      
+      // Decrypt sensitive medical fields
+      return {
+        ...profile,
+        conditions: profile.conditions
+          ? JSON.parse(decryptField(profile.conditions as any))
+          : [],
+        medications: profile.medications
+          ? JSON.parse(decryptField(profile.medications as any))
+          : [],
+        allergies: profile.allergies
+          ? JSON.parse(decryptField(profile.allergies as any))
+          : []
+      };
     } catch (error) {
       console.error('Error getting health profile:', error);
       return undefined;
@@ -325,9 +340,35 @@ export class DrizzleStorage implements IStorage {
 
   async createHealthProfile(insertProfile: InsertHealthProfile): Promise<HealthProfile> {
     try {
-      // Data is now pre-validated by Zod schemas at the API route level
-      const [profile] = await db.insert(healthProfiles).values([insertProfile]).returning();
-      return profile;
+      // Encrypt sensitive medical fields before storing
+      const encryptedProfile = {
+        ...insertProfile,
+        conditions: insertProfile.conditions && insertProfile.conditions.length > 0
+          ? encryptField(JSON.stringify(insertProfile.conditions))
+          : null,
+        medications: insertProfile.medications && insertProfile.medications.length > 0
+          ? encryptField(JSON.stringify(insertProfile.medications))
+          : null,
+        allergies: insertProfile.allergies && insertProfile.allergies.length > 0
+          ? encryptField(JSON.stringify(insertProfile.allergies))
+          : null
+      };
+      
+      const [profile] = await db.insert(healthProfiles).values([encryptedProfile as any]).returning();
+      
+      // Decrypt for return
+      return {
+        ...profile,
+        conditions: profile.conditions
+          ? JSON.parse(decryptField(profile.conditions as any))
+          : [],
+        medications: profile.medications
+          ? JSON.parse(decryptField(profile.medications as any))
+          : [],
+        allergies: profile.allergies
+          ? JSON.parse(decryptField(profile.allergies as any))
+          : []
+      };
     } catch (error) {
       console.error('Error creating health profile:', error);
       throw new Error('Failed to create health profile');
@@ -336,13 +377,52 @@ export class DrizzleStorage implements IStorage {
 
   async updateHealthProfile(userId: string, updates: Partial<InsertHealthProfile>): Promise<HealthProfile | undefined> {
     try {
-      // Data is now pre-validated by Zod schemas at the API route level
+      // Encrypt sensitive fields in updates
+      const encryptedUpdates = {
+        ...updates,
+        conditions: updates.conditions !== undefined
+          ? (updates.conditions && updates.conditions.length > 0
+            ? encryptField(JSON.stringify(updates.conditions))
+            : null)
+          : undefined,
+        medications: updates.medications !== undefined
+          ? (updates.medications && updates.medications.length > 0
+            ? encryptField(JSON.stringify(updates.medications))
+            : null)
+          : undefined,
+        allergies: updates.allergies !== undefined
+          ? (updates.allergies && updates.allergies.length > 0
+            ? encryptField(JSON.stringify(updates.allergies))
+            : null)
+          : undefined
+      };
+      
+      // Remove undefined values
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(encryptedUpdates).filter(([_, v]) => v !== undefined)
+      );
+      
       const [profile] = await db
         .update(healthProfiles)
-        .set(updates)
+        .set(cleanUpdates as any)
         .where(eq(healthProfiles.userId, userId))
         .returning();
-      return profile || undefined;
+      
+      if (!profile) return undefined;
+      
+      // Decrypt for return
+      return {
+        ...profile,
+        conditions: profile.conditions
+          ? JSON.parse(decryptField(profile.conditions as any))
+          : [],
+        medications: profile.medications
+          ? JSON.parse(decryptField(profile.medications as any))
+          : [],
+        allergies: profile.allergies
+          ? JSON.parse(decryptField(profile.allergies as any))
+          : []
+      };
     } catch (error) {
       console.error('Error updating health profile:', error);
       return undefined;
@@ -957,10 +1037,29 @@ export class DrizzleStorage implements IStorage {
   // Lab Analysis operations (AI-generated insights)
   async createLabAnalysis(insertAnalysis: InsertLabAnalysis): Promise<LabAnalysis> {
     try {
-      // Handle extractedMarkers and aiInsights fields properly
-      // Data is pre-validated by Zod schemas at API route level
-      const [analysis] = await db.insert(labAnalyses).values([insertAnalysis]).returning();
-      return analysis;
+      // Encrypt sensitive health data before storing
+      const encryptedAnalysis = {
+        ...insertAnalysis,
+        extractedMarkers: insertAnalysis.extractedMarkers 
+          ? encryptField(JSON.stringify(insertAnalysis.extractedMarkers))
+          : null,
+        aiInsights: insertAnalysis.aiInsights
+          ? encryptField(JSON.stringify(insertAnalysis.aiInsights))
+          : null
+      };
+      
+      const [analysis] = await db.insert(labAnalyses).values([encryptedAnalysis as any]).returning();
+      
+      // Decrypt for return
+      return {
+        ...analysis,
+        extractedMarkers: analysis.extractedMarkers 
+          ? JSON.parse(decryptField(analysis.extractedMarkers as any))
+          : [],
+        aiInsights: analysis.aiInsights
+          ? JSON.parse(decryptField(analysis.aiInsights as any))
+          : undefined
+      };
     } catch (error) {
       console.error('Error creating lab analysis:', error);
       throw new Error('Failed to create lab analysis');
@@ -970,7 +1069,18 @@ export class DrizzleStorage implements IStorage {
   async getLabAnalysis(fileId: string): Promise<LabAnalysis | undefined> {
     try {
       const [analysis] = await db.select().from(labAnalyses).where(eq(labAnalyses.fileId, fileId));
-      return analysis || undefined;
+      if (!analysis) return undefined;
+      
+      // Decrypt sensitive fields
+      return {
+        ...analysis,
+        extractedMarkers: analysis.extractedMarkers
+          ? JSON.parse(decryptField(analysis.extractedMarkers as any))
+          : [],
+        aiInsights: analysis.aiInsights
+          ? JSON.parse(decryptField(analysis.aiInsights as any))
+          : undefined
+      };
     } catch (error) {
       console.error('Error getting lab analysis:', error);
       return undefined;
@@ -979,15 +1089,40 @@ export class DrizzleStorage implements IStorage {
 
   async updateLabAnalysis(id: string, updates: Partial<InsertLabAnalysis>): Promise<LabAnalysis | undefined> {
     try {
-      // Handle extractedMarkers and aiInsights fields properly
-      // Data is pre-validated by Zod schemas at API route level
-      const safeUpdates = updates;
+      // Encrypt sensitive fields in updates
+      const encryptedUpdates = {
+        ...updates,
+        extractedMarkers: updates.extractedMarkers
+          ? encryptField(JSON.stringify(updates.extractedMarkers))
+          : undefined,
+        aiInsights: updates.aiInsights
+          ? encryptField(JSON.stringify(updates.aiInsights))
+          : undefined
+      };
+      
+      // Remove undefined values
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(encryptedUpdates).filter(([_, v]) => v !== undefined)
+      );
+      
       const [analysis] = await db
         .update(labAnalyses)
-        .set(safeUpdates)
+        .set(cleanUpdates as any)
         .where(eq(labAnalyses.id, id))
         .returning();
-      return analysis || undefined;
+      
+      if (!analysis) return undefined;
+      
+      // Decrypt for return
+      return {
+        ...analysis,
+        extractedMarkers: analysis.extractedMarkers
+          ? JSON.parse(decryptField(analysis.extractedMarkers as any))
+          : [],
+        aiInsights: analysis.aiInsights
+          ? JSON.parse(decryptField(analysis.aiInsights as any))
+          : undefined
+      };
     } catch (error) {
       console.error('Error updating lab analysis:', error);
       return undefined;
@@ -996,7 +1131,18 @@ export class DrizzleStorage implements IStorage {
 
   async listLabAnalysesByUser(userId: string): Promise<LabAnalysis[]> {
     try {
-      return await db.select().from(labAnalyses).where(eq(labAnalyses.userId, userId)).orderBy(desc(labAnalyses.processedAt));
+      const analyses = await db.select().from(labAnalyses).where(eq(labAnalyses.userId, userId)).orderBy(desc(labAnalyses.processedAt));
+      
+      // Decrypt each analysis
+      return analyses.map(analysis => ({
+        ...analysis,
+        extractedMarkers: analysis.extractedMarkers
+          ? JSON.parse(decryptField(analysis.extractedMarkers as any))
+          : [],
+        aiInsights: analysis.aiInsights
+          ? JSON.parse(decryptField(analysis.aiInsights as any))
+          : undefined
+      }));
     } catch (error) {
       console.error('Error listing lab analyses by user:', error);
       return [];

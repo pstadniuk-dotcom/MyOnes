@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import fileUpload from "express-fileupload";
 import session from "express-session";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startSmsReminderScheduler } from "./smsReminderScheduler";
@@ -39,6 +40,38 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Rate limiting configuration
+// General API rate limit - prevents abuse and excessive costs
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per 15 minutes
+  message: { error: 'Too many requests from this IP, please try again later.' },
+  standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
+  legacyHeaders: false, // Disable `X-RateLimit-*` headers
+});
+
+// Stricter limit for authentication endpoints - prevents brute force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Only 5 attempts per 15 minutes
+  message: { error: 'Too many login attempts, please try again later.' },
+  skipSuccessfulRequests: true, // Don't count successful logins
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// AI chat rate limit - prevents API cost abuse
+const aiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 50, // 50 AI requests per hour per IP
+  message: { error: 'Too many AI requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply general rate limit to all API routes
+app.use('/api/', apiLimiter);
 
 // Configure session middleware for OAuth state management
 app.use(session({
@@ -93,7 +126,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  const server = await registerRoutes(app, { authLimiter, aiLimiter });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

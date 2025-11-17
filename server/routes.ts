@@ -1,4 +1,5 @@
 import express, { type Express, Request, Response, NextFunction } from "express";
+import type { RateLimitRequestHandler } from "express-rate-limit";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import OpenAI from "openai";
@@ -2061,7 +2062,12 @@ setInterval(() => {
   keysToDelete.forEach(key => rateLimitStore.delete(key));
 }, 60000); // Clean up every minute
 
-export async function registerRoutes(app: Express): Promise<Server> {
+// ... rest of imports ...
+
+export async function registerRoutes(
+  app: Express,
+  rateLimiters?: { authLimiter?: RateLimitRequestHandler; aiLimiter?: RateLimitRequestHandler }
+): Promise<Server> {
   // Use Express built-in JSON middleware (much more reliable)
   app.use('/api', (req, res, next) => {
     console.log('🔧 REQUEST MIDDLEWARE: Processing request', {
@@ -2118,7 +2124,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.warn('⚠️ Failed to load persisted AI settings, using env defaults:', (e as Error)?.message || e);
   }
 
-  // Authentication routes
+  // Authentication routes (with stricter rate limiting)
+  if (rateLimiters?.authLimiter) {
+    app.use('/api/auth/signup', rateLimiters.authLimiter);
+    app.use('/api/auth/login', rateLimiters.authLimiter);
+  }
+  
   app.post('/api/auth/signup', async (req, res) => {
     const startTime = Date.now();
     console.log('🔧 SIGNUP REQUEST START:', {
@@ -2316,6 +2327,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: 'Failed to fetch user data' });
     }
   });
+
+  // AI/Chat endpoints (with stricter rate limiting to prevent cost abuse)
+  if (rateLimiters?.aiLimiter) {
+    app.use('/api/chat', rateLimiters.aiLimiter);
+  }
 
   // Streaming chat endpoint with enhanced security
   app.post('/api/chat/stream', requireAuth, async (req, res) => {

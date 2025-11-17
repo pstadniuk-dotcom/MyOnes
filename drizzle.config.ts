@@ -15,7 +15,7 @@ export default defineConfig({
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }, // Allow Supabase pooler certificates
   },
-  // SSL configuration for Supabase
   strict: true,
 });
