@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/api';
 import type { AuthResponse, SignupData, LoginData } from '@shared/schema';
 
 interface User {
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const validateToken = async (authToken: string) => {
     try {
-      const response = await fetch('/api/auth/me', {
+      const response = await apiRequest('/api/auth/me', {
         headers: {
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json',
@@ -124,11 +125,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
 
-      const response = await fetch('/api/auth/signup', {
+      const response = await apiRequest('/api/auth/signup', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(signupData),
       });
 
@@ -170,7 +168,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
 
-      const response = await fetch('/api/auth/login', {
+      const response = await apiRequest('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -215,7 +213,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = () => {
     try {
       // Make API call to logout endpoint
-      fetch('/api/auth/logout', {
+      apiRequest('/api/auth/logout', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -251,7 +249,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!token) return;
 
     try {
-      const response = await fetch('/api/auth/me', {
+      const response = await apiRequest('/api/auth/me', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
