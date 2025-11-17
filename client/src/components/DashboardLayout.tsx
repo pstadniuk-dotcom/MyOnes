@@ -17,7 +17,8 @@ import {
   ChevronDown, 
   LogOut, 
   Bell, 
-  Shield
+  Shield,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'wouter';
@@ -77,6 +78,14 @@ function UserDropdown() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
+          {user.isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link href="/admin" data-testid="link-admin-panel">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Admin Panel</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem asChild>
             <Link href="/dashboard/settings?tab=notifications" data-testid="link-notifications">
               <Bell className="mr-2 h-4 w-4" />

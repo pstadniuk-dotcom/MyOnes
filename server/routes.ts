@@ -6090,6 +6090,34 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         userId
       };
       const ticket = await storage.createSupportTicket(ticketData);
+      
+      // Send email notification to support team
+      try {
+        const user = await storage.getUserById(userId);
+        if (user) {
+          await sendNotificationEmail({
+            to: 'support@myones.ai',
+            subject: `New Support Ticket: ${ticket.subject}`,
+            html: `
+              <h2>New Support Ticket Received</h2>
+              <p><strong>From:</strong> ${user.name} (${user.email})</p>
+              <p><strong>Subject:</strong> ${ticket.subject}</p>
+              <p><strong>Category:</strong> ${ticket.category}</p>
+              <p><strong>Priority:</strong> ${ticket.priority}</p>
+              <p><strong>Description:</strong></p>
+              <p>${ticket.description}</p>
+              <p><strong>Ticket ID:</strong> ${ticket.id}</p>
+              <p><a href="https://myones.ai/admin">View in Admin Dashboard</a></p>
+            `,
+            text: `New Support Ticket from ${user.name} (${user.email})\n\nSubject: ${ticket.subject}\nCategory: ${ticket.category}\nPriority: ${ticket.priority}\n\nDescription:\n${ticket.description}\n\nTicket ID: ${ticket.id}`
+          });
+          console.log(`📧 Support notification email sent for ticket ${ticket.id}`);
+        }
+      } catch (emailError) {
+        // Log but don't fail the ticket creation if email fails
+        console.error('Failed to send support notification email:', emailError);
+      }
+      
       res.json({ ticket });
     } catch (error) {
       console.error('Error creating support ticket:', error);
@@ -6127,6 +6155,32 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         isStaff: false
       };
       const response = await storage.createSupportTicketResponse(responseData);
+      
+      // Send email notification to support team about new user response
+      try {
+        const user = await storage.getUserById(userId);
+        if (user && ticket) {
+          await sendNotificationEmail({
+            to: 'support@myones.ai',
+            subject: `New Response on Ticket: ${ticket.subject}`,
+            html: `
+              <h2>New User Response on Support Ticket</h2>
+              <p><strong>From:</strong> ${user.name} (${user.email})</p>
+              <p><strong>Ticket Subject:</strong> ${ticket.subject}</p>
+              <p><strong>Ticket ID:</strong> ${ticketId}</p>
+              <p><strong>New Message:</strong></p>
+              <p>${messageValidation.data.message}</p>
+              <p><a href="https://myones.ai/admin/support/${ticketId}">View Ticket in Admin Dashboard</a></p>
+            `,
+            text: `New response from ${user.name} (${user.email}) on ticket: ${ticket.subject}\n\nMessage:\n${messageValidation.data.message}\n\nTicket ID: ${ticketId}`
+          });
+          console.log(`📧 Support response notification email sent for ticket ${ticketId}`);
+        }
+      } catch (emailError) {
+        // Log but don't fail if email fails
+        console.error('Failed to send response notification email:', emailError);
+      }
+      
       res.json({ response });
     } catch (error) {
       console.error('Error creating support ticket response:', error);
