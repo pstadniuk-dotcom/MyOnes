@@ -79,9 +79,9 @@ ANTHROPIC_API_KEY=sk-ant-api03-bcKDAD13XQ5LDYstGRswmH1u...
 **Email/SMS:**
 ```
 SENDGRID_API_KEY=SG.8qVQzg1wROChUoVJJtRXaA...
-TWILIO_ACCOUNT_SID=AC5b3552826c77c63a021246e578bdd534
-TWILIO_AUTH_TOKEN=c45deca441fdd5d7606a0b86e56433d1
-TWILIO_FROM=+18553890981
+TWILIO_ACCOUNT_SID=AC...  # Get from Twilio Console
+TWILIO_AUTH_TOKEN=...     # Get from Twilio Console
+TWILIO_FROM=+1...         # Your Twilio phone number
 ```
 
 **OAuth (Wearables):**

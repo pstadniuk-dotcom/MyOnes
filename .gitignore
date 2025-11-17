@@ -10,3 +10,8 @@ vite.config.ts.*
 .env.*
 server/.env
 client/.env
+
+# Test scripts with potential hardcoded credentials
+test-prod-db.mjs
+test-dev-db.mjs
+check-deployment.mjs
