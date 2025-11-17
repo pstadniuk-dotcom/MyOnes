@@ -186,16 +186,19 @@ export default function ChatPage() {
 
     try {
       // Enhanced fetch with proper error handling
-      const response = await fetch('/api/chat/stream', {
+      const API_BASE = import.meta.env.VITE_API_BASE || '';
+      const response = await fetch(`${API_BASE}/api/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
         body: JSON.stringify({
           message: currentMessage,
           sessionId,
           userId: 'authenticated-user' // In production, get from auth context
         }),
+        credentials: 'include',
         signal: abortController.signal
       });
 
