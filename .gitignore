@@ -21,3 +21,4 @@ client/.env
 test-prod-db.mjs
 test-dev-db.mjs
 check-deployment.mjs
+.vercel
