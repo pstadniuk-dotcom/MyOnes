@@ -18,6 +18,8 @@ app.use((req, res, next) => {
   const allowedOrigins = [
     'https://my-ones.vercel.app',
     'https://my-ones-210a7gjcx-pstadniuk-dotcoms-projects.vercel.app',
+    'https://myones.ai',
+    'https://www.myones.ai',
     'http://localhost:5000',
     'http://localhost:5173'
   ];
