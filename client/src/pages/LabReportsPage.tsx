@@ -71,22 +71,31 @@ export default function LabReportsPage() {
   // Grant consent mutation
   const grantConsentMutation = useMutation({
     mutationFn: async () => {
+      console.log('Granting consent...');
       const response = await apiRequest('POST', '/api/consents/grant', {
         consentType: 'lab_data_processing',
-        granted: true
+        granted: true,
+        consentVersion: '1.0',
+        consentText: 'User consents to lab data processing for personalized supplement recommendations'
       });
-      return response.json();
+      const result = await response.json();
+      console.log('Consent granted:', result);
+      return result;
     },
     onSuccess: async () => {
+      console.log('Consent grant successful, uploading file...');
       // Invalidate consents to refresh the hasLabDataConsent check
       await queryClient.invalidateQueries({ queryKey: ['/api/consents'] });
       setShowConsentDialog(false);
       if (pendingFile) {
+        // Small delay to ensure consent is persisted before upload
+        await new Promise(resolve => setTimeout(resolve, 500));
         await uploadFile(pendingFile);
         setPendingFile(null);
       }
     },
     onError: (error: Error) => {
+      console.error('Consent grant error:', error);
       toast({
         title: "Consent failed",
         description: error.message,
@@ -230,6 +239,19 @@ export default function LabReportsPage() {
       return;
     }
 
+    // Check if user has consent before uploading
+    if (!hasLabDataConsent) {
+      console.log('Manual entry needs consent, showing dialog');
+      setShowManualEntryDialog(false);
+      // Create the file and store it as pending
+      const blob = new Blob([manualEntryText], { type: 'text/plain' });
+      const fileName = `${selectedTestType}_manual_entry_${new Date().toISOString().split('T')[0]}.txt`;
+      const file = new File([blob], fileName, { type: 'text/plain' });
+      setPendingFile(file);
+      setShowConsentDialog(true);
+      return;
+    }
+
     setIsUploading(true);
     setShowManualEntryDialog(false);
 
@@ -259,6 +281,21 @@ export default function LabReportsPage() {
 
       if (!response.ok) {
         const error = await response.json();
+        console.log('Manual entry upload error:', response.status, error);
+        
+        // Check for consent error
+        if (response.status === 403) {
+          console.log('403 error on manual entry, showing consent dialog');
+          setIsUploading(false);
+          setPendingFile(file);
+          setShowConsentDialog(true);
+          toast({
+            title: "Consent Required",
+            description: "Please grant consent to process your health data.",
+          });
+          return;
+        }
+        
         throw new Error(error.error || 'Upload failed');
       }
 
