@@ -4507,6 +4507,18 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Get user's consents
+  app.get('/api/consents', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const consents = await storage.getUserConsents(userId);
+      res.json(consents);
+    } catch (error) {
+      console.error('Error fetching consents:', error);
+      res.status(500).json({ error: 'Failed to fetch consents' });
+    }
+  });
+
   // Get user's uploaded files
   app.get('/api/files/user/:userId/:type', requireAuth, async (req, res) => {
     const { userId, type } = req.params;
