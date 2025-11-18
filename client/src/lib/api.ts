@@ -3,21 +3,31 @@
  */
 
 // Get API base URL from environment variable, fallback to relative URL for dev
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+export const API_BASE = (import.meta.env.VITE_API_BASE || '').trim();
+
+export function buildApiUrl(endpoint: string) {
+  if (/^https?:\/\//i.test(endpoint)) {
+    return endpoint;
+  }
+
+  const normalized = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${API_BASE}${normalized}`;
+}
 
 /**
  * Make an API request with the correct base URL
  */
-export async function apiRequest(endpoint: string, options?: RequestInit) {
-  const url = `${API_BASE}${endpoint}`;
-  
+export async function apiRequest(endpoint: string, options: RequestInit = {}) {
+  const url = buildApiUrl(endpoint);
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  } satisfies HeadersInit;
+
   const response = await fetch(url, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    credentials: 'include', // Include cookies for CORS
+    headers,
+    credentials: options.credentials ?? 'include', // Include cookies for CORS
   });
 
   return response;

@@ -18,7 +18,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
+import { buildApiUrl } from '@/lib/api';
 import { Link } from 'wouter';
 import ThinkingIndicator from '@/components/ThinkingIndicator';
 
@@ -77,7 +78,8 @@ const removeJsonBlocks = (content: string): string => {
   cleaned = cleaned.replace(/__([^_]+)__/g, '$1');
   
   // Remove most common emojis that might appear in responses
-  cleaned = cleaned.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+  // Strip astral-plane characters (mostly emoji) to keep prompts clean without unicode regex flags
+  cleaned = cleaned.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '');
   
   // Clean up any resulting multiple blank lines
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
@@ -317,12 +319,11 @@ export default function ConsultationPage() {
         })) || []
       };
       
-      const API_BASE = import.meta.env.VITE_API_BASE || '';
-      const response = await fetch(`${API_BASE}/api/chat/stream`, {
+      const response = await fetch(buildApiUrl('/api/chat/stream'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          ...getAuthHeaders()
         },
         body: JSON.stringify(requestBody),
         credentials: 'include',
@@ -539,12 +540,11 @@ export default function ConsultationPage() {
         formData.append('type', 'lab_report');
         formData.append('userId', user?.id || '');
 
-        const uploadResponse = await fetch('/api/files/upload', {
+        const uploadResponse = await fetch(buildApiUrl('/api/files/upload'), {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-          },
-          body: formData
+          headers: getAuthHeaders(),
+          body: formData,
+          credentials: 'include'
         });
 
         if (!uploadResponse.ok) {
