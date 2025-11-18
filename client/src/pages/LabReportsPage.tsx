@@ -14,7 +14,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest, getAuthHeaders } from '@/lib/queryClient';
 import { buildApiUrl } from '@/lib/api';
-import type { FileUpload } from '@shared/schema';
+import type { FileUpload, UserConsent } from '@shared/schema';
 
 function LabReportsSkeleton() {
   return (
@@ -49,11 +49,22 @@ export default function LabReportsPage() {
   const [manualEntryText, setManualEntryText] = useState('');
   const [selectedTestType, setSelectedTestType] = useState<'blood_test'>('blood_test');
 
+  // Fetch user consents
+  const { data: consents } = useQuery<UserConsent[]>({
+    queryKey: ['/api/consents'],
+    enabled: isAuthenticated && !!user?.id,
+  });
+
   // Fetch lab reports
   const { data: labReports, isLoading: labReportsLoading } = useQuery<FileUpload[]>({
     queryKey: ['/api/files', 'user', user?.id, 'lab-reports'],
     enabled: isAuthenticated && !!user?.id,
   });
+
+  // Check if user has lab data processing consent
+  const hasLabDataConsent = consents?.some(
+    consent => consent.consentType === 'lab_data_processing' && !consent.revokedAt
+  ) ?? false;
 
   // Grant consent mutation
   const grantConsentMutation = useMutation({
@@ -65,6 +76,8 @@ export default function LabReportsPage() {
       return response.json();
     },
     onSuccess: async () => {
+      // Invalidate consents to refresh the hasLabDataConsent check
+      await queryClient.invalidateQueries({ queryKey: ['/api/consents'] });
       setShowConsentDialog(false);
       if (pendingFile) {
         await uploadFile(pendingFile);
@@ -124,6 +137,20 @@ export default function LabReportsPage() {
 
       if (!response.ok) {
         const error = await response.json();
+        
+        // Check for consent error specifically
+        if (response.status === 403 && error.error?.includes('consent')) {
+          toast({
+            title: "Consent Required",
+            description: "Please grant consent to upload lab data. The consent dialog will appear.",
+            variant: "destructive",
+          });
+          // Show consent dialog automatically
+          setPendingFile(file);
+          setShowConsentDialog(true);
+          return;
+        }
+        
         throw new Error(error.error || 'Upload failed');
       }
 
@@ -175,9 +202,15 @@ export default function LabReportsPage() {
       return;
     }
 
-    // Store the file and show consent dialog
-    setPendingFile(file);
-    setShowConsentDialog(true);
+    // Check if user has already consented
+    if (hasLabDataConsent) {
+      // User already has consent, upload directly
+      await uploadFile(file);
+    } else {
+      // User needs to consent first
+      setPendingFile(file);
+      setShowConsentDialog(true);
+    }
   };
 
   const handleManualEntry = async () => {
