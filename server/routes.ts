@@ -317,17 +317,16 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
 }
 
 // JWT Configuration
+const isProdLike = (process.env.APP_ENV || process.env.NODE_ENV)?.toLowerCase() === 'prod' || process.env.NODE_ENV === 'production';
 let JWT_SECRET: string = process.env.JWT_SECRET || '';
 
 if (!JWT_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('FATAL: JWT_SECRET environment variable is required for security in production');
-    process.exit(1);
-  } else {
-    // Development fallback - use a generated secret
-    JWT_SECRET = 'dev-jwt-secret-' + Date.now() + '-' + Math.random().toString(36);
-    console.warn('WARNING: Using generated JWT_SECRET for development. Set JWT_SECRET environment variable for production.');
+  if (isProdLike) {
+    throw new Error('JWT_SECRET environment variable is required in production. Set it in Railway/Vercel env vars.');
   }
+
+  JWT_SECRET = 'dev-jwt-secret-placeholder';
+  console.warn('Using fallback JWT secret for local development. Do not use this in production.');
 }
 
 // TypeScript assertion that JWT_SECRET is now definitely a string
@@ -410,10 +409,14 @@ function isIngredientApproved(ingredientName: string, approvedSet: Set<string>):
   
   // Defensive fallback: check if any approved ingredient matches (preserves backward compat)
   const normalizedLower = normalized.toLowerCase();
-  for (const approved of approvedSet) {
-    if (approved.toLowerCase() === normalizedLower) {
-      return true;
+  let foundMatch = false;
+  approvedSet.forEach((approved) => {
+    if (!foundMatch && approved.toLowerCase() === normalizedLower) {
+      foundMatch = true;
     }
+  });
+  if (foundMatch) {
+    return true;
   }
   
   return false;
@@ -433,6 +436,27 @@ const ALL_APPROVED_INGREDIENTS = new Set([
 // Helper to check if ANY ingredient is approved from complete catalog (category-agnostic)
 function isAnyIngredientApproved(ingredientName: string): boolean {
   return isIngredientApproved(ingredientName, ALL_APPROVED_INGREDIENTS);
+}
+
+function normalizePromptHealthProfile(profile?: Awaited<ReturnType<typeof storage.getHealthProfile>>): PromptContext['healthProfile'] | undefined {
+  if (!profile) return undefined;
+  const { conditions, medications, allergies, ...rest } = profile;
+  return {
+    ...rest,
+    conditions: conditions ?? undefined,
+    medications: medications ?? undefined,
+    allergies: allergies ?? undefined,
+  };
+}
+
+function normalizePromptFormula(formula?: Awaited<ReturnType<typeof storage.getCurrentFormulaByUser>>): PromptContext['activeFormula'] | undefined {
+  if (!formula) return undefined;
+  const { additions, userCustomizations, ...rest } = formula;
+  return {
+    ...rest,
+    additions: additions ?? undefined,
+    userCustomizations: userCustomizations ?? undefined,
+  };
 }
 
 // SINGLE SOURCE OF TRUTH: Build canonical doses from shared ingredient catalog
@@ -2827,8 +2851,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       
       // Build comprehensive prompt with all context
       const promptContext: PromptContext = {
-        healthProfile: healthProfile || undefined,
-        activeFormula: activeFormula || undefined,
+        healthProfile: normalizePromptHealthProfile(healthProfile),
+        activeFormula: normalizePromptFormula(activeFormula),
         labDataContext: labDataContext || undefined,
         recentMessages: previousMessages
       };
@@ -3388,7 +3412,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           
           // Validate base formulas (category-agnostic - checks against ALL approved ingredients)
           for (const base of extractedFormula.bases) {
-            const ingredientName = base.ingredient || base.name;
+            const ingredientName = base.ingredient;
             if (!ingredientName || !isAnyIngredientApproved(ingredientName)) {
               console.error(`VALIDATION ERROR: Unapproved ingredient "${ingredientName}" detected in bases array`);
               throw new Error(`The ingredient "${ingredientName}" is not in our approved catalog. Please use only approved ingredients from our catalog.`);
@@ -3397,7 +3421,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           
           // Validate additions (category-agnostic - checks against ALL approved ingredients)
           for (const addition of extractedFormula.additions) {
-            const ingredientName = addition.ingredient || addition.name;
+            const ingredientName = addition.ingredient;
             if (!ingredientName || !isAnyIngredientApproved(ingredientName)) {
               console.error(`VALIDATION ERROR: Unapproved ingredient "${ingredientName}" detected in additions array`);
               throw new Error(`The ingredient "${ingredientName}" is not in our approved catalog. Please use only approved ingredients from our catalog.`);
@@ -3409,10 +3433,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
           
           // Convert formula to storage format with normalized ingredient names
-          const formulaData = {
-            userId,
-            bases: extractedFormula.bases.map((b: any) => {
-              const rawName = b.ingredient || b.name;
+          const normalizedBases = extractedFormula.bases.map((b: any) => {
+            const rawName = b.ingredient || b.name;
               const normalizedName = normalizeIngredientName(rawName);
               console.log(`🔄 Normalizing base: "${rawName}" → "${normalizedName}"`);
               return {
@@ -3421,19 +3443,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                 unit: 'mg',
                 purpose: b.purpose
               };
-            }),
-            additions: extractedFormula.additions.map((a: any) => {
-              const rawName = a.ingredient || a.name;
-              const normalizedName = normalizeIngredientName(rawName);
-              console.log(`🔄 Normalizing addition: "${rawName}" → "${normalizedName}"`);
-              return {
-                ingredient: normalizedName,
-                amount: typeof a.amount === 'number' ? a.amount : parseDoseToMg(a.dose || `${a.amount}mg`, rawName),
-                unit: 'mg',
-                purpose: a.purpose
-              };
-            }),
-            totalMg: extractedFormula.totalMg,
+            });
+          const normalizedAdditions = extractedFormula.additions.map((a: any) => {
+            const rawName = a.ingredient || a.name;
+            const normalizedName = normalizeIngredientName(rawName);
+            console.log(`🔄 Normalizing addition: "${rawName}" → "${normalizedName}"`);
+            return {
+              ingredient: normalizedName,
+              amount: typeof a.amount === 'number' ? a.amount : parseDoseToMg(a.dose || `${a.amount}mg`, rawName),
+              unit: 'mg',
+              purpose: a.purpose
+            };
+          });
+          const computedTotalMg = [...normalizedBases, ...normalizedAdditions].reduce((sum, item) => sum + item.amount, 0);
+          const formulaData = {
+            userId,
+            bases: normalizedBases,
+            additions: normalizedAdditions,
+            totalMg: typeof extractedFormula.totalMg === 'number' ? extractedFormula.totalMg : computedTotalMg,
             rationale: extractedFormula.rationale,
             warnings: extractedFormula.warnings || [],
             disclaimers: extractedFormula.disclaimers || [],
@@ -3511,14 +3538,16 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // 🔒 CRITICAL: Only show formula if it was actually saved (passed validation)
       let formulaForDisplay = null;
       if (savedFormula) {
+        const savedBases = savedFormula.bases ?? [];
+        const savedAdditions = savedFormula.additions ?? [];
         // Use savedFormula data which includes the corrected totalMg and validated ingredients
         formulaForDisplay = {
-          bases: savedFormula.bases.map((b: any) => ({
+          bases: savedBases.map((b: any) => ({
             name: b.ingredient || b.name,
             dose: typeof b.amount === 'number' ? `${b.amount}mg` : (b.dose || `${b.amount}mg`),
             purpose: b.purpose
           })),
-          additions: savedFormula.additions.map((a: any) => ({
+          additions: savedAdditions.map((a: any) => ({
             name: a.ingredient || a.name,
             dose: typeof a.amount === 'number' ? `${a.amount}mg` : (a.dose || `${a.amount}mg`),
             purpose: a.purpose
@@ -3690,6 +3719,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       
       // Fetch messages for this session
       const messages = await storage.listMessagesBySession(sessionId);
+      const sessionUpdatedAt = messages.length > 0
+        ? messages[messages.length - 1].createdAt
+        : session.createdAt;
       
       res.json({
         session: {
@@ -3697,7 +3729,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           userId: session.userId,
           status: session.status,
           createdAt: session.createdAt,
-          updatedAt: session.updatedAt
+          updatedAt: sessionUpdatedAt
         },
         messages: messages.map(msg => ({
           id: msg.id,
@@ -4452,7 +4484,6 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         userId,
         consentType,
         granted: true,
-        grantedAt: new Date(),
         consentVersion: consentVersion || '1.0',
         ipAddress,
         userAgent,
@@ -4829,7 +4860,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         timestamp: new Date().toISOString(),
         userId,
         fileId,
-        fileName: fileUpload.fileName,
+        fileName: fileUpload.originalFileName,
         fileType: fileUpload.type,
         action: 'delete',
         ipAddress: auditInfo.ipAddress,
@@ -6095,21 +6126,22 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       try {
         const user = await storage.getUserById(userId);
         if (user) {
+          const adminActionUrl = 'https://myones.ai/admin';
           await sendNotificationEmail({
             to: 'support@myones.ai',
             subject: `New Support Ticket: ${ticket.subject}`,
-            html: `
-              <h2>New Support Ticket Received</h2>
-              <p><strong>From:</strong> ${user.name} (${user.email})</p>
-              <p><strong>Subject:</strong> ${ticket.subject}</p>
-              <p><strong>Category:</strong> ${ticket.category}</p>
-              <p><strong>Priority:</strong> ${ticket.priority}</p>
-              <p><strong>Description:</strong></p>
-              <p>${ticket.description}</p>
-              <p><strong>Ticket ID:</strong> ${ticket.id}</p>
-              <p><a href="https://myones.ai/admin">View in Admin Dashboard</a></p>
+            title: 'New Support Ticket Received',
+            content: `
+              <strong>From:</strong> ${user.name} (${user.email})<br/>
+              <strong>Subject:</strong> ${ticket.subject}<br/>
+              <strong>Category:</strong> ${ticket.category}<br/>
+              <strong>Priority:</strong> ${ticket.priority}<br/>
+              <strong>Description:</strong> ${ticket.description}<br/>
+              <strong>Ticket ID:</strong> ${ticket.id}
             `,
-            text: `New Support Ticket from ${user.name} (${user.email})\n\nSubject: ${ticket.subject}\nCategory: ${ticket.category}\nPriority: ${ticket.priority}\n\nDescription:\n${ticket.description}\n\nTicket ID: ${ticket.id}`
+            actionUrl: adminActionUrl,
+            actionText: 'Open Admin Dashboard',
+            type: 'system'
           });
           console.log(`📧 Support notification email sent for ticket ${ticket.id}`);
         }
@@ -6160,19 +6192,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       try {
         const user = await storage.getUserById(userId);
         if (user && ticket) {
+          const adminTicketUrl = `https://myones.ai/admin/support/${ticketId}`;
           await sendNotificationEmail({
             to: 'support@myones.ai',
             subject: `New Response on Ticket: ${ticket.subject}`,
-            html: `
-              <h2>New User Response on Support Ticket</h2>
-              <p><strong>From:</strong> ${user.name} (${user.email})</p>
-              <p><strong>Ticket Subject:</strong> ${ticket.subject}</p>
-              <p><strong>Ticket ID:</strong> ${ticketId}</p>
-              <p><strong>New Message:</strong></p>
-              <p>${messageValidation.data.message}</p>
-              <p><a href="https://myones.ai/admin/support/${ticketId}">View Ticket in Admin Dashboard</a></p>
+            title: 'New Support Ticket Response',
+            content: `
+              <strong>From:</strong> ${user.name} (${user.email})<br/>
+              <strong>Ticket Subject:</strong> ${ticket.subject}<br/>
+              <strong>Ticket ID:</strong> ${ticketId}<br/>
+              <strong>New Message:</strong> ${messageValidation.data.message}
             `,
-            text: `New response from ${user.name} (${user.email}) on ticket: ${ticket.subject}\n\nMessage:\n${messageValidation.data.message}\n\nTicket ID: ${ticketId}`
+            actionUrl: adminTicketUrl,
+            actionText: 'Review Ticket',
+            type: 'system'
           });
           console.log(`📧 Support response notification email sent for ticket ${ticketId}`);
         }

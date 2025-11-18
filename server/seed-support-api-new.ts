@@ -1,3 +1,6 @@
+import { db } from './db';
+import { faqItems, helpArticles } from '@shared/schema';
+
 const helpArticlesData = [
   {
     category: 'Getting Started',

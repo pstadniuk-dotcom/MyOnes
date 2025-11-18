@@ -1,6 +1,5 @@
 import "./env";
 import express, { type Request, Response, NextFunction } from "express";
-import type { ListenOptions } from "net";
 import fileUpload from "express-fileupload";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
@@ -102,28 +101,15 @@ app.use(fileUpload({
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
 
   res.on("finish", () => {
+    if (!path.startsWith("/api")) return;
+
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
+    const contentLength = res.getHeader("content-length");
+    const meta = contentLength ? ` ~${contentLength}b` : "";
+    const logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms${meta}`;
+    log(logLine);
   });
 
   next();
@@ -154,17 +140,10 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  const listenOptions: ListenOptions = {
+  server.listen({
     port,
     host: "0.0.0.0",
-  };
-
-  // Windows does not support SO_REUSEPORT, so enable reuse only where available.
-  if (process.platform !== "win32") {
-    listenOptions.reusePort = true;
-  }
-
-  server.listen(listenOptions, () => {
+  }, () => {
     log(`serving on port ${port}`);
     
     // Start SMS reminder scheduler

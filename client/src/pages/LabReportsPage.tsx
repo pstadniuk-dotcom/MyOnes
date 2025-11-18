@@ -12,7 +12,8 @@ import { FileText, Plus, Trash2, Download, Loader2, Upload, ClipboardPaste } fro
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { queryClient, apiRequest, getAuthHeaders } from '@/lib/queryClient';
+import { buildApiUrl } from '@/lib/api';
 import type { FileUpload } from '@shared/schema';
 
 function LabReportsSkeleton() {
@@ -114,16 +115,9 @@ export default function LabReportsPage() {
         originalName: file.name
       }));
 
-      // Get auth token from localStorage
-      const token = localStorage.getItem('authToken');
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch('/api/files/upload', {
+      const response = await fetch(buildApiUrl('/api/files/upload'), {
         method: 'POST',
-        headers,
+        headers: getAuthHeaders(),
         body: formData,
         credentials: 'include'
       });
@@ -216,15 +210,9 @@ export default function LabReportsPage() {
         manualEntry: true
       }));
 
-      const token = localStorage.getItem('authToken');
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch('/api/files/upload', {
+      const response = await fetch(buildApiUrl('/api/files/upload'), {
         method: 'POST',
-        headers,
+        headers: getAuthHeaders(),
         body: formData,
         credentials: 'include'
       });

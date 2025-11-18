@@ -490,12 +490,7 @@ function AISettingsCard({ onChanged }: { onChanged?: () => void }) {
 
   const testMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch('/api/admin/ai-settings/test', {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        credentials: 'include'
-      });
+      const res = await apiRequest('POST', '/api/admin/ai-settings/test');
       const text = await res.text();
       let data: any = null;
       try {

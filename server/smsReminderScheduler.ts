@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { storage } from './storage';
 import { sendNotificationSms } from './smsService';
-import { generatePersonalizedTip } from './healthTips';
+import { generatePersonalizedTip, type FormulaIngredient } from './healthTips';
 
 interface ReminderCheck {
   userId: string;
@@ -9,7 +9,7 @@ interface ReminderCheck {
   timezone: string;
   mealType: 'breakfast' | 'lunch' | 'dinner';
   capsuleCount: number;
-  ingredients: string[];
+  ingredients: FormulaIngredient[];
 }
 
 // Track which users we've sent reminders to today (to avoid duplicates)
@@ -87,23 +87,25 @@ async function checkAndSendReminders() {
       }
       
       // Calculate total capsule count from formula
-      const totalDosage = activeFormula.dosage || 0;
-      const capsuleCount = Math.ceil(totalDosage / 1500); // Each capsule is ~1500mg
-      
-      // Get ingredient names for personalized tips
-      const ingredients = [
-        ...(activeFormula.baseCombinations || []),
-        ...(activeFormula.individualIngredients || [])
-      ].map(item => item.ingredient);
+      const totalDosage = Math.max(activeFormula.totalMg || 0, 0);
+      const capsuleCount = Math.max(1, Math.ceil(totalDosage / 1500)); // Each capsule is ~1500mg
+
+      // Gather ingredients for personalized tips
+      const bases = Array.isArray(activeFormula.bases) ? activeFormula.bases : [];
+      const additions = Array.isArray(activeFormula.additions) ? activeFormula.additions : [];
+      const ingredients: FormulaIngredient[] = [...bases, ...additions];
       
       // Check each meal time
-      const reminders: Array<{ mealType: 'breakfast' | 'lunch' | 'dinner'; time: string }> = [
+      const reminders: Array<{ mealType: 'breakfast' | 'lunch' | 'dinner'; time: string | null | undefined }> = [
         { mealType: 'breakfast', time: prefs.reminderBreakfast },
         { mealType: 'lunch', time: prefs.reminderLunch },
         { mealType: 'dinner', time: prefs.reminderDinner }
       ];
       
       for (const { mealType, time } of reminders) {
+        if (!time) {
+          continue;
+        }
         const [targetHours, targetMinutes] = time.split(':').map(Number);
         
         const timeMatches = currentTime.hours === targetHours && currentTime.minutes === targetMinutes;
@@ -138,7 +140,7 @@ async function sendReminderSms(reminder: ReminderCheck) {
     const { phone, mealType, capsuleCount, ingredients } = reminder;
     
     // Generate AI-powered health tip or use static fallback
-    const healthTip = await generatePersonalizedTip(ingredients, mealType);
+    const healthTip = await generatePersonalizedTip(ingredients, mapMealTypeToTipContext(mealType));
     
     // Format meal type for display
     const mealDisplay = mealType.charAt(0).toUpperCase() + mealType.slice(1);
@@ -182,3 +184,10 @@ export function startSmsReminderScheduler() {
 
 // Export for manual testing
 export { checkAndSendReminders, sendReminderSms };
+
+function mapMealTypeToTipContext(mealType: 'breakfast' | 'lunch' | 'dinner'): 'morning' | 'evening' {
+  if (mealType === 'dinner') {
+    return 'evening';
+  }
+  return 'morning';
+}

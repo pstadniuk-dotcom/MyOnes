@@ -1,7 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-
-// Get API base URL from environment variable, fallback to relative URL for dev
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+import { buildApiUrl } from "@/lib/api";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -10,7 +8,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-function getAuthHeaders(): Record<string, string> {
+export function getAuthHeaders(): Record<string, string> {
   const token = localStorage.getItem('authToken');
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
@@ -20,7 +18,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const fullUrl = `${API_BASE}${url}`;
+  const fullUrl = buildApiUrl(url);
   const headers = {
     ...getAuthHeaders(),
     ...(data ? { "Content-Type": "application/json" } : {}),
@@ -43,7 +41,8 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const endpoint = buildEndpointFromQueryKey(queryKey);
+    const res = await fetch(buildApiUrl(endpoint), {
       headers: getAuthHeaders(),
       credentials: "include",
     });
@@ -70,3 +69,25 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+function buildEndpointFromQueryKey(queryKey: readonly unknown[]): string {
+  if (!queryKey.length) {
+    throw new Error('Query key must not be empty');
+  }
+
+  const [first, ...rest] = queryKey;
+  if (typeof first !== 'string') {
+    throw new Error('First query key entry must be a string endpoint');
+  }
+
+  const suffixParts = rest
+    .filter((part) => part !== undefined && part !== null)
+    .map((part) => encodeURIComponent(String(part)));
+
+  if (!suffixParts.length) {
+    return first;
+  }
+
+  const separator = first.endsWith('/') ? '' : '/';
+  return `${first}${separator}${suffixParts.join('/')}`;
+}

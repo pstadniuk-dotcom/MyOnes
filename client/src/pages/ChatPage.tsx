@@ -7,6 +7,8 @@ import { Send, Upload, User, AlertTriangle, CheckCircle, Menu } from 'lucide-rea
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
 import ThinkingIndicator from '@/components/ThinkingIndicator';
+import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
+import { buildApiUrl } from '@/lib/api';
 
 interface Message {
   id: string;
@@ -51,7 +53,7 @@ export default function ChatPage() {
   useEffect(() => {
     const loadRecentSession = async () => {
       try {
-        const response = await fetch('/api/consultations/history');
+        const response = await apiRequest('GET', '/api/consultations/history');
         if (response.ok) {
           const data = await response.json();
           
@@ -104,7 +106,7 @@ export default function ChatPage() {
       if (!sessionId || isLoadingHistory || isTyping) return;
       
       try {
-        const response = await fetch(`/api/consultations/${sessionId}`);
+        const response = await apiRequest('GET', `/api/consultations/${sessionId}`);
         if (response.ok) {
           const data = await response.json();
           
@@ -186,12 +188,11 @@ export default function ChatPage() {
 
     try {
       // Enhanced fetch with proper error handling
-      const API_BASE = import.meta.env.VITE_API_BASE || '';
-      const response = await fetch(`${API_BASE}/api/chat/stream`, {
+      const response = await fetch(buildApiUrl('/api/chat/stream'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          ...getAuthHeaders()
         },
         body: JSON.stringify({
           message: currentMessage,

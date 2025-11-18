@@ -38,7 +38,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSearch } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, getAuthHeaders } from '@/lib/queryClient';
+import { buildApiUrl } from '@/lib/api';
 import type { User as UserType, HealthProfile } from '@shared/schema';
 
 // Loading skeleton components
@@ -311,16 +312,9 @@ export default function ProfilePage() {
         originalName: file.name
       }));
 
-      // Get auth token from localStorage
-      const token = localStorage.getItem('authToken');
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch('/api/files/upload', {
+      const response = await fetch(buildApiUrl('/api/files/upload'), {
         method: 'POST',
-        headers,
+        headers: getAuthHeaders(),
         body: formData,
         credentials: 'include'
       });

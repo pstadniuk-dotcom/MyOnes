@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Calendar, Bell, Mail, MessageSquare, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { buildApiUrl } from "@/lib/api";
+import { getAuthHeaders } from "@/lib/queryClient";
 
 type ReviewFrequency = 'monthly' | 'bimonthly' | 'quarterly';
 
@@ -48,8 +50,9 @@ export function ReviewScheduleCard({ formulaId }: ReviewScheduleCardProps) {
   const loadSchedule = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/formulas/${formulaId}/review-schedule`, {
+      const response = await fetch(buildApiUrl(`/api/formulas/${formulaId}/review-schedule`), {
         credentials: 'include',
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -72,9 +75,12 @@ export function ReviewScheduleCard({ formulaId }: ReviewScheduleCardProps) {
   const handleSaveSchedule = async () => {
     try {
       setSaving(true);
-      const response = await fetch(`/api/formulas/${formulaId}/review-schedule`, {
+      const response = await fetch(buildApiUrl(`/api/formulas/${formulaId}/review-schedule`), {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
         credentials: 'include',
         body: JSON.stringify({
           frequency,
@@ -110,8 +116,9 @@ export function ReviewScheduleCard({ formulaId }: ReviewScheduleCardProps) {
 
   const handleDownloadCalendar = async () => {
     try {
-      const response = await fetch(`/api/formulas/${formulaId}/review-schedule/calendar`, {
+      const response = await fetch(buildApiUrl(`/api/formulas/${formulaId}/review-schedule/calendar`), {
         credentials: 'include',
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {

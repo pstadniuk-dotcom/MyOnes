@@ -12,6 +12,7 @@ import {
   Download
 } from 'lucide-react';
 import { calculateDosage } from '@/lib/utils';
+import { buildApiUrl } from '@/lib/api';
 import { BASE_FORMULA_DETAILS, findIngredientByName } from '@shared/ingredients';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -22,7 +23,7 @@ export default function SharedFormulaPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['/api/formulas/shared', formulaId],
     queryFn: async () => {
-      const response = await fetch(`/api/formulas/shared/${formulaId}`);
+      const response = await fetch(buildApiUrl(`/api/formulas/shared/${formulaId}`));
       if (!response.ok) {
         throw new Error('Formula not found');
       }

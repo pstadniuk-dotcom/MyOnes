@@ -97,6 +97,8 @@ export default function FormulaPage() {
     );
   }
 
+  const additions = currentFormula.additions ?? [];
+
   return (
     <div className="space-y-6" data-testid="page-formula">
       {/* Header */}
@@ -179,7 +181,7 @@ export default function FormulaPage() {
               <div>
                 <h3 className="font-semibold text-lg mb-3">Personalized Additions</h3>
                 <div className="grid gap-4">
-                  {currentFormula.additions.map((addition, idx) => (
+                  {additions.map((addition, idx) => (
                     <Card key={idx} className="border-l-4 border-l-blue-400">
                       <CardContent className="pt-4">
                         <div className="flex items-center justify-between mb-2">
@@ -263,15 +265,15 @@ export default function FormulaPage() {
                       </div>
                       <Progress value={Math.round((currentFormula.bases.reduce((sum, base) => sum + base.amount, 0) / currentFormula.totalMg) * 100)} />
                     </div>
-                    {currentFormula.additions.length > 0 && (
+                    {additions.length > 0 && (
                       <div>
                         <div className="flex justify-between text-sm mb-1">
                           <span>Additional Supplements</span>
                           <span>
-                            {currentFormula.additions.reduce((sum, addition) => sum + addition.amount, 0)}{currentFormula.additions[0]?.unit || 'mg'}
+                            {additions.reduce((sum, addition) => sum + addition.amount, 0)}{additions[0]?.unit || 'mg'}
                           </span>
                         </div>
-                        <Progress value={Math.round((currentFormula.additions.reduce((sum, addition) => sum + addition.amount, 0) / currentFormula.totalMg) * 100)} />
+                        <Progress value={Math.round((additions.reduce((sum, addition) => sum + addition.amount, 0) / currentFormula.totalMg) * 100)} />
                       </div>
                     )}
                   </div>
@@ -282,7 +284,7 @@ export default function FormulaPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Total Ingredients</span>
-                      <Badge variant="secondary">{currentFormula.bases.length + currentFormula.additions.length}</Badge>
+                      <Badge variant="secondary">{currentFormula.bases.length + additions.length}</Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Base Formulas</span>
@@ -290,7 +292,7 @@ export default function FormulaPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Added Supplements</span>
-                      <Badge variant="outline">{currentFormula.additions.length}</Badge>
+                      <Badge variant="outline">{additions.length}</Badge>
                     </div>
                   </div>
                 </div>
