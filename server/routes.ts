@@ -4759,7 +4759,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         ipAddress: auditInfo.ipAddress,
         userAgent: auditInfo.userAgent,
         success: false,
-        reason: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        reason: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        stack: error instanceof Error ? error.stack : undefined
       });
 
       if (error instanceof Error && error.name === 'ConsentRequiredError') {
@@ -4770,7 +4771,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
       
       console.error('File upload error:', error);
-      res.status(500).json({ error: 'Failed to upload file' });
+      res.status(500).json({ 
+        error: 'Failed to upload file',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

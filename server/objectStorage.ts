@@ -71,49 +71,65 @@ export async function enforceConsentRequirements(
   operation: 'upload' | 'download' | 'delete' | 'list' | 'ai_analysis',
   auditInfo?: { ipAddress?: string, userAgent?: string }
 ): Promise<void> {
-  // Map operations to required consent types
-  const requiredConsents: Record<string, string[]> = {
-    'upload': ['lab_data_processing'],
-    'download': ['lab_data_processing'],
-    'delete': ['lab_data_processing'],
-    'list': ['lab_data_processing'],
-    'ai_analysis': ['lab_data_processing', 'ai_analysis']
-  };
+  try {
+    // Map operations to required consent types
+    const requiredConsents: Record<string, string[]> = {
+      'upload': ['lab_data_processing'],
+      'download': ['lab_data_processing'],
+      'delete': ['lab_data_processing'],
+      'list': ['lab_data_processing'],
+      'ai_analysis': ['lab_data_processing', 'ai_analysis']
+    };
 
-  const consentsNeeded = requiredConsents[operation] || [];
-  const missingConsents: string[] = [];
+    const consentsNeeded = requiredConsents[operation] || [];
+    const missingConsents: string[] = [];
 
-  // Check each required consent
-  for (const consentType of consentsNeeded) {
-    const consent = await storage.getUserConsent(userId, consentType as any);
-    if (!consent) {
-      missingConsents.push(consentType);
+    // Check each required consent
+    for (const consentType of consentsNeeded) {
+      try {
+        const consent = await storage.getUserConsent(userId, consentType as any);
+        if (!consent) {
+          missingConsents.push(consentType);
+        }
+      } catch (error) {
+        console.error(`Error checking consent ${consentType}:`, error);
+        // If we can't check consent, assume it's missing
+        missingConsents.push(consentType);
+      }
     }
-  }
 
-  // Log consent check result
-  const auditEntry = {
-    timestamp: new Date().toISOString(),
-    userId,
-    action: 'access_denied' as const,
-    objectPath: `consent-check-${operation}`,
-    ipAddress: auditInfo?.ipAddress,
-    userAgent: auditInfo?.userAgent,
-    success: missingConsents.length === 0,
-    reason: missingConsents.length > 0 
-      ? `Missing required consents: ${missingConsents.join(', ')}` 
-      : `All required consents verified for ${operation}`
-  };
+    // Log consent check result
+    const auditEntry = {
+      timestamp: new Date().toISOString(),
+      userId,
+      action: 'access_denied' as const,
+      objectPath: `consent-check-${operation}`,
+      ipAddress: auditInfo?.ipAddress,
+      userAgent: auditInfo?.userAgent,
+      success: missingConsents.length === 0,
+      reason: missingConsents.length > 0 
+        ? `Missing required consents: ${missingConsents.join(', ')}` 
+        : `All required consents verified for ${operation}`
+    };
 
-  if (missingConsents.length > 0) {
-    console.warn("HIPAA AUDIT LOG - Consent Violation:", auditEntry);
-    throw new ConsentRequiredError(
-      `Operation blocked: Missing required consents for ${operation}. ` +
-      `Required: ${missingConsents.join(', ')}. ` +
-      `Please provide consent before accessing medical data.`
-    );
-  } else {
-    console.log("HIPAA AUDIT LOG - Consent Verified:", auditEntry);
+    if (missingConsents.length > 0) {
+      console.warn("HIPAA AUDIT LOG - Consent Violation:", auditEntry);
+      throw new ConsentRequiredError(
+        `Operation blocked: Missing required consents for ${operation}. ` +
+        `Required: ${missingConsents.join(', ')}. ` +
+        `Please provide consent before accessing medical data.`
+      );
+    } else {
+      console.log("HIPAA AUDIT LOG - Consent Verified:", auditEntry);
+    }
+  } catch (error) {
+    // Re-throw ConsentRequiredError as-is
+    if (error instanceof ConsentRequiredError) {
+      throw error;
+    }
+    // Log and re-throw other errors
+    console.error('Error in enforceConsentRequirements:', error);
+    throw error;
   }
 }
 
