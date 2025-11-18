@@ -60,20 +60,21 @@ export default function ChatPage() {
           // Check if there's an active session with messages
           if (data.sessions && data.sessions.length > 0) {
             const recentSession = data.sessions[0]; // Most recent session
+            const sessionMessages = data.messages?.[recentSession.id] || [];
             
-            if (recentSession.id && recentSession.messages && recentSession.messages.length > 0) {
+            if (recentSession.id && sessionMessages.length > 0) {
               console.log('Auto-restored session:', recentSession.id);
               
               // Set the session ID and persist to localStorage
               setSessionId(recentSession.id);
               localStorage.setItem('currentSessionId', recentSession.id);
               
-              // Load the messages
-              const loadedMessages: Message[] = recentSession.messages.map((msg: any) => ({
+              // Load the messages from the messages map
+              const loadedMessages: Message[] = sessionMessages.map((msg: any) => ({
                 id: msg.id,
                 content: msg.content,
-                sender: msg.role === 'user' ? 'user' : 'ai',
-                timestamp: new Date(msg.createdAt)
+                sender: msg.sender || (msg.role === 'user' ? 'user' : 'ai'),
+                timestamp: new Date(msg.timestamp || msg.createdAt)
               }));
               
               setMessages(loadedMessages);
