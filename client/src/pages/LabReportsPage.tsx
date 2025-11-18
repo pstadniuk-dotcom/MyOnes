@@ -50,9 +50,10 @@ export default function LabReportsPage() {
   const [selectedTestType, setSelectedTestType] = useState<'blood_test'>('blood_test');
 
   // Fetch user consents
-  const { data: consents } = useQuery<UserConsent[]>({
+  const { data: consents, isLoading: consentsLoading, error: consentsError } = useQuery<UserConsent[]>({
     queryKey: ['/api/consents'],
     enabled: isAuthenticated && !!user?.id,
+    retry: 1, // Don't retry too many times if endpoint doesn't exist yet
   });
 
   // Fetch lab reports
@@ -62,9 +63,10 @@ export default function LabReportsPage() {
   });
 
   // Check if user has lab data processing consent
-  const hasLabDataConsent = consents?.some(
+  // If consents endpoint fails (backend not deployed), default to showing dialog
+  const hasLabDataConsent = consentsError ? false : (consents?.some(
     consent => consent.consentType === 'lab_data_processing' && !consent.revokedAt
-  ) ?? false;
+  ) ?? false);
 
   // Grant consent mutation
   const grantConsentMutation = useMutation({
@@ -137,17 +139,18 @@ export default function LabReportsPage() {
 
       if (!response.ok) {
         const error = await response.json();
+        console.log('Upload error response:', response.status, error);
         
         // Check for consent error specifically
-        if (response.status === 403 && error.error?.includes('consent')) {
-          toast({
-            title: "Consent Required",
-            description: "Please grant consent to upload lab data. The consent dialog will appear.",
-            variant: "destructive",
-          });
-          // Show consent dialog automatically
+        if (response.status === 403) {
+          console.log('403 error detected, showing consent dialog');
+          setIsUploading(false);
           setPendingFile(file);
           setShowConsentDialog(true);
+          toast({
+            title: "Consent Required",
+            description: "Please grant consent to process your health data before uploading.",
+          });
           return;
         }
         
@@ -180,6 +183,8 @@ export default function LabReportsPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    console.log('File selected:', file.name, 'hasLabDataConsent:', hasLabDataConsent);
+
     // Validate file type
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
     if (!allowedTypes.includes(file.type)) {
@@ -204,9 +209,11 @@ export default function LabReportsPage() {
 
     // Check if user has already consented
     if (hasLabDataConsent) {
+      console.log('User has consent, uploading directly');
       // User already has consent, upload directly
       await uploadFile(file);
     } else {
+      console.log('User needs consent, showing dialog');
       // User needs to consent first
       setPendingFile(file);
       setShowConsentDialog(true);
