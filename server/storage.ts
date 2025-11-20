@@ -8,6 +8,8 @@ import {
   notifications, notificationPrefs, auditLogs, userConsents, labAnalyses,
   faqItems, supportTickets, supportTicketResponses, helpArticles, newsletterSubscribers,
   researchCitations, wearableConnections, appSettings, reviewSchedules,
+  optimizePlans, optimizeDailyLogs, workoutPlans, workouts, workoutLogs,
+  mealPlans, recipes, mealLogs, groceryLists, optimizeSmsPreferences, userStreaks,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -32,7 +34,18 @@ import {
   type ResearchCitation, type InsertResearchCitation,
   type WearableConnection, type InsertWearableConnection,
   type AppSetting, type InsertAppSetting,
-  type ReviewSchedule, type InsertReviewSchedule
+  type ReviewSchedule, type InsertReviewSchedule,
+  type OptimizePlan, type InsertOptimizePlan,
+  type OptimizeDailyLog, type InsertOptimizeDailyLog,
+  type WorkoutPlan, type InsertWorkoutPlan,
+  type Workout, type InsertWorkout,
+  type WorkoutLog, type InsertWorkoutLog,
+  type MealPlan, type InsertMealPlan,
+  type Recipe, type InsertRecipe,
+  type MealLog, type InsertMealLog,
+  type GroceryList, type InsertGroceryList,
+  type OptimizeSmsPreferences, type InsertOptimizeSmsPreferences,
+  type UserStreak, type InsertUserStreak
 } from "@shared/schema";
 
 export interface IStorage {
@@ -154,6 +167,7 @@ export interface IStorage {
   createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket>;
   updateSupportTicket(id: string, updates: Partial<InsertSupportTicket>): Promise<SupportTicket | undefined>;
   listSupportTicketsByUser(userId: string): Promise<SupportTicket[]>;
+  listAllSupportTickets(status?: string, limit?: number, offset?: number): Promise<{tickets: Array<SupportTicket & {userName: string, userEmail: string}>, total: number}>;
   getSupportTicketWithResponses(id: string, userId: string): Promise<{ticket: SupportTicket, responses: SupportTicketResponse[]} | undefined>;
   
   // Support ticket response operations
@@ -1702,7 +1716,7 @@ export class DrizzleStorage implements IStorage {
   async getSupportTicket(id: string): Promise<SupportTicket | undefined> {
     try {
       const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, id));
-      return ticket || undefined;
+      return ticket;
     } catch (error) {
       console.error('Error getting support ticket:', error);
       return undefined;
@@ -1772,6 +1786,49 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error getting support ticket with responses:', error);
       return undefined;
+    }
+  }
+
+  async listAllSupportTickets(status?: string, limit: number = 50, offset: number = 0): Promise<{tickets: Array<SupportTicket & {userName: string, userEmail: string}>, total: number}> {
+    try {
+      let query = db
+        .select({
+          id: supportTickets.id,
+          userId: supportTickets.userId,
+          subject: supportTickets.subject,
+          description: supportTickets.description,
+          category: supportTickets.category,
+          status: supportTickets.status,
+          priority: supportTickets.priority,
+          assignedTo: supportTickets.assignedTo,
+          resolvedAt: supportTickets.resolvedAt,
+          createdAt: supportTickets.createdAt,
+          updatedAt: supportTickets.updatedAt,
+          userName: users.name,
+          userEmail: users.email
+        })
+        .from(supportTickets)
+        .leftJoin(users, eq(supportTickets.userId, users.id))
+        .orderBy(desc(supportTickets.createdAt))
+        .$dynamic();
+
+      if (status && status !== 'all') {
+        query = query.where(eq(supportTickets.status, status as any));
+      }
+
+      const allTickets = await query;
+      const normalizedTickets = allTickets.map(ticket => ({
+        ...ticket,
+        userName: ticket.userName ?? '',
+        userEmail: ticket.userEmail ?? ''
+      }));
+      const total = normalizedTickets.length;
+      const tickets = normalizedTickets.slice(offset, offset + limit);
+
+      return { tickets, total };
+    } catch (error) {
+      console.error('Error listing all support tickets:', error);
+      return { tickets: [], total: 0 };
     }
   }
 
@@ -2613,6 +2670,327 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error fetching upcoming review schedules:', error);
       return [];
+    }
+  }
+
+  // ===== OPTIMIZE FEATURE OPERATIONS =====
+  
+  // Optimize Plans
+  async createOptimizePlan(plan: InsertOptimizePlan): Promise<OptimizePlan> {
+    const [created] = await db.insert(optimizePlans).values(plan).returning();
+    return created;
+  }
+
+  async getOptimizePlan(id: string): Promise<OptimizePlan | undefined> {
+    const [plan] = await db
+      .select()
+      .from(optimizePlans)
+      .where(eq(optimizePlans.id, id));
+    return plan;
+  }
+
+  async getActiveOptimizePlan(userId: string, planType: 'nutrition' | 'workout' | 'lifestyle'): Promise<OptimizePlan | undefined> {
+    const [plan] = await db
+      .select()
+      .from(optimizePlans)
+      .where(and(
+        eq(optimizePlans.userId, userId),
+        eq(optimizePlans.planType, planType),
+        eq(optimizePlans.isActive, true)
+      ))
+      .orderBy(desc(optimizePlans.createdAt))
+      .limit(1);
+    return plan;
+  }
+
+  async listOptimizePlans(userId: string): Promise<OptimizePlan[]> {
+    return await db
+      .select()
+      .from(optimizePlans)
+      .where(eq(optimizePlans.userId, userId))
+      .orderBy(desc(optimizePlans.createdAt));
+  }
+
+  async updateOptimizePlan(id: string, updates: Partial<InsertOptimizePlan>): Promise<OptimizePlan | undefined> {
+    const [updated] = await db
+      .update(optimizePlans)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(optimizePlans.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Daily Logs & Streaks
+  async createDailyLog(log: InsertOptimizeDailyLog): Promise<OptimizeDailyLog> {
+    const [created] = await db.insert(optimizeDailyLogs).values(log).returning();
+    
+    // Update streak after logging
+    await this.updateUserStreak(log.userId, log.logDate);
+    
+    return created;
+  }
+
+  async getDailyLog(userId: string, date: Date): Promise<OptimizeDailyLog | undefined> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const [log] = await db
+      .select()
+      .from(optimizeDailyLogs)
+      .where(and(
+        eq(optimizeDailyLogs.userId, userId),
+        gte(optimizeDailyLogs.logDate, startOfDay),
+        lte(optimizeDailyLogs.logDate, endOfDay)
+      ))
+      .limit(1);
+    return log;
+  }
+
+  async listDailyLogs(userId: string, startDate: Date, endDate: Date): Promise<OptimizeDailyLog[]> {
+    return await db
+      .select()
+      .from(optimizeDailyLogs)
+      .where(and(
+        eq(optimizeDailyLogs.userId, userId),
+        gte(optimizeDailyLogs.logDate, startDate),
+        lte(optimizeDailyLogs.logDate, endDate)
+      ))
+      .orderBy(desc(optimizeDailyLogs.logDate));
+  }
+
+  async updateDailyLog(id: string, updates: Partial<InsertOptimizeDailyLog>): Promise<OptimizeDailyLog | undefined> {
+    const [updated] = await db
+      .update(optimizeDailyLogs)
+      .set(updates)
+      .where(eq(optimizeDailyLogs.id, id))
+      .returning();
+    return updated;
+  }
+
+  // User Streaks
+  async getUserStreak(userId: string, streakType: 'overall' | 'nutrition' | 'workout' | 'lifestyle'): Promise<UserStreak | undefined> {
+    const [streak] = await db
+      .select()
+      .from(userStreaks)
+      .where(and(
+        eq(userStreaks.userId, userId),
+        eq(userStreaks.streakType, streakType)
+      ));
+    return streak;
+  }
+
+  async updateUserStreak(userId: string, logDate: Date): Promise<void> {
+    // Get yesterday's log
+    const yesterday = new Date(logDate);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayLog = await this.getDailyLog(userId, yesterday);
+    
+    // Get or create overall streak
+    let streak = await this.getUserStreak(userId, 'overall');
+    
+    if (!streak) {
+      // Create new streak
+      await db.insert(userStreaks).values({
+        userId,
+        streakType: 'overall',
+        currentStreak: 1,
+        longestStreak: 1,
+        lastLoggedDate: logDate
+      });
+      return;
+    }
+
+    // Calculate if streak continues
+    const yesterday24h = new Date();
+    yesterday24h.setDate(yesterday24h.getDate() - 1);
+    yesterday24h.setHours(0, 0, 0, 0);
+    
+    const lastLoggedDate = streak.lastLoggedDate ? new Date(streak.lastLoggedDate) : null;
+    lastLoggedDate?.setHours(0, 0, 0, 0);
+
+    let newCurrentStreak = streak.currentStreak;
+    
+    // Check if logged yesterday (streak continues)
+    if (lastLoggedDate && lastLoggedDate.getTime() === yesterday24h.getTime()) {
+      newCurrentStreak += 1;
+    } else if (!lastLoggedDate || lastLoggedDate.getTime() < yesterday24h.getTime()) {
+      // Streak broken - reset to 1
+      newCurrentStreak = 1;
+    }
+    // If logged today already, don't change streak
+
+    const newLongestStreak = Math.max(newCurrentStreak, streak.longestStreak);
+
+    await db
+      .update(userStreaks)
+      .set({
+        currentStreak: newCurrentStreak,
+        longestStreak: newLongestStreak,
+        lastLoggedDate: logDate,
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(userStreaks.userId, userId),
+        eq(userStreaks.streakType, 'overall')
+      ));
+  }
+
+  // Workout Plans & Logs
+  async createWorkoutPlan(plan: InsertWorkoutPlan): Promise<WorkoutPlan> {
+    const [created] = await db.insert(workoutPlans).values(plan).returning();
+    return created;
+  }
+
+  async getWorkoutPlan(id: string): Promise<WorkoutPlan | undefined> {
+    const [plan] = await db
+      .select()
+      .from(workoutPlans)
+      .where(eq(workoutPlans.id, id));
+    return plan;
+  }
+
+  async getActiveWorkoutPlan(userId: string): Promise<WorkoutPlan | undefined> {
+    const [plan] = await db
+      .select()
+      .from(workoutPlans)
+      .where(and(
+        eq(workoutPlans.userId, userId),
+        eq(workoutPlans.isActive, true)
+      ))
+      .orderBy(desc(workoutPlans.createdAt))
+      .limit(1);
+    return plan;
+  }
+
+  async updateMealPlan(id: string, updates: Partial<InsertMealPlan>): Promise<MealPlan | undefined> {
+    const [updated] = await db
+      .update(mealPlans)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(mealPlans.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getRecipe(id: string): Promise<Recipe | undefined> {
+    const [recipe] = await db
+      .select()
+      .from(recipes)
+      .where(eq(recipes.id, id));
+    return recipe;
+  }
+
+  async searchRecipes(filters: {
+    tags?: string[];
+    category?: Recipe['category'];
+    maxCalories?: number;
+    query?: string;
+  }): Promise<Recipe[]> {
+    const conditions = [];
+    
+    if (filters.category) {
+      conditions.push(eq(recipes.category, filters.category));
+    }
+    
+    if (filters.maxCalories) {
+      conditions.push(sql`(${recipes.macros}->>'calories')::int <= ${filters.maxCalories}`);
+    }
+    
+    if (filters.query) {
+      conditions.push(or(
+        ilike(recipes.name, `%${filters.query}%`),
+        ilike(recipes.description, `%${filters.query}%`)
+      ));
+    }
+
+    if (filters.tags && filters.tags.length > 0) {
+      // Check if any of the tags exist in the tags array
+      conditions.push(sql`${recipes.tags} && ARRAY[${filters.tags.join(',')}]::text[]`);
+    }
+
+    return await db
+      .select()
+      .from(recipes)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(recipes.name);
+  }
+
+  async createMealLog(log: InsertMealLog): Promise<MealLog> {
+    const [created] = await db.insert(mealLogs).values(log).returning();
+    return created;
+  }
+
+  async listMealLogs(userId: string, startDate?: Date, endDate?: Date): Promise<MealLog[]> {
+    const conditions = [eq(mealLogs.userId, userId)];
+    if (startDate) conditions.push(gte(mealLogs.loggedAt, startDate));
+    if (endDate) conditions.push(lte(mealLogs.loggedAt, endDate));
+
+    return await db
+      .select()
+      .from(mealLogs)
+      .where(and(...conditions))
+      .orderBy(desc(mealLogs.loggedAt));
+  }
+
+  // Grocery Lists
+  async createGroceryList(list: InsertGroceryList): Promise<GroceryList> {
+    const [created] = await db.insert(groceryLists).values(list).returning();
+    return created;
+  }
+
+  async getGroceryList(id: string): Promise<GroceryList | undefined> {
+    const [list] = await db
+      .select()
+      .from(groceryLists)
+      .where(eq(groceryLists.id, id));
+    return list;
+  }
+
+  async getActiveGroceryList(userId: string): Promise<GroceryList | undefined> {
+    const [list] = await db
+      .select()
+      .from(groceryLists)
+      .where(and(
+        eq(groceryLists.userId, userId),
+        eq(groceryLists.isArchived, false)
+      ))
+      .orderBy(desc(groceryLists.generatedAt))
+      .limit(1);
+    return list;
+  }
+
+  async updateGroceryList(id: string, updates: Partial<InsertGroceryList>): Promise<GroceryList | undefined> {
+    const [updated] = await db
+      .update(groceryLists)
+      .set(updates)
+      .where(eq(groceryLists.id, id))
+      .returning();
+    return updated;
+  }
+
+  // SMS Preferences
+  async getOptimizeSmsPreferences(userId: string): Promise<OptimizeSmsPreferences | undefined> {
+    const [prefs] = await db
+      .select()
+      .from(optimizeSmsPreferences)
+      .where(eq(optimizeSmsPreferences.userId, userId));
+    return prefs;
+  }
+
+  async createOrUpdateOptimizeSmsPreferences(prefs: InsertOptimizeSmsPreferences): Promise<OptimizeSmsPreferences> {
+    const existing = await this.getOptimizeSmsPreferences(prefs.userId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(optimizeSmsPreferences)
+        .set({ ...prefs, updatedAt: new Date() })
+        .where(eq(optimizeSmsPreferences.userId, prefs.userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(optimizeSmsPreferences).values(prefs).returning();
+      return created;
     }
   }
 }

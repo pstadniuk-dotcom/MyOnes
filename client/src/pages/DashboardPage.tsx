@@ -490,6 +490,14 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {user?.isAdmin && (
+                <Link href="/admin">
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Shield className="w-4 h-4" />
+                    Admin Dashboard
+                  </Button>
+                </Link>
+              )}
               <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
                 <Sparkles className="w-3 h-3 mr-1" />
                 Premium Member

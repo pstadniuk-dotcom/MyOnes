@@ -6,7 +6,9 @@ const candidates = ["server/.env.local", "server/.env"];
 let loadedFromFile = false;
 for (const candidate of candidates) {
 	const envPath = path.resolve(process.cwd(), candidate);
+	console.log(`Checking env path: ${envPath}`);
 	if (fs.existsSync(envPath)) {
+		console.log(`Loading env from: ${envPath}`);
 		loadEnv({ path: envPath, override: true });
 		loadedFromFile = true;
 		break;

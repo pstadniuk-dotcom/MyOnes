@@ -1198,7 +1198,22 @@ export default function ConsultationPage() {
                         </Button>
                       </div>
                       
-                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{removeJsonBlocks(message.content)}</p>
+                      {/* Show thinking indicator if AI message is empty/thinking */}
+                      {message.sender === 'ai' && !message.content && (isTyping || thinkingMessage) ? (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                            {thinkingMessage || 'Ones AI is analyzing...'}
+                          </p>
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{removeJsonBlocks(message.content)}</p>
+                      )}
                       
                       {/* File Attachment Display */}
                       {message.fileAttachment && (
@@ -1321,39 +1336,6 @@ export default function ConsultationPage() {
               </div>
             );
           })}
-            
-            {/* Thinking Indicator with Status */}
-            {thinkingMessage && (
-              <div className="flex justify-start max-w-[85%]" data-testid="indicator-thinking">
-                <ThinkingIndicator message={thinkingMessage} />
-              </div>
-            )}
-            
-            {/* Modern Typing Indicator (fallback when no thinking message) */}
-            {isTyping && !thinkingMessage && (
-              <div className="flex justify-start" data-testid="indicator-typing">
-                <div className="bg-background/80 backdrop-blur-sm rounded-2xl rounded-tl-sm p-5 max-w-[85%] border shadow-md">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-9 w-9 ring-2 ring-primary/10">
-                      <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-xs font-semibold text-primary">
-                        Ones
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                        Ones AI is analyzing...
-                      </p>
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>

@@ -146,7 +146,7 @@ export default function PersonalizationShowcase() {
   };
 
   return (
-    <div className="w-full bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+    <div id="personalization" className="w-full bg-gradient-to-br from-primary/5 via-background to-secondary/5">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative rounded-2xl overflow-hidden">
           {/* Header */}

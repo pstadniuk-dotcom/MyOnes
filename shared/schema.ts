@@ -876,3 +876,305 @@ export type BiometricTrend = typeof biometricTrends.$inferSelect;
 
 export type InsertReorderRecommendation = z.infer<typeof insertReorderRecommendationSchema>;
 export type ReorderRecommendation = typeof reorderRecommendations.$inferSelect;
+
+// ============================================================================
+// OPTIMIZE (Wellness Center) - Nutrition, Workout, Lifestyle Plans
+// ============================================================================
+
+// Enums for Optimize
+export const planTypeEnum = pgEnum('plan_type', ['nutrition', 'workout', 'lifestyle']);
+export const workoutExperienceLevelEnum = pgEnum('workout_experience_level', ['beginner', 'intermediate', 'advanced']);
+export const mealTypeEnum = pgEnum('meal_type', ['breakfast', 'lunch', 'dinner', 'snack']);
+export const recipeCategoryEnum = pgEnum('recipe_category', ['breakfast', 'lunch', 'dinner', 'snack', 'dessert']);
+
+// Optimize Plans - Main table for AI-generated wellness plans
+export const optimizePlans = pgTable("optimize_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  planType: planTypeEnum("plan_type").notNull(),
+  
+  // Plan content (flexible JSON structure)
+  content: json("content").notNull(), // Nutrition: meals, macros; Workout: exercises, schedule; Lifestyle: protocols
+  aiRationale: text("ai_rationale"), // Why this plan was created
+  
+  // Context used to generate plan (for regeneration)
+  basedOnFormulaId: varchar("based_on_formula_id").references(() => formulas.id),
+  basedOnLabs: json("based_on_labs"), // Snapshot of lab data used
+  preferences: json("preferences"), // User preferences (workout days, dietary restrictions, etc.)
+  
+  // Metadata
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Daily tracking for user progress
+export const optimizeDailyLogs = pgTable("optimize_daily_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  logDate: timestamp("log_date").notNull(), // Date of tracking
+  
+  // Daily completion tracking
+  nutritionCompleted: boolean("nutrition_completed").default(false).notNull(),
+  workoutCompleted: boolean("workout_completed").default(false).notNull(),
+  supplementsTaken: boolean("supplements_taken").default(false).notNull(),
+  
+  // Hydration tracking
+  waterIntakeOz: integer("water_intake_oz"),
+  
+  // Subjective ratings (1-5 scale)
+  energyLevel: integer("energy_level"), // 1 = very low, 5 = excellent
+  moodLevel: integer("mood_level"), // 1 = poor, 5 = excellent
+  sleepQuality: integer("sleep_quality"), // 1 = poor, 5 = excellent
+  
+  // Notes
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Workout Plans - Structured weekly programs
+export const workoutPlans = pgTable("workout_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "3-Day Strength Program"
+  daysPerWeek: integer("days_per_week").notNull(), // 1-7
+  experienceLevel: workoutExperienceLevelEnum("experience_level").notNull(),
+  
+  // Schedule: [{ day: "Monday", workoutId: "uuid" }, ...]
+  workoutSchedule: json("workout_schedule").notNull(),
+  
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Individual Workouts - Specific training sessions
+export const workouts = pgTable("workouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").references(() => workoutPlans.id, { onDelete: "cascade" }),
+  
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "Upper Body Push"
+  description: text("description"),
+  durationMinutes: integer("duration_minutes"),
+  
+  // Exercises: [{ name, sets, reps, rest, notes, videoUrl }]
+  exercises: json("exercises").notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Workout Logs - Track completed workouts
+export const workoutLogs = pgTable("workout_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  workoutId: varchar("workout_id").references(() => workouts.id),
+  
+  completedAt: timestamp("completed_at").defaultNow().notNull(),
+  
+  // Actual performance: [{ exerciseName, sets: [{ weight, reps }] }]
+  exercisesCompleted: json("exercises_completed"),
+  
+  durationActual: integer("duration_actual"), // Actual minutes spent
+  difficultyRating: integer("difficulty_rating"), // 1-5 scale
+  notes: text("notes"),
+});
+
+// Meal Plans - Weekly nutrition structure
+export const mealPlans = pgTable("meal_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "High Protein Anti-Inflammatory"
+  dailyCalories: integer("daily_calories").notNull(),
+  
+  // Macros: { protein: 200, carbs: 220, fat: 80 }
+  macros: json("macros").notNull(),
+  
+  // Meals: [{ mealType: "breakfast", recipes: [...], timing: "7-8 AM" }]
+  meals: json("meals").notNull(),
+  
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Recipe Library - Reusable recipes
+export const recipes = pgTable("recipes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  category: recipeCategoryEnum("category").notNull(),
+  
+  prepTimeMinutes: integer("prep_time_minutes"),
+  cookTimeMinutes: integer("cook_time_minutes"),
+  servings: integer("servings").notNull(),
+  
+  // Ingredients: [{ item, amount, unit }]
+  ingredients: json("ingredients").notNull(),
+  
+  // Instructions as array of steps
+  instructions: json("instructions").notNull(), // Array of strings
+  
+  // Macros per serving: { calories, protein, carbs, fat, fiber }
+  macros: json("macros").notNull(),
+  
+  // Tags: ["high-protein", "anti-inflammatory", "quick", etc.]
+  tags: json("tags"), // Array of strings
+  
+  imageUrl: text("image_url"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Meal Logs - Track what users eat
+export const mealLogs = pgTable("meal_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  recipeId: varchar("recipe_id").references(() => recipes.id), // NULL if custom meal
+  mealType: mealTypeEnum("meal_type").notNull(),
+  customMealName: varchar("custom_meal_name", { length: 255 }),
+  
+  loggedAt: timestamp("logged_at").defaultNow().notNull(),
+  servings: integer("servings").default(1),
+  notes: text("notes"),
+});
+
+// Grocery Lists - Auto-generated from meal plans
+export const groceryLists = pgTable("grocery_lists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  mealPlanId: varchar("meal_plan_id").references(() => mealPlans.id),
+  
+  // Items: [{ item, amount, unit, category, checked }]
+  items: json("items").notNull(),
+  
+  generatedAt: timestamp("generated_at").defaultNow().notNull(),
+  isArchived: boolean("is_archived").default(false).notNull(),
+});
+
+// SMS Preferences for Optimize reminders
+export const optimizeSmsPreferences = pgTable("optimize_sms_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  
+  // Morning reminder (nutrition + workout + supplements)
+  morningReminderEnabled: boolean("morning_reminder_enabled").default(true).notNull(),
+  morningReminderTime: text("morning_reminder_time").default('07:00').notNull(), // HH:MM format
+  
+  // Pre-workout reminder
+  workoutReminderEnabled: boolean("workout_reminder_enabled").default(true).notNull(),
+  workoutReminderTime: text("workout_reminder_time").default('17:00').notNull(),
+  
+  // Evening check-in
+  eveningCheckinEnabled: boolean("evening_checkin_enabled").default(true).notNull(),
+  eveningCheckinTime: text("evening_checkin_time").default('21:00').notNull(),
+  
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// User Streaks - Track consistency
+export const userStreaks = pgTable("user_streaks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  streakType: varchar("streak_type", { length: 50 }).notNull(), // 'overall', 'nutrition', 'workout', 'supplements'
+  currentStreak: integer("current_streak").default(0).notNull(),
+  longestStreak: integer("longest_streak").default(0).notNull(),
+  lastLoggedDate: timestamp("last_logged_date"),
+  
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Insert schemas for Optimize tables
+export const insertOptimizePlanSchema = createInsertSchema(optimizePlans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOptimizeDailyLogSchema = createInsertSchema(optimizeDailyLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorkoutPlanSchema = createInsertSchema(workoutPlans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWorkoutSchema = createInsertSchema(workouts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorkoutLogSchema = createInsertSchema(workoutLogs).omit({
+  id: true,
+});
+
+export const insertMealPlanSchema = createInsertSchema(mealPlans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRecipeSchema = createInsertSchema(recipes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMealLogSchema = createInsertSchema(mealLogs).omit({
+  id: true,
+});
+
+export const insertGroceryListSchema = createInsertSchema(groceryLists).omit({
+  id: true,
+});
+
+export const insertOptimizeSmsPreferencesSchema = createInsertSchema(optimizeSmsPreferences).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const insertUserStreakSchema = createInsertSchema(userStreaks).omit({
+  id: true,
+  updatedAt: true,
+});
+
+// Types for Optimize
+export type InsertOptimizePlan = z.infer<typeof insertOptimizePlanSchema>;
+export type OptimizePlan = typeof optimizePlans.$inferSelect;
+
+export type InsertOptimizeDailyLog = z.infer<typeof insertOptimizeDailyLogSchema>;
+export type OptimizeDailyLog = typeof optimizeDailyLogs.$inferSelect;
+
+export type InsertWorkoutPlan = z.infer<typeof insertWorkoutPlanSchema>;
+export type WorkoutPlan = typeof workoutPlans.$inferSelect;
+
+export type InsertWorkout = z.infer<typeof insertWorkoutSchema>;
+export type Workout = typeof workouts.$inferSelect;
+
+export type InsertWorkoutLog = z.infer<typeof insertWorkoutLogSchema>;
+export type WorkoutLog = typeof workoutLogs.$inferSelect;
+
+export type InsertMealPlan = z.infer<typeof insertMealPlanSchema>;
+export type MealPlan = typeof mealPlans.$inferSelect;
+
+export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
+export type Recipe = typeof recipes.$inferSelect;
+
+export type InsertMealLog = z.infer<typeof insertMealLogSchema>;
+export type MealLog = typeof mealLogs.$inferSelect;
+
+export type InsertGroceryList = z.infer<typeof insertGroceryListSchema>;
+export type GroceryList = typeof groceryLists.$inferSelect;
+
+export type InsertOptimizeSmsPreferences = z.infer<typeof insertOptimizeSmsPreferencesSchema>;
+export type OptimizeSmsPreferences = typeof optimizeSmsPreferences.$inferSelect;
+
+export type InsertUserStreak = z.infer<typeof insertUserStreakSchema>;
+export type UserStreak = typeof userStreaks.$inferSelect;

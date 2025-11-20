@@ -30,6 +30,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import HomePage from "@/pages/HomePage";
 import ConsultationPage from "@/pages/ConsultationPage";
 import MyFormulaPage from "@/pages/MyFormulaPage";
+import OptimizePage from "@/pages/OptimizePage";
 import WearablesPage from "@/pages/WearablesPage";
 import LabReportsPage from "@/pages/LabReportsPage";
 import OrdersPage from "@/pages/OrdersPage";
@@ -41,6 +42,7 @@ import SupportPage from "@/pages/SupportPage";
 import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
 import UserManagementPage from "@/pages/admin/UserManagementPage";
 import UserDetailPage from "@/pages/admin/UserDetailPage";
+import AdminSupportTicketsPage from "@/pages/admin/AdminSupportTicketsPage";
 
 // Import shared/public components
 import SharedFormulaPage from "@/pages/SharedFormulaPage";
@@ -132,6 +134,13 @@ function MainRouter() {
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/dashboard/optimize/:tab?">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <OptimizePage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/dashboard/wearables">
         <ProtectedRoute>
           <DashboardLayout>
@@ -197,6 +206,18 @@ function MainRouter() {
         <ProtectedAdminRoute>
           <UserDetailPage />
         </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/support-tickets">
+        <ProtectedAdminRoute>
+          <AdminSupportTicketsPage />
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/support-tickets/:id">
+        {(params) => (
+          <ProtectedAdminRoute>
+            <AdminSupportTicketsPage ticketId={params.id} />
+          </ProtectedAdminRoute>
+        )}
       </Route>
       
       {/* Public Shared Formula View */}
