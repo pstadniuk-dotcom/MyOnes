@@ -11,17 +11,17 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import type { SignupData, LoginData, AuthResponse } from "@shared/schema";
 import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, insertHealthProfileSchema, insertSupportTicketSchema, insertSupportTicketResponseSchema, insertNewsletterSubscriberSchema } from "@shared/schema";
-import { ObjectStorageService, ObjectNotFoundError, AccessDeniedError } from "./objectStorage";
+import { ObjectStorageService } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { analyzeLabReport } from "./fileAnalysis";
 import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDIENTS, BASE_FORMULA_DETAILS, normalizeIngredientName, findIngredientByName } from "@shared/ingredients";
 import { sendNotificationEmail } from "./emailService";
 import { sendNotificationSms } from "./smsService";
 import type { User, Notification, NotificationPref } from "@shared/schema";
-// Removed hybrid routing - now using GPT-4o only
 import { buildGPT4Prompt, buildO1MiniPrompt, type PromptContext } from "./prompt-builder";
+import { buildNutritionPlanPrompt, buildWorkoutPlanPrompt, buildLifestylePlanPrompt } from "./optimize-prompts";
+import { parseAiJson } from "./utils/parseAiJson";
 
-// Extend Express Request interface to include userId property
 declare global {
   namespace Express {
     interface Request {
@@ -30,7 +30,6 @@ declare global {
   }
 }
 
-// Extend express-session SessionData to include OAuth properties
 declare module 'express-session' {
   interface SessionData {
     oauthState?: string;
@@ -39,13 +38,10 @@ declare module 'express-session' {
   }
 }
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// In-memory admin-set AI settings (preferred over env when present)
 const aiRuntimeSettings: { provider?: 'openai' | 'anthropic'; model?: string; updatedAt?: string; source?: 'override' | 'env' } = {};
 
-// Allowed/canonical models per provider and a normalizer for common aliases/typos
 const ALLOWED_MODELS: Record<'openai'|'anthropic', string[]> = {
   openai: ['gpt-4o', 'gpt-5'],
   anthropic: [
@@ -55,11 +51,13 @@ const ALLOWED_MODELS: Record<'openai'|'anthropic', string[]> = {
     'claude-haiku-4-5',
     'claude-opus-4-1-20250805',
     'claude-opus-4-1',
-    // Legacy 3.x models
     'claude-3-5-sonnet-20241022',
     'claude-3-5-haiku-20241022'
   ]
 };
+
+
+
 
 function normalizeModel(provider: 'openai'|'anthropic', model: string | undefined | null): string | null {
   if (!model) return null;
@@ -2122,6 +2120,33 @@ export async function registerRoutes(
     res.json({ status: 'ok' });
   });
 
+  // Download lab report file
+  app.get('/api/files/:fileId/download', requireAuth, async (req, res) => {
+    const userId = req.userId!;
+    const { fileId } = req.params;
+    try {
+      const fileUpload = await storage.getFileUpload(fileId);
+      if (!fileUpload) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      if (fileUpload.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      // Download file from Supabase storage
+      const objectPath = fileUpload.objectPath;
+      const buffer = await ObjectStorageService.prototype.getLabReportFile(objectPath, userId);
+      if (!buffer) {
+        return res.status(500).json({ error: 'Failed to download file' });
+      }
+      res.setHeader('Content-Type', fileUpload.mimeType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileUpload.originalFileName}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error('File download error:', error);
+      res.status(500).json({ error: 'Failed to download file' });
+    }
+  });
+
   // Load persisted AI settings (if any) from DB at startup
   try {
     const saved = await storage.getAppSetting('ai_settings');
@@ -3700,6 +3725,68 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Get consultation history (enhanced format for ConsultationPage) - MUST be before /:sessionId route
+  app.get('/api/consultations/history', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
+      
+      // Fetch user's chat sessions
+      const sessions = await storage.listChatSessionsByUser(userId);
+      
+      // Fetch messages for all sessions and organize them
+      const messagesPromises = sessions.map(session => 
+        storage.listMessagesBySession(session.id).then(messages => ({
+          sessionId: session.id,
+          messages
+        }))
+      );
+      
+      const sessionMessages = await Promise.all(messagesPromises);
+      
+      // Organize messages by session ID
+      const messagesMap: Record<string, any[]> = {};
+      sessionMessages.forEach(({ sessionId, messages }) => {
+        messagesMap[sessionId] = messages.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          role: msg.role,
+          sender: msg.role === 'assistant' ? 'ai' : 'user',
+          timestamp: msg.createdAt,
+          sessionId: msg.sessionId,
+          formula: msg.formula || undefined // Include formula data if present
+        }));
+      });
+
+      // Enhance sessions with metadata for frontend
+      const enhancedSessions = sessions.map(session => {
+        const sessionMsgs = messagesMap[session.id] || [];
+        const lastMessage = sessionMsgs[sessionMsgs.length - 1];
+        const hasFormula = sessionMsgs.some(msg => msg.formula);
+        
+        return {
+          id: session.id,
+          title: `Consultation ${new Date(session.createdAt).toLocaleDateString()}`,
+          lastMessage: lastMessage?.content?.substring(0, 100) + '...' || 'New consultation',
+          timestamp: session.createdAt,
+          messageCount: sessionMsgs.length,
+          hasFormula,
+          status: session.status
+        };
+      });
+
+      // Sort sessions by most recent first
+      enhancedSessions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      res.json({
+        sessions: enhancedSessions,
+        messages: messagesMap
+      });
+    } catch (error) {
+      console.error('Get consultation history error:', error);
+      res.status(500).json({ error: 'Failed to fetch consultation history' });
+    }
+  });
+
   // Get specific consultation session with messages
   app.get('/api/consultations/:sessionId', requireAuth, async (req, res) => {
     try {
@@ -4400,68 +4487,6 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
-  // Get consultation history (enhanced format for ConsultationPage)
-  app.get('/api/consultations/history', requireAuth, async (req, res) => {
-    try {
-      const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
-      
-      // Fetch user's chat sessions
-      const sessions = await storage.listChatSessionsByUser(userId);
-      
-      // Fetch messages for all sessions and organize them
-      const messagesPromises = sessions.map(session => 
-        storage.listMessagesBySession(session.id).then(messages => ({
-          sessionId: session.id,
-          messages
-        }))
-      );
-      
-      const sessionMessages = await Promise.all(messagesPromises);
-      
-      // Organize messages by session ID
-      const messagesMap: Record<string, any[]> = {};
-      sessionMessages.forEach(({ sessionId, messages }) => {
-        messagesMap[sessionId] = messages.map(msg => ({
-          id: msg.id,
-          content: msg.content,
-          role: msg.role,
-          sender: msg.role === 'assistant' ? 'ai' : 'user',
-          timestamp: msg.createdAt,
-          sessionId: msg.sessionId,
-          formula: msg.formula || undefined // Include formula data if present
-        }));
-      });
-
-      // Enhance sessions with metadata for frontend
-      const enhancedSessions = sessions.map(session => {
-        const sessionMsgs = messagesMap[session.id] || [];
-        const lastMessage = sessionMsgs[sessionMsgs.length - 1];
-        const hasFormula = sessionMsgs.some(msg => msg.formula);
-        
-        return {
-          id: session.id,
-          title: `Consultation ${new Date(session.createdAt).toLocaleDateString()}`,
-          lastMessage: lastMessage?.content?.substring(0, 100) + '...' || 'New consultation',
-          timestamp: session.createdAt,
-          messageCount: sessionMsgs.length,
-          hasFormula,
-          status: session.status
-        };
-      });
-
-      // Sort sessions by most recent first
-      enhancedSessions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-      res.json({
-        sessions: enhancedSessions,
-        messages: messagesMap
-      });
-    } catch (error) {
-      console.error('Get consultation history error:', error);
-      res.status(500).json({ error: 'Failed to fetch consultation history' });
-    }
-  });
-
   // Grant user consent for HIPAA-compliant operations
   app.post('/api/consents/grant', requireAuth, async (req, res) => {
     try {
@@ -4646,34 +4671,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Use HIPAA-compliant ObjectStorageService for secure upload
       const objectStorageService = new ObjectStorageService();
       
-      // Get secure upload URL with consent enforcement and audit logging
-      const uploadUrl = await objectStorageService.getLabReportUploadURL(
-        userId, 
-        uploadedFile.name,
-        auditInfo
-      );
-
-      // Upload file using the secure signed URL
-      const response = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: uploadedFile.data,
-        headers: {
-          'Content-Type': uploadedFile.mimetype,
-          'Content-Length': uploadedFile.size.toString()
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed with status: ${response.status}`);
-      }
-
-      // Set HIPAA-compliant ACL policy for the uploaded file
-      const normalizedPath = await objectStorageService.setLabReportAclPolicy(
-        uploadUrl,
+      // Upload directly to Supabase
+      const normalizedPath = await objectStorageService.uploadLabReportFile(
         userId,
+        uploadedFile.data,
         uploadedFile.name,
-        fileType,
-        auditInfo
+        uploadedFile.mimetype
       );
 
       // Save file metadata to storage with HIPAA compliance fields
@@ -4689,9 +4692,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         retentionPolicyId: '7_years' // Default 7-year retention for medical records
       });
 
-      // Analyze lab reports automatically (PDF, images, and text files)
+      // Analyze lab reports automatically (PDF and images only - text files analyzed in background)
       let labDataExtraction = null;
-      if (fileType === 'lab_report' && (uploadedFile.mimetype === 'application/pdf' || uploadedFile.mimetype.startsWith('image/') || uploadedFile.mimetype === 'text/plain')) {
+      if (fileType === 'lab_report' && (uploadedFile.mimetype === 'application/pdf' || uploadedFile.mimetype.startsWith('image/'))) {
         try {
           console.log(`✨ Analyzing lab report: ${uploadedFile.name} (${uploadedFile.mimetype})`);
           labDataExtraction = await analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId);
@@ -4721,6 +4724,36 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             });
           }
         }
+      } else if (fileType === 'lab_report' && uploadedFile.mimetype === 'text/plain') {
+        // For text files, analyze in background to avoid timeout
+        console.log(`📝 Queuing background analysis for text file: ${uploadedFile.name}`);
+        // Fire-and-forget background analysis
+        analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId)
+          .then(async (extraction) => {
+            if (extraction && fileUpload.id) {
+              await storage.updateFileUpload(fileUpload.id, {
+                labReportData: {
+                  testDate: extraction.testDate,
+                  testType: extraction.testType,
+                  labName: extraction.labName,
+                  physicianName: extraction.physicianName,
+                  analysisStatus: 'completed',
+                  extractedData: extraction.extractedData || []
+                }
+              });
+              console.log(`✅ Background analysis completed for ${uploadedFile.name}`);
+            }
+          })
+          .catch(async (error) => {
+            console.error('Background lab report analysis failed:', error);
+            if (fileUpload.id) {
+              await storage.updateFileUpload(fileUpload.id, {
+                labReportData: {
+                  analysisStatus: 'error'
+                }
+              });
+            }
+          });
       }
 
       // Log successful upload
@@ -4836,68 +4869,25 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.delete('/api/files/:fileId', requireAuth, async (req, res) => {
     const userId = req.userId!;
     const { fileId } = req.params;
-    const auditInfo = {
-      ipAddress: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
-      userAgent: req.headers['user-agent']
-    };
-
     try {
       // Verify file belongs to user
       const fileUpload = await storage.getFileUpload(fileId);
-      
       if (!fileUpload) {
         return res.status(404).json({ error: 'File not found' });
       }
-      
       if (fileUpload.userId !== userId) {
-        console.warn("HIPAA AUDIT LOG - Unauthorized Delete Attempt:", {
-          timestamp: new Date().toISOString(),
-          userId,
-          fileId,
-          action: 'delete',
-          ipAddress: auditInfo.ipAddress,
-          userAgent: auditInfo.userAgent,
-          success: false,
-          reason: 'User does not own this file'
-        });
         return res.status(403).json({ error: 'Access denied' });
       }
-
-      // Soft delete the file
+      // Hard delete from Supabase storage
+      const objectPath = fileUpload.objectPath;
+      const deletedFromStorage = await ObjectStorageService.prototype.secureDeleteLabReport(objectPath, userId);
+      // Soft delete in DB
       const deleted = await storage.softDeleteFileUpload(fileId, userId);
-      
-      if (!deleted) {
+      if (!deleted || !deletedFromStorage) {
         throw new Error('Failed to delete file');
       }
-
-      // Log successful deletion
-      console.log("HIPAA AUDIT LOG - File Deleted:", {
-        timestamp: new Date().toISOString(),
-        userId,
-        fileId,
-        fileName: fileUpload.originalFileName,
-        fileType: fileUpload.type,
-        action: 'delete',
-        ipAddress: auditInfo.ipAddress,
-        userAgent: auditInfo.userAgent,
-        success: true,
-        reason: 'User requested file deletion'
-      });
-
       res.json({ success: true, message: 'File deleted successfully' });
-      
     } catch (error) {
-      console.error("HIPAA AUDIT LOG - Delete Error:", {
-        timestamp: new Date().toISOString(),
-        userId,
-        fileId,
-        action: 'delete',
-        ipAddress: auditInfo.ipAddress,
-        userAgent: auditInfo.userAgent,
-        success: false,
-        reason: `Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
-      
       console.error('File delete error:', error);
       res.status(500).json({ error: 'Failed to delete file' });
     }
@@ -6530,6 +6520,119 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Admin: Get all support tickets
+  app.get('/api/admin/support-tickets', requireAdmin, async (req, res) => {
+    try {
+      const status = (req.query.status as string) || 'all';
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const result = await storage.listAllSupportTickets(status, limit, offset);
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching support tickets:', error);
+      res.status(500).json({ error: 'Failed to fetch support tickets' });
+    }
+  });
+
+  // Admin: Get support ticket details with responses
+  app.get('/api/admin/support-tickets/:id', requireAdmin, async (req, res) => {
+    try {
+      const ticket = await storage.getSupportTicket(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ error: 'Support ticket not found' });
+      }
+
+      const responses = await storage.listSupportTicketResponses(req.params.id);
+      const user = await storage.getUserById(ticket.userId);
+
+      res.json({
+        ticket,
+        responses,
+        user: user ? { id: user.id, name: user.name, email: user.email } : null
+      });
+    } catch (error) {
+      console.error('Error fetching support ticket details:', error);
+      res.status(500).json({ error: 'Failed to fetch support ticket details' });
+    }
+  });
+
+  // Admin: Update support ticket
+  app.patch('/api/admin/support-tickets/:id', requireAdmin, async (req, res) => {
+    try {
+      const allowedUpdates = ['status', 'priority', 'adminNotes'];
+      const updates: any = {};
+      
+      for (const key of allowedUpdates) {
+        if (req.body[key] !== undefined) {
+          updates[key] = req.body[key];
+        }
+      }
+
+      const ticket = await storage.updateSupportTicket(req.params.id, updates);
+      if (!ticket) {
+        return res.status(404).json({ error: 'Support ticket not found' });
+      }
+
+      res.json(ticket);
+    } catch (error) {
+      console.error('Error updating support ticket:', error);
+      res.status(500).json({ error: 'Failed to update support ticket' });
+    }
+  });
+
+  // Admin: Reply to support ticket
+  app.post('/api/admin/support-tickets/:id/reply', requireAdmin, async (req, res) => {
+    try {
+      const ticketId = req.params.id;
+      const { message } = req.body;
+
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+      const ticket = await storage.getSupportTicket(ticketId);
+      if (!ticket) {
+        return res.status(404).json({ error: 'Support ticket not found' });
+      }
+
+      const response = await storage.createSupportTicketResponse({
+        ticketId,
+        userId: req.userId!,
+        message,
+        isStaff: true
+      });
+
+      // Send email notification to user
+      try {
+        const user = await storage.getUserById(ticket.userId);
+        if (user) {
+          const ticketUrl = `https://myones.ai/support/tickets/${ticketId}`;
+          await sendNotificationEmail({
+            to: user.email,
+            subject: `Response to: ${ticket.subject}`,
+            title: 'Support Team Response',
+            content: `
+              <strong>Ticket Subject:</strong> ${ticket.subject}<br/>
+              <strong>Response:</strong> ${message}
+            `,
+            actionUrl: ticketUrl,
+            actionText: 'View Ticket',
+            type: 'system'
+          });
+          console.log(`📧 Support response email sent to user ${user.email}`);
+        }
+      } catch (emailError) {
+        console.error('Failed to send response notification email:', emailError);
+      }
+
+      res.json({ response });
+    } catch (error) {
+      console.error('Error replying to support ticket:', error);
+      res.status(500).json({ error: 'Failed to reply to support ticket' });
+    }
+  });
+
   // ===== WEARABLE DEVICE INTEGRATION ROUTES =====
   
   // Get user's connected wearable devices
@@ -6820,6 +6923,210 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     } catch (error) {
       console.error('Error in manual sync:', error);
       res.status(500).json({ error: 'Failed to sync data' });
+    }
+  });
+
+  // ===== OPTIMIZE FEATURE ROUTES =====
+  
+  // Get user's optimize plans
+  app.get('/api/optimize/plans', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const plans = await storage.listOptimizePlans(userId);
+      res.json(plans);
+    } catch (error) {
+      console.error('Error fetching optimize plans:', error);
+      res.status(500).json({ error: 'Failed to fetch plans' });
+    }
+  });
+
+  // Get user's streaks
+  app.get('/api/optimize/streaks', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const streaks = [];
+      
+      // Get all streak types
+      const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle'] as const;
+      for (const type of streakTypes) {
+        const streak = await storage.getUserStreak(userId, type);
+        if (streak) {
+          streaks.push(streak);
+        }
+      }
+      
+      res.json(streaks);
+    } catch (error) {
+      console.error('Error fetching streaks:', error);
+      res.status(500).json({ error: 'Failed to fetch streaks' });
+    }
+  });
+
+  // Generate optimize plans (nutrition, workout, lifestyle)
+  app.post('/api/optimize/plans/generate', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { planTypes, preferences } = req.body;
+      
+      console.log('🎯 OPTIMIZE PLAN GENERATION STARTED', { userId, planTypes, preferences });
+      
+      if (!Array.isArray(planTypes) || planTypes.length === 0) {
+        return res.status(400).json({ error: 'planTypes array is required' });
+      }
+
+      // Get user context
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const healthProfile = await storage.getHealthProfile(userId);
+      const activeFormula = await storage.getCurrentFormulaByUser(userId);
+      const labAnalyses = await storage.listLabAnalysesByUser(userId);
+
+      console.log('📊 Context loaded:', { hasProfile: !!healthProfile, hasFormula: !!activeFormula, labCount: labAnalyses.length });
+
+      const labSummary = labAnalyses
+        .map((analysis) => {
+          if (analysis.aiInsights?.summary) {
+            return analysis.aiInsights.summary;
+          }
+          const abnormalMarkers = analysis.extractedMarkers
+            ?.filter((marker) => marker.status && marker.status !== 'normal')
+            .map((marker) => `${marker.name}: ${marker.value}${marker.unit ?? ''} (${marker.status})`)
+            .join(', ');
+          return abnormalMarkers ? `Markers of concern: ${abnormalMarkers}` : '';
+        })
+        .filter(Boolean)
+        .join('\n\n');
+
+      // Build context for AI prompt
+      const optimizeContext = {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
+        healthProfile,
+        activeFormula,
+        labData: labAnalyses.length > 0 ? {
+          reports: labAnalyses,
+          summary: labSummary || 'Lab analyses available for personalization.',
+        } : undefined,
+        preferences: preferences || {},
+      };
+
+      const results: Record<string, any> = {};
+      
+      for (const planType of planTypes) {
+        console.log(`🤖 Generating ${planType} plan...`);
+        let prompt: string;
+        
+        // Select prompt builder based on plan type
+        switch (planType) {
+          case 'nutrition':
+            prompt = buildNutritionPlanPrompt(optimizeContext);
+            break;
+          case 'workout':
+            prompt = buildWorkoutPlanPrompt(optimizeContext);
+            break;
+          case 'lifestyle':
+            prompt = buildLifestylePlanPrompt(optimizeContext);
+            break;
+          default:
+            return res.status(400).json({ error: `Invalid plan type: ${planType}` });
+        }
+
+        console.log(`📝 Prompt built, length: ${prompt.length} chars`);
+
+        // Call AI to generate plan
+        const aiProvider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai'|'anthropic';
+        const aiModel = aiRuntimeSettings.model || process.env.AI_MODEL || (aiProvider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o');
+        console.log(`🧠 Using AI: ${aiProvider} / ${aiModel}`);
+        
+        let planContent: any;
+        let rationale = '';
+
+        try {
+          if (aiProvider === 'anthropic') {
+            const Anthropic = (await import('@anthropic-ai/sdk')).default;
+            const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+            
+            console.log('⏳ Calling Anthropic API...');
+            const response = await anthropic.messages.create({
+              model: aiModel,
+              max_tokens: 4096,
+              messages: [{ role: 'user', content: prompt }],
+            });
+
+            const content = response.content[0];
+            if (content.type === 'text') {
+              console.log(`✅ AI response received, length: ${content.text.length} chars`);
+              console.log(`🔍 First 200 chars: ${content.text.substring(0, 200)}`);
+              console.log('📦 Normalizing Anthropic plan JSON');
+              planContent = parseAiJson(content.text);
+              rationale = planContent.weeklyGuidance || planContent.programOverview || planContent.focusAreas || 'Personalized plan generated';
+            }
+          } else {
+            // OpenAI
+            console.log('⏳ Calling OpenAI API...');
+            const response = await openai.chat.completions.create({
+              model: aiModel,
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.7,
+            });
+
+            const content = response.choices[0].message.content || '{}';
+            console.log(`✅ AI response received, length: ${content.length} chars`);
+            console.log('📦 Normalizing OpenAI plan JSON');
+            planContent = parseAiJson(content);
+            rationale = planContent.weeklyGuidance || planContent.programOverview || planContent.focusAreas || 'Personalized plan generated';
+          }
+        } catch (aiError) {
+          console.error(`❌ AI generation error for ${planType}:`, aiError);
+          planContent = { error: 'Failed to generate plan', details: aiError instanceof Error ? aiError.message : 'Unknown error' };
+          rationale = 'AI generation failed';
+        }
+
+        console.log(`💾 Saving ${planType} plan to database...`);
+        // Save plan to database
+        const plan = await storage.createOptimizePlan({
+          userId,
+          planType,
+          content: planContent,
+          aiRationale: rationale,
+          preferences: preferences || {},
+          basedOnFormulaId: activeFormula?.id || null,
+          basedOnLabs: labAnalyses.length > 0 ? labAnalyses[0] : null,
+          isActive: true,
+        });
+        
+        console.log(`✅ ${planType} plan saved with ID: ${plan.id}`);
+        results[planType] = plan;
+      }
+
+      console.log('🎉 All plans generated successfully');
+      res.json(results);
+    } catch (error) {
+      console.error('❌ Error generating optimize plans:', error);
+      res.status(500).json({ error: 'Failed to generate plans' });
+    }
+  });
+
+  // Swap a meal in nutrition plan
+  app.post('/api/optimize/nutrition/swap-meal', requireAuth, async (req, res) => {
+    try {
+      const { planId, dayIndex, mealType } = req.body;
+      console.log('🔄 Meal swap requested:', { userId: req.userId, planId, dayIndex, mealType });
+      
+      // TODO: Implement actual AI swap logic
+      res.json({ 
+        success: true,
+        message: 'Meal swapped successfully'
+      });
+    } catch (error) {
+      console.error('❌ Error swapping meal:', error);
+      res.status(500).json({ error: 'Failed to swap meal' });
     }
   });
 

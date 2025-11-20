@@ -47,11 +47,25 @@ export default function Header() {
               How it Works
             </button>
             <button 
+              onClick={() => handleNavClick('personalization')}
+              className="text-foreground hover:text-primary transition-colors duration-200"
+              data-testid="link-personalization"
+            >
+              Personalization
+            </button>
+            <button 
               onClick={() => handleNavClick('science')}
               className="text-foreground hover:text-primary transition-colors duration-200"
               data-testid="link-science"
             >
               Science
+            </button>
+            <button 
+              onClick={() => handleNavClick('testimonials')}
+              className="text-foreground hover:text-primary transition-colors duration-200"
+              data-testid="link-testimonials"
+            >
+              Testimonials
             </button>
             <button 
               onClick={() => handleNavClick('pricing')}
@@ -128,11 +142,25 @@ export default function Header() {
                 How it Works
               </button>
               <button 
+                onClick={() => handleNavClick('personalization')}
+                className="text-foreground hover:text-primary transition-colors duration-200 text-left"
+                data-testid="link-mobile-personalization"
+              >
+                Personalization
+              </button>
+              <button 
                 onClick={() => handleNavClick('science')}
                 className="text-foreground hover:text-primary transition-colors duration-200 text-left"
                 data-testid="link-mobile-science"
               >
                 Science
+              </button>
+              <button 
+                onClick={() => handleNavClick('testimonials')}
+                className="text-foreground hover:text-primary transition-colors duration-200 text-left"
+                data-testid="link-mobile-testimonials"
+              >
+                Testimonials
               </button>
               <button 
                 onClick={() => handleNavClick('pricing')}

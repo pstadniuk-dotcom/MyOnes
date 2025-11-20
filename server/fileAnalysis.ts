@@ -213,22 +213,13 @@ export async function analyzeLabReport(
   userId: string
 ): Promise<LabDataExtraction> {
   try {
-    // Get signed download URL from ObjectStorageService
+    // Get file buffer directly from ObjectStorageService
     const objectStorageService = new ObjectStorageService();
-    const downloadUrl = await objectStorageService.getLabReportDownloadURL(
-      objectPath,
-      userId,
-      { ipAddress: 'internal-analysis', userAgent: 'lab-analysis-service' }
-    );
+    const fileBuffer = await objectStorageService.getLabReportFile(objectPath, userId);
     
-    // Download file using HTTP fetch
-    const response = await fetch(downloadUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+    if (!fileBuffer) {
+      throw new Error(`Failed to download file from storage`);
     }
-    
-    const arrayBuffer = await response.arrayBuffer();
-    const fileBuffer = Buffer.from(arrayBuffer);
     
     // Detect file type
     const fileType = getFileType(mimeType);

@@ -11,7 +11,8 @@ import {
   Package,
   TrendingUp,
   UserCheck,
-  Clock
+  Clock,
+  MessageSquare
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useEffect, useMemo, useState } from 'react';
@@ -231,6 +232,54 @@ export default function AdminDashboardPage() {
         <AISettingsCard onChanged={() => {
           queryClient.invalidateQueries({ queryKey: ['/api/admin/ai-settings'] });
         }} />
+
+        {/* Quick Links */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card 
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setLocation('/admin/users')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                User Management
+              </CardTitle>
+              <CardDescription>
+                View and manage all users
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          
+          <Card 
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setLocation('/admin/support-tickets')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Support Tickets
+              </CardTitle>
+              <CardDescription>
+                Manage user support requests
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          
+          <Card 
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setLocation('/admin')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Analytics
+              </CardTitle>
+              <CardDescription>
+                View detailed platform analytics
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="section-stats-cards">
