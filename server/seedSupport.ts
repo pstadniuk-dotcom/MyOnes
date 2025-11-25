@@ -1,15 +1,107 @@
 import { storage } from './storage';
 import './db';
 
-// Comprehensive help articles with screenshot placeholders
+// Comprehensive help articles
 const helpArticles = [
   // Getting Started Category
   {
     category: 'Getting Started',
-    title: 'Creating Your Account and Setting Up Your Profile',
-    content: `# Creating Your Account and Setting Up Your Profile
+    title: 'Understanding Your Personalized Supplement Formula',
+    content: `Welcome to ONES! Your personalized formula is created by AI based on your unique health profile, lab results, and goals. This guide explains exactly what's in your formula and why.
 
-Welcome to Ones AI! This guide will walk you through creating your account and setting up your health profile for personalized supplement recommendations.
+WHAT'S IN YOUR FORMULA
+
+Your ONES formula contains two types of ingredients:
+
+**Base Formulas (2-3 selected)**
+These are proprietary blends targeting specific health systems. Each base formula contains multiple active ingredients at therapeutic dosages. Examples include:
+- Adrenal Support (420mg) - Supports stress response and hormone balance
+- Heart Support (450mg) - Cardiovascular health and energy
+- Immune Support (350mg) - Defense and recovery
+
+**Individual Additions (5-7 ingredients)**
+Single therapeutic ingredients added on top of base formulas to address your specific needs. Examples:
+- Ashwagandha (600mg) - Stress reduction and cortisol management
+- CoQ10 (200mg) - Cellular energy and heart health
+- Curcumin (500mg) - Anti-inflammatory support
+
+TOTAL DOSAGE: 4500-5500MG
+
+Your complete formula typically contains 4500-5500mg total, delivered in 6-9 capsules per day (size 00 capsules). This range maximizes therapeutic benefit while maintaining cost-effectiveness.
+
+CAPSULE BREAKDOWN
+
+The system automatically calculates your capsule count:
+- Each capsule holds ~550mg
+- Total formula ÷ 550mg = capsules per day
+- Distributed across 3 meals (morning, lunch, dinner)
+
+Example: 4,950mg formula = 9 capsules/day = 3 capsules per meal
+
+WHY THESE INGREDIENTS?
+
+The AI selects ingredients based on:
+
+1. **Your Lab Results** - Addressing deficiencies or elevated biomarkers
+   Example: Low vitamin D (25 ng/mL) → AI adds Vitamin D3
+
+2. **Reported Symptoms** - Targeting what you're experiencing
+   Example: Brain fog + fatigue → AI adds Lion's Mane + B-Complex
+
+3. **Health Goals** - Supporting what you want to achieve
+   Example: Goal = Better sleep → AI adds Magnesium + L-Theanine
+
+4. **Medication Interactions** - Only safe combinations
+   The AI automatically excludes ingredients that interact with your medications
+
+HOW TO READ YOUR FORMULA PDF
+
+After your consultation, you'll receive a PDF with:
+- Complete ingredient list with dosages
+- Rationale for each ingredient (linked to your specific data)
+- Daily dosing instructions
+- Warnings or considerations
+
+FORMULA VERSIONS
+
+Your formula can be updated anytime:
+- Upload new lab results → AI adjusts recommendations
+- Report new symptoms → AI adds targeted support
+- Change medications → AI removes contraindicated ingredients
+
+Each update creates a new version while preserving your history in My Formula page.
+
+INGREDIENT SOURCING
+
+All ONES ingredients are:
+- Third-party tested for purity
+- Sourced from FDA-registered facilities
+- Free from fillers, artificial colors, and common allergens
+- Selected for bioavailability (how well your body absorbs them)
+
+COMMON QUESTIONS
+
+**Q: Can I request changes to my formula?**
+A: Yes! Just return to the AI consultation and say "I'd like to modify my formula" or "Can we remove ingredient X?"
+
+**Q: What if I have side effects?**
+A: Stop taking the supplement and contact support@ones.ai immediately. The AI can create a modified formula avoiding problematic ingredients.
+
+**Q: How long until I see results?**
+A: Most users notice improvements within 2-4 weeks. Some benefits (like energy) appear quickly, while others (like inflammation reduction) take 6-8 weeks.
+
+NEED HELP?
+
+- View your complete formula: Dashboard > My Formula
+- Request updates: Dashboard > Consultation
+- Contact support: support@ones.ai`,
+    displayOrder: 1,
+    isPublished: true
+  },
+  {
+    category: 'Getting Started',
+    title: 'Creating Your Account and Setting Up Your Profile',
+    content: `Welcome to ONES! This guide will walk you through creating your account and setting up your health profile for personalized supplement recommendations.
 
 ## Step 1: Sign Up
 
@@ -77,163 +169,361 @@ Need help? Contact our support team at support@ones.ai`,
   {
     category: 'Getting Started',
     title: 'How to Start Your First AI Consultation',
-    content: `# How to Start Your First AI Consultation
+    content: `Your AI consultation is where personalized health optimization begins. Our AI practitioner analyzes your health data to create a custom supplement formula tailored to your unique needs.
 
-Your AI consultation is where the magic happens - our intelligent system analyzes your health data and creates a personalized supplement formula just for you.
+ACCESSING THE CONSULTATION
 
-## Accessing the Consultation
-
-1. Log into your Ones AI dashboard
+1. Log into your ONES dashboard
 2. Click "Consultation" in the left sidebar
-3. You'll see the AI chat interface
+3. The AI chat interface will open
 
-[Screenshot placeholder: Consultation page overview]
+The consultation typically takes 10-20 minutes for new users, less for formula updates.
 
-## What to Expect
+WHAT THE AI WILL ASK
 
-The AI will guide you through a structured conversation covering:
+The consultation follows a structured approach:
 
-### Phase 1: Basic Health Check
-- Current symptoms or concerns
+**Phase 1: Current Health Status**
+- How you're feeling today
 - Energy levels and sleep quality
-- Stress and mental health
+- Any active symptoms or concerns
+- Stress levels and mental clarity
 
-### Phase 2: Health Goals
-- What you want to improve
-- Specific health targets
-- Timeline expectations
+Example: "I've been experiencing afternoon fatigue and brain fog. My sleep is okay but I wake up groggy."
 
-[Screenshot placeholder: AI asking health questions]
+**Phase 2: Medical Background**
+- Current medications (CRITICAL - ensures safety)
+- Known allergies
+- Chronic conditions or diagnoses
+- Recent illnesses or surgeries
 
-### Phase 3: Detailed Assessment
-- Medical history review
-- Lab data analysis (if uploaded)
-- Medication interactions check
+Be thorough here! The AI cross-references every ingredient against your medications to prevent interactions.
 
-### Phase 4: Formula Creation
+**Phase 3: Lab Data Review** (if uploaded)
 The AI will:
-1. Analyze all your data
-2. Research evidence-based ingredients
-3. Create your custom formula
-4. Explain each ingredient's purpose
+- Identify biomarkers outside normal ranges
+- Explain what elevated/low values mean
+- Recommend targeted ingredients for specific deficiencies
 
-[Screenshot placeholder: Formula creation in progress]
+Example: "Your vitamin D is 22 ng/mL (low). I'm adding 5000 IU vitamin D3 to bring you into optimal range (40-60 ng/mL)."
 
-## Tips for a Great Consultation
+**Phase 4: Health Goals**
+- What you want to improve (energy, sleep, focus, etc.)
+- Timeline expectations
+- Specific performance or wellness targets
 
-✓ **Be thorough** - The more information you provide, the better your formula
-✓ **Upload labs** - Blood work gives the most accurate insights
-✓ **Ask questions** - The AI can explain ingredients, dosages, and research
-✓ **Be honest** - Accurate information leads to safe, effective recommendations
+**Phase 5: Formula Creation**
+The AI will:
+1. Select 2-3 base formulas targeting your main health systems
+2. Add 5-7 individual ingredients for specific needs
+3. Calculate total dosage (typically 4500-5500mg)
+4. Explain the rationale for each ingredient
 
-## After Your Consultation
+UNDERSTANDING THE AI'S RECOMMENDATIONS
+
+When the AI creates your formula, it explains:
+
+**Ingredient Selection**
+"For your elevated LDL (151 mg/dL), I'm adding Heart Support (450mg) which contains L-Carnitine, CoQ10, and Magnesium. These work synergistically to support cardiovascular health and healthy cholesterol metabolism."
+
+**Dosage Calculation**
+"Your total formula is 4,950mg delivered in 9 capsules per day (3 with each meal)."
+
+**Safety Checks**
+"I've verified no interactions with your current medications (Metformin, Lisinopril)."
+
+TIPS FOR A GREAT CONSULTATION
+
+**Do:**
+- Upload recent lab results before starting (optional but highly recommended)
+- List ALL medications and supplements you currently take
+- Be specific about symptoms (when they occur, severity, duration)
+- Ask questions if you don't understand something
+
+**Don't:**
+- Rush through questions - accuracy matters for safety
+- Skip the medication list - this is critical
+- Hesitate to mention "minor" symptoms - they may be important
+- Forget to mention allergies or sensitivities
+
+AFTER YOUR CONSULTATION
 
 Once your formula is created:
-1. Review the ingredients and rationale
-2. Check safety warnings and interactions
-3. Click "See Your Formulation" to view details
-4. Place your order when ready
 
-[Screenshot placeholder: Completed formula display]
+1. **Review Your Formula** - Click "See Your Formulation" to see:
+   - Complete ingredient list with dosages
+   - Rationale for each ingredient linked to YOUR specific data
+   - Daily dosing instructions (capsules per meal)
+   - Any warnings or considerations
 
-Questions? Your AI assistant is always available to clarify or adjust recommendations.`,
+2. **Download Your PDF** - Professional formula document with:
+   - All ingredients and active compounds
+   - Scientific rationale
+   - Usage instructions
+   - Interaction warnings
+
+3. **Place Your Order** - When ready:
+   - Select subscription frequency (30/60/90 days)
+   - Choose shipping preferences
+   - Set up payment
+
+UPDATING YOUR FORMULA
+
+Your formula can evolve as your health changes:
+
+**Return to consultation and say:**
+- "I got new lab results" → AI analyzes and updates formula
+- "I'm experiencing [new symptom]" → AI adds targeted support
+- "I started taking [new medication]" → AI checks interactions and adjusts
+- "Can we remove [ingredient]?" → AI modifies formula
+
+Each update creates a new version. Your formula history is saved under My Formula → View All Versions.
+
+CONSULTATION PHILOSOPHY
+
+The AI acts like a real practitioner:
+- Asks clarifying questions when needed
+- Explains medical terms in plain language
+- Considers whole-person health, not just symptoms
+- Updates recommendations as your health evolves
+- Never rushes you through important decisions
+
+COMMON FIRST CONSULTATION QUESTIONS
+
+**Q: Do I need lab results to get a formula?**
+A: No, but labs give the most accurate recommendations. Without labs, the AI makes conservative evidence-based suggestions.
+
+**Q: How long does the consultation take?**
+A: 10-20 minutes for first-time users. Formula updates take 5-10 minutes.
+
+**Q: Can I save and resume later?**
+A: Yes! The AI saves your conversation. Return anytime to continue.
+
+**Q: What if I disagree with a recommendation?**
+A: Just tell the AI! "I don't want to take [ingredient]" and it will create an alternative formula.
+
+**Q: Is my health data private?**
+A: Absolutely. All consultations are encrypted and HIPAA-compliant. We never sell your data.
+
+NEED HELP?
+
+- Stuck during consultation? Click the help icon (?) in the chat
+- Questions about ingredients? Ask the AI to explain in detail
+- Technical issues? Email support@ones.ai
+- Want to speak to a human? Contact our clinical team
+
+Your AI practitioner is available 24/7 to create, explain, and update your personalized health formula.`,
     displayOrder: 2,
     isPublished: true
   },
   {
     category: 'Getting Started',
-    title: 'Understanding Your Personalized Formula',
-    content: `# Understanding Your Personalized Formula
+    title: 'Uploading and Understanding Lab Results',
+    content: `Lab results are the gold standard for personalized supplement recommendations. This guide explains how to upload your blood work and what the AI analyzes.
 
-Your formula is custom-built based on your unique health profile, goals, and biomarkers. Here's how to read and understand it.
+WHY UPLOAD LAB RESULTS?
 
-## Formula Components
+Without labs, the AI makes educated guesses based on symptoms. With labs, the AI sees your exact biomarker levels and can:
+- Target specific deficiencies with precise dosing
+- Avoid recommending nutrients you already have in excess
+- Track improvement over time
+- Make evidence-based adjustments to your formula
 
-Every Ones formula contains two types of ingredients:
+Example: 
+- Without labs: "You mentioned fatigue → I'll add B-vitamins"
+- With labs: "Your B12 is 210 pg/mL (low normal) and vitamin D is 18 ng/mL (deficient) → I'll add 1000mcg B12 + 5000 IU D3"
 
-### Base Formulas (Pre-formulated Blends)
-These are expert-designed combinations that target specific systems:
-- Heart Support (cardiovascular health)
-- Immune Support (immunity and inflammation)
-- Digestive Support (gut health)
-- Energy Support (mitochondrial function)
+SUPPORTED FILE FORMATS
 
-[Screenshot placeholder: Base formula card showing ingredients]
+Upload any of these:
+- PDF reports (LabCorp, Quest, Function Health, Any Lab Test Now)
+- JPG/PNG images (clear photos of paper reports)
+- Scanned documents
 
-### Individual Ingredients
-Single nutrients added for specific needs:
-- Vitamins (D3, B12, etc.)
-- Minerals (Magnesium, Zinc)
-- Botanicals (Ashwagandha, Turmeric)
-- Specialized compounds (CoQ10, Omega-3)
+Maximum file size: 10MB
 
-[Screenshot placeholder: Individual ingredient list]
+HOW TO UPLOAD
 
-## Reading Your Formula Card
+1. Log into ONES dashboard
+2. Click "Profile" in the left sidebar
+3. Select "Lab Reports" tab
+4. Click "Upload Lab Results"
+5. Choose your file
+6. Add optional notes (test date, lab provider)
+7. Click "Upload"
 
-Your formula display shows:
+The AI automatically extracts biomarker values within 30 seconds.
 
-1. **Total Dosage** - Daily amount in mg (max 5500mg for safety)
-2. **Ingredient List** - All components with amounts
-3. **Purpose** - Why each ingredient was included
-4. **Rationale** - Overall formula reasoning
-5. **Warnings** - Important safety information
+WHAT THE AI ANALYZES
 
-[Screenshot placeholder: Complete formula card]
+**Complete Blood Count (CBC):**
+- White blood cells → Immune function
+- Red blood cells → Oxygen transport, anemia
+- Hemoglobin/Hematocrit → Iron status
+- Platelets → Clotting function
 
-## Capsule Information
+**Metabolic Panel:**
+- Glucose → Blood sugar control
+- Kidney function (creatinine, BUN)
+- Liver enzymes (ALT, AST)
+- Electrolytes (sodium, potassium)
 
-All formulas are delivered in:
-- **00-size capsules** - Easy to swallow
-- **4-9 capsules per day** - Depending on your total dosage
-- **Single daily dose** - Take all capsules together or split between meals
+**Lipid Panel:**
+- Total cholesterol
+- LDL (bad cholesterol)
+- HDL (good cholesterol)
+- Triglycerides
 
-## Safety Limits
+**Thyroid Panel:**
+- TSH (thyroid stimulating hormone)
+- T3/T4 (thyroid hormones)
 
-Your formula is automatically validated to ensure:
-- Total dosage ≤ 5500mg (capsule capacity)
-- All ingredients from approved catalog
-- No exceeding maximum safe dosages
-- Interaction warnings for medications
+**Vitamins & Minerals:**
+- Vitamin D (25-OH)
+- B12
+- Folate
+- Iron/Ferritin
+- Magnesium
+- Zinc
 
-## Updating Your Formula
+**Inflammatory Markers:**
+- C-Reactive Protein (CRP)
+- Homocysteine
 
-Your formula can be adjusted anytime:
-1. Return to the AI consultation
-2. Request changes ("Add immune support", "Remove caffeine")
-3. AI creates an updated formula
-4. Previous versions saved in your history
+**Hormones:**
+- Testosterone
+- Estradiol
+- Cortisol
+- DHEA
 
-[Screenshot placeholder: Formula history showing versions]
+UNDERSTANDING YOUR RESULTS
 
-Need clarification on an ingredient? Ask the AI for research and evidence!`,
+The AI explains each biomarker in plain language:
+
+**Example:**
+"Your vitamin D is 22 ng/mL. The lab says 'normal' is >20, but optimal is 40-60 ng/mL. Low vitamin D is linked to fatigue, weakened immunity, and bone health. I'm adding 5000 IU vitamin D3 daily to bring you into the optimal range."
+
+**Reference Ranges:**
+- Lab "normal" = what most people have (not necessarily optimal)
+- ONES "optimal" = ranges associated with best health outcomes
+- AI targets optimal, not just normal
+
+HOW THE AI USES YOUR LABS
+
+**Step 1: Identify Abnormalities**
+Scans all biomarkers for values outside optimal ranges
+
+**Step 2: Correlate with Symptoms**
+"Your ferritin is 18 ng/mL (low) AND you mentioned fatigue → Iron deficiency anemia is likely"
+
+**Step 3: Select Targeted Ingredients**
+"I'm adding Iron (18mg as ferrous bisglycinate) + Vitamin C (250mg to enhance absorption)"
+
+**Step 4: Calculate Dosages**
+Based on how far you are from optimal range
+
+**Step 5: Monitor Over Time**
+"Upload new labs in 90 days to see if we've brought your vitamin D from 22 to 50+"
+
+COMMON LAB-BASED RECOMMENDATIONS
+
+**Low Vitamin D (<30 ng/mL):**
+→ Vitamin D3 (2000-5000 IU)
+
+**Elevated LDL (>130 mg/dL):**
+→ Heart Support base formula (contains CoQ10, L-Carnitine, Magnesium)
+
+**Low B12 (<400 pg/mL):**
+→ Methylcobalamin B12 (1000mcg)
+
+**High CRP (>3.0 mg/L):**
+→ Curcumin (500mg), Omega-3 (1000mg EPA/DHA)
+
+**Low Ferritin (<30 ng/mL women, <50 men):**
+→ Iron (18mg) + Vitamin C
+
+**Low Magnesium (<2.0 mg/dL or symptoms):**
+→ Magnesium Glycinate (300-400mg elemental)
+
+GETTING YOUR FIRST LABS
+
+**Option 1: Your Doctor**
+Ask for a "comprehensive metabolic panel with lipids, CBC, vitamin D, and B12"
+
+**Option 2: Direct-to-Consumer Labs**
+- Function Health (500+ biomarkers, $499/year, recommended)
+- Any Lab Test Now
+- Ulta Lab Tests
+- Request Labs
+
+**What to Order (Minimum):**
+- Complete Metabolic Panel (CMP)
+- Complete Blood Count (CBC)
+- Lipid Panel
+- Vitamin D (25-OH)
+- Vitamin B12
+- Thyroid Panel (TSH, Free T3, Free T4)
+
+**Comprehensive Panel (Ideal):**
+All of the above, plus:
+- Iron Panel (iron, ferritin, TIBC)
+- Inflammatory markers (CRP, homocysteine)
+- Hormones (testosterone, estradiol, cortisol)
+- Advanced lipids (ApoB, Lp(a))
+
+RE-TESTING FREQUENCY
+
+Upload new labs every 3-6 months to:
+- Track improvements from supplementation
+- Adjust dosages based on progress
+- Catch new deficiencies early
+- Validate that formulation is working
+
+The AI will prompt you: "It's been 90 days since your last labs. Ready to upload new results and optimize your formula?"
+
+PRIVACY & SECURITY
+
+- All lab uploads are encrypted (HIPAA-compliant)
+- Only you and the AI can access your data
+- We never sell or share your health information
+- Delete labs anytime from Profile > Lab Reports
+
+TROUBLESHOOTING UPLOADS
+
+**Upload Failed:**
+- Ensure file is under 10MB (compress large PDFs)
+- Check file format (PDF, JPG, PNG only)
+- Try a different browser (Chrome works best)
+
+**AI Didn't Extract Values:**
+- Make sure text is clear and readable
+- Avoid heavily shadowed photos
+- Re-scan at higher resolution if possible
+- You can manually enter values in consultation
+
+**Missing Biomarkers:**
+- Not all lab reports include all markers
+- AI works with whatever data you provide
+- Upload multiple reports to fill in gaps
+
+NEED HELP?
+
+- Questions about specific biomarkers? Ask the AI during consultation
+- Upload errors? Email support@ones.ai with screenshot
+- Interpreting results? The AI explains everything in plain language
+
+Lab results transform your ONES experience from good to exceptional. Upload yours today!`,
     displayOrder: 3,
     isPublished: true
   },
   {
-    category: 'Getting Started',
-    title: 'Uploading and Understanding Lab Results',
-    content: `# Uploading and Understanding Lab Results
+    category: 'Formula & Health',
+    title: 'How to Take Your Supplements Correctly',
+    content: `Taking your supplements correctly maximizes absorption and effectiveness. This guide covers timing, storage, and best practices.
 
-Lab results provide the most accurate foundation for your personalized formula. Here's how to upload them and what the AI analyzes.
+DAILY DOSING SCHEDULE
 
-## Supported Lab Formats
-
-You can upload:
-- **PDF reports** - From LabCorp, Quest, Function Health, etc.
-- **Images** - Clear photos of paper reports
-- **Scanned documents** - High-quality scans
-
-[Screenshot placeholder: File upload interface]
-
-## How to Upload
-
-1. Go to Dashboard > Profile
-2. Click "Lab Reports" tab
-3. Click "Upload Lab Results"
-4. Select your file (max 10MB)
-5. Add optional notes (test date, provider)
-6. Click "Upload"
+Your ONES formula is divided across 3 meals:
 
 [Screenshot placeholder: Upload flow]
 

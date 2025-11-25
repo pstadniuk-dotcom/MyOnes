@@ -1,0 +1,153 @@
+```json
+{
+  "programOverview": {
+    "daysPerWeek": 4,
+    "durationWeeks": 8,
+    "focus": "Full-body strength and cardiovascular health",
+    "targetAudience": "intermediate"
+  },
+  "weeklyGuidance": "This personalized workout plan is designed for your intermediate fitness level and aims to enhance your strength and cardiovascular health while managing stress levels. Given your age of 40, it's important to focus on strength and balance to prevent age-related decline. Your current activity level of 3 days/week suggests a gradual increase to 4 days to promote adaptation. Since you have a stress level of 7/10, incorporating active recovery and stress-reducing exercises is also included.",
+  "weekPlan": [
+    {
+      "day": 1,
+      "dayName": "Monday",
+      "workout": {
+        "name": "Upper Body Strength & Cardio",
+        "durationMinutes": 60,
+        "estimatedCalories": 450,
+        "type": "strength_cardio",
+        "focus": "Improves insulin sensitivity via compound lifts + heart health",
+        "exercises": [
+          {"name": "Dynamic Arm Circles", "sets": 2, "reps": "30 sec", "restSeconds": 0, "notes": "Warm-up shoulder joints", "healthBenefits": "Increases synovial fluid"},
+          {"name": "Dumbbell Bench Press", "sets": 3, "reps": "8-10", "restSeconds": 90, "notes": "Keep shoulder blades retracted", "healthBenefits": "Builds lean tissue for better glucose disposal"},
+          {"name": "Bent-over Rows", "sets": 3, "reps": "8-10", "restSeconds": 90, "notes": "Engage your core", "healthBenefits": "Improves back strength and posture"},
+          {"name": "Push-ups", "sets": 3, "reps": "10-15", "restSeconds": 60, "notes": "Keep body straight", "healthBenefits": "Enhances upper body endurance"},
+          {"name": "Zone 2 Incline Walk", "sets": 1, "reps": "20 mins", "restSeconds": 0, "notes": "Steady state, nasal breathing", "healthBenefits": "Directly targets lipid oxidation"},
+          {"name": "Static Stretching", "sets": 1, "reps": "5 mins", "restSeconds": 0, "notes": "Focus on arms and chest", "healthBenefits": "Improves flexibility and reduces soreness"}
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 2,
+      "dayName": "Tuesday",
+      "workout": {
+        "name": "Active Recovery",
+        "durationMinutes": 30,
+        "estimatedCalories": 150,
+        "type": "recovery",
+        "focus": "Blood flow and stress reduction",
+        "exercises": [
+          {"name": "Light Walk", "sets": 1, "reps": "30 mins", "restSeconds": 0, "notes": "Nature walk if possible", "healthBenefits": "Lowers cortisol"}
+        ]
+      },
+      "isRestDay": true
+    },
+    {
+      "day": 3,
+      "dayName": "Wednesday",
+      "workout": {
+        "name": "Lower Body Strength & Balance",
+        "durationMinutes": 60,
+        "estimatedCalories": 500,
+        "type": "strength_balance",
+        "focus": "Enhance lower body strength and balance",
+        "exercises": [
+          {"name": "Leg Swings", "sets": 2, "reps": "30 sec", "restSeconds": 0, "notes": "Warm-up hip joints", "healthBenefits": "Improves hip mobility"},
+          {"name": "Squats", "sets": 3, "reps": "8-10", "restSeconds": 90, "notes": "Keep knees aligned", "healthBenefits": "Builds lower body strength"},
+          {"name": "Lunges", "sets": 3, "reps": "10 per leg", "restSeconds": 60, "notes": "Keep torso upright", "healthBenefits": "Improves balance and coordination"},
+          {"name": "Calf Raises", "sets": 3, "reps": "12-15", "restSeconds": 60, "notes": "Full range of motion", "healthBenefits": "Strengthens calves and improves balance"},
+          {"name": "Plank", "sets": 3, "reps": "30-60 sec", "restSeconds": 60, "notes": "Keep core tight", "healthBenefits": "Enhances core stability"},
+          {"name": "Cool-down Stretching", "sets": 1, "reps": "5 mins", "restSeconds": 0, "notes": "Focus on legs", "healthBenefits": "Aids in muscle recovery"}
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 4,
+      "dayName": "Thursday",
+      "workout": {
+        "name": "Active Recovery",
+        "durationMinutes": 30,
+        "estimatedCalories": 150,
+        "type": "recovery",
+        "focus": "Joint mobility and relaxation",
+        "exercises": [
+          {"name": "Yoga", "sets": 1, "reps": "30 mins", "restSeconds": 0, "notes": "Focus on breath", "healthBenefits": "Enhances flexibility and reduces stress"}
+        ]
+      },
+      "isRestDay": true
+    },
+    {
+      "day": 5,
+      "dayName": "Friday",
+      "workout": {
+        "name": "Full Body Strength & Cardio",
+        "durationMinutes": 60,
+        "estimatedCalories": 500,
+        "type": "strength_cardio",
+        "focus": "Overall strength and cardiovascular endurance",
+        "exercises": [
+          {"name": "Jumping Jacks", "sets": 2, "reps": "30 sec", "restSeconds": 0, "notes": "Warm-up full body", "healthBenefits": "Increases heart rate"},
+          {"name": "Deadlifts", "sets": 3, "reps": "8-10", "restSeconds": 90, "notes": "Maintain neutral spine", "healthBenefits": "Strengthens posterior chain"},
+          {"name": "Overhead Press", "sets": 3, "reps": "8-10", "restSeconds": 90, "notes": "Engage core", "healthBenefits": "Improves shoulder strength"},
+          {"name": "Bent-over Dumbbell Flyes", "sets": 3, "reps": "10-12", "restSeconds": 60, "notes": "Control the motion", "healthBenefits": "Enhances upper back strength"},
+          {"name": "Rowing Machine", "sets": 1, "reps": "15 mins", "restSeconds": 0, "notes": "Steady pace", "healthBenefits": "Boosts cardiovascular fitness"},
+          {"name": "Cool-down Stretching", "sets": 1, "reps": "5 mins", "restSeconds": 0, "notes": "Focus on full body", "healthBenefits": "Promotes relaxation"}
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 6,
+      "dayName": "Saturday",
+      "workout": {
+        "name": "Core & Balance",
+        "durationMinutes": 60,
+        "estimatedCalories": 400,
+        "type": "core_balance",
+        "focus": "Enhance core strength and balance",
+        "exercises": [
+          {"name": "Torso Twists", "sets": 2, "reps": "30 sec", "restSeconds": 0, "notes": "Warm-up core muscles", "healthBenefits": "Improves rotational flexibility"},
+          {"name": "Russian Twists", "sets": 3, "reps": "15 per side", "restSeconds": 60, "notes": "Keep feet off ground", "healthBenefits": "Strengthens obliques"},
+          {"name": "Side Plank", "sets": 3, "reps": "30 sec per side", "restSeconds": 60, "notes": "Maintain straight line", "healthBenefits": "Improves lateral stability"},
+          {"name": "Single-leg Balance", "sets": 3, "reps": "30 sec per leg", "restSeconds": 60, "notes": "Focus on stability", "healthBenefits": "Enhances proprioception"},
+          {"name": "Mountain Climbers", "sets": 3, "reps": "30 sec", "restSeconds": 60, "notes": "Drive knees towards chest", "healthBenefits": "Boosts cardio and core endurance"},
+          {"name": "Cool-down Stretching", "sets": 1, "reps": "5 mins", "restSeconds": 0, "notes": "Focus on core muscles", "healthBenefits": "Aids in recovery"}
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 7,
+      "dayName": "Sunday",
+      "workout": {
+        "name": "Rest and Recovery",
+        "durationMinutes": 30,
+        "estimatedCalories": 100,
+        "type": "recovery",
+        "focus": "Relaxation and mental clarity",
+        "exercises": [
+          {"name": "Meditation", "sets": 1, "reps": "30 mins", "restSeconds": 0, "notes": "Focus on breath", "healthBenefits": "Reduces stress and improves mental clarity"}
+        ]
+      },
+      "isRestDay": true
+    }
+  ],
+  "recoveryTips": ["Walk 5 minutes post session", "90 seconds diaphragmatic breathing"],
+  "progressionPlan": {
+    "week1-2": "Establish baseline",
+    "week3-4": "Increase load 5%",
+    "week5-6": "Add reps",
+    "week7-8": "Reassess"
+  },
+  "safetyGuidelines": ["Stop if sharp pain", "Use RPE 7-8"],
+  "equipmentNeeded": ["Dumbbells", "Bands", "Yoga mat"],
+  "personalizationNotes": {
+    "healthProfileInsights": ["Resting blood pressure 135/85 so tempo control added"],
+    "labInsightsAddressed": ["High LDL implies three moderate cardio blocks per week"],
+    "supplementCoordination": "Avoided adaptogens already supplied by formula",
+    "goalAlignment": "Supports recomposition and glucose control"
+  }
+}
+```

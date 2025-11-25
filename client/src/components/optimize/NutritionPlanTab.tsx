@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   Salad, 
   Sparkles,
@@ -19,20 +20,41 @@ import {
   Droplets,
   Clock,
   ChevronRight,
-  Info
+  Info,
+  ChefHat
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { GroceryListModal } from '@/components/GroceryListModal';
+import type { OptimizeLogsByDate } from '@/types/optimize';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Share2, Mail, MessageSquare } from "lucide-react";
 
 interface NutritionPlanTabProps {
   plan: any;
   healthProfile: any;
+  dailyLogsByDate?: OptimizeLogsByDate;
+  logsLoading?: boolean;
 }
 
 const WEEKDAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MEAL_TYPES = ['breakfast', 'lunch', 'dinner'];
 
 const addDays = (date: Date, days: number) => {
   const copy = new Date(date);
@@ -49,12 +71,17 @@ const getPlanStartDate = (createdAt?: string) => {
   return addDays(base, offset);
 };
 
-export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps) {
+export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: NutritionPlanTabProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeDay, setActiveDay] = useState('day-1');
   const [showGroceryList, setShowGroceryList] = useState(false);
   const [swappingMeal, setSwappingMeal] = useState<string | null>(null);
+  const [viewingRecipe, setViewingRecipe] = useState<{ mealName: string, recipe: any } | null>(null);
+  const [isRecipeOpen, setIsRecipeOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareTarget, setShareTarget] = useState('');
+  const [shareMethod, setShareMethod] = useState<'sms' | 'email'>('sms');
 
   const generatePlan = useMutation({
     mutationFn: async () => {
@@ -66,6 +93,8 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/plans'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/grocery-list'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/grocery-list'] });
       toast({
         title: '🎉 Plan Generated!',
         description: 'Your personalized nutrition plan is ready.',
@@ -81,12 +110,14 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
   });
 
   const swapMeal = useMutation({
-    mutationFn: async ({ day, mealType, id }: any) => {
+    mutationFn: async ({ dayIndex, mealType, currentMealName, mealIndex, id }: any) => {
       setSwappingMeal(id);
       const res = await apiRequest('POST', '/api/optimize/nutrition/swap-meal', {
         planId: plan?.id,
-        day,
-        mealType
+        dayIndex,
+        mealType,
+        currentMealName,
+        mealIndex
       });
       return res.json();
     },
@@ -108,21 +139,62 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
     },
   });
 
+  const generateRecipe = useMutation({
+    mutationFn: async (data: { mealName: string, ingredients: string[] }) => {
+      const res = await apiRequest('POST', '/api/optimize/nutrition/recipe', data);
+      return res.json();
+    },
+    onSuccess: (recipe, variables) => {
+      setViewingRecipe({ mealName: variables.mealName, recipe });
+      setIsRecipeOpen(true);
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to generate recipe",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const shareRecipe = useMutation({
+    mutationFn: async (data: { recipe: any, method: 'sms' | 'email', target: string }) => {
+      await apiRequest('POST', '/api/optimize/nutrition/recipe/share', data);
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Recipe Shared',
+        description: 'The recipe has been sent successfully.',
+      });
+      setShareOpen(false);
+      setShareTarget('');
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Share Failed',
+        description: error.message,
+      });
+    }
+  });
+
   // Calculate week tabs
   const weekTabs = useMemo(() => {
     if (!plan?.createdAt) return [];
     
     const planStart = getPlanStartDate(plan.createdAt);
-    const weekPlan = plan?.content?.weekPlan || [];
+    const weekPlan = Array.isArray(plan?.content?.weekPlan) ? plan.content.weekPlan : [];
     
     return WEEKDAY_KEYS.map((weekdayKey, dayNumber) => {
       const currentDate = addDays(planStart, dayNumber);
       const dateLabel = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(currentDate);
       const fullDateLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(currentDate);
-      const planDay = weekPlan.find((d: any) => {
+      const planDay = weekPlan[dayNumber] || weekPlan.find((d: any) => {
         const normalized = d?.dayName?.toLowerCase().trim();
         return normalized === weekdayKey || normalized?.startsWith(weekdayKey.slice(0, 3));
       });
+      const dateKey = currentDate.toISOString().slice(0, 10);
+      const dailyLog = dailyLogsByDate?.[dateKey];
       
       return {
         value: `day-${dayNumber + 1}`,
@@ -130,17 +202,24 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
         dateLabel,
         fullDateLabel,
         planDay,
-        dayNumber
+        dayNumber,
+        dateKey,
+        dailyLog,
       };
     });
-  }, [plan]);
+  }, [plan, dailyLogsByDate]);
+
+  const weekRangeLabel = weekTabs.length > 0 
+    ? `${weekTabs[0]?.dateLabel ?? ''} – ${weekTabs[weekTabs.length - 1]?.dateLabel ?? ''}`
+    : '';
+  const planNeedsRegeneration = Boolean(plan?.content?.autoHealMeta?.missingDays);
 
   if (!plan) {
     return (
       <div className="space-y-6">
-        <Card className="border-green-200 bg-gradient-to-br from-green-50 to-green-100/30">
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="rounded-full bg-gradient-to-br from-green-500 to-emerald-500 p-4 mb-4 shadow-lg">
+            <div className="rounded-full bg-gradient-to-br from-primary to-primary p-4 mb-4 shadow-lg">
               <Salad className="h-10 w-10 text-white" />
             </div>
             <h3 className="text-2xl font-semibold mb-2">Generate Your Nutrition Plan</h3>
@@ -152,19 +231,19 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
             {/* Benefits Grid */}
             <div className="grid grid-cols-2 gap-3 w-full max-w-lg mb-6">
               <div className="flex items-start gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                 <span>Macro-balanced meals</span>
               </div>
               <div className="flex items-start gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                 <span>Personalized portions</span>
               </div>
               <div className="flex items-start gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                 <span>Shopping list included</span>
               </div>
               <div className="flex items-start gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                 <span>Meal prep guidance</span>
               </div>
             </div>
@@ -173,7 +252,7 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
               size="lg"
               onClick={() => generatePlan.mutate()}
               disabled={generatePlan.isPending}
-              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg"
+              className="bg-gradient-to-r from-primary to-primary hover:from-primary/90 hover:to-primary/90 shadow-lg"
             >
               {generatePlan.isPending ? (
                 <>
@@ -196,7 +275,7 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
         <div className="grid md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-3">
-              <Apple className="h-8 w-8 text-green-600 mb-2" />
+              <Apple className="h-8 w-8 text-primary mb-2" />
               <CardTitle className="text-base">Science-Backed</CardTitle>
             </CardHeader>
             <CardContent>
@@ -208,7 +287,7 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
           
           <Card>
             <CardHeader className="pb-3">
-              <RefreshCw className="h-8 w-8 text-blue-600 mb-2" />
+              <RefreshCw className="h-8 w-8 text-stone-600 mb-2" />
               <CardTitle className="text-base">Flexible Swaps</CardTitle>
             </CardHeader>
             <CardContent>
@@ -220,7 +299,7 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
           
           <Card>
             <CardHeader className="pb-3">
-              <TrendingUp className="h-8 w-8 text-purple-600 mb-2" />
+              <TrendingUp className="h-8 w-8 text-primary mb-2" />
               <CardTitle className="text-base">Adaptive Plans</CardTitle>
             </CardHeader>
             <CardContent>
@@ -234,20 +313,13 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
     );
   }
 
-  const weekRangeLabel = weekTabs.length > 0 
-    ? `${weekTabs[0].dateLabel} – ${weekTabs[6].dateLabel}`
-    : '';
-
-  // Calculate daily adherence (mock data - would come from logging)
-  const dailyAdherence = [95, 100, 87, 92, 100, 78, 85];
-
   return (
     <div className="space-y-6">
       {/* Header Actions */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
               Active Plan
             </Badge>
             <Badge variant="secondary" className="text-xs">
@@ -290,68 +362,69 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
 
       <GroceryListModal open={showGroceryList} onOpenChange={setShowGroceryList} />
 
+      {planNeedsRegeneration && (
+        <Alert className="border-yellow-300 bg-yellow-50">
+          <AlertTitle className="flex items-center gap-2 text-yellow-900">
+            <AlertCircle className="h-4 w-4" />
+            Plan needs regeneration
+          </AlertTitle>
+          <AlertDescription className="text-sm text-yellow-900/80">
+            We filled in missing days to keep things moving, but you should regenerate this plan to receive fully personalized meals.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-green-50 to-green-100/30 border-green-200">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <Flame className="h-5 w-5 text-green-600" />
+              <Flame className="h-5 w-5 text-primary" />
               <span className="text-xs text-muted-foreground">Daily</span>
             </div>
-            <p className="text-2xl font-bold text-green-700">
+            <p className="text-2xl font-bold text-primary">
               {plan.content?.macroTargets?.dailyCalories || 2000}
             </p>
             <p className="text-xs text-muted-foreground">Calories</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100/30 border-blue-200">
+        <Card className="bg-gradient-to-br from-stone-50 to-stone-100/30 border-stone-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <Apple className="h-5 w-5 text-blue-600" />
+              <Apple className="h-5 w-5 text-stone-600" />
               <span className="text-xs text-muted-foreground">Target</span>
             </div>
-            <p className="text-2xl font-bold text-blue-700">
+            <p className="text-2xl font-bold text-stone-700">
               {plan.content?.macroTargets?.proteinGrams || 150}g
             </p>
             <p className="text-xs text-muted-foreground">Protein</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100/30 border-purple-200">
+        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <Droplets className="h-5 w-5 text-purple-600" />
+              <Droplets className="h-5 w-5 text-primary" />
               <span className="text-xs text-muted-foreground">Daily</span>
             </div>
-            <p className="text-2xl font-bold text-purple-700">3.5L</p>
+            <p className="text-2xl font-bold text-primary">3.5L</p>
             <p className="text-xs text-muted-foreground">Hydration</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100/30 border-orange-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <TrendingUp className="h-5 w-5 text-orange-600" />
-              <span className="text-xs text-muted-foreground">This Week</span>
-            </div>
-            <p className="text-2xl font-bold text-orange-700">91%</p>
-            <p className="text-xs text-muted-foreground">Adherence</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Rationale */}
-      <Card className="border-green-200 bg-gradient-to-r from-green-50/50 to-transparent">
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Info className="h-5 w-5 text-green-600" />
+            <Info className="h-5 w-5 text-primary" />
             Why This Plan Works for You
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            {plan.rationale || 'This plan is tailored to your unique health profile, goals, and supplement formula.'}
+            {plan.aiRationale || 'This plan is tailored to your unique health profile, goals, and supplement formula.'}
           </p>
         </CardContent>
       </Card>
@@ -362,7 +435,7 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-green-600" />
+                <Calendar className="h-5 w-5 text-primary" />
                 Your 7-Day Meal Plan
               </CardTitle>
               <CardDescription className="mt-1">
@@ -376,7 +449,6 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
             {/* Day Selector */}
             <TabsList className="w-full grid grid-cols-7 gap-2 bg-transparent p-0 h-auto">
               {weekTabs.map((day, idx) => {
-                const adherence = dailyAdherence[idx];
                 const isToday = idx === new Date().getDay() - 1 || (new Date().getDay() === 0 && idx === 6);
                 
                 return (
@@ -385,8 +457,8 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
                     value={day.value}
                     className={`
                       flex flex-col gap-2 p-3 rounded-xl border-2 transition-all
-                      data-[state=active]:border-green-500 data-[state=active]:bg-green-50
-                      ${isToday ? 'ring-2 ring-green-200' : ''}
+                      data-[state=active]:border-primary data-[state=active]:bg-primary/5
+                      ${isToday ? 'ring-2 ring-primary/20' : ''}
                     `}
                   >
                     <span className="text-xs font-medium text-muted-foreground">
@@ -395,11 +467,8 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
                     <span className="text-sm font-semibold">
                       {day.dateLabel.split(' ')[1]}
                     </span>
-                    {adherence && (
-                      <Progress value={adherence} className="h-1" />
-                    )}
                     {isToday && (
-                      <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-green-100 text-green-700">
+                      <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-primary/10 text-primary">
                         Today
                       </Badge>
                     )}
@@ -409,16 +478,16 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
             </TabsList>
 
             {/* Day Content */}
-            {weekTabs.map((day) => (
+                {weekTabs.map((day) => (
               <TabsContent key={day.value} value={day.value} className="mt-0 space-y-4">
                 {/* Day Header */}
-                <div className="rounded-xl border-2 border-green-100 bg-gradient-to-r from-green-50 to-emerald-50/30 p-4">
+                <div className="rounded-xl border-2 border-primary/10 bg-gradient-to-r from-primary/5 to-primary/10 p-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-xl font-semibold text-green-900">
+                      <h3 className="text-xl font-semibold text-primary">
                         {day.planDay?.dayName || day.tabLabel}
                       </h3>
-                      <p className="text-sm text-green-700">{day.fullDateLabel}</p>
+                      <p className="text-sm text-primary/80">{day.fullDateLabel}</p>
                     </div>
                     {day.planDay?.dailyTotals && (
                       <div className="flex flex-wrap gap-2">
@@ -434,7 +503,7 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
                 </div>
 
                 {/* Meals */}
-                {day.planDay?.meals ? (
+                    {day.planDay?.meals ? (
                   <div className="grid gap-3">
                     {day.planDay.meals.map((meal: any, idx: number) => {
                       const mealId = `${day.value}-${meal.mealType}-${idx}`;
@@ -443,7 +512,7 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
                       return (
                         <Card 
                           key={mealId} 
-                          className="group hover:shadow-md transition-all hover:border-green-200 relative overflow-hidden"
+                          className="group hover:shadow-md transition-all hover:border-primary/20 relative overflow-hidden"
                         >
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between gap-4">
@@ -451,7 +520,7 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
                                 <div className="flex items-center gap-2 mb-1">
                                   <Badge 
                                     variant="outline" 
-                                    className="text-xs capitalize bg-green-50 text-green-700 border-green-200"
+                                    className="text-xs capitalize bg-primary/5 text-primary border-primary/20"
                                   >
                                     {meal.mealType}
                                   </Badge>
@@ -464,7 +533,7 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
                                 <h4 className="font-semibold text-lg mb-2">{meal.name}</h4>
                                 {meal.healthBenefits && (
                                   <p className="text-sm text-muted-foreground mb-2 flex items-start gap-2">
-                                    <Sparkles className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                    <Sparkles className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                                     {meal.healthBenefits}
                                   </p>
                                 )}
@@ -476,24 +545,35 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
                                 )}
                               </div>
                               
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={`
-                                  transition-all
-                                  ${isSwapping ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
-                                `}
-                                onClick={() => swapMeal.mutate({ 
-                                  day: day.planDay.day, 
-                                  mealType: meal.mealType,
-                                  currentMeal: meal,
-                                  id: mealId
-                                })}
-                                disabled={isSwapping || swapMeal.isPending}
-                              >
-                                <RefreshCw className={`h-4 w-4 mr-2 ${isSwapping ? 'animate-spin' : ''}`} />
-                                Swap
-                              </Button>
+                              <div className={`flex flex-col gap-1 transition-all ${isSwapping ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => generateRecipe.mutate({ 
+                                    mealName: meal.name, 
+                                    ingredients: meal.ingredients || [] 
+                                  })}
+                                  disabled={generateRecipe.isPending}
+                                >
+                                  <ChefHat className={`h-4 w-4 mr-2 ${generateRecipe.isPending && generateRecipe.variables?.mealName === meal.name ? 'animate-spin' : ''}`} />
+                                  Recipe
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => swapMeal.mutate({ 
+                                    dayIndex: day.planDay.day - 1, 
+                                    mealType: meal.mealType,
+                                    currentMealName: meal.name,
+                                    mealIndex: idx,
+                                    id: mealId
+                                  })}
+                                  disabled={isSwapping || swapMeal.isPending}
+                                >
+                                  <RefreshCw className={`h-4 w-4 mr-2 ${isSwapping ? 'animate-spin' : ''}`} />
+                                  Swap
+                                </Button>
+                              </div>
                             </div>
                           </CardContent>
                         </Card>
@@ -529,7 +609,7 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
             <div className="grid md:grid-cols-2 gap-3">
               {plan.content.mealPrepTips.map((tip: string, idx: number) => (
                 <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                  <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                   <span className="text-sm">{tip}</span>
                 </div>
               ))}
@@ -537,6 +617,183 @@ export function NutritionPlanTab({ plan, healthProfile }: NutritionPlanTabProps)
           </CardContent>
         </Card>
       )}
+
+      {/* Recipe Dialog */}
+      <Dialog open={isRecipeOpen} onOpenChange={setIsRecipeOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <div className="flex items-center justify-between pr-8">
+              <DialogTitle className="text-2xl flex items-center gap-2">
+                <ChefHat className="h-6 w-6 text-primary" />
+                {viewingRecipe?.recipe?.name || viewingRecipe?.mealName}
+              </DialogTitle>
+              
+              <Popover open={shareOpen} onOpenChange={setShareOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Share2 className="h-4 w-4" />
+                    Share
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="grid gap-4">
+                    <div className="space-y-2">
+                      <h4 className="font-medium leading-none">Share Recipe</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Send this recipe to your phone or email.
+                      </p>
+                    </div>
+                    <div className="grid gap-2">
+                      <div className="flex items-center gap-2 p-1 bg-muted rounded-lg">
+                        <Button 
+                          variant={shareMethod === 'sms' ? 'secondary' : 'ghost'} 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => setShareMethod('sms')}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          SMS
+                        </Button>
+                        <Button 
+                          variant={shareMethod === 'email' ? 'secondary' : 'ghost'} 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => setShareMethod('email')}
+                        >
+                          <Mail className="h-4 w-4 mr-2" />
+                          Email
+                        </Button>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="target">
+                          {shareMethod === 'sms' ? 'Phone Number' : 'Email Address'}
+                        </Label>
+                        <Input
+                          id="target"
+                          placeholder={shareMethod === 'sms' ? '+1234567890' : 'you@example.com'}
+                          value={shareTarget}
+                          onChange={(e) => setShareTarget(e.target.value)}
+                        />
+                      </div>
+                      <Button 
+                        onClick={() => shareRecipe.mutate({ 
+                          recipe: viewingRecipe?.recipe, 
+                          method: shareMethod, 
+                          target: shareTarget 
+                        })}
+                        disabled={!shareTarget || shareRecipe.isPending}
+                      >
+                        {shareRecipe.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          'Send'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <DialogDescription>
+              {viewingRecipe?.recipe?.description}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {viewingRecipe?.recipe && (
+            <ScrollArea className="h-[60vh] pr-4">
+              <div className="space-y-6">
+                {/* Meta Info */}
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    Prep: {viewingRecipe.recipe.prepTime}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Flame className="h-4 w-4" />
+                    Cook: {viewingRecipe.recipe.cookTime}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <TrendingUp className="h-4 w-4" />
+                    {viewingRecipe.recipe.macros?.calories} cal
+                  </div>
+                </div>
+
+                {/* Ingredients */}
+                <div>
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <ShoppingBasket className="h-4 w-4 text-primary" />
+                    Ingredients
+                  </h4>
+                  <ul className="grid sm:grid-cols-2 gap-2">
+                    {viewingRecipe.recipe.ingredients?.map((ing: any, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm bg-muted/30 p-2 rounded">
+                        <span className="font-medium">{ing.amount}</span>
+                        <span>{ing.item}</span>
+                        {ing.notes && <span className="text-muted-foreground italic">({ing.notes})</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Instructions */}
+                <div>
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    Instructions
+                  </h4>
+                  <div className="space-y-4">
+                    {viewingRecipe.recipe.instructions?.map((step: string, idx: number) => (
+                      <div key={idx} className="flex gap-3">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+                          {idx + 1}
+                        </div>
+                        <p className="text-sm leading-relaxed">{step}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Macros */}
+                <div className="bg-muted/30 p-4 rounded-lg">
+                  <h4 className="font-semibold mb-3 text-sm">Nutritional Breakdown</h4>
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div className="p-2 bg-background rounded shadow-sm">
+                      <div className="text-xs text-muted-foreground">Protein</div>
+                      <div className="font-bold text-primary">{viewingRecipe.recipe.macros?.protein}g</div>
+                    </div>
+                    <div className="p-2 bg-background rounded shadow-sm">
+                      <div className="text-xs text-muted-foreground">Carbs</div>
+                      <div className="font-bold text-primary">{viewingRecipe.recipe.macros?.carbs}g</div>
+                    </div>
+                    <div className="p-2 bg-background rounded shadow-sm">
+                      <div className="text-xs text-muted-foreground">Fats</div>
+                      <div className="font-bold text-primary">{viewingRecipe.recipe.macros?.fat}g</div>
+                    </div>
+                    <div className="p-2 bg-background rounded shadow-sm">
+                      <div className="text-xs text-muted-foreground">Calories</div>
+                      <div className="font-bold text-primary">{viewingRecipe.recipe.macros?.calories}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Chef's Tip */}
+                {viewingRecipe.recipe.chefTip && (
+                  <Alert className="bg-primary/5 border-primary/20">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <AlertTitle>Chef's Tip</AlertTitle>
+                    <AlertDescription>
+                      {viewingRecipe.recipe.chefTip}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

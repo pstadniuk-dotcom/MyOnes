@@ -13,7 +13,7 @@ import whoopIcon from '@assets/WHOOP_idNTL3Ndjp_1_1763160952445.png';
 interface WearableConnection {
   id: string;
   userId: string;
-  provider: 'fitbit' | 'oura' | 'whoop' | 'apple';
+  provider: 'fitbit' | 'oura' | 'whoop'; // apple disabled - requires native iOS app
   status: 'connected' | 'disconnected' | 'error';
   connectedAt: string;
   lastSyncedAt: string | null;
@@ -36,10 +36,10 @@ const OuraLogo = () => (
 );
 
 // Optional image paths (served from client/public). We try several extensions in order.
-const PROVIDER_IMAGES: Record<'fitbit' | 'oura' | 'whoop' | 'apple', string[] | null> = {
+const PROVIDER_IMAGES: Record<'fitbit' | 'oura' | 'apple', string[] | null> = {
   fitbit: [fitbitIcon],
   oura: [ouraIcon],
-  whoop: [whoopIcon],
+  // whoop: [whoopIcon], // Disabled - requires business API access
   apple: null,
 };
 
@@ -48,7 +48,7 @@ function ProviderLogo({
   Inline,
   name,
 }: {
-  provider: 'fitbit' | 'oura' | 'whoop' | 'apple';
+  provider: 'fitbit' | 'oura' | 'apple'; // whoop disabled
   Inline: React.ComponentType;
   name: string;
 }) {
@@ -106,20 +106,22 @@ const PROVIDER_INFO = {
     color: 'text-[#0B0F1C]',
     bgColor: 'bg-slate-100',
   },
-  whoop: {
-    name: 'WHOOP',
-    description: 'Analyze strain, recovery, and sleep performance',
-    logo: WhoopLogo,
-    color: 'text-[#000000]',
-    bgColor: 'bg-slate-100',
-  },
-  apple: {
-    name: 'Apple Watch',
-    description: 'Sync health data from Apple Health and Apple Watch',
-    logo: AppleLogo,
-    color: 'text-slate-800',
-    bgColor: 'bg-slate-100',
-  },
+  // WHOOP temporarily disabled - requires business partnership API access
+  // whoop: {
+  //   name: 'WHOOP',
+  //   description: 'Analyze strain, recovery, and sleep performance',
+  //   logo: WhoopLogo,
+  //   color: 'text-[#000000]',
+  //   bgColor: 'bg-slate-100',
+  // },
+  // Apple Watch temporarily disabled - requires native iOS app for data sync
+  // apple: {
+  //   name: 'Apple Watch',
+  //   description: 'Sync health data from Apple Health and Apple Watch',
+  //   logo: AppleLogo,
+  //   color: 'text-slate-800',
+  //   bgColor: 'bg-slate-100',
+  // },
 };
 
 export default function WearablesPage() {
@@ -150,14 +152,15 @@ export default function WearablesPage() {
     },
   });
 
-  const handleConnect = async (provider: 'fitbit' | 'oura' | 'whoop' | 'apple') => {
-    if (provider === 'apple') {
-      toast({
-        title: 'Coming Soon',
-        description: 'Apple Watch integration will be available soon!',
-      });
-      return;
-    }
+  const handleConnect = async (provider: 'fitbit' | 'oura') => {
+    // Apple Watch integration removed - requires native iOS app
+    // if (provider === 'apple') {
+    //   toast({
+    //     title: 'Coming Soon',
+    //     description: 'Apple Watch integration will be available soon!',
+    //   });
+    //   return;
+    // }
 
     try {
       // Use apiRequest so the Authorization header is included from localStorage
@@ -198,7 +201,7 @@ export default function WearablesPage() {
     disconnectMutation.mutate(connectionId);
   };
 
-  const getConnectionStatus = (provider: 'fitbit' | 'oura' | 'whoop' | 'apple') => {
+  const getConnectionStatus = (provider: 'fitbit' | 'oura') => {
     return connections.find((conn) => conn.provider === provider);
   };
 
@@ -220,7 +223,7 @@ export default function WearablesPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {(Object.keys(PROVIDER_INFO) as Array<'fitbit' | 'oura' | 'whoop' | 'apple'>).map((provider) => {
+        {(Object.keys(PROVIDER_INFO) as Array<'fitbit' | 'oura'>).map((provider) => {
           const info = PROVIDER_INFO[provider];
           const connection = getConnectionStatus(provider);
           const Logo = info.logo;

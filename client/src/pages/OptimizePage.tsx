@@ -1,31 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
 import { 
   Salad, 
   Dumbbell,
   Heart,
   Sparkles,
-  Loader2,
-  TrendingUp,
-  Target,
-  Flame,
   Calendar,
-  Award,
   BarChart3,
   ArrowRight,
   CheckCircle2,
   Clock
 } from 'lucide-react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { getQueryFn } from '@/lib/queryClient';
 import { Link, useLocation } from 'wouter';
 import { NutritionPlanTab } from '@/components/optimize/NutritionPlanTab';
 import { WorkoutPlanTab } from '@/components/optimize/WorkoutPlanTab';
 import { LifestylePlanTab } from '@/components/optimize/LifestylePlanTab';
+import type { OptimizeLogsByDate } from '@/types/optimize';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 interface OptimizePlan {
   id: string;
@@ -44,18 +44,7 @@ interface HealthProfile {
 }
 
 export default function OptimizePage() {
-  const [location] = useLocation();
-  const queryClient = useQueryClient();
-  
-  // Determine active tab from URL
-  const getActiveTab = () => {
-    if (location.includes('nutrition')) return 'nutrition';
-    if (location.includes('workout')) return 'workout';
-    if (location.includes('lifestyle')) return 'lifestyle';
-    return 'nutrition';
-  };
-  
-  const [activeTab, setActiveTab] = useState(getActiveTab());
+  const [location, navigate] = useLocation();
 
   // Fetch health profile
   const { data: healthProfile } = useQuery<HealthProfile>({
@@ -75,14 +64,63 @@ export default function OptimizePage() {
 
   const isProfileComplete = !!healthProfile && !!healthProfile.age && !!healthProfile.sex;
 
-  // Calculate overall progress
-  const totalPlans = 3;
-  const activePlans = [nutritionPlan, workoutPlan, lifestylePlan].filter(Boolean).length;
-  const completionPercentage = (activePlans / totalPlans) * 100;
+  const planSections = [
+    {
+      key: 'nutrition' as const,
+      title: 'Nutrition',
+      description: 'Meal plans & macros',
+      icon: Salad,
+      accent: 'from-green-500 to-green-600',
+      badgeClass: 'bg-green-100 text-green-700',
+      isActive: !!nutritionPlan,
+      content: (
+        <NutritionPlanTab
+          plan={nutritionPlan}
+          healthProfile={healthProfile}
+        />
+      ),
+    },
+    {
+      key: 'workout' as const,
+      title: 'Workout',
+      description: 'Training schedule',
+      icon: Dumbbell,
+      accent: 'from-blue-500 to-blue-600',
+      badgeClass: 'bg-blue-100 text-blue-700',
+      isActive: !!workoutPlan,
+      content: (
+        <WorkoutPlanTab
+          plan={workoutPlan}
+          healthProfile={healthProfile}
+        />
+      ),
+    },
+    {
+      key: 'lifestyle' as const,
+      title: 'Lifestyle',
+      description: 'Sleep & recovery',
+      icon: Heart,
+      accent: 'from-purple-500 to-purple-600',
+      badgeClass: 'bg-purple-100 text-purple-700',
+      isActive: !!lifestylePlan,
+      content: <LifestylePlanTab plan={lifestylePlan} healthProfile={healthProfile} />,
+    },
+  ];
 
-  // Mock adherence data (would come from daily logging in production)
-  const weeklyAdherence = 85;
-  const currentStreak = 7;
+  // Calculate default tab only once and memoize to prevent flashing
+  const defaultTab = useMemo(() => {
+    if (plansLoading) return 'nutrition' as const; // Default while loading
+    return (planSections.find((section) => section.isActive)?.key ?? planSections[0].key) as typeof planSections[number]['key'];
+  }, [nutritionPlan, workoutPlan, lifestylePlan, plansLoading]);
+  
+  const [activePlanTab, setActivePlanTab] = useState<typeof defaultTab>(defaultTab);
+  
+  // Update active tab only once when plans finish loading
+  useEffect(() => {
+    if (!plansLoading) {
+      setActivePlanTab(defaultTab);
+    }
+  }, [defaultTab, plansLoading]);
 
   if (!isProfileComplete) {
     return (
@@ -121,6 +159,7 @@ export default function OptimizePage() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-6">
+
       {/* Header Section */}
       <div className="flex flex-col gap-6">
         <div>
@@ -131,178 +170,95 @@ export default function OptimizePage() {
             Your AI-powered health optimization dashboard
           </p>
         </div>
+      </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="border-green-200 bg-gradient-to-br from-green-50 to-green-100/50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Active Plans</p>
-                  <p className="text-3xl font-bold text-green-700">{activePlans}/3</p>
+      {/* Plan Sections */}
+      <Tabs value={activePlanTab} onValueChange={(value) => setActivePlanTab(value as typeof activePlanTab)} className="space-y-8">
+        <TabsList className="h-auto w-full rounded-xl border bg-muted/20 p-1 grid grid-cols-2 md:grid-cols-3 gap-1">
+          {planSections.map((section) => {
+            const Icon = section.icon;
+            return (
+              <TabsTrigger
+                key={section.key}
+                value={section.key}
+                className="w-full justify-start rounded-lg border border-transparent px-3 py-2 text-left transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <div className={`h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0 ${
+                    activePlanTab === section.key ? section.badgeClass : 'bg-muted text-muted-foreground'
+                  }`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-foreground truncate">{section.title}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{section.description}</p>
+                  </div>
                 </div>
-                <div className="h-12 w-12 rounded-full bg-green-600 flex items-center justify-center">
-                  <Target className="h-6 w-6 text-white" />
-                </div>
-              </div>
-              <Progress value={completionPercentage} className="mt-3 h-2" />
-            </CardContent>
-          </Card>
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
 
-          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Weekly Adherence</p>
-                  <p className="text-3xl font-bold text-blue-700">{weeklyAdherence}%</p>
-                </div>
-                <div className="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-white" />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">+12% from last week</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100/50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Current Streak</p>
-                  <p className="text-3xl font-bold text-orange-700">{currentStreak} days</p>
-                </div>
-                <div className="h-12 w-12 rounded-full bg-orange-600 flex items-center justify-center">
-                  <Flame className="h-6 w-6 text-white" />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">Personal best!</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100/50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Achievements</p>
-                  <p className="text-3xl font-bold text-purple-700">12</p>
-                </div>
-                <div className="h-12 w-12 rounded-full bg-purple-600 flex items-center justify-center">
-                  <Award className="h-6 w-6 text-white" />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">2 unlocked this week</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Actions */}
-        <Card className="bg-gradient-to-r from-green-500/10 via-blue-500/10 to-purple-500/10 border-none">
+        {/* Reminders Setup Prompt */}
+        <Card className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 border-none">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-green-600 to-blue-600 flex items-center justify-center">
-                  <CheckCircle2 className="h-5 w-5 text-white" />
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-semibold">Today's Check-In</p>
-                  <p className="text-sm text-muted-foreground">Log your meals, workouts, and wellness</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">Stay on Track with Reminders</p>
+                    <HoverCard>
+                      <HoverCardTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 text-purple-500 hover:text-purple-600 hover:bg-purple-100/50 rounded-full p-0">
+                          <Sparkles className="h-3 w-3" />
+                        </Button>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80 bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200">
+                        <div className="flex gap-3">
+                          <div className="h-8 w-8 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
+                            <Sparkles className="h-4 w-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-purple-900 mb-1 text-sm">Pro Tip</p>
+                            <p className="text-xs text-purple-800">
+                              Set up personalized reminders for supplements, workouts, meals, and check-ins. 
+                              Daily reminders help you stay consistent and achieve your health goals faster.
+                            </p>
+                          </div>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Configure reminders for supplements, workouts, meals & more</p>
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  <Clock className="mr-2 h-4 w-4" />
-                  Quick Log
-                </Button>
-                <Button size="sm" className="bg-gradient-to-r from-green-600 to-blue-600">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  View Progress
-                </Button>
+                <Link href="/dashboard/settings#notifications">
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    Set Up Reminders
+                  </Button>
+                </Link>
               </div>
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Main Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-muted/50">
-          <TabsTrigger 
-            value="nutrition" 
-            className="flex flex-col items-center gap-2 py-4 data-[state=active]:bg-gradient-to-br data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white"
-          >
-            <Salad className="h-5 w-5" />
-            <div className="text-center">
-              <div className="font-semibold">Nutrition</div>
-              <div className="text-xs opacity-80">7-day meal plans</div>
+        {planSections.map((section) => (
+          <TabsContent key={section.key} value={section.key} className="mt-0 space-y-6">
+            <div className="rounded-3xl border bg-card/70 p-6 shadow-sm">
+              {section.content}
             </div>
-            {nutritionPlan && (
-              <Badge variant="secondary" className="absolute top-2 right-2 bg-green-100 text-green-700 text-xs">
-                Active
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger 
-            value="workout" 
-            className="flex flex-col items-center gap-2 py-4 data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white"
-          >
-            <Dumbbell className="h-5 w-5" />
-            <div className="text-center">
-              <div className="font-semibold">Workout</div>
-              <div className="text-xs opacity-80">Training programs</div>
-            </div>
-            {workoutPlan && (
-              <Badge variant="secondary" className="absolute top-2 right-2 bg-blue-100 text-blue-700 text-xs">
-                Active
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger 
-            value="lifestyle" 
-            className="flex flex-col items-center gap-2 py-4 data-[state=active]:bg-gradient-to-br data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
-          >
-            <Heart className="h-5 w-5" />
-            <div className="text-center">
-              <div className="font-semibold">Lifestyle</div>
-              <div className="text-xs opacity-80">Sleep & recovery</div>
-            </div>
-            {lifestylePlan && (
-              <Badge variant="secondary" className="absolute top-2 right-2 bg-purple-100 text-purple-700 text-xs">
-                Active
-              </Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="nutrition" className="space-y-6 mt-0">
-          <NutritionPlanTab plan={nutritionPlan} healthProfile={healthProfile} />
-        </TabsContent>
-
-        <TabsContent value="workout" className="space-y-6 mt-0">
-          <WorkoutPlanTab plan={workoutPlan} healthProfile={healthProfile} />
-        </TabsContent>
-
-        <TabsContent value="lifestyle" className="space-y-6 mt-0">
-          <LifestylePlanTab plan={lifestylePlan} healthProfile={healthProfile} />
-        </TabsContent>
+          </TabsContent>
+        ))}
       </Tabs>
 
-      {/* Pro Tip */}
-      <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100/50">
-        <CardContent className="p-4">
-          <div className="flex gap-3">
-            <div className="h-10 w-10 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <p className="font-semibold text-amber-900 mb-1">Pro Tip</p>
-              <p className="text-sm text-amber-800">
-                Enable daily check-ins to track your adherence and get personalized recommendations. 
-                Our AI learns from your patterns to optimize your plans over time.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

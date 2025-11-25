@@ -3,9 +3,10 @@ import type { RateLimitRequestHandler } from "express-rate-limit";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import OpenAI from "openai";
+import YouTube from "youtube-sr";
 import { z } from "zod";
 import { createInsertSchema } from "drizzle-zod";
-import type { InsertMessage, InsertChatSession } from "@shared/schema";
+import type { InsertMessage, InsertChatSession, OptimizeDailyLog } from "@shared/schema";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
@@ -16,11 +17,79 @@ import { ObjectPermission } from "./objectAcl";
 import { analyzeLabReport } from "./fileAnalysis";
 import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDIENTS, BASE_FORMULA_DETAILS, normalizeIngredientName, findIngredientByName } from "@shared/ingredients";
 import { sendNotificationEmail } from "./emailService";
-import { sendNotificationSms } from "./smsService";
+import { sendNotificationSms, sendRawSms } from "./smsService";
 import type { User, Notification, NotificationPref } from "@shared/schema";
 import { buildGPT4Prompt, buildO1MiniPrompt, type PromptContext } from "./prompt-builder";
-import { buildNutritionPlanPrompt, buildWorkoutPlanPrompt, buildLifestylePlanPrompt } from "./optimize-prompts";
+import { buildNutritionPlanPrompt, buildWorkoutPlanPrompt, buildLifestylePlanPrompt, buildRecipePrompt } from "./optimize-prompts";
 import { parseAiJson } from "./utils/parseAiJson";
+import { normalizePlanContent, DEFAULT_MEAL_TYPES } from "./optimize-normalizer";
+import { nanoid } from "nanoid";
+import { startOfWeek, endOfWeek, subWeeks, format, parseISO, differenceInWeeks, differenceInDays, isSameDay } from "date-fns";
+
+type GroceryListItem = {
+  id: string;
+  item: string;
+  amount?: string;
+  unit?: string;
+  category?: string;
+  checked: boolean;
+};
+
+function mapIngredientToItem(value: any): GroceryListItem | null {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    return {
+      id: nanoid(8),
+      item: value,
+      category: 'General',
+      checked: false,
+    };
+  }
+
+  const itemName = value.item || value.name || value.ingredient;
+  if (!itemName) {
+    return null;
+  }
+
+  return {
+    id: nanoid(8),
+    item: itemName,
+    amount: value.quantity || value.amount || value.qty || undefined,
+    unit: value.unit,
+    category: value.category || value.type || 'General',
+    checked: Boolean(value.checked && value.checked === true),
+  };
+}
+
+function buildGroceryItemsFromPlanContent(content: any): GroceryListItem[] {
+  if (Array.isArray(content?.shoppingList) && content.shoppingList.length > 0) {
+    return content.shoppingList
+      .map((item: any) => mapIngredientToItem(item))
+      .filter((item: GroceryListItem | null): item is GroceryListItem => Boolean(item))
+      .map((item: GroceryListItem) => ({ ...item, checked: false }));
+  }
+
+  const aggregated = new Map<string, GroceryListItem>();
+  const weekPlan = Array.isArray(content?.weekPlan) ? content.weekPlan : [];
+
+  weekPlan.forEach((day: any) => {
+    if (!Array.isArray(day?.meals)) return;
+    day.meals.forEach((meal: any) => {
+      if (!Array.isArray(meal?.ingredients)) return;
+      meal.ingredients.forEach((ingredient: any) => {
+        const normalized = mapIngredientToItem(ingredient);
+        if (!normalized) return;
+        const key = normalized.item.toLowerCase();
+        if (aggregated.has(key)) {
+          return;
+        }
+        aggregated.set(key, normalized);
+      });
+    });
+  });
+
+  return Array.from(aggregated.values());
+}
 
 declare global {
   namespace Express {
@@ -5820,7 +5889,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
       
       const schedule = await storage.getReviewSchedule(userId, formulaId);
-      res.json(schedule);
+      res.json(schedule || null);
     } catch (error) {
       console.error('Error fetching review schedule:', error);
       res.status(500).json({ error: 'Failed to fetch review schedule' });
@@ -6668,10 +6737,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       (req.session as any).oauthUserId = userId;
       (req.session as any).oauthProvider = provider;
 
-  let authUrl = '';
-  // Build redirect URI dynamically from the incoming request to avoid env mismatches
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const redirectUri = `${baseUrl}/api/wearables/callback/${provider}`;
+      let authUrl = '';
+      // Build redirect URI - use env var if set (for production), otherwise use request host (for dev)
+      const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+      const redirectUri = `${baseUrl}/api/wearables/callback/${provider}`;
 
       if (provider === 'fitbit') {
         const clientId = process.env.FITBIT_CLIENT_ID;
@@ -6897,32 +6966,198 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.post('/api/wearables/sync', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      const { syncOuraData } = await import('./wearableDataSync');
+      const { syncOuraData, syncFitbitData } = await import('./wearableDataSync');
+      // syncWhoopData disabled - requires business API access
       
       const connections = await storage.getWearableConnections(userId);
-      const ouraConnection = connections.find(c => c.provider === 'oura' && c.status === 'connected');
+      const results = [];
       
-      if (!ouraConnection) {
-        return res.status(404).json({ error: 'No Oura Ring connected' });
+      for (const connection of connections) {
+        if (connection.status !== 'connected') continue;
+        
+        let result;
+        if (connection.provider === 'oura') {
+          result = await syncOuraData(userId, connection, storage, 7);
+        } else if (connection.provider === 'fitbit') {
+          result = await syncFitbitData(userId, connection, storage, 7);
+        }
+        // WHOOP sync disabled - requires business partnership API access
+        // else if (connection.provider === 'whoop') {
+        //   result = await syncWhoopData(userId, connection, storage, 7);
+        // }
+        
+        if (result) {
+          results.push({ provider: connection.provider, ...result });
+        }
       }
       
-      const result = await syncOuraData(userId, ouraConnection, storage, 7); // Sync last 7 days
-      
-      if (result.success) {
-        res.json({ 
-          success: true, 
-          message: `Synced ${result.daysSynced} days of data`,
-          daysSynced: result.daysSynced 
-        });
-      } else {
-        res.status(500).json({ 
-          error: 'Sync failed', 
-          details: result.error 
-        });
+      if (results.length === 0) {
+        return res.status(404).json({ error: 'No wearables connected' });
       }
+      
+      const totalDays = results.reduce((sum, r) => sum + r.daysSynced, 0);
+      const anySuccess = results.some(r => r.success);
+      
+      res.json({ 
+        success: anySuccess,
+        results,
+        totalDaysSynced: totalDays,
+      });
     } catch (error) {
       console.error('Error in manual sync:', error);
       res.status(500).json({ error: 'Failed to sync data' });
+    }
+  });
+
+  // Get normalized biometric data for a date range
+  app.get('/api/wearables/biometric-data', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { startDate, endDate, provider } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'startDate and endDate are required' });
+      }
+      
+      const start = new Date(startDate as string);
+      const end = new Date(endDate as string);
+      
+      // Get raw biometric data
+      const rawData = await storage.getBiometricData(userId, start, end);
+      
+      // Filter by provider if specified
+      const filteredData = provider 
+        ? rawData.filter(d => d.provider === provider)
+        : rawData;
+      
+      // Normalize the data
+      const { normalizeBiometricData } = await import('./wearableDataNormalizer');
+      const normalizedData = filteredData.map(d => normalizeBiometricData(d));
+      
+      res.json({ data: normalizedData });
+    } catch (error) {
+      console.error('Error fetching biometric data:', error);
+      res.status(500).json({ error: 'Failed to fetch biometric data' });
+    }
+  });
+
+  // Get merged biometric data (combines data from all providers by date)
+  app.get('/api/wearables/biometric-data/merged', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'startDate and endDate are required' });
+      }
+      
+      const start = new Date(startDate as string);
+      const end = new Date(endDate as string);
+      
+      // Get raw biometric data
+      const rawData = await storage.getBiometricData(userId, start, end);
+      
+      if (rawData.length === 0) {
+        return res.json({ data: [] });
+      }
+      
+      // Normalize all data
+      const { normalizeBiometricData, mergeMultiProviderData } = await import('./wearableDataNormalizer');
+      const normalizedData = rawData.map(d => normalizeBiometricData(d));
+      
+      // Group by date and merge
+      const dataByDate = new Map<string, typeof normalizedData>();
+      normalizedData.forEach(d => {
+        const dateKey = d.date.toISOString().split('T')[0];
+        if (!dataByDate.has(dateKey)) {
+          dataByDate.set(dateKey, []);
+        }
+        dataByDate.get(dateKey)!.push(d);
+      });
+      
+      // Merge data for each date
+      const mergedData = Array.from(dataByDate.values()).map(dataArray => {
+        return dataArray.length > 1 
+          ? mergeMultiProviderData(dataArray)
+          : dataArray[0];
+      });
+      
+      // Sort by date
+      mergedData.sort((a, b) => a.date.getTime() - b.date.getTime());
+      
+      res.json({ data: mergedData });
+    } catch (error) {
+      console.error('Error fetching merged biometric data:', error);
+      res.status(500).json({ error: 'Failed to fetch merged biometric data' });
+    }
+  });
+
+  // Get biometric trends and insights
+  app.get('/api/wearables/insights', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const days = parseInt(req.query.days as string) || 30;
+      
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      
+      // Get merged biometric data
+      const rawData = await storage.getBiometricData(userId, startDate, endDate);
+      
+      if (rawData.length === 0) {
+        return res.json({ 
+          insights: {
+            sleep: null,
+            heart: null,
+            recovery: null,
+            activity: null,
+          },
+          message: 'No data available for insights',
+        });
+      }
+      
+      const { normalizeBiometricData, calculateTrend, calculateSleepQuality } = await import('./wearableDataNormalizer');
+      const normalizedData = rawData.map(d => normalizeBiometricData(d));
+      
+      // Calculate trends
+      const sleepDurations = normalizedData.map(d => d.sleep.totalMinutes).filter(Boolean) as number[];
+      const sleepScores = normalizedData.map(d => d.sleep.score || calculateSleepQuality(d.sleep)).filter(Boolean) as number[];
+      const hrvValues = normalizedData.map(d => d.heart.hrvMs).filter(Boolean) as number[];
+      const restingHRs = normalizedData.map(d => d.heart.restingRate).filter(Boolean) as number[];
+      const recoveryScores = normalizedData.map(d => d.recovery.score).filter(Boolean) as number[];
+      const steps = normalizedData.map(d => d.activity.steps).filter(Boolean) as number[];
+      
+      const insights = {
+        sleep: sleepDurations.length > 0 ? {
+          averageMinutes: Math.round(sleepDurations.reduce((a, b) => a + b, 0) / sleepDurations.length),
+          averageScore: Math.round(sleepScores.reduce((a, b) => a + b, 0) / sleepScores.length),
+          trend: calculateTrend(sleepDurations),
+          qualityTrend: calculateTrend(sleepScores),
+        } : null,
+        
+        heart: hrvValues.length > 0 || restingHRs.length > 0 ? {
+          averageHRV: hrvValues.length > 0 ? Math.round(hrvValues.reduce((a, b) => a + b, 0) / hrvValues.length) : null,
+          averageRestingHR: restingHRs.length > 0 ? Math.round(restingHRs.reduce((a, b) => a + b, 0) / restingHRs.length) : null,
+          hrvTrend: hrvValues.length > 0 ? calculateTrend(hrvValues) : null,
+          restingHRTrend: restingHRs.length > 0 ? calculateTrend(restingHRs) : null,
+        } : null,
+        
+        recovery: recoveryScores.length > 0 ? {
+          averageScore: Math.round(recoveryScores.reduce((a, b) => a + b, 0) / recoveryScores.length),
+          trend: calculateTrend(recoveryScores),
+        } : null,
+        
+        activity: steps.length > 0 ? {
+          averageSteps: Math.round(steps.reduce((a, b) => a + b, 0) / steps.length),
+          trend: calculateTrend(steps),
+        } : null,
+      };
+      
+      res.json({ insights, daysAnalyzed: days });
+    } catch (error) {
+      console.error('Error calculating insights:', error);
+      res.status(500).json({ error: 'Failed to calculate insights' });
     }
   });
 
@@ -6932,7 +7167,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/optimize/plans', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      const plans = await storage.listOptimizePlans(userId);
+      const plans = await storage.getOptimizePlans(userId);
       res.json(plans);
     } catch (error) {
       console.error('Error fetching optimize plans:', error);
@@ -7039,48 +7274,94 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
         console.log(`📝 Prompt built, length: ${prompt.length} chars`);
 
-        // Call AI to generate plan
-        const aiProvider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai'|'anthropic';
-        const aiModel = aiRuntimeSettings.model || process.env.AI_MODEL || (aiProvider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o');
-        console.log(`🧠 Using AI: ${aiProvider} / ${aiModel}`);
+        // Always use GPT-4o for Optimize plan generation (faster and more reliable)
+        console.log(`🧠 Using AI: OpenAI / gpt-4o`);
+        console.log(`📏 Estimated prompt tokens: ~${Math.ceil(prompt.length / 4)} (prompt length / 4)`);
         
         let planContent: any;
         let rationale = '';
 
         try {
-          if (aiProvider === 'anthropic') {
-            const Anthropic = (await import('@anthropic-ai/sdk')).default;
-            const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-            
-            console.log('⏳ Calling Anthropic API...');
-            const response = await anthropic.messages.create({
-              model: aiModel,
-              max_tokens: 4096,
-              messages: [{ role: 'user', content: prompt }],
-            });
+          // OpenAI GPT-4o (using 2024-08-06 model which supports 16k output tokens)
+          console.log('⏳ Calling OpenAI API (Single Pass)...');
+          const response = await openai.chat.completions.create({
+            model: 'gpt-4o-2024-08-06', // Explicitly use the model with 16k output token limit
+            messages: [
+              { 
+                role: 'system', 
+                content: "You are a clinical nutrition expert. You MUST generate a complete 7-day meal plan (Monday-Sunday). Do not stop early. The response must be valid JSON containing all 7 days."
+              },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 16000,
+          });
 
-            const content = response.content[0];
-            if (content.type === 'text') {
-              console.log(`✅ AI response received, length: ${content.text.length} chars`);
-              console.log(`🔍 First 200 chars: ${content.text.substring(0, 200)}`);
-              console.log('📦 Normalizing Anthropic plan JSON');
-              planContent = parseAiJson(content.text);
-              rationale = planContent.weeklyGuidance || planContent.programOverview || planContent.focusAreas || 'Personalized plan generated';
+          // Log token usage
+          if (response.usage) {
+            console.log(`📊 Token Usage:`);
+            console.log(`   - Prompt tokens: ${response.usage.prompt_tokens}`);
+            console.log(`   - Completion tokens: ${response.usage.completion_tokens}`);
+            console.log(`   - Total tokens: ${response.usage.total_tokens}`);
+            console.log(`   - Max allowed: 16000`);
+          }
+          
+          // Check finish reason
+          const finishReason = response.choices[0].finish_reason;
+          console.log(`🏁 Finish reason: ${finishReason}`);
+          if (finishReason === 'length') {
+            console.log(`   ❌ CRITICAL: Response was truncated due to max_tokens limit!`);
+          }
+
+          const content = response.choices[0].message.content || '{}';
+          
+          console.log('📦 Normalizing OpenAI plan JSON');
+          planContent = parseAiJson(content);
+          
+          console.log(`📊 Parsed plan has ${planContent.weekPlan?.length || 0} days total`);
+          if (planContent.weekPlan?.[0]) {
+             console.log('🔍 Day 1 preview:', JSON.stringify(planContent.weekPlan[0], null, 2));
+          }
+          
+          console.log(`✅ AI response received, length: ${content.length} chars`);
+          console.log(`🔍 First 500 chars: ${content.substring(0, 500)}`);
+          console.log(`🔍 Last 500 chars: ${content.substring(Math.max(0, content.length - 500))}`);
+          
+          // Write full response to temp file for debugging
+          const fs = await import('fs');
+          const tempFile = `./ai-response-${planType}-${Date.now()}.json`;
+          await fs.promises.writeFile(tempFile, content, 'utf-8');
+          console.log(`💾 Full AI response saved to: ${tempFile}`);
+          
+          console.log('📦 Normalizing OpenAI plan JSON');
+          planContent = parseAiJson(content);
+          
+          // Deep debugging
+          console.log(`\n🔍 DEEP DEBUG - Raw Plan Content Structure:`);
+          console.log(`   - Has weekPlan property: ${!!planContent.weekPlan}`);
+          console.log(`   - weekPlan is array: ${Array.isArray(planContent.weekPlan)}`);
+          console.log(`   - weekPlan length: ${planContent.weekPlan?.length || 0}`);
+          
+          if (planContent.weekPlan && Array.isArray(planContent.weekPlan)) {
+            console.log(`   - Days in weekPlan: ${planContent.weekPlan.map((d: any) => d.dayName || d.day || 'unnamed').join(', ')}`);
+            console.log(`   - Day 1 has ${planContent.weekPlan[0]?.meals?.length || 0} meals`);
+            if (planContent.weekPlan.length < 7) {
+              console.log(`   ⚠️  WARNING: Only ${planContent.weekPlan.length} days generated, expected 7!`);
+              console.log(`   - Content length: ${content.length} characters`);
+              console.log(`   - Last day generated: ${planContent.weekPlan[planContent.weekPlan.length - 1]?.dayName || 'unknown'}`);
             }
           } else {
-            // OpenAI
-            console.log('⏳ Calling OpenAI API...');
-            const response = await openai.chat.completions.create({
-              model: aiModel,
-              messages: [{ role: 'user', content: prompt }],
-              temperature: 0.7,
-            });
-
-            const content = response.choices[0].message.content || '{}';
-            console.log(`✅ AI response received, length: ${content.length} chars`);
-            console.log('📦 Normalizing OpenAI plan JSON');
-            planContent = parseAiJson(content);
-            rationale = planContent.weeklyGuidance || planContent.programOverview || planContent.focusAreas || 'Personalized plan generated';
+            console.log(`   ❌ weekPlan is not a valid array!`);
+          }
+          
+          rationale = planContent.weeklyGuidance || planContent.programOverview || planContent.focusAreas || 'Personalized plan generated';
+          
+          // Ensure rationale is not empty or generic if possible
+          if (!rationale || rationale === 'Personalized plan generated') {
+             console.log('⚠️ Rationale was empty or generic, attempting to extract from other fields');
+             if (planContent.personalizationNotes) {
+                rationale = `Based on your profile: ${JSON.stringify(planContent.personalizationNotes)}`;
+             }
           }
         } catch (aiError) {
           console.error(`❌ AI generation error for ${planType}:`, aiError);
@@ -7088,12 +7369,21 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           rationale = 'AI generation failed';
         }
 
+        const normalizedContent = normalizePlanContent(planType as 'nutrition' | 'workout' | 'lifestyle', planContent);
+
+        console.log(`\n🔧 AFTER NORMALIZATION:`);
+        console.log(`   - normalizedContent.weekPlan length: ${normalizedContent.weekPlan?.length || 0}`);
+        if (normalizedContent.weekPlan) {
+          console.log(`   - Normalized days: ${normalizedContent.weekPlan.map((d: any) => d.dayName || d.day).join(', ')}`);
+          console.log(`   - autoHealMeta.missingDays: ${normalizedContent.autoHealMeta?.missingDays}`);
+        }
+
         console.log(`💾 Saving ${planType} plan to database...`);
         // Save plan to database
         const plan = await storage.createOptimizePlan({
           userId,
           planType,
-          content: planContent,
+          content: normalizedContent,
           aiRationale: rationale,
           preferences: preferences || {},
           basedOnFormulaId: activeFormula?.id || null,
@@ -7106,6 +7396,107 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
 
       console.log('🎉 All plans generated successfully');
+      
+      // Auto-generate grocery list if nutrition plan was created
+      if (results.nutrition && planTypes.includes('nutrition')) {
+        console.log('🛒 Auto-generating grocery list for nutrition plan...');
+        try {
+          const nutritionPlan = results.nutrition;
+          const content = nutritionPlan.content as any;
+          const weekPlan = content.weekPlan || [];
+          
+          let mealsText = '';
+          weekPlan.forEach((day: any) => {
+            mealsText += `\nDay ${day.day} (${day.dayName}):\n`;
+            day.meals?.forEach((meal: any) => {
+              const ingredients = Array.isArray(meal.ingredients) ? meal.ingredients.join(', ') : '';
+              mealsText += `- ${meal.name}: ${ingredients}\n`;
+            });
+          });
+
+          const prompt = `
+You are a smart nutritionist assistant creating a PRACTICAL grocery shopping list.
+The user needs to buy actual items/packages at the store, not individual tablespoons of ingredients.
+
+RULES:
+1. **Consolidate items** into purchasable units (e.g., "1 jar", "1 bag", "1 carton", "1 bottle").
+2. **NO small measurements** like "tbsp", "tsp", "oz", or "cups" unless it's for produce count (e.g. "5 apples").
+3. **Round up** to standard package sizes.
+   - BAD: "2 tbsp Honey", "1/4 cup Pumpkin Seeds", "3 tbsp Olive Oil"
+   - GOOD: "Honey (1 jar)", "Pumpkin Seeds (1 bag)", "Olive Oil (1 bottle)"
+4. **Group items** by category (Produce, Meat/Seafood, Dairy/Eggs, Pantry, Bakery, Frozen, Other).
+5. **Combine duplicates** intelligently (e.g. if 3 meals need eggs, list "Eggs (1 dozen)").
+
+Meal Plan:
+${mealsText}
+
+Return a JSON object with this structure:
+{
+  "items": [
+    {
+      "item": "Eggs",
+      "amount": "1",
+      "unit": "dozen",
+      "category": "Dairy/Eggs"
+    },
+    {
+      "item": "Honey",
+      "amount": "1",
+      "unit": "jar",
+      "category": "Pantry"
+    }
+  ]
+}
+IMPORTANT: Return ONLY valid JSON. No markdown formatting.
+`;
+
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.5,
+            response_format: { type: "json_object" }
+          });
+
+          const responseContent = completion.choices[0].message.content || '{}';
+          const parsed = JSON.parse(responseContent);
+          
+          const items = (parsed.items || []).map((item: any) => ({
+            id: nanoid(8),
+            item: item.item,
+            amount: item.amount,
+            unit: item.unit,
+            category: item.category,
+            checked: false
+          }));
+
+          if (items.length > 0) {
+            const existingList = await storage.getActiveGroceryList(userId);
+            const groceryList = existingList
+              ? await storage.updateGroceryList(existingList.id, {
+                  optimizePlanId: nutritionPlan.id,
+                  items,
+                  generatedAt: new Date(),
+                  isArchived: false,
+                })
+              : await storage.createGroceryList({
+                  userId,
+                  optimizePlanId: nutritionPlan.id,
+                  items,
+                  generatedAt: new Date(),
+                  isArchived: false,
+                });
+            
+            console.log(`✅ Grocery list auto-generated with ${items.length} items`);
+            results.groceryList = groceryList;
+          } else {
+            console.log('⚠️ No grocery items generated, skipping list creation');
+          }
+        } catch (groceryError) {
+          console.error('⚠️ Failed to auto-generate grocery list (non-fatal):', groceryError);
+          // Don't fail the whole request if grocery list generation fails
+        }
+      }
+      
       res.json(results);
     } catch (error) {
       console.error('❌ Error generating optimize plans:', error);
@@ -7113,20 +7504,1064 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  app.get('/api/optimize/daily-logs', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { start, end } = req.query;
+
+      const endDate = end ? new Date(String(end)) : new Date();
+      if (Number.isNaN(endDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid end date' });
+      }
+      endDate.setHours(23, 59, 59, 999);
+
+      const startDate = start ? new Date(String(start)) : new Date(endDate);
+      if (Number.isNaN(startDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid start date' });
+      }
+      if (!start) {
+        startDate.setDate(endDate.getDate() - 6);
+      }
+      startDate.setHours(0, 0, 0, 0);
+
+      if (startDate > endDate) {
+        return res.status(400).json({ error: 'start date must be before end date' });
+      }
+
+      const logs = await storage.listDailyLogs(userId, startDate, endDate);
+      const normalizedLogs = logs
+        .map((log) => ({
+          ...log,
+          logDate: new Date(log.logDate).toISOString(),
+        }))
+        .sort((a, b) => new Date(a.logDate).getTime() - new Date(b.logDate).getTime());
+
+      const logsByDate = normalizedLogs.reduce<Record<string, typeof normalizedLogs[number]>>((acc, log) => {
+        const dayKey = log.logDate.slice(0, 10);
+        acc[dayKey] = log;
+        return acc;
+      }, {});
+
+      const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle'] as const;
+      const streaks = {} as Record<typeof streakTypes[number], Awaited<ReturnType<typeof storage.getUserStreak>> | null>;
+      for (const type of streakTypes) {
+        streaks[type] = (await storage.getUserStreak(userId, type)) ?? null;
+      }
+
+      res.json({
+        range: {
+          start: startDate.toISOString(),
+          end: endDate.toISOString(),
+        },
+        logs: normalizedLogs,
+        logsByDate,
+        streaks,
+      });
+    } catch (error) {
+      console.error('❌ Error fetching daily logs:', error);
+      res.status(500).json({ error: 'Failed to fetch optimize logs' });
+    }
+  });
+
+  // Log a meal completion for the day
+  app.post('/api/optimize/nutrition/log-meal', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { date, mealType } = req.body;
+
+      if (!date || !mealType) {
+        return res.status(400).json({ error: 'date and mealType are required' });
+      }
+
+      const logDate = new Date(date);
+      if (Number.isNaN(logDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid date value' });
+      }
+
+      const normalizedMealType = String(mealType).toLowerCase();
+      const existingLog = await storage.getDailyLog(userId, logDate);
+      const mealsLogged = new Set<string>(
+        Array.isArray(existingLog?.mealsLogged) ? existingLog!.mealsLogged : [],
+      );
+      mealsLogged.add(normalizedMealType);
+
+      const nutritionCompleted = mealsLogged.size >= DEFAULT_MEAL_TYPES.length;
+      let updatedLog = existingLog;
+
+      if (existingLog) {
+        updatedLog = await storage.updateDailyLog(existingLog.id, {
+          mealsLogged: Array.from(mealsLogged),
+          nutritionCompleted,
+        });
+      } else {
+        updatedLog = await storage.createDailyLog({
+          userId,
+          logDate,
+          mealsLogged: Array.from(mealsLogged),
+          nutritionCompleted,
+          workoutCompleted: false,
+          supplementsTaken: false,
+        });
+      }
+
+      res.json({
+        success: true,
+        log: updatedLog,
+        mealsLogged: Array.from(mealsLogged),
+        nutritionCompleted,
+      });
+    } catch (error) {
+      console.error('❌ Error logging meal:', error);
+      res.status(500).json({ error: 'Failed to log meal' });
+    }
+  });
+
+  // Get workout logs history
+  app.get('/api/optimize/workout/logs', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const logs = await storage.listWorkoutLogs(userId, limit, offset);
+      const total = logs.length; // TODO: Add count query for pagination
+
+      res.json({ logs, total, limit, offset });
+    } catch (error) {
+      console.error('❌ Error fetching workout logs:', error);
+      res.status(500).json({ error: 'Failed to fetch workout logs' });
+    }
+  });
+
+  // Create detailed workout log with exercise data
+  app.post('/api/optimize/workout/logs', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const {
+        workoutId,
+        workoutName,
+        completedAt,
+        durationActual,
+        difficultyRating,
+        exercisesCompleted,
+        notes,
+      } = req.body;
+
+      console.log('📝 Creating workout log:', { userId, workoutId, completedAt, exerciseCount: exercisesCompleted?.length });
+      console.log('🏋️ Exercises received:', JSON.stringify(exercisesCompleted, null, 2));
+
+      if (!completedAt) {
+        return res.status(400).json({ error: 'completedAt is required' });
+      }
+
+      const log = await storage.createWorkoutLog({
+        userId,
+        workoutId: workoutId || null,
+        workoutName: workoutName || null,
+        completedAt: new Date(completedAt),
+        durationActual: durationActual || null,
+        difficultyRating: difficultyRating || null,
+        exercisesCompleted: exercisesCompleted || [],
+        notes: notes || null,
+      });
+
+      console.log('✅ Workout log created:', log.id);
+      console.log('📊 Stored exercises:', JSON.stringify(log.exercisesCompleted, null, 2));
+
+      // Also update daily log for backward compatibility
+      try {
+        const logDate = new Date(completedAt);
+        logDate.setHours(0, 0, 0, 0); // Normalize to start of day
+        const existingDailyLog = await storage.getDailyLog(userId, logDate);
+        
+        if (existingDailyLog) {
+          await storage.updateDailyLog(existingDailyLog.id, {
+            workoutCompleted: true,
+          });
+        } else {
+          await storage.createDailyLog({
+            userId,
+            logDate,
+            mealsLogged: [],
+            nutritionCompleted: false,
+            workoutCompleted: true,
+            supplementsTaken: false,
+          });
+        }
+      } catch (dailyLogError) {
+        console.warn('⚠️ Could not update daily log (non-fatal):', dailyLogError);
+        // Continue anyway - daily log is just for backward compatibility
+      }
+
+      res.json({ log });
+    } catch (error) {
+      console.error('❌ Error creating workout log:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message, error.stack);
+      }
+      res.status(500).json({ error: 'Failed to create workout log' });
+    }
+  });
+
+  // Switch/regenerate a single exercise in a workout
+  app.post('/api/optimize/workout/switch', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { dayIndex, exerciseIndex, reason } = req.body;
+
+      console.log('🔄 Switching exercise:', { userId, dayIndex, exerciseIndex, reason });
+
+      if (dayIndex === undefined || exerciseIndex === undefined) {
+        return res.status(400).json({ error: 'dayIndex and exerciseIndex are required' });
+      }
+
+      const workoutPlan = await storage.getActiveOptimizePlan(userId, 'workout');
+      if (!workoutPlan) {
+        console.error('❌ No workout plan found for user:', userId);
+        return res.status(404).json({ error: 'No workout plan found' });
+      }
+
+      const weekPlan = (workoutPlan.content as any)?.weekPlan || [];
+      if (dayIndex < 0 || dayIndex >= weekPlan.length) {
+        console.error('❌ Invalid dayIndex:', dayIndex, 'weekPlan length:', weekPlan.length);
+        return res.status(400).json({ error: 'Invalid dayIndex' });
+      }
+
+      const targetDay = weekPlan[dayIndex];
+      if (targetDay.isRestDay) {
+        return res.status(400).json({ error: 'Cannot switch exercise on a rest day' });
+      }
+
+      const exercises = targetDay.workout?.exercises || [];
+      if (exerciseIndex < 0 || exerciseIndex >= exercises.length) {
+        console.error('❌ Invalid exerciseIndex:', exerciseIndex, 'exercises length:', exercises.length);
+        return res.status(400).json({ error: 'Invalid exerciseIndex' });
+      }
+
+      const currentExercise = exercises[exerciseIndex];
+      console.log('Current exercise to replace:', currentExercise.name);
+
+      // Get user's health profile and preferences
+      const healthProfile = await storage.getHealthProfile(userId);
+      const workoutPrefs = await storage.getWorkoutPreferences(userId);
+
+      // Build prompt for AI to generate alternative exercise
+      const prompt = `Generate a creative and distinct alternative exercise to replace the current one in this workout.
+
+User Context:
+- Fitness Level: ${(healthProfile as any)?.fitnessLevel || 'intermediate'}
+- Equipment: ${(workoutPrefs as any)?.availableEquipment?.join(', ') || 'bodyweight, dumbbells'}
+- Workout Type: ${targetDay.workout?.type || 'strength'}
+
+${reason ? `Reason for switch: ${reason}` : ''}
+
+Current exercise to replace:
+${JSON.stringify(currentExercise, null, 2)}
+
+Other exercises in this workout (avoid duplicates):
+${exercises.filter((_: any, i: number) => i !== exerciseIndex).map((e: any) => e.name).join(', ')}
+
+Generate ONE alternative exercise that targets similar muscle groups but uses different movement patterns or equipment.
+The alternative should be distinct and not just a slight variation.
+Include a short instructional snippet (notes) and the specific benefit (healthBenefits).
+
+CRITICAL:
+- Use LBS for weight.
+- Use MILES for distance.
+
+Return ONLY valid JSON in this exact format:
+{
+  "name": "Exercise Name",
+  "type": "strength" | "cardio" | "timed",
+  "sets": ${currentExercise.sets || 3},
+  "reps": ${currentExercise.reps || 10},
+  "weight": ${currentExercise.weight || 0},
+  "tempo": "${currentExercise.tempo || '2-0-2-0'}",
+  "rest": "${currentExercise.rest || '60s'}",
+  "notes": "Short cue like 'Keep core tight' or 'Squeeze glutes'",
+  "healthBenefits": "Specific focus like 'Postural correction' or 'Rotator cuff stability'"
+}`;
+
+      const aiSettings = await storage.getAppSetting('ai_settings');
+      const settings = aiSettings?.value as any || {};
+      const provider = settings.provider || process.env.AI_PROVIDER || 'openai';
+
+      let newExercise;
+      try {
+        if (provider === 'anthropic') {
+          const { text } = await callAnthropic(
+            'You are a fitness expert. Generate creative exercise alternatives in valid JSON format.',
+            [{ role: 'user', content: prompt }],
+            settings.model || 'claude-sonnet-4-20250514',
+            0.8, // Increased temperature for variety
+            500,
+            false
+          );
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            newExercise = JSON.parse(jsonMatch[0]);
+          }
+        } else {
+          const response = await openai.chat.completions.create({
+            model: settings.model || 'gpt-4o',
+            messages: [{ role: 'user', content: prompt }],
+            response_format: { type: 'json_object' },
+            temperature: 0.9, // Increased temperature for variety
+          });
+          newExercise = JSON.parse(response.choices[0].message.content || '{}');
+        }
+      } catch (aiError) {
+        console.error('❌ AI generation error:', aiError);
+        throw new Error('Failed to generate alternative exercise from AI');
+      }
+
+      if (!newExercise || !newExercise.name) {
+        throw new Error('Failed to generate alternative exercise');
+      }
+
+      console.log('✅ Generated new exercise:', newExercise.name);
+
+      // Update the exercise in the plan
+      exercises[exerciseIndex] = newExercise;
+      
+      const updatedPlan = await storage.updateOptimizePlan(workoutPlan.id, {
+        content: { ...(workoutPlan.content as any), weekPlan } as any,
+      });
+
+      console.log('✅ Plan updated successfully');
+
+      res.json({ plan: updatedPlan, newExercise });
+    } catch (error) {
+      console.error('❌ Error switching exercise:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message, error.stack);
+      }
+      res.status(500).json({ error: 'Failed to switch exercise' });
+    }
+  });
+
+  // Log a workout completion (legacy endpoint - keep for backward compatibility)
+  app.post('/api/optimize/workout/log', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { date, completed } = req.body;
+
+      if (!date) {
+        return res.status(400).json({ error: 'date is required' });
+      }
+
+      const logDate = new Date(date);
+      if (Number.isNaN(logDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid date value' });
+      }
+
+      const existingLog = await storage.getDailyLog(userId, logDate);
+      let updatedLog = existingLog;
+
+      if (existingLog) {
+        updatedLog = await storage.updateDailyLog(existingLog.id, {
+          workoutCompleted: Boolean(completed),
+        });
+      } else {
+        updatedLog = await storage.createDailyLog({
+          userId,
+          logDate,
+          mealsLogged: [],
+          nutritionCompleted: false,
+          workoutCompleted: Boolean(completed),
+          supplementsTaken: false,
+        });
+      }
+
+      res.json({
+        success: true,
+        log: updatedLog,
+        workoutCompleted: Boolean(completed),
+      });
+    } catch (error) {
+      console.error('❌ Error logging workout:', error);
+      res.status(500).json({ error: 'Failed to log workout' });
+    }
+  });
+
+  // General daily log endpoint (Quick Log)
+  app.post('/api/optimize/daily-logs', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const {
+        date,
+        nutritionCompleted,
+        workoutCompleted,
+        supplementsTaken,
+        waterIntakeOz,
+        energyLevel,
+        moodLevel,
+        sleepQuality,
+        notes,
+      } = req.body ?? {};
+
+      const logDate = date ? new Date(date) : new Date();
+      if (Number.isNaN(logDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid date value' });
+      }
+      logDate.setHours(12, 0, 0, 0);
+
+      const clampRating = (value: unknown) => {
+        if (value === undefined || value === null || value === '') return null;
+        const parsed = Number(value);
+        if (Number.isNaN(parsed)) return null;
+        return Math.min(5, Math.max(1, Math.round(parsed)));
+      };
+
+      const normalizeWater = (value: unknown) => {
+        if (value === undefined || value === null || value === '') return null;
+        const parsed = Number(value);
+        if (Number.isNaN(parsed)) return null;
+        return Math.max(0, Math.round(parsed));
+      };
+
+      const existingLog = await storage.getDailyLog(userId, logDate);
+
+      const resolvedLog = {
+        nutritionCompleted: typeof nutritionCompleted === 'boolean'
+          ? nutritionCompleted
+          : existingLog?.nutritionCompleted ?? false,
+        workoutCompleted: typeof workoutCompleted === 'boolean'
+          ? workoutCompleted
+          : existingLog?.workoutCompleted ?? false,
+        supplementsTaken: typeof supplementsTaken === 'boolean'
+          ? supplementsTaken
+          : existingLog?.supplementsTaken ?? false,
+        waterIntakeOz: normalizeWater(waterIntakeOz) ?? existingLog?.waterIntakeOz ?? null,
+        energyLevel: clampRating(energyLevel) ?? existingLog?.energyLevel ?? null,
+        moodLevel: clampRating(moodLevel) ?? existingLog?.moodLevel ?? null,
+        sleepQuality: clampRating(sleepQuality) ?? existingLog?.sleepQuality ?? null,
+        notes: typeof notes === 'string' && notes.trim().length
+          ? notes.trim()
+          : existingLog?.notes ?? null,
+      };
+
+      let updatedLog: OptimizeDailyLog | undefined;
+      if (existingLog) {
+        updatedLog = await storage.updateDailyLog(existingLog.id, resolvedLog);
+        await storage.updateUserStreak(userId, logDate);
+      } else {
+        updatedLog = await storage.createDailyLog({
+          userId,
+          logDate,
+          mealsLogged: [],
+          ...resolvedLog,
+        });
+      }
+
+      const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle'] as const;
+      const streaks = {} as Record<typeof streakTypes[number], Awaited<ReturnType<typeof storage.getUserStreak>> | null>;
+      for (const type of streakTypes) {
+        streaks[type] = (await storage.getUserStreak(userId, type)) ?? null;
+      }
+
+      res.json({ success: true, log: updatedLog, streaks });
+    } catch (error) {
+      console.error('❌ Error saving daily log:', error);
+      res.status(500).json({ error: 'Failed to save daily log' });
+    }
+  });
+
   // Swap a meal in nutrition plan
   app.post('/api/optimize/nutrition/swap-meal', requireAuth, async (req, res) => {
     try {
-      const { planId, dayIndex, mealType } = req.body;
-      console.log('🔄 Meal swap requested:', { userId: req.userId, planId, dayIndex, mealType });
+      const { planId, dayIndex, mealType, currentMealName, mealIndex } = req.body;
+      console.log('🔄 Meal swap requested:', { userId: req.userId, planId, dayIndex, mealType, currentMealName, mealIndex });
       
-      // TODO: Implement actual AI swap logic
+      // Get the current plan
+      const plan = await storage.getOptimizePlan(planId);
+      if (!plan) {
+        return res.status(404).json({ error: 'Plan not found' });
+      }
+
+      if (plan.planType !== 'nutrition') {
+        return res.status(400).json({ error: 'Can only swap meals in nutrition plans' });
+      }
+
+      // Find the current meal
+      const content = plan.content as any;
+      const weekPlan = content?.weekPlan || [];
+      if (!Array.isArray(weekPlan) || dayIndex < 0 || dayIndex >= weekPlan.length) {
+        return res.status(400).json({ error: 'Invalid day index' });
+      }
+
+      const dayPlan = weekPlan[dayIndex];
+      
+      // Find meal by index if provided (most accurate), then name, then type
+      let currentMeal;
+      if (typeof mealIndex === 'number' && dayPlan.meals?.[mealIndex]) {
+        currentMeal = dayPlan.meals[mealIndex];
+      } else if (currentMealName) {
+        currentMeal = dayPlan.meals?.find((m: any) => m.name === currentMealName);
+      } else {
+        currentMeal = dayPlan.meals?.find((m: any) => m.mealType === mealType);
+      }
+
+      if (!currentMeal) {
+        return res.status(404).json({ error: 'Meal not found' });
+      }
+
+      // Collect all existing meal names to avoid duplicates
+      const existingMeals = new Set<string>();
+      weekPlan.forEach((day: any) => {
+        day.meals?.forEach((m: any) => {
+          if (m.name) existingMeals.add(m.name);
+        });
+      });
+      const avoidList = Array.from(existingMeals).join(', ');
+
+      // Get AI settings
+      const aiSettings = await storage.getAppSetting('ai_settings');
+      const provider = aiSettings?.value?.provider || 'anthropic';
+      const model = aiSettings?.value?.model || 'claude-sonnet-4.5';
+
+      // Build swap prompt
+      const swapPrompt = `You are a nutrition expert. The user wants to swap out this meal:
+
+**Current Meal:**
+- Type: ${currentMeal.mealType}
+- Name: ${currentMeal.name}
+- Calories: ${currentMeal.macros?.calories || 'N/A'}
+- Protein: ${currentMeal.macros?.protein || 'N/A'}g
+- Carbs: ${currentMeal.macros?.carbs || 'N/A'}g
+- Fats: ${currentMeal.macros?.fats || 'N/A'}g
+
+**User Context:**
+${plan.aiRationale || 'Personalized nutrition plan'}
+
+**Constraints:**
+1. DO NOT suggest any of these meals (already in plan): ${avoidList}
+2. The new meal must be COMPLETELY DIFFERENT from the current meal (different main ingredients).
+3. It must match the SAME macro targets (±50 calories, ±5g protein).
+4. It must fit the same meal type and time of day.
+5. **SNACK RULES:** If mealType is "snack", it MUST be simple (fruit, nuts, yogurt, protein shake, etc.). NO fish, cooked meats, or complex savory dishes for snacks.
+
+Generate ONE alternative ${mealType} meal that includes health benefits relevant to the user's goals.
+
+Return ONLY a valid JSON object with this EXACT structure (no markdown, no code fences):
+{
+  "mealType": "${mealType}",
+  "name": "New Meal Name",
+  "ingredients": ["ingredient 1", "ingredient 2", "ingredient 3"],
+  "macros": {
+    "calories": 450,
+    "protein": 35,
+    "carbs": 40,
+    "fats": 15
+  },
+  "healthBenefits": "Brief explanation of why this meal supports the user's goals"
+}`;
+
+      // Call AI
+      let newMeal: any;
+      if (provider === 'openai') {
+        const completion = await openai.chat.completions.create({
+          model: model || 'gpt-4o',
+          messages: [{ role: 'user', content: swapPrompt }],
+          temperature: 0.9,
+          max_tokens: 800
+        });
+        const rawResponse = completion.choices[0]?.message?.content?.trim() || '{}';
+        newMeal = parseAiJson(rawResponse);
+      } else {
+        // Anthropic
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const message = await anthropic.messages.create({
+          model: model || 'claude-sonnet-4.5',
+          max_tokens: 800,
+          temperature: 0.9,
+          messages: [{ role: 'user', content: swapPrompt }]
+        });
+        const block = message.content[0];
+        const rawResponse = block.type === 'text' ? block.text : '{}';
+        newMeal = parseAiJson(rawResponse);
+      }
+
+      // Validate response structure
+      if (!newMeal.name || !newMeal.macros || !newMeal.ingredients) {
+        throw new Error('Invalid AI response structure');
+      }
+
+      // Update the plan
+      const updatedWeekPlan = weekPlan.map((day: any, idx: number) => {
+        if (idx !== dayIndex) return day;
+        
+        // If we have a specific meal index, use that directly (most accurate)
+        if (typeof mealIndex === 'number' && day.meals[mealIndex]) {
+          const newMeals = [...day.meals];
+          newMeals[mealIndex] = newMeal;
+          return { ...day, meals: newMeals };
+        }
+
+        return {
+          ...day,
+          meals: day.meals.map((m: any) => {
+            // If we have a specific meal name, match by that
+            if (currentMealName) {
+              return m.name === currentMealName ? newMeal : m;
+            }
+            // Fallback to matching by type (legacy)
+            return m.mealType === mealType ? newMeal : m;
+          })
+        };
+      });
+
+      const updatedContent = {
+        ...(plan.content as any),
+        weekPlan: updatedWeekPlan
+      };
+
+      await storage.updateOptimizePlan(planId, {
+        content: updatedContent
+      });
+
+      console.log('✅ Meal swapped successfully:', newMeal.name);
       res.json({ 
         success: true,
+        meal: newMeal,
         message: 'Meal swapped successfully'
       });
     } catch (error) {
       console.error('❌ Error swapping meal:', error);
       res.status(500).json({ error: 'Failed to swap meal' });
+    }
+  });
+
+  app.post('/api/optimize/nutrition/recipe', requireAuth, async (req, res) => {
+    try {
+      const { mealName, ingredients, dietaryRestrictions } = req.body;
+      
+      if (!mealName) {
+        return res.status(400).json({ error: 'Meal name is required' });
+      }
+
+      console.log('👨‍🍳 Generating recipe for:', mealName);
+
+      // Get AI settings
+      const aiSettings = await storage.getAppSetting('ai_settings');
+      const provider = aiSettings?.value?.provider || 'anthropic';
+      const model = aiSettings?.value?.model || 'claude-sonnet-4.5';
+
+      const prompt = buildRecipePrompt(mealName, ingredients || [], dietaryRestrictions || []);
+
+      let recipe: any;
+      if (provider === 'openai') {
+        const completion = await openai.chat.completions.create({
+          model: model || 'gpt-4o',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7,
+          max_tokens: 1000
+        });
+        const rawResponse = completion.choices[0]?.message?.content?.trim() || '{}';
+        recipe = parseAiJson(rawResponse);
+      } else {
+        // Anthropic
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const message = await anthropic.messages.create({
+          model: model || 'claude-sonnet-4.5',
+          max_tokens: 1000,
+          temperature: 0.7,
+          messages: [{ role: 'user', content: prompt }]
+        });
+        const block = message.content[0];
+        const rawResponse = block.type === 'text' ? block.text : '{}';
+        recipe = parseAiJson(rawResponse);
+      }
+
+      res.json(recipe);
+    } catch (error) {
+      console.error('❌ Error generating recipe:', error);
+      res.status(500).json({ error: 'Failed to generate recipe' });
+    }
+  });
+
+  // Grocery list endpoints
+  app.get('/api/optimize/grocery-list', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const list = await storage.getActiveGroceryList(userId);
+      res.json(list || null);
+    } catch (error) {
+      console.error('❌ Error fetching grocery list:', error);
+      res.status(500).json({ error: 'Failed to fetch grocery list' });
+    }
+  });
+
+  app.post('/api/optimize/grocery-list/generate', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const plan = await storage.getActiveOptimizePlan(userId, 'nutrition');
+      if (!plan || !plan.content) {
+        return res.status(400).json({ error: 'Generate a nutrition plan before creating a grocery list' });
+      }
+
+      // Use AI to generate a smart, categorized grocery list
+      const content = plan.content as any;
+      const weekPlan = content.weekPlan || [];
+      
+      let mealsText = '';
+      weekPlan.forEach((day: any) => {
+        mealsText += `\nDay ${day.day} (${day.dayName}):\n`;
+        day.meals?.forEach((meal: any) => {
+          const ingredients = Array.isArray(meal.ingredients) ? meal.ingredients.join(', ') : '';
+          mealsText += `- ${meal.name}: ${ingredients}\n`;
+        });
+      });
+
+      console.log('🥦 Generating grocery list for plan:', plan.id);
+
+      const prompt = `
+You are a smart nutritionist assistant creating a PRACTICAL grocery shopping list.
+The user needs to buy actual items/packages at the store, not individual tablespoons of ingredients.
+
+RULES:
+1. **Consolidate items** into purchasable units (e.g., "1 jar", "1 bag", "1 carton", "1 bottle").
+2. **NO small measurements** like "tbsp", "tsp", "oz", or "cups" unless it's for produce count (e.g. "5 apples").
+3. **Round up** to standard package sizes.
+   - BAD: "2 tbsp Honey", "1/4 cup Pumpkin Seeds", "3 tbsp Olive Oil"
+   - GOOD: "Honey (1 jar)", "Pumpkin Seeds (1 bag)", "Olive Oil (1 bottle)"
+4. **Group items** by category (Produce, Meat/Seafood, Dairy/Eggs, Pantry, Bakery, Frozen, Other).
+5. **Combine duplicates** intelligently (e.g. if 3 meals need eggs, list "Eggs (1 dozen)").
+
+Meal Plan:
+${mealsText}
+
+Return a JSON object with this structure:
+{
+  "items": [
+    {
+      "item": "Eggs",
+      "amount": "1",
+      "unit": "dozen",
+      "category": "Dairy/Eggs"
+    },
+    {
+      "item": "Honey",
+      "amount": "1",
+      "unit": "jar",
+      "category": "Pantry"
+    }
+  ]
+}
+IMPORTANT: Return ONLY valid JSON. No markdown formatting.
+`;
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.5,
+        response_format: { type: "json_object" }
+      });
+
+      const responseContent = completion.choices[0].message.content || '{}';
+      const parsed = JSON.parse(responseContent);
+      
+      const items = (parsed.items || []).map((item: any) => ({
+        id: nanoid(8),
+        item: item.item,
+        amount: item.amount,
+        unit: item.unit,
+        category: item.category,
+        checked: false
+      }));
+
+      if (items.length === 0) {
+        // Fallback to old method if AI fails
+        console.log('⚠️ AI returned empty list, falling back to simple extraction');
+        const fallbackItems = buildGroceryItemsFromPlanContent(plan.content);
+        if (fallbackItems.length > 0) {
+          items.push(...fallbackItems);
+        } else {
+           return res.status(422).json({ error: 'Could not generate grocery list from this plan.' });
+        }
+      }
+
+      const existingList = await storage.getActiveGroceryList(userId);
+      const list = existingList
+        ? await storage.updateGroceryList(existingList.id, {
+            optimizePlanId: plan.id,
+            items,
+            generatedAt: new Date(),
+            isArchived: false,
+          })
+        : await storage.createGroceryList({
+            userId,
+            optimizePlanId: plan.id,
+            items,
+            generatedAt: new Date(),
+            isArchived: false,
+          });
+
+      res.json(list);
+    } catch (error) {
+      console.error('❌ Error generating grocery list:', error);
+      res.status(500).json({ error: 'Failed to generate grocery list' });
+    }
+  });
+
+  app.patch('/api/optimize/grocery-list/:id', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const listId = req.params.id;
+      const list = await storage.getGroceryList(listId);
+
+      if (!list || list.userId !== userId) {
+        return res.status(404).json({ error: 'Grocery list not found' });
+      }
+
+      const updates: any = {};
+      if (Array.isArray(req.body.items)) {
+        updates.items = req.body.items;
+      }
+      if (typeof req.body.isArchived === 'boolean') {
+        updates.isArchived = req.body.isArchived;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: 'No updates provided' });
+      }
+
+      const updated = await storage.updateGroceryList(listId, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error('❌ Error updating grocery list:', error);
+      res.status(500).json({ error: 'Failed to update grocery list' });
+    }
+  });
+
+  // Twilio Webhook for SMS Replies
+  app.post('/api/webhooks/twilio/sms', async (req, res) => {
+    try {
+      const { From: phoneNumber, Body: body } = req.body;
+      console.log(`📩 Received SMS from ${phoneNumber}: ${body}`);
+      
+      const user = await storage.getUserByPhone(phoneNumber);
+      if (!user) {
+        console.log(`❌ User not found for phone ${phoneNumber}`);
+        return res.status(404).send('User not found');
+      }
+      
+      const response = body.trim().toUpperCase();
+      const today = new Date();
+      
+      let nutritionCompleted = false;
+      let workoutCompleted = false;
+      
+      if (response === 'YES' || response === 'DONE') {
+        nutritionCompleted = true;
+        workoutCompleted = true;
+      } else if (response === 'NUTRITION') {
+        nutritionCompleted = true;
+      } else if (response === 'WORKOUT') {
+        workoutCompleted = true;
+      } else if (response === 'SKIP') {
+        // Log nothing, just acknowledge
+      } else {
+        // Unknown command
+        return res.sendStatus(200);
+      }
+      
+      if (nutritionCompleted || workoutCompleted) {
+        const existingLog = await storage.getDailyLog(user.id, today);
+        
+        if (existingLog) {
+          await storage.updateDailyLog(existingLog.id, {
+            nutritionCompleted: nutritionCompleted || existingLog.nutritionCompleted,
+            workoutCompleted: workoutCompleted || existingLog.workoutCompleted,
+            notes: existingLog.notes ? `${existingLog.notes}\nAuto-logged via SMS: ${response}` : `Auto-logged via SMS: ${response}`
+          });
+        } else {
+          await storage.createDailyLog({
+            userId: user.id,
+            logDate: today,
+            nutritionCompleted,
+            workoutCompleted,
+            supplementsTaken: false, // They'll update via app
+            waterIntakeOz: null,
+            energyLevel: null,
+            moodLevel: null,
+            sleepQuality: null,
+            notes: `Auto-logged via SMS reply: ${response}`
+          });
+        }
+      }
+      
+      const confirmMessage = response === 'SKIP' 
+        ? `No worries! Tomorrow's a fresh start 💪`
+        : `✅ Logged! Keep up the great work 🔥`;
+      
+      await sendRawSms(phoneNumber, confirmMessage);
+      
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error handling SMS webhook:', error);
+      res.sendStatus(500);
+    }
+  });
+
+  // YouTube Search API (No API Key required via scraping)
+  app.get('/api/integrations/youtube/search', async (req, res) => {
+    const query = req.query.q as string;
+    if (!query) {
+      return res.status(400).json({ error: 'Query parameter "q" is required' });
+    }
+
+    try {
+      // Search for 1 video
+      // Handle ESM/CommonJS interop issues with youtube-sr
+      const searchFn = (YouTube as any).search || (YouTube as any).default?.search;
+      
+      if (typeof searchFn !== 'function') {
+        throw new Error('YouTube.search is not a function');
+      }
+
+      const videos = await searchFn(query, { limit: 1 });
+      
+      if (videos && videos.length > 0) {
+        const video = videos[0];
+        res.json({
+          videoId: video.id,
+          title: video.title,
+          thumbnail: video.thumbnail?.url,
+          duration: video.durationFormatted,
+          channel: video.channel?.name
+        });
+      } else {
+        res.status(404).json({ error: 'No videos found' });
+      }
+    } catch (error) {
+      console.error('YouTube search error:', error);
+      res.status(500).json({ error: 'Failed to search YouTube' });
+    }
+  });
+
+  // Workout Analytics
+  app.get('/api/optimize/analytics/workout', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const logs = await storage.getAllWorkoutLogs(userId);
+
+      // Process logs for analytics
+      const volumeByWeek: Record<string, number> = {};
+      const personalRecords: Record<string, { weight: number, date: string }> = {};
+      const workoutsByWeek: Record<string, number> = {};
+      const exerciseCounts: Record<string, number> = {};
+      
+      // Calculate Duration this week
+      const currentWeekStart = startOfWeek(new Date());
+      let durationThisWeek = 0;
+
+      logs.forEach(log => {
+        const date = new Date(log.completedAt);
+        const weekStart = format(startOfWeek(date), 'yyyy-MM-dd');
+        
+        // Duration this week
+        if (date >= currentWeekStart) {
+          durationThisWeek += (log.durationActual || 0);
+        }
+
+        // Volume & PRs
+        let logVolume = 0;
+        const exercises = log.exercisesCompleted as any;
+        if (exercises && Array.isArray(exercises)) {
+          exercises.forEach((ex: any) => {
+            // Track exercise frequency
+            exerciseCounts[ex.name] = (exerciseCounts[ex.name] || 0) + 1;
+
+            if (ex.sets && Array.isArray(ex.sets)) {
+              ex.sets.forEach((set: any) => {
+                const weight = Number(set.weight) || 0;
+                const reps = Number(set.reps) || 0;
+                logVolume += weight * reps;
+
+                // Check PR
+                if (weight > 0) {
+                  if (!personalRecords[ex.name] || weight > personalRecords[ex.name].weight) {
+                    personalRecords[ex.name] = { weight, date: log.completedAt.toISOString() };
+                  }
+                }
+              });
+            }
+          });
+        }
+
+        volumeByWeek[weekStart] = (volumeByWeek[weekStart] || 0) + logVolume;
+        workoutsByWeek[weekStart] = (workoutsByWeek[weekStart] || 0) + 1;
+      });
+
+      // Format Volume Chart Data
+      const volumeChartData = Object.entries(volumeByWeek)
+        .map(([date, volume]) => ({ date, volume }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      // Format Consistency Data
+      const consistencyData = Object.entries(workoutsByWeek)
+        .map(([week, count]) => ({ week, count }))
+        .sort((a, b) => new Date(a.week).getTime() - new Date(b.week).getTime());
+
+      // Calculate Daily Streak
+      let currentStreak = 0;
+      if (logs.length > 0) {
+        // Sort logs by date descending
+        const sortedLogs = [...logs].sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
+        
+        const today = new Date();
+        const lastWorkoutDate = new Date(sortedLogs[0].completedAt);
+        
+        // Check if streak is active (workout today or yesterday)
+        // Using start of day for comparison to be safe
+        const todayStart = new Date(today.setHours(0,0,0,0));
+        const lastWorkoutStart = new Date(new Date(lastWorkoutDate).setHours(0,0,0,0));
+        
+        if (differenceInDays(todayStart, lastWorkoutStart) <= 1) {
+          currentStreak = 1;
+          let currentDate = lastWorkoutStart;
+          
+          // Iterate through logs to find consecutive days
+          for (let i = 1; i < sortedLogs.length; i++) {
+            const logDate = new Date(sortedLogs[i].completedAt);
+            const logDateStart = new Date(new Date(logDate).setHours(0,0,0,0));
+            
+            if (isSameDay(currentDate, logDateStart)) {
+              continue; // Multiple workouts on same day
+            }
+            
+            if (differenceInDays(currentDate, logDateStart) === 1) {
+              currentStreak++;
+              currentDate = logDateStart;
+            } else {
+              break; // Streak broken
+            }
+          }
+        }
+      }
+
+      // Top Exercises
+      const topExercises = Object.entries(exerciseCounts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      res.json({
+        volumeChartData,
+        personalRecords,
+        consistencyData,
+        currentStreak,
+        totalWorkouts: logs.length,
+        topExercises,
+        durationThisWeek
+      });
+
+    } catch (error) {
+      console.error('Error fetching workout analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch workout analytics' });
     }
   });
 

@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { useLocation, useSearch } from 'wouter';
+import { useLocation } from 'wouter';
 import { Search as SearchIcon, ChevronLeft, ChevronRight, Users, Shield, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -66,8 +66,8 @@ function UserTableSkeleton() {
 }
 
 export default function UserManagementPage() {
-  const [, setLocation] = useLocation();
-  const searchParams = useSearch();
+  const [location, setLocation] = useLocation();
+  const searchParams = location.split('?')[1] || '';
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
