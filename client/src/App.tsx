@@ -27,7 +27,7 @@ import ShippingPage from "@/pages/ShippingPage";
 
 // Import dashboard components
 import { DashboardLayout } from "@/components/DashboardLayout";
-import HomePage from "@/pages/HomePage";
+import DashboardHome from "@/pages/DashboardHome";
 import ConsultationPage from "@/pages/ConsultationPage";
 import MyFormulaPage from "@/pages/MyFormulaPage";
 import OptimizePage from "@/pages/OptimizePage";
@@ -109,7 +109,7 @@ function MainRouter() {
       <Route path="/dashboard">
         <ProtectedRoute>
           <DashboardLayout>
-            <HomePage />
+            <DashboardHome />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

@@ -28,6 +28,116 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
 import type { FaqItem, SupportTicket, HelpArticle } from '@shared/schema';
 
+// Article content renderer with better formatting
+function ArticleContent({ content }: { content: string }) {
+  // Split content into sections and format
+  const formatContent = (text: string) => {
+    const lines = text.split('\n');
+    const elements: JSX.Element[] = [];
+    let currentSection: string[] = [];
+    let sectionType: 'paragraph' | 'list' | 'heading' = 'paragraph';
+    let key = 0;
+
+    const flushSection = () => {
+      if (currentSection.length === 0) return;
+      
+      const content = currentSection.join('\n').trim();
+      if (!content) return;
+
+      if (sectionType === 'heading') {
+        // Check heading level based on content (ALL CAPS = h2, sentence case = h3)
+        const isMainHeading = content === content.toUpperCase() && content.length > 3;
+        elements.push(
+          isMainHeading ? (
+            <h2 key={key++} className="text-2xl font-bold text-gray-900 mt-8 mb-4 first:mt-0">
+              {content}
+            </h2>
+          ) : (
+            <h3 key={key++} className="text-xl font-semibold text-gray-800 mt-6 mb-3">
+              {content}
+            </h3>
+          )
+        );
+      } else if (sectionType === 'list') {
+        elements.push(
+          <ul key={key++} className="space-y-2 my-4 ml-6">
+            {currentSection.map((item, idx) => (
+              <li key={idx} className="text-gray-700 text-base leading-relaxed list-disc">
+                {formatInlineText(item.replace(/^[-*]\s*/, ''))}
+              </li>
+            ))}
+          </ul>
+        );
+      } else {
+        elements.push(
+          <p key={key++} className="text-gray-700 text-base leading-relaxed my-4">
+            {formatInlineText(content)}
+          </p>
+        );
+      }
+      
+      currentSection = [];
+    };
+
+    const formatInlineText = (text: string) => {
+      // Convert **bold** to <strong>
+      const parts = text.split(/(\*\*[^*]+\*\*)/g);
+      return parts.map((part, idx) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={idx} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+      });
+    };
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      
+      // Empty line - flush current section
+      if (!trimmed) {
+        flushSection();
+        sectionType = 'paragraph';
+        return;
+      }
+
+      // Heading detection (ALL CAPS lines or lines that look like headings)
+      if (trimmed === trimmed.toUpperCase() && trimmed.length > 3 && !trimmed.match(/^[-*]/)) {
+        flushSection();
+        sectionType = 'heading';
+        currentSection.push(trimmed);
+        flushSection();
+        return;
+      }
+
+      // List item detection
+      if (trimmed.match(/^[-*]\s+/)) {
+        if (sectionType !== 'list') {
+          flushSection();
+          sectionType = 'list';
+        }
+        currentSection.push(trimmed);
+        return;
+      }
+
+      // Regular paragraph
+      if (sectionType !== 'paragraph') {
+        flushSection();
+        sectionType = 'paragraph';
+      }
+      currentSection.push(trimmed);
+    });
+
+    flushSection();
+    return elements;
+  };
+
+  return (
+    <div className="article-content max-w-3xl" data-testid="article-content">
+      {formatContent(content)}
+    </div>
+  );
+}
+
 // Help category configurations
 const helpCategoryConfigs = [
   {
@@ -273,23 +383,18 @@ export default function SupportPage() {
                 </Button>
 
                 {/* Article Content */}
-                <div className="space-y-4">
-                  <div>
-                    <h2 className="text-2xl font-bold mb-2" data-testid="article-title">
+                <div className="space-y-6">
+                  <div className="border-b pb-6">
+                    <h1 className="text-3xl md:text-4xl font-bold mb-3 text-gray-900" data-testid="article-title">
                       {selectedArticle.title}
-                    </h2>
+                    </h1>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                      <Badge variant="secondary">{selectedArticle.category}</Badge>
+                      <Badge variant="secondary" className="text-xs">{selectedArticle.category}</Badge>
                       <span>•</span>
                       <span>Last updated {new Date(selectedArticle.updatedAt).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <div 
-                    className="prose prose-sm dark:prose-invert max-w-none leading-relaxed whitespace-pre-wrap"
-                    data-testid="article-content"
-                  >
-                    {selectedArticle.content}
-                  </div>
+                  <ArticleContent content={selectedArticle.content} />
                 </div>
               </CardContent>
             </Card>
