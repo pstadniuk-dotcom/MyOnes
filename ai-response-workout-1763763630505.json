@@ -1,0 +1,213 @@
+```json
+{
+  "programOverview": {
+    "daysPerWeek": 4,
+    "durationWeeks": 8,
+    "focus": "Full-body strength and cardiovascular health",
+    "targetAudience": "intermediate"
+  },
+  "weekPlan": [
+    {
+      "day": 1,
+      "dayName": "Monday",
+      "workout": {
+        "name": "Upper Body Strength",
+        "durationMinutes": 60,
+        "estimatedCalories": 400,
+        "type": "strength",
+        "focus": "Improves muscle mass and insulin sensitivity via compound lifts",
+        "exercises": [
+          {
+            "name": "Dumbbell Bench Press",
+            "sets": 3,
+            "reps": "8-10",
+            "restSeconds": 90,
+            "notes": "Keep shoulder blades retracted, feet flat on floor",
+            "healthBenefits": "Builds lean tissue for better glucose disposal"
+          },
+          {
+            "name": "Bent Over Row",
+            "sets": 3,
+            "reps": "8-10",
+            "restSeconds": 90,
+            "notes": "Maintain a neutral spine, pull elbows to ribcage",
+            "healthBenefits": "Enhances back strength and posture"
+          },
+          {
+            "name": "Shoulder Press",
+            "sets": 3,
+            "reps": "10-12",
+            "restSeconds": 90,
+            "notes": "Keep core tight, avoid arching back",
+            "healthBenefits": "Improves shoulder stability and upper body strength"
+          },
+          {
+            "name": "Tricep Dips",
+            "sets": 3,
+            "reps": "10-12",
+            "restSeconds": 60,
+            "notes": "Lower body in a controlled manner",
+            "healthBenefits": "Strengthens triceps and improves arm definition"
+          }
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 2,
+      "dayName": "Wednesday",
+      "workout": {
+        "name": "Lower Body and Core",
+        "durationMinutes": 60,
+        "estimatedCalories": 450,
+        "type": "strength",
+        "focus": "Strengthens lower body and improves core stability",
+        "exercises": [
+          {
+            "name": "Squats",
+            "sets": 3,
+            "reps": "10-12",
+            "restSeconds": 90,
+            "notes": "Keep knees over toes, maintain a neutral spine",
+            "healthBenefits": "Builds leg strength and enhances metabolic rate"
+          },
+          {
+            "name": "Deadlifts",
+            "sets": 3,
+            "reps": "8-10",
+            "restSeconds": 90,
+            "notes": "Keep bar close to body, hinge at hips",
+            "healthBenefits": "Improves posterior chain strength and posture"
+          },
+          {
+            "name": "Lunges",
+            "sets": 3,
+            "reps": "10 per leg",
+            "restSeconds": 60,
+            "notes": "Step forward, knee over ankle",
+            "healthBenefits": "Enhances balance and leg strength"
+          },
+          {
+            "name": "Plank",
+            "sets": 3,
+            "reps": "30-60 seconds",
+            "restSeconds": 60,
+            "notes": "Keep body in a straight line from head to heels",
+            "healthBenefits": "Improves core stability and endurance"
+          }
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 3,
+      "dayName": "Thursday",
+      "workout": {
+        "name": "Cardio and Flexibility",
+        "durationMinutes": 45,
+        "estimatedCalories": 300,
+        "type": "cardio",
+        "focus": "Enhances cardiovascular health and flexibility",
+        "exercises": [
+          {
+            "name": "Interval Running",
+            "sets": 6,
+            "reps": "1 minute run, 1 minute walk",
+            "restSeconds": 0,
+            "notes": "Maintain steady pace, use intervals to boost heart rate",
+            "healthBenefits": "Improves cardiovascular endurance and VO2 max"
+          },
+          {
+            "name": "Yoga Stretches",
+            "sets": 1,
+            "reps": "15 minutes",
+            "restSeconds": 0,
+            "notes": "Focus on breathing and flexibility",
+            "healthBenefits": "Enhances flexibility and reduces muscle tension"
+          }
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 4,
+      "dayName": "Saturday",
+      "workout": {
+        "name": "Full Body Circuit",
+        "durationMinutes": 60,
+        "estimatedCalories": 500,
+        "type": "circuit",
+        "focus": "Combines strength and cardio for full-body conditioning",
+        "exercises": [
+          {
+            "name": "Burpees",
+            "sets": 3,
+            "reps": "10-12",
+            "restSeconds": 60,
+            "notes": "Explode upwards, maintain core tightness",
+            "healthBenefits": "Boosts cardiovascular fitness and engages full body"
+          },
+          {
+            "name": "Push-ups",
+            "sets": 3,
+            "reps": "10-15",
+            "restSeconds": 60,
+            "notes": "Keep elbows close to body, maintain a plank position",
+            "healthBenefits": "Strengthens upper body and core"
+          },
+          {
+            "name": "Kettlebell Swings",
+            "sets": 3,
+            "reps": "15-20",
+            "restSeconds": 60,
+            "notes": "Use hips to drive movement, keep arms straight",
+            "healthBenefits": "Improves power and cardiovascular endurance"
+          },
+          {
+            "name": "Mountain Climbers",
+            "sets": 3,
+            "reps": "30 seconds",
+            "restSeconds": 60,
+            "notes": "Maintain plank position, drive knees to chest",
+            "healthBenefits": "Enhances core strength and cardiovascular endurance"
+          }
+        ]
+      },
+      "isRestDay": false
+    }
+  ],
+  "recoveryTips": [
+    "Walk 5-10 minutes post workout to cool down",
+    "Hydrate well and consume a balanced meal post workout",
+    "Incorporate 90 seconds of diaphragmatic breathing daily"
+  ],
+  "progressionPlan": {
+    "week1-2": "Establish baseline with proper form",
+    "week3-4": "Increase resistance by 5%",
+    "week5-6": "Add 1-2 reps per set",
+    "week7-8": "Reassess and adjust to new goals"
+  },
+  "safetyGuidelines": [
+    "Stop any exercise if sharp pain occurs",
+    "Maintain proper form to avoid injury",
+    "Use a perceived exertion scale of 7-8 out of 10"
+  ],
+  "equipmentNeeded": [
+    "Dumbbells",
+    "Resistance Bands",
+    "Kettlebell",
+    "Yoga Mat"
+  ],
+  "personalizationNotes": {
+    "healthProfileInsights": [
+      "Included cardiovascular components to manage the stress level of 7/10",
+      "Structured workouts to optimize recovery with 7 hours of sleep"
+    ],
+    "labInsightsAddressed": [
+      "While no lab abnormalities were noted, cardiovascular work supports general heart health"
+    ],
+    "supplementCoordination": "Focus on joint-friendly exercises considering ligament support supplementation",
+    "goalAlignment": "Program supports recomposition and overall health enhancement"
+  }
+}
+```

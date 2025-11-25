@@ -1,5 +1,6 @@
 import { storage as storageInstance } from './storage';
-import { syncAllOuraConnections } from './wearableDataSync';
+import { syncAllOuraConnections, syncAllFitbitConnections } from './wearableDataSync';
+// import { syncAllWhoopConnections } from './wearableDataSync'; // Disabled - requires business API access
 import type { IStorage } from './storage';
 
 const storage = storageInstance as IStorage;
@@ -20,6 +21,8 @@ export function startWearableDataScheduler() {
     if (typeof (storage as any).getAllWearableConnections === 'function') {
       try {
         await syncAllOuraConnections(storage);
+        await syncAllFitbitConnections(storage);
+        // await syncAllWhoopConnections(storage); // Disabled - requires business API access
       } catch (error) {
         console.error('Error in initial wearable sync:', error);
       }
@@ -29,6 +32,8 @@ export function startWearableDataScheduler() {
         if (typeof (storage as any).getAllWearableConnections === 'function') {
           try {
             await syncAllOuraConnections(storage);
+            await syncAllFitbitConnections(storage);
+            // await syncAllWhoopConnections(storage); // Disabled - requires business API access
           } catch (error) {
             console.error('Error in delayed initial wearable sync:', error);
           }
@@ -65,14 +70,22 @@ export function startWearableDataScheduler() {
 
   setTimeout(() => {
     console.log('⏰ Running scheduled wearable sync at 6am...');
-    syncAllOuraConnections(storage).catch(error => {
+    Promise.all([
+      syncAllOuraConnections(storage),
+      syncAllFitbitConnections(storage),
+      // syncAllWhoopConnections(storage), // Disabled - requires business API access
+    ]).catch(error => {
       console.error('Error in scheduled wearable sync:', error);
     });
 
     // Then repeat every 24 hours
     setInterval(() => {
       console.log('⏰ Running daily wearable sync...');
-      syncAllOuraConnections(storage).catch(error => {
+      Promise.all([
+        syncAllOuraConnections(storage),
+        syncAllFitbitConnections(storage),
+        // syncAllWhoopConnections(storage), // Disabled - requires business API access
+      ]).catch(error => {
         console.error('Error in daily wearable sync:', error);
       });
     }, SYNC_INTERVAL);

@@ -6,14 +6,17 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Lock, Bell, Shield, Clock, Pill, Globe } from 'lucide-react';
+import { Lock, Bell, Shield, Clock, Pill, Globe, Dumbbell, Salad, Heart } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { getCurrentTimezone } from '@/hooks/use-timezone';
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('account');
+  
+  // Check URL hash on mount to determine initial tab
+  const initialTab = window.location.hash === '#notifications' ? 'notifications' : 'account';
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Account settings state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -45,9 +48,13 @@ export default function SettingsPage() {
     smsShipping: false,
     smsBilling: false,
     dailyRemindersEnabled: false,
-    reminderBreakfast: '08:00',
-    reminderLunch: '12:00',
-    reminderDinner: '18:00',
+    reminderMorning: '07:00',
+    reminderAfternoon: '14:00',
+    reminderEvening: '19:00',
+    includePills: true,
+    includeWorkout: true,
+    includeNutrition: true,
+    includeLifestyle: true,
   });
 
   // Update local state when data is fetched
@@ -61,9 +68,13 @@ export default function SettingsPage() {
         smsShipping: notificationPrefs.smsShipping,
         smsBilling: notificationPrefs.smsBilling,
         dailyRemindersEnabled: notificationPrefs.dailyRemindersEnabled ?? false,
-        reminderBreakfast: notificationPrefs.reminderBreakfast ?? '08:00',
-        reminderLunch: notificationPrefs.reminderLunch ?? '12:00',
-        reminderDinner: notificationPrefs.reminderDinner ?? '18:00',
+        reminderMorning: (notificationPrefs as any).reminderMorning ?? notificationPrefs.reminderBreakfast ?? '07:00',
+        reminderAfternoon: (notificationPrefs as any).reminderAfternoon ?? notificationPrefs.reminderLunch ?? '14:00',
+        reminderEvening: (notificationPrefs as any).reminderEvening ?? notificationPrefs.reminderDinner ?? '19:00',
+        includePills: (notificationPrefs as any).includePills ?? true,
+        includeWorkout: (notificationPrefs as any).includeWorkout ?? true,
+        includeNutrition: (notificationPrefs as any).includeNutrition ?? true,
+        includeLifestyle: (notificationPrefs as any).includeLifestyle ?? true,
       });
     }
   }, [notificationPrefs]);
@@ -344,16 +355,16 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    {/* Daily Pill Reminders */}
+                    {/* Daily Reminders - Unified System */}
                     <div className="space-y-4 pt-4 border-t">
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <Pill className="w-4 h-4" />
-                            <Label className="text-base font-semibold">Daily Pill Reminders (SMS)</Label>
+                            <Clock className="w-4 h-4" />
+                            <Label className="text-base font-semibold">Daily Reminders (SMS)</Label>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            Get personalized SMS reminders to take your supplements
+                            Get personalized SMS reminders for supplements, workouts, nutrition & lifestyle
                           </p>
                         </div>
                         <Switch
@@ -366,7 +377,7 @@ export default function SettingsPage() {
                       </div>
 
                       {notifications.dailyRemindersEnabled && (
-                        <div className="ml-6 space-y-4 pl-4 border-l-2 border-primary/20">
+                        <div className="ml-6 space-y-6 pl-4 border-l-2 border-primary/20">
                           <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
                             <Globe className="w-4 h-4 text-muted-foreground" />
                             <p className="text-sm text-muted-foreground">
@@ -374,64 +385,162 @@ export default function SettingsPage() {
                             </p>
                           </div>
                           
-                          <p className="text-sm text-muted-foreground">
-                            Set your preferred reminder times. You'll receive AI-powered health tips with each reminder!
-                          </p>
-                          
-                          <div className="grid gap-4 sm:grid-cols-3">
-                            <div className="space-y-2">
-                              <Label htmlFor="breakfast-time" className="flex items-center gap-2">
-                                <Clock className="w-3 h-3" />
-                                Breakfast
-                              </Label>
-                              <Input
-                                id="breakfast-time"
-                                type="time"
-                                value={notifications.reminderBreakfast}
-                                onChange={(e) =>
-                                  setNotifications({ ...notifications, reminderBreakfast: e.target.value })
-                                }
-                                data-testid="input-breakfast-time"
-                              />
+                          {/* Reminder Times */}
+                          <div className="space-y-3">
+                            <Label className="text-sm font-semibold">Reminder Times</Label>
+                            <div className="grid gap-4 sm:grid-cols-3">
+                              <div className="space-y-2">
+                                <Label htmlFor="morning-time" className="flex items-center gap-2 text-sm">
+                                  <Clock className="w-3 h-3" />
+                                  Morning
+                                </Label>
+                                <Input
+                                  id="morning-time"
+                                  type="time"
+                                  value={notifications.reminderMorning}
+                                  onChange={(e) =>
+                                    setNotifications({ ...notifications, reminderMorning: e.target.value })
+                                  }
+                                  data-testid="input-morning-time"
+                                />
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label htmlFor="afternoon-time" className="flex items-center gap-2 text-sm">
+                                  <Clock className="w-3 h-3" />
+                                  Afternoon
+                                </Label>
+                                <Input
+                                  id="afternoon-time"
+                                  type="time"
+                                  value={notifications.reminderAfternoon}
+                                  onChange={(e) =>
+                                    setNotifications({ ...notifications, reminderAfternoon: e.target.value })
+                                  }
+                                  data-testid="input-afternoon-time"
+                                />
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label htmlFor="evening-time" className="flex items-center gap-2 text-sm">
+                                  <Clock className="w-3 h-3" />
+                                  Evening
+                                </Label>
+                                <Input
+                                  id="evening-time"
+                                  type="time"
+                                  value={notifications.reminderEvening}
+                                  onChange={(e) =>
+                                    setNotifications({ ...notifications, reminderEvening: e.target.value })
+                                  }
+                                  data-testid="input-evening-time"
+                                />
+                              </div>
                             </div>
-                            
-                            <div className="space-y-2">
-                              <Label htmlFor="lunch-time" className="flex items-center gap-2">
-                                <Clock className="w-3 h-3" />
-                                Lunch
-                              </Label>
-                              <Input
-                                id="lunch-time"
-                                type="time"
-                                value={notifications.reminderLunch}
-                                onChange={(e) =>
-                                  setNotifications({ ...notifications, reminderLunch: e.target.value })
-                                }
-                                data-testid="input-lunch-time"
-                              />
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label htmlFor="dinner-time" className="flex items-center gap-2">
-                                <Clock className="w-3 h-3" />
-                                Dinner
-                              </Label>
-                              <Input
-                                id="dinner-time"
-                                type="time"
-                                value={notifications.reminderDinner}
-                                onChange={(e) =>
-                                  setNotifications({ ...notifications, reminderDinner: e.target.value })
-                                }
-                                data-testid="input-dinner-time"
-                              />
+                          </div>
+
+                          {/* What to Include */}
+                          <div className="space-y-3">
+                            <Label className="text-sm font-semibold">Include in Reminders</Label>
+                            <p className="text-xs text-muted-foreground">
+                              Choose what topics to include in your daily reminder messages
+                            </p>
+                            <div className="space-y-3 ml-2">
+                              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                                <div className="flex items-center gap-3">
+                                  <Pill className="w-4 h-4 text-primary" />
+                                  <div>
+                                    <Label className="font-medium cursor-pointer">Supplement Reminders</Label>
+                                    <p className="text-xs text-muted-foreground">"Take your pills with breakfast"</p>
+                                  </div>
+                                </div>
+                                <Switch
+                                  checked={notifications.includePills}
+                                  onCheckedChange={(checked) =>
+                                    setNotifications({ ...notifications, includePills: checked })
+                                  }
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                                <div className="flex items-center gap-3">
+                                  <Dumbbell className="w-4 h-4 text-blue-600" />
+                                  <div>
+                                    <Label className="font-medium cursor-pointer">Workout Reminders</Label>
+                                    <p className="text-xs text-muted-foreground">"Today's workout: Upper Body - Click to view"</p>
+                                  </div>
+                                </div>
+                                <Switch
+                                  checked={notifications.includeWorkout}
+                                  onCheckedChange={(checked) =>
+                                    setNotifications({ ...notifications, includeWorkout: checked })
+                                  }
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                                <div className="flex items-center gap-3">
+                                  <Salad className="w-4 h-4 text-green-600" />
+                                  <div>
+                                    <Label className="font-medium cursor-pointer">Nutrition Tips</Label>
+                                    <p className="text-xs text-muted-foreground">"Remember to limit sugars & stay hydrated"</p>
+                                  </div>
+                                </div>
+                                <Switch
+                                  checked={notifications.includeNutrition}
+                                  onCheckedChange={(checked) =>
+                                    setNotifications({ ...notifications, includeNutrition: checked })
+                                  }
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                                <div className="flex items-center gap-3">
+                                  <Heart className="w-4 h-4 text-purple-600" />
+                                  <div>
+                                    <Label className="font-medium cursor-pointer">Lifestyle & Wellness</Label>
+                                    <p className="text-xs text-muted-foreground">"Aim for 7-8 hours of sleep tonight"</p>
+                                  </div>
+                                </div>
+                                <Switch
+                                  checked={notifications.includeLifestyle}
+                                  onCheckedChange={(checked) =>
+                                    setNotifications({ ...notifications, includeLifestyle: checked })
+                                  }
+                                />
+                              </div>
                             </div>
                           </div>
                           
-                          <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
-                            <p className="text-sm text-muted-foreground">
-                              💡 <strong>Preview:</strong> "⚗️ ONES: Breakfast time! Take 3 capsules with your meal. 💡 Tip: A 10-minute walk helps your Omega-3s absorb and boosts energy!"
-                            </p>
+                          {/* Example Messages */}
+                          <div className="space-y-3">
+                            <Label className="text-sm font-semibold">Example Messages</Label>
+                            <div className="space-y-2">
+                              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <p className="text-xs font-medium text-green-800 mb-1">☀️ Morning ({notifications.reminderMorning})</p>
+                                <p className="text-sm text-green-900">
+                                  "⚗️ ONES: Good morning! {notifications.includePills && "Take 3 capsules with breakfast. "}
+                                  {notifications.includeWorkout && "💪 Today's workout: Upper Body Strength - Click here to view. "}
+                                  {notifications.includeNutrition && "🥗 Tip: Start your day with protein for sustained energy!"}"
+                                </p>
+                              </div>
+                              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p className="text-xs font-medium text-blue-800 mb-1">☀️ Afternoon ({notifications.reminderAfternoon})</p>
+                                <p className="text-sm text-blue-900">
+                                  "⚗️ ONES: Afternoon check-in! 
+                                  {notifications.includePills && "Take 2 capsules with lunch. "}
+                                  {notifications.includeNutrition && "💧 Stay hydrated - aim for 8 glasses of water today!"}"
+                                </p>
+                              </div>
+                              <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                                <p className="text-xs font-medium text-purple-800 mb-1">🌙 Evening ({notifications.reminderEvening})</p>
+                                <p className="text-sm text-purple-900">
+                                  "⚗️ ONES: Evening reminder! 
+                                  {notifications.includePills && "Take 2 capsules with dinner. "}
+                                  {notifications.includeLifestyle && "❤️ Tip: Wind down 1 hour before bed for better sleep quality."}"
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}

@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { storage } from './storage';
-import { sendNotificationSms } from './smsService';
+import { sendNotificationSms, sendRawSms } from './smsService';
 import { generatePersonalizedTip, type FormulaIngredient } from './healthTips';
 
 interface ReminderCheck {
@@ -14,9 +14,11 @@ interface ReminderCheck {
 
 // Track which users we've sent reminders to today (to avoid duplicates)
 const sentRemindersToday = new Map<string, Set<string>>(); // userId -> Set<mealTypes>
+const sentOptimizeRemindersToday = new Map<string, Set<string>>(); // userId -> Set<reminderType>
 
 function resetDailyTracking() {
   sentRemindersToday.clear();
+  sentOptimizeRemindersToday.clear();
   console.log('📅 Daily reminder tracking reset');
 }
 
@@ -29,6 +31,17 @@ function markReminderAsSent(userId: string, mealType: string) {
     sentRemindersToday.set(userId, new Set());
   }
   sentRemindersToday.get(userId)!.add(mealType);
+}
+
+function hasOptimizeReminderBeenSent(userId: string, reminderType: string): boolean {
+  return sentOptimizeRemindersToday.get(userId)?.has(reminderType) || false;
+}
+
+function markOptimizeReminderAsSent(userId: string, reminderType: string) {
+  if (!sentOptimizeRemindersToday.has(userId)) {
+    sentOptimizeRemindersToday.set(userId, new Set());
+  }
+  sentOptimizeRemindersToday.get(userId)!.add(reminderType);
 }
 
 function getCurrentTimeInTimezone(timezone: string): { hours: number; minutes: number } {
@@ -47,6 +60,107 @@ function getCurrentTimeInTimezone(timezone: string): { hours: number; minutes: n
     // Fallback to UTC
     const now = new Date();
     return { hours: now.getUTCHours(), minutes: now.getUTCMinutes() };
+  }
+}
+
+async function checkAndSendOptimizeReminders() {
+  try {
+    console.log('⏰ Checking for OPTIMIZE reminders...');
+    const allUsers = await storage.listAllUsers?.() || [];
+    console.log(`📋 Found ${allUsers.length} users for optimize reminders`);
+    
+    for (const user of allUsers) {
+      if (!user.phone) continue;
+
+      const prefs = await storage.getOptimizeSmsPreferences(user.id);
+      if (!prefs) continue; // Skip if no optimize prefs
+
+      const timezone = user.timezone || 'America/New_York';
+      const { hours, minutes } = getCurrentTimeInTimezone(timezone);
+      const currentTime = `${hours}:${minutes.toString().padStart(2, '0')}`;
+      
+      // console.log(`👤 Checking optimize reminders for ${user.id} at ${currentTime}`);
+
+      // 1. Morning Reminder
+      if (prefs.morningReminderEnabled && prefs.morningReminderTime === currentTime && !hasOptimizeReminderBeenSent(user.id, 'morning')) {
+        console.log(`🔔 Sending Morning Optimize Reminder to ${user.id}`);
+        const mealPlan = await storage.getActiveOptimizePlan(user.id, 'nutrition');
+        const streak = await storage.getUserStreak(user.id, 'overall');
+        
+        let message = `☀️ Good morning, ${user.name}!\n\n`;
+        
+        if (mealPlan && mealPlan.content) {
+           const content = mealPlan.content as any;
+           const todayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1; // Mon=0, Sun=6
+           const todayPlan = content.weekPlan?.[todayIndex];
+           
+           if (todayPlan) {
+             message += `TODAY'S PLAN:\n`;
+             todayPlan.meals?.forEach((meal: any) => {
+               const emoji = meal.mealType === 'breakfast' ? '🍳' : meal.mealType === 'lunch' ? '🥗' : '🍽️';
+               message += `${emoji} ${meal.name} (${meal.macros?.calories || 0} cal)\n`;
+             });
+             message += `\n`;
+           }
+        }
+        
+        message += `💊 Don't forget your supplements!\n`;
+        message += `💧 Hydration goal: 100oz\n\n`;
+        
+        if (streak) {
+          message += `Current streak: 🔥 ${streak.currentStreak} days - keep it up!`;
+        }
+        
+        await sendRawSms(user.phone, message);
+        markOptimizeReminderAsSent(user.id, 'morning');
+      }
+
+      // 2. Workout Reminder
+      if (prefs.workoutReminderEnabled && prefs.workoutReminderTime === currentTime && !hasOptimizeReminderBeenSent(user.id, 'workout')) {
+         console.log(`🔔 Sending Workout Optimize Reminder to ${user.id}`);
+         const workoutPlan = await storage.getActiveOptimizePlan(user.id, 'workout');
+         
+         if (workoutPlan && workoutPlan.content) {
+           const content = workoutPlan.content as any;
+           // Simple logic: find workout for today's day of week (1-7)
+           const todayDay = new Date().getDay() || 7; // 1=Mon, 7=Sun
+           const todayWorkout = content.workouts?.find((w: any) => w.dayOfWeek === todayDay);
+           
+           if (todayWorkout) {
+             let message = `💪 Workout time, ${user.name}!\n\n`;
+             message += `TODAY'S WORKOUT:\n`;
+             message += `${todayWorkout.workoutName} (${todayWorkout.totalDuration} min)\n`;
+             
+             const mainExercises = todayWorkout.mainWorkout?.exercises?.slice(0, 4) || [];
+             mainExercises.forEach((ex: any) => {
+               message += `- ${ex.name} ${ex.sets}x${ex.reps}\n`;
+             });
+             
+             message += `\nReply DONE when complete ✅`;
+             
+             await sendRawSms(user.phone, message);
+             markOptimizeReminderAsSent(user.id, 'workout');
+           }
+         }
+      }
+
+      // 3. Evening Check-in
+      if (prefs.eveningCheckinEnabled && prefs.eveningCheckinTime === currentTime && !hasOptimizeReminderBeenSent(user.id, 'evening')) {
+         console.log(`🔔 Sending Evening Optimize Reminder to ${user.id}`);
+         const message = `🌙 End-of-day check-in, ${user.name}!\n\n` +
+        `Did you complete today?\n` +
+        `Reply with:\n` +
+        `✅ YES - All done!\n` +
+        `🍽️ NUTRITION - Just meals\n` +
+        `💪 WORKOUT - Just workout\n` +
+        `❌ SKIP - Tomorrow's a new day`;
+        
+        await sendRawSms(user.phone, message);
+        markOptimizeReminderAsSent(user.id, 'evening');
+      }
+    }
+  } catch (error) {
+    console.error('Error in checkAndSendOptimizeReminders:', error);
   }
 }
 
@@ -172,6 +286,7 @@ export function startSmsReminderScheduler() {
   // Check every minute for reminders
   cron.schedule('* * * * *', async () => {
     await checkAndSendReminders();
+    await checkAndSendOptimizeReminders();
   });
   
   // Reset daily tracking at midnight UTC

@@ -4,40 +4,23 @@
  * based on user's health profile, labs, supplement formula, and biometric data
  */
 
-import type { HealthProfile, Formula, LabAnalysis } from "../shared/schema";
+import type { OptimizeContext, PersonalizationSnapshot } from "./optimize-context";
+import { buildPersonalizationSnapshot, formatPersonalizationSnapshot } from "./optimize-context";
 
-interface OptimizeContext {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  healthProfile?: HealthProfile;
-  activeFormula?: Formula;
-  labData?: {
-    reports: LabAnalysis[];
-    summary: string;
-  };
-  biometrics?: {
-    recentSleep?: number; // hours
-    recentHRV?: number; // ms
-    recentSteps?: number;
-    recentRHR?: number; // bpm
-  };
-  preferences: {
-    daysPerWeek?: number; // for workouts
-    experienceLevel?: 'beginner' | 'intermediate' | 'advanced';
-    dietaryRestrictions?: string[];
-    goals?: string;
-  };
+function resolveSnapshot(context: OptimizeContext, snapshot?: PersonalizationSnapshot) {
+  return snapshot ?? buildPersonalizationSnapshot(context);
+}
+
+function personalizationBlock(snapshot: PersonalizationSnapshot) {
+  return `## Personalization Data (MANDATORY)\n${formatPersonalizationSnapshot(snapshot)}\n\nYou must reference every applicable item from the personalization data inside the plan and fill the required "personalizationNotes" object.`;
 }
 
 /**
  * Build prompt for AI to generate comprehensive nutrition plan
- * Considers: lab abnormalities, supplement formula (don't duplicate), dietary preferences
  */
-export function buildNutritionPlanPrompt(context: OptimizeContext): string {
+export function buildNutritionPlanPrompt(context: OptimizeContext, snapshot?: PersonalizationSnapshot): string {
   const { user, healthProfile, activeFormula, labData, preferences } = context;
+  const personalizationSnapshot = resolveSnapshot(context, snapshot);
 
   let prompt = `You are a clinical nutrition expert creating a personalized 7-day meal plan for ${user.name}.
 
@@ -47,21 +30,21 @@ export function buildNutritionPlanPrompt(context: OptimizeContext): string {
 `;
 
   if (healthProfile) {
-    prompt += `- Age: ${healthProfile.age || 'Not provided'}
-- Sex: ${healthProfile.sex || 'Not provided'}
-- Height: ${healthProfile.heightCm ? `${healthProfile.heightCm}cm` : 'Not provided'}
-- Weight: ${healthProfile.weightLbs ? `${healthProfile.weightLbs}lbs` : 'Not provided'}
-- Activity Level: ${healthProfile.exerciseDaysPerWeek ? `${healthProfile.exerciseDaysPerWeek} days/week` : 'Not specified'}
+    prompt += `- Age: ${healthProfile.age || "Not provided"}
+- Sex: ${healthProfile.sex || "Not provided"}
+- Height: ${healthProfile.heightCm ? `${healthProfile.heightCm}cm` : "Not provided"}
+- Weight: ${healthProfile.weightLbs ? `${healthProfile.weightLbs}lbs` : "Not provided"}
+- Activity Level: ${healthProfile.exerciseDaysPerWeek ? `${healthProfile.exerciseDaysPerWeek} days/week` : "Not specified"}
 `;
   }
 
-if (healthProfile?.medications && Array.isArray(healthProfile.medications) && healthProfile.medications.length > 0) {
-    prompt += `\n## Current Medications\n${healthProfile.medications.map((m: any) => `- ${m}`).join('\n')}\n`;
+  if (healthProfile?.medications?.length) {
+    prompt += `\n## Current Medications\n${healthProfile.medications.map((m: any) => `- ${m}`).join("\n")}\n`;
   }
 
-  if (labData && labData.summary) {
+  if (labData?.summary) {
     prompt += `\n## Lab Results Summary\n${labData.summary}\n\n`;
-    prompt += `**Key Areas to Address via Nutrition:**\n`;
+    prompt += `Key areas to address via nutrition:\n`;
     prompt += `- Identify markers that are out of range\n`;
     prompt += `- Suggest foods that support optimization of these markers\n`;
     prompt += `- Avoid foods that may worsen abnormalities\n`;
@@ -70,27 +53,27 @@ if (healthProfile?.medications && Array.isArray(healthProfile.medications) && he
   if (activeFormula) {
     prompt += `\n## Current Supplement Formula\n`;
     prompt += `User is already taking these supplements - DO NOT duplicate nutrients in meal plan:\n\n`;
-    
-    if (activeFormula.bases && Array.isArray(activeFormula.bases)) {
-      prompt += `**Base Formulas:**\n`;
+
+    if (Array.isArray(activeFormula.bases) && activeFormula.bases.length) {
+      prompt += `Base Formulas:\n`;
       activeFormula.bases.forEach((base: any) => {
         prompt += `- ${base.ingredient} (${base.amount}${base.unit})\n`;
       });
     }
-    
-    if (activeFormula.additions && Array.isArray(activeFormula.additions)) {
-      prompt += `\n**Individual Ingredients:**\n`;
+
+    if (Array.isArray(activeFormula.additions) && activeFormula.additions.length) {
+      prompt += `\nIndividual Ingredients:\n`;
       activeFormula.additions.forEach((add: any) => {
         prompt += `- ${add.ingredient} (${add.amount}${add.unit})\n`;
       });
     }
 
-    prompt += `\n**Important:** The meal plan should COMPLEMENT these supplements, not duplicate them. Focus on whole food nutrition.\n`;
+    prompt += `\nImportant: The meal plan should complement these supplements, not duplicate them. Focus on whole food nutrition.\n`;
   }
 
-  if (preferences.dietaryRestrictions && preferences.dietaryRestrictions.length > 0) {
+  if (preferences.dietaryRestrictions?.length) {
     prompt += `\n## Dietary Restrictions\n`;
-    preferences.dietaryRestrictions.forEach(r => {
+    preferences.dietaryRestrictions.forEach((r) => {
       prompt += `- ${r}\n`;
     });
   }
@@ -99,104 +82,89 @@ if (healthProfile?.medications && Array.isArray(healthProfile.medications) && he
     prompt += `\n## Nutrition Goals\n${preferences.goals}\n`;
   }
 
-  prompt += `\n# TASK
+  prompt += `\n${personalizationBlock(personalizationSnapshot)}\n\n# TASK
 
 Generate a comprehensive 7-day meal plan optimized for this user's health profile, lab results, and goals.
 
+** CRITICAL REQUIREMENT: YOU MUST GENERATE ALL 7 DAYS **
+- Day 1 (Monday) - REQUIRED
+- Day 2 (Tuesday) - REQUIRED
+- Day 3 (Wednesday) - REQUIRED  
+- Day 4 (Thursday) - REQUIRED
+- Day 5 (Friday) - REQUIRED
+- Day 6 (Saturday) - REQUIRED
+- Day 7 (Sunday) - REQUIRED
+
+Do NOT stop after 4 days. Do NOT skip Friday, Saturday, or Sunday. Generate the complete 7-day week.
+
 ## Requirements
 
-1. **Macronutrient Targets:**
-   - Calculate based on user's weight, activity level, and goals
-   - Provide daily breakdown: protein, carbs, fats, calories
+MANDATORY: Generate ALL 7 DAYS (Monday-Sunday). The weekPlan array must have exactly 7 day objects.
 
-2. **Meal Structure:**
-   - 3 main meals + 2 snacks per day
-   - Each meal includes:
-     * Recipe name
-     * Ingredients with quantities
-     * Macros (calories, protein, carbs, fat)
-     * Prep time
-     * Why this meal supports their health goals
+1. Calculate macro targets from weight/activity/goals
+2. Each day: 5 meals (breakfast, snack, lunch, snack, dinner) with NAME ONLY and brief macros
+3. Keep ingredient lists to 3-4 items max per meal
+4. Instructions: 1 sentence max per meal
+5. Health benefits: 1 short sentence max
+6. Vary protein sources across days
+7. **SNACK GUIDELINES:**
+   - Snacks MUST be simple, traditional snacks (e.g., fruit, nuts, yogurt, hard-boiled eggs, protein shake, hummus & veggies).
+   - DO NOT suggest "mini-meals" like fish, cooked meats, or complex dishes for snacks.
+   - NO smoked fish, sardines, or heavy savory dishes for snacks unless explicitly requested.
+   - Keep snacks light, portable, and easy to prepare.
+8. **COMPLETE ALL 7 DAYS - this is non-negotiable**
+9. **SMART RATIONALE (CRITICAL):** The "weeklyGuidance" field must be a high-quality, personalized explanation of WHY this plan works for THIS user.
+   - You MUST explicitly reference their **Health Profile** (e.g., "As a 45-year-old active male...")
+   - You MUST explicitly reference their **Lab Results** if available (e.g., "To address your low Vitamin D and elevated LDL...")
+   - You MUST explicitly reference their **Goals** (e.g., "To support your goal of muscle gain...")
+   - Do NOT use generic phrases like "This plan is balanced." Be specific and scientific.
 
-3. **Lab-Driven Optimization:**
-   - Address any abnormal markers through food choices
-   - Example: High cholesterol → emphasize fiber, omega-3s, avoid saturated fats
-   - Example: Low vitamin D → include fortified foods, fatty fish
+## Output Format
 
-4. **Variety & Sustainability:**
-   - Different protein sources throughout the week
-   - Seasonal, accessible ingredients
-   - Realistic prep times (mostly 15-30 min)
+Return compact JSON. Each meal needs only: mealType, name, 3-4 ingredients, 1-sentence instructions, macros (calories/protein/carbs/fats), 1-sentence healthBenefits.
 
-5. **Supplement Coordination:**
-   - DO NOT recommend foods rich in nutrients already in their supplement formula
-   - Focus on vitamins, minerals, and nutrients NOT covered by supplements
-
-## Output Format (JSON)
-
-Return ONLY valid JSON in this exact structure:
-
-\`\`\`json
 {
-  "macroTargets": {
-    "dailyCalories": 2200,
-    "proteinGrams": 165,
-    "carbsGrams": 220,
-    "fatGrams": 73
+  "nutritionalStrategy": {
+    "primaryFocus": "Strategy name (e.g. High Protein)",
+    "hydrationGoal": "Daily water target (e.g. 3000ml)",
+    "caffeineLimit": "Daily limit (e.g. 200mg)",
+    "alcoholLimit": "Weekly limit (e.g. 2 drinks/week)",
+    "intermittentFasting": "Protocol if applicable (e.g. 16:8) or null"
   },
+  "macroTargets": {"dailyCalories": 2200, "proteinGrams": 165, "carbsGrams": 220, "fatGrams": 73},
   "weekPlan": [
-    {
-      "day": 1,
-      "dayName": "Monday",
-      "meals": [
-        {
-          "mealType": "breakfast",
-          "name": "Protein-Packed Oatmeal Bowl",
-          "ingredients": ["1 cup oats", "1 scoop protein powder", "1/2 cup berries", "1 tbsp almond butter"],
-          "instructions": "Cook oats, stir in protein powder, top with berries and almond butter",
-          "prepTimeMinutes": 10,
-          "macros": {
-            "calories": 450,
-            "protein": 30,
-            "carbs": 52,
-            "fat": 14
-          },
-          "healthBenefits": "High fiber supports cholesterol management; protein stabilizes blood sugar"
-        }
-      ],
-      "dailyTotals": {
-        "calories": 2180,
-        "protein": 163,
-        "carbs": 218,
-        "fat": 71
-      }
-    }
+    {"day": 1, "dayName": "Monday", "meals": [5 compact meals], "dailyTotals": {"calories": 2100, "protein": 160, "carbs": 210, "fat": 70}},
+    {"day": 2, "dayName": "Tuesday", "meals": [5 compact meals], "dailyTotals": {}},
+    {"day": 3, "dayName": "Wednesday", "meals": [5 compact meals], "dailyTotals": {}},
+    {"day": 4, "dayName": "Thursday", "meals": [5 compact meals], "dailyTotals": {}},
+    {"day": 5, "dayName": "Friday", "meals": [5 compact meals], "dailyTotals": {}},
+    {"day": 6, "dayName": "Saturday", "meals": [5 compact meals], "dailyTotals": {}},
+    {"day": 7, "dayName": "Sunday", "meals": [5 compact meals], "dailyTotals": {}}
   ],
-  "shoppingList": [
-    {"item": "Rolled oats", "quantity": "2 lbs", "category": "grains"},
-    {"item": "Chicken breast", "quantity": "3 lbs", "category": "protein"}
-  ],
-  "weeklyGuidance": "This plan addresses your elevated cholesterol by emphasizing soluble fiber (oats, beans, berries) and omega-3s (salmon 3x/week). We're keeping saturated fat under 20g/day to support cardiovascular health.",
-  "mealPrepTips": [
-    "Sunday: Cook 3 lbs chicken breast, portion into containers",
-    "Monday: Prep overnight oats for Tuesday-Thursday"
-  ]
+  "weeklyGuidance": "Detailed, personalized explanation referencing specific profile data and lab results (e.g. 'Designed for your 34yo metabolism and elevated LDL...')",
+  "personalizationNotes": {"healthProfileInsights": ["1 insight"], "labInsightsAddressed": ["1 lab focus"], "supplementCoordination": "1 sentence", "goalAlignment": "1 sentence"}
 }
-\`\`\`
 
-Be specific, practical, and evidence-based. This is a real person's health we're optimizing.`;
+Example compact meal: {"mealType": "breakfast", "name": "Greek Yogurt Bowl", "ingredients": ["Greek yogurt", "berries", "granola"], "instructions": "Mix yogurt with toppings", "prepTimeMinutes": 5, "macros": {"calories": 350, "protein": 25, "carbs": 40, "fats": 8}, "healthBenefits": "High protein supports muscle recovery"}
+
+**YOU MUST GENERATE ALL 7 DAYS. Stopping early makes the plan unusable. Keep descriptions brief to fit all days.**
+**CRITICAL: The 'weeklyGuidance' field MUST be a detailed paragraph (3-4 sentences) explaining WHY this plan works for this specific user.**
+**MANDATORY: You MUST explicitly mention at least 3 specific data points from the user's profile in the 'weeklyGuidance' text (e.g., 'Because your LDL is 140...', 'Given your goal of muscle gain...', 'Since you are 45 years old...'). Do not use generic text.**
+
+Be specific, practical, and evidence-based. This is a real person's health we are optimizing.`;
 
   return prompt;
 }
 
 /**
  * Build prompt for AI to generate workout program
- * Considers: fitness level, time availability, injuries, health goals
  */
-export function buildWorkoutPlanPrompt(context: OptimizeContext): string {
+export function buildWorkoutPlanPrompt(context: OptimizeContext, snapshot?: PersonalizationSnapshot): string {
   const { user, healthProfile, labData, biometrics, preferences } = context;
+  const personalizationSnapshot = resolveSnapshot(context, snapshot);
+  const preferredDays = Array.isArray(preferences.preferredDays) ? (preferences.preferredDays as string[]) : [];
 
-  let prompt = `You are a certified strength & conditioning specialist creating a personalized workout program for ${user.name}.
+  let prompt = `You are a certified strength and conditioning specialist creating a personalized workout program for ${user.name}.
 
 # USER FITNESS CONTEXT
 
@@ -204,9 +172,9 @@ export function buildWorkoutPlanPrompt(context: OptimizeContext): string {
 `;
 
   if (healthProfile) {
-    prompt += `- Age: ${healthProfile.age || 'Not provided'}
-- Sex: ${healthProfile.sex || 'Not provided'}
-- Current Activity Level: ${healthProfile.exerciseDaysPerWeek ? `${healthProfile.exerciseDaysPerWeek} days/week` : 'Sedentary'}
+    prompt += `- Age: ${healthProfile.age || "Not provided"}
+- Sex: ${healthProfile.sex || "Not provided"}
+- Current Activity Level: ${healthProfile.exerciseDaysPerWeek ? `${healthProfile.exerciseDaysPerWeek} days/week` : "Sedentary"}
 `;
   }
 
@@ -223,14 +191,18 @@ export function buildWorkoutPlanPrompt(context: OptimizeContext): string {
     prompt += `- Available Training Days: ${preferences.daysPerWeek} days/week\n`;
   }
 
-  if (healthProfile?.conditions && healthProfile.conditions.length > 0) {
+  if (Array.isArray(preferences.preferredDays) && preferences.preferredDays.length > 0) {
+    prompt += `- Preferred Training Days: ${preferences.preferredDays.join(", ")}\n`;
+  }
+
+  if (healthProfile?.conditions?.length) {
     prompt += `\n## Medical Considerations\n`;
     healthProfile.conditions.forEach((condition) => {
       prompt += `- ${condition}\n`;
     });
   }
 
-  if (healthProfile?.medications && healthProfile.medications.length > 0) {
+  if (healthProfile?.medications?.length) {
     prompt += `\n## Current Medications\n`;
     healthProfile.medications.forEach((med) => {
       prompt += `- ${med}\n`;
@@ -246,126 +218,129 @@ export function buildWorkoutPlanPrompt(context: OptimizeContext): string {
 
   if (labData?.summary) {
     prompt += `\n## Lab Insights\n${labData.summary}\n`;
-    prompt += `\nTranslate abnormal markers into specific training prescriptions. For example: elevated LDL → prioritize moderate-intensity cardio 3-4x/week; impaired glucose tolerance → include interval training + resistance work that improves insulin sensitivity; hypertension → emphasize aerobic conditioning, breathing drills, and avoid heavy Valsalva maneuvers.\n`;
+    prompt += `\nTranslate abnormal markers into specific training prescriptions (for example, elevated LDL implies moderate cardio 3 to 4 times per week; impaired glucose tolerance implies intervals plus resistance work; hypertension implies aerobic conditioning and breathing drills).\n`;
   }
 
   if (preferences.goals) {
     prompt += `\n## Fitness Goals\n${preferences.goals}\n`;
   }
 
-  prompt += `\n# TASK
+  prompt += `\n${personalizationBlock(personalizationSnapshot)}\n\n# TASK
 
-Create a structured ${preferences.daysPerWeek || 3}-day/week workout program tailored to this user's level, goals, and limitations.
+Create a **PROFESSIONAL-GRADE** structured ${preferences.daysPerWeek || 3}-day per week workout program tailored to this user's level, goals, and limitations.
 
 ## Requirements
 
-1. **Progressive Overload:**
-   - Start conservatively based on experience level
-   - Clear progression plan (weights, reps, sets)
-   - Build gradually to prevent injury
+1. **MANDATORY 7-DAY SCHEDULE:**
+   - You MUST generate an array of exactly 7 objects in "weekPlan", representing Monday through Sunday.
+   - **DO NOT** group days. Each day must be a separate object.
+   - **DO NOT** skip days.
 
-2. **Program Structure:**
-   - Warm-up routine (5-10 min)
-   - Main workout (30-45 min)
-   - Cool-down/stretching (5-10 min)
+2. **WORKOUT DAYS VS REST DAYS:**
+   - The user requested ${preferences.daysPerWeek || 3} workout days per week.
+   - ${preferredDays.length > 0 ? `The user prefers to workout on: ${preferredDays.join(", ")}. Schedule full workouts on these days.` : `Distribute the ${preferences.daysPerWeek || 3} workouts evenly throughout the week (e.g., Mon, Wed, Fri).`}
+   - On workout days: Provide a full, detailed workout. Set "isRestDay": false.
+   - On non-workout days: Set "isRestDay": true. Provide a light "Active Recovery" suggestion (e.g., "30 min walk", "Stretching").
 
-3. **Exercise Selection:**
-   - Appropriate for experience level
-   - Work around any injuries
-   - Include compound movements (if appropriate)
-   - Balance muscle groups
+3. **IMPRESSIVE VOLUME & DENSITY (CRITICAL):**
+   - **NO "FLUFF" WORKOUTS.** A 60-minute session must be dense and effective.
+   - **Minimum 8 Exercises per Session:**
+     - 2 Warm-up (Mobility/Activation)
+     - 4-5 Main Lifts (Use Supersets like A1/A2 or Circuits to increase density)
+     - 1-2 Cardio/Conditioning Finishers
+     - 1 Cool-down
+   - **Use Professional Notation:** Use "A1. Exercise / A2. Exercise" for supersets in the name field to show sophisticated programming.
+   - **Tempo & Intensity:** In the "notes", specify tempo (e.g., "3-0-1-0") or intensity (e.g., "RPE 8") to make it feel professional.
 
-4. **Safety & Form:**
-   - Form cues for each exercise
-   - Modification options for beginners
-   - Red flags to stop (pain, dizziness, etc.)
+   - **EXERCISE TYPES (CRITICAL):**
+   - You MUST classify each exercise with a "type" field:
+     - "strength": Standard sets/reps/weight (e.g., Squats, Bench Press).
+     - "cardio": Distance/time based (e.g., Running, Rowing, Cycling).
+     - "timed": Duration based (e.g., Planks, Stretching, Box Breathing).
+   - For "cardio" or "timed" exercises, use the "reps" field to specify duration (e.g., "20 mins") or distance (e.g., "3 miles").
+   - **UNITS (CRITICAL):**
+     - ALWAYS use **LBS** (pounds) for weight.
+     - ALWAYS use **MILES** for distance.
+     - Do NOT use kg or km.
 
-5. **Metabolic & Cardiovascular Priorities:**
-  - Explicitly address lab abnormalities or health conditions (e.g., dyslipidemia, insulin resistance, high blood pressure)
-  - Specify cardio dosage, intensity zones, and frequency when cholesterol, triglycerides, or glucose markers are elevated
-  - Include heart-healthy conditioning blocks even inside strength days when relevant
+5. **STRUCTURED SESSIONS:**
+   - **Warm-up:** 5-10 mins (Dynamic stretching, light cardio).
+   - **Main Workout:** 35-45 mins (Strength, HIIT, or steady state).
+   - **Cool-down:** 5-10 mins (Static stretching, breathing).
+   - **Cardio Integration:** If the user has elevated BP, lipids, or weight loss goals, you MUST include dedicated cardio (e.g., "20 mins Zone 2 cycling") either as a separate session or part of the workout.
 
-6. **Why Each Element Matters:**
-  - Every workout object must include \`healthFocus\` explaining the intent (e.g., "Improves HDL by combining moderate cardio + tempo strength")
-  - Every exercise (warmup/main/cooldown) needs a \`healthBenefits\` string tying it back to labs, biometrics, or health goals
+5. **DEEP PERSONALIZATION:**
+   - **Lab-Based Adjustments:**
+     - High Cortisol? -> Limit HIIT, focus on strength + recovery.
+     - High Glucose/HbA1c? -> Prioritize hypertrophy (glucose disposal) and post-meal walks.
+     - High BP? -> Avoid max-effort valsalva maneuvers; focus on rhythmic breathing.
+   - **Profile-Based Adjustments:**
+     - Sedentary job? -> Focus on posture, hip flexors, and glute activation.
+     - Older adult? -> Focus on balance, power, and fall prevention.
 
-7. **Recovery Guidance:**
-   - Rest days between sessions
-   - Active recovery suggestions
-   - Signs of overtraining
+6. **OUTPUT QUALITY:**
+   - Every workout day must provide a "workout.focus" string tying back to health profile or labs.
+   - Every listed exercise must include a "healthBenefits" explanation.
+   - Include recovery tips, signs of overtraining, and rest guidance.
+   - Populate "personalizationNotes" describing how the program leverages health profile facts, lab findings, supplement coordination, and stated goals.
 
-## Output Format (JSON)
+## Output JSON Structure
 
-Return ONLY valid JSON in this exact structure:
-
-\`\`\`json
+Return ONLY valid JSON in this model (values customized):
 {
-  "programOverview": {
-    "daysPerWeek": 3,
-    "durationWeeks": 8,
-    "focus": "Full-body strength with cardiovascular conditioning",
-    "targetAudience": "intermediate"
-  },
-  "weeklySchedule": {
-    "monday": "Upper Body Strength",
-    "wednesday": "Lower Body + Core",
-    "friday": "Full Body Conditioning"
-  },
-  "workouts": [
+  "programOverview": {"daysPerWeek": 3, "durationWeeks": 8, "focus": "Full-body strength", "targetAudience": "intermediate"},
+  "weeklyGuidance": "Detailed, personalized explanation referencing specific profile data and lab results. Explain WHY this workout plan is optimal for them. You MUST explicitly mention at least 3 specific data points from the user's profile (e.g., 'Because your LDL is 140...', 'Given your goal of muscle gain...', 'Since you are 45 years old...').",
+  "weekPlan": [
     {
-      "dayOfWeek": 1,
-      "workoutName": "Upper Body Strength",
-      "totalDuration": 50,
-      "healthFocus": "Improves insulin sensitivity via large compound lifts and finishes with moderate cardio",
-      "warmup": {
+      "day": 1,
+      "dayName": "Monday",
+      "workout": {
+        "name": "Metabolic Strength & Conditioning",
+        "durationMinutes": 60,
+        "estimatedCalories": 550,
+        "type": "strength_cardio",
+        "focus": "High-volume hypertrophy to maximize glucose disposal + Zone 2 finish",
         "exercises": [
-          {"name": "Arm circles", "duration": "30 seconds", "sets": 2, "healthBenefits": "Lubricates shoulder joint before pressing"},
-          {"name": "Band pull-aparts", "reps": 15, "sets": 2, "healthBenefits": "Activates postural muscles to support better breathing mechanics"}
+          {"name": "Warmup: Cat-Cow & T-Spine Rotations", "type": "timed", "sets": 2, "reps": "60 sec", "restSeconds": 0, "notes": "Mobilize spine", "healthBenefits": "Prepares nervous system"},
+          {"name": "Warmup: Band Pull-Aparts", "type": "strength", "sets": 2, "reps": "15", "restSeconds": 30, "notes": "Activate rear delts", "healthBenefits": "Postural correction"},
+          {"name": "A1. Goblet Squats", "type": "strength", "sets": 4, "reps": "12", "restSeconds": 0, "notes": "Deep depth, tempo 3-0-1-0", "healthBenefits": "Large muscle group activation for metabolic demand"},
+          {"name": "A2. Push-Ups", "type": "strength", "sets": 4, "reps": "AMRAP", "restSeconds": 90, "notes": "Chest to floor", "healthBenefits": "Upper body endurance"},
+          {"name": "B1. Dumbbell RDL", "type": "strength", "sets": 3, "reps": "10-12", "restSeconds": 0, "notes": "Hinge at hips, flat back", "healthBenefits": "Posterior chain strength"},
+          {"name": "B2. Single-Arm Row", "type": "strength", "sets": 3, "reps": "12/side", "restSeconds": 60, "notes": "Control the eccentric", "healthBenefits": "Corrects asymmetry"},
+          {"name": "Finisher: Zone 2 Incline Walk", "type": "cardio", "sets": 1, "reps": "20 mins", "restSeconds": 0, "notes": "Incline 10%, Speed 3.0", "healthBenefits": "Lipid oxidation and recovery"},
+          {"name": "Cooldown: Box Breathing", "type": "timed", "sets": 1, "reps": "3 mins", "restSeconds": 0, "notes": "Inhale 4s, Hold 4s, Exhale 4s, Hold 4s", "healthBenefits": "Downregulates cortisol"}
         ]
       },
-      "mainWorkout": {
+      "isRestDay": false
+    },
+    {
+      "day": 2,
+      "dayName": "Tuesday",
+      "workout": {
+        "name": "Active Recovery",
+        "durationMinutes": 30,
+        "estimatedCalories": 150,
+        "type": "recovery",
+        "focus": "Blood flow and stress reduction",
         "exercises": [
-          {
-            "name": "Dumbbell Bench Press",
-            "sets": 3,
-            "reps": "8-10",
-            "rest": "90 seconds",
-            "formCues": ["Keep shoulder blades retracted", "Lower weight to chest level", "Press through heels"],
-            "modifications": {
-              "easier": "Push-ups on knees",
-              "harder": "Barbell bench press"
-            },
-            "targetMuscles": ["chest", "triceps", "shoulders"],
-            "healthBenefits": "Builds lean mass to improve metabolic rate without spiking BP"
-          }
+           {"name": "Light Walk", "type": "cardio", "sets": 1, "reps": "30 mins", "restSeconds": 0, "notes": "Nature walk if possible", "healthBenefits": "Lowers cortisol"}
         ]
       },
-      "cooldown": {
-        "exercises": [
-          {"name": "Chest doorway stretch", "duration": "30 seconds", "sets": 2, "healthBenefits": "Opens anterior chain for better breathing and posture"},
-          {"name": "Shoulder rolls", "duration": "30 seconds", "sets": 2, "healthBenefits": "Downregulates nervous system after loading"}
-        ]
-      }
+      "isRestDay": true
     }
+    // ... MUST INCLUDE ALL 7 DAYS (Wednesday through Sunday)
   ],
-  "progressionPlan": {
-    "week1-2": "Learn movement patterns, establish baseline",
-    "week3-4": "Increase weight by 5-10% if form is good",
-    "week5-6": "Add 1-2 reps per set OR increase weight",
-    "week7-8": "Test new 1RMs or max reps"
-  },
-  "safetyGuidelines": [
-    "Stop immediately if you feel sharp pain (not muscle burn)",
-    "Never sacrifice form for heavier weight",
-    "Warm up properly before every session"
-  ],
-  "equipmentNeeded": [
-    "Dumbbells (5-25 lbs)",
-    "Resistance bands",
-    "Yoga mat"
-  ]
+  "recoveryTips": ["Walk 5 minutes post session", "90 seconds diaphragmatic breathing"],
+  "progressionPlan": {"week1-2": "Establish baseline", "week3-4": "Increase load 5%", "week5-6": "Add reps", "week7-8": "Reassess"},
+  "safetyGuidelines": ["Stop if sharp pain", "Use RPE 7-8"],
+  "equipmentNeeded": ["Dumbbells", "Bands", "Yoga mat"],
+  "personalizationNotes": {
+    "healthProfileInsights": ["Resting blood pressure 135/85 so tempo control added"],
+    "labInsightsAddressed": ["High LDL implies three moderate cardio blocks per week"],
+    "supplementCoordination": "Avoided adaptogens already supplied by formula",
+    "goalAlignment": "Supports recomposition and glucose control"
+  }
 }
-\`\`\`
 
 Be practical, safe, and results-driven. This program should be sustainable long-term.`;
 
@@ -374,10 +349,10 @@ Be practical, safe, and results-driven. This program should be sustainable long-
 
 /**
  * Build prompt for AI to generate lifestyle coaching plan
- * Considers: sleep data, stress levels, recovery metrics, health goals
  */
-export function buildLifestylePlanPrompt(context: OptimizeContext): string {
+export function buildLifestylePlanPrompt(context: OptimizeContext, snapshot?: PersonalizationSnapshot): string {
   const { user, healthProfile, labData, biometrics, preferences } = context;
+  const personalizationSnapshot = resolveSnapshot(context, snapshot);
 
   let prompt = `You are a functional medicine lifestyle coach creating a personalized wellness protocol for ${user.name}.
 
@@ -387,163 +362,124 @@ export function buildLifestylePlanPrompt(context: OptimizeContext): string {
 `;
 
   if (healthProfile) {
-    prompt += `- Sleep: ${healthProfile.sleepHoursPerNight ? `${healthProfile.sleepHoursPerNight} hours/night` : 'Not tracked'}
-- Stress Level: ${healthProfile.stressLevel || 'Not reported'}
-- Alcohol: ${healthProfile.alcoholDrinksPerWeek ? `${healthProfile.alcoholDrinksPerWeek} drinks/week` : 'None'}
-- Smoking: ${healthProfile.smokingStatus || 'Not reported'}
+    prompt += `- Sleep: ${healthProfile.sleepHoursPerNight ? `${healthProfile.sleepHoursPerNight} hours/night` : "Not tracked"}
+- Stress Level: ${healthProfile.stressLevel || "Not reported"}
+- Alcohol: ${healthProfile.alcoholDrinksPerWeek ? `${healthProfile.alcoholDrinksPerWeek} drinks/week` : "None"}
+- Smoking: ${healthProfile.smokingStatus || "Not reported"}
 `;
   }
 
   if (biometrics) {
-    prompt += `\n## Biometric Trends (Recent 7-day average)\n`;
+    prompt += `\n## Biometric Trends (recent 7-day average)\n`;
     if (biometrics.recentSleep) prompt += `- Sleep Duration: ${biometrics.recentSleep} hours\n`;
-    if (biometrics.recentHRV) prompt += `- HRV: ${biometrics.recentHRV} ms ${biometrics.recentHRV < 50 ? '(LOW - indicates stress/poor recovery)' : '(GOOD)'}\n`;
-    if (biometrics.recentRHR) prompt += `- Resting HR: ${biometrics.recentRHR} bpm\n`;
+    if (biometrics.recentHRV) prompt += `- HRV: ${biometrics.recentHRV} ms ${biometrics.recentHRV < 50 ? "(LOW - indicates stress/poor recovery)" : "(GOOD)"}\n`;
+    if (biometrics.recentRHR) prompt += `- Resting Heart Rate: ${biometrics.recentRHR} bpm\n`;
   }
 
-if (labData && labData.summary) {
-    prompt += `\n## Lab-Based Insights\n${labData.summary}\n`;
-    prompt += `\nConsider how lifestyle factors (sleep, stress, hydration) impact these markers.\n`;
+  if (labData?.summary) {
+    prompt += `\n## Lab-driven Lifestyle Targets\n${labData.summary}\n`;
   }
 
   if (preferences.goals) {
-    prompt += `\n## Wellness Goals\n${preferences.goals}\n`;
+    prompt += `\n## Lifestyle Goals\n${preferences.goals}\n`;
   }
 
-  prompt += `\n# TASK
+  prompt += `\n${personalizationBlock(personalizationSnapshot)}\n\n# TASK
 
-Create a comprehensive lifestyle optimization protocol addressing sleep, stress, recovery, and daily habits.
+Create a lifestyle coaching plan that addresses nervous system regulation, sleep hygiene, stress management, and daily routines tailored to this user.
 
 ## Requirements
 
-1. **Sleep Optimization:**
-   - Target sleep duration based on data
-   - Sleep hygiene protocol
-   - Evening routine recommendations
-   - Morning light exposure strategy
-  - Include a short \`reason\` for target hours and each routine step
+1. Provide a seven-day "weekPlan" array. Each day must include morning protocol, daytime focus, evening shutdown, and nervous system support activities.
+2. Tie recommendations back to health profile facts and lab findings (example: high cortisol implies breathwork and balanced meals; low vitamin D implies sunlight exposure guidance).
+3. Keep guidance practical with time windows and fallback options for busy days.
+4. Suggest daily tracking signals (sleep quality, HRV, mood) and note when to escalate to a practitioner.
+5. Populate "personalizationNotes" summarizing how the lifestyle protocol reflects health profile facts, lab trends, supplement timing, and goals.
 
-2. **Stress Management:**
-   - Evidence-based techniques (breathing, meditation, etc.)
-   - Daily practices (5-10 min realistic)
-   - Acute stress response toolkit
-  - Provide a \`reason\` for every technique that references labs/biometrics/health profile
+## Output JSON Structure
 
-3. **Recovery Protocols:**
-   - Post-workout recovery
-   - Weekly recovery day activities
-   - Signs you need extra rest
-  - Each recommendation should include a \`reason\` tying it to user data when possible
-
-4. **Hydration Strategy:**
-   - Daily water intake target
-   - Electrolyte timing (based on activity)
-   - Avoid: excessive caffeine, late-day fluids
-    "reason": "7.5 hours lowers evening cortisol and supports lipid metabolism",
-
-5. **Habit Stacking:**
-   - Morning routine (10-15 min)
-      {"time": "9:00 PM", "action": "Dim lights, stop screens", "reason": "Reduces blue light to boost melatonin"},
-      {"time": "9:30 PM", "action": "Take magnesium supplement", "reason": "Supports parasympathetic shift"},
-      {"time": "10:00 PM", "action": "Read or gentle stretching", "reason": "Lowers evening cortisol"},
-      {"time": "10:30 PM", "action": "Lights out", "reason": "Fixed sleep window keeps circadian rhythm aligned"}
-
-Return ONLY valid JSON in this exact structure:
-      {"time": "6:00 AM", "action": "Wake naturally (no snooze)", "reason": "Avoids cortisol spikes"},
-      {"time": "6:05 AM", "action": "10 min sunlight exposure outside", "reason": "Anchors circadian clock"},
-      {"time": "6:15 AM", "action": "Hydrate with 16oz water", "reason": "Replenishes overnight fluid loss"}
-  "sleepProtocol": {
-    "targetHours": 7.5,
-      {"tip": "Keep bedroom 65-68°F", "reason": "Cool temps improve deep sleep"},
-      {"tip": "Use blackout curtains or sleep mask", "reason": "Keeps melatonin high"},
-      {"tip": "White noise if needed", "reason": "Reduces sleep fragmentation"},
-      {"tip": "No caffeine after 2 PM", "reason": "Prevents REM suppression"}
-      {"time": "9:30 PM", "action": "Take magnesium supplement"},
-      {"time": "10:00 PM", "action": "Read or gentle stretching"},
-      {"time": "10:30 PM", "action": "Lights out"}
-    ],
-    "morningRoutine": [
-      {"time": "6:00 AM", "action": "Wake naturally (no snooze)"},
-      {"time": "6:05 AM", "action": "10 min sunlight exposure outside"},
-      {"time": "6:15 AM", "action": "Hydrate with 16oz water"}
-    ],
-        "reason": "Activates parasympathetic nervous system to lower cortisol/LDL"
-      "Keep bedroom 65-68°F",
-      "Use blackout curtains or sleep mask",
-      "White noise if needed",
-      {"tool": "4-7-8 breathing", "reason": "Drops heart rate quickly"},
-      {"tool": "5-minute walk outside", "reason": "Improves insulin sensitivity during stress"},
-      {"tool": "Cold water on face", "reason": "Triggers vagal response"}
-  "stressManagement": {
-    "dailyPractices": [
-      {
-        "technique": "Box Breathing",
-        "duration": 5,
-      {"time": "Upon waking", "amount": "16 oz", "reason": "Rehydrates after sleep"},
-      {"time": "Mid-morning", "amount": "20 oz", "reason": "Supports cognitive performance"},
-      {"time": "Before lunch", "amount": "16 oz", "reason": "Helps satiety for weight goals"},
-      {"time": "Afternoon", "amount": "20 oz", "reason": "Counters afternoon fatigue"},
-      {"time": "Pre-workout", "amount": "16 oz", "reason": "Optimizes plasma volume"},
-      {"time": "With dinner", "amount": "12 oz", "reason": "Aids digestion"}
-      "4-7-8 breathing (immediate calm in 60 seconds)",
-    "electrolytes": "Add 1/4 tsp sea salt to morning water; electrolyte drink post-workout",
-    "reason": "Balances sodium losses from training and supports blood pressure"
-      "Cold water on face (dive reflex)"
-    ]
-  },
-      {"practice": "10 min foam rolling before bed", "reason": "Improves circulation and lowers RHR"},
-      {"practice": "Contrast shower: 30s cold, 90s hot, repeat 3x", "reason": "Reduces inflammation and aids lipid metabolism"}
-    "timing": [
-      {"time": "Upon waking", "amount": "16 oz"},
-      {"practice": "Sunday: 30 min gentle yoga or stretching", "reason": "Stimulates parasympathetic recovery"},
-      {"practice": "Wednesday: Active recovery walk (20-30 min)", "reason": "Improves HDL via NEAT"}
-      {"time": "Afternoon", "amount": "20 oz"},
-      {"time": "Pre-workout", "amount": "16 oz"},
-      {"time": "With dinner", "amount": "12 oz"}
-    ],
-    "electrolytes": "Add 1/4 tsp sea salt to morning water; electrolyte drink post-workout"
-  },
-  "recoveryProtocol": {
-    "dailyRecovery": [
-      "10 min foam rolling before bed",
-      {"habit": "☀️ Sunlight exposure (6:05 AM)", "reason": "Boosts serotonin and circadian alignment"},
-      {"habit": "💧 Hydrate 16oz (6:15 AM)", "reason": "Supports lipid transport"},
-      {"habit": "🧘 5-min breathing exercise (6:20 AM)", "reason": "Keeps HRV higher"}
-      "Sunday: 30 min gentle yoga or stretching",
-      "Wednesday: Active recovery walk (20-30 min)"
-    ],
-    "signsToRest": [
-      "HRV drops >10ms below baseline",
-      "Resting HR elevated >5 bpm",
-      "Persistent fatigue despite sleep"
-    ]
-  },
-  "habitStack": {
-    "morning": [
-      "☀️ Sunlight exposure (6:05 AM)",
-      "💧 Hydrate 16oz (6:15 AM)",
-      "🧘 5-min breathing exercise (6:20 AM)",
-      "💊 Take supplements with breakfast (7:00 AM)"
-    ],
-    "evening": [
-      "🌙 Dim lights (9:00 PM)",
-      "📵 Screens off (9:00 PM)",
-      "🧊 Foam roll 10 min (9:30 PM)",
-      "📖 Read 20 min (10:00 PM)"
-    ]
-  },
-  "weeklyChecklist": [
-    "✅ 7+ hours sleep each night",
-    "✅ Daily breathing practice",
-    "✅ 100oz water daily",
-    "✅ 1 full recovery day",
-    "✅ Consistent sleep/wake times (±30 min)"
+{
+  "weeklyGuidance": "Detailed, personalized explanation referencing specific profile data and lab results. Explain WHY this lifestyle protocol is optimal for them. You MUST explicitly mention at least 3 specific data points from the user's profile (e.g., 'Because your LDL is 140...', 'Given your goal of muscle gain...', 'Since you are 45 years old...').",
+  "weekPlan": [
+    {
+      "day": 1,
+      "dayName": "Monday",
+      "focusArea": "Anti-inflammatory morning",
+      "morningProtocol": "Wake 6:30 AM, hydrate with mineral water, 5 minutes sunlight",
+      "daytimeFocus": "Batch meetings before noon, 10-minute walk after lunch",
+      "eveningProtocol": "Blue-light blockers at 8 PM, in bed by 10 PM",
+      "nervousSystemSupport": ["Box breathing 4-4-4-4 for 5 minutes"],
+      "breathwork": ["Resonant breathing, 6 breaths/min"],
+      "healthBenefits": "Targets elevated cortisol and improves HRV"
+    }
   ],
-  "rationale": "Your HRV of 45ms suggests sympathetic dominance (stress response). This protocol prioritizes parasympathetic activation through sleep optimization, breathwork, and structured recovery. Expect HRV to improve 10-20% within 4 weeks."
+  "sleepProtocols": ["Keep bedroom at 65F", "No caffeine after 1 PM"],
+  "stressProtocols": ["90-second cold shower finisher", "Daily journaling"],
+  "trackingSignals": ["Sleep quality score", "Morning HRV", "Energy level"],
+  "escalationGuidelines": "Flag sustained HRV drop below 35 ms or persistent insomnia for medical review",
+  "personalizationNotes": {
+    "healthProfileInsights": ["Sleep debt averaged 5.5 hours so strict evening routine included"],
+    "labInsightsAddressed": ["CRP elevated so anti-inflammatory routines prioritized"],
+    "supplementCoordination": "Times adaptogens to avoid overlap with supplement stack",
+    "goalAlignment": "Supports stated energy and focus goals"
+  }
 }
-\`\`\`
 
-Be specific, actionable, and sustainable. Small consistent changes compound over time.`;
+Provide empathetic, achievable guidance with clear next steps.`;
+
+  return prompt;
+}
+
+/**
+ * Build prompt for AI to generate a single recipe
+ */
+export function buildRecipePrompt(mealName: string, ingredients: string[], dietaryRestrictions: string[] = []): string {
+  let prompt = `You are a professional chef and nutritionist. Create a detailed, easy-to-follow recipe for "${mealName}".
+
+Ingredients to include:
+${ingredients.map(i => `- ${i}`).join('\n')}
+
+`;
+
+  if (dietaryRestrictions.length > 0) {
+    prompt += `Dietary Restrictions to respect:
+${dietaryRestrictions.map(r => `- ${r}`).join('\n')}
+
+`;
+  }
+
+  prompt += `
+Requirements:
+1. Simple, clear instructions.
+2. Prep time and cook time.
+3. Exact measurements for 1 serving.
+4. Nutritional breakdown (Calories, Protein, Carbs, Fat).
+5. A brief "Chef's Tip" for better flavor or easier prep.
+
+Output JSON format:
+{
+  "name": "Recipe Name",
+  "description": "Brief appetizing description",
+  "prepTime": "10 mins",
+  "cookTime": "15 mins",
+  "servings": 1,
+  "ingredients": [
+    {"item": "Chicken Breast", "amount": "150g", "notes": "boneless, skinless"},
+    {"item": "Olive Oil", "amount": "1 tbsp", "notes": ""}
+  ],
+  "instructions": [
+    "Step 1...",
+    "Step 2..."
+  ],
+  "macros": {
+    "calories": 450,
+    "protein": 35,
+    "carbs": 10,
+    "fat": 20
+  },
+  "chefTip": "Marinate for at least 30 mins for best results."
+}
+`;
 
   return prompt;
 }

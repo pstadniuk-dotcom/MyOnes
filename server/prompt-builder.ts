@@ -74,6 +74,19 @@ Answer the user's question directly and helpfully.`;
  */
 export function buildO1MiniPrompt(context: PromptContext): string {
   
+  // Generate dynamic ingredient lists for the prompt
+  const baseFormulasList = BASE_FORMULAS.map(f => `• ${f.name} (${f.doseMg}mg) - ${f.description}`).join('\n');
+  
+  const individualIngredientsList = INDIVIDUAL_INGREDIENTS.map(ing => {
+    let doseInfo = `${ing.doseMg}mg`;
+    if (ing.doseRangeMin && ing.doseRangeMax) {
+      doseInfo = `${ing.doseRangeMin}-${ing.doseRangeMax}mg`;
+    } else if (ing.doseMg) {
+      doseInfo = `${ing.doseMg}mg fixed`;
+    }
+    return `• ${ing.name} (${doseInfo}) - ${ing.type || 'general health'}`;
+  }).join('\n');
+
   // Detect user sophistication level
   const hasLabData = !!context.labDataContext;
   const hasActiveFormula = !!context.activeFormula;
@@ -229,61 +242,25 @@ NOTE: DO NOT include "totalMg" - backend calculates it automatically!
 2. Pregnant or nursing? (many herbs contraindicated)
 3. Major health conditions? (autoimmune, cancer, organ disease)
 
-**Dosage Rules:**
-- **Base formulas have FIXED dosages** - you cannot adjust their amounts
-    - Heart Support: exactly 450mg
-  - Liver Support: exactly 500mg
-  - Adrenal Support: exactly 400mg
-  - Thyroid Support: exactly 300mg
-  - You can only add/remove entire base formulas, not change amounts- **Individual ingredients with FIXED doses:**
-  - Ashwagandha: exactly 600mg
-  - Camu Camu: exactly 2500mg
-- **Individual ingredients with RANGES** (you can adjust within range):
-  - CoQ10: 100-200mg
-  - Curcumin: 30-600mg
-  - Ginger Root: 75-500mg
-  - Hawthorn Berry: 50-100mg (comes in 50mg doses: 50 or 100mg)
-  - Garlic: 50-200mg (comes in 50mg doses: 50, 100, 150, or 200mg)
-  - Magnesium: 50-800mg
-  - Omega-3: 100-1000mg
-  - Resveratrol: 20-500mg
-  - Red Ginseng: 200-400mg
-  - NAD+: 100-300mg
-- When in doubt, use the standard dose listed in catalog
-- If backend rejects your formula, it will show why - adjust accordingly
-
 **Formula Limits:**
 - Maximum: 5500mg total
 - Backend enforces this automatically
 - If you exceed, backend provides error, you revise
 
-=== 📚 INGREDIENT QUICK REFERENCE ===
+=== 📏 STRICT DOSAGE RULES & INGREDIENT CATALOG ===
 
-**Popular Base Formulas:**
-• Heart Support (450mg) - cardiovascular, CoQ10, L-Carnitine
-• Liver Support (500mg) - detox, liver health
-• Adrenal Support (400mg) - stress, cortisol, energy
-• Thyroid Support (300mg) - metabolism, thyroid function
+**Base Formulas (Fixed Dosages - CANNOT CHANGE):**
+${baseFormulasList}
 
-**Top Individual Ingredients:**
-• Ashwagandha (600mg fixed) - stress, anxiety, cortisol
-• CoEnzyme Q10 (100-200mg) - heart, energy, antioxidant
-• L-Theanine (200-400mg) - calm focus, anxiety
-• Phosphatidylcholine (400mg) - brain cell membranes, neurotransmitter production
-• Magnesium (50-800mg) - muscle function, nerve health, sleep
-• Omega-3 (100-1000mg) - heart health, inflammation, brain function
-• Curcumin (30-600mg) - inflammation, antioxidant
-• Resveratrol (20-500mg) - anti-aging, heart health
-• Vitamin D3 - NOT AVAILABLE (recommend external purchase)
-• Camu Camu (2500mg fixed) - immune, vitamin C
-• NAD+ (100-300mg) - anti-aging, cellular health
-• Hawthorn Berry (50-100mg) - cardiovascular support, blood pressure
-• Garlic (50-200mg) - cholesterol, immune function, blood pressure
-• Red Ginseng (200-400mg) - energy, adaptogen
-• Ginger Root (75-500mg) - digestion, inflammation
+**Individual Ingredients (Strict Limits):**
+- If a range is shown (e.g. 50-250mg), you MUST stay within it.
+- If "fixed" is shown, you MUST use that exact amount.
+- NO EXCEPTIONS.
+
+${individualIngredientsList}
 
 **Common Use Cases:**
-- Cardiovascular: Heart Support + CoQ10 + Garlic (200mg) + Hawthorn Berry (100mg) + Omega-3 (500mg)
+- Cardiovascular: Heart Support + CoQ10 + Garlic + Hawthorn Berry + Omega-3
 - Stress/Anxiety: Adrenal Support + Ashwagandha + L-Theanine + GABA
 - Digestion: Ginger Root + Aloe Vera
 - Inflammation: Curcumin + Cinnamon + Broccoli Concentrate

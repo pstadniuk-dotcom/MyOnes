@@ -35,7 +35,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSearch } from 'wouter';
+import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient, getAuthHeaders } from '@/lib/queryClient';
@@ -76,8 +76,8 @@ function HealthProfileSkeleton() {
 export default function ProfilePage() {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const search = useSearch();
-  const searchParams = new URLSearchParams(search);
+  const [location] = useLocation();
+  const searchParams = new URLSearchParams(location.split('?')[1] || '');
   const initialTab = searchParams.get('tab') || 'profile';
   const [activeTab, setActiveTab] = useState(initialTab);
   const fileInputRef = useRef<HTMLInputElement>(null);

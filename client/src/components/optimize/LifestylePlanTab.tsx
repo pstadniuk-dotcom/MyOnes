@@ -8,7 +8,7 @@ import {
   Loader2,
   CheckCircle2,
   Moon,
-  Brain,
+  Leaf,
   Wind,
   Sun,
   Sunrise,
@@ -58,9 +58,9 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
   if (!plan) {
     return (
       <div className="space-y-6">
-        <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100/30">
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="rounded-full bg-gradient-to-br from-purple-500 to-pink-500 p-4 mb-4 shadow-lg">
+            <div className="rounded-full bg-gradient-to-br from-green-500 to-emerald-500 p-4 mb-4 shadow-lg">
               <Heart className="h-10 w-10 text-white" />
             </div>
             <h3 className="text-2xl font-semibold mb-2">Generate Your Lifestyle Plan</h3>
@@ -72,19 +72,19 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
             {/* Benefits Grid */}
             <div className="grid grid-cols-2 gap-3 w-full max-w-lg mb-6">
               <div className="flex items-start gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                <span>Sleep optimization protocol</span>
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>Sleep optimization</span>
               </div>
               <div className="flex items-start gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                <span>Stress management toolkit</span>
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>Stress management</span>
               </div>
               <div className="flex items-start gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                <span>Recovery strategies</span>
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>Recovery tracking</span>
               </div>
               <div className="flex items-start gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                 <span>Circadian rhythm support</span>
               </div>
             </div>
@@ -93,7 +93,7 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
               size="lg"
               onClick={() => generatePlan.mutate()}
               disabled={generatePlan.isPending}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg"
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg"
             >
               {generatePlan.isPending ? (
                 <>
@@ -116,7 +116,7 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
         <div className="grid md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-3">
-              <Moon className="h-8 w-8 text-purple-600 mb-2" />
+              <Moon className="h-8 w-8 text-primary mb-2" />
               <CardTitle className="text-base">Sleep Science</CardTitle>
             </CardHeader>
             <CardContent>
@@ -128,7 +128,7 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
           
           <Card>
             <CardHeader className="pb-3">
-              <Brain className="h-8 w-8 text-blue-600 mb-2" />
+              <Leaf className="h-8 w-8 text-secondary mb-2" />
               <CardTitle className="text-base">Stress Mastery</CardTitle>
             </CardHeader>
             <CardContent>
@@ -140,7 +140,7 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
           
           <Card>
             <CardHeader className="pb-3">
-              <Zap className="h-8 w-8 text-amber-600 mb-2" />
+              <Zap className="h-8 w-8 text-yellow-600 mb-2" />
               <CardTitle className="text-base">Energy Optimization</CardTitle>
             </CardHeader>
             <CardContent>
@@ -166,7 +166,7 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
               Active Protocol
             </Badge>
             <Badge variant="secondary" className="text-xs">
@@ -199,47 +199,47 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100/30 border-purple-200">
+        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <Moon className="h-5 w-5 text-purple-600" />
-              <span className="text-xs text-muted-foreground">Last Night</span>
+              <Moon className="h-5 w-5 text-primary" />
+              <span className="text-xs text-muted-foreground">Avg</span>
             </div>
-            <p className="text-2xl font-bold text-purple-700">{sleepScore}</p>
+            <p className="text-2xl font-bold text-primary">{sleepScore}</p>
             <p className="text-xs text-muted-foreground">Sleep Score</p>
             <Progress value={sleepScore} className="mt-2 h-1" />
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100/30 border-blue-200">
+        <Card className="bg-gradient-to-br from-secondary/5 to-secondary/10 border-secondary/20">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <Clock className="h-5 w-5 text-blue-600" />
+              <Clock className="h-5 w-5 text-secondary" />
               <span className="text-xs text-muted-foreground">Avg</span>
             </div>
-            <p className="text-2xl font-bold text-blue-700">{avgSleepDuration}h</p>
+            <p className="text-2xl font-bold text-secondary">{avgSleepDuration}h</p>
             <p className="text-xs text-muted-foreground">Sleep Duration</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-amber-50 to-amber-100/30 border-amber-200">
+        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100/30 border-yellow-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <Brain className="h-5 w-5 text-amber-600" />
+              <Leaf className="h-5 w-5 text-secondary" />
               <span className="text-xs text-muted-foreground">Current</span>
             </div>
-            <p className="text-xl font-bold text-amber-700">{stressLevel}</p>
+            <p className="text-xl font-bold text-yellow-700">{stressLevel}</p>
             <p className="text-xs text-muted-foreground">Stress Level</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-50 to-green-100/30 border-green-200">
+        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <Zap className="h-5 w-5 text-green-600" />
-              <span className="text-xs text-muted-foreground">Today</span>
+              <Zap className="h-5 w-5 text-primary" />
+              <span className="text-xs text-muted-foreground">Avg</span>
             </div>
-            <p className="text-2xl font-bold text-green-700">{recoveryScore}</p>
+            <p className="text-2xl font-bold text-primary">{recoveryScore}</p>
             <p className="text-xs text-muted-foreground">Recovery</p>
             <Progress value={recoveryScore} className="mt-2 h-1" />
           </CardContent>
@@ -247,26 +247,26 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
       </div>
 
       {/* Rationale */}
-      <Card className="border-purple-200 bg-gradient-to-r from-purple-50/50 to-transparent">
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Info className="h-5 w-5 text-purple-600" />
+            <TrendingUp className="h-5 w-5 text-primary" />
             Your Personalized Approach
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            {plan.rationale || 'This protocol is designed to optimize your sleep quality, manage stress, and enhance recovery based on your unique biomarkers.'}
+            {plan.aiRationale || 'This protocol is designed to optimize your sleep quality, manage stress, and enhance recovery based on your unique biomarkers.'}
           </p>
         </CardContent>
       </Card>
 
       {/* Sleep Protocol */}
       {plan.content?.sleepProtocol && (
-        <Card className="shadow-lg border-purple-200">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-transparent">
+        <Card className="shadow-lg border-green-200">
+          <CardHeader className="bg-gradient-to-r from-green-50 to-transparent">
             <CardTitle className="flex items-center gap-2">
-              <Moon className="h-6 w-6 text-purple-600" />
+              <Moon className="h-6 w-6 text-green-600" />
               Sleep Optimization Protocol
             </CardTitle>
             <CardDescription>
@@ -276,40 +276,40 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
           <CardContent className="pt-6 space-y-6">
             {/* Sleep Targets */}
             <div className="grid md:grid-cols-3 gap-4">
-              <div className="p-4 rounded-lg bg-purple-50 border border-purple-100">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="h-5 w-5 text-purple-600" />
-                  <p className="font-semibold text-purple-900">Target Duration</p>
+              <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="h-5 w-5 text-primary" />
+                  <p className="font-semibold text-primary">Target Duration</p>
                 </div>
-                <p className="text-2xl font-bold text-purple-700">
+                <p className="text-2xl font-bold text-primary">
                   {plan.content.sleepProtocol.targetHours || 8} hours
                 </p>
               </div>
               
-              <div className="p-4 rounded-lg bg-purple-50 border border-purple-100">
-                <div className="flex items-center gap-2 mb-2">
-                  <Moon className="h-5 w-5 text-purple-600" />
-                  <p className="font-semibold text-purple-900">Bedtime</p>
+              <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
+                <div className="flex items-center gap-2 mb-1">
+                  <Moon className="h-5 w-5 text-primary" />
+                  <p className="font-semibold text-primary">Bedtime</p>
                 </div>
-                <p className="text-2xl font-bold text-purple-700">
+                <p className="text-2xl font-bold text-primary">
                   {plan.content.sleepProtocol.bedtime || '10:30 PM'}
                 </p>
               </div>
               
-              <div className="p-4 rounded-lg bg-purple-50 border border-purple-100">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sunrise className="h-5 w-5 text-purple-600" />
-                  <p className="font-semibold text-purple-900">Wake Time</p>
+              <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
+                <div className="flex items-center gap-2 mb-1">
+                  <Sunrise className="h-5 w-5 text-primary" />
+                  <p className="font-semibold text-primary">Wake Time</p>
                 </div>
-                <p className="text-2xl font-bold text-purple-700">
+                <p className="text-2xl font-bold text-primary">
                   {plan.content.sleepProtocol.wakeTime || '6:30 AM'}
                 </p>
               </div>
             </div>
 
             {plan.content.sleepProtocol.reason && (
-              <div className="p-4 rounded-lg bg-purple-50/50 border border-purple-100">
-                <p className="text-sm text-purple-900">
+              <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
+                <p className="text-sm text-primary">
                   <span className="font-semibold">Why this schedule: </span>
                   {plan.content.sleepProtocol.reason}
                 </p>
@@ -320,19 +320,19 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
             {plan.content.sleepProtocol.eveningRoutine && (
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <Moon className="h-5 w-5 text-purple-600" />
+                  <Moon className="h-5 w-5 text-green-600" />
                   <h4 className="font-semibold text-lg">Evening Wind-Down Routine</h4>
                 </div>
                 <div className="space-y-2">
                   {plan.content.sleepProtocol.eveningRoutine.map((step: any, idx: number) => (
-                    <Card key={idx} className="bg-gradient-to-r from-purple-50 to-transparent border-purple-100">
+                    <Card key={idx} className="bg-gradient-to-r from-green-50 to-transparent border-green-100">
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
-                          <div className="h-8 w-8 rounded-full bg-purple-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                          <div className="h-8 min-w-[2rem] px-2 w-auto rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
                             {step.time}
                           </div>
                           <div className="flex-1">
-                            <p className="font-medium text-purple-900 mb-1">{step.action}</p>
+                            <p className="font-medium text-green-900 mb-1">{step.action}</p>
                             {step.reason && (
                               <p className="text-sm text-muted-foreground">{step.reason}</p>
                             )}
@@ -349,19 +349,19 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
             {plan.content.sleepProtocol.morningRoutine && (
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <Sun className="h-5 w-5 text-amber-600" />
+                  <Sun className="h-5 w-5 text-yellow-600" />
                   <h4 className="font-semibold text-lg">Morning Activation Routine</h4>
                 </div>
                 <div className="space-y-2">
                   {plan.content.sleepProtocol.morningRoutine.map((step: any, idx: number) => (
-                    <Card key={idx} className="bg-gradient-to-r from-amber-50 to-transparent border-amber-100">
+                    <Card key={idx} className="bg-gradient-to-r from-yellow-50 to-transparent border-yellow-100">
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
-                          <div className="h-8 w-8 rounded-full bg-amber-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                          <div className="h-8 min-w-[2rem] px-2 w-auto rounded-full bg-yellow-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
                             {step.time}
                           </div>
                           <div className="flex-1">
-                            <p className="font-medium text-amber-900 mb-1">{step.action}</p>
+                            <p className="font-medium text-yellow-900 mb-1">{step.action}</p>
                             {step.reason && (
                               <p className="text-sm text-muted-foreground">{step.reason}</p>
                             )}
@@ -379,10 +379,10 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
 
       {/* Stress Management */}
       {plan.content?.stressManagement?.dailyPractices && (
-        <Card className="shadow-lg border-blue-200">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-transparent">
+        <Card className="shadow-lg border-stone-200">
+          <CardHeader className="bg-gradient-to-r from-stone-50 to-transparent">
             <CardTitle className="flex items-center gap-2">
-              <Brain className="h-6 w-6 text-blue-600" />
+              <Leaf className="h-6 w-6 text-stone-600" />
               Stress Management Toolkit
             </CardTitle>
             <CardDescription>
@@ -391,18 +391,18 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
             {plan.content.stressManagement.dailyPractices.map((practice: any, idx: number) => (
-              <Card key={idx} className="bg-gradient-to-r from-blue-50 to-transparent border-blue-100">
+              <Card key={idx} className="bg-gradient-to-r from-stone-50 to-transparent border-stone-100">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
-                    <div className="h-12 w-12 rounded-full bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
+                    <div className="h-12 w-12 rounded-full bg-stone-600 text-white flex items-center justify-center flex-shrink-0">
                       <Wind className="h-6 w-6" />
                     </div>
                     <div className="flex-1">
-                      <h4 className="font-semibold text-lg text-blue-900 mb-1">
+                      <h4 className="font-semibold text-lg text-stone-900 mb-1">
                         {practice.technique}
                       </h4>
                       <div className="flex gap-3 mb-2">
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                        <Badge variant="secondary" className="bg-stone-100 text-stone-700">
                           <Clock className="h-3 w-3 mr-1" />
                           {practice.duration} min
                         </Badge>
@@ -414,7 +414,7 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
                         {practice.instructions}
                       </p>
                       {practice.reason && (
-                        <p className="text-sm text-blue-900 bg-blue-50 p-2 rounded">
+                        <p className="text-sm text-secondary bg-secondary/5 p-2 rounded">
                           <span className="font-medium">Why: </span>
                           {practice.reason}
                         </p>
@@ -427,10 +427,10 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
 
             {/* Acute Stress Toolkit */}
             {plan.content.stressManagement.acuteStressToolkit && (
-              <div className="mt-6 p-4 rounded-lg bg-amber-50 border border-amber-200">
+              <div className="mt-6 p-4 rounded-lg bg-yellow-50 border border-yellow-200">
                 <div className="flex items-center gap-2 mb-3">
-                  <Zap className="h-5 w-5 text-amber-600" />
-                  <h4 className="font-semibold text-amber-900">Emergency Stress Tools</h4>
+                  <Zap className="h-5 w-5 text-yellow-600" />
+                  <h4 className="font-semibold text-yellow-900">Emergency Stress Tools</h4>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
                   Use these when you need immediate stress relief:
@@ -442,7 +442,7 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
                     
                     return (
                       <div key={idx} className="flex items-start gap-2 p-2 bg-white rounded">
-                        <CheckCircle2 className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
                         <div>
                           <span className="text-sm font-medium">{toolText}</span>
                           {reason && (

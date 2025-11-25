@@ -27,6 +27,8 @@ export const notificationTypeEnum = pgEnum('notification_type', ['order_update',
 export const evidenceLevelEnum = pgEnum('evidence_level', ['strong', 'moderate', 'preliminary', 'limited']);
 export const studyTypeEnum = pgEnum('study_type', ['rct', 'meta_analysis', 'systematic_review', 'observational', 'case_study', 'review']);
 export const reviewFrequencyEnum = pgEnum('review_frequency', ['monthly', 'bimonthly', 'quarterly']);
+export const wearableProviderEnum = pgEnum('wearable_provider', ['fitbit', 'oura', 'whoop']);
+export const wearableConnectionStatusEnum = pgEnum('wearable_connection_status', ['connected', 'disconnected', 'error', 'token_expired']);
 
 // Users table - updated with name, email, phone, password
 export const users = pgTable("users", {
@@ -468,6 +470,8 @@ export const insertReviewScheduleSchema = createInsertSchema(reviewSchedules).om
   updatedAt: true,
 });
 
+
+
 // TypeScript types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -577,10 +581,6 @@ export const userConsentSchema = z.object({
 
 export type LabReportUploadData = z.infer<typeof labReportUploadSchema>;
 export type UserConsentData = z.infer<typeof userConsentSchema>;
-
-// Wearable device enums
-export const wearableProviderEnum = pgEnum('wearable_provider', ['fitbit', 'oura', 'whoop']);
-export const wearableConnectionStatusEnum = pgEnum('wearable_connection_status', ['connected', 'disconnected', 'error', 'token_expired']);
 
 // Support system schemas
 export const supportTicketStatusEnum = pgEnum('support_ticket_status', ['open', 'in_progress', 'resolved', 'closed']);
@@ -887,6 +887,17 @@ export const workoutExperienceLevelEnum = pgEnum('workout_experience_level', ['b
 export const mealTypeEnum = pgEnum('meal_type', ['breakfast', 'lunch', 'dinner', 'snack']);
 export const recipeCategoryEnum = pgEnum('recipe_category', ['breakfast', 'lunch', 'dinner', 'snack', 'dessert']);
 
+// Workout Preferences - Settings for the Workout Tracker
+export const workoutPreferences = pgTable("workout_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  preferredDays: json("preferred_days").$type<string[]>().default(['Monday', 'Wednesday', 'Friday']).notNull(),
+  preferredTime: text("preferred_time").default('07:00').notNull(),
+  smsEnabled: boolean("sms_enabled").default(false).notNull(),
+  calendarSync: boolean("calendar_sync").default(false).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Optimize Plans - Main table for AI-generated wellness plans
 export const optimizePlans = pgTable("optimize_plans", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -916,6 +927,7 @@ export const optimizeDailyLogs = pgTable("optimize_daily_logs", {
   
   // Daily completion tracking
   nutritionCompleted: boolean("nutrition_completed").default(false).notNull(),
+  mealsLogged: json("meals_logged"), // Array of meal types logged: ['breakfast', 'lunch']
   workoutCompleted: boolean("workout_completed").default(false).notNull(),
   supplementsTaken: boolean("supplements_taken").default(false).notNull(),
   
@@ -1047,7 +1059,7 @@ export const mealLogs = pgTable("meal_logs", {
 export const groceryLists = pgTable("grocery_lists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  mealPlanId: varchar("meal_plan_id").references(() => mealPlans.id),
+  optimizePlanId: varchar("optimize_plan_id").references(() => optimizePlans.id),
   
   // Items: [{ item, amount, unit, category, checked }]
   items: json("items").notNull(),
@@ -1140,6 +1152,11 @@ export const insertOptimizeSmsPreferencesSchema = createInsertSchema(optimizeSms
   updatedAt: true,
 });
 
+export const insertWorkoutPreferencesSchema = createInsertSchema(workoutPreferences).omit({
+  id: true,
+  updatedAt: true,
+});
+
 export const insertUserStreakSchema = createInsertSchema(userStreaks).omit({
   id: true,
   updatedAt: true,
@@ -1175,6 +1192,9 @@ export type GroceryList = typeof groceryLists.$inferSelect;
 
 export type InsertOptimizeSmsPreferences = z.infer<typeof insertOptimizeSmsPreferencesSchema>;
 export type OptimizeSmsPreferences = typeof optimizeSmsPreferences.$inferSelect;
+
+export type InsertWorkoutPreferences = z.infer<typeof insertWorkoutPreferencesSchema>;
+export type WorkoutPreferences = typeof workoutPreferences.$inferSelect;
 
 export type InsertUserStreak = z.infer<typeof insertUserStreakSchema>;
 export type UserStreak = typeof userStreaks.$inferSelect;

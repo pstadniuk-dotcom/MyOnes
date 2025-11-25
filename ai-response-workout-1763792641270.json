@@ -1,0 +1,358 @@
+```json
+{
+  "programOverview": {
+    "daysPerWeek": 3,
+    "durationWeeks": 8,
+    "focus": "Full-body strength",
+    "targetAudience": "intermediate"
+  },
+  "weeklyGuidance": "This workout plan optimizes full-body strength and cardiovascular health, focusing on hypertrophy and metabolic conditioning. Given Peter's age of 40, the plan includes exercises that enhance muscle mass to support metabolism. The inclusion of Zone 2 cardio aids in lipid oxidation, addressing potential cardiovascular concerns. The program is designed for Peter's intermediate level, ensuring a balance between challenge and sustainability.",
+  "weekPlan": [
+    {
+      "day": 1,
+      "dayName": "Monday",
+      "workout": {
+        "name": "Metabolic Strength & Conditioning",
+        "durationMinutes": 60,
+        "estimatedCalories": 550,
+        "type": "strength_cardio",
+        "focus": "High-volume hypertrophy to maximize glucose disposal + Zone 2 finish",
+        "exercises": [
+          {
+            "name": "Warmup: Cat-Cow & T-Spine Rotations",
+            "sets": 2,
+            "reps": "60 sec",
+            "restSeconds": 0,
+            "notes": "Mobilize spine",
+            "healthBenefits": "Prepares nervous system"
+          },
+          {
+            "name": "Warmup: Band Pull-Aparts",
+            "sets": 2,
+            "reps": "15",
+            "restSeconds": 30,
+            "notes": "Activate rear delts",
+            "healthBenefits": "Postural correction"
+          },
+          {
+            "name": "A1. Goblet Squats",
+            "sets": 4,
+            "reps": "12",
+            "restSeconds": 0,
+            "notes": "Deep depth, tempo 3-0-1-0",
+            "healthBenefits": "Large muscle group activation for metabolic demand"
+          },
+          {
+            "name": "A2. Push-Ups",
+            "sets": 4,
+            "reps": "AMRAP",
+            "restSeconds": 90,
+            "notes": "Chest to floor",
+            "healthBenefits": "Upper body endurance"
+          },
+          {
+            "name": "B1. Dumbbell RDL",
+            "sets": 3,
+            "reps": "10-12",
+            "restSeconds": 0,
+            "notes": "Hinge at hips, flat back",
+            "healthBenefits": "Posterior chain strength"
+          },
+          {
+            "name": "B2. Single-Arm Row",
+            "sets": 3,
+            "reps": "12/side",
+            "restSeconds": 60,
+            "notes": "Control the eccentric",
+            "healthBenefits": "Corrects asymmetry"
+          },
+          {
+            "name": "Finisher: Zone 2 Incline Walk",
+            "sets": 1,
+            "reps": "20 mins",
+            "restSeconds": 0,
+            "notes": "Incline 10%, Speed 3.0",
+            "healthBenefits": "Lipid oxidation and recovery"
+          },
+          {
+            "name": "Cooldown: Box Breathing",
+            "sets": 1,
+            "reps": "3 mins",
+            "restSeconds": 0,
+            "notes": "Inhale 4s, Hold 4s, Exhale 4s, Hold 4s",
+            "healthBenefits": "Downregulates cortisol"
+          }
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 2,
+      "dayName": "Tuesday",
+      "workout": {
+        "name": "Active Recovery",
+        "durationMinutes": 30,
+        "estimatedCalories": 150,
+        "type": "recovery",
+        "focus": "Blood flow and stress reduction",
+        "exercises": [
+          {
+            "name": "Light Walk",
+            "sets": 1,
+            "reps": "30 mins",
+            "restSeconds": 0,
+            "notes": "Nature walk if possible",
+            "healthBenefits": "Lowers cortisol"
+          }
+        ]
+      },
+      "isRestDay": true
+    },
+    {
+      "day": 3,
+      "dayName": "Wednesday",
+      "workout": {
+        "name": "Strength & Power",
+        "durationMinutes": 60,
+        "estimatedCalories": 500,
+        "type": "strength_hypertrophy",
+        "focus": "Muscle strength and power",
+        "exercises": [
+          {
+            "name": "Warmup: Jumping Jacks & Arm Circles",
+            "sets": 2,
+            "reps": "60 sec",
+            "restSeconds": 0,
+            "notes": "Increase heart rate",
+            "healthBenefits": "Improves circulation"
+          },
+          {
+            "name": "Warmup: Hip Bridges",
+            "sets": 2,
+            "reps": "15",
+            "restSeconds": 30,
+            "notes": "Activate glutes",
+            "healthBenefits": "Supports lower back"
+          },
+          {
+            "name": "A1. Deadlift",
+            "sets": 4,
+            "reps": "8",
+            "restSeconds": 0,
+            "notes": "Maintain flat back, tempo 2-0-1-0",
+            "healthBenefits": "Full-body strength"
+          },
+          {
+            "name": "A2. Military Press",
+            "sets": 4,
+            "reps": "10",
+            "restSeconds": 90,
+            "notes": "Core engaged",
+            "healthBenefits": "Shoulder stability"
+          },
+          {
+            "name": "B1. Walking Lunges",
+            "sets": 3,
+            "reps": "12/side",
+            "restSeconds": 0,
+            "notes": "Knee over ankle",
+            "healthBenefits": "Leg strength and balance"
+          },
+          {
+            "name": "B2. Bent Over Row",
+            "sets": 3,
+            "reps": "10-12",
+            "restSeconds": 60,
+            "notes": "Focus on scapular retraction",
+            "healthBenefits": "Upper back strength"
+          },
+          {
+            "name": "Finisher: Battle Rope Slams",
+            "sets": 1,
+            "reps": "3 mins",
+            "restSeconds": 0,
+            "notes": "Explosive movement",
+            "healthBenefits": "Cardiovascular conditioning"
+          },
+          {
+            "name": "Cooldown: Pigeon Pose Stretch",
+            "sets": 1,
+            "reps": "2 mins/side",
+            "restSeconds": 0,
+            "notes": "Deep stretch for hips",
+            "healthBenefits": "Flexibility and relaxation"
+          }
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 4,
+      "dayName": "Thursday",
+      "workout": {
+        "name": "Active Recovery",
+        "durationMinutes": 30,
+        "estimatedCalories": 150,
+        "type": "recovery",
+        "focus": "Mobility and relaxation",
+        "exercises": [
+          {
+            "name": "Tai Chi or Yoga",
+            "sets": 1,
+            "reps": "30 mins",
+            "restSeconds": 0,
+            "notes": "Focus on breath",
+            "healthBenefits": "Enhances joint mobility"
+          }
+        ]
+      },
+      "isRestDay": true
+    },
+    {
+      "day": 5,
+      "dayName": "Friday",
+      "workout": {
+        "name": "Full-Body Circuit Training",
+        "durationMinutes": 60,
+        "estimatedCalories": 600,
+        "type": "circuit_training",
+        "focus": "Endurance and functional strength",
+        "exercises": [
+          {
+            "name": "Warmup: High Knees & Arm Swings",
+            "sets": 2,
+            "reps": "60 sec",
+            "restSeconds": 0,
+            "notes": "Dynamic movement",
+            "healthBenefits": "Increases heart rate"
+          },
+          {
+            "name": "Warmup: World’s Greatest Stretch",
+            "sets": 2,
+            "reps": "5/side",
+            "restSeconds": 30,
+            "notes": "Full body activation",
+            "healthBenefits": "Improves flexibility"
+          },
+          {
+            "name": "A1. Kettlebell Swings",
+            "sets": 4,
+            "reps": "15",
+            "restSeconds": 0,
+            "notes": "Explosive hip hinge",
+            "healthBenefits": "Cardio and strength"
+          },
+          {
+            "name": "A2. TRX Rows",
+            "sets": 4,
+            "reps": "12",
+            "restSeconds": 90,
+            "notes": "Core engaged",
+            "healthBenefits": "Upper body strength"
+          },
+          {
+            "name": "B1. Plank",
+            "sets": 3,
+            "reps": "60 sec",
+            "restSeconds": 0,
+            "notes": "Maintain straight line",
+            "healthBenefits": "Core stability"
+          },
+          {
+            "name": "B2. Box Jumps",
+            "sets": 3,
+            "reps": "10",
+            "restSeconds": 60,
+            "notes": "Soft landing",
+            "healthBenefits": "Explosive power"
+          },
+          {
+            "name": "Finisher: Rowing Machine",
+            "sets": 1,
+            "reps": "10 mins",
+            "restSeconds": 0,
+            "notes": "Steady pace",
+            "healthBenefits": "Full-body cardio"
+          },
+          {
+            "name": "Cooldown: Thread the Needle",
+            "sets": 1,
+            "reps": "2 mins/side",
+            "restSeconds": 0,
+            "notes": "Gentle spinal twist",
+            "healthBenefits": "Relieves tension"
+          }
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 6,
+      "dayName": "Saturday",
+      "workout": {
+        "name": "Active Recovery",
+        "durationMinutes": 30,
+        "estimatedCalories": 150,
+        "type": "recovery",
+        "focus": "Mental relaxation and flexibility",
+        "exercises": [
+          {
+            "name": "Guided Meditation",
+            "sets": 1,
+            "reps": "15 mins",
+            "restSeconds": 0,
+            "notes": "Focus on calm breathing",
+            "healthBenefits": "Reduces stress"
+          },
+          {
+            "name": "Gentle Stretching",
+            "sets": 1,
+            "reps": "15 mins",
+            "restSeconds": 0,
+            "notes": "Hold each stretch",
+            "healthBenefits": "Improves flexibility"
+          }
+        ]
+      },
+      "isRestDay": true
+    },
+    {
+      "day": 7,
+      "dayName": "Sunday",
+      "workout": {
+        "name": "Active Recovery",
+        "durationMinutes": 30,
+        "estimatedCalories": 150,
+        "type": "recovery",
+        "focus": "Light activity and recovery",
+        "exercises": [
+          {
+            "name": "Casual Cycling",
+            "sets": 1,
+            "reps": "30 mins",
+            "restSeconds": 0,
+            "notes": "Enjoy the ride",
+            "healthBenefits": "Promotes circulation"
+          }
+        ]
+      },
+      "isRestDay": true
+    }
+  ],
+  "recoveryTips": ["Walk 5 minutes post session", "90 seconds diaphragmatic breathing"],
+  "progressionPlan": {
+    "week1-2": "Establish baseline",
+    "week3-4": "Increase load 5%",
+    "week5-6": "Add reps",
+    "week7-8": "Reassess"
+  },
+  "safetyGuidelines": ["Stop if sharp pain", "Use RPE 7-8"],
+  "equipmentNeeded": ["Dumbbells", "Bands", "Yoga mat"],
+  "personalizationNotes": {
+    "healthProfileInsights": ["Resting blood pressure 135/85 so tempo control added"],
+    "labInsightsAddressed": ["High LDL implies three moderate cardio blocks per week"],
+    "supplementCoordination": "Avoided adaptogens already supplied by formula",
+    "goalAlignment": "Supports recomposition and glucose control"
+  }
+}
+```

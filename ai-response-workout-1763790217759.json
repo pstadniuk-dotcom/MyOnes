@@ -1,0 +1,152 @@
+```json
+{
+  "programOverview": {
+    "daysPerWeek": 3,
+    "durationWeeks": 8,
+    "focus": "Full-body strength",
+    "targetAudience": "intermediate"
+  },
+  "weeklyGuidance": "This program is tailored to optimize Peter's metabolic health and manage stress while building strength and endurance. Given Peter's age of 40, the focus includes mobility and injury prevention. The integration of cardiovascular components supports heart health and stress reduction, critical given his stress level of 7/10. Supplements like Omega-3 and CoEnzyme Q10 complement the program by supporting cardiovascular health and energy production.",
+  "weekPlan": [
+    {
+      "day": 1,
+      "dayName": "Monday",
+      "workout": {
+        "name": "Metabolic Strength & Conditioning",
+        "durationMinutes": 60,
+        "estimatedCalories": 550,
+        "type": "strength_cardio",
+        "focus": "High-volume hypertrophy to maximize glucose disposal + Zone 2 finish",
+        "exercises": [
+          {"name": "Warmup: Cat-Cow & T-Spine Rotations", "sets": 2, "reps": "60 sec", "restSeconds": 0, "notes": "Mobilize spine", "healthBenefits": "Prepares nervous system"},
+          {"name": "Warmup: Band Pull-Aparts", "sets": 2, "reps": "15", "restSeconds": 30, "notes": "Activate rear delts", "healthBenefits": "Postural correction"},
+          {"name": "A1. Goblet Squats", "sets": 4, "reps": "12", "restSeconds": 0, "notes": "Deep depth, tempo 3-0-1-0", "healthBenefits": "Large muscle group activation for metabolic demand"},
+          {"name": "A2. Push-Ups", "sets": 4, "reps": "AMRAP", "restSeconds": 90, "notes": "Chest to floor", "healthBenefits": "Upper body endurance"},
+          {"name": "B1. Dumbbell RDL", "sets": 3, "reps": "10-12", "restSeconds": 0, "notes": "Hinge at hips, flat back", "healthBenefits": "Posterior chain strength"},
+          {"name": "B2. Single-Arm Row", "sets": 3, "reps": "12/side", "restSeconds": 60, "notes": "Control the eccentric", "healthBenefits": "Corrects asymmetry"},
+          {"name": "Finisher: Zone 2 Incline Walk", "sets": 1, "reps": "20 mins", "restSeconds": 0, "notes": "Incline 10%, Speed 3.0", "healthBenefits": "Lipid oxidation and recovery"},
+          {"name": "Cooldown: Box Breathing", "sets": 1, "reps": "3 mins", "restSeconds": 0, "notes": "Inhale 4s, Hold 4s, Exhale 4s, Hold 4s", "healthBenefits": "Downregulates cortisol"}
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 2,
+      "dayName": "Tuesday",
+      "workout": {
+        "name": "Active Recovery",
+        "durationMinutes": 30,
+        "estimatedCalories": 150,
+        "type": "recovery",
+        "focus": "Blood flow and stress reduction",
+        "exercises": [
+           {"name": "Light Walk", "sets": 1, "reps": "30 mins", "restSeconds": 0, "notes": "Nature walk if possible", "healthBenefits": "Lowers cortisol"}
+        ]
+      },
+      "isRestDay": true
+    },
+    {
+      "day": 3,
+      "dayName": "Wednesday",
+      "workout": {
+        "name": "Power and Core Stability",
+        "durationMinutes": 60,
+        "estimatedCalories": 530,
+        "type": "strength",
+        "focus": "Powerful movements for muscle recruitment and core stabilization",
+        "exercises": [
+          {"name": "Warmup: Arm Circles & Leg Swings", "sets": 2, "reps": "60 sec", "restSeconds": 0, "notes": "Loosen joints", "healthBenefits": "Improves joint mobility"},
+          {"name": "Warmup: Plank to Downward Dog", "sets": 2, "reps": "10", "restSeconds": 30, "notes": "Core activation", "healthBenefits": "Engages core and stretches posterior chain"},
+          {"name": "A1. Box Jumps", "sets": 3, "reps": "8", "restSeconds": 0, "notes": "Explosive", "healthBenefits": "Enhances power and agility"},
+          {"name": "A2. TRX Rows", "sets": 3, "reps": "12", "restSeconds": 60, "notes": "Full range motion", "healthBenefits": "Strengthens upper back"},
+          {"name": "B1. Kettlebell Swings", "sets": 4, "reps": "15", "restSeconds": 0, "notes": "Dynamic hip hinge", "healthBenefits": "Improves cardiovascular fitness"},
+          {"name": "B2. Pallof Press", "sets": 4, "reps": "12/side", "restSeconds": 60, "notes": "Core stability", "healthBenefits": "Enhances anti-rotational strength"},
+          {"name": "Finisher: Battle Ropes", "sets": 1, "reps": "3 mins", "restSeconds": 0, "notes": "Alternate waves", "healthBenefits": "Boosts endurance and coordination"},
+          {"name": "Cooldown: Seated Forward Bend", "sets": 1, "reps": "3 mins", "restSeconds": 0, "notes": "Gentle stretch", "healthBenefits": "Promotes relaxation and flexibility"}
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 4,
+      "dayName": "Thursday",
+      "workout": {
+        "name": "Active Recovery",
+        "durationMinutes": 30,
+        "estimatedCalories": 150,
+        "type": "recovery",
+        "focus": "Joint mobility and mental relaxation",
+        "exercises": [
+          {"name": "Tai Chi", "sets": 1, "reps": "30 mins", "restSeconds": 0, "notes": "Focus on breathing", "healthBenefits": "Improves balance and stress management"}
+        ]
+      },
+      "isRestDay": true
+    },
+    {
+      "day": 5,
+      "dayName": "Friday",
+      "workout": {
+        "name": "Muscular Endurance and Conditioning",
+        "durationMinutes": 60,
+        "estimatedCalories": 540,
+        "type": "strength_cardio",
+        "focus": "Endurance work to improve muscular and cardiovascular capacity",
+        "exercises": [
+          {"name": "Warmup: Jumping Jacks & High Knees", "sets": 2, "reps": "60 sec", "restSeconds": 0, "notes": "Elevate heart rate", "healthBenefits": "Increases circulation"},
+          {"name": "Warmup: World’s Greatest Stretch", "sets": 2, "reps": "5/side", "restSeconds": 30, "notes": "Dynamic stretch", "healthBenefits": "Enhances flexibility"},
+          {"name": "A1. Bulgarian Split Squats", "sets": 3, "reps": "10/leg", "restSeconds": 0, "notes": "Knee over toes", "healthBenefits": "Improves unilateral strength"},
+          {"name": "A2. Plank Shoulder Taps", "sets": 3, "reps": "20", "restSeconds": 60, "notes": "Minimize hip sway", "healthBenefits": "Enhances core stability"},
+          {"name": "B1. Overhead Dumbbell Press", "sets": 3, "reps": "10", "restSeconds": 0, "notes": "Neutral grip", "healthBenefits": "Strengthens shoulders"},
+          {"name": "B2. Russian Twists", "sets": 3, "reps": "20", "restSeconds": 60, "notes": "Controlled movement", "healthBenefits": "Enhances oblique strength"},
+          {"name": "Finisher: Rowing Machine", "sets": 1, "reps": "10 mins", "restSeconds": 0, "notes": "Steady pace", "healthBenefits": "Improves cardiovascular fitness"},
+          {"name": "Cooldown: Child’s Pose", "sets": 1, "reps": "3 mins", "restSeconds": 0, "notes": "Relax and stretch", "healthBenefits": "Releases tension in back and shoulders"}
+        ]
+      },
+      "isRestDay": false
+    },
+    {
+      "day": 6,
+      "dayName": "Saturday",
+      "workout": {
+        "name": "Active Recovery",
+        "durationMinutes": 30,
+        "estimatedCalories": 150,
+        "type": "recovery",
+        "focus": "Relaxation and flexibility",
+        "exercises": [
+          {"name": "Yoga Flow", "sets": 1, "reps": "30 mins", "restSeconds": 0, "notes": "Focus on breathing and movement", "healthBenefits": "Improves flexibility and reduces stress"}
+        ]
+      },
+      "isRestDay": true
+    },
+    {
+      "day": 7,
+      "dayName": "Sunday",
+      "workout": {
+        "name": "Rest Day",
+        "durationMinutes": 0,
+        "estimatedCalories": 0,
+        "type": "rest",
+        "focus": "Recovery and rejuvenation",
+        "exercises": []
+      },
+      "isRestDay": true
+    }
+  ],
+  "recoveryTips": ["Walk 5 minutes post session", "90 seconds diaphragmatic breathing"],
+  "progressionPlan": {
+    "week1-2": "Establish baseline",
+    "week3-4": "Increase load 5%",
+    "week5-6": "Add reps",
+    "week7-8": "Reassess"
+  },
+  "safetyGuidelines": ["Stop if sharp pain", "Use RPE 7-8"],
+  "equipmentNeeded": ["Dumbbells", "Bands", "Yoga mat"],
+  "personalizationNotes": {
+    "healthProfileInsights": ["Resting blood pressure 135/85 so tempo control added"],
+    "labInsightsAddressed": ["High LDL implies three moderate cardio blocks per week"],
+    "supplementCoordination": "Avoided adaptogens already supplied by formula",
+    "goalAlignment": "Supports recomposition and glucose control"
+  }
+}
+```

@@ -5,37 +5,149 @@ import { helpArticles, faqItems } from '../shared/schema';
 const helpArticlesData = [
   {
     category: 'Getting Started',
-    title: 'Creating Your Account and Setting Up Your Profile',
-    content: `Welcome to Ones AI! Creating your account takes just a few minutes. The more complete your profile, the better your personalized supplement recommendations will be.
+    title: 'Understanding Your Personalized Supplement Formula',
+    content: `Welcome to ONES! Your personalized formula is created by AI based on your unique health profile, lab results, and goals. This guide explains exactly what's in your formula and why.
 
-CREATING YOUR ACCOUNT
+WHAT'S IN YOUR FORMULA
 
-Visit ones.ai and click "Get Started". Enter your name, email address, and create a password. We recommend adding your phone number for order tracking and optional pill reminders.
+Your ONES formula contains two types of ingredients:
 
-After signing up, check your email for a verification link. Click it to activate your account. If you don't see the email, check your spam folder.
+**Base Formulas (2-3 selected)**
+These are proprietary blends targeting specific health systems. Each base formula contains multiple active ingredients at therapeutic dosages. Examples include:
+- Adrenal Support (420mg) - Supports stress response and hormone balance
+- Heart Support (450mg) - Cardiovascular health and energy
+- Immune Support (350mg) - Defense and recovery
 
-SETTING UP YOUR HEALTH PROFILE
+**Individual Additions (5-7 ingredients)**
+Single therapeutic ingredients added on top of base formulas to address your specific needs. Examples:
+- Ashwagandha (600mg) - Stress reduction and cortisol management
+- CoQ10 (200mg) - Cellular energy and heart health
+- Curcumin (500mg) - Anti-inflammatory support
 
-Once logged in, the AI guides you through a health assessment. This takes 10-15 minutes and covers important areas of your health.
+TOTAL DOSAGE: 4500-5500MG
 
-The AI asks about your age, sex, height, and weight to calculate safe dosages. You'll share lifestyle details like sleep hours, exercise frequency, stress levels, smoking status, and alcohol consumption.
+Your complete formula typically contains 4500-5500mg total, delivered in 6-9 capsules per day (size 00 capsules). This range maximizes therapeutic benefit while maintaining cost-effectiveness.
 
-Most importantly, list all medications you take, allergies you have, and current health conditions. This is critical - the AI never recommends anything that could interact with your medications or trigger allergies.
+CAPSULE BREAKDOWN
 
-Finally, describe your health goals and symptoms you want to address. Be specific about what you hope to achieve.
+The system automatically calculates your capsule count:
+- Each capsule holds ~550mg
+- Total formula ÷ 550mg = capsules per day
+- Distributed across 3 meals (morning, lunch, dinner)
 
-UPLOADING LAB RESULTS
+Example: 4,950mg formula = 9 capsules/day = 3 capsules per meal
 
-Lab results are optional but highly recommended. They allow the AI to see your exact nutrient levels instead of making educated guesses.
+WHY THESE INGREDIENTS?
 
-Upload PDF files or clear photos of your blood work. The AI automatically extracts biomarker values and adjusts recommendations based on your results.
+The AI selects ingredients based on:
 
-If you don't have recent labs, you can ask your doctor or use direct-to-consumer services like Function Health.
+1. **Your Lab Results** - Addressing deficiencies or elevated biomarkers
+   Example: Low vitamin D (25 ng/mL) → AI adds Vitamin D3
+
+2. **Reported Symptoms** - Targeting what you're experiencing
+   Example: Brain fog + fatigue → AI adds Lion's Mane + B-Complex
+
+3. **Health Goals** - Supporting what you want to achieve
+   Example: Goal = Better sleep → AI adds Magnesium + L-Theanine
+
+4. **Medication Interactions** - Only safe combinations
+   The AI automatically excludes ingredients that interact with your medications
+
+HOW TO READ YOUR FORMULA PDF
+
+After your consultation, you'll receive a PDF with:
+- Complete ingredient list with dosages
+- Rationale for each ingredient (linked to your specific data)
+- Daily dosing instructions
+- Warnings or considerations
+
+FORMULA VERSIONS
+
+Your formula can be updated anytime:
+- Upload new lab results → AI adjusts recommendations
+- Report new symptoms → AI adds targeted support
+- Change medications → AI removes contraindicated ingredients
+
+Each update creates a new version while preserving your history in My Formula page.
+
+COMMON QUESTIONS
+
+**Q: Can I request changes to my formula?**
+A: Yes! Just return to the AI consultation and say "I'd like to modify my formula" or "Can we remove ingredient X?"
+
+**Q: What if I have side effects?**
+A: Stop taking the supplement and contact support@ones.ai immediately. The AI can create a modified formula avoiding problematic ingredients.
+
+**Q: How long until I see results?**
+A: Most users notice improvements within 2-4 weeks. Some benefits (like energy) appear quickly, while others (like inflammation reduction) take 6-8 weeks.
 
 NEED HELP?
 
-Email support@ones.ai for assistance with account setup or profile questions.`,
+- View your complete formula: Dashboard > My Formula
+- Request updates: Dashboard > Consultation
+- Contact support: support@ones.ai`,
     displayOrder: 1,
+    isPublished: true
+  },
+  {
+    category: 'Getting Started',
+    title: 'Creating Your Account and Setting Up Your Profile',
+    content: `Welcome to ONES! This guide walks you through creating your account and setting up your health profile for personalized supplement recommendations.
+
+CREATING YOUR ACCOUNT
+
+Visit ones.ai and click "Sign Up". Enter your email address and create a strong password (at least 8 characters with letters and numbers).
+
+You'll receive a verification email. Click the link to confirm your account and activate access.
+
+COMPLETING YOUR HEALTH PROFILE
+
+After logging in, you'll be prompted to complete your health profile. This information helps the AI create accurate recommendations.
+
+Basic Information: Age, weight, biological sex, and primary health goals.
+
+Medical History: Current health conditions, past diagnoses, surgeries, and family history of health issues.
+
+Medications: List all prescription medications, over-the-counter drugs, and any supplements you currently take. Include dosages if known.
+
+Allergies and Sensitivities: Food allergies, medication allergies, and any ingredient sensitivities.
+
+UPLOADING LAB RESULTS (OPTIONAL BUT RECOMMENDED)
+
+If you have recent lab results (within 6 months), upload them now. The AI uses these to identify specific deficiencies and create precise dosage recommendations.
+
+Accepted formats: PDF, JPG, or PNG. Maximum file size 10MB.
+
+The AI automatically extracts biomarker values using advanced OCR technology. You can review and correct any extraction errors.
+
+SETTING YOUR HEALTH GOALS
+
+Tell the AI what you want to achieve:
+- Energy and performance optimization
+- Stress and sleep support
+- Immune system strengthening
+- Cognitive function and focus
+- Athletic performance and recovery
+- Specific health condition support
+
+Be specific - the more detail you provide, the better your recommendations.
+
+PRIVACY AND SECURITY
+
+All your health information is encrypted and stored securely. We never share your data with third parties or use it for marketing.
+
+You can update, download, or delete your profile data anytime from your account settings.
+
+NEXT STEPS
+
+Once your profile is complete, you're ready to start your first AI consultation. The AI will review everything you've provided and begin creating your personalized formula.
+
+You can update your profile anytime as your health status changes or you get new lab results.
+
+NEED HELP?
+
+Email support@ones.ai if you have trouble completing your profile or questions about what information to include.`,
+    displayOrder: 2,
     isPublished: true
   },
   {

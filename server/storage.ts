@@ -8,7 +8,7 @@ import {
   notifications, notificationPrefs, auditLogs, userConsents, labAnalyses,
   faqItems, supportTickets, supportTicketResponses, helpArticles, newsletterSubscribers,
   researchCitations, wearableConnections, appSettings, reviewSchedules,
-  optimizePlans, optimizeDailyLogs, workoutPlans, workouts, workoutLogs,
+  optimizePlans, optimizeDailyLogs, workoutPlans, workouts, workoutLogs, workoutPreferences,
   mealPlans, recipes, mealLogs, groceryLists, optimizeSmsPreferences, userStreaks,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
@@ -40,6 +40,7 @@ import {
   type WorkoutPlan, type InsertWorkoutPlan,
   type Workout, type InsertWorkout,
   type WorkoutLog, type InsertWorkoutLog,
+  type WorkoutPreferences, type InsertWorkoutPreferences,
   type MealPlan, type InsertMealPlan,
   type Recipe, type InsertRecipe,
   type MealLog, type InsertMealLog,
@@ -52,6 +53,7 @@ export interface IStorage {
   // User operations  
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByPhone(phone: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
   listAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
@@ -249,7 +251,7 @@ export interface IStorage {
     respiratoryRate?: number | null;
     rawData?: Record<string, any>;
   }): Promise<void>;
-  getBiometricData(userId: string, days?: number): Promise<any[]>;
+  getBiometricData(userId: string, startDate: Date, endDate: Date): Promise<any[]>;
   getBiometricTrends(userId: string, periodType: 'week' | 'month'): Promise<any | null>;
 
   // App settings operations (key-value store)
@@ -485,6 +487,14 @@ export class DrizzleStorage implements IStorage {
 
   async getUserById(id: string): Promise<User | undefined> {
     return this.getUser(id);
+  }
+
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.phone, phone));
+    return user;
   }
 
   async listAllUsers(): Promise<User[]> {
@@ -1994,6 +2004,13 @@ export class DrizzleStorage implements IStorage {
     try {
       const searchPattern = `%${query}%`;
       const searchCondition = or(
+
+
+
+
+
+
+
         ilike(users.email, searchPattern),
         ilike(users.name, searchPattern),
         ilike(users.phone, searchPattern)
@@ -2454,18 +2471,17 @@ export class DrizzleStorage implements IStorage {
     }
   }
 
-  async getBiometricData(userId: string, days: number = 30): Promise<any[]> {
+  async getBiometricData(userId: string, startDate: Date, endDate: Date): Promise<any[]> {
     try {
       const { biometricData } = await import('@shared/schema');
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
       
       return await db
         .select()
         .from(biometricData)
         .where(and(
           eq(biometricData.userId, userId),
-          gte(biometricData.dataDate, startDate)
+          gte(biometricData.dataDate, startDate),
+          lte(biometricData.dataDate, endDate)
         ))
         .orderBy(desc(biometricData.dataDate));
     } catch (error) {
@@ -2703,7 +2719,7 @@ export class DrizzleStorage implements IStorage {
     return plan;
   }
 
-  async listOptimizePlans(userId: string): Promise<OptimizePlan[]> {
+  async getOptimizePlans(userId: string): Promise<OptimizePlan[]> {
     return await db
       .select()
       .from(optimizePlans)
@@ -2864,73 +2880,74 @@ export class DrizzleStorage implements IStorage {
     return plan;
   }
 
-  async updateMealPlan(id: string, updates: Partial<InsertMealPlan>): Promise<MealPlan | undefined> {
-    const [updated] = await db
-      .update(mealPlans)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(mealPlans.id, id))
-      .returning();
-    return updated;
-  }
-
-  async getRecipe(id: string): Promise<Recipe | undefined> {
-    const [recipe] = await db
-      .select()
-      .from(recipes)
-      .where(eq(recipes.id, id));
-    return recipe;
-  }
-
-  async searchRecipes(filters: {
-    tags?: string[];
-    category?: Recipe['category'];
-    maxCalories?: number;
-    query?: string;
-  }): Promise<Recipe[]> {
-    const conditions = [];
-    
-    if (filters.category) {
-      conditions.push(eq(recipes.category, filters.category));
-    }
-    
-    if (filters.maxCalories) {
-      conditions.push(sql`(${recipes.macros}->>'calories')::int <= ${filters.maxCalories}`);
-    }
-    
-    if (filters.query) {
-      conditions.push(or(
-        ilike(recipes.name, `%${filters.query}%`),
-        ilike(recipes.description, `%${filters.query}%`)
-      ));
-    }
-
-    if (filters.tags && filters.tags.length > 0) {
-      // Check if any of the tags exist in the tags array
-      conditions.push(sql`${recipes.tags} && ARRAY[${filters.tags.join(',')}]::text[]`);
-    }
-
-    return await db
-      .select()
-      .from(recipes)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(recipes.name);
-  }
-
-  async createMealLog(log: InsertMealLog): Promise<MealLog> {
-    const [created] = await db.insert(mealLogs).values(log).returning();
+  async createWorkout(workout: InsertWorkout): Promise<Workout> {
+    const [created] = await db.insert(workouts).values(workout).returning();
     return created;
   }
 
-  async listMealLogs(userId: string, startDate?: Date, endDate?: Date): Promise<MealLog[]> {
-    const conditions = [eq(mealLogs.userId, userId)];
-    if (startDate) conditions.push(gte(mealLogs.loggedAt, startDate));
-    if (endDate) conditions.push(lte(mealLogs.loggedAt, endDate));
-
+  async listWorkoutsForPlan(planId: string): Promise<Workout[]> {
     return await db
       .select()
-      .from(mealLogs)
-      .where(and(...conditions))
-      .orderBy(desc(mealLogs.loggedAt));
+      .from(workouts)
+      .where(eq(workouts.planId, planId));
+  }
+
+  async getWorkout(id: string): Promise<Workout | undefined> {
+    const [workout] = await db
+      .select()
+      .from(workouts)
+      .where(eq(workouts.id, id));
+    return workout;
+  }
+
+  async createWorkoutLog(log: InsertWorkoutLog): Promise<WorkoutLog> {
+    const [created] = await db.insert(workoutLogs).values(log).returning();
+    return created;
+  }
+
+  async listWorkoutLogs(userId: string, limit = 10, offset = 0): Promise<WorkoutLog[]> {
+    return await db
+      .select()
+      .from(workoutLogs)
+      .where(eq(workoutLogs.userId, userId))
+      .orderBy(desc(workoutLogs.completedAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getAllWorkoutLogs(userId: string): Promise<WorkoutLog[]> {
+    return await db
+      .select()
+      .from(workoutLogs)
+      .where(eq(workoutLogs.userId, userId))
+      .orderBy(desc(workoutLogs.completedAt));
+  }
+
+  async getWorkoutPreferences(userId: string): Promise<WorkoutPreferences | undefined> {
+    const [prefs] = await db
+      .select()
+      .from(workoutPreferences)
+      .where(eq(workoutPreferences.userId, userId));
+    return prefs;
+  }
+
+  async upsertWorkoutPreferences(userId: string, prefs: Partial<InsertWorkoutPreferences>): Promise<WorkoutPreferences> {
+    const existing = await this.getWorkoutPreferences(userId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(workoutPreferences)
+        .set({ ...prefs, updatedAt: new Date() } as any)
+        .where(eq(workoutPreferences.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(workoutPreferences)
+        .values({ ...prefs, userId } as any)
+        .returning();
+      return created;
+    }
   }
 
   // Grocery Lists
@@ -2969,7 +2986,7 @@ export class DrizzleStorage implements IStorage {
     return updated;
   }
 
-  // SMS Preferences
+  // Optimize SMS Preferences
   async getOptimizeSmsPreferences(userId: string): Promise<OptimizeSmsPreferences | undefined> {
     const [prefs] = await db
       .select()
@@ -2978,20 +2995,50 @@ export class DrizzleStorage implements IStorage {
     return prefs;
   }
 
-  async createOrUpdateOptimizeSmsPreferences(prefs: InsertOptimizeSmsPreferences): Promise<OptimizeSmsPreferences> {
-    const existing = await this.getOptimizeSmsPreferences(prefs.userId);
+  async createOrUpdateOptimizeSmsPreferences(userId: string, prefs: Partial<InsertOptimizeSmsPreferences>): Promise<OptimizeSmsPreferences> {
+    const existing = await this.getOptimizeSmsPreferences(userId);
     
     if (existing) {
       const [updated] = await db
         .update(optimizeSmsPreferences)
-        .set({ ...prefs, updatedAt: new Date() })
-        .where(eq(optimizeSmsPreferences.userId, prefs.userId))
+        .set({ ...prefs, updatedAt: new Date() } as any)
+        .where(eq(optimizeSmsPreferences.id, existing.id))
         .returning();
       return updated;
     } else {
-      const [created] = await db.insert(optimizeSmsPreferences).values(prefs).returning();
+      const [created] = await db
+        .insert(optimizeSmsPreferences)
+        .values({ ...prefs, userId } as any)
+        .returning();
       return created;
     }
+  }
+
+  // Meal Plans
+  async createMealPlan(plan: InsertMealPlan): Promise<MealPlan> {
+    const [created] = await db.insert(mealPlans).values(plan).returning();
+    return created;
+  }
+
+  async getMealPlan(id: string): Promise<MealPlan | undefined> {
+    const [plan] = await db
+      .select()
+      .from(mealPlans)
+      .where(eq(mealPlans.id, id));
+    return plan;
+  }
+
+  async getActiveMealPlan(userId: string): Promise<MealPlan | undefined> {
+    const [plan] = await db
+      .select()
+      .from(mealPlans)
+      .where(and(
+        eq(mealPlans.userId, userId),
+        eq(mealPlans.isActive, true)
+      ))
+      .orderBy(desc(mealPlans.createdAt))
+      .limit(1);
+    return plan;
   }
 }
 

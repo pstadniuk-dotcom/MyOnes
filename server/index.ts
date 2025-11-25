@@ -13,6 +13,16 @@ const app = express();
 // Trust reverse proxy (needed for secure cookies and correct protocol detection in production)
 app.set('trust proxy', 1);
 
+// Add CSP middleware to allow 'unsafe-eval' for development
+// This must be the FIRST middleware to ensure headers are set
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *; font-src 'self' data: *; img-src 'self' data: *; connect-src 'self' * ws: wss:; frame-src 'self' https://www.youtube.com;"
+  );
+  next();
+});
+
 // CORS middleware - allow requests from Vercel frontend
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -146,7 +156,8 @@ app.use((req, res, next) => {
     // ALWAYS serve the app on the port specified in the environment variable PORT
     // Other ports are firewalled. Default to 5000 if not specified.
     const port = parseInt(process.env.PORT || '5000', 10);
-    server.listen(port, '127.0.0.1', () => {
+    const host = process.env.HOST || '0.0.0.0';
+    server.listen(port, host, () => {
       log(`serving on port ${port}`);
       
       // Start SMS reminder scheduler
@@ -164,7 +175,7 @@ app.use((req, res, next) => {
         console.error('Address in use, retrying...');
         setTimeout(() => {
           server.close();
-          server.listen(port, '127.0.0.1');
+          server.listen(port, host);
         }, 1000);
       } else {
         console.error("Server error:", e);
@@ -178,6 +189,7 @@ app.use((req, res, next) => {
     server.on('listening', () => {
       console.log('✅ SERVER LISTENING EVENT FIRED');
     });
+    
   } catch (error) {
     console.error("FATAL SERVER ERROR:", error);
     process.exit(1);

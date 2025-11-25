@@ -60,6 +60,24 @@ export async function sendNotificationSms(notification: SmsNotification): Promis
   }
 }
 
+export async function sendRawSms(to: string, body: string): Promise<boolean> {
+  try {
+    if (!twilioClient || !TWILIO_PHONE_NUMBER) {
+      // console.log('❌ Twilio not configured'); // Reduce noise in dev
+      return false;
+    }
+    await twilioClient.messages.create({
+      body,
+      from: TWILIO_PHONE_NUMBER,
+      to
+    });
+    return true;
+  } catch (error) {
+    console.error('Error sending raw SMS:', error);
+    return false;
+  }
+}
+
 export function getNotificationSmsContent(
   type: 'order_update' | 'formula_update' | 'consultation_reminder' | 'system',
   message: string

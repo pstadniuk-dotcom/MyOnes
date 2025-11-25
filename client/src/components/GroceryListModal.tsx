@@ -3,14 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ShoppingBasket, Check, RefreshCw } from 'lucide-react';
+import { Loader2, ShoppingBasket, Check, RefreshCw, Share2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getQueryFn } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface GroceryItem {
   item: string;
-  amount: number;
+  amount: number | string;
   unit: string;
   category: string;
   checked: boolean;
@@ -83,6 +83,51 @@ export function GroceryListModal({ open, onOpenChange }: GroceryListModalProps) 
     });
     
     updateList.mutate({ ...groceryList, items: newItems });
+  };
+
+  const handleShare = async () => {
+    if (!groceryList) return;
+
+    // Group for text output
+    const groupedForShare = groceryList.items.reduce((acc, item) => {
+      const category = item.category || 'Other';
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(item);
+      return acc;
+    }, {} as Record<string, GroceryItem[]>);
+
+    let text = "🛒 ONES Grocery List\n";
+    Object.entries(groupedForShare).forEach(([category, items]) => {
+      text += `\n${category}:\n`;
+      items.forEach(item => {
+        text += `- [${item.checked ? 'x' : ' '}] ${item.item} (${item.amount} ${item.unit})\n`;
+      });
+    });
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'ONES Grocery List',
+          text: text,
+        });
+      } catch (err) {
+        console.log('Share cancelled or failed', err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast({
+          title: 'Copied to Clipboard',
+          description: 'Grocery list copied to your clipboard.',
+        });
+      } catch (err) {
+        toast({
+          variant: 'destructive',
+          title: 'Copy Failed',
+          description: 'Could not copy to clipboard.',
+        });
+      }
+    }
   };
 
   // Group items by category
@@ -171,15 +216,25 @@ export function GroceryListModal({ open, onOpenChange }: GroceryListModalProps) 
           </div>
           <div className="flex gap-2">
             {groceryList && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => generateList.mutate()}
-                disabled={generateList.isPending}
-              >
-                <RefreshCw className="mr-2 h-3 w-3" />
-                Regenerate
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleShare}
+                  title="Share List"
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => generateList.mutate()}
+                  disabled={generateList.isPending}
+                >
+                  <RefreshCw className="mr-2 h-3 w-3" />
+                  Regenerate
+                </Button>
+              </>
             )}
             <Button onClick={() => onOpenChange(false)}>
               Done

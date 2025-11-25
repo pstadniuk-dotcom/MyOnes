@@ -1,0 +1,390 @@
+```json
+{
+  "nutritionalStrategy": {
+    "primaryFocus": "High Protein, Moderate Carb",
+    "hydrationGoal": "3500ml",
+    "caffeineLimit": "200mg",
+    "alcoholLimit": "3 drinks/week",
+    "intermittentFasting": null
+  },
+  "macroTargets": {
+    "dailyCalories": 2200,
+    "proteinGrams": 165,
+    "carbsGrams": 220,
+    "fatGrams": 73
+  },
+  "weekPlan": [
+    {
+      "day": 1,
+      "dayName": "Monday",
+      "meals": [
+        {
+          "mealType": "breakfast",
+          "name": "Oatmeal with Almonds",
+          "ingredients": ["oats", "almonds", "honey"],
+          "instructions": "Cook oats and top with almonds and honey.",
+          "prepTimeMinutes": 10,
+          "macros": {"calories": 400, "protein": 12, "carbs": 60, "fats": 15},
+          "healthBenefits": "Provides sustained energy with complex carbs."
+        },
+        {
+          "mealType": "snack",
+          "name": "Apple and Peanut Butter",
+          "ingredients": ["apple", "peanut butter"],
+          "instructions": "Slice apple and dip in peanut butter.",
+          "prepTimeMinutes": 5,
+          "macros": {"calories": 200, "protein": 4, "carbs": 27, "fats": 10},
+          "healthBenefits": "Rich in fiber and healthy fats."
+        },
+        {
+          "mealType": "lunch",
+          "name": "Chicken Salad",
+          "ingredients": ["chicken breast", "mixed greens", "olive oil"],
+          "instructions": "Grill chicken and toss with greens and dressing.",
+          "prepTimeMinutes": 15,
+          "macros": {"calories": 500, "protein": 45, "carbs": 20, "fats": 25},
+          "healthBenefits": "High in protein for muscle maintenance."
+        },
+        {
+          "mealType": "snack",
+          "name": "Greek Yogurt",
+          "ingredients": ["Greek yogurt", "honey", "chia seeds"],
+          "instructions": "Mix yogurt with honey and sprinkle chia seeds.",
+          "prepTimeMinutes": 5,
+          "macros": {"calories": 180, "protein": 17, "carbs": 20, "fats": 4},
+          "healthBenefits": "Provides probiotics and protein."
+        },
+        {
+          "mealType": "dinner",
+          "name": "Grilled Salmon with Quinoa",
+          "ingredients": ["salmon", "quinoa", "lemon"],
+          "instructions": "Grill salmon and serve with cooked quinoa, squeeze lemon.",
+          "prepTimeMinutes": 20,
+          "macros": {"calories": 820, "protein": 82, "carbs": 83, "fats": 40},
+          "healthBenefits": "Rich in omega-3s for heart health."
+        }
+      ],
+      "dailyTotals": {"calories": 2100, "protein": 160, "carbs": 210, "fat": 70}
+    },
+    {
+      "day": 2,
+      "dayName": "Tuesday",
+      "meals": [
+        {
+          "mealType": "breakfast",
+          "name": "Avocado Toast",
+          "ingredients": ["whole grain bread", "avocado", "egg"],
+          "instructions": "Top toasted bread with avocado and poached egg.",
+          "prepTimeMinutes": 10,
+          "macros": {"calories": 350, "protein": 14, "carbs": 30, "fats": 22},
+          "healthBenefits": "Rich in healthy fats and fiber."
+        },
+        {
+          "mealType": "snack",
+          "name": "Mixed Nuts",
+          "ingredients": ["almonds", "walnuts", "cashews"],
+          "instructions": "Mix and enjoy.",
+          "prepTimeMinutes": 2,
+          "macros": {"calories": 200, "protein": 6, "carbs": 8, "fats": 18},
+          "healthBenefits": "Provides healthy fats and protein."
+        },
+        {
+          "mealType": "lunch",
+          "name": "Turkey Wrap",
+          "ingredients": ["whole grain wrap", "turkey", "spinach"],
+          "instructions": "Wrap turkey and spinach in the wrap.",
+          "prepTimeMinutes": 5,
+          "macros": {"calories": 450, "protein": 35, "carbs": 45, "fats": 15},
+          "healthBenefits": "High in lean protein and fiber."
+        },
+        {
+          "mealType": "snack",
+          "name": "Carrot Sticks with Hummus",
+          "ingredients": ["carrot sticks", "hummus"],
+          "instructions": "Dip carrot sticks in hummus.",
+          "prepTimeMinutes": 3,
+          "macros": {"calories": 150, "protein": 3, "carbs": 15, "fats": 8},
+          "healthBenefits": "Rich in fiber and healthy fats."
+        },
+        {
+          "mealType": "dinner",
+          "name": "Stir-Fried Tofu with Vegetables",
+          "ingredients": ["tofu", "broccoli", "soy sauce"],
+          "instructions": "Stir-fry tofu and broccoli with soy sauce.",
+          "prepTimeMinutes": 15,
+          "macros": {"calories": 600, "protein": 40, "carbs": 60, "fats": 20},
+          "healthBenefits": "High in plant-based protein and vitamins."
+        }
+      ],
+      "dailyTotals": {"calories": 2050, "protein": 148, "carbs": 158, "fat": 83}
+    },
+    {
+      "day": 3,
+      "dayName": "Wednesday",
+      "meals": [
+        {
+          "mealType": "breakfast",
+          "name": "Smoothie Bowl",
+          "ingredients": ["banana", "spinach", "almond milk"],
+          "instructions": "Blend ingredients and top with seeds.",
+          "prepTimeMinutes": 5,
+          "macros": {"calories": 300, "protein": 10, "carbs": 50, "fats": 8},
+          "healthBenefits": "High in vitamins and fiber."
+        },
+        {
+          "mealType": "snack",
+          "name": "Protein Shake",
+          "ingredients": ["protein powder", "water"],
+          "instructions": "Shake and drink.",
+          "prepTimeMinutes": 2,
+          "macros": {"calories": 150, "protein": 25, "carbs": 5, "fats": 2},
+          "healthBenefits": "Supports muscle recovery."
+        },
+        {
+          "mealType": "lunch",
+          "name": "Quinoa and Black Bean Bowl",
+          "ingredients": ["quinoa", "black beans", "corn"],
+          "instructions": "Mix ingredients and season.",
+          "prepTimeMinutes": 10,
+          "macros": {"calories": 550, "protein": 20, "carbs": 80, "fats": 15},
+          "healthBenefits": "Rich in fiber and plant protein."
+        },
+        {
+          "mealType": "snack",
+          "name": "Cottage Cheese with Pineapple",
+          "ingredients": ["cottage cheese", "pineapple"],
+          "instructions": "Mix and enjoy.",
+          "prepTimeMinutes": 3,
+          "macros": {"calories": 180, "protein": 15, "carbs": 20, "fats": 5},
+          "healthBenefits": "High in protein and vitamin C."
+        },
+        {
+          "mealType": "dinner",
+          "name": "Beef Stir-Fry",
+          "ingredients": ["beef strips", "bell peppers", "soy sauce"],
+          "instructions": "Stir-fry beef and peppers with soy sauce.",
+          "prepTimeMinutes": 15,
+          "macros": {"calories": 700, "protein": 80, "carbs": 35, "fats": 30},
+          "healthBenefits": "High in protein and iron."
+        }
+      ],
+      "dailyTotals": {"calories": 2100, "protein": 150, "carbs": 190, "fat": 60}
+    },
+    {
+      "day": 4,
+      "dayName": "Thursday",
+      "meals": [
+        {
+          "mealType": "breakfast",
+          "name": "Egg White Omelette",
+          "ingredients": ["egg whites", "spinach", "tomatoes"],
+          "instructions": "Cook egg whites with veggies.",
+          "prepTimeMinutes": 10,
+          "macros": {"calories": 250, "protein": 20, "carbs": 10, "fats": 10},
+          "healthBenefits": "Low in calories, high in protein."
+        },
+        {
+          "mealType": "snack",
+          "name": "Orange",
+          "ingredients": ["orange"],
+          "instructions": "Peel and eat.",
+          "prepTimeMinutes": 2,
+          "macros": {"calories": 80, "protein": 1, "carbs": 20, "fats": 0},
+          "healthBenefits": "High in vitamin C."
+        },
+        {
+          "mealType": "lunch",
+          "name": "Tuna Salad",
+          "ingredients": ["tuna", "lettuce", "olive oil"],
+          "instructions": "Mix tuna with lettuce and dressing.",
+          "prepTimeMinutes": 5,
+          "macros": {"calories": 400, "protein": 35, "carbs": 5, "fats": 25},
+          "healthBenefits": "Rich in omega-3 fatty acids."
+        },
+        {
+          "mealType": "snack",
+          "name": "Rice Cakes with Almond Butter",
+          "ingredients": ["rice cakes", "almond butter"],
+          "instructions": "Spread almond butter on rice cakes.",
+          "prepTimeMinutes": 3,
+          "macros": {"calories": 160, "protein": 4, "carbs": 18, "fats": 9},
+          "healthBenefits": "Provides quick energy."
+        },
+        {
+          "mealType": "dinner",
+          "name": "Grilled Chicken with Sweet Potatoes",
+          "ingredients": ["chicken breast", "sweet potatoes", "rosemary"],
+          "instructions": "Grill chicken and bake sweet potatoes.",
+          "prepTimeMinutes": 25,
+          "macros": {"calories": 750, "protein": 65, "carbs": 70, "fats": 20},
+          "healthBenefits": "High in protein and antioxidants."
+        }
+      ],
+      "dailyTotals": {"calories": 1900, "protein": 125, "carbs": 123, "fat": 64}
+    },
+    {
+      "day": 5,
+      "dayName": "Friday",
+      "meals": [
+        {
+          "mealType": "breakfast",
+          "name": "Chia Pudding",
+          "ingredients": ["chia seeds", "almond milk", "berries"],
+          "instructions": "Mix and refrigerate overnight.",
+          "prepTimeMinutes": 5,
+          "macros": {"calories": 300, "protein": 10, "carbs": 30, "fats": 15},
+          "healthBenefits": "Rich in fiber and omega-3s."
+        },
+        {
+          "mealType": "snack",
+          "name": "Banana",
+          "ingredients": ["banana"],
+          "instructions": "Peel and eat.",
+          "prepTimeMinutes": 1,
+          "macros": {"calories": 100, "protein": 1, "carbs": 27, "fats": 0},
+          "healthBenefits": "High in potassium."
+        },
+        {
+          "mealType": "lunch",
+          "name": "Lentil Soup",
+          "ingredients": ["lentils", "carrots", "celery"],
+          "instructions": "Simmer ingredients until cooked.",
+          "prepTimeMinutes": 20,
+          "macros": {"calories": 450, "protein": 25, "carbs": 60, "fats": 5},
+          "healthBenefits": "Rich in fiber and protein."
+        },
+        {
+          "mealType": "snack",
+          "name": "Trail Mix",
+          "ingredients": ["nuts", "raisins", "dark chocolate"],
+          "instructions": "Mix and enjoy.",
+          "prepTimeMinutes": 2,
+          "macros": {"calories": 200, "protein": 5, "carbs": 20, "fats": 12},
+          "healthBenefits": "Provides quick energy and antioxidants."
+        },
+        {
+          "mealType": "dinner",
+          "name": "Pasta with Marinara Sauce",
+          "ingredients": ["whole grain pasta", "marinara sauce", "Parmesan cheese"],
+          "instructions": "Cook pasta and mix with sauce.",
+          "prepTimeMinutes": 15,
+          "macros": {"calories": 700, "protein": 30, "carbs": 90, "fats": 20},
+          "healthBenefits": "High in carbohydrates for energy."
+        }
+      ],
+      "dailyTotals": {"calories": 2100, "protein": 71, "carbs": 227, "fat": 52}
+    },
+    {
+      "day": 6,
+      "dayName": "Saturday",
+      "meals": [
+        {
+          "mealType": "breakfast",
+          "name": "Pancakes with Berries",
+          "ingredients": ["whole grain pancake mix", "berries", "maple syrup"],
+          "instructions": "Cook pancakes and top with berries.",
+          "prepTimeMinutes": 10,
+          "macros": {"calories": 400, "protein": 10, "carbs": 60, "fats": 15},
+          "healthBenefits": "Provides antioxidants and fiber."
+        },
+        {
+          "mealType": "snack",
+          "name": "Celery Sticks with Peanut Butter",
+          "ingredients": ["celery sticks", "peanut butter"],
+          "instructions": "Spread peanut butter on celery.",
+          "prepTimeMinutes": 3,
+          "macros": {"calories": 150, "protein": 5, "carbs": 10, "fats": 12},
+          "healthBenefits": "Rich in healthy fats and fiber."
+        },
+        {
+          "mealType": "lunch",
+          "name": "Veggie Burger",
+          "ingredients": ["veggie patty", "whole grain bun", "lettuce"],
+          "instructions": "Cook patty and assemble burger.",
+          "prepTimeMinutes": 10,
+          "macros": {"calories": 500, "protein": 25, "carbs": 60, "fats": 20},
+          "healthBenefits": "High in plant protein and fiber."
+        },
+        {
+          "mealType": "snack",
+          "name": "Edamame",
+          "ingredients": ["edamame"],
+          "instructions": "Steam and season.",
+          "prepTimeMinutes": 5,
+          "macros": {"calories": 120, "protein": 11, "carbs": 10, "fats": 5},
+          "healthBenefits": "Rich in protein and fiber."
+        },
+        {
+          "mealType": "dinner",
+          "name": "Baked Cod with Asparagus",
+          "ingredients": ["cod", "asparagus", "lemon"],
+          "instructions": "Bake cod and asparagus with lemon.",
+          "prepTimeMinutes": 20,
+          "macros": {"calories": 650, "protein": 60, "carbs": 25, "fats": 30},
+          "healthBenefits": "High in protein and omega-3s."
+        }
+      ],
+      "dailyTotals": {"calories": 1820, "protein": 111, "carbs": 165, "fat": 82}
+    },
+    {
+      "day": 7,
+      "dayName": "Sunday",
+      "meals": [
+        {
+          "mealType": "breakfast",
+          "name": "Breakfast Burrito",
+          "ingredients": ["whole wheat tortilla", "eggs", "salsa"],
+          "instructions": "Scramble eggs and wrap in tortilla with salsa.",
+          "prepTimeMinutes": 10,
+          "macros": {"calories": 350, "protein": 20, "carbs": 40, "fats": 15},
+          "healthBenefits": "Rich in protein and fiber."
+        },
+        {
+          "mealType": "snack",
+          "name": "Strawberries",
+          "ingredients": ["strawberries"],
+          "instructions": "Wash and eat.",
+          "prepTimeMinutes": 2,
+          "macros": {"calories": 50, "protein": 1, "carbs": 12, "fats": 0},
+          "healthBenefits": "High in vitamin C and antioxidants."
+        },
+        {
+          "mealType": "lunch",
+          "name": "Chicken and Avocado Sandwich",
+          "ingredients": ["whole grain bread", "chicken breast", "avocado"],
+          "instructions": "Assemble sandwich with sliced chicken and avocado.",
+          "prepTimeMinutes": 10,
+          "macros": {"calories": 600, "protein": 50, "carbs": 50, "fats": 25},
+          "healthBenefits": "High in healthy fats and protein."
+        },
+        {
+          "mealType": "snack",
+          "name": "Yogurt with Granola",
+          "ingredients": ["yogurt", "granola"],
+          "instructions": "Mix and enjoy.",
+          "prepTimeMinutes": 2,
+          "macros": {"calories": 200, "protein": 8, "carbs": 30, "fats": 5},
+          "healthBenefits": "Provides probiotics and energy."
+        },
+        {
+          "mealType": "dinner",
+          "name": "Shrimp and Brown Rice",
+          "ingredients": ["shrimp", "brown rice", "bell peppers"],
+          "instructions": "Sauté shrimp with peppers and serve over rice.",
+          "prepTimeMinutes": 20,
+          "macros": {"calories": 750, "protein": 60, "carbs": 80, "fats": 20},
+          "healthBenefits": "High in protein and complex carbs."
+        }
+      ],
+      "dailyTotals": {"calories": 1950, "protein": 139, "carbs": 212, "fat": 65}
+    }
+  ],
+  "weeklyGuidance": "This meal plan is designed to support Peter's active lifestyle as a 40-year-old male who exercises three times a week. By focusing on high protein and moderate carbs, it helps to maintain muscle mass while providing enough energy for workouts. The inclusion of heart-healthy foods like salmon and nuts complements his current supplement regimen without duplicating nutrients. The plan also considers Peter's stress levels by incorporating foods high in antioxidants and omega-3s to support overall well-being. With personalized macro targets, this plan aims to help Peter achieve his health and fitness goals effectively.",
+  "personalizationNotes": {
+    "healthProfileInsights": ["Designed for an active 40-year-old male with a focus on heart health."],
+    "labInsightsAddressed": ["Incorporates foods rich in antioxidants and omega-3s."],
+    "supplementCoordination": "Minimized duplication of nutrients covered by current supplements.",
+    "goalAlignment": "Supports fitness goals with a focus on muscle maintenance and energy."
+  }
+}
+```
