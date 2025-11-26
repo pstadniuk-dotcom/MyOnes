@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
+import { logger } from "./logger";
 
 // Supabase client - lazy initialization to avoid crashes when env vars missing
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
@@ -49,7 +50,7 @@ export async function enforceConsentRequirements(
           missingConsents.push(consentType);
         }
       } catch (error) {
-        console.error(`Error checking consent ${consentType}:`, error);
+        logger.error(`Error checking consent ${consentType}`, { error, userId });
         // If we can't check consent, assume it's missing
         missingConsents.push(consentType);
       }
@@ -70,14 +71,14 @@ export async function enforceConsentRequirements(
     };
 
     if (missingConsents.length > 0) {
-      console.warn("HIPAA AUDIT LOG - Consent Violation:", auditEntry);
+      logger.warn("HIPAA AUDIT LOG - Consent Violation", auditEntry);
       throw new ConsentRequiredError(
         `Operation blocked: Missing required consents for ${operation}. ` +
         `Required: ${missingConsents.join(', ')}. ` +
         `Please provide consent before accessing medical data.`
       );
     } else {
-      console.log("HIPAA AUDIT LOG - Consent Verified:", auditEntry);
+      logger.info("HIPAA AUDIT LOG - Consent Verified", auditEntry);
     }
   } catch (error) {
     // Re-throw ConsentRequiredError as-is
@@ -85,7 +86,7 @@ export async function enforceConsentRequirements(
       throw error;
     }
     // Log and re-throw other errors
-    console.error('Error in enforceConsentRequirements:', error);
+    logger.error('Error in enforceConsentRequirements', { error });
     throw error;
   }
 }
@@ -127,7 +128,7 @@ export class ObjectStorageService {
     await enforceConsentRequirements(userId, 'download', auditInfo);
 
     if (!objectPath.startsWith(`${userId}/`)) {
-      console.warn("HIPAA AUDIT LOG - Unauthorized Access Attempt:", {
+      logger.warn("HIPAA AUDIT LOG - Unauthorized Access Attempt", {
         timestamp: new Date().toISOString(),
         userId,
         action: 'access_denied',
@@ -159,7 +160,7 @@ export class ObjectStorageService {
     await enforceConsentRequirements(userId, 'download');
 
     if (!objectPath.startsWith(`${userId}/`)) {
-      console.warn("HIPAA AUDIT LOG - Unauthorized Access Attempt:", {
+      logger.warn("HIPAA AUDIT LOG - Unauthorized Access Attempt", {
         timestamp: new Date().toISOString(),
         userId,
         action: 'access_denied',
@@ -175,7 +176,7 @@ export class ObjectStorageService {
       .from(LAB_REPORTS_BUCKET)
       .download(objectPath);
     if (error) {
-      console.error('Supabase download error:', error);
+      logger.error('Supabase download error', { error, objectPath });
       return null;
     }
     // data is a Blob; convert to Buffer for Node.js
@@ -192,7 +193,7 @@ export class ObjectStorageService {
     await enforceConsentRequirements(userId, 'delete');
 
     if (!objectPath.startsWith(`${userId}/`)) {
-      console.warn("HIPAA AUDIT LOG - Unauthorized Delete Attempt:", {
+      logger.warn("HIPAA AUDIT LOG - Unauthorized Delete Attempt", {
         timestamp: new Date().toISOString(),
         userId,
         action: 'access_denied',
@@ -208,7 +209,7 @@ export class ObjectStorageService {
       .from(LAB_REPORTS_BUCKET)
       .remove([objectPath]);
     if (error) {
-      console.error('Supabase delete error:', error);
+      logger.error('Supabase delete error', { error, objectPath });
       return false;
     }
     return true;

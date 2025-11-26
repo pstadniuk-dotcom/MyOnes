@@ -2,6 +2,7 @@ import { eq, desc, and, isNull, gte, lte, lt, or, ilike, sql, count, inArray } f
 import { db } from "./db";
 import { encryptToken, decryptToken } from "./tokenEncryption";
 import { encryptField, decryptField, encryptFieldSafe, decryptFieldSafe } from "./fieldEncryption";
+import { logger } from "./logger";
 import {
   users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
