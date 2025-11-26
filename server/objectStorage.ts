@@ -2,12 +2,17 @@ import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
 
-// Supabase client
+// Supabase client - lazy initialization to avoid crashes when env vars missing
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '';
 const LAB_REPORTS_BUCKET = 'lab-reports';
-export const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-export const supabaseStorageClient = supabaseClient.storage;
+
+// Only create client if URL is provided
+export const supabaseClient = SUPABASE_URL 
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  : null as any; // Will throw error on actual use, but won't crash on import
+
+export const supabaseStorageClient = supabaseClient?.storage;
 
 export class ConsentRequiredError extends Error {
   constructor(message: string = "User consent required") {
