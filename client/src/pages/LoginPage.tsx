@@ -67,6 +67,8 @@ export default function LoginPage() {
                         <Input 
                           type="email" 
                           placeholder="Enter your email address"
+                          id="email"
+                          autoComplete="email"
                           {...field}
                           data-testid="input-email"
                         />
@@ -86,6 +88,8 @@ export default function LoginPage() {
                         <Input 
                           type="password" 
                           placeholder="Enter your password"
+                          id="password"
+                          autoComplete="current-password"
                           {...field}
                           data-testid="input-password"
                         />

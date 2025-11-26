@@ -15,11 +15,12 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Content Security Policy - Security hardened
-// Note: 'unsafe-inline' and 'unsafe-eval' kept for development compatibility
-// TODO: Remove 'unsafe-eval' in production once build is optimized
+// 'unsafe-eval' only in development (needed for Vite HMR and React dev tools)
+// 'unsafe-inline' kept for inline styles from UI libraries
+const isDevMode = process.env.NODE_ENV !== 'production';
 const cspDirectives = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
+  `script-src 'self' 'unsafe-inline'${isDevMode ? " 'unsafe-eval'" : ''} https://cdn.jsdelivr.net`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: https: blob:",

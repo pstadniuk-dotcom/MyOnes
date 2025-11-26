@@ -134,7 +134,7 @@ function getEmailTemplate(notification: EmailNotification): string {
       <p><strong>ONES - Personalized AI Supplements</strong></p>
       <p>Your custom formula, delivered to your door.</p>
       <p style="margin-top: 20px;">
-        <a href="https://${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/dashboard/settings">Manage Notification Preferences</a>
+        <a href="${process.env.APP_URL || 'https://my-ones.vercel.app'}/dashboard/settings">Manage Notification Preferences</a>
       </p>
       <p style="font-size: 12px; color: #9ca3af; margin-top: 20px;">
         This is a transactional email related to your ONES account.
