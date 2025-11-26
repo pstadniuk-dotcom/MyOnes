@@ -13,44 +13,63 @@ const app = express();
 // Trust reverse proxy (needed for secure cookies and correct protocol detection in production)
 app.set('trust proxy', 1);
 
-// Add CSP middleware to allow 'unsafe-eval' for development
-// This must be the FIRST middleware to ensure headers are set
+// Content Security Policy - Security hardened
+// Note: 'unsafe-inline' and 'unsafe-eval' kept for development compatibility
+// TODO: Remove 'unsafe-eval' in production once build is optimized
+const cspDirectives = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: https: blob:",
+  "connect-src 'self' https://api.openai.com https://api.anthropic.com wss: ws:",
+  "frame-src 'self' https://www.youtube.com https://youtube.com",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'"
+].join('; ');
+
 app.use((req, res, next) => {
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *; font-src 'self' data: *; img-src 'self' data: *; connect-src 'self' * ws: wss:; frame-src 'self' https://www.youtube.com;"
-  );
+  res.setHeader('Content-Security-Policy', cspDirectives);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   next();
 });
 
-// CORS middleware - allow requests from Vercel frontend
+// CORS middleware - SECURITY: Only allow explicit origins (no wildcard fallback)
+const isProduction = process.env.NODE_ENV === 'production';
+const allowedOrigins = [
+  'https://my-ones.vercel.app',
+  'https://myones.ai',
+  'https://www.myones.ai',
+  // Vercel preview deployments - add specific ones as needed
+  'https://my-ones-jnsk1y9e1-pstadniuk-dotcoms-projects.vercel.app',
+  'https://my-ones-210a7gjcx-pstadniuk-dotcoms-projects.vercel.app',
+  // Local development only
+  ...(!isProduction ? ['http://localhost:5000', 'http://localhost:5173', 'http://127.0.0.1:5000', 'http://127.0.0.1:5173'] : [])
+];
+
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  const allowedOrigins = [
-    'https://my-ones.vercel.app',
-    'https://my-ones-jnsk1y9e1-pstadniuk-dotcoms-projects.vercel.app',
-    'https://my-ones-210a7gjcx-pstadniuk-dotcoms-projects.vercel.app',
-    'https://myones.ai',
-    'https://www.myones.ai',
-    'http://localhost:5000',
-    'http://localhost:5173'
-  ];
   
-  // Always reflect the origin if it's in the allowed list, otherwise allow all
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-  } else {
-    // For non-listed origins, use wildcard but don't set credentials
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // SECURITY: Do NOT set any CORS headers for unknown origins
+  // The browser will block the request if headers are missing
   
   // Handle preflight
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
+    if (origin && allowedOrigins.includes(origin)) {
+      return res.sendStatus(200);
+    }
+    // Don't explicitly reject - just don't set CORS headers
+    return res.sendStatus(204);
   }
   
   next();

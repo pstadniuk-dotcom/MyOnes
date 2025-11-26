@@ -383,21 +383,23 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
   };
 }
 
-// JWT Configuration
-const isProdLike = (process.env.APP_ENV || process.env.NODE_ENV)?.toLowerCase() === 'prod' || process.env.NODE_ENV === 'production';
-let JWT_SECRET: string = process.env.JWT_SECRET || '';
+// JWT Configuration - SECURITY CRITICAL
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const isProduction = NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production';
 
-if (!JWT_SECRET) {
-  if (isProdLike) {
-    throw new Error('JWT_SECRET environment variable is required in production. Set it in Railway/Vercel env vars.');
+const JWT_SECRET_RAW = process.env.JWT_SECRET;
+
+if (!JWT_SECRET_RAW) {
+  if (isProduction) {
+    console.error('FATAL: JWT_SECRET environment variable is required in production.');
+    console.error('Set JWT_SECRET in Railway dashboard: railway.app → Variables');
+    process.exit(1); // Hard fail - do not start server without JWT_SECRET
   }
-
-  JWT_SECRET = 'dev-jwt-secret-placeholder';
-  console.warn('Using fallback JWT secret for local development. Do not use this in production.');
+  console.warn('⚠️  WARNING: JWT_SECRET not set. Using insecure dev fallback. DO NOT DEPLOY THIS.');
 }
 
 // TypeScript assertion that JWT_SECRET is now definitely a string
-const JWT_SECRET_FINAL: string = JWT_SECRET;
+const JWT_SECRET_FINAL: string = JWT_SECRET_RAW || 'dev-only-insecure-secret-do-not-use-in-production';
 const JWT_EXPIRES_IN = '7d'; // 7 days
 
 // JWT Utilities
@@ -7657,7 +7659,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
       const log = await storage.createWorkoutLog({
         userId,
         workoutId: workoutId || null,
-        workoutName: workoutName || null,
+        // Note: workoutName is extracted but not saved - schema doesn't have this field
         completedAt: new Date(completedAt),
         durationActual: durationActual || null,
         difficultyRating: difficultyRating || null,

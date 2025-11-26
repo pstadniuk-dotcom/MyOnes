@@ -96,6 +96,9 @@ export class ObjectStorageService {
 
   // Uploads a lab report file to Supabase Storage
   async uploadLabReportFile(userId: string, fileBuffer: Buffer, originalFileName: string, contentType: string = 'application/pdf'): Promise<string> {
+    if (!supabaseStorageClient) {
+      throw new Error('File storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
+    }
     await enforceConsentRequirements(userId, 'upload');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const objectId = randomUUID();
@@ -118,6 +121,9 @@ export class ObjectStorageService {
     userId: string,
     auditInfo?: { ipAddress?: string, userAgent?: string }
   ): Promise<string> {
+    if (!supabaseStorageClient) {
+      throw new Error('File storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
+    }
     await enforceConsentRequirements(userId, 'download', auditInfo);
 
     if (!objectPath.startsWith(`${userId}/`)) {
@@ -147,6 +153,9 @@ export class ObjectStorageService {
 
   // Gets the object entity file from the object path with enhanced security checks
   async getLabReportFile(objectPath: string, userId: string): Promise<Buffer | null> {
+    if (!supabaseStorageClient) {
+      throw new Error('File storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
+    }
     await enforceConsentRequirements(userId, 'download');
 
     if (!objectPath.startsWith(`${userId}/`)) {
@@ -177,6 +186,9 @@ export class ObjectStorageService {
   // Generic method for getting any object entity file
   // HIPAA-compliant secure deletion of lab reports
   async secureDeleteLabReport(objectPath: string, userId: string): Promise<boolean> {
+    if (!supabaseStorageClient) {
+      throw new Error('File storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
+    }
     await enforceConsentRequirements(userId, 'delete');
 
     if (!objectPath.startsWith(`${userId}/`)) {
@@ -204,12 +216,15 @@ export class ObjectStorageService {
 
   // List all lab reports for a specific user
   async listUserLabReports(userId: string): Promise<Array<{path: string, uploadedAt: string}>> {
+    if (!supabaseStorageClient) {
+      throw new Error('File storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
+    }
     await enforceConsentRequirements(userId, 'list');
     const { data, error } = await supabaseStorageClient
       .from(LAB_REPORTS_BUCKET)
       .list(userId, { limit: 100 });
     if (error) throw new Error(`Supabase list error: ${error.message}`);
-    return (data || []).map(file => ({
+    return (data || []).map((file: { name: string; created_at?: string }) => ({
       path: `${userId}/${file.name}`,
       uploadedAt: file.created_at || new Date().toISOString()
     }));
