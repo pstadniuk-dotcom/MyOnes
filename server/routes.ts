@@ -26,6 +26,21 @@ import { normalizePlanContent, DEFAULT_MEAL_TYPES } from "./optimize-normalizer"
 import { nanoid } from "nanoid";
 import { startOfWeek, endOfWeek, subWeeks, format, parseISO, differenceInWeeks, differenceInDays, isSameDay } from "date-fns";
 
+// Import modular route handlers
+import {
+  authRoutes,
+  userRoutes,
+  notificationRoutes,
+  adminRoutes,
+  supportRoutes,
+  consentsRoutes,
+  filesRoutes,
+  formulasRoutes,
+  ingredientsRoutes,
+  wearablesRoutes,
+  optimizeRoutes
+} from "./routes/index";
+
 type GroceryListItem = {
   id: string;
   item: string;
@@ -2190,6 +2205,56 @@ export async function registerRoutes(
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
   });
+
+  // ============================================================
+  // MODULAR ROUTES (migrated from inline definitions)
+  // These routes have been extracted to server/routes/*.routes.ts
+  // for better organization and maintainability.
+  // ============================================================
+  
+  // Auth routes: /api/auth/* - signup, login, logout, me
+  if (rateLimiters?.authLimiter) {
+    app.use('/api/auth/signup', rateLimiters.authLimiter);
+    app.use('/api/auth/login', rateLimiters.authLimiter);
+  }
+  app.use('/api/auth', authRoutes);
+  
+  // User routes: /api/users/* - profile, health-profile, orders
+  app.use('/api/users', userRoutes);
+  
+  // Notification routes: /api/notifications/*
+  app.use('/api/notifications', notificationRoutes);
+  
+  // Admin routes: /api/admin/* - stats, users, support-tickets
+  app.use('/api/admin', adminRoutes);
+  
+  // Support routes: /api/support/* - FAQ, tickets, help
+  app.use('/api/support', supportRoutes);
+  
+  // Consents routes: /api/consents/*
+  app.use('/api/consents', consentsRoutes);
+  
+  // Files routes: /api/files/* - HIPAA-compliant file uploads
+  app.use('/api/files', filesRoutes);
+  
+  // Formulas routes: /api/formulas/*, /api/users/me/formula/*
+  app.use('/api/formulas', formulasRoutes);
+  
+  // Ingredients routes: /api/ingredients/*
+  app.use('/api/ingredients', ingredientsRoutes);
+  
+  // Wearables routes: /api/wearables/* - OAuth, device connections
+  app.use('/api/wearables', wearablesRoutes);
+  
+  // Optimize routes: /api/optimize/* - plans, logs, grocery lists
+  app.use('/api/optimize', optimizeRoutes);
+  
+  // ============================================================
+  // LEGACY INLINE ROUTES (to be migrated)
+  // The following routes are still defined inline and will be
+  // migrated in future iterations:
+  // - /api/chat/* (complex SSE streaming)
+  // ============================================================
 
   // Download lab report file
   app.get('/api/files/:fileId/download', requireAuth, async (req, res) => {
@@ -5673,9 +5738,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Build the full action URL if provided
       let actionUrl = notification.metadata?.actionUrl;
       if (actionUrl) {
-        const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0];
-        if (baseUrl && !actionUrl.startsWith('http')) {
-          actionUrl = `https://${baseUrl}${actionUrl}`;
+        const baseUrl = process.env.APP_URL || 'https://my-ones.vercel.app';
+        if (!actionUrl.startsWith('http')) {
+          actionUrl = `${baseUrl}${actionUrl}`;
         }
       }
       

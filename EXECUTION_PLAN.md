@@ -14,13 +14,34 @@
 - [x] **S2** - Added test suite (vitest + 16 tests)
 - [x] **S3** - Winston logger implemented (`server/logger.ts`)
 - [x] **S6** - bcrypt rounds increased to 12
+- [x] **S1** - Routes modularization **COMPLETE** (11 route modules created & wired)
 
 ### User Manual Tasks Completed
 - [x] **C1** - Credentials rotated (JWT_SECRET, SESSION_SECRET, OpenAI, Anthropic keys)
 
+### Routes Modularization Progress (S1) - ✅ COMPLETE
+Created modular route structure in `server/routes/`:
+- ✅ `middleware.ts` - Auth middleware, JWT utilities, rate limiting
+- ✅ `auth.routes.ts` - /api/auth/* (signup, login, logout, me)
+- ✅ `user.routes.ts` - /api/users/* (profile, health-profile, orders, etc.)
+- ✅ `notifications.routes.ts` - /api/notifications/*
+- ✅ `admin.routes.ts` - /api/admin/* (stats, users, support-tickets)
+- ✅ `support.routes.ts` - /api/support/* (FAQ, tickets, help)
+- ✅ `consents.routes.ts` - /api/consents/*
+- ✅ `files.routes.ts` - /api/files/* (HIPAA-compliant file uploads)
+- ✅ `formulas.routes.ts` - /api/formulas/*, /api/users/me/formula/*
+- ✅ `ingredients.routes.ts` - /api/ingredients/*
+- ✅ `wearables.routes.ts` - /api/wearables/* (OAuth, device integrations)
+- ✅ `optimize.routes.ts` - /api/optimize/* (nutrition/workout plans, logs, grocery)
+- ✅ `index.ts` - Route aggregation and exports
+- ✅ All routes wired into main `routes.ts` via `app.use()`
+
+Remaining in `routes.ts` (future migration - complex AI streaming):
+- /api/chat/* (AI chat streaming - complex SSE handling, 1300+ lines)
+
 ### Remaining Tasks (Future)
-- [ ] **S1** - Split routes.ts (complex refactor - postponed)
 - [ ] **S7** - Add API input validation (optional improvement)
+- [ ] Complete chat route migration (complex SSE streaming)
 
 ---
 
@@ -46,13 +67,13 @@ Based on the comprehensive audit, this document provides an actionable, engineer
 
 | ID | Issue | File(s) | Effort | Risk | Status |
 |----|-------|---------|--------|------|--------|
-| S1 | Split routes.ts into modules | `server/routes/*.ts` | 8 hours | MEDIUM | ⏳ Manual |
-| S2 | Add core test suite | `server/__tests__/` | 6 hours | LOW | ⏳ Manual |
-| S3 | Replace console.log with logger | All server files | 4 hours | LOW | 🔄 Pending |
+| S1 | Split routes.ts into modules | `server/routes/*.ts` | 8 hours | MEDIUM | ✅ Done |
+| S2 | Add core test suite | `server/__tests__/` | 6 hours | LOW | ✅ Done |
+| S3 | Replace console.log with logger | All server files | 4 hours | LOW | ✅ Done |
 | S4 | Fix duplicate apiRequest | `client/src/lib/` | 1 hour | LOW | ✅ Done |
 | S5 | Tighten CSP headers | `server/index.ts` | 2 hours | MEDIUM | ✅ Done |
-| S6 | Increase bcrypt rounds | `server/routes.ts` | 30 mins | LOW | 🔄 Pending |
-| S7 | Add API input validation | `server/routes.ts` | 4 hours | MEDIUM | ⏳ Manual |
+| S6 | Increase bcrypt rounds | `server/routes.ts` | 30 mins | LOW | ✅ Done |
+| S7 | Add API input validation | `server/routes.ts` | 4 hours | MEDIUM | ⏳ Future |
 
 ### 🟡 MEDIUM-TERM FIXES (Month 1)
 

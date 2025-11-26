@@ -80,6 +80,8 @@ export default function SignupPage() {
                       <FormControl>
                         <Input 
                           placeholder="Enter your full name"
+                          id="name"
+                          autoComplete="name"
                           {...field}
                           data-testid="input-name"
                         />
@@ -99,6 +101,8 @@ export default function SignupPage() {
                         <Input 
                           type="email" 
                           placeholder="Enter your email address"
+                          id="email"
+                          autoComplete="email"
                           {...field}
                           data-testid="input-email"
                         />
@@ -118,6 +122,8 @@ export default function SignupPage() {
                         <Input 
                           type="password" 
                           placeholder="Create a secure password"
+                          id="password"
+                          autoComplete="new-password"
                           {...field}
                           data-testid="input-password"
                         />
@@ -137,6 +143,8 @@ export default function SignupPage() {
                         <Input 
                           type="password" 
                           placeholder="Confirm your password"
+                          id="confirmPassword"
+                          autoComplete="new-password"
                           {...field}
                           data-testid="input-confirm-password"
                         />
