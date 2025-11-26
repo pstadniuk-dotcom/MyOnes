@@ -11,13 +11,16 @@
 - [x] **C5** - npm audit fix (partial - dev dependencies remain)
 - [x] **S4** - Fixed duplicate apiRequest (`client/src/lib/api.ts`)
 - [x] **S5** - CSP headers hardened (`server/index.ts`)
+- [x] **S2** - Added test suite (vitest + 16 tests)
+- [x] **S3** - Winston logger implemented (`server/logger.ts`)
+- [x] **S6** - bcrypt rounds increased to 12
 
-### Remaining Manual Tasks
-- [ ] **C1** - Rotate credentials (MANUAL - see instructions below)
-- [ ] **S1** - Split routes.ts (MANUAL - complex refactor)
-- [ ] **S2** - Add test suite (MANUAL)
-- [ ] **S3** - Replace console.log with logger (AUTOMATED)
-- [ ] **S6** - Increase bcrypt rounds (AUTOMATED)
+### User Manual Tasks Completed
+- [x] **C1** - Credentials rotated (JWT_SECRET, SESSION_SECRET, OpenAI, Anthropic keys)
+
+### Remaining Tasks (Future)
+- [ ] **S1** - Split routes.ts (complex refactor - postponed)
+- [ ] **S7** - Add API input validation (optional improvement)
 
 ---
 

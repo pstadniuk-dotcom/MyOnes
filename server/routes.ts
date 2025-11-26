@@ -2286,9 +2286,9 @@ export async function registerRoutes(
       }
       console.log('✅ SIGNUP: User does not exist, proceeding');
 
-      // Hash password with reduced salt rounds for better performance
+      // Hash password with secure salt rounds
       console.log('📋 SIGNUP: Hashing password...');
-      const saltRounds = 10; // Reduced from 12 for better performance
+      const saltRounds = 12; // Secure default (OWASP recommendation)
       const hashedPassword = await bcrypt.hash(validatedData.password, saltRounds);
       console.log('✅ SIGNUP: Password hashed successfully');
 

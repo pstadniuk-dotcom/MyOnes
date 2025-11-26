@@ -8,6 +8,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { startSmsReminderScheduler } from "./smsReminderScheduler";
 import { startTokenRefreshScheduler } from "./tokenRefreshScheduler";
 import { startWearableDataScheduler } from "./wearableDataScheduler";
+import { logger } from "./logger";
 
 const app = express();
 // Trust reverse proxy (needed for secure cookies and correct protocol detection in production)
@@ -192,26 +193,26 @@ app.use((req, res, next) => {
 
     server.on('error', (e: any) => {
       if (e.code === 'EADDRINUSE') {
-        console.error('Address in use, retrying...');
+        logger.error('Address in use, retrying...');
         setTimeout(() => {
           server.close();
           server.listen(port, host);
         }, 1000);
       } else {
-        console.error("Server error:", e);
+        logger.error("Server error", { error: e });
       }
     });
     
     server.on('close', () => {
-      console.error('⚠️  SERVER CLOSED');
+      logger.warn('Server closed');
     });
     
     server.on('listening', () => {
-      console.log('✅ SERVER LISTENING EVENT FIRED');
+      logger.info('Server listening event fired');
     });
     
   } catch (error) {
-    console.error("FATAL SERVER ERROR:", error);
+    logger.error("FATAL SERVER ERROR", { error });
     process.exit(1);
   }
 })();
