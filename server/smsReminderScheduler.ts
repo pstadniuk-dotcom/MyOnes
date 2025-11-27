@@ -188,8 +188,9 @@ async function checkAndSendReminders() {
       
       const timezone = user.timezone || 'America/New_York';
       const currentTime = getCurrentTimeInTimezone(timezone);
+      const currentTimeStr = `${currentTime.hours.toString().padStart(2, '0')}:${currentTime.minutes.toString().padStart(2, '0')}`;
       
-      console.log(`👤 Checking user ${user.id} - Local time: ${currentTime.hours}:${currentTime.minutes.toString().padStart(2, '0')} (${timezone})`);
+      console.log(`👤 Checking user ${user.id} - Local time: ${currentTimeStr} (${timezone})`);
       
       // Get user's active formula to determine capsule count and ingredients
       const formulas = await storage.getFormulaHistory(user.id);
@@ -209,7 +210,7 @@ async function checkAndSendReminders() {
       const additions = Array.isArray(activeFormula.additions) ? activeFormula.additions : [];
       const ingredients: FormulaIngredient[] = [...bases, ...additions];
       
-      // Check each meal time
+      // Check scheduled meal times (morning, afternoon, evening)
       const reminders: Array<{ mealType: 'breakfast' | 'lunch' | 'dinner'; time: string | null | undefined }> = [
         { mealType: 'breakfast', time: prefs.reminderBreakfast },
         { mealType: 'lunch', time: prefs.reminderLunch },
@@ -243,15 +244,96 @@ async function checkAndSendReminders() {
           markReminderAsSent(user.id, mealType);
         }
       }
+      
+      // Check custom time reminders for each notification type
+      const customTimeChecks = [
+        { type: 'pills', slot: prefs.pillsTimeSlot, customTime: prefs.pillsCustomTime },
+        { type: 'workout', slot: prefs.workoutTimeSlot, customTime: prefs.workoutCustomTime },
+        { type: 'nutrition', slot: prefs.nutritionTimeSlot, customTime: prefs.nutritionCustomTime },
+        { type: 'lifestyle', slot: prefs.lifestyleTimeSlot, customTime: prefs.lifestyleCustomTime },
+      ];
+      
+      for (const { type, slot, customTime } of customTimeChecks) {
+        if (slot === 'custom' && customTime) {
+          const customKey = `custom_${type}`;
+          const alreadySent = hasReminderBeenSent(user.id, customKey);
+          
+          if (customTime === currentTimeStr && !alreadySent) {
+            console.log(`🔔 SENDING custom ${type} reminder to user ${user.id} at ${customTime}!`);
+            await sendCustomNotificationSms(user.id, user.phone, type, capsuleCount, ingredients);
+            markReminderAsSent(user.id, customKey);
+          }
+        }
+      }
     }
   } catch (error) {
     console.error('❌ Error in checkAndSendReminders:', error);
   }
 }
 
+// Send a custom-timed notification for a specific notification type
+async function sendCustomNotificationSms(
+  userId: string, 
+  phone: string, 
+  notificationType: string, 
+  capsuleCount: number, 
+  ingredients: FormulaIngredient[]
+) {
+  try {
+    let message = '';
+    
+    switch (notificationType) {
+      case 'pills':
+        message = `💊 Custom reminder: Take ${capsuleCount} capsule${capsuleCount !== 1 ? 's' : ''} now.`;
+        break;
+      case 'workout':
+        const workoutPlan = await storage.getActiveOptimizePlan(userId, 'workout');
+        if (workoutPlan?.content) {
+          const content = workoutPlan.content as any;
+          const todayDay = new Date().getDay() || 7;
+          const todayWorkout = content.workouts?.find((w: any) => w.dayOfWeek === todayDay);
+          if (todayWorkout) {
+            message = `💪 Workout time! Today: ${todayWorkout.workoutName}`;
+          } else {
+            message = `💪 Time for your workout!`;
+          }
+        } else {
+          message = `💪 Time for your workout!`;
+        }
+        break;
+      case 'nutrition':
+        const healthTip = await generatePersonalizedTip(ingredients, 'morning');
+        message = `🥗 Nutrition tip: ${healthTip}`;
+        break;
+      case 'lifestyle':
+        message = `❤️ Wellness reminder: Take a moment for yourself. Stay hydrated and get quality rest.`;
+        break;
+      default:
+        message = `⚗️ ONES reminder`;
+    }
+    
+    const success = await sendNotificationSms({
+      to: phone,
+      message,
+      type: 'system'
+    });
+    
+    if (success) {
+      console.log(`✅ Sent custom ${notificationType} reminder to user ${userId}`);
+    } else {
+      console.error(`❌ Failed to send custom ${notificationType} reminder to user ${userId}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error sending custom ${notificationType} SMS:`, error);
+  }
+}
+
 async function sendReminderSms(reminder: ReminderCheck) {
   try {
-    const { phone, mealType, capsuleCount, ingredients } = reminder;
+    const { phone, mealType, capsuleCount, ingredients, userId } = reminder;
+    
+    // Get notification preferences to check what to include
+    const prefs = await storage.getNotificationPrefs(userId);
     
     // Generate AI-powered health tip or use static fallback
     const healthTip = await generatePersonalizedTip(ingredients, mapMealTypeToTipContext(mealType));
@@ -259,8 +341,63 @@ async function sendReminderSms(reminder: ReminderCheck) {
     // Format meal type for display
     const mealDisplay = mealType.charAt(0).toUpperCase() + mealType.slice(1);
     
-    // Create personalized message
-    const message = `${mealDisplay} time! Take ${capsuleCount} capsule${capsuleCount !== 1 ? 's' : ''} with your meal. 💡 Tip: ${healthTip}`;
+    // Map meal type to time slot
+    const mealToSlot: Record<string, string> = {
+      breakfast: 'morning',
+      lunch: 'afternoon',
+      dinner: 'evening'
+    };
+    const currentSlot = mealToSlot[mealType];
+    
+    // Build message based on user preferences and time slots
+    const parts: string[] = [];
+    
+    // Greeting emoji
+    const emoji = mealType === 'breakfast' ? '☀️' : mealType === 'lunch' ? '🌤️' : '🌙';
+    
+    // Pills/Supplements section - check if this time slot matches
+    const pillsSlot = prefs?.pillsTimeSlot ?? 'all';
+    if (pillsSlot === 'all' || pillsSlot === currentSlot) {
+      parts.push(`💊 ${mealDisplay} time! Take ${capsuleCount} capsule${capsuleCount !== 1 ? 's' : ''} with your meal.`);
+    }
+    
+    // Workout section - check if this time slot matches
+    const workoutSlot = prefs?.workoutTimeSlot ?? 'morning';
+    if (workoutSlot === currentSlot) {
+      try {
+        const workoutPlan = await storage.getActiveOptimizePlan(userId, 'workout');
+        if (workoutPlan?.content) {
+          const content = workoutPlan.content as any;
+          const todayDay = new Date().getDay() || 7; // 1=Mon, 7=Sun
+          const todayWorkout = content.workouts?.find((w: any) => w.dayOfWeek === todayDay);
+          if (todayWorkout) {
+            parts.push(`💪 Today: ${todayWorkout.workoutName}`);
+          }
+        }
+      } catch (e) {
+        // Ignore errors fetching workout
+      }
+    }
+    
+    // Nutrition section - check if this time slot matches
+    const nutritionSlot = prefs?.nutritionTimeSlot ?? 'morning';
+    if (nutritionSlot === currentSlot) {
+      parts.push(`🥗 Tip: ${healthTip}`);
+    }
+    
+    // Lifestyle section - check if this time slot matches
+    const lifestyleSlot = prefs?.lifestyleTimeSlot ?? 'evening';
+    if (lifestyleSlot === currentSlot) {
+      parts.push(`❤️ Remember to wind down before bed for better sleep.`);
+    }
+    
+    // If nothing is enabled for this time slot, skip sending
+    if (parts.length === 0) {
+      console.log(`⏭️  No notifications configured for ${mealType} slot for user ${userId}`);
+      return;
+    }
+    
+    const message = parts.join(' ');
     
     // Send SMS via Twilio
     const success = await sendNotificationSms({

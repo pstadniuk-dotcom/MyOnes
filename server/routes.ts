@@ -5877,7 +5877,17 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         dailyRemindersEnabled,
         reminderBreakfast,
         reminderLunch,
-        reminderDinner
+        reminderDinner,
+        // Time slot selections for each notification type
+        pillsTimeSlot,
+        workoutTimeSlot,
+        nutritionTimeSlot,
+        lifestyleTimeSlot,
+        // Custom times (when time slot is 'custom')
+        pillsCustomTime,
+        workoutCustomTime,
+        nutritionCustomTime,
+        lifestyleCustomTime
       } = req.body;
       
       // Validate boolean input
@@ -5897,6 +5907,21 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         return res.status(400).json({ error: 'Invalid dailyRemindersEnabled value' });
       }
       
+      // Validate time slot values
+      const validTimeSlots = ['morning', 'afternoon', 'evening', 'custom', 'off', 'all'];
+      if (pillsTimeSlot && !validTimeSlots.includes(pillsTimeSlot)) {
+        return res.status(400).json({ error: 'Invalid pillsTimeSlot value' });
+      }
+      if (workoutTimeSlot && !validTimeSlots.includes(workoutTimeSlot)) {
+        return res.status(400).json({ error: 'Invalid workoutTimeSlot value' });
+      }
+      if (nutritionTimeSlot && !validTimeSlots.includes(nutritionTimeSlot)) {
+        return res.status(400).json({ error: 'Invalid nutritionTimeSlot value' });
+      }
+      if (lifestyleTimeSlot && !validTimeSlots.includes(lifestyleTimeSlot)) {
+        return res.status(400).json({ error: 'Invalid lifestyleTimeSlot value' });
+      }
+      
       let prefs = await storage.getNotificationPrefs(userId);
       
       if (!prefs) {
@@ -5913,6 +5938,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           reminderBreakfast: reminderBreakfast ?? '08:00',
           reminderLunch: reminderLunch ?? '12:00',
           reminderDinner: reminderDinner ?? '18:00',
+          pillsTimeSlot: pillsTimeSlot ?? 'all',
+          workoutTimeSlot: workoutTimeSlot ?? 'morning',
+          nutritionTimeSlot: nutritionTimeSlot ?? 'morning',
+          lifestyleTimeSlot: lifestyleTimeSlot ?? 'evening',
+          pillsCustomTime: pillsCustomTime ?? null,
+          workoutCustomTime: workoutCustomTime ?? null,
+          nutritionCustomTime: nutritionCustomTime ?? null,
+          lifestyleCustomTime: lifestyleCustomTime ?? null,
         });
       } else {
         // Update existing
@@ -5927,6 +5960,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           reminderBreakfast: reminderBreakfast ?? prefs.reminderBreakfast,
           reminderLunch: reminderLunch ?? prefs.reminderLunch,
           reminderDinner: reminderDinner ?? prefs.reminderDinner,
+          pillsTimeSlot: pillsTimeSlot ?? prefs.pillsTimeSlot,
+          workoutTimeSlot: workoutTimeSlot ?? prefs.workoutTimeSlot,
+          nutritionTimeSlot: nutritionTimeSlot ?? prefs.nutritionTimeSlot,
+          lifestyleTimeSlot: lifestyleTimeSlot ?? prefs.lifestyleTimeSlot,
+          pillsCustomTime: pillsCustomTime !== undefined ? pillsCustomTime : prefs.pillsCustomTime,
+          workoutCustomTime: workoutCustomTime !== undefined ? workoutCustomTime : prefs.workoutCustomTime,
+          nutritionCustomTime: nutritionCustomTime !== undefined ? nutritionCustomTime : prefs.nutritionCustomTime,
+          lifestyleCustomTime: lifestyleCustomTime !== undefined ? lifestyleCustomTime : prefs.lifestyleCustomTime,
         });
       }
       
