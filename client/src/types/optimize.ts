@@ -9,6 +9,7 @@ export interface OptimizeDailyLog {
   energyLevel?: number | null;
   moodLevel?: number | null;
   sleepQuality?: number | null;
+  notes?: string | null;
 }
 
 export interface Exercise {
