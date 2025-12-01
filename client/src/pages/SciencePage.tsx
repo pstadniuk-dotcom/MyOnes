@@ -1,15 +1,15 @@
-import Header from "@/components/Header";
+import HeaderV2 from "@/components/HeaderV2";
 import ScienceSection from "@/components/ScienceSection";
-import Footer from "@/components/Footer";
+import FooterV2 from "@/components/FooterV2";
 
 export default function SciencePage() {
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <div className="min-h-screen bg-[#FAF7F2]">
+      <HeaderV2 />
       <main>
         <ScienceSection />
       </main>
-      <Footer />
+      <FooterV2 />
     </div>
   );
 }

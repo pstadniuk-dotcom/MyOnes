@@ -348,6 +348,16 @@ export const notificationPrefs = pgTable("notification_prefs", {
   reminderBreakfast: text("reminder_breakfast").default('08:00').notNull(),
   reminderLunch: text("reminder_lunch").default('12:00').notNull(),
   reminderDinner: text("reminder_dinner").default('18:00').notNull(),
+  // Time slot selection for each notification type: 'morning' | 'afternoon' | 'evening' | 'custom' | 'off'
+  pillsTimeSlot: text("pills_time_slot").default('all').notNull(), // 'all' sends at all 3 times
+  workoutTimeSlot: text("workout_time_slot").default('morning').notNull(),
+  nutritionTimeSlot: text("nutrition_time_slot").default('morning').notNull(),
+  lifestyleTimeSlot: text("lifestyle_time_slot").default('evening').notNull(),
+  // Custom times for each notification type (used when time slot is 'custom')
+  pillsCustomTime: text("pills_custom_time"),
+  workoutCustomTime: text("workout_custom_time"),
+  nutritionCustomTime: text("nutrition_custom_time"),
+  lifestyleCustomTime: text("lifestyle_custom_time"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

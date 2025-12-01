@@ -5,11 +5,27 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Lock, Bell, Shield, Clock, Pill, Globe, Dumbbell, Salad, Heart } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { getCurrentTimezone } from '@/hooks/use-timezone';
+
+// Time slot options for each notification type
+const TIME_SLOT_OPTIONS = [
+  { value: 'morning', label: '☀️ Morning' },
+  { value: 'afternoon', label: '🌤️ Afternoon' },
+  { value: 'evening', label: '🌙 Evening' },
+  { value: 'custom', label: '⏰ Custom Time' },
+  { value: 'off', label: '🔕 Off' },
+];
+
+// Pills have an extra "all" option
+const PILLS_TIME_SLOT_OPTIONS = [
+  { value: 'all', label: '📅 All Times' },
+  ...TIME_SLOT_OPTIONS,
+];
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -35,6 +51,16 @@ export default function SettingsPage() {
     reminderBreakfast?: string;
     reminderLunch?: string;
     reminderDinner?: string;
+    // Time slot selections
+    pillsTimeSlot?: string;
+    workoutTimeSlot?: string;
+    nutritionTimeSlot?: string;
+    lifestyleTimeSlot?: string;
+    // Custom times
+    pillsCustomTime?: string | null;
+    workoutCustomTime?: string | null;
+    nutritionCustomTime?: string | null;
+    lifestyleCustomTime?: string | null;
   }>({
     queryKey: ['/api/notification-prefs'],
   });
@@ -51,10 +77,16 @@ export default function SettingsPage() {
     reminderMorning: '07:00',
     reminderAfternoon: '14:00',
     reminderEvening: '19:00',
-    includePills: true,
-    includeWorkout: true,
-    includeNutrition: true,
-    includeLifestyle: true,
+    // Time slot selections: 'morning' | 'afternoon' | 'evening' | 'custom' | 'off' | 'all'
+    pillsTimeSlot: 'all',
+    workoutTimeSlot: 'morning',
+    nutritionTimeSlot: 'morning',
+    lifestyleTimeSlot: 'evening',
+    // Custom times for each notification type
+    pillsCustomTime: '',
+    workoutCustomTime: '',
+    nutritionCustomTime: '',
+    lifestyleCustomTime: '',
   });
 
   // Update local state when data is fetched
@@ -71,10 +103,14 @@ export default function SettingsPage() {
         reminderMorning: (notificationPrefs as any).reminderMorning ?? notificationPrefs.reminderBreakfast ?? '07:00',
         reminderAfternoon: (notificationPrefs as any).reminderAfternoon ?? notificationPrefs.reminderLunch ?? '14:00',
         reminderEvening: (notificationPrefs as any).reminderEvening ?? notificationPrefs.reminderDinner ?? '19:00',
-        includePills: (notificationPrefs as any).includePills ?? true,
-        includeWorkout: (notificationPrefs as any).includeWorkout ?? true,
-        includeNutrition: (notificationPrefs as any).includeNutrition ?? true,
-        includeLifestyle: (notificationPrefs as any).includeLifestyle ?? true,
+        pillsTimeSlot: notificationPrefs.pillsTimeSlot ?? 'all',
+        workoutTimeSlot: notificationPrefs.workoutTimeSlot ?? 'morning',
+        nutritionTimeSlot: notificationPrefs.nutritionTimeSlot ?? 'morning',
+        lifestyleTimeSlot: notificationPrefs.lifestyleTimeSlot ?? 'evening',
+        pillsCustomTime: notificationPrefs.pillsCustomTime ?? '',
+        workoutCustomTime: notificationPrefs.workoutCustomTime ?? '',
+        nutritionCustomTime: notificationPrefs.nutritionCustomTime ?? '',
+        lifestyleCustomTime: notificationPrefs.lifestyleCustomTime ?? '',
       });
     }
   }, [notificationPrefs]);
@@ -439,75 +475,163 @@ export default function SettingsPage() {
                             </div>
                           </div>
 
-                          {/* What to Include */}
+                          {/* Notification Schedule - Time Slot Selection */}
                           <div className="space-y-3">
-                            <Label className="text-sm font-semibold">Include in Reminders</Label>
+                            <Label className="text-sm font-semibold">Notification Schedule</Label>
                             <p className="text-xs text-muted-foreground">
-                              Choose what topics to include in your daily reminder messages
+                              Choose when to receive each type of reminder
                             </p>
-                            <div className="space-y-3 ml-2">
-                              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                            <div className="space-y-4 ml-2">
+                              {/* Supplement Reminders */}
+                              <div className="p-3 rounded-lg border bg-card space-y-3">
                                 <div className="flex items-center gap-3">
                                   <Pill className="w-4 h-4 text-primary" />
-                                  <div>
-                                    <Label className="font-medium cursor-pointer">Supplement Reminders</Label>
-                                    <p className="text-xs text-muted-foreground">"Take your pills with breakfast"</p>
+                                  <div className="flex-1">
+                                    <Label className="font-medium">Supplement Reminders</Label>
+                                    <p className="text-xs text-muted-foreground">"Take your pills with your meal"</p>
                                   </div>
+                                  <Select
+                                    value={notifications.pillsTimeSlot}
+                                    onValueChange={(value) =>
+                                      setNotifications({ ...notifications, pillsTimeSlot: value })
+                                    }
+                                  >
+                                    <SelectTrigger className="w-[140px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {PILLS_TIME_SLOT_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-                                <Switch
-                                  checked={notifications.includePills}
-                                  onCheckedChange={(checked) =>
-                                    setNotifications({ ...notifications, includePills: checked })
-                                  }
-                                />
+                                {notifications.pillsTimeSlot === 'custom' && (
+                                  <div className="ml-7">
+                                    <Input
+                                      type="time"
+                                      value={notifications.pillsCustomTime}
+                                      onChange={(e) =>
+                                        setNotifications({ ...notifications, pillsCustomTime: e.target.value })
+                                      }
+                                      className="w-[140px]"
+                                    />
+                                  </div>
+                                )}
                               </div>
 
-                              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                              {/* Workout Reminders */}
+                              <div className="p-3 rounded-lg border bg-card space-y-3">
                                 <div className="flex items-center gap-3">
                                   <Dumbbell className="w-4 h-4 text-blue-600" />
-                                  <div>
-                                    <Label className="font-medium cursor-pointer">Workout Reminders</Label>
-                                    <p className="text-xs text-muted-foreground">"Today's workout: Upper Body - Click to view"</p>
+                                  <div className="flex-1">
+                                    <Label className="font-medium">Workout Reminders</Label>
+                                    <p className="text-xs text-muted-foreground">"Today's workout: Upper Body"</p>
                                   </div>
+                                  <Select
+                                    value={notifications.workoutTimeSlot}
+                                    onValueChange={(value) =>
+                                      setNotifications({ ...notifications, workoutTimeSlot: value })
+                                    }
+                                  >
+                                    <SelectTrigger className="w-[140px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {TIME_SLOT_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-                                <Switch
-                                  checked={notifications.includeWorkout}
-                                  onCheckedChange={(checked) =>
-                                    setNotifications({ ...notifications, includeWorkout: checked })
-                                  }
-                                />
+                                {notifications.workoutTimeSlot === 'custom' && (
+                                  <div className="ml-7">
+                                    <Input
+                                      type="time"
+                                      value={notifications.workoutCustomTime}
+                                      onChange={(e) =>
+                                        setNotifications({ ...notifications, workoutCustomTime: e.target.value })
+                                      }
+                                      className="w-[140px]"
+                                    />
+                                  </div>
+                                )}
                               </div>
 
-                              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                              {/* Nutrition Tips */}
+                              <div className="p-3 rounded-lg border bg-card space-y-3">
                                 <div className="flex items-center gap-3">
                                   <Salad className="w-4 h-4 text-green-600" />
-                                  <div>
-                                    <Label className="font-medium cursor-pointer">Nutrition Tips</Label>
-                                    <p className="text-xs text-muted-foreground">"Remember to limit sugars & stay hydrated"</p>
+                                  <div className="flex-1">
+                                    <Label className="font-medium">Nutrition Tips</Label>
+                                    <p className="text-xs text-muted-foreground">"Stay hydrated & eat mindfully"</p>
                                   </div>
+                                  <Select
+                                    value={notifications.nutritionTimeSlot}
+                                    onValueChange={(value) =>
+                                      setNotifications({ ...notifications, nutritionTimeSlot: value })
+                                    }
+                                  >
+                                    <SelectTrigger className="w-[140px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {TIME_SLOT_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-                                <Switch
-                                  checked={notifications.includeNutrition}
-                                  onCheckedChange={(checked) =>
-                                    setNotifications({ ...notifications, includeNutrition: checked })
-                                  }
-                                />
+                                {notifications.nutritionTimeSlot === 'custom' && (
+                                  <div className="ml-7">
+                                    <Input
+                                      type="time"
+                                      value={notifications.nutritionCustomTime}
+                                      onChange={(e) =>
+                                        setNotifications({ ...notifications, nutritionCustomTime: e.target.value })
+                                      }
+                                      className="w-[140px]"
+                                    />
+                                  </div>
+                                )}
                               </div>
 
-                              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                              {/* Lifestyle & Wellness */}
+                              <div className="p-3 rounded-lg border bg-card space-y-3">
                                 <div className="flex items-center gap-3">
                                   <Heart className="w-4 h-4 text-purple-600" />
-                                  <div>
-                                    <Label className="font-medium cursor-pointer">Lifestyle & Wellness</Label>
-                                    <p className="text-xs text-muted-foreground">"Aim for 7-8 hours of sleep tonight"</p>
+                                  <div className="flex-1">
+                                    <Label className="font-medium">Lifestyle & Wellness</Label>
+                                    <p className="text-xs text-muted-foreground">"Wind down for better sleep"</p>
                                   </div>
+                                  <Select
+                                    value={notifications.lifestyleTimeSlot}
+                                    onValueChange={(value) =>
+                                      setNotifications({ ...notifications, lifestyleTimeSlot: value })
+                                    }
+                                  >
+                                    <SelectTrigger className="w-[140px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {TIME_SLOT_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-                                <Switch
-                                  checked={notifications.includeLifestyle}
-                                  onCheckedChange={(checked) =>
-                                    setNotifications({ ...notifications, includeLifestyle: checked })
-                                  }
-                                />
+                                {notifications.lifestyleTimeSlot === 'custom' && (
+                                  <div className="ml-7">
+                                    <Input
+                                      type="time"
+                                      value={notifications.lifestyleCustomTime}
+                                      onChange={(e) =>
+                                        setNotifications({ ...notifications, lifestyleCustomTime: e.target.value })
+                                      }
+                                      className="w-[140px]"
+                                    />
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -519,25 +643,28 @@ export default function SettingsPage() {
                               <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                                 <p className="text-xs font-medium text-green-800 mb-1">☀️ Morning ({notifications.reminderMorning})</p>
                                 <p className="text-sm text-green-900">
-                                  "⚗️ ONES: Good morning! {notifications.includePills && "Take 3 capsules with breakfast. "}
-                                  {notifications.includeWorkout && "💪 Today's workout: Upper Body Strength - Click here to view. "}
-                                  {notifications.includeNutrition && "🥗 Tip: Start your day with protein for sustained energy!"}"
+                                  "⚗️ ONES: Good morning! 
+                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'morning') && "💊 Take 3 capsules with breakfast. "}
+                                  {notifications.workoutTimeSlot === 'morning' && "💪 Today's workout: Upper Body Strength. "}
+                                  {notifications.nutritionTimeSlot === 'morning' && "🥗 Tip: Start your day with protein!"}"
                                 </p>
                               </div>
                               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p className="text-xs font-medium text-blue-800 mb-1">☀️ Afternoon ({notifications.reminderAfternoon})</p>
+                                <p className="text-xs font-medium text-blue-800 mb-1">🌤️ Afternoon ({notifications.reminderAfternoon})</p>
                                 <p className="text-sm text-blue-900">
                                   "⚗️ ONES: Afternoon check-in! 
-                                  {notifications.includePills && "Take 2 capsules with lunch. "}
-                                  {notifications.includeNutrition && "💧 Stay hydrated - aim for 8 glasses of water today!"}"
+                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'afternoon') && "💊 Take 2 capsules with lunch. "}
+                                  {notifications.workoutTimeSlot === 'afternoon' && "💪 Time to work out! "}
+                                  {notifications.nutritionTimeSlot === 'afternoon' && "💧 Stay hydrated!"}"
                                 </p>
                               </div>
                               <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
                                 <p className="text-xs font-medium text-purple-800 mb-1">🌙 Evening ({notifications.reminderEvening})</p>
                                 <p className="text-sm text-purple-900">
                                   "⚗️ ONES: Evening reminder! 
-                                  {notifications.includePills && "Take 2 capsules with dinner. "}
-                                  {notifications.includeLifestyle && "❤️ Tip: Wind down 1 hour before bed for better sleep quality."}"
+                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'evening') && "💊 Take 2 capsules with dinner. "}
+                                  {notifications.workoutTimeSlot === 'evening' && "💪 Evening workout time! "}
+                                  {notifications.lifestyleTimeSlot === 'evening' && "❤️ Wind down before bed for better sleep."}"
                                 </p>
                               </div>
                             </div>

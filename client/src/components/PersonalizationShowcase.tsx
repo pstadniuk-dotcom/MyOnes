@@ -146,7 +146,7 @@ export default function PersonalizationShowcase() {
   };
 
   return (
-    <div id="personalization" className="w-full bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+    <div id="personalization" className="w-full bg-[#FAF7F2]">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative rounded-2xl overflow-hidden">
           {/* Header */}
@@ -163,12 +163,12 @@ export default function PersonalizationShowcase() {
           </div>
 
           {/* Main Content */}
-          <div className="grid md:grid-cols-2 gap-8 p-6 md:p-12 items-center">
+          <div className="grid md:grid-cols-2 gap-8 p-6 md:p-12 items-stretch">
             {/* Left: Person Image */}
-            <div className="relative group">
+            <div className="relative group h-[550px]">
               <div className="absolute -inset-1 bg-gradient-to-r from-primary to-secondary rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-500"></div>
-              <Card className="relative overflow-hidden border-primary/20">
-                <div className="aspect-[3/4] relative overflow-hidden">
+              <Card className="relative overflow-hidden border-primary/20 h-full">
+                <div className="h-full relative overflow-hidden">
                   <img 
                     src={activePersona.image} 
                     alt={activePersona.name}
@@ -188,17 +188,17 @@ export default function PersonalizationShowcase() {
             </div>
 
             {/* Right: AI Chat Window */}
-            <div className="relative">
+            <div className="relative h-[550px]">
               <div className="absolute -inset-1 bg-gradient-to-r from-secondary to-primary rounded-2xl blur opacity-20"></div>
-              <Card className="relative border-primary/20 bg-card/95 backdrop-blur-sm">
-                <div className="p-6">
+              <Card className="relative border-primary/20 bg-card/95 backdrop-blur-sm h-full flex flex-col">
+                <div className="p-6 flex flex-col h-full">
                   {/* Chat Header */}
                   <div className="flex items-center gap-3 pb-4 border-b border-border/50">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-lg">
-                      AI
+                    <div className="w-12 h-12 flex items-center justify-center">
+                      <img src="/Ones Logo Green.svg" alt="ONES" className="w-full h-full object-contain" />
                     </div>
                     <div>
-                      <div className="font-semibold">Ones AI</div>
+                      <div className="font-semibold text-[#1B4332]">ONES</div>
                       <div className="text-xs text-muted-foreground flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-green-500"></span>
                         Analyzing your profile...
@@ -207,7 +207,7 @@ export default function PersonalizationShowcase() {
                   </div>
 
                   {/* Chat Messages */}
-                  <div key={`chat-${activeIndex}`} className="space-y-4 py-6 min-h-[400px] max-h-[500px] overflow-y-auto transition-opacity duration-300">
+                  <div key={`chat-${activeIndex}`} className="space-y-4 py-6 flex-1 overflow-y-auto transition-opacity duration-300">
                     {activePersona.chat.slice(0, visibleMessages).map((message, index) => (
                       <div
                         key={`${activeIndex}-${index}`}

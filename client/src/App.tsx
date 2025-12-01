@@ -17,6 +17,7 @@ import AboutPage from "@/pages/AboutPage";
 import BlogPage from "@/pages/BlogPage";
 import CareersPage from "@/pages/CareersPage";
 import PressPage from "@/pages/PressPage";
+import PartnershipsPage from "@/pages/PartnershipsPage";
 import ContactPage from "@/pages/ContactPage";
 import PrivacyPage from "@/pages/PrivacyPage";
 import TermsPage from "@/pages/TermsPage";
@@ -60,6 +61,9 @@ import FAQSection from "@/components/FAQSection";
 import CTASection from "@/components/CTASection";
 import Footer from "@/components/Footer";
 
+// Import V2 landing page (premium design)
+import LandingPageV2 from "@/pages/LandingPageV2";
+
 function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
@@ -86,7 +90,7 @@ function LandingPage() {
 function MainRouter() {
   return (
     <Switch>
-      <Route path="/" component={LandingPage} />
+      <Route path="/" component={LandingPageV2} />
       <Route path="/science" component={SciencePage} />
       <Route path="/signup" component={SignupPage} />
       <Route path="/login" component={LoginPage} />
@@ -96,6 +100,7 @@ function MainRouter() {
       <Route path="/blog" component={BlogPage} />
       <Route path="/careers" component={CareersPage} />
       <Route path="/press" component={PressPage} />
+      <Route path="/partnerships" component={PartnershipsPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
