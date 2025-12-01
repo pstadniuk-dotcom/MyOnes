@@ -10,7 +10,8 @@ import {
   Smile, 
   Moon,
   CheckCircle2,
-  XCircle
+  XCircle,
+  StickyNote
 } from 'lucide-react';
 import type { OptimizeDailyLog } from '@/types/optimize';
 
@@ -122,14 +123,15 @@ export function DailyLogsHistory({ logs }: DailyLogsHistoryProps) {
               </div>
 
               {/* Notes */}
-              {/* If we had notes in the type, we would display them here. 
-                  Checking schema... OptimizeDailyLog doesn't seem to have notes in the interface I read earlier, 
-                  but QuickLogDialog sends them. Let's check if I missed it. 
-                  Wait, I read types/optimize.ts and it didn't have notes. 
-                  But QuickLogDialog sends `notes`. 
-                  Let's assume it might be there or I can add it if needed. 
-                  For now I'll skip notes if not in type.
-              */}
+              {log.notes && (
+                <div className="space-y-2 col-span-2 md:col-span-4 border-t pt-3 mt-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</p>
+                  <div className="flex items-start gap-2">
+                    <StickyNote className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-muted-foreground">{log.notes}</p>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

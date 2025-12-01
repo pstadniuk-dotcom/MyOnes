@@ -1,9 +1,12 @@
 import { defineConfig } from "drizzle-kit";
 import { config as loadEnv } from "dotenv";
+import fs from "fs";
 
-// Ensure we load environment variables from the server env file for CLI usage
-// Use override so this takes precedence over any pre-set env (e.g. old Neon URL)
-loadEnv({ path: "./server/.env", override: true });
+// Load from server/.env if it exists, otherwise use existing environment variables
+const envPath = "./server/.env";
+if (fs.existsSync(envPath)) {
+  loadEnv({ path: envPath, override: true });
+}
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL, ensure the database is provisioned");
