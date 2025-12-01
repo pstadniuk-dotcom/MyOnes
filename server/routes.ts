@@ -5877,7 +5877,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         dailyRemindersEnabled,
         reminderBreakfast,
         reminderLunch,
-        reminderDinner
+        reminderDinner,
+        // Time slot preferences
+        reminderMorning,
+        reminderAfternoon,
+        reminderEvening,
+        pillsTimeSlot,
+        workoutTimeSlot,
+        nutritionTimeSlot,
+        lifestyleTimeSlot,
+        pillsCustomTime,
+        workoutCustomTime,
+        nutritionCustomTime,
+        lifestyleCustomTime,
       } = req.body;
       
       // Validate boolean input
@@ -5910,9 +5922,17 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           smsShipping,
           smsBilling,
           dailyRemindersEnabled: dailyRemindersEnabled ?? false,
-          reminderBreakfast: reminderBreakfast ?? '08:00',
-          reminderLunch: reminderLunch ?? '12:00',
-          reminderDinner: reminderDinner ?? '18:00',
+          reminderBreakfast: reminderMorning ?? reminderBreakfast ?? '08:00',
+          reminderLunch: reminderAfternoon ?? reminderLunch ?? '12:00',
+          reminderDinner: reminderEvening ?? reminderDinner ?? '18:00',
+          pillsTimeSlot: pillsTimeSlot ?? 'all',
+          workoutTimeSlot: workoutTimeSlot ?? 'morning',
+          nutritionTimeSlot: nutritionTimeSlot ?? 'morning',
+          lifestyleTimeSlot: lifestyleTimeSlot ?? 'evening',
+          pillsCustomTime: pillsCustomTime ?? null,
+          workoutCustomTime: workoutCustomTime ?? null,
+          nutritionCustomTime: nutritionCustomTime ?? null,
+          lifestyleCustomTime: lifestyleCustomTime ?? null,
         });
       } else {
         // Update existing
@@ -5924,9 +5944,17 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           smsShipping,
           smsBilling,
           dailyRemindersEnabled: dailyRemindersEnabled ?? prefs.dailyRemindersEnabled,
-          reminderBreakfast: reminderBreakfast ?? prefs.reminderBreakfast,
-          reminderLunch: reminderLunch ?? prefs.reminderLunch,
-          reminderDinner: reminderDinner ?? prefs.reminderDinner,
+          reminderBreakfast: reminderMorning ?? reminderBreakfast ?? prefs.reminderBreakfast,
+          reminderLunch: reminderAfternoon ?? reminderLunch ?? prefs.reminderLunch,
+          reminderDinner: reminderEvening ?? reminderDinner ?? prefs.reminderDinner,
+          pillsTimeSlot: pillsTimeSlot ?? (prefs as any).pillsTimeSlot ?? 'all',
+          workoutTimeSlot: workoutTimeSlot ?? (prefs as any).workoutTimeSlot ?? 'morning',
+          nutritionTimeSlot: nutritionTimeSlot ?? (prefs as any).nutritionTimeSlot ?? 'morning',
+          lifestyleTimeSlot: lifestyleTimeSlot ?? (prefs as any).lifestyleTimeSlot ?? 'evening',
+          pillsCustomTime: pillsCustomTime !== undefined ? pillsCustomTime : (prefs as any).pillsCustomTime,
+          workoutCustomTime: workoutCustomTime !== undefined ? workoutCustomTime : (prefs as any).workoutCustomTime,
+          nutritionCustomTime: nutritionCustomTime !== undefined ? nutritionCustomTime : (prefs as any).nutritionCustomTime,
+          lifestyleCustomTime: lifestyleCustomTime !== undefined ? lifestyleCustomTime : (prefs as any).lifestyleCustomTime,
         });
       }
       
