@@ -201,6 +201,24 @@ router.post('/revert', requireAuth, async (req, res) => {
       rationale: reason
     });
 
+    // 📬 Create notification for formula reversion
+    try {
+      await storage.createNotification({
+        userId,
+        type: 'formula_update',
+        title: `Formula Reverted to V${originalFormula.version}`,
+        content: `Your formula has been reverted. Reason: ${reason}`,
+        formulaId: revertedFormula.id,
+        metadata: { 
+          actionUrl: '/dashboard/my-formula', 
+          icon: 'beaker', 
+          priority: 'low' 
+        }
+      });
+    } catch (notifError) {
+      logger.error('Failed to create reversion notification:', notifError);
+    }
+
     res.json({ 
       success: true, 
       formula: revertedFormula,
@@ -363,6 +381,24 @@ router.post('/custom', requireAuth, async (req, res) => {
       ],
       notes: null
     });
+
+    // 📬 Create notification for user-built formula
+    try {
+      await storage.createNotification({
+        userId,
+        type: 'formula_update',
+        title: `Custom Formula V${nextVersion} Created`,
+        content: `You've built a custom formula with ${totalMg}mg of ingredients. Consider having AI review it for optimization.`,
+        formulaId: newFormula.id,
+        metadata: { 
+          actionUrl: '/dashboard/my-formula', 
+          icon: 'beaker', 
+          priority: 'medium' 
+        }
+      });
+    } catch (notifError) {
+      logger.error('Failed to create formula notification:', notifError);
+    }
 
     res.json({ 
       success: true,

@@ -3659,6 +3659,29 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             console.log('✅ Security validation passed - formula within safe limits');
             savedFormula = await storage.createFormula(formulaData);
             console.log(`Formula v${nextVersion} saved successfully for user ${userId}`);
+            
+            // 📬 Create in-app notification for formula update
+            try {
+              const isFirstFormula = nextVersion === 1;
+              await storage.createNotification({
+                userId,
+                type: 'formula_update',
+                title: isFirstFormula ? 'Your Formula is Ready! 🧪' : `Formula Updated to V${nextVersion}`,
+                content: isFirstFormula 
+                  ? `Your personalized supplement formula has been created with ${savedFormula.totalMg}mg of targeted ingredients.`
+                  : `Your formula has been updated based on your consultation. Review the changes in My Formula.`,
+                formulaId: savedFormula.id,
+                metadata: { 
+                  actionUrl: '/dashboard/my-formula', 
+                  icon: 'beaker', 
+                  priority: isFirstFormula ? 'high' : 'medium' 
+                }
+              });
+              console.log(`📬 Formula notification created for user ${userId}`);
+            } catch (notifError) {
+              console.error('Failed to create formula notification:', notifError);
+              // Don't fail the whole flow for notification errors
+            }
           }
         } catch (formulaSaveError) {
           console.error('❌ ERROR SAVING FORMULA:', formulaSaveError);
@@ -5192,6 +5215,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         rationale: reason
       });
 
+      // 📬 Create notification for formula reversion
+      try {
+        await storage.createNotification({
+          userId,
+          type: 'formula_update',
+          title: `Formula Reverted to V${originalFormula.version}`,
+          content: `Your formula has been reverted. Reason: ${reason}`,
+          formulaId: revertedFormula.id,
+          metadata: { 
+            actionUrl: '/dashboard/my-formula', 
+            icon: 'beaker', 
+            priority: 'low' 
+          }
+        });
+      } catch (notifError) {
+        console.error('Failed to create reversion notification:', notifError);
+      }
+
       res.json({ 
         success: true, 
         formula: revertedFormula,
@@ -5354,6 +5395,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         ],
         notes: null
       });
+
+      // 📬 Create notification for user-built formula
+      try {
+        await storage.createNotification({
+          userId,
+          type: 'formula_update',
+          title: `Custom Formula V${nextVersion} Created`,
+          content: `You've built a custom formula with ${totalMg}mg of ingredients. Consider having AI review it for optimization.`,
+          formulaId: newFormula.id,
+          metadata: { 
+            actionUrl: '/dashboard/my-formula', 
+            icon: 'beaker', 
+            priority: 'medium' 
+          }
+        });
+      } catch (notifError) {
+        console.error('Failed to create formula notification:', notifError);
+      }
 
       // Invalidate queries to refresh UI
       res.json({ 
@@ -5907,6 +5966,21 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Validate daily reminder fields if provided
       if (dailyRemindersEnabled !== undefined && typeof dailyRemindersEnabled !== 'boolean') {
         return res.status(400).json({ error: 'Invalid dailyRemindersEnabled value' });
+      }
+      
+      // Validate time slot values
+      const validTimeSlots = ['morning', 'afternoon', 'evening', 'custom', 'off', 'all'];
+      if (pillsTimeSlot && !validTimeSlots.includes(pillsTimeSlot)) {
+        return res.status(400).json({ error: 'Invalid pillsTimeSlot value' });
+      }
+      if (workoutTimeSlot && !validTimeSlots.includes(workoutTimeSlot)) {
+        return res.status(400).json({ error: 'Invalid workoutTimeSlot value' });
+      }
+      if (nutritionTimeSlot && !validTimeSlots.includes(nutritionTimeSlot)) {
+        return res.status(400).json({ error: 'Invalid nutritionTimeSlot value' });
+      }
+      if (lifestyleTimeSlot && !validTimeSlots.includes(lifestyleTimeSlot)) {
+        return res.status(400).json({ error: 'Invalid lifestyleTimeSlot value' });
       }
       
       let prefs = await storage.getNotificationPrefs(userId);

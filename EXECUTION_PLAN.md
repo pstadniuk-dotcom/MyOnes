@@ -57,7 +57,7 @@ Based on the comprehensive audit, this document provides an actionable, engineer
 
 | ID | Issue | File(s) | Effort | Risk | Status |
 |----|-------|---------|--------|------|--------|
-| C1 | Rotate exposed credentials | `.env`, Railway/Vercel dashboards | 2 hours | HIGH | ⏳ Manual |
+| C1 | Rotate exposed credentials | `.env`, Railway/Vercel dashboards | 2 hours | HIGH | ✅ Done |
 | C2 | Fix Supabase null crash | `server/objectStorage.ts` | 1 hour | HIGH | ✅ Done |
 | C3 | JWT_SECRET strict enforcement | `server/routes.ts` | 30 mins | HIGH | ✅ Done |
 | C4 | CORS hardening | `server/index.ts` | 1 hour | MEDIUM | ✅ Done |
@@ -77,14 +77,14 @@ Based on the comprehensive audit, this document provides an actionable, engineer
 
 ### 🟡 MEDIUM-TERM FIXES (Month 1)
 
-| ID | Issue | File(s) | Effort | Risk |
-|----|-------|---------|--------|------|
-| M1 | Implement proper error handling | All routes | 6 hours | MEDIUM |
-| M2 | Add rate limiting per endpoint | `server/index.ts`, routes | 4 hours | LOW |
-| M3 | Database query optimization | `server/storage.ts` | 8 hours | MEDIUM |
-| M4 | Add request/response logging | Middleware | 4 hours | LOW |
-| M5 | Implement health check endpoint | `server/routes.ts` | 1 hour | LOW |
-| M6 | Add OpenAPI documentation | New files | 8 hours | LOW |
+| ID | Issue | File(s) | Effort | Risk | Status |
+|----|-------|---------|--------|------|--------|
+| M1 | Implement proper error handling | All routes | 6 hours | MEDIUM | ⏳ Future |
+| M2 | Add rate limiting per endpoint | `server/index.ts`, routes | 4 hours | LOW | ⏳ Future |
+| M3 | Database query optimization | `server/storage.ts` | 8 hours | MEDIUM | ⏳ Future |
+| M4 | Add request/response logging | Middleware | 4 hours | LOW | ⏳ Future |
+| M5 | Implement health check endpoint | `server/routes.ts` | 1 hour | LOW | ✅ Done |
+| M6 | Add OpenAPI documentation | New files | 8 hours | LOW | ⏳ Future |
 
 ### 🟢 LONG-TERM IMPROVEMENTS (Nice-to-Have)
 
