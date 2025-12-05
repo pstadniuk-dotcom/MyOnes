@@ -1,0 +1,19 @@
+echo "🔍 Running pre-commit checks..."
+
+# Run TypeScript check
+echo "📝 Checking TypeScript..."
+npm run check
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript check failed. Please fix errors before committing."
+  exit 1
+fi
+
+# Run tests
+echo "🧪 Running tests..."
+npm run test
+if [ $? -ne 0 ]; then
+  echo "❌ Tests failed. Please fix failing tests before committing."
+  exit 1
+fi
+
+echo "✅ All checks passed!"
