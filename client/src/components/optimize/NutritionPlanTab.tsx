@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,8 +21,16 @@ import {
   Clock,
   ChevronRight,
   Info,
-  ChefHat
+  ChefHat,
+  Utensils,
+  History,
+  ClipboardList,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { MealLogger } from './nutrition/MealLogger';
+import { HydrationTracker } from './nutrition/HydrationTracker';
+import { TodayNutritionSummary } from './nutrition/TodayNutritionSummary';
+import { NutritionHistory } from './nutrition/NutritionHistory';
 import {
   Dialog,
   DialogContent,
@@ -74,6 +82,37 @@ const getPlanStartDate = (createdAt?: string) => {
 export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: NutritionPlanTabProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Check for view=log URL parameter to auto-switch to log tab
+  const getViewParam = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('view');
+  };
+  
+  const [mainTab, setMainTab] = useState(() => getViewParam() === 'log' ? 'log' : 'plan');
+  
+  // Update tab when URL param changes (e.g., navigating from dashboard)
+  // Check on every render since wouter doesn't trigger remounts
+  useEffect(() => {
+    const checkViewParam = () => {
+      const viewParam = getViewParam();
+      if (viewParam === 'log') {
+        setMainTab('log');
+        // Clear the URL param after switching to avoid issues on tab change
+        const url = new URL(window.location.href);
+        url.searchParams.delete('view');
+        window.history.replaceState({}, '', url.toString());
+      }
+    };
+    
+    // Check immediately
+    checkViewParam();
+    
+    // Also listen for popstate events (back/forward navigation)
+    window.addEventListener('popstate', checkViewParam);
+    return () => window.removeEventListener('popstate', checkViewParam);
+  }, []);
+  
   const [activeDay, setActiveDay] = useState('day-1');
   const [showGroceryList, setShowGroceryList] = useState(false);
   const [swappingMeal, setSwappingMeal] = useState<string | null>(null);
@@ -82,6 +121,30 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
   const [shareOpen, setShareOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState('');
   const [shareMethod, setShareMethod] = useState<'sms' | 'email'>('sms');
+
+  // Fetch today's nutrition data for logging tab
+  const { data: todayNutrition, refetch: refetchTodayNutrition } = useQuery<{
+    totals: { calories: number; protein: number; carbs: number; fat: number; mealsLogged: number; waterOz: number };
+    meals: any[];
+    waterIntakeOz: number;
+  }>({
+    queryKey: ['/api/optimize/nutrition/today'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/optimize/nutrition/today');
+      if (!res.ok) throw new Error('Failed to fetch today nutrition');
+      return res.json();
+    },
+    enabled: mainTab === 'log',
+  });
+
+  // Get today's planned meals for quick logging
+  const todayPlanMeals = useMemo(() => {
+    if (!plan?.content?.weekPlan) return [];
+    const today = new Date().getDay();
+    const dayIndex = today === 0 ? 6 : today - 1; // Adjust for week starting Monday
+    const todayPlan = plan.content.weekPlan[dayIndex];
+    return todayPlan?.meals || [];
+  }, [plan]);
 
   const generatePlan = useMutation({
     mutationFn: async () => {
@@ -315,50 +378,71 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
 
   return (
     <div className="space-y-6">
-      {/* Header Actions */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
-              Active Plan
-            </Badge>
-            <Badge variant="secondary" className="text-xs">
-              Generated {new Date(plan.createdAt).toLocaleDateString()}
-            </Badge>
+      {/* Main Tab Navigation */}
+      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3 max-w-md">
+          <TabsTrigger value="plan" className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
+            <span className="hidden sm:inline">Meal Plan</span>
+            <span className="sm:hidden">Plan</span>
+          </TabsTrigger>
+          <TabsTrigger value="log" className="flex items-center gap-2">
+            <Utensils className="h-4 w-4" />
+            <span className="hidden sm:inline">Log Meals</span>
+            <span className="sm:hidden">Log</span>
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            <span>History</span>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ===== MEAL PLAN TAB ===== */}
+        <TabsContent value="plan" className="space-y-6 mt-0">
+          {/* Header Actions */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
+                  Active Plan
+                </Badge>
+                <Badge variant="secondary" className="text-xs">
+                  Generated {new Date(plan.createdAt).toLocaleDateString()}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Week of {weekRangeLabel}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                onClick={() => setShowGroceryList(true)}
+                className="shadow-sm"
+              >
+                <ShoppingBasket className="mr-2 h-4 w-4" />
+                Grocery List
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => generatePlan.mutate()}
+                disabled={generatePlan.isPending}
+                className="shadow-sm"
+              >
+                {generatePlan.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Regenerating...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Regenerate
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Week of {weekRangeLabel}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline"
-            onClick={() => setShowGroceryList(true)}
-            className="shadow-sm"
-          >
-            <ShoppingBasket className="mr-2 h-4 w-4" />
-            Grocery List
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => generatePlan.mutate()}
-            disabled={generatePlan.isPending}
-            className="shadow-sm"
-          >
-            {generatePlan.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Regenerating...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Regenerate
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
 
       <GroceryListModal open={showGroceryList} onOpenChange={setShowGroceryList} />
 
@@ -617,6 +701,44 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
           </CardContent>
         </Card>
       )}
+      </TabsContent>
+
+      {/* ===== LOG MEALS TAB ===== */}
+      <TabsContent value="log" className="space-y-6 mt-0">
+        {/* Today's Summary */}
+        {todayNutrition && (
+          <TodayNutritionSummary 
+            totals={todayNutrition.totals}
+            meals={todayNutrition.meals}
+            targets={{
+              calories: plan?.content?.macroTargets?.dailyCalories || 2000,
+              protein: plan?.content?.macroTargets?.proteinGrams || 150,
+              carbs: plan?.content?.macroTargets?.carbsGrams || 200,
+              fat: plan?.content?.macroTargets?.fatGrams || 65,
+            }}
+            onMealDeleted={() => refetchTodayNutrition()}
+          />
+        )}
+
+        {/* Meal Logger and Hydration Tracker side by side */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          <MealLogger 
+            todayPlanMeals={todayPlanMeals}
+            onMealLogged={() => refetchTodayNutrition()}
+          />
+          <HydrationTracker 
+            currentOz={todayNutrition?.waterIntakeOz || 0}
+            goalOz={100}
+            onUpdate={() => refetchTodayNutrition()}
+          />
+        </div>
+      </TabsContent>
+
+      {/* ===== HISTORY TAB ===== */}
+      <TabsContent value="history" className="space-y-6 mt-0">
+        <NutritionHistory />
+      </TabsContent>
+      </Tabs>
 
       {/* Recipe Dialog */}
       <Dialog open={isRecipeOpen} onOpenChange={setIsRecipeOpen}>

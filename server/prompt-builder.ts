@@ -1,4 +1,4 @@
-import { BASE_FORMULAS, INDIVIDUAL_INGREDIENTS, BASE_FORMULA_DETAILS } from "@shared/ingredients";
+import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, SYSTEM_SUPPORT_DETAILS } from "@shared/ingredients";
 
 // Define types directly to avoid circular dependencies
 export interface HealthProfile {
@@ -75,7 +75,13 @@ Answer the user's question directly and helpfully.`;
 export function buildO1MiniPrompt(context: PromptContext): string {
   
   // Generate dynamic ingredient lists for the prompt
-  const baseFormulasList = BASE_FORMULAS.map(f => `• ${f.name} (${f.doseMg}mg) - ${f.description}`).join('\n');
+  // System supports now show 1x dose with option to use 2x or 3x
+  const systemSupportsList = SYSTEM_SUPPORTS.map(f => {
+    const dose1x = f.doseMg;
+    const dose2x = f.doseMg * 2;
+    const dose3x = f.doseMg * 3;
+    return `• ${f.name} (1x=${dose1x}mg, 2x=${dose2x}mg, 3x=${dose3x}mg) - ${f.description}`;
+  }).join('\n');
   
   const individualIngredientsList = INDIVIDUAL_INGREDIENTS.map(ing => {
     let doseInfo = `${ing.doseMg}mg`;
@@ -121,6 +127,19 @@ Create personalized supplement formulas that are:
 - Maximum: 5500mg total for the COMPLETE new formula
 - Think: "What should the full formula contain?" not "What should I add to it?"
 
+🚨 **CRITICAL: CALCULATE BEFORE CREATING**
+Before outputting ANY formula JSON, you MUST:
+1. Add up ALL system support dosages (check catalog for exact amounts)
+2. Add up ALL individual ingredient dosages
+3. Verify total is ≤5500mg
+4. If over 5500mg, REMOVE ingredients before creating the JSON
+
+**Typical safe formula patterns (memorize these):**
+- 2 system supports (~900mg) + 6-8 individuals (~2000-2500mg) = ~3000-3500mg ✓
+- 3 system supports (~1350mg) + 5-6 individuals (~1500-2000mg) = ~3000-3500mg ✓
+- 1 large system support (2500mg) + 4-5 individuals (~1500mg) = ~4000mg ✓
+- AVOID: 4+ system supports + 8+ individuals = WILL EXCEED 5500mg ❌
+
 **RULE #3: ALWAYS COLLECT CRITICAL HEALTH DATA FIRST**
 
 Before creating ANY formula, you MUST know:
@@ -129,6 +148,7 @@ Before creating ANY formula, you MUST know:
 3. **Allergies** (safety check)
 4. **Primary health goals** (what they want to achieve)
 5. **Pregnancy/nursing status** (if applicable)
+6. **Organ-specific symptoms** (see ORGAN-SPECIFIC section below for questions to ask)
 
 ${isAdvancedUser ? `
 - This user has formula history - they're experienced
@@ -138,6 +158,8 @@ ${isAdvancedUser ? `
 ` : `
 - This appears to be a new user - guide them thoroughly
 - Ask 4-6 questions to understand their complete health picture
+- **IMPORTANT: Probe for organ-specific issues** (thyroid, liver, kidneys, lungs, prostate/ovaries, joints, etc.)
+- Many users won't mention these unless asked directly
 - Educate them about the personalization process
 - Build trust before creating formulas
 - Encourage uploading blood tests for better optimization
@@ -249,8 +271,11 @@ NOTE: DO NOT include "totalMg" - backend calculates it automatically!
 
 === 📏 STRICT DOSAGE RULES & INGREDIENT CATALOG ===
 
-**Base Formulas (Fixed Dosages - CANNOT CHANGE):**
-${baseFormulasList}
+**System Supports (1x, 2x, or 3x dosing allowed):**
+- Each system support can be used at 1x, 2x, or 3x its base dose
+- 1x = mild support/prevention, 2x = moderate issues, 3x = therapeutic/severe
+- You MUST use exact multiples (1x, 2x, or 3x) - no arbitrary amounts
+${systemSupportsList}
 
 **Individual Ingredients (Strict Limits):**
 - If a range is shown (e.g. 50-250mg), you MUST stay within it.
@@ -265,9 +290,125 @@ ${individualIngredientsList}
 - Digestion: Ginger Root + Aloe Vera
 - Inflammation: Curcumin + Cinnamon + Broccoli Concentrate
 - Energy: Adrenal Support + Red Ginseng + CoQ10
-- Immune: Camu Camu + Astragalus + Cats Claw + Chaga
-- Liver/Detox: Liver Support + Glutathione
+- Immune: Immune-C + Camu Camu + Astragalus + Cats Claw + Chaga
+- Liver/Detox: Liver Support + Beta Max + Glutathione
 - Brain/Focus: Phosphatidylcholine + L-Theanine + Ginkgo Biloba
+
+=== 🎯 ORGAN-SPECIFIC SYSTEM SUPPORT RECOMMENDATIONS ===
+
+**CRITICAL: Always ask about these symptoms/conditions to determine organ support needs:**
+
+**Prostate Support (202mg, max 606mg for 3x)** - For MALES with:
+- Urinary frequency, urgency, or weak stream
+- Prostate enlargement (BPH)
+- History of prostatitis or prostate issues
+- PSA concerns
+→ ASK: "Do you have any urinary issues like frequent urination, difficulty starting, or weak stream?"
+
+**Ovary Uterus Support (253mg, max 759mg for 3x)** - For FEMALES with:
+- Irregular menstrual cycles
+- PCOS, endometriosis, or fibroids
+- Hormonal imbalances
+- Menopause symptoms (hot flashes, mood swings)
+- Fertility concerns
+→ ASK: "How are your menstrual cycles? Any irregularities, cramping, or hormonal symptoms?"
+
+**Kidney & Bladder Support (400mg, max 1200mg for 3x)** - For users with:
+- History of kidney stones
+- UTIs or bladder infections (recurring)
+- Blood pressure issues
+- Edema/water retention
+- Family history of kidney disease
+→ ASK: "Any history of kidney stones, UTIs, or bladder issues?"
+
+**Lung Support (242mg, max 726mg for 3x)** - For users with:
+- Asthma, COPD, or chronic bronchitis
+- Smokers or former smokers
+- Environmental allergies affecting breathing
+- Shortness of breath
+- History of pneumonia or lung infections
+→ ASK: "How is your respiratory health? Any breathing issues, allergies, or smoking history?"
+
+**Liver Support (530mg, max 1590mg for 3x)** - For users with:
+- High alcohol consumption
+- Fatty liver or elevated liver enzymes (ALT/AST)
+- History of hepatitis
+- Taking medications that stress the liver
+- Detox goals
+→ ASK: "How is your liver health? Any history of elevated enzymes, fatty liver, or heavy alcohol use?"
+
+**Thyroid Support (291mg, max 873mg for 3x)** - For users with:
+- Hypothyroidism or Hashimoto's
+- Fatigue and weight gain
+- Cold intolerance
+- Hair loss or brittle nails
+- TSH/T3/T4 abnormalities
+→ ASK: "Have you had your thyroid checked? Any symptoms like fatigue, weight changes, or cold sensitivity?"
+
+**Adrenal Support (420mg, max 1260mg for 3x)** - For users with:
+- Chronic fatigue or burnout
+- High stress lifestyle
+- Cortisol imbalances
+- Difficulty waking up, afternoon crashes
+- Anxiety or irritability
+→ ASK: "How are your energy levels? Any chronic fatigue, stress, or burnout symptoms?"
+
+**Endocrine Support (335mg, max 1005mg for 3x)** - For users with:
+- Multiple hormonal imbalances
+- Blood sugar dysregulation
+- Pancreatic concerns
+- Metabolic issues
+→ ASK: "Any issues with blood sugar, hormones, or metabolism?"
+
+**Heart Support (689mg, max 2067mg for 3x)** - For users with:
+- High blood pressure or heart palpitations
+- Family history of heart disease
+- High cholesterol or triglycerides
+- Chest discomfort or circulation issues
+→ ASK: "Any cardiovascular concerns like high blood pressure, cholesterol, or family history of heart disease?"
+
+**Spleen Support (203mg, max 609mg for 3x)** - For users with:
+- Immune system weakness
+- Frequent infections
+- Blood disorders
+- Lymphatic congestion
+→ ASK: "Do you get sick frequently or have any immune system concerns?"
+
+**Ligament Support (130mg, max 390mg for 3x)** - For users with:
+- Joint pain, stiffness, or arthritis
+- Sports injuries or repetitive strain
+- Tendonitis or ligament issues
+- Recovery from injury/surgery
+→ ASK: "Any joint pain, stiffness, or issues with ligaments/tendons?"
+
+**Histamine Support (200mg, max 600mg for 3x)** - For users with:
+- Seasonal allergies
+- Food sensitivities/intolerances
+- Histamine intolerance symptoms (flushing, hives)
+- Mast cell issues
+→ ASK: "Do you have allergies, food sensitivities, or histamine reactions?"
+
+**Mold RX (525mg, max 1575mg for 3x)** - For users with:
+- Mold exposure (home, work)
+- Chronic inflammatory response syndrome (CIRS)
+- Mycotoxin illness
+- Unexplained fatigue + brain fog after water damage exposure
+→ ASK: "Any known or suspected mold exposure? Water damage in home/workplace?"
+
+**Para X (523mg, max 1569mg for 3x)** - For users with:
+- Travel to endemic areas
+- Unexplained GI symptoms
+- History of parasites
+- Bloating, irregular bowels, unexplained weight changes
+→ ASK: "Any international travel or unexplained digestive issues?"
+
+**DOSING STRATEGY:**
+- 1 unit (1x dose): Mild symptoms or preventive support
+- 2 units (2x dose): Moderate symptoms or active issues
+- 3 units (3x dose): Severe symptoms or therapeutic intervention
+
+**ALWAYS PROBE for organ-specific issues during initial consultation!**
+Many users won't volunteer these details unless asked directly.
 
 `;
 
@@ -315,12 +456,26 @@ If you need specific ingredient info, reference the quick guide above.
 `;
     
     if (formula.bases && formula.bases.length > 0) {
-      prompt += `**Current Base Formulas:**\n`;
+      prompt += `**Current System Supports (HISTORICAL - see warning below):**\n`;
       formula.bases.forEach((base) => {
+        // Look up current catalog dosage for comparison
+        const catalogBase = SYSTEM_SUPPORTS.find(f => f.name === base.ingredient);
+        const catalogDose = catalogBase?.doseMg;
+        const doseChanged = catalogDose && catalogDose !== base.amount;
+        
         prompt += `- ${base.ingredient}: ${base.amount}mg`;
+        if (doseChanged) {
+          prompt += ` ⚠️ CATALOG NOW: ${catalogDose}mg - USE ${catalogDose}mg!`;
+        }
         if (base.purpose) prompt += ` (${base.purpose})`;
         prompt += `\n`;
       });
+      
+      prompt += `\n🚨 **CRITICAL: SYSTEM SUPPORT DOSAGES ARE FIXED**
+- The amounts shown above are HISTORICAL (what user received before)
+- You MUST use the CATALOG dosages from the ingredient list above
+- System supports have FIXED dosages that CANNOT be changed
+- If you include a system support, use its CATALOG dosage, NOT the historical amount\n`;
     }
     
     if (formula.additions && formula.additions.length > 0) {
@@ -354,6 +509,7 @@ WRONG: Keep all 4000mg + add Hawthorn 100mg + Garlic 200mg = 4300mg total ❌
     if (profile.age) prompt += `Age: ${profile.age}\n`;
     if (profile.sex) prompt += `Sex: ${profile.sex}\n`;
     if (profile.weightLbs) prompt += `Weight: ${profile.weightLbs} lbs\n`;
+    if (profile.heightCm) prompt += `Height: ${profile.heightCm} cm\n`;
     
     if (profile.conditions && profile.conditions.length > 0) {
       prompt += `Medical Conditions: ${profile.conditions.join(', ')}\n`;
@@ -367,6 +523,80 @@ WRONG: Keep all 4000mg + add Hawthorn 100mg + Garlic 200mg = 4300mg total ❌
     
     if (profile.sleepHoursPerNight) prompt += `Sleep: ${profile.sleepHoursPerNight} hours/night\n`;
     if (profile.exerciseDaysPerWeek) prompt += `Exercise: ${profile.exerciseDaysPerWeek} days/week\n`;
+    if (profile.stressLevel) prompt += `Stress Level: ${profile.stressLevel}/10\n`;
+    if (profile.smokingStatus) prompt += `Smoking: ${profile.smokingStatus}\n`;
+    if (profile.alcoholDrinksPerWeek) prompt += `Alcohol: ${profile.alcoholDrinksPerWeek} drinks/week\n`;
+    
+    // Gender-specific guidance
+    if (profile.sex) {
+      prompt += `\n**GENDER-SPECIFIC CONSIDERATIONS:**\n`;
+      if (profile.sex.toLowerCase() === 'female') {
+        prompt += `- Consider asking about menstrual cycles, menopause, or hormonal symptoms\n`;
+        prompt += `- Ovary Uterus Support may be appropriate if reproductive issues present\n`;
+        prompt += `- DO NOT recommend Prostate Support\n`;
+        prompt += `- Consider iron needs (menstruation can cause deficiency)\n`;
+        if (profile.age && profile.age >= 45) {
+          prompt += `- At ${profile.age}, perimenopause/menopause symptoms are common - ask about hot flashes, mood changes\n`;
+        }
+      } else if (profile.sex.toLowerCase() === 'male') {
+        prompt += `- Consider asking about urinary symptoms (frequency, weak stream, nighttime urination)\n`;
+        prompt += `- Prostate Support may be appropriate, especially if age 40+\n`;
+        prompt += `- DO NOT recommend Ovary Uterus Support\n`;
+        if (profile.age && profile.age >= 40) {
+          prompt += `- At ${profile.age}, prostate health becomes important - ask about PSA, urinary issues\n`;
+        }
+        if (profile.age && profile.age >= 50) {
+          prompt += `- Testosterone decline common at this age - ask about energy, libido, muscle mass\n`;
+        }
+      }
+    }
+    
+    // Age-specific guidance
+    if (profile.age) {
+      prompt += `\n**AGE-SPECIFIC CONSIDERATIONS (${profile.age} years old):**\n`;
+      if (profile.age < 30) {
+        prompt += `- Focus on energy, stress management, and prevention\n`;
+        prompt += `- Lighter dosing typically appropriate\n`;
+      } else if (profile.age >= 30 && profile.age < 50) {
+        prompt += `- Focus on optimization, stress/adrenal support, and early prevention\n`;
+        prompt += `- Standard dosing typically appropriate\n`;
+      } else if (profile.age >= 50 && profile.age < 65) {
+        prompt += `- Focus on cardiovascular, cognitive, and joint health\n`;
+        prompt += `- Heart Support, NAD+, NMN, CoQ10 become more important\n`;
+        prompt += `- Consider 2x dosing for organ supports if issues present\n`;
+      } else if (profile.age >= 65) {
+        prompt += `- Focus on longevity, cognitive preservation, and mobility\n`;
+        prompt += `- NAD+, NMN, CoQ10, Heart Support, Ligament Support often beneficial\n`;
+        prompt += `- Be extra cautious with interactions - ask about ALL medications\n`;
+      }
+    }
+    
+    // Weight-specific guidance
+    if (profile.weightLbs) {
+      prompt += `\n**WEIGHT CONSIDERATIONS (${profile.weightLbs} lbs):**\n`;
+      if (profile.weightLbs > 250) {
+        prompt += `- Higher body mass may benefit from 2x dosing on key supports\n`;
+        prompt += `- Consider metabolic support: InnoSlim, Cinnamon, Blood Sugar support\n`;
+        prompt += `- Liver Support important for metabolic health\n`;
+      } else if (profile.weightLbs < 120) {
+        prompt += `- Lower body mass - consider starting with 1x dosing\n`;
+        prompt += `- Monitor for sensitivity to ingredients\n`;
+      }
+    }
+    
+    // Lifestyle-specific guidance
+    if (profile.stressLevel && profile.stressLevel >= 7) {
+      prompt += `\n**HIGH STRESS ALERT (${profile.stressLevel}/10):** Strongly consider Adrenal Support, Ashwagandha, L-Theanine, GABA\n`;
+    }
+    if (profile.sleepHoursPerNight && profile.sleepHoursPerNight < 6) {
+      prompt += `\n**SLEEP DEFICIENCY (${profile.sleepHoursPerNight} hrs):** Consider L-Theanine, GABA, Magnesium for sleep support\n`;
+    }
+    if (profile.alcoholDrinksPerWeek && profile.alcoholDrinksPerWeek >= 10) {
+      prompt += `\n**ALCOHOL USE (${profile.alcoholDrinksPerWeek}/week):** Liver Support recommended, consider 2x dosing\n`;
+    }
+    if (profile.smokingStatus && profile.smokingStatus !== 'never') {
+      prompt += `\n**SMOKING HISTORY:** Lung Support recommended, antioxidants (C Boost, Glutathione) important\n`;
+    }
     
     // Show missing critical fields
     const missingCritical = [];
@@ -429,13 +659,43 @@ ${isAdvancedUser ? `
 🚨 If user asks to "adjust", "add", "modify", or "support X" - OUTPUT THE COMPLETE NEW FORMULA JSON!
 🚨 Don't just DESCRIBE the changes - OUTPUT the actual \`\`\`json block with the COMPLETE new formula!
 
-STEP 1 - EXPLAIN YOUR CLINICAL REASONING (2-3 paragraphs):
+**=== FORMULA CREATION WORKFLOW (FOLLOW THIS ORDER!) ===**
+
+**STEP 0 - PLAN YOUR FORMULA FIRST (INTERNALLY, before writing response):**
+1. List ALL ingredients you want to include
+2. Add up their dosages: System Supports (use catalog values) + Individual Ingredients
+3. If total > 5500mg, REMOVE ingredients until it fits
+4. FINALIZE the ingredient list BEFORE writing anything to the user
+5. Only ingredients in your FINAL list should be mentioned in your explanation
+
+🚨🚨🚨 **CRITICAL CONSISTENCY RULE** 🚨🚨🚨
+- ONLY discuss ingredients that WILL appear in your JSON block
+- If you mention an ingredient in your explanation, it MUST be in the JSON
+- If it's not in your final JSON, DO NOT mention it to the user
+- DO NOT say "I'm also adding L-Theanine..." if L-Theanine won't be in the JSON
+- The user will feel BETRAYED if you promise ingredients that don't appear
+
+**Example of what NOT to do:**
+❌ "I'm adding L-Theanine for calm focus, Ginkgo for circulation, and CoQ10 for energy..."
+   [JSON only contains 2 of those 3 ingredients]
+   = User sees the JSON is MISSING promised ingredients = BAD EXPERIENCE
+
+**Example of CORRECT approach:**
+✓ Plan internally: "I want Heart Support (689mg) + CoQ10 (200mg) + Omega-3 (1000mg) + Ashwagandha (600mg) = 2489mg ✓"
+✓ Write explanation ONLY about those 4 ingredients
+✓ JSON contains exactly those 4 ingredients
+✓ = Perfect consistency = GOOD EXPERIENCE
+
+**STEP 1 - EXPLAIN YOUR CLINICAL REASONING (2-3 paragraphs):**
+- ONLY discuss ingredients from your finalized plan (Step 0)
 - Why these specific ingredients for their situation
 - How they address biomarkers, symptoms, or goals
 - Any safety considerations or interactions  
 - Expected outcomes
+- DO NOT mention ingredients you didn't include in your plan
 
-STEP 2 - IMMEDIATELY OUTPUT THE JSON BLOCK (DO NOT SKIP THIS):
+**STEP 2 - IMMEDIATELY OUTPUT THE JSON BLOCK (DO NOT SKIP THIS):**
+The JSON must contain EXACTLY the ingredients you discussed in Step 1. No more, no less.
 The user is ASKING you to create a formula. Do NOT just describe it - OUTPUT THE JSON!
 Do NOT say "Here's your formula" and then forget to include the JSON block.
 Do NOT wait for user to say "create it" - they already asked by requesting formula optimization.
@@ -461,7 +721,7 @@ Do NOT wait for user to say "create it" - they already asked by requesting formu
 \`\`\`json
 {
   "bases": [
-    {"ingredient": "Heart Support", "amount": 450, "unit": "mg", "purpose": "cardiovascular support"}
+    {"ingredient": "Heart Support", "amount": 689, "unit": "mg", "purpose": "cardiovascular support"}
   ],
   "additions": [
     {"ingredient": "Ashwagandha", "amount": 600, "unit": "mg", "purpose": "stress management"}

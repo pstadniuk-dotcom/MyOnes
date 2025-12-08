@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { calculateDosage } from '@/lib/utils';
 import { buildApiUrl } from '@/lib/api';
-import { BASE_FORMULA_DETAILS, findIngredientByName } from '@shared/ingredients';
+import { SYSTEM_SUPPORT_DETAILS, findIngredientByName } from '@shared/ingredients';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function SharedFormulaPage() {
@@ -157,16 +157,16 @@ export default function SharedFormulaPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {/* Base Formulas */}
+                {/* System Supports */}
                 {formula.bases && formula.bases.length > 0 && (
                   <div>
                     <h3 className="font-semibold mb-3 flex items-center gap-2">
                       <Package className="w-4 h-4" />
-                      Base Formulas
+                      System Supports
                     </h3>
                     <div className="space-y-3">
                       {formula.bases.map((base: { ingredient: string; amount: number }, idx: number) => {
-                        const baseFormula = Object.values(BASE_FORMULA_DETAILS).find(
+                        const systemSupport = Object.values(SYSTEM_SUPPORT_DETAILS).find(
                           (f) => f.name === base.ingredient
                         );
                         return (
@@ -174,19 +174,19 @@ export default function SharedFormulaPage() {
                             <div className="flex items-start justify-between mb-2">
                               <div>
                                 <div className="font-medium">{base.ingredient}</div>
-                                {baseFormula?.description && (
+                                {systemSupport?.description && (
                                   <div className="text-sm text-muted-foreground mt-1">
-                                    {baseFormula.description}
+                                    {systemSupport.description}
                                   </div>
                                 )}
                               </div>
                               <Badge variant="secondary">{base.amount} mg</Badge>
                             </div>
-                            {baseFormula?.activeIngredients && baseFormula.activeIngredients.length > 0 && (
+                            {systemSupport?.activeIngredients && systemSupport.activeIngredients.length > 0 && (
                               <div className="mt-3 pt-3 border-t">
                                 <div className="text-sm font-medium mb-2">Active Ingredients:</div>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {baseFormula.activeIngredients.map((ing, i) => (
+                                  {systemSupport.activeIngredients.map((ing, i) => (
                                     <Badge key={i} variant="outline" className="text-xs">
                                       {typeof ing === 'string' ? ing : ing.name}
                                     </Badge>

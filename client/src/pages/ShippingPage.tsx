@@ -117,7 +117,7 @@ export default function ShippingPage() {
               <li>Check with neighbors and building management</li>
               <li>Verify the shipping address in your account</li>
               <li>Wait 24 hours (sometimes carriers mark as delivered early)</li>
-              <li>Contact us at support@ones.health - we'll help resolve the issue</li>
+              <li>Contact us at support@myones.ai - we'll help resolve the issue</li>
             </ol>
 
             <h3 className="text-xl font-medium text-[#1B4332] mb-3 mt-6">Damaged in Transit</h3>
@@ -132,7 +132,7 @@ export default function ShippingPage() {
               Questions about shipping? Our support team is here to help:
             </p>
             <p className="text-[#52796F] mt-4">
-              <strong className="text-[#1B4332]">Email:</strong> support@ones.health<br />
+              <strong className="text-[#1B4332]">Email:</strong> support@myones.ai<br />
               <strong className="text-[#1B4332]">Phone:</strong> 1-800-ONES-HELP<br />
               <strong className="text-[#1B4332]">Hours:</strong> Monday-Friday, 9am-6pm PST
             </p>

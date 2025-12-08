@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, X, Sparkles, ChevronDown, ChevronUp, CheckCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -26,9 +27,15 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 interface IngredientInfo {
   name: string;
   doseMg: number;
+  doseRangeMin?: number;
+  doseRangeMax?: number;
   category: 'base' | 'individual';
   description?: string;
   benefits?: string[];
+}
+
+interface AddedIngredient extends IngredientInfo {
+  selectedDose: number;
 }
 
 interface Props {
@@ -38,6 +45,12 @@ interface Props {
   existingBases: string[];
   existingIndividuals: string[];
 }
+
+// Helper function for dynamic step sizes based on max dose
+const getStepSize = (max: number): number => {
+  if (max < 500) return 5;
+  return 10;
+};
 
 export function FormulaCustomizationDialog({
   open,
@@ -49,23 +62,24 @@ export function FormulaCustomizationDialog({
   const { toast } = useToast();
   const [selectedBase, setSelectedBase] = useState<string>("");
   const [selectedIndividual, setSelectedIndividual] = useState<string>("");
-  const [addedBases, setAddedBases] = useState<IngredientInfo[]>([]);
-  const [addedIndividuals, setAddedIndividuals] = useState<IngredientInfo[]>([]);
+  const [selectedIndividualDose, setSelectedIndividualDose] = useState<number>(0);
+  const [addedBases, setAddedBases] = useState<AddedIngredient[]>([]);
+  const [addedIndividuals, setAddedIndividuals] = useState<AddedIngredient[]>([]);
   const [breakdownExpanded, setBreakdownExpanded] = useState(true);
   const [expandedSubIngredients, setExpandedSubIngredients] = useState<Record<number, boolean>>({});
   const [expandedIndividualIngredients, setExpandedIndividualIngredients] = useState<Record<number, boolean>>({});
 
   // Fetch ingredient catalog
   const { data: catalog, isLoading: catalogLoading } = useQuery<{
-    baseFormulas: IngredientInfo[];
+    systemSupports: IngredientInfo[];
     individualIngredients: IngredientInfo[];
   }>({
     queryKey: ["/api/ingredients/catalog"],
     enabled: open,
   });
 
-  // Fetch base formula details for ingredient breakdowns
-  const { data: baseFormulaData, isLoading: baseDetailsLoading } = useQuery<{ baseFormulaDetails: Array<{
+  // Fetch system support details for ingredient breakdowns
+  const { data: systemSupportData, isLoading: baseDetailsLoading } = useQuery<{ systemSupportDetails: Array<{
     name: string;
     doseMg: number;
     systemSupported: string;
@@ -77,8 +91,8 @@ export function FormulaCustomizationDialog({
     enabled: open
   });
 
-  // Get breakdown for currently selected base formula
-  const selectedBaseBreakdown = selectedBase ? baseFormulaData?.baseFormulaDetails.find(
+  // Get breakdown for currently selected system support
+  const selectedBaseBreakdown = selectedBase ? systemSupportData?.systemSupportDetails.find(
     f => f.name === selectedBase
   ) : null;
 
@@ -90,18 +104,27 @@ export function FormulaCustomizationDialog({
     }
   }, [selectedBase]);
 
+  // Update selected dose when individual ingredient changes - start at 0
+  useEffect(() => {
+    if (selectedIndividual) {
+      setSelectedIndividualDose(0);
+    } else {
+      setSelectedIndividualDose(0);
+    }
+  }, [selectedIndividual]);
+
   // Save customizations mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
       return apiRequest("PATCH", `/api/users/me/formula/${formulaId}/customize`, {
         addedBases: addedBases.map(b => ({
           ingredient: b.name,
-          amount: b.doseMg,
+          amount: b.selectedDose,
           unit: "mg"
         })),
         addedIndividuals: addedIndividuals.map(i => ({
           ingredient: i.name,
-          amount: i.doseMg,
+          amount: i.selectedDose,
           unit: "mg"
         }))
       }).then(res => res.json());
@@ -130,7 +153,7 @@ export function FormulaCustomizationDialog({
   });
 
   // Filter out already selected and existing ingredients
-  const availableBases = catalog?.baseFormulas.filter(
+  const availableBases = catalog?.systemSupports.filter(
     b => !existingBases.includes(b.name) && !addedBases.some(ab => ab.name === b.name)
   ) || [];
 
@@ -140,19 +163,20 @@ export function FormulaCustomizationDialog({
 
   const handleAddBase = () => {
     if (!selectedBase) return;
-    const base = catalog?.baseFormulas.find(b => b.name === selectedBase);
+    const base = catalog?.systemSupports.find(b => b.name === selectedBase);
     if (base) {
-      setAddedBases([...addedBases, base]);
+      setAddedBases([...addedBases, { ...base, selectedDose: base.doseMg }]);
       setSelectedBase("");
     }
   };
 
   const handleAddIndividual = () => {
-    if (!selectedIndividual) return;
+    if (!selectedIndividual || selectedIndividualDose <= 0) return;
     const individual = catalog?.individualIngredients.find(i => i.name === selectedIndividual);
     if (individual) {
-      setAddedIndividuals([...addedIndividuals, individual]);
+      setAddedIndividuals([...addedIndividuals, { ...individual, selectedDose: selectedIndividualDose }]);
       setSelectedIndividual("");
+      setSelectedIndividualDose(0);
     }
   };
 
@@ -165,7 +189,7 @@ export function FormulaCustomizationDialog({
   };
 
   const totalAddedMg = [...addedBases, ...addedIndividuals].reduce(
-    (sum, item) => sum + item.doseMg,
+    (sum, item) => sum + item.selectedDose,
     0
   );
 
@@ -178,21 +202,21 @@ export function FormulaCustomizationDialog({
             Customize Your Formula
           </DialogTitle>
           <DialogDescription>
-            Add extra base formulations or individual ingredients to personalize your supplement formula.
+            Add extra system supports or individual ingredients to personalize your supplement formula.
             Only approved catalog ingredients can be added.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Add Base Formulas */}
+          {/* Add System Supports */}
           <div className="space-y-3">
-            <h3 className="font-medium text-sm">Add Base Formulas</h3>
+            <h3 className="font-medium text-sm">Add System Supports</h3>
             <div className="flex gap-2">
               <Select value={selectedBase} onValueChange={setSelectedBase}>
-                <SelectTrigger className="flex-1 h-auto min-h-[2.5rem] py-2" data-testid="select-base-formula">
-                  <SelectValue placeholder="Select a base formula..." />
+                <SelectTrigger className="flex-1 h-auto min-h-[2.5rem] py-2" data-testid="select-system-support">
+                  <SelectValue placeholder="Select a system support..." />
                 </SelectTrigger>
-                <SelectContent className="select-wide-dropdown max-h-[500px] overflow-y-auto">
+                <SelectContent className="select-wide-dropdown max-h-[300px] overflow-y-auto">
                   {availableBases.map(base => (
                     <SelectItem key={base.name} value={base.name} className="py-4 h-auto">
                       <div className="flex flex-col gap-1.5 min-w-0">
@@ -217,7 +241,7 @@ export function FormulaCustomizationDialog({
               </Button>
             </div>
 
-            {/* Show breakdown for selected base formula */}
+            {/* Show breakdown for selected system support */}
             {selectedBase && selectedBaseBreakdown && (
               <Card className="p-4 bg-primary/5 border-primary/20">
                 <div className="space-y-3">
@@ -354,7 +378,7 @@ export function FormulaCustomizationDialog({
                 {addedBases.map((base, index) => (
                   <Card key={index} className="p-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{base.doseMg}mg</Badge>
+                      <Badge variant="secondary">{base.selectedDose}mg</Badge>
                       <span className="text-sm">{base.name}</span>
                     </div>
                     <Button
@@ -379,11 +403,13 @@ export function FormulaCustomizationDialog({
                 <SelectTrigger className="flex-1 h-auto min-h-[2.5rem] py-2" data-testid="select-individual-ingredient">
                   <SelectValue placeholder="Select an individual ingredient..." />
                 </SelectTrigger>
-                <SelectContent className="select-wide-dropdown max-h-[500px] overflow-y-auto">
+                <SelectContent className="select-wide-dropdown max-h-[300px] overflow-y-auto">
                   {availableIndividuals.map(ingredient => (
                     <SelectItem key={ingredient.name} value={ingredient.name} className="py-4 h-auto">
                       <div className="flex flex-col gap-1.5 min-w-0">
-                        <span className="font-medium text-sm">{ingredient.name} - {ingredient.doseMg}mg</span>
+                        <span className="font-medium text-sm">
+                          {ingredient.name} - up to {ingredient.doseRangeMax || ingredient.doseMg}mg
+                        </span>
                         {ingredient.benefits && ingredient.benefits.length > 0 && (
                           <div className="text-xs text-muted-foreground leading-relaxed space-y-1">
                             {ingredient.benefits.slice(0, 2).map((benefit, idx) => (
@@ -396,15 +422,60 @@ export function FormulaCustomizationDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                onClick={handleAddIndividual}
-                disabled={!selectedIndividual || catalogLoading}
-                size="icon"
-                data-testid="button-add-individual"
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
             </div>
+
+            {/* Dose Slider - Show when ingredient is selected */}
+            {selectedIndividual && (() => {
+              const ingredient = catalog?.individualIngredients.find(i => i.name === selectedIndividual);
+              if (!ingredient) return null;
+              const min = 0;
+              const max = ingredient.doseRangeMax || ingredient.doseMg;
+              const hasRange = max > 0;
+              
+              return (
+                <Card className="p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm">{ingredient.name}</span>
+                      <Badge variant="secondary" className="bg-blue-600 text-white">
+                        {selectedIndividualDose}mg
+                      </Badge>
+                    </div>
+                    
+                    {hasRange ? (
+                      <div className="space-y-2">
+                        <Slider
+                          value={[selectedIndividualDose]}
+                          onValueChange={(values) => setSelectedIndividualDose(values[0])}
+                          min={min}
+                          max={max}
+                          step={getStepSize(max)}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>{min}mg</span>
+                          <span>{max}mg</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Fixed dose: {min}mg
+                      </p>
+                    )}
+                    
+                    <Button
+                      onClick={handleAddIndividual}
+                      disabled={catalogLoading}
+                      className="w-full"
+                      data-testid="button-add-individual"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add {ingredient.name} ({selectedIndividualDose}mg)
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })()}
 
             {addedIndividuals.length > 0 && (
               <div className="space-y-2">
@@ -412,7 +483,7 @@ export function FormulaCustomizationDialog({
                   <Card key={index} className="p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-1">
-                        <Badge variant="secondary">{ingredient.doseMg}mg</Badge>
+                        <Badge variant="secondary">{ingredient.selectedDose}mg</Badge>
                         {ingredient.benefits && ingredient.benefits.length > 0 ? (
                           <Collapsible
                             open={expandedIndividualIngredients[index]}

@@ -1,3 +1,4 @@
+import { Link } from 'wouter';
 import { Mail, Users, Sparkles, TrendingUp, Heart } from 'lucide-react';
 import HeaderV2 from '@/components/HeaderV2';
 import FooterV2 from '@/components/FooterV2';
@@ -124,13 +125,13 @@ export default function PartnershipsPage() {
             <p className="text-[#52796F] mb-8 max-w-xl mx-auto">
               We'd love to hear from you. Reach out to discuss how we can work together to bring personalized wellness to more people.
             </p>
-            <a 
-              href="mailto:support@myones.ai?subject=Partnership Inquiry" 
+            <Link 
+              href="/contact?type=partnership" 
               className="inline-flex items-center gap-2 bg-[#1B4332] hover:bg-[#143728] text-white px-8 py-3 rounded-full font-medium transition-colors"
             >
               <Mail className="w-5 h-5" />
-              support@myones.ai
-            </a>
+              Contact Us
+            </Link>
           </div>
         </div>
       </section>

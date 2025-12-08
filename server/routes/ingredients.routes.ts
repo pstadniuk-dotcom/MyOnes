@@ -3,13 +3,13 @@
  * 
  * Handles all /api/ingredients/* endpoints:
  * - Ingredient catalog
- * - Base formula details
+ * - System support details
  * - Individual ingredient info and research
  */
 
 import { Router } from 'express';
 import { requireAuth } from './middleware';
-import { BASE_FORMULAS, INDIVIDUAL_INGREDIENTS, BASE_FORMULA_DETAILS, findIngredientByName } from '@shared/ingredients';
+import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, SYSTEM_SUPPORT_DETAILS, findIngredientByName } from '@shared/ingredients';
 import logger from '../logger';
 
 const router = Router();
@@ -18,7 +18,7 @@ const router = Router();
 router.get('/catalog', requireAuth, async (req, res) => {
   try {
     res.json({
-      baseFormulas: BASE_FORMULAS,
+      systemSupports: SYSTEM_SUPPORTS,
       individualIngredients: INDIVIDUAL_INGREDIENTS
     });
   } catch (error) {
@@ -27,15 +27,15 @@ router.get('/catalog', requireAuth, async (req, res) => {
   }
 });
 
-// Get detailed base formula breakdowns (ingredient compositions)
+// Get detailed system support breakdowns (ingredient compositions)
 router.get('/base-details', requireAuth, async (req, res) => {
   try {
     res.json({
-      baseFormulaDetails: BASE_FORMULA_DETAILS
+      systemSupportDetails: SYSTEM_SUPPORT_DETAILS
     });
   } catch (error) {
-    logger.error('Error fetching base formula details:', error);
-    res.status(500).json({ error: 'Failed to fetch base formula details' });
+    logger.error('Error fetching system support details:', error);
+    res.status(500).json({ error: 'Failed to fetch system support details' });
   }
 });
 

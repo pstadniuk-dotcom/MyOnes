@@ -66,19 +66,34 @@ export function WorkoutPreferencesDialog({
             <RadioGroup 
               value={experienceLevel} 
               onValueChange={setExperienceLevel}
-              className="flex flex-col space-y-1"
+              className="flex flex-col space-y-2"
             >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="beginner" id="beginner" />
-                <Label htmlFor="beginner">Beginner</Label>
+              <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+                <RadioGroupItem value="beginner" id="beginner" className="mt-1" />
+                <div className="flex-1">
+                  <Label htmlFor="beginner" className="font-semibold cursor-pointer">Beginner</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    New to strength training (&lt;1 year). Focus on form, machines, and foundational movements with higher reps.
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="intermediate" id="intermediate" />
-                <Label htmlFor="intermediate">Intermediate</Label>
+              <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+                <RadioGroupItem value="intermediate" id="intermediate" className="mt-1" />
+                <div className="flex-1">
+                  <Label htmlFor="intermediate" className="font-semibold cursor-pointer">Intermediate</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    1-3 years training. Comfortable with compound lifts, supersets, and progressive overload.
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="advanced" id="advanced" />
-                <Label htmlFor="advanced">Advanced</Label>
+              <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+                <RadioGroupItem value="advanced" id="advanced" className="mt-1" />
+                <div className="flex-1">
+                  <Label htmlFor="advanced" className="font-semibold cursor-pointer">Advanced</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    3+ years training. Ready for complex periodization, intensity techniques, and Olympic lifts.
+                  </p>
+                </div>
               </div>
             </RadioGroup>
           </div>

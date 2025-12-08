@@ -28,7 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { FormulaCustomizationDialog } from '@/components/FormulaCustomizationDialog';
 import { CustomFormulaBuilderDialog } from '@/components/CustomFormulaBuilderDialog';
-import { ResearchCitationCard } from '@/components/ResearchCitationCard';
+import { ResearchCitationCard, ResearchSummaryDialog } from '@/components/ResearchCitationCard';
 import { ReviewScheduleCard } from '@/components/ReviewScheduleCard';
 import { calculateDosage } from '@/lib/utils';
 import type { ResearchCitation } from '@shared/schema';
@@ -153,7 +153,7 @@ export default function MyFormulaPage() {
 
   // Fetch ingredient catalog for individual ingredient benefits
   const { data: ingredientCatalog } = useQuery<{
-    baseFormulas: Array<{ name: string; doseMg: number; category: string; description?: string; benefits?: string[] }>;
+    systemSupports: Array<{ name: string; doseMg: number; category: string; description?: string; benefits?: string[] }>;
     individualIngredients: Array<{ name: string; doseMg: number; category: string; description?: string; benefits?: string[] }>;
   }>({
     queryKey: ['/api/ingredients/catalog'],
@@ -498,7 +498,7 @@ export default function MyFormulaPage() {
                     Customize Your Formula
                   </CardTitle>
                   <CardDescription>
-                    Add extra base formulations or individual ingredients to personalize your formula
+                    Add extra system supports or individual ingredients to personalize your formula
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -573,12 +573,12 @@ export default function MyFormulaPage() {
                   </div>
                   
                   <Separator />
-                  {/* Base Formulas */}
+                  {/* System Supports */}
                   {selectedFormula.bases.length > 0 && (
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-2">
                         <Beaker className="w-4 h-4" />
-                        Base Formulas ({selectedFormula.bases.length})
+                        System Supports ({selectedFormula.bases.length})
                       </h4>
                       <div className="space-y-2">
                         {selectedFormula.bases.map((base, idx) => (
@@ -893,7 +893,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
             <div className="font-bold text-lg text-primary leading-none mb-1.5">
               {formula.bases.length + (formula.userCustomizations?.addedBases?.length || 0)}
             </div>
-            <div className="text-xs text-muted-foreground text-center leading-tight">Base Formulas</div>
+            <div className="text-xs text-muted-foreground text-center leading-tight">System Supports</div>
           </div>
           <div className="flex flex-col items-center justify-center p-3 bg-muted/30 rounded-lg min-h-[72px]">
             <div className="font-bold text-lg text-blue-600 leading-none mb-1.5">
@@ -928,12 +928,12 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 space-y-3">
-            {/* Base Formulas */}
+            {/* System Supports */}
             {formula.bases.length > 0 && (
               <div>
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
                   <Beaker className="w-3 h-3" />
-                  Base Formulas
+                  System Supports
                 </h4>
                 <div className="space-y-1">
                   {formula.bases.map((base, idx) => (
@@ -1098,9 +1098,9 @@ function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
         <CardContent className="space-y-6">
           {/* Quick Stats */}
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="text-center p-4 bg-muted/30 rounded-lg" data-testid="stat-base-formulas">
+            <div className="text-center p-4 bg-muted/30 rounded-lg" data-testid="stat-system-supports">
               <div className="text-2xl font-bold text-primary">{formula.bases.length}</div>
-              <p className="text-sm text-muted-foreground">Base Formulas</p>
+              <p className="text-sm text-muted-foreground">System Supports</p>
             </div>
             <div className="text-center p-4 bg-muted/30 rounded-lg" data-testid="stat-custom-additions">
               <div className="text-2xl font-bold text-blue-600">{formula.additions.length}</div>
@@ -1114,12 +1114,12 @@ function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
 
           <Separator />
 
-          {/* Base Formulas */}
+          {/* System Supports */}
           {formula.bases.length > 0 && (
             <div>
               <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
                 <Target className="w-5 h-5" />
-                Base Formulas ({formula.bases.length})
+                System Supports ({formula.bases.length})
               </h3>
               <div className="grid gap-4">
                 {formula.bases.map((base, idx) => (
@@ -1295,7 +1295,7 @@ function IngredientsSection({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Ingredients</SelectItem>
-                <SelectItem value="bases">Base Formulas</SelectItem>
+                <SelectItem value="bases">System Supports</SelectItem>
                 <SelectItem value="additions">Custom Additions</SelectItem>
               </SelectContent>
             </Select>
@@ -1340,12 +1340,13 @@ function IngredientCard({
   const [expandedIngredients, setExpandedIngredients] = useState<Record<string, boolean>>({});
 
   const { data: ingredientDetail, isLoading } = useQuery<IngredientDetail>({
-    queryKey: ['/api/ingredients', encodeURIComponent(ingredient.ingredient)],
-    enabled: isExpanded
+    queryKey: ['/api/ingredients', ingredient.ingredient],
+    enabled: isExpanded,
+    staleTime: 0, // Always fetch fresh data
   });
 
-  // Fetch base formula details if this is a base formula type
-  const { data: baseFormulaData } = useQuery<{ baseFormulaDetails: Array<{
+  // Fetch system support details if this is a system support type
+  const { data: systemSupportData } = useQuery<{ systemSupportDetails: Array<{
     name: string;
     doseMg: number;
     systemSupported: string;
@@ -1357,13 +1358,36 @@ function IngredientCard({
     enabled: ingredient.type === 'base' && isExpanded
   });
 
-  // Fetch research citations for this ingredient
-  const { data: researchCitations, isLoading: isLoadingResearch } = useQuery<ResearchCitation[]>({
-    queryKey: ['/api/ingredients', encodeURIComponent(ingredient.ingredient), 'research'],
-    enabled: isExpanded
+  // Fetch research citations for this ingredient - includes summary, benefits, and safety data
+  // Only fetch for individual ingredients, NOT system supports (which are proprietary blends)
+  const { data: researchData, isLoading: isLoadingResearch } = useQuery<{ 
+    ingredientName: string;
+    summary: string | null;
+    keyBenefits: string[];
+    safetyProfile: string | null;
+    recommendedFor: string[];
+    citations: Array<{
+      id: string;
+      citationTitle: string;
+      journal: string;
+      publicationYear: number;
+      authors?: string | null;
+      findings: string;
+      sampleSize?: number | null;
+      pubmedUrl?: string | null;
+      evidenceLevel: 'strong' | 'moderate' | 'preliminary' | 'limited';
+      studyType: 'rct' | 'meta_analysis' | 'systematic_review' | 'observational' | 'case_study' | 'review';
+    }>; 
+    totalCitations: number;
+  }>({
+    queryKey: ['/api/ingredients', ingredient.ingredient, 'research'],
+    enabled: isExpanded && ingredient.type !== 'base', // Skip research for system supports (proprietary blends)
+    staleTime: 0, // Always fetch fresh data
   });
 
-  const formulaBreakdown = baseFormulaData?.baseFormulaDetails.find(
+  const researchCitations = researchData?.citations || [];
+
+  const formulaBreakdown = systemSupportData?.systemSupportDetails.find(
     f => f.name === ingredient.ingredient
   );
 
@@ -1378,7 +1402,7 @@ function IngredientCard({
                 <div className="flex items-center gap-2 flex-wrap">
                   <CardTitle className="text-lg">{ingredient.ingredient}</CardTitle>
                   <Badge variant={ingredient.type === 'base' ? 'default' : 'outline'} data-testid={`badge-ingredient-type-${ingredient.ingredient}`}>
-                    {ingredient.type === 'base' ? 'Base Formula' : 'Addition'}
+                    {ingredient.type === 'base' ? 'System Support' : 'Addition'}
                   </Badge>
                   {ingredient.source === 'user' && (
                     <Badge variant="secondary" className="bg-purple-100 text-purple-800">
@@ -1411,7 +1435,7 @@ function IngredientCard({
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Base Formula Breakdown - Show for base formulas */}
+                {/* System Support Breakdown - Show for system supports */}
                 {ingredient.type === 'base' && formulaBreakdown && (
                   <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
                     <h4 className="font-semibold mb-3 flex items-center gap-2 text-primary">
@@ -1486,7 +1510,7 @@ function IngredientCard({
                 )}
 
                 {/* Benefits */}
-                {ingredientDetail && (
+                {ingredientDetail && ingredientDetail.benefits && ingredientDetail.benefits.length > 0 && (
                   <div>
                     <h4 className="font-medium mb-2 flex items-center gap-2">
                       <Heart className="w-4 h-4 text-red-500" />
@@ -1525,9 +1549,13 @@ function IngredientCard({
                       <div>
                         <h4 className="font-medium mb-2 flex items-center gap-2">
                           <BookOpen className="w-4 h-4 text-purple-500" />
-                          Research
+                          {ingredient.type === 'base' ? 'Proprietary Blend' : 'Research'}
                         </h4>
-                        {ingredientDetail.researchBacking && (
+                        {ingredient.type === 'base' ? (
+                          <p className="text-sm text-muted-foreground">
+                            This is a proprietary blend of multiple synergistic ingredients.
+                          </p>
+                        ) : ingredientDetail.researchBacking && (
                           <div className="space-y-1 text-sm">
                             <p>Studies: {ingredientDetail.researchBacking.studyCount}+</p>
                             <p>Evidence: {ingredientDetail.researchBacking.evidenceLevel}</p>
@@ -1537,6 +1565,7 @@ function IngredientCard({
                     </div>
 
                     {/* Sources */}
+                    {ingredientDetail.sources && ingredientDetail.sources.length > 0 && (
                     <div>
                       <h4 className="font-medium mb-2 flex items-center gap-2">
                         <Package className="w-4 h-4 text-green-500" />
@@ -1547,6 +1576,7 @@ function IngredientCard({
                           <Badge key={idx} variant="outline" className="text-xs">{source}</Badge>
                         ))}
                       </div>
+                      {ingredientDetail.qualityIndicators && ingredientDetail.qualityIndicators.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">
                         {ingredientDetail.qualityIndicators.map((indicator: string, idx: number) => (
                           <Badge key={idx} variant="secondary" className="text-xs">
@@ -1555,10 +1585,12 @@ function IngredientCard({
                           </Badge>
                         ))}
                       </div>
+                      )}
                     </div>
+                    )}
 
                     {/* Interactions */}
-                    {ingredientDetail.interactions.length > 0 && (
+                    {ingredientDetail.interactions && ingredientDetail.interactions.length > 0 && (
                       <div>
                         <h4 className="font-medium mb-2 flex items-center gap-2">
                           <AlertTriangle className="w-4 h-4 text-orange-500" />
@@ -1575,7 +1607,7 @@ function IngredientCard({
                     )}
 
                     {/* Alternatives */}
-                    {ingredientDetail.alternatives.length > 0 && (
+                    {ingredientDetail.alternatives && ingredientDetail.alternatives.length > 0 && (
                       <div>
                         <h4 className="font-medium mb-2 flex items-center gap-2">
                           <RefreshCw className="w-4 h-4 text-blue-500" />
@@ -1591,18 +1623,75 @@ function IngredientCard({
                   </>
                 )}
 
-                {/* Research Citations - Real studies from PubMed */}
-                {researchCitations && researchCitations.length > 0 && (
-                  <div>
-                    <h4 className="font-medium mb-3 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-blue-500" />
-                      Published Research
-                    </h4>
-                    <div className="space-y-3" data-testid={`research-citations-${ingredient.ingredient}`}>
-                      {researchCitations.map((citation) => (
-                        <ResearchCitationCard key={citation.id} citation={citation} />
-                      ))}
-                    </div>
+                {/* Research Summary & Citations Section */}
+                {researchData && (researchData.summary || researchCitations.length > 0) && (
+                  <div className="space-y-4">
+                    {/* Research Overview Card */}
+                    {researchData.summary && (
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-blue-800">
+                          <Sparkles className="w-4 h-4" />
+                          Research Overview
+                        </h4>
+                        <p className="text-sm text-blue-900 leading-relaxed line-clamp-3">{researchData.summary}</p>
+                        
+                        {/* Key benefits from research */}
+                        {researchData.keyBenefits && researchData.keyBenefits.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-blue-200">
+                            <p className="text-xs font-medium text-blue-800 mb-2">Research-Backed Benefits:</p>
+                            <ul className="space-y-1">
+                              {researchData.keyBenefits.slice(0, 3).map((benefit, idx) => (
+                                <li key={idx} className="text-xs text-blue-800 flex items-start gap-1.5">
+                                  <span className="text-green-600 mt-0.5">✓</span>
+                                  <span>{benefit}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        {/* View Full Research Button */}
+                        <div className="mt-3 pt-3 border-t border-blue-200">
+                          <ResearchSummaryDialog
+                            ingredientName={ingredient.ingredient}
+                            summary={researchData.summary}
+                            keyBenefits={researchData.keyBenefits || []}
+                            safetyProfile={researchData.safetyProfile}
+                            recommendedFor={researchData.recommendedFor || []}
+                            citations={researchCitations}
+                            totalCitations={researchData.totalCitations}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Individual Citation Cards - show first 2, rest in popup */}
+                    {!researchData.summary && researchCitations.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-3 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-blue-500" />
+                          Published Research ({researchData.totalCitations} studies)
+                        </h4>
+                        <div className="space-y-3" data-testid={`research-citations-${ingredient.ingredient}`}>
+                          {researchCitations.slice(0, 2).map((citation) => (
+                            <ResearchCitationCard key={citation.id} citation={citation} />
+                          ))}
+                          {researchCitations.length > 2 && (
+                            <div className="text-center pt-2">
+                              <ResearchSummaryDialog
+                                ingredientName={ingredient.ingredient}
+                                summary={researchData.summary}
+                                keyBenefits={researchData.keyBenefits || []}
+                                safetyProfile={researchData.safetyProfile}
+                                recommendedFor={researchData.recommendedFor || []}
+                                citations={researchCitations}
+                                totalCitations={researchData.totalCitations}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

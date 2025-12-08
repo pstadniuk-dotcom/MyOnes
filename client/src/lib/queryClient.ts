@@ -1,8 +1,21 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { buildApiUrl } from "@/lib/api";
 
+// Session expired event - components can listen for this
+export const SESSION_EXPIRED_EVENT = 'session-expired';
+
+function handleSessionExpired() {
+  // Dispatch event for AuthContext to handle
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    // Handle 401 errors globally - session expired
+    if (res.status === 401) {
+      handleSessionExpired();
+      throw new Error('Session expired. Please log in again.');
+    }
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
@@ -43,8 +56,13 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const endpoint = buildEndpointFromQueryKey(queryKey);
     const res = await fetch(buildApiUrl(endpoint), {
-      headers: getAuthHeaders(),
+      headers: {
+        ...getAuthHeaders(),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
       credentials: "include",
+      cache: 'no-store', // Force browser to not use cache
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
@@ -61,7 +79,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for 5 min
       retry: false,
     },
     mutations: {

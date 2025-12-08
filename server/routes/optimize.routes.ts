@@ -189,17 +189,31 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
           return res.status(400).json({ error: `Invalid plan type: ${planType}` });
       }
 
-      logger.info(`📝 Prompt built, length: ${prompt.length} chars`);
+      logger.info(`📝 Prompt built for ${planType}, length: ${prompt.length} chars`);
+      logger.info(`🎯 Preferences: ${JSON.stringify(preferences)}`);
 
       let planContent: any;
       let rationale = '';
+
+      // Build appropriate system message based on plan type
+      let systemMessage = '';
+      if (planType === 'workout') {
+        const expLevel = preferences?.experienceLevel || 'intermediate';
+        const exerciseCount = expLevel === 'beginner' ? '6-7' : expLevel === 'advanced' ? '10-12' : '8';
+        systemMessage = `You are a certified strength and conditioning specialist. You MUST generate a complete 7-day workout program. Each WORKOUT DAY (non-rest day) MUST contain ${exerciseCount} exercises for ${expLevel} level. COUNT your exercises before responding. The response must be valid JSON.`;
+        logger.info(`💪 Workout generation for ${expLevel} level - expecting ${exerciseCount} exercises per session`);
+      } else if (planType === 'nutrition') {
+        systemMessage = "You are a clinical nutrition expert. You MUST generate a complete 7-day meal plan (Monday-Sunday). Do not stop early. The response must be valid JSON containing all 7 days.";
+      } else {
+        systemMessage = "You are a functional medicine lifestyle coach. You MUST generate a complete 7-day lifestyle protocol. The response must be valid JSON containing all 7 days.";
+      }
 
       try {
         logger.info('⏳ Calling OpenAI API...');
         const response = await openai.chat.completions.create({
           model: 'gpt-4o-2024-08-06',
           messages: [
-            { role: 'system', content: "You are a clinical nutrition expert. You MUST generate a complete 7-day meal plan (Monday-Sunday). Do not stop early. The response must be valid JSON containing all 7 days." },
+            { role: 'system', content: systemMessage },
             { role: 'user', content: prompt }
           ],
           temperature: 0.7,
@@ -215,6 +229,22 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
         rationale = planContent.weeklyGuidance || planContent.programOverview || planContent.focusAreas || 'Personalized plan generated';
         
         logger.info(`✅ AI response received, length: ${content.length} chars`);
+
+        // Log workout exercise counts for debugging
+        if (planType === 'workout' && planContent.weekPlan) {
+          const exerciseCounts = planContent.weekPlan
+            .filter((day: any) => !day.isRestDay && day.workout?.exercises)
+            .map((day: any) => `${day.dayName}: ${day.workout.exercises.length} exercises`);
+          logger.info(`📊 Workout exercise counts: ${exerciseCounts.join(', ')}`);
+          
+          const expLevel = preferences?.experienceLevel || 'intermediate';
+          const minExpected = expLevel === 'beginner' ? 6 : expLevel === 'advanced' ? 10 : 8;
+          const underCount = planContent.weekPlan
+            .filter((day: any) => !day.isRestDay && day.workout?.exercises?.length < minExpected);
+          if (underCount.length > 0) {
+            logger.warn(`⚠️ Some workouts have fewer exercises than expected for ${expLevel} level (min: ${minExpected})`);
+          }
+        }
       } catch (aiError) {
         logger.error(`❌ AI generation error for ${planType}:`, aiError);
         planContent = { error: 'Failed to generate plan', details: aiError instanceof Error ? aiError.message : 'Unknown error' };
@@ -597,7 +627,28 @@ router.post('/workout/log', requireAuth, async (req, res) => {
 router.post('/daily-logs', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const { date, nutritionCompleted, workoutCompleted, supplementsTaken, waterIntakeOz, energyLevel, moodLevel, sleepQuality, notes } = req.body ?? {};
+    const {
+      date,
+      nutritionCompleted,
+      workoutCompleted,
+      supplementsTaken,
+      supplementMorning,
+      supplementAfternoon,
+      supplementEvening,
+      waterIntakeOz,
+      energyLevel,
+      moodLevel,
+      sleepQuality,
+      notes,
+    } = req.body ?? {};
+
+    // Debug logging for incoming request
+    console.log('📝 Daily log POST - incoming body:', {
+      supplementMorning,
+      supplementAfternoon,
+      supplementEvening,
+      userId: userId.substring(0, 8) + '...',
+    });
 
     const logDate = date ? new Date(date) : new Date();
     if (Number.isNaN(logDate.getTime())) {
@@ -621,23 +672,65 @@ router.post('/daily-logs', requireAuth, async (req, res) => {
 
     const existingLog = await storage.getDailyLog(userId, logDate);
 
+    // Handle granular supplement tracking
+    const resolvedMorning = typeof supplementMorning === 'boolean' 
+      ? supplementMorning 
+      : existingLog?.supplementMorning ?? false;
+    const resolvedAfternoon = typeof supplementAfternoon === 'boolean' 
+      ? supplementAfternoon 
+      : existingLog?.supplementAfternoon ?? false;
+    const resolvedEvening = typeof supplementEvening === 'boolean' 
+      ? supplementEvening 
+      : existingLog?.supplementEvening ?? false;
+    
+    // supplementsTaken is true if any dose was taken (for backwards compatibility)
+    const resolvedSupplementsTaken = typeof supplementsTaken === 'boolean'
+      ? supplementsTaken
+      : ((resolvedMorning || resolvedAfternoon || resolvedEvening) || (existingLog?.supplementsTaken ?? false));
+
     const resolvedLog = {
-      nutritionCompleted: typeof nutritionCompleted === 'boolean' ? nutritionCompleted : existingLog?.nutritionCompleted ?? false,
-      workoutCompleted: typeof workoutCompleted === 'boolean' ? workoutCompleted : existingLog?.workoutCompleted ?? false,
-      supplementsTaken: typeof supplementsTaken === 'boolean' ? supplementsTaken : existingLog?.supplementsTaken ?? false,
+      nutritionCompleted: typeof nutritionCompleted === 'boolean'
+        ? nutritionCompleted
+        : existingLog?.nutritionCompleted ?? false,
+      workoutCompleted: typeof workoutCompleted === 'boolean'
+        ? workoutCompleted
+        : existingLog?.workoutCompleted ?? false,
+      supplementsTaken: resolvedSupplementsTaken,
+      supplementMorning: resolvedMorning,
+      supplementAfternoon: resolvedAfternoon,
+      supplementEvening: resolvedEvening,
       waterIntakeOz: normalizeWater(waterIntakeOz) ?? existingLog?.waterIntakeOz ?? null,
       energyLevel: clampRating(energyLevel) ?? existingLog?.energyLevel ?? null,
       moodLevel: clampRating(moodLevel) ?? existingLog?.moodLevel ?? null,
       sleepQuality: clampRating(sleepQuality) ?? existingLog?.sleepQuality ?? null,
-      notes: typeof notes === 'string' && notes.trim().length ? notes.trim() : existingLog?.notes ?? null,
+      notes: typeof notes === 'string' && notes.trim().length
+        ? notes.trim()
+        : existingLog?.notes ?? null,
     };
 
     let updatedLog: OptimizeDailyLog | undefined;
     if (existingLog) {
       updatedLog = await storage.updateDailyLog(existingLog.id, resolvedLog);
+      console.log('📝 Daily log updated:', {
+        logId: existingLog.id,
+        supplementMorning: resolvedLog.supplementMorning,
+        supplementAfternoon: resolvedLog.supplementAfternoon,
+        supplementEvening: resolvedLog.supplementEvening,
+      });
       await storage.updateUserStreak(userId, logDate);
     } else {
-      updatedLog = await storage.createDailyLog({ userId, logDate, mealsLogged: [], ...resolvedLog });
+      updatedLog = await storage.createDailyLog({
+        userId,
+        logDate,
+        mealsLogged: [],
+        ...resolvedLog,
+      });
+      console.log('📝 Daily log created:', {
+        logId: updatedLog?.id,
+        supplementMorning: resolvedLog.supplementMorning,
+        supplementAfternoon: resolvedLog.supplementAfternoon,
+        supplementEvening: resolvedLog.supplementEvening,
+      });
     }
 
     const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle'] as const;
@@ -903,14 +996,97 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const logs = await storage.getAllWorkoutLogs(userId);
+    
+    // Fetch saved PRs from exercise_records
+    const exerciseRecords = await storage.getExerciseRecords(userId);
+    const savedPRs: Record<string, { weight: number, date: string }> = {};
+    exerciseRecords.forEach(record => {
+      if (record.isPrTracked && record.prWeight && record.prDate) {
+        savedPRs[record.exerciseName] = {
+          weight: record.prWeight,
+          date: record.prDate.toISOString(),
+        };
+      }
+    });
+
+    // Helper to identify muscle groups from exercise name
+    function identifyMuscleGroup(exerciseName: string): string[] {
+      const name = exerciseName.toLowerCase();
+      const groups: string[] = [];
+      
+      // Chest
+      if (name.includes('bench') || name.includes('push-up') || name.includes('pushup') || name.includes('push up') || 
+          name.includes('chest') || name.includes('fly') || name.includes('pec') || name.includes('dip')) {
+        groups.push('Chest');
+      }
+      // Shoulders
+      if (name.includes('shoulder') || name.includes('press') || name.includes('lateral') || name.includes('delt') || 
+          name.includes('overhead') || name.includes('raise') || name.includes('military')) {
+        groups.push('Shoulders');
+      }
+      // Back
+      if (name.includes('row') || name.includes('pull') || name.includes('lat') || name.includes('back') || 
+          name.includes('chin') || name.includes('shrug')) {
+        groups.push('Back');
+      }
+      // Biceps
+      if (name.includes('curl') || name.includes('bicep')) {
+        groups.push('Biceps');
+      }
+      // Triceps
+      if (name.includes('tricep') || name.includes('extension') || name.includes('pushdown') || name.includes('skull')) {
+        groups.push('Triceps');
+      }
+      // Quads/Legs
+      if (name.includes('squat') || name.includes('leg') || name.includes('quad') || name.includes('lunge') || 
+          name.includes('jump') || name.includes('step') || name.includes('knee') || name.includes('sled')) {
+        groups.push('Legs');
+      }
+      // Hamstrings
+      if (name.includes('deadlift') || name.includes('hamstring') || name.includes('rdl') || name.includes('good morning')) {
+        groups.push('Hamstrings');
+      }
+      // Calves
+      if (name.includes('calf') || name.includes('calves')) {
+        groups.push('Calves');
+      }
+      // Glutes
+      if (name.includes('glute') || name.includes('hip thrust') || name.includes('bridge')) {
+        groups.push('Glutes');
+      }
+      // Core
+      if (name.includes('ab') || name.includes('core') || name.includes('plank') || name.includes('crunch') || 
+          name.includes('twist') || name.includes('sit-up') || name.includes('situp') || name.includes('hollow')) {
+        groups.push('Core');
+      }
+      // Olympic/Power lifts - Full Body
+      if (name.includes('clean') || name.includes('snatch') || name.includes('jerk') || name.includes('thruster')) {
+        groups.push('Full Body');
+      }
+      
+      // Skip warmups/cooldowns - don't count them as "Other"
+      if (name.includes('warmup') || name.includes('warm-up') || name.includes('warm up') || 
+          name.includes('cooldown') || name.includes('cool-down') || name.includes('cool down') ||
+          name.includes('stretch') || name.includes('pose') || name.includes('mobility')) {
+        // Return the groups found, or skip entirely if none
+        return groups.length > 0 ? groups : [];
+      }
+      
+      return groups.length > 0 ? groups : ['Other'];
+    }
 
     const volumeByWeek: Record<string, number> = {};
-    const personalRecords: Record<string, { weight: number, date: string }> = {};
     const workoutsByWeek: Record<string, number> = {};
     const exerciseCounts: Record<string, number> = {};
+    const muscleGroupCounts: Record<string, number> = {};
     
     const currentWeekStart = startOfWeek(new Date());
     let durationThisWeek = 0;
+    
+    // Completion tracking
+    let totalExercisesLogged = 0;
+    let totalExercisesSkipped = 0;
+    const skippedExerciseCounts: Record<string, number> = {};
 
     logs.forEach(log => {
       const date = new Date(log.completedAt);
@@ -922,20 +1098,35 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
 
       let logVolume = 0;
       const exercises = log.exercisesCompleted as any;
+      
       if (exercises && Array.isArray(exercises)) {
         exercises.forEach((ex: any) => {
+          // Track skipped exercises
+          if (ex.skipped) {
+            totalExercisesSkipped++;
+            skippedExerciseCounts[ex.name] = (skippedExerciseCounts[ex.name] || 0) + 1;
+            return; // Skip volume calculation for skipped exercises
+          }
+          
+          totalExercisesLogged++;
           exerciseCounts[ex.name] = (exerciseCounts[ex.name] || 0) + 1;
+          
+          // Track muscle group counts
+          const muscleGroups = identifyMuscleGroup(ex.name);
+          muscleGroups.forEach(group => {
+            muscleGroupCounts[group] = (muscleGroupCounts[group] || 0) + 1;
+          });
 
-          if (ex.sets && Array.isArray(ex.sets)) {
+          // Use pre-calculated volume if available
+          if (typeof ex.totalVolume === 'number' && ex.totalVolume > 0) {
+            logVolume += ex.totalVolume;
+          } else if (ex.sets && Array.isArray(ex.sets)) {
+            // Calculate volume from individual sets if not pre-calculated
             ex.sets.forEach((set: any) => {
               const weight = Number(set.weight) || 0;
               const reps = Number(set.reps) || 0;
-              logVolume += weight * reps;
-
-              if (weight > 0) {
-                if (!personalRecords[ex.name] || weight > personalRecords[ex.name].weight) {
-                  personalRecords[ex.name] = { weight, date: log.completedAt.toISOString() };
-                }
+              if (set.completed || (weight > 0 && reps > 0)) {
+                logVolume += weight * reps;
               }
             });
           }
@@ -991,18 +1182,169 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
+    // Muscle Group Breakdown
+    const muscleGroupBreakdown = Object.entries(muscleGroupCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // Calculate completion rate
+    const totalExercises = totalExercisesLogged + totalExercisesSkipped;
+    const completionRate = totalExercises > 0 
+      ? Math.round((totalExercisesLogged / totalExercises) * 100) 
+      : 100;
+    
+    // Top skipped exercises
+    const mostSkippedExercises = Object.entries(skippedExerciseCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
     res.json({
       volumeChartData,
-      personalRecords,
+      personalRecords: savedPRs, // Use manually saved PRs from exercise_records table
       consistencyData,
       currentStreak,
       totalWorkouts: logs.length,
       topExercises,
-      durationThisWeek
+      durationThisWeek,
+      muscleGroupBreakdown,
+      // Completion stats
+      completionRate,
+      totalExercisesLogged,
+      totalExercisesSkipped,
+      mostSkippedExercises
     });
   } catch (error) {
     logger.error('Error fetching workout analytics:', error);
     res.status(500).json({ error: 'Failed to fetch workout analytics' });
+  }
+});
+
+// =====================
+// Exercise Records / PRs
+// =====================
+
+// Get all tracked PRs for a user
+router.get('/exercise-records/prs', requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const prs = await storage.getTrackedPRs(userId);
+    res.json(prs);
+  } catch (error) {
+    logger.error('Error fetching PRs:', error);
+    res.status(500).json({ error: 'Failed to fetch PRs' });
+  }
+});
+
+// Get exercise records for weight suggestions
+router.get('/exercise-records', requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const records = await storage.getExerciseRecords(userId);
+    res.json(records);
+  } catch (error) {
+    logger.error('Error fetching exercise records:', error);
+    res.status(500).json({ error: 'Failed to fetch exercise records' });
+  }
+});
+
+// Get single exercise record (for weight suggestion)
+router.get('/exercise-records/:exerciseName', requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const exerciseName = decodeURIComponent(req.params.exerciseName);
+    const record = await storage.getExerciseRecord(userId, exerciseName);
+    res.json(record || null);
+  } catch (error) {
+    logger.error('Error fetching exercise record:', error);
+    res.status(500).json({ error: 'Failed to fetch exercise record' });
+  }
+});
+
+// Update single exercise record (last weight used)
+router.post('/exercise-records', requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const { exerciseName, weight, reps } = req.body;
+    
+    if (!exerciseName || weight === undefined) {
+      return res.status(400).json({ error: 'exerciseName and weight are required' });
+    }
+    
+    const record = await storage.upsertExerciseRecord(userId, exerciseName, {
+      lastWeight: weight,
+      lastReps: reps,
+    });
+    
+    res.json(record);
+  } catch (error) {
+    logger.error('Error updating exercise record:', error);
+    res.status(500).json({ error: 'Failed to update exercise record' });
+  }
+});
+
+// Save a PR manually
+router.post('/exercise-records/pr', requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const { exerciseName, weight, reps } = req.body;
+    
+    if (!exerciseName || !weight) {
+      return res.status(400).json({ error: 'exerciseName and weight are required' });
+    }
+    
+    const record = await storage.upsertExerciseRecord(userId, exerciseName, {
+      prWeight: weight,
+      prReps: reps,
+      isPrTracked: true,
+    });
+    
+    res.json(record);
+  } catch (error) {
+    logger.error('Error saving PR:', error);
+    res.status(500).json({ error: 'Failed to save PR' });
+  }
+});
+
+// Update last logged weight (called when logging a workout)
+router.post('/exercise-records/log', requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const { exercises } = req.body; // Array of { name, weight, reps }
+    
+    if (!exercises || !Array.isArray(exercises)) {
+      return res.status(400).json({ error: 'exercises array is required' });
+    }
+    
+    const results = await Promise.all(
+      exercises.map(async (ex: { name: string; weight: number; reps?: number }) => {
+        if (ex.weight > 0) {
+          return storage.upsertExerciseRecord(userId, ex.name, {
+            lastWeight: ex.weight,
+            lastReps: ex.reps,
+          });
+        }
+        return null;
+      })
+    );
+    
+    res.json({ updated: results.filter(Boolean).length });
+  } catch (error) {
+    logger.error('Error logging exercise weights:', error);
+    res.status(500).json({ error: 'Failed to log exercise weights' });
+  }
+});
+
+// Delete a PR
+router.delete('/exercise-records/pr/:exerciseName', requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const exerciseName = decodeURIComponent(req.params.exerciseName);
+    const success = await storage.deleteExercisePR(userId, exerciseName);
+    res.json({ success });
+  } catch (error) {
+    logger.error('Error deleting PR:', error);
+    res.status(500).json({ error: 'Failed to delete PR' });
   }
 });
 

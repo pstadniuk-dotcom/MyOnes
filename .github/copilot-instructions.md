@@ -73,7 +73,7 @@ node check-deployment.mjs         # Check all config before deploy
 
 ### Ingredient System
 **Source of truth:** `shared/ingredients.ts`
-- **Base Formulas (18):** Fixed-dose proprietary blends (e.g., "Adrenal Support" = 420mg)
+- **System Supports (18):** Fixed-dose proprietary blends (e.g., "Adrenal Support" = 420mg)
 - **Individual Ingredients (200+):** Flexible dosing within ranges (e.g., Ashwagandha: 600mg fixed)
 - **Formula limits:** Max 5500mg total per formula (enforced server-side)
 

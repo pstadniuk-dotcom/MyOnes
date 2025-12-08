@@ -19,7 +19,7 @@ export interface SubIngredient {
   benefits?: string[];
 }
 
-export interface BaseFormulaDetails {
+export interface SystemSupportDetails {
   name: string;
   doseMg: number;
   systemSupported: string;
@@ -29,117 +29,153 @@ export interface BaseFormulaDetails {
 }
 
 // ============================================================================
-// BASE FORMULAS (18 total) - FIXED dosages, cannot be adjusted
+// SYSTEM SUPPORTS (18 total) - FIXED dosages, cannot be adjusted
 // ============================================================================
 
-export const BASE_FORMULAS: IngredientInfo[] = [
+export const SYSTEM_SUPPORTS: IngredientInfo[] = [
   {
     name: 'Adrenal Support',
     doseMg: 420,
+    doseRangeMin: 420,
+    doseRangeMax: 1260,
     category: 'base',
     description: 'Supports adrenal gland function and stress response. This complex of vitamins and herbs may help to alleviate signs of Adrenal Fatigue.',
   },
   {
     name: 'Beta Max',
-    doseMg: 2500,
+    doseMg: 650,
+    doseRangeMin: 650,
+    doseRangeMax: 1950,
     category: 'base',
     description: 'Supports liver, gallbladder, and pancreas. Helps regulate multiple hepatic functions such as lipid and carbohydrate metabolism and proper liver functions.',
   },
   {
     name: 'C Boost',
-    doseMg: 1680,
+    doseMg: 598,
+    doseRangeMin: 598,
+    doseRangeMax: 1794,
     category: 'base',
-    description: 'Vitamin C and bioflavonoids blend with antioxidant and anti-inflammatory properties. Helps the body fight against viral infections.',
+    description: 'Vitamin C and bioflavonoids blend with antioxidant and anti-inflammatory properties. Supports soft tissue health.',
   },
   {
     name: 'Endocrine Support',
-    doseMg: 350,
+    doseMg: 335,
+    doseRangeMin: 335,
+    doseRangeMax: 1005,
     category: 'base',
-    description: 'Supports the endocrine system with pantothenic acid, manganese, and glandular sources. Helps utilize vitamins, improve energy production and ensure proper liver function.',
+    description: 'Supports endocrine system and pancreatic health. Helps utilize vitamins, improve energy production and ensure proper liver function.',
   },
   {
     name: 'Heart Support',
-    doseMg: 450,
+    doseMg: 689,
+    doseRangeMin: 689,
+    doseRangeMax: 2067,
     category: 'base',
     description: 'Supports heart function with magnesium, l-carnitine and l-taurine. Aids in blood pressure, nervous system, heart failure, oxidative stress, and myocardial contractions.',
   },
   {
     name: 'Histamine Support',
-    doseMg: 190,
+    doseMg: 200,
+    doseRangeMin: 200,
+    doseRangeMax: 600,
     category: 'base',
-    description: 'Important for immune system support when compromised. Helps stabilize mast cell membranes and reduce histamine reactions.',
+    description: 'Supports immune system and normal levels of histamine. Helps stabilize mast cell membranes and reduce histamine reactions.',
   },
   {
     name: 'Immune-C',
-    doseMg: 430,
+    doseMg: 358,
+    doseRangeMin: 358,
+    doseRangeMax: 1074,
     category: 'base',
-    description: 'Powerful immune support formulation with Graviola, vitamin C, Camu Camu berry, and Cats Claw.',
+    description: 'Supports immune system health with Graviola, vitamin C, Camu Camu berry, Cats Claw, and Astragalus.',
   },
   {
     name: 'Kidney & Bladder Support',
     doseMg: 400,
+    doseRangeMin: 400,
+    doseRangeMax: 1200,
     category: 'base',
     description: 'Supports kidney and bladder function. May improve blood pressure and blood sugar; helps flush kidney stones and stop inflammatory diseases of the urinary tract.',
   },
   {
     name: 'Ligament Support',
-    doseMg: 400,
+    doseMg: 130,
+    doseRangeMin: 130,
+    doseRangeMax: 390,
     category: 'base',
     description: 'Supports muscles and connective tissue. Helps improve stiffness, inflammation, arthritis, joint support, and soreness.',
   },
   {
     name: 'Liver Support',
-    doseMg: 480,
+    doseMg: 530,
+    doseRangeMin: 530,
+    doseRangeMax: 1590,
     category: 'base',
-    description: 'For individuals experiencing decreased liver functions. Helps reduce fatty necrosis, reduce stress on liver, support bile production, and improve liver function.',
+    description: 'Supports liver health. Helps reduce fatty necrosis, reduce stress on liver, support bile production, and improve liver function.',
   },
   {
     name: 'Lung Support',
-    doseMg: 250,
+    doseMg: 242,
+    doseRangeMin: 242,
+    doseRangeMax: 726,
     category: 'base',
-    description: 'Supports lungs and immune system. Combination of vitamins and antioxidants support lungs, lymph nodes and thymus.',
+    description: 'Supports lung and immune system health. Combination of vitamins and antioxidants support lungs, lymph nodes and thymus.',
   },
   {
     name: 'MG/K',
-    doseMg: 540,
+    doseMg: 90,
+    doseRangeMin: 90,
+    doseRangeMax: 270,
     category: 'base',
-    description: 'Concentrated blend of seven forms of magnesium bound in potassium. Supports autonomic nervous system, adrenal glands, muscles, blood sugar, bone and DNA.',
+    description: 'Magnesium Complex - concentrated blend of seven forms of magnesium bound in potassium. Supports autonomic nervous system, adrenal glands, muscles, blood sugar, bone and DNA.',
   },
   {
     name: 'Mold RX',
     doseMg: 525,
+    doseRangeMin: 525,
+    doseRangeMax: 1575,
     category: 'base',
     description: 'Detoxification of molds. Oregano, Chaga, Sage produce powerful antifungal, antibacterial and anti-inflammatory effects against mold.',
   },
   {
     name: 'Ovary Uterus Support',
-    doseMg: 300,
+    doseMg: 253,
+    doseRangeMin: 253,
+    doseRangeMax: 759,
     category: 'base',
-    description: 'Supports female reproductive system. Helps regulate women\'s cycles, alleviate muscle spasms and may reduce risk for certain cancers.',
+    description: 'Supports female reproductive system health. Helps regulate women\'s cycles, alleviate muscle spasms and may reduce risk for certain cancers.',
   },
   {
     name: 'Para X',
-    doseMg: 500,
+    doseMg: 523,
+    doseRangeMin: 523,
+    doseRangeMax: 1569,
     category: 'base',
-    description: 'Eliminates parasites from the body through detox. Black walnut and wormwood treat parasitic worm infections naturally.',
+    description: 'Supports intestinal health when exposed to parasites. Black walnut and wormwood treat parasitic worm infections naturally.',
   },
   {
     name: 'Prostate Support',
-    doseMg: 300,
+    doseMg: 202,
+    doseRangeMin: 202,
+    doseRangeMax: 606,
     category: 'base',
-    description: 'Supports prostate and male reproductive systems. Encourages anti-inflammation and proper function.',
+    description: 'Supports general prostate health. Encourages anti-inflammation and proper function.',
   },
   {
     name: 'Spleen Support',
-    doseMg: 400,
+    doseMg: 203,
+    doseRangeMin: 203,
+    doseRangeMax: 609,
     category: 'base',
-    description: 'Supports liver, kidney, and spleen. Dandelion and nettle help the endocrine system including the spleen.',
+    description: 'Supports spleen and lymphatic system health. Dandelion and nettle help the endocrine system including the spleen.',
   },
   {
     name: 'Thyroid Support',
-    doseMg: 470,
+    doseMg: 291,
+    doseRangeMin: 291,
+    doseRangeMax: 873,
     category: 'base',
-    description: 'Provides necessary nutrients for proper thyroid function. Combines iodine and glandular concentrates.',
+    description: 'Supports thyroid health. Provides necessary nutrients for proper thyroid function. Combines iodine and glandular concentrates.',
   },
 ];
 
@@ -740,10 +776,10 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
 ];
 
 // ============================================================================
-// DETAILED BREAKDOWN OF BASE FORMULAS
+// DETAILED BREAKDOWN OF SYSTEM SUPPORTS
 // ============================================================================
 
-export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
+export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
   {
     name: 'Adrenal Support',
     doseMg: 420,
@@ -1707,7 +1743,7 @@ export const BASE_FORMULA_DETAILS: BaseFormulaDetails[] = [
 ];
 
 // Combined catalog of ALL approved ingredients
-export const ALL_INGREDIENTS = [...BASE_FORMULAS, ...INDIVIDUAL_INGREDIENTS];
+export const ALL_INGREDIENTS = [...SYSTEM_SUPPORTS, ...INDIVIDUAL_INGREDIENTS];
 
 // ============================================================================
 // INGREDIENT NAME ALIASES - Maps common variations to canonical names
@@ -1728,7 +1764,7 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'pc': 'Phosphatidylcholine',
   'phosphocholine': 'Phosphatidylcholine',
   
-  // Base Formula spacing variations
+  // System Support spacing variations
   'cboost': 'C Boost',
   'c-boost': 'C Boost',
   
@@ -1825,9 +1861,9 @@ export function isValidIngredient(name: string): boolean {
   return findIngredientByName(name) !== undefined;
 }
 
-export function getBaseFormulaDetails(name: string): BaseFormulaDetails | undefined {
+export function getSystemSupportDetails(name: string): SystemSupportDetails | undefined {
   const normalizedName = normalizeIngredientName(name);
-  return BASE_FORMULA_DETAILS.find(
+  return SYSTEM_SUPPORT_DETAILS.find(
     formula => formula.name.toLowerCase() === normalizedName.toLowerCase()
   );
 }

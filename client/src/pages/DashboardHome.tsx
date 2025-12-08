@@ -7,12 +7,11 @@ import {
   MessageSquare, 
   FlaskConical, 
   Package, 
-  TrendingUp, 
   Upload,
   Shield,
   Sparkles,
   PlayCircle,
-  Activity,
+  TrendingUp,
   
 } from 'lucide-react';
 import { Link } from 'wouter';
@@ -114,13 +113,13 @@ export default function HomePage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6" data-testid="page-home">
-      {/* Personal Greeting */}
+      {/* Personal Greeting - V2 Branding */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground mb-1" data-testid="text-greeting">
+          <h1 className="text-3xl font-semibold text-[#1B4332] mb-1" data-testid="text-greeting">
             Long live {userName}.
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-[#52796F]">
             {isNewUser 
               ? "Start your personalized supplement journey" 
               : "Your health journey overview"
@@ -129,45 +128,45 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Quick Stats */}
+      {/* Quick Stats - V2 Styled Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         {/* Profile Completeness */}
         <Card 
           data-testid="card-profile-completeness" 
-          className="hover-elevate cursor-pointer"
+          className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer"
           onClick={() => setShowProfileDialog(true)}
         >
           <CardHeader className="space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Profile Completeness</CardTitle>
+            <CardTitle className="text-sm font-medium text-[#52796F]">Profile Completeness</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold text-primary mb-1">
+            <div className="text-3xl font-semibold text-[#1B4332] mb-1">
               {metrics?.profileCompleteness || 0}%
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[#52796F]">
               {metrics?.nextAction || 'Complete your profile'}
             </p>
-            <Progress value={metrics?.profileCompleteness || 0} className="mt-2 h-1" />
+            <Progress value={metrics?.profileCompleteness || 0} className="mt-2 h-1 bg-[#1B4332]/10" />
           </CardContent>
         </Card>
 
         {/* Formula Version */}
-        <Card data-testid="card-formula-version" className="hover-elevate">
+        <Card data-testid="card-formula-version" className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all">
           <CardHeader className="space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Current Formula</CardTitle>
+            <CardTitle className="text-sm font-medium text-[#52796F]">Current Formula</CardTitle>
           </CardHeader>
           <CardContent>
             {currentFormula ? (
               <>
-                <div className="text-3xl font-semibold mb-1">
+                <div className="text-3xl font-semibold text-[#1B4332] mb-1">
                   {currentFormula.name || `Version ${currentFormula.version}`}
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-[#52796F]">
                   {currentFormula.name && `Version ${currentFormula.version} • `}
                   {currentFormula.bases.length + (currentFormula.additions?.length || 0)} ingredients
                 </p>
                 <div className="mt-2">
-                  <Badge variant="secondary" className="text-xs gap-1">
+                  <Badge className="text-xs gap-1 bg-[#1B4332]/10 text-[#1B4332] hover:bg-[#1B4332]/20">
                     <Shield className="w-3 h-3" />
                     Active
                   </Badge>
@@ -175,10 +174,10 @@ export default function HomePage() {
               </>
             ) : (
               <>
-                <div className="text-2xl font-semibold mb-1 text-muted-foreground">
+                <div className="text-2xl font-semibold mb-1 text-[#52796F]">
                   Not created
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-[#52796F]">
                   Start consultation
                 </p>
               </>
@@ -187,57 +186,57 @@ export default function HomePage() {
         </Card>
 
         {/* Consultations */}
-        <Card data-testid="card-consultations" className="hover-elevate">
+        <Card data-testid="card-consultations" className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all">
           <CardHeader className="space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Consultations</CardTitle>
+            <CardTitle className="text-sm font-medium text-[#52796F]">Consultations</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold mb-1">
+            <div className="text-3xl font-semibold text-[#1B4332] mb-1">
               {metrics?.consultationsSessions || 0}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[#52796F]">
               AI sessions completed
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* New User Onboarding */}
+      {/* New User Onboarding - V2 Styled */}
       {isNewUser && (
-        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-onboarding">
+        <Card className="border-[#1B4332]/20 bg-gradient-to-r from-[#1B4332]/5 to-[#52796F]/10" data-testid="card-onboarding">
           <CardContent className="p-6">
             <div className="space-y-4">
               <div>
-                <h2 className="text-2xl font-semibold text-primary mb-2">
-                  Welcome to Ones AI
+                <h2 className="text-2xl font-semibold text-[#1B4332] mb-2">
+                  Welcome to ONES AI
                 </h2>
-                <p className="text-muted-foreground">
+                <p className="text-[#52796F]">
                   Let's create your personalized supplement formula. Our AI will analyze your health profile to recommend the perfect blend.
                 </p>
               </div>
               
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1B4332] text-white text-sm font-medium">
                     1
                   </div>
-                  <span className="text-sm">Start with an AI consultation</span>
+                  <span className="text-sm text-[#1B4332]">Start with an AI consultation</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-medium">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1B4332]/10 text-[#52796F] text-sm font-medium">
                     2
                   </div>
-                  <span className="text-sm text-muted-foreground">Get personalized formula</span>
+                  <span className="text-sm text-[#52796F]">Get personalized formula</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-medium">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1B4332]/10 text-[#52796F] text-sm font-medium">
                     3
                   </div>
-                  <span className="text-sm text-muted-foreground">Receive supplements monthly</span>
+                  <span className="text-sm text-[#52796F]">Receive supplements monthly</span>
                 </div>
               </div>
 
-              <Button asChild className="gap-2" data-testid="button-start-consultation">
+              <Button asChild className="gap-2 bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-6" data-testid="button-start-consultation">
                 <Link href="/dashboard/chat">
                   <PlayCircle className="w-4 h-4" />
                   Start Consultation
@@ -248,21 +247,21 @@ export default function HomePage() {
         </Card>
       )}
 
-      {/* Current Formula Preview */}
+      {/* Current Formula Preview - V2 Styled */}
       {currentFormula && (
-        <Card data-testid="card-formula-preview">
+        <Card data-testid="card-formula-preview" className="bg-white border-[#1B4332]/10">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <FlaskConical className="w-5 h-5 text-primary" />
+                <CardTitle className="flex items-center gap-2 text-[#1B4332]">
+                  <FlaskConical className="w-5 h-5 text-[#1B4332]" />
                   {currentFormula.name || `Version ${currentFormula.version}`}
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-[#52796F]">
                   {currentFormula.name && `Version ${currentFormula.version} • `}{currentFormula.totalMg}mg total
                 </CardDescription>
               </div>
-              <Button asChild variant="outline" size="sm" data-testid="button-view-full">
+              <Button asChild variant="outline" size="sm" className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white rounded-full" data-testid="button-view-full">
                 <Link href="/dashboard/formula">View Full</Link>
               </Button>
             </div>
@@ -272,12 +271,12 @@ export default function HomePage() {
               {/* Daily Dosage */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Daily Dosage</span>
-                  <span className="font-medium text-base" data-testid="text-dosage-display">
+                  <span className="text-[#52796F]">Daily Dosage</span>
+                  <span className="font-medium text-base text-[#1B4332]" data-testid="text-dosage-display">
                     {calculateDosage(currentFormula.totalMg).display}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-[#52796F]">
                   {calculateDosage(currentFormula.totalMg).total} capsules per day ({currentFormula.totalMg}mg total)
                 </p>
               </div>
@@ -285,27 +284,27 @@ export default function HomePage() {
               {/* Dosage Progress */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Capsule Fill (4500-5500mg)</span>
-                  <span className="font-medium">{currentFormula.totalMg}mg</span>
+                  <span className="text-[#52796F]">Capsule Fill (4500-5500mg)</span>
+                  <span className="font-medium text-[#1B4332]">{currentFormula.totalMg}mg</span>
                 </div>
                 <Progress 
                   value={Math.min((currentFormula.totalMg / 5500) * 100, 100)} 
-                  className="h-2"
+                  className="h-2 bg-[#1B4332]/10"
                 />
               </div>
 
               {/* Top Ingredients Preview */}
               <div>
-                <h4 className="font-medium text-sm mb-2 text-muted-foreground">Top Ingredients</h4>
+                <h4 className="font-medium text-sm mb-2 text-[#52796F]">Top Ingredients</h4>
                 <div className="space-y-2">
                   {currentFormula.bases.slice(0, 3).map((base, index) => (
                     <div key={index} className="flex justify-between text-sm">
-                      <span>{base.ingredient}</span>
-                      <span className="text-muted-foreground">{base.amount}mg</span>
+                      <span className="text-[#1B4332]">{base.ingredient}</span>
+                      <span className="text-[#52796F]">{base.amount}mg</span>
                     </div>
                   ))}
                   {currentFormula.bases.length > 3 && (
-                    <div className="text-xs text-muted-foreground pt-1">
+                    <div className="text-xs text-[#52796F] pt-1">
                       +{currentFormula.bases.length - 3} more ingredients
                     </div>
                   )}
@@ -314,13 +313,13 @@ export default function HomePage() {
 
               {/* Action Buttons */}
               <div className="flex gap-2 pt-2">
-                <Button variant="default" size="sm" asChild className="flex-1" data-testid="button-order-now">
+                <Button size="sm" asChild className="flex-1 bg-[#1B4332] hover:bg-[#143728] text-white rounded-full" data-testid="button-order-now">
                   <Link href="/dashboard/orders">
                     <Package className="w-4 h-4 mr-2" />
                     Order Now
                   </Link>
                 </Button>
-                <Button variant="outline" size="sm" asChild className="flex-1" data-testid="button-refine-formula">
+                <Button variant="outline" size="sm" asChild className="flex-1 border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white rounded-full" data-testid="button-refine-formula">
                   <Link href="/dashboard/chat">
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Refine
@@ -332,36 +331,36 @@ export default function HomePage() {
         </Card>
       )}
 
-      {/* Quick Actions for Users with Formula */}
+      {/* Quick Actions for Users with Formula - V2 Styled */}
       {!isNewUser && currentFormula && (
         <div className="grid gap-4 md:grid-cols-2">
-          <Card className="hover-elevate cursor-pointer" data-testid="card-upload-labs">
+          <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-upload-labs">
             <Link href="/dashboard/lab-reports">
               <CardHeader className="space-y-0 pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-primary" />
+                <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
+                  <Upload className="w-4 h-4 text-[#1B4332]" />
                   Upload Lab Results
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-[#52796F]">
                   Add blood tests for better formula optimization
                 </p>
               </CardContent>
             </Link>
           </Card>
 
-          <Card className="hover-elevate cursor-pointer" data-testid="card-track-progress">
-            <Link href="/dashboard/formula">
+          <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-track-progress">
+            <Link href="/dashboard/optimize/tracking">
               <CardHeader className="space-y-0 pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-primary" />
+                <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
+                  <TrendingUp className="w-4 h-4 text-[#1B4332]" />
                   Track Progress
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  View formula history and health trends
+                <p className="text-sm text-[#52796F]">
+                  View your wellness streaks and daily progress
                 </p>
               </CardContent>
             </Link>
@@ -369,18 +368,18 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Promotional/Info Section (inspired by Function Health's right sidebar) */}
+      {/* Promotional/Info Section - V2 Styled */}
       {!isNewUser && (
-        <Card className="bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/20">
+        <Card className="bg-gradient-to-br from-[#1B4332]/10 to-[#52796F]/5 border-[#1B4332]/20">
           <CardContent className="p-6">
             <div className="flex items-start gap-4">
-              <Sparkles className="w-8 h-8 text-primary flex-shrink-0" />
+              <Sparkles className="w-8 h-8 text-[#D4A574] flex-shrink-0" />
               <div>
-                <h3 className="font-semibold mb-1">Optimize Your Formula</h3>
-                <p className="text-sm text-muted-foreground mb-3">
+                <h3 className="font-semibold mb-1 text-[#1B4332]">Optimize Your Formula</h3>
+                <p className="text-sm text-[#52796F] mb-3">
                   Chat with our AI to refine your supplement blend based on your latest health goals and lab results.
                 </p>
-                <Button asChild variant="default" size="sm">
+                <Button asChild size="sm" className="bg-[#1B4332] hover:bg-[#143728] text-white rounded-full">
                   <Link href="/dashboard/chat">
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Start Chat

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { getQueryFn } from '@/lib/queryClient';
-import { Link, useLocation } from 'wouter';
+import { Link, useLocation, useParams } from 'wouter';
 import { NutritionPlanTab } from '@/components/optimize/NutritionPlanTab';
 import { WorkoutPlanTab } from '@/components/optimize/WorkoutPlanTab';
 import { LifestylePlanTab } from '@/components/optimize/LifestylePlanTab';
@@ -45,9 +45,13 @@ interface HealthProfile {
 
 export default function OptimizePage() {
   const [location, navigate] = useLocation();
+  const params = useParams<{ tab?: string }>();
+  
+  // Get tab from URL param (e.g., /dashboard/optimize/workout)
+  const urlTab = params.tab as 'nutrition' | 'workout' | 'lifestyle' | undefined;
 
   // Fetch health profile
-  const { data: healthProfile } = useQuery<HealthProfile>({
+  const { data: healthProfile, isLoading: profileLoading } = useQuery<HealthProfile>({
     queryKey: ['/api/users/me/health-profile'],
     queryFn: getQueryFn({ on401: 'throw' }),
   });
@@ -63,6 +67,7 @@ export default function OptimizePage() {
   const lifestylePlan = plans?.find((p) => p.planType === 'lifestyle' && p.isActive);
 
   const isProfileComplete = !!healthProfile && !!healthProfile.age && !!healthProfile.sex;
+  const isLoading = profileLoading || plansLoading;
 
   const planSections = [
     {
@@ -107,20 +112,45 @@ export default function OptimizePage() {
     },
   ];
 
-  // Calculate default tab only once and memoize to prevent flashing
+  // Calculate default tab - prioritize URL param, then first active plan
   const defaultTab = useMemo(() => {
+    // If URL has a valid tab param, use it
+    if (urlTab && ['nutrition', 'workout', 'lifestyle'].includes(urlTab)) {
+      return urlTab as 'nutrition' | 'workout' | 'lifestyle';
+    }
     if (plansLoading) return 'nutrition' as const; // Default while loading
     return (planSections.find((section) => section.isActive)?.key ?? planSections[0].key) as typeof planSections[number]['key'];
-  }, [nutritionPlan, workoutPlan, lifestylePlan, plansLoading]);
+  }, [urlTab, nutritionPlan, workoutPlan, lifestylePlan, plansLoading]);
   
   const [activePlanTab, setActivePlanTab] = useState<typeof defaultTab>(defaultTab);
   
-  // Update active tab only once when plans finish loading
+  // Update active tab when URL param changes or plans finish loading
   useEffect(() => {
-    if (!plansLoading) {
+    if (urlTab && ['nutrition', 'workout', 'lifestyle'].includes(urlTab)) {
+      setActivePlanTab(urlTab as 'nutrition' | 'workout' | 'lifestyle');
+    } else if (!plansLoading) {
       setActivePlanTab(defaultTab);
     }
-  }, [defaultTab, plansLoading]);
+  }, [urlTab, defaultTab, plansLoading]);
+
+  // Show loading state while fetching profile/plans to prevent flash of incomplete profile card
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6 max-w-6xl">
+        <div className="mb-6">
+          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Optimize
+          </h1>
+          <p className="text-muted-foreground text-lg">
+            AI-powered personalized plans for nutrition, fitness, and lifestyle
+          </p>
+        </div>
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isProfileComplete) {
     return (
@@ -173,7 +203,10 @@ export default function OptimizePage() {
       </div>
 
       {/* Plan Sections */}
-      <Tabs value={activePlanTab} onValueChange={(value) => setActivePlanTab(value as typeof activePlanTab)} className="space-y-8">
+      <Tabs value={activePlanTab} onValueChange={(value) => {
+        setActivePlanTab(value as typeof activePlanTab);
+        navigate(`/dashboard/optimize/${value}`);
+      }} className="space-y-8">
         <TabsList className="h-auto w-full rounded-xl border bg-muted/20 p-1 grid grid-cols-2 md:grid-cols-3 gap-1">
           {planSections.map((section) => {
             const Icon = section.icon;

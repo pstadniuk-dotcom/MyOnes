@@ -1,5 +1,5 @@
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
-import { BASE_FORMULA_DETAILS } from './ingredients';
+import { SYSTEM_SUPPORT_DETAILS } from './ingredients';
 
 export interface FormulaForPDF {
   id: string;
@@ -256,7 +256,7 @@ export function generateFormulaPDF(
 
   if (formula.bases.length > 0) {
     content.push({
-      text: `🧪  Base Formulas (${formula.bases.length})`,
+      text: `🧪  System Supports (${formula.bases.length})`,
       fontSize: 13,
       bold: true,
       color: BRAND_COLORS.dark,
@@ -264,7 +264,7 @@ export function generateFormulaPDF(
     });
 
     formula.bases.forEach((base, idx) => {
-      const baseFormula = BASE_FORMULA_DETAILS.find(
+      const systemSupport = SYSTEM_SUPPORT_DETAILS.find(
         (f) => f.name === base.ingredient
       );
 
@@ -299,7 +299,7 @@ export function generateFormulaPDF(
         });
       }
 
-      if (baseFormula?.activeIngredients && baseFormula.activeIngredients.length > 0) {
+      if (systemSupport?.activeIngredients && systemSupport.activeIngredients.length > 0) {
         baseContent.push({
           text: 'Contains:',
           fontSize: 8,
@@ -308,7 +308,7 @@ export function generateFormulaPDF(
           margin: [0, 6, 0, 3],
         });
 
-        const ingredientsList = baseFormula.activeIngredients.map((ing) => {
+        const ingredientsList = systemSupport.activeIngredients.map((ing) => {
           const ingName = typeof ing === 'string' ? ing : ing.name;
           const ingAmount = typeof ing === 'string' ? '' : ` (${ing.amount || 'various'})`;
           return `• ${ingName}${ingAmount}`;

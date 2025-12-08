@@ -223,7 +223,7 @@ export default function AIChat() {
                   {/* Formula Bases */}
                   {message.formula.bases.length > 0 && (
                     <div className="mb-3">
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Base Formulas:</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">System Supports:</p>
                       <div className="space-y-1">
                         {message.formula.bases.map((base, idx) => (
                           <div key={idx} className="flex items-center justify-between text-xs">

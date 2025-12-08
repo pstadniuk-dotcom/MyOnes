@@ -112,7 +112,7 @@ export default function HeroSectionV2() {
                       msg.role === 'assistant' ? 'w-8 h-8' : 'w-8 h-8 rounded-full'
                     }`}>
                       {msg.role === 'assistant' ? (
-                        <img src="/Ones Logo Green.svg" alt="ONES" className="w-full h-full object-contain" />
+                        <img src="/ones-logo-icon.svg" alt="ONES" className="w-full h-full object-contain" />
                       ) : (
                         <img 
                           src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face" 
@@ -135,7 +135,7 @@ export default function HeroSectionV2() {
                 {visibleMessages < chatMessages.length && (
                   <div className="flex gap-3 animate-in fade-in duration-300">
                     <div className="w-8 h-8 flex items-center justify-center">
-                      <img src="/Ones Logo Green.svg" alt="ONES" className="w-full h-full object-contain" />
+                      <img src="/ones-logo-icon.svg" alt="ONES" className="w-full h-full object-contain" />
                     </div>
                     <div className="bg-white px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm">
                       <div className="flex gap-1">

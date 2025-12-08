@@ -113,6 +113,7 @@ export default function ConsultationPage() {
   
   // Input and interaction state
   const [inputValue, setInputValue] = useState('');
+  const [draftSaved, setDraftSaved] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [thinkingMessage, setThinkingMessage] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -127,13 +128,55 @@ export default function ConsultationPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   
+  // Draft autosave key
+  const DRAFT_KEY = 'consultation_draft';
+  
   // Refs and hooks
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const draftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Restore draft on mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem(DRAFT_KEY);
+    if (savedDraft) {
+      setInputValue(savedDraft);
+      setDraftSaved(true);
+    }
+  }, []);
+
+  // Autosave draft with debounce
+  useEffect(() => {
+    if (draftTimeoutRef.current) {
+      clearTimeout(draftTimeoutRef.current);
+    }
+    
+    if (inputValue.trim().length > 10) {
+      draftTimeoutRef.current = setTimeout(() => {
+        localStorage.setItem(DRAFT_KEY, inputValue);
+        setDraftSaved(true);
+      }, 1000);
+    } else if (inputValue.trim().length === 0) {
+      localStorage.removeItem(DRAFT_KEY);
+      setDraftSaved(false);
+    }
+    
+    return () => {
+      if (draftTimeoutRef.current) {
+        clearTimeout(draftTimeoutRef.current);
+      }
+    };
+  }, [inputValue]);
+
+  // Clear draft when message is sent
+  const clearDraft = useCallback(() => {
+    localStorage.removeItem(DRAFT_KEY);
+    setDraftSaved(false);
+  }, []);
 
   // Suggested prompts data
   const suggestedPrompts: SuggestedPrompt[] = useMemo(() => [
@@ -300,6 +343,7 @@ export default function ConsultationPage() {
 
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
+    clearDraft(); // Clear autosaved draft when message is sent
     initialInputRef.current = ''; // Clear voice input reference
     setIsTyping(true);
     setUploadedFiles([]);
@@ -734,7 +778,7 @@ export default function ConsultationPage() {
     const shareData = {
       title: 'Ones AI Consultation',
       text: formula 
-        ? `Check out my personalized supplement formula from Ones AI:\n\n${content}\n\nTotal: ${formula.totalMg}mg formula with ${formula.bases.length} base formulas and ${formula.additions?.length || 0} additions.`
+        ? `Check out my personalized supplement formula from Ones AI:\n\n${content}\n\nTotal: ${formula.totalMg}mg formula with ${formula.bases.length} system supports and ${formula.additions?.length || 0} additions.`
         : `Ones AI Health Consultation:\n\n${content}`,
       url: window.location.origin
     };
@@ -1155,11 +1199,11 @@ export default function ConsultationPage() {
                   >
                   <div className={`flex items-start gap-4 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
                     {message.sender === 'ai' && (
-                      <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-primary/10">
-                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-xs font-semibold text-primary">
-                          Ones
-                        </AvatarFallback>
-                      </Avatar>
+                      <img 
+                        src="/ones-logo-icon.svg" 
+                        alt="ONES" 
+                        className={`h-9 w-9 flex-shrink-0 ${!message.content && (isTyping || thinkingMessage) ? 'animate-spin' : ''}`}
+                      />
                     )}
                     {message.sender === 'user' && (
                       <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-white/30 dark:ring-white/20">
@@ -1200,17 +1244,9 @@ export default function ConsultationPage() {
                       
                       {/* Show thinking indicator if AI message is empty/thinking */}
                       {message.sender === 'ai' && !message.content && (isTyping || thinkingMessage) ? (
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                            {thinkingMessage || 'Ones AI is analyzing...'}
-                          </p>
-                          <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce"></div>
-                            <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                          </div>
-                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {thinkingMessage || 'Analyzing your health data...'}
+                        </p>
                       ) : (
                         <p className="text-sm whitespace-pre-wrap leading-relaxed">{removeJsonBlocks(message.content)}</p>
                       )}
@@ -1393,6 +1429,12 @@ export default function ConsultationPage() {
                     <FileText className="w-3 h-3" />
                     <span>Upload files or type your question</span>
                   </div>
+                  {draftSaved && inputValue.trim().length > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-green-600">
+                      <CheckCircle className="w-3 h-3" />
+                      <span>Draft saved</span>
+                    </div>
+                  )}
                 </div>
               </div>
               

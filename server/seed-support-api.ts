@@ -65,7 +65,7 @@ The AI considers your medications to avoid interactions and checks for any contr
 
 GETTING YOUR FORMULA
 
-After gathering all necessary information, the AI creates your personalized formula. This combines ingredients from our catalog of 32 base formulas and 29 individual ingredients.
+After gathering all necessary information, the AI creates your personalized formula. This combines ingredients from our catalog of 32 system supports and 29 individual ingredients.
 
 You'll see exactly what's in your formula, why each ingredient was included, and the recommended dosage. The AI explains the science behind each recommendation.
 
@@ -92,13 +92,13 @@ HOW YOUR FORMULA IS CREATED
 
 The AI analyzes your health data including age, weight, medical conditions, medications, lab results, and health goals. It reviews scientific research on ingredient effectiveness and safety.
 
-Your formula combines base formulas and individual ingredients from our approved catalog. The AI calculates precise dosages based on your body and needs.
+Your formula combines system supports and individual ingredients from our approved catalog. The AI calculates precise dosages based on your body and needs.
 
 Every formula is validated against safety limits. Maximum total dosage is 5500mg per day, with minimum 50mg per ingredient.
 
 READING YOUR FORMULA
 
-Each ingredient in your formula includes its name, dosage amount, and why it was included for you. Base formulas show their total amount (for example, "Heart Support - 450mg").
+Each ingredient in your formula includes its name, dosage amount, and why it was included for you. system supports show their total amount (for example, "Heart Support - 450mg").
 
 The formula view shows all ingredients, safety metrics, and detailed information about each component.
 
@@ -176,9 +176,9 @@ Email support@myones.ai for help with lab uploads or questions about your result
 
 OUR INGREDIENT CATALOG
 
-We offer 32 base formulas and 29 individual ingredients. Every ingredient has been carefully selected based on scientific research and safety data.
+We offer 32 system supports and 29 individual ingredients. Every ingredient has been carefully selected based on scientific research and safety data.
 
-Base formulas support specific body systems like adrenal function, digestion, cardiovascular health, and immune function. Individual ingredients include targeted nutrients and botanicals.
+system supports support specific body systems like adrenal function, digestion, cardiovascular health, and immune function. Individual ingredients include targeted nutrients and botanicals.
 
 QUALITY STANDARDS
 

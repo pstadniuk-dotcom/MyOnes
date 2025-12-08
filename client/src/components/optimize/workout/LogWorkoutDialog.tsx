@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ExerciseLogForm } from './ExerciseLogForm';
@@ -44,24 +44,47 @@ export function LogWorkoutDialog({ open, onOpenChange, selectedWorkout, onSucces
   const [difficulty, setDifficulty] = useState(3);
   const [notes, setNotes] = useState('');
   const [exerciseLogs, setExerciseLogs] = useState<Record<string, ExerciseLog>>({});
+  const [prsToSave, setPrsToSave] = useState<Set<string>>(new Set()); // Track which exercises to save as PR
+
+  // Fetch exercise records for weight suggestions
+  const { data: exerciseRecords } = useQuery({
+    queryKey: ['/api/optimize/exercise-records'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/optimize/exercise-records');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  // Create a map for quick lookup
+  const recordsMap = exerciseRecords?.reduce((acc: Record<string, any>, rec: any) => {
+    acc[rec.exerciseName] = rec;
+    return acc;
+  }, {}) ?? {};
 
   // Initialize exercise logs when workout changes
   useEffect(() => {
     if (selectedWorkout?.workout?.exercises) {
       const initialLogs: Record<string, ExerciseLog> = {};
       selectedWorkout.workout.exercises.forEach((ex: any) => {
+        // Use last logged weight if available, otherwise fall back to exercise default
+        const lastRecord = recordsMap[ex.name];
+        const suggestedWeight = lastRecord?.lastWeight ?? ex.weight ?? 0;
+        
         initialLogs[ex.name] = {
           name: ex.name,
           sets: Array.from({ length: ex.sets }, () => ({
             completed: false,
             reps: ex.reps,
-            weight: ex.weight ?? 0,
+            weight: suggestedWeight,
           })),
         };
       });
       setExerciseLogs(initialLogs);
+      setPrsToSave(new Set()); // Reset PRs to save
     }
-  }, [selectedWorkout]);
+  }, [selectedWorkout, recordsMap]);
 
   const handleExerciseUpdate = (exerciseName: string, data: { sets: ExerciseSet[]; notes?: string }) => {
     setExerciseLogs(prev => ({
@@ -101,16 +124,46 @@ export function LogWorkoutDialog({ open, onOpenChange, selectedWorkout, onSucces
         throw new Error(errorData.error || 'Failed to log workout');
       }
       
+      // Update exercise records with max weights used in this workout
+      for (const log of Object.values(exerciseLogs)) {
+        const completedSets = log.sets.filter(s => s.completed && s.weight > 0);
+        if (completedSets.length > 0) {
+          // Find max weight used for this exercise
+          const maxWeightSet = completedSets.reduce((max, set) => 
+            set.weight > max.weight ? set : max, completedSets[0]);
+          
+          // Save to exercise records
+          await apiRequest('POST', '/api/optimize/exercise-records', {
+            exerciseName: log.name,
+            weight: maxWeightSet.weight,
+            reps: maxWeightSet.reps,
+          });
+          
+          // If user marked this as a PR, save it
+          if (prsToSave.has(log.name)) {
+            await apiRequest('POST', '/api/optimize/exercise-records/pr', {
+              exerciseName: log.name,
+              weight: maxWeightSet.weight,
+              notes: `PR set during ${selectedWorkout?.workout?.name}`,
+            });
+          }
+        }
+      }
+      
       return res.json();
     },
     onSuccess: () => {
       console.log('✅ Workout logged successfully');
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/daily'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/exercise-records'] });
       onOpenChange(false);
+      const prCount = prsToSave.size;
       toast({
         title: 'Workout Logged! 💪',
-        description: 'Great job! Your workout has been recorded.',
+        description: prCount > 0 
+          ? `Great job! ${prCount} PR${prCount > 1 ? 's' : ''} saved!`
+          : 'Great job! Your workout has been recorded.',
       });
       // Reset form
       setNotes('');
@@ -135,6 +188,18 @@ export function LogWorkoutDialog({ open, onOpenChange, selectedWorkout, onSucces
     0
   );
 
+  const handleTogglePr = (exerciseName: string) => {
+    setPrsToSave(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(exerciseName)) {
+        newSet.delete(exerciseName);
+      } else {
+        newSet.add(exerciseName);
+      }
+      return newSet;
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] flex flex-col p-4 sm:p-6">
@@ -153,14 +218,21 @@ export function LogWorkoutDialog({ open, onOpenChange, selectedWorkout, onSucces
                 <h3 className="font-semibold text-sm text-gray-700">
                   Exercise Tracking ({totalCompletedSets} sets completed)
                 </h3>
-                {selectedWorkout.workout.exercises.map((exercise: any) => (
-                  <ExerciseLogForm
-                    key={exercise.name}
-                    exercise={exercise}
-                    onUpdate={(data) => handleExerciseUpdate(exercise.name, data)}
-                    initialData={exerciseLogs[exercise.name]}
-                  />
-                ))}
+                {selectedWorkout.workout.exercises.map((exercise: any) => {
+                  const lastRecord = recordsMap[exercise.name];
+                  return (
+                    <ExerciseLogForm
+                      key={exercise.name}
+                      exercise={exercise}
+                      onUpdate={(data) => handleExerciseUpdate(exercise.name, data)}
+                      initialData={exerciseLogs[exercise.name]}
+                      suggestedWeight={lastRecord?.lastWeight}
+                      lastReps={lastRecord?.lastReps}
+                      isPrMarked={prsToSave.has(exercise.name)}
+                      onTogglePr={handleTogglePr}
+                    />
+                  );
+                })}
               </div>
             )}
 
