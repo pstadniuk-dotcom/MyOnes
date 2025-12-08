@@ -37,32 +37,44 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
   const [activeTab, setActiveTab] = useState('schedule');
   const [showIncompleteAlert, setShowIncompleteAlert] = useState(false);
 
+  // Generate a stable key for workout progress storage
+  // Uses plan ID + day name since workout.id might not exist
+  const getWorkoutStorageKey = (workout: any, dayIndex: number) => {
+    const planId = plan?.id || 'unknown';
+    const dayName = workout?.dayName || `day_${dayIndex}`;
+    return `workout_progress_${planId}_${dayName}`;
+  };
+
   // Load progress from local storage when workout is selected
   useEffect(() => {
-    if (selectedWorkout && selectedDayIndex !== -1) {
-      const key = `workout_progress_${selectedWorkout.workout?.id}_${selectedDayIndex}`;
+    if (selectedWorkout && selectedDayIndex !== -1 && plan?.id) {
+      const key = getWorkoutStorageKey(selectedWorkout, selectedDayIndex);
       const saved = localStorage.getItem(key);
       if (saved) {
         try {
-          setCompletedExercises(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          console.log('📂 Loaded workout progress from storage:', key, parsed);
+          setCompletedExercises(parsed);
         } catch (e) {
           console.error("Failed to parse saved workout progress", e);
+          setCompletedExercises({});
         }
       } else {
         setCompletedExercises({});
       }
     }
-  }, [selectedWorkout?.workout?.id, selectedDayIndex]);
+  }, [selectedWorkout?.dayName, selectedDayIndex, plan?.id]);
 
   // Save progress to local storage whenever it changes
   useEffect(() => {
-    if (selectedWorkout && selectedDayIndex !== -1) {
-      const key = `workout_progress_${selectedWorkout.workout?.id}_${selectedDayIndex}`;
+    if (selectedWorkout && selectedDayIndex !== -1 && plan?.id) {
+      const key = getWorkoutStorageKey(selectedWorkout, selectedDayIndex);
       if (Object.keys(completedExercises).length > 0) {
+        console.log('💾 Saving workout progress to storage:', key, completedExercises);
         localStorage.setItem(key, JSON.stringify(completedExercises));
       }
     }
-  }, [completedExercises, selectedWorkout?.workout?.id, selectedDayIndex]);
+  }, [completedExercises, selectedWorkout?.dayName, selectedDayIndex, plan?.id]);
 
   const { data: workoutLogsData } = useQuery<any>({
     queryKey: ['/api/optimize/workout/logs'],
@@ -162,10 +174,12 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/analytics/workout'] });
       
-      // Clear local storage for this workout
-      if (selectedWorkout && selectedDayIndex !== -1) {
-        const key = `workout_progress_${selectedWorkout.workout?.id}_${selectedDayIndex}`;
+      // Clear local storage for this workout using the same key function
+      if (selectedWorkout && selectedDayIndex !== -1 && plan?.id) {
+        const key = getWorkoutStorageKey(selectedWorkout, selectedDayIndex);
+        console.log('🗑️ Clearing workout progress from storage:', key);
         localStorage.removeItem(key);
       }
       
@@ -173,6 +187,33 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
       toast({
         title: 'Workout Logged!',
         description: 'Great job! Your progress has been saved.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  });
+
+  const deleteWorkoutLog = useMutation({
+    mutationFn: async (logId: string) => {
+      const res = await apiRequest('DELETE', `/api/optimize/workout/logs/${logId}`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to delete workout');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/analytics/workout'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+      toast({
+        title: 'Workout Deleted',
+        description: 'The workout session has been removed from your history.',
       });
     },
     onError: (error: Error) => {
@@ -250,6 +291,7 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
       ...prev,
       [loggingExercise.name]: {
         name: loggingExercise.name,
+        skipped: false,
         ...data
       }
     }));
@@ -260,11 +302,32 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
     });
   };
 
+  const handleSkipExercise = (exerciseName: string) => {
+    setCompletedExercises(prev => ({
+      ...prev,
+      [exerciseName]: {
+        name: exerciseName,
+        skipped: true,
+        sets: [],
+        totalSets: 0,
+        completedSets: 0,
+        totalVolume: 0
+      }
+    }));
+    setLoggingExercise(null);
+    toast({ 
+      title: "Exercise Skipped", 
+      description: `${exerciseName} marked as skipped.`,
+      variant: "default"
+    });
+  };
+
   const handleFinishClick = () => {
     const totalExercises = selectedWorkout?.workout?.exercises?.length || 0;
-    const completedCount = Object.keys(completedExercises).length;
+    const accountedFor = Object.keys(completedExercises).length;
     
-    if (completedCount < totalExercises) {
+    // Allow finishing if all exercises are accounted for (logged or skipped)
+    if (accountedFor < totalExercises) {
       setShowIncompleteAlert(true);
     } else {
       finishWorkout.mutate();
@@ -330,9 +393,39 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <WorkoutSchedule plan={plan} onWorkoutClick={handleWorkoutClick} />
+                <WorkoutSchedule plan={plan} onWorkoutClick={handleWorkoutClick} workoutLogs={workoutLogs} />
               </CardContent>
             </Card>
+
+            {/* Why This Plan - AI Rationale Card */}
+            {plan.content?.weeklyRationale && (
+              <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50/50 to-purple-50/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-indigo-600" />
+                    Why This Plan
+                  </CardTitle>
+                  <CardDescription>
+                    AI-powered insights based on your workout history and progress
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
+                    {plan.content.weeklyRationale}
+                  </p>
+                  {plan.content?.personalizationNotes?.progressionRationale && (
+                    <div className="mt-4 pt-4 border-t border-indigo-100">
+                      <h5 className="text-xs font-semibold text-indigo-700 uppercase tracking-wider mb-2">
+                        Progression Strategy
+                      </h5>
+                      <p className="text-sm text-muted-foreground">
+                        {plan.content.personalizationNotes.progressionRationale}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {selectedWorkout && (
               <Card className="mt-6 border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -360,7 +453,15 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Progress</span>
                         <span className="font-medium">
-                          {Object.keys(completedExercises).length} / {selectedWorkout.workout?.exercises?.length || 0} exercises
+                          {Object.values(completedExercises).filter((e: any) => !e.skipped).length} logged
+                          {Object.values(completedExercises).filter((e: any) => e.skipped).length > 0 && (
+                            <span className="text-orange-500 ml-1">
+                              • {Object.values(completedExercises).filter((e: any) => e.skipped).length} skipped
+                            </span>
+                          )}
+                          <span className="text-muted-foreground ml-1">
+                            / {selectedWorkout.workout?.exercises?.length || 0}
+                          </span>
                         </span>
                       </div>
                       <Progress value={(Object.keys(completedExercises).length / (selectedWorkout.workout?.exercises?.length || 1)) * 100} className="h-2" />
@@ -398,72 +499,83 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
                       )}
 
                       <div className="grid gap-3 md:grid-cols-2">
-                        {selectedWorkout.workout?.exercises?.map((ex: any, i: number) => (
-                          <div key={i} className="p-4 rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow">
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="font-semibold text-lg flex-1">{ex.name}</div>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant={completedExercises[ex.name] ? "default" : "outline"}
-                                  size="sm"
-                                  className={`h-7 px-2 text-xs gap-1 ${completedExercises[ex.name] ? "bg-green-600 hover:bg-green-700" : ""}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setLoggingExercise(ex);
-                                  }}
-                                >
-                                  {completedExercises[ex.name] ? <CheckCircle2 className="h-3 w-3" /> : <Edit className="h-3 w-3" />}
-                                  {completedExercises[ex.name] ? "Logged" : "Log"}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                  onClick={() => handleSwitchExercise(i)}
-                                  disabled={switchWorkout.isPending}
-                                >
-                                  <Shuffle className="h-3 w-3" />
-                                  Switch
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 px-2 text-[10px] gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleWatchVideo(ex.name);
-                                  }}
-                                  disabled={isVideoLoading}
-                                >
-                                  <PlayCircle className="h-3 w-3" />
-                                  Watch
-                                </Button>
-                                <div className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                                  {ex.sets} × {ex.reps}
+                        {selectedWorkout.workout?.exercises?.map((ex: any, i: number) => {
+                          const exerciseState = completedExercises[ex.name];
+                          const isLogged = exerciseState && !exerciseState.skipped;
+                          const isSkipped = exerciseState?.skipped;
+                          
+                          return (
+                            <div key={i} className={`p-4 rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow ${isSkipped ? 'opacity-60 bg-orange-50/30' : ''}`}>
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="font-semibold text-lg flex-1">{ex.name}</div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant={exerciseState ? "default" : "outline"}
+                                    size="sm"
+                                    className={`h-7 px-2 text-xs gap-1 ${
+                                      isLogged ? "bg-green-600 hover:bg-green-700" : 
+                                      isSkipped ? "bg-orange-500 hover:bg-orange-600" : ""
+                                    }`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setLoggingExercise(ex);
+                                    }}
+                                  >
+                                    {isLogged ? <CheckCircle2 className="h-3 w-3" /> : 
+                                     isSkipped ? <AlertCircle className="h-3 w-3" /> : 
+                                     <Edit className="h-3 w-3" />}
+                                    {isLogged ? "Logged" : isSkipped ? "Skipped" : "Log"}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                    onClick={() => handleSwitchExercise(i)}
+                                    disabled={switchWorkout.isPending}
+                                  >
+                                    <Shuffle className="h-3 w-3" />
+                                    Switch
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2 text-[10px] gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleWatchVideo(ex.name);
+                                    }}
+                                    disabled={isVideoLoading}
+                                  >
+                                    <PlayCircle className="h-3 w-3" />
+                                    Watch
+                                  </Button>
+                                  <div className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                                    {ex.sets} × {ex.reps}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                            
-                            {ex.restSeconds && (
-                              <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                                <History className="h-3 w-3" />
-                                {ex.restSeconds}s rest
-                              </div>
-                            )}
+                              
+                              {ex.restSeconds && (
+                                <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                                  <History className="h-3 w-3" />
+                                  {ex.restSeconds}s rest
+                                </div>
+                              )}
 
-                            {ex.notes && (
-                              <div className="text-sm text-muted-foreground mt-2 pt-2 border-t border-dashed">
-                                "{ex.notes}"
-                              </div>
-                            )}
-                            
-                            {ex.healthBenefits && (
-                              <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded border border-green-100">
-                                💡 {ex.healthBenefits}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                              {ex.notes && (
+                                <div className="text-sm text-muted-foreground mt-2 pt-2 border-t border-dashed">
+                                  "{ex.notes}"
+                                </div>
+                              )}
+                              
+                              {ex.healthBenefits && (
+                                <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded border border-green-100">
+                                  💡 {ex.healthBenefits}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -473,7 +585,11 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
           </TabsContent>
 
           <TabsContent value="history">
-            <WorkoutHistory logs={workoutLogs || []} />
+            <WorkoutHistory 
+              logs={workoutLogs || []} 
+              onDelete={(logId) => deleteWorkoutLog.mutate(logId)}
+              isDeleting={deleteWorkoutLog.isPending}
+            />
           </TabsContent>
 
           <TabsContent value="analytics">
@@ -545,6 +661,7 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
             <DynamicExerciseLogger
               exercise={loggingExercise}
               onSave={handleSaveLog}
+              onSkip={handleSkipExercise}
               onCancel={() => setLoggingExercise(null)}
               initialData={completedExercises[loggingExercise.name]}
             />

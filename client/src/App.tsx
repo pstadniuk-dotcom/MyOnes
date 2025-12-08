@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ProtectedAdminRoute from "@/components/ProtectedAdminRoute";
 import NotFound from "@/pages/not-found";
@@ -16,7 +17,6 @@ import SciencePage from "@/pages/SciencePage";
 import AboutPage from "@/pages/AboutPage";
 import BlogPage from "@/pages/BlogPage";
 import CareersPage from "@/pages/CareersPage";
-import PressPage from "@/pages/PressPage";
 import PartnershipsPage from "@/pages/PartnershipsPage";
 import ContactPage from "@/pages/ContactPage";
 import PrivacyPage from "@/pages/PrivacyPage";
@@ -32,6 +32,7 @@ import DashboardHome from "@/pages/DashboardHome";
 import ConsultationPage from "@/pages/ConsultationPage";
 import MyFormulaPage from "@/pages/MyFormulaPage";
 import OptimizePage from "@/pages/OptimizePage";
+import TrackingPage from "@/pages/TrackingPage";
 import WearablesPage from "@/pages/WearablesPage";
 import LabReportsPage from "@/pages/LabReportsPage";
 import OrdersPage from "@/pages/OrdersPage";
@@ -99,7 +100,7 @@ function MainRouter() {
       <Route path="/about" component={AboutPage} />
       <Route path="/blog" component={BlogPage} />
       <Route path="/careers" component={CareersPage} />
-      <Route path="/press" component={PressPage} />
+      <Route path="/press">{() => { window.location.href = '/contact?type=press'; return null; }}</Route>
       <Route path="/partnerships" component={PartnershipsPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/privacy" component={PrivacyPage} />
@@ -139,6 +140,13 @@ function MainRouter() {
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/dashboard/optimize/tracking">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <TrackingPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/dashboard/optimize/:tab?">
         <ProtectedRoute>
           <DashboardLayout>
@@ -146,6 +154,7 @@ function MainRouter() {
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
       <Route path="/dashboard/wearables">
         <ProtectedRoute>
           <DashboardLayout>
@@ -192,7 +201,9 @@ function MainRouter() {
       {/* Legacy /chat redirect to dashboard consultation */}
       <Route path="/chat">
         <ProtectedRoute>
-          <ConsultationPage />
+          <DashboardLayout>
+            <ConsultationPage />
+          </DashboardLayout>
         </ProtectedRoute>
       </Route>
       
@@ -235,14 +246,16 @@ function MainRouter() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <MainRouter />
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <MainRouter />
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

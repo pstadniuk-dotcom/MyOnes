@@ -456,30 +456,30 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-profile-title">
+          <h1 className="text-3xl font-bold tracking-tight text-[#1B4332]" data-testid="text-profile-title">
             Profile & Settings
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-[#52796F]">
             Manage your account, health profile, and preferences
           </p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="profile" data-testid="tab-profile">Profile</TabsTrigger>
-          <TabsTrigger value="health" data-testid="tab-health">Health Info</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 bg-[#FAF7F2]">
+          <TabsTrigger value="profile" data-testid="tab-profile" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">Profile</TabsTrigger>
+          <TabsTrigger value="health" data-testid="tab-health" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">Health Info</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-6">
           {/* Personal Information */}
-          <Card data-testid="section-personal-info">
+          <Card data-testid="section-personal-info" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                 <User className="w-5 h-5" />
                 Personal Information
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-[#52796F]">
                 Update your personal details and contact information
               </CardDescription>
             </CardHeader>
@@ -610,6 +610,7 @@ export default function ProfilePage() {
                   }}
                   disabled={updateUserProfileMutation.isPending}
                   data-testid="button-save-profile"
+                  className="bg-[#1B4332] hover:bg-[#1B4332]/90 text-white"
                 >
                   {updateUserProfileMutation.isPending && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -623,21 +624,21 @@ export default function ProfilePage() {
 
         <TabsContent value="health" className="space-y-6">
           {/* Health Profile */}
-          <Card data-testid="section-health-profile">
+          <Card data-testid="section-health-profile" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                 <Activity className="w-5 h-5" />
                 Health Profile
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-[#52796F]">
                 Keep your health information up to date for better formula optimization
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Basic Demographics */}
               <div className="space-y-2 mb-4">
-                <h3 className="text-lg font-semibold">Basic Information</h3>
-                <p className="text-sm text-muted-foreground">Essential details for health calculations</p>
+                <h3 className="text-lg font-semibold text-[#1B4332]">Basic Information</h3>
+                <p className="text-sm text-[#52796F]">Essential details for health calculations</p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div>
@@ -725,12 +726,12 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-[#52796F]/20" />
 
               {/* Vital Signs */}
               <div className="space-y-2 mb-4">
-                <h3 className="text-lg font-semibold">Vital Signs</h3>
-                <p className="text-sm text-muted-foreground">Current measurements for accurate health scoring</p>
+                <h3 className="text-lg font-semibold text-[#1B4332]">Vital Signs</h3>
+                <p className="text-sm text-[#52796F]">Current measurements for accurate health scoring</p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div>
@@ -768,12 +769,12 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-[#52796F]/20" />
 
               {/* Lifestyle Factors */}
               <div className="space-y-2 mb-4">
-                <h3 className="text-lg font-semibold">Lifestyle Factors</h3>
-                <p className="text-sm text-muted-foreground">Help us understand your daily habits</p>
+                <h3 className="text-lg font-semibold text-[#1B4332]">Lifestyle Factors</h3>
+                <p className="text-sm text-[#52796F]">Help us understand your daily habits</p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div>
@@ -815,12 +816,12 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-[#52796F]/20" />
 
               {/* Risk Factors */}
               <div className="space-y-2 mb-4">
-                <h3 className="text-lg font-semibold">Risk Factors</h3>
-                <p className="text-sm text-muted-foreground">Important for personalized recommendations</p>
+                <h3 className="text-lg font-semibold text-[#1B4332]">Risk Factors</h3>
+                <p className="text-sm text-[#52796F]">Important for personalized recommendations</p>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
@@ -850,7 +851,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-[#52796F]/20" />
 
               <div className="space-y-4">
                 <div>
@@ -1014,6 +1015,7 @@ export default function ProfilePage() {
                   }}
                   disabled={updateHealthProfileMutation.isPending}
                   data-testid="button-save-health-profile"
+                  className="bg-[#1B4332] hover:bg-[#1B4332]/90 text-white"
                 >
                   {updateHealthProfileMutation.isPending && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />

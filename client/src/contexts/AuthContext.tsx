@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
+import { SESSION_EXPIRED_EVENT } from '@/lib/queryClient';
 import type { AuthResponse, SignupData, LoginData } from '@shared/schema';
 
 interface User {
@@ -38,6 +39,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const { toast } = useToast();
 
   const isAuthenticated = !!user && !!token;
+
+  // Handle session expiration from API calls
+  const handleSessionExpired = useCallback(() => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    
+    toast({
+      title: "Session Expired",
+      description: "Your session has expired. Please log in again.",
+      variant: "destructive"
+    });
+    
+    setLocation('/login');
+  }, [toast, setLocation]);
+
+  // Listen for session expired events from queryClient
+  useEffect(() => {
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    };
+  }, [handleSessionExpired]);
 
   // Initialize authentication state from localStorage
   useEffect(() => {

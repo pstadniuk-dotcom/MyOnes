@@ -10,7 +10,8 @@ import {
   faqItems, supportTickets, supportTicketResponses, helpArticles, newsletterSubscribers,
   researchCitations, wearableConnections, appSettings, reviewSchedules,
   optimizePlans, optimizeDailyLogs, workoutPlans, workouts, workoutLogs, workoutPreferences,
-  mealPlans, recipes, mealLogs, groceryLists, optimizeSmsPreferences, userStreaks,
+  mealPlans, recipes, mealLogs, groceryLists, optimizeSmsPreferences, trackingPreferences, userStreaks,
+  dailyCompletions, weeklySummaries, exerciseRecords,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -47,7 +48,11 @@ import {
   type MealLog, type InsertMealLog,
   type GroceryList, type InsertGroceryList,
   type OptimizeSmsPreferences, type InsertOptimizeSmsPreferences,
-  type UserStreak, type InsertUserStreak
+  type TrackingPreferences, type InsertTrackingPreferences,
+  type UserStreak, type InsertUserStreak,
+  type DailyCompletion, type InsertDailyCompletion,
+  type WeeklySummary, type InsertWeeklySummary,
+  type ExerciseRecord, type InsertExerciseRecord
 } from "@shared/schema";
 
 export interface IStorage {
@@ -2786,6 +2791,76 @@ export class DrizzleStorage implements IStorage {
     return updated;
   }
 
+  // Meal Logs
+  async createMealLog(log: InsertMealLog): Promise<MealLog> {
+    const [created] = await db.insert(mealLogs).values(log).returning();
+    return created;
+  }
+
+  async getMealLogById(logId: string): Promise<MealLog | undefined> {
+    const [log] = await db
+      .select()
+      .from(mealLogs)
+      .where(eq(mealLogs.id, logId));
+    return log;
+  }
+
+  async getMealLogsForDay(userId: string, date: Date): Promise<MealLog[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return await db
+      .select()
+      .from(mealLogs)
+      .where(and(
+        eq(mealLogs.userId, userId),
+        gte(mealLogs.loggedAt, startOfDay),
+        lte(mealLogs.loggedAt, endOfDay)
+      ))
+      .orderBy(mealLogs.loggedAt);
+  }
+
+  async getMealLogsHistory(userId: string, limit = 50): Promise<MealLog[]> {
+    return await db
+      .select()
+      .from(mealLogs)
+      .where(eq(mealLogs.userId, userId))
+      .orderBy(desc(mealLogs.loggedAt))
+      .limit(limit);
+  }
+
+  async updateMealLog(logId: string, updates: Partial<InsertMealLog>): Promise<MealLog | undefined> {
+    const [updated] = await db
+      .update(mealLogs)
+      .set(updates)
+      .where(eq(mealLogs.id, logId))
+      .returning();
+    return updated;
+  }
+
+  async deleteMealLog(userId: string, logId: string): Promise<boolean> {
+    const result = await db
+      .delete(mealLogs)
+      .where(and(eq(mealLogs.id, logId), eq(mealLogs.userId, userId)));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getTodayNutritionTotals(userId: string): Promise<{ calories: number; protein: number; carbs: number; fat: number; mealsLogged: number; waterOz: number }> {
+    const today = new Date();
+    const meals = await this.getMealLogsForDay(userId, today);
+    
+    return {
+      calories: meals.reduce((sum, m) => sum + (m.calories || 0), 0),
+      protein: meals.reduce((sum, m) => sum + (m.proteinGrams || 0), 0),
+      carbs: meals.reduce((sum, m) => sum + (m.carbsGrams || 0), 0),
+      fat: meals.reduce((sum, m) => sum + (m.fatGrams || 0), 0),
+      mealsLogged: meals.filter(m => !m.waterOz).length, // Don't count water-only entries as meals
+      waterOz: meals.reduce((sum, m) => sum + (m.waterOz || 0), 0),
+    };
+  }
+
   // User Streaks
   async getUserStreak(userId: string, streakType: 'overall' | 'nutrition' | 'workout' | 'lifestyle'): Promise<UserStreak | undefined> {
     const [streak] = await db
@@ -2851,6 +2926,640 @@ export class DrizzleStorage implements IStorage {
       .where(and(
         eq(userStreaks.userId, userId),
         eq(userStreaks.streakType, 'overall')
+      ));
+  }
+
+  // =====================================================
+  // ENHANCED STREAK & SCORING SYSTEM
+  // =====================================================
+
+  // Category score calculation functions
+  calculateNutritionScore(dailyLog: OptimizeDailyLog | null | undefined, meals: MealLog[]): number {
+    if (!dailyLog && meals.length === 0) return 0;
+    
+    let score = 0;
+    
+    // Count meal types logged
+    const mealTypes = new Set(meals.map(m => m.mealType));
+    if (mealTypes.has('breakfast')) score += 0.25;
+    if (mealTypes.has('lunch')) score += 0.25;
+    if (mealTypes.has('dinner')) score += 0.25;
+    if (mealTypes.has('snack')) score += 0.10;
+    
+    // Bonus for hitting calorie goals (we don't have stored targets, so just check if reasonable calories logged)
+    const totalCalories = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+    // Give bonus if user logged reasonable calories (between 1500-3000)
+    if (totalCalories >= 1500 && totalCalories <= 3000) {
+      score += 0.15;
+    }
+    
+    return Math.min(score, 1.0);
+  }
+
+  calculateWorkoutScore(
+    workoutLog: WorkoutLog | null, 
+    workoutPlan: WorkoutPlan | null | undefined, 
+    dayOfWeek: string
+  ): number | null {
+    // Get planned workout for today from workoutSchedule
+    const schedule = workoutPlan?.workoutSchedule as Array<{ day: string; isRestDay?: boolean; workoutId?: string }> | null;
+    const todayPlan = schedule?.find(d => d.day.toLowerCase() === dayOfWeek.toLowerCase());
+    
+    // Planned rest day = full credit
+    if (todayPlan?.isRestDay) return 1.0;
+    
+    // No workout planned and none done - N/A (don't count against streak)
+    if (!todayPlan && !workoutLog) return null;
+    
+    // Workout completed
+    if (workoutLog?.completedAt) {
+      // We don't have direct access to planned exercises here, use exercisesCompleted count
+      const exercisesCompleted = (workoutLog.exercisesCompleted as unknown[] | null)?.length || 0;
+      // If they completed exercises, give proportional credit based on effort
+      if (exercisesCompleted >= 6) return 1.0;
+      if (exercisesCompleted >= 4) return 0.75;
+      if (exercisesCompleted >= 2) return 0.50;
+      const completionRatio = exercisesCompleted > 0 ? 0.25 : 0;
+      
+      return completionRatio;
+    }
+    
+    // Planned workout not done
+    return 0;
+  }
+
+  calculateSupplementScore(dailyLog: OptimizeDailyLog | null | undefined): number {
+    if (!dailyLog) return 0;
+    
+    let doses = 0;
+    if (dailyLog.supplementMorning) doses++;
+    if (dailyLog.supplementAfternoon) doses++;
+    if (dailyLog.supplementEvening) doses++;
+    
+    // Return exact proportion (0, 0.33, 0.67, or 1.0)
+    return Math.round((doses / 3) * 100) / 100;
+  }
+
+  calculateLifestyleScore(dailyLog: OptimizeDailyLog | null | undefined, biometricData?: { sleepDuration?: number; steps?: number }): number {
+    // Simplified: if user logged sleep, energy, and mood, that's the core lifestyle check-in
+    // Each core metric (sleep, energy, mood) contributes equally = 0.33 each
+    // Bonus points for biometrics and hydration
+    
+    let score = 0;
+    
+    // Core lifestyle check-in (0.33 each = 1.0 total for all three)
+    if (dailyLog?.sleepQuality) score += 0.33;
+    if (dailyLog?.energyLevel) score += 0.33;
+    if (dailyLog?.moodLevel) score += 0.34;
+    
+    // Bonus: biometric data (if connected to wearables)
+    const sleepHours = biometricData?.sleepDuration;
+    if (sleepHours && sleepHours >= 7) score += 0.10;
+    
+    const steps = biometricData?.steps;
+    if (steps && steps >= 7500) score += 0.10;
+    
+    // Bonus: hydration (already tracked separately, but contributes to overall wellness)
+    const waterOz = dailyLog?.waterIntakeOz || 0;
+    if (waterOz >= 64) score += 0.10;
+    
+    return Math.min(score, 1.0);
+  }
+
+  // Get or create daily completion record
+  async getDailyCompletion(userId: string, logDate: Date): Promise<DailyCompletion | undefined> {
+    const dateStr = logDate.toISOString().split('T')[0];
+    const [completion] = await db
+      .select()
+      .from(dailyCompletions)
+      .where(and(
+        eq(dailyCompletions.userId, userId),
+        eq(dailyCompletions.logDate, dateStr)
+      ));
+    return completion;
+  }
+
+  async upsertDailyCompletion(userId: string, logDate: Date, updates: Partial<InsertDailyCompletion>): Promise<DailyCompletion> {
+    const dateStr = logDate.toISOString().split('T')[0];
+    const existing = await this.getDailyCompletion(userId, logDate);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(dailyCompletions)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(dailyCompletions.id, existing.id))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db
+      .insert(dailyCompletions)
+      .values({
+        userId,
+        logDate: dateStr,
+        ...updates
+      })
+      .returning();
+    return created;
+  }
+
+  // Calculate all scores for a specific day and update daily_completions
+  async calculateAndSaveDailyScores(userId: string, logDate: Date): Promise<DailyCompletion> {
+    const dateStr = logDate.toISOString().split('T')[0];
+    const dayOfWeek = logDate.toLocaleDateString('en-US', { weekday: 'long' });
+    
+    // Fetch all required data
+    const [dailyLog, meals, workoutPlan, workoutLogs] = await Promise.all([
+      this.getDailyLog(userId, logDate),
+      this.getMealLogsForDay(userId, logDate),
+      this.getActiveWorkoutPlan(userId),
+      this.getWorkoutLogsForDate(userId, logDate)
+    ]);
+    
+    const workoutLog = workoutLogs.length > 0 ? workoutLogs[0] : null;
+    
+    // Calculate individual category scores
+    const nutritionScore = this.calculateNutritionScore(dailyLog, meals);
+    const workoutScore = this.calculateWorkoutScore(workoutLog, workoutPlan, dayOfWeek);
+    const supplementScore = this.calculateSupplementScore(dailyLog);
+    const lifestyleScore = this.calculateLifestyleScore(dailyLog);
+    
+    // Calculate weighted daily score (workouts optional if no plan)
+    let dailyScore: number;
+    if (workoutScore === null) {
+      // No workout expected - weight across 3 categories
+      dailyScore = (nutritionScore * 0.35 + supplementScore * 0.35 + lifestyleScore * 0.30);
+    } else {
+      // Full 4-category weighting
+      dailyScore = (nutritionScore * 0.25 + workoutScore * 0.30 + supplementScore * 0.25 + lifestyleScore * 0.20);
+    }
+    
+    // Save to daily_completions
+    const completion = await this.upsertDailyCompletion(userId, logDate, {
+      nutritionScore: nutritionScore.toFixed(2),
+      workoutScore: workoutScore?.toFixed(2) ?? null,
+      supplementScore: supplementScore.toFixed(2),
+      lifestyleScore: lifestyleScore.toFixed(2),
+      dailyScore: dailyScore.toFixed(2),
+      nutritionDetails: { mealsLogged: meals.length, mealTypes: Array.from(new Set(meals.map((m: MealLog) => m.mealType))) },
+      workoutDetails: workoutLog ? { completed: true, exerciseCount: (workoutLog.exercisesCompleted as unknown[] | null)?.length || 0 } : null,
+      supplementDetails: { morning: dailyLog?.supplementMorning, afternoon: dailyLog?.supplementAfternoon, evening: dailyLog?.supplementEvening },
+      lifestyleDetails: { sleepQuality: dailyLog?.sleepQuality, waterOz: dailyLog?.waterIntakeOz, mood: dailyLog?.moodLevel, energy: dailyLog?.energyLevel }
+    });
+    
+    return completion;
+  }
+
+  // Enhanced streak update for all categories
+  async updateCategoryStreak(
+    userId: string, 
+    streakType: 'overall' | 'nutrition' | 'workout' | 'supplements' | 'lifestyle',
+    todayScore: number,
+    logDate: Date,
+    threshold: number = 0.50
+  ): Promise<UserStreak> {
+    const dateStr = logDate.toISOString().split('T')[0];
+    
+    // Get or create streak record
+    let streak = await this.getUserStreak(userId, streakType as 'overall' | 'nutrition' | 'workout' | 'lifestyle');
+    
+    if (!streak) {
+      // Create new streak for this category
+      const [created] = await db.insert(userStreaks).values({
+        userId,
+        streakType,
+        currentStreak: todayScore >= threshold ? 1 : 0,
+        longestStreak: todayScore >= threshold ? 1 : 0,
+        lastLoggedDate: logDate,
+        lastCompletedDate: todayScore >= threshold ? dateStr : null
+      }).returning();
+      return created;
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const lastCompleted = streak.lastCompletedDate ? new Date(streak.lastCompletedDate) : null;
+    lastCompleted?.setHours(0, 0, 0, 0);
+    
+    let newCurrentStreak = streak.currentStreak;
+    
+    // Score meets threshold
+    if (todayScore >= threshold) {
+      if (!lastCompleted) {
+        // First completion ever
+        newCurrentStreak = 1;
+      } else if (lastCompleted.getTime() === yesterday.getTime()) {
+        // Completed yesterday - streak continues
+        newCurrentStreak = streak.currentStreak + 1;
+      } else if (lastCompleted.getTime() === today.getTime()) {
+        // Already logged today - no change
+        newCurrentStreak = streak.currentStreak;
+      } else {
+        // Gap in completions - check grace period (28 hours for late logging)
+        const hoursAgo = (today.getTime() - lastCompleted.getTime()) / (1000 * 60 * 60);
+        if (hoursAgo <= 52) { // ~2 days grace
+          newCurrentStreak = streak.currentStreak + 1;
+        } else {
+          newCurrentStreak = 1; // Reset streak
+        }
+      }
+    } else {
+      // Score below threshold
+      if (lastCompleted && lastCompleted.getTime() < yesterday.getTime()) {
+        // More than a day since last completion - break streak
+        newCurrentStreak = 0;
+      }
+    }
+    
+    const newLongestStreak = Math.max(newCurrentStreak, streak.longestStreak);
+    
+    const [updated] = await db
+      .update(userStreaks)
+      .set({
+        currentStreak: newCurrentStreak,
+        longestStreak: newLongestStreak,
+        lastLoggedDate: logDate,
+        lastCompletedDate: todayScore >= threshold ? dateStr : streak.lastCompletedDate,
+        updatedAt: new Date()
+      })
+      .where(eq(userStreaks.id, streak.id))
+      .returning();
+    
+    return updated;
+  }
+
+  // Update all streaks for a user (called after any log update)
+  async updateAllStreaks(userId: string, logDate: Date): Promise<{ [key: string]: UserStreak }> {
+    // First calculate and save daily scores
+    const completion = await this.calculateAndSaveDailyScores(userId, logDate);
+    
+    // Define thresholds for each category
+    const thresholds = {
+      nutrition: 0.50,    // At least 2 meals
+      workout: 0.50,      // At least half the workout
+      supplements: 0.33,  // At least 1 dose
+      lifestyle: 0.40,    // Sleep + one other
+      overall: 0.50       // Weighted average
+    };
+    
+    const results: { [key: string]: UserStreak } = {};
+    
+    // Update each category streak
+    if (completion.nutritionScore) {
+      results.nutrition = await this.updateCategoryStreak(userId, 'nutrition', parseFloat(completion.nutritionScore), logDate, thresholds.nutrition);
+    }
+    if (completion.workoutScore) {
+      results.workout = await this.updateCategoryStreak(userId, 'workout', parseFloat(completion.workoutScore), logDate, thresholds.workout);
+    }
+    if (completion.supplementScore) {
+      results.supplements = await this.updateCategoryStreak(userId, 'supplements', parseFloat(completion.supplementScore), logDate, thresholds.supplements);
+    }
+    if (completion.lifestyleScore) {
+      results.lifestyle = await this.updateCategoryStreak(userId, 'lifestyle', parseFloat(completion.lifestyleScore), logDate, thresholds.lifestyle);
+    }
+    if (completion.dailyScore) {
+      results.overall = await this.updateCategoryStreak(userId, 'overall', parseFloat(completion.dailyScore), logDate, thresholds.overall);
+    }
+    
+    return results;
+  }
+
+  // Get all streaks for a user
+  async getAllUserStreaks(userId: string): Promise<UserStreak[]> {
+    return await db
+      .select()
+      .from(userStreaks)
+      .where(eq(userStreaks.userId, userId));
+  }
+
+  // Get streak summary for dashboard
+  async getStreakSummary(userId: string): Promise<{
+    overall: { current: number; longest: number };
+    nutrition: { current: number; longest: number };
+    workout: { current: number; longest: number };
+    supplements: { current: number; longest: number };
+    lifestyle: { current: number; longest: number };
+    todayScores: {
+      nutrition: number | null;
+      workout: number | null;
+      supplements: number | null;
+      lifestyle: number | null;
+      overall: number;
+    } | null;
+    weeklyProgress: Array<{
+      date: string;
+      nutritionScore: number | null;
+      workoutScore: number | null;
+      supplementScore: number | null;
+      lifestyleScore: number | null;
+      dailyScore: number | null;
+    }>;
+    isPaused?: boolean;
+  }> {
+    const prefs = await this.getTrackingPreferences(userId);
+    
+    // Check if tracking is paused
+    const isPaused = prefs?.pauseUntil ? new Date(prefs.pauseUntil) > new Date() : false;
+    
+    const enabled = {
+      nutrition: prefs?.trackNutrition !== false,
+      workout: prefs?.trackWorkouts !== false,
+      supplements: prefs?.trackSupplements !== false,
+      lifestyle: prefs?.trackLifestyle !== false,
+    };
+
+    const streaks = await this.getAllUserStreaks(userId);
+
+    const defaultStreak = { current: 0, longest: 0 };
+    const streakMap: { [key: string]: { current: number; longest: number } } = {};
+    for (const s of streaks) {
+      streakMap[s.streakType] = { current: s.currentStreak, longest: s.longestStreak };
+    }
+
+    const today = new Date();
+    const todayCompletion = await this.getDailyCompletion(userId, today);
+
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    const weeklyCompletions = await db
+      .select()
+      .from(dailyCompletions)
+      .where(and(
+        eq(dailyCompletions.userId, userId),
+        gte(dailyCompletions.logDate, weekAgo.toISOString().split('T')[0])
+      ))
+      .orderBy(dailyCompletions.logDate);
+
+    // When paused, freeze streaks at their current values (don't reset to 0)
+    // but don't allow them to grow either - they stay frozen
+    return {
+      overall: streakMap['overall'] || defaultStreak,
+      nutrition: enabled.nutrition ? (streakMap['nutrition'] || defaultStreak) : defaultStreak,
+      workout: enabled.workout ? (streakMap['workout'] || defaultStreak) : defaultStreak,
+      supplements: enabled.supplements ? (streakMap['supplements'] || defaultStreak) : defaultStreak,
+      lifestyle: enabled.lifestyle ? (streakMap['lifestyle'] || defaultStreak) : defaultStreak,
+      todayScores: isPaused ? null : (todayCompletion ? {
+        nutrition: enabled.nutrition ? parseFloat(todayCompletion.nutritionScore || '0') : null,
+        workout: enabled.workout && todayCompletion.workoutScore ? parseFloat(todayCompletion.workoutScore) : null,
+        supplements: enabled.supplements ? parseFloat(todayCompletion.supplementScore || '0') : null,
+        lifestyle: enabled.lifestyle ? parseFloat(todayCompletion.lifestyleScore || '0') : null,
+        overall: parseFloat(todayCompletion.dailyScore || '0'),
+      } : null),
+      weeklyProgress: weeklyCompletions.map(c => ({
+        date: c.logDate,
+        nutritionScore: enabled.nutrition && c.nutritionScore ? parseFloat(c.nutritionScore) : null,
+        workoutScore: enabled.workout && c.workoutScore ? parseFloat(c.workoutScore) : null,
+        supplementScore: enabled.supplements && c.supplementScore ? parseFloat(c.supplementScore) : null,
+        lifestyleScore: enabled.lifestyle && c.lifestyleScore ? parseFloat(c.lifestyleScore) : null,
+        dailyScore: c.dailyScore ? parseFloat(c.dailyScore) : null,
+      })),
+      isPaused,
+    };
+  }
+
+  // Get smart streak data with percentage-based daily progress and rest day detection
+  async getSmartStreakData(userId: string): Promise<{
+    currentStreak: number;
+    longestStreak: number;
+    monthlyProgress: Array<{
+      date: string;
+      percentage: number;
+      isRestDay: boolean;
+      breakdown: {
+        workout: { done: boolean; isRestDay: boolean };
+        nutrition: { score: number; mealsLogged: number; mainMeals: number; goal: number };
+        supplements: { taken: number; total: number };
+        water: { current: number; goal: number };
+        lifestyle: { sleepLogged: boolean; energyLogged: boolean; moodLogged: boolean; complete: boolean };
+      };
+    }>;
+    todayBreakdown: {
+      workout: { done: boolean; isRestDay: boolean };
+      nutrition: { score: number; mealsLogged: number; mainMeals: number; goal: number };
+      supplements: { taken: number; total: number };
+      water: { current: number; goal: number };
+      lifestyle: { sleepLogged: boolean; energyLogged: boolean; moodLogged: boolean; complete: boolean };
+    } | null;
+  }> {
+    const prefs = await this.getTrackingPreferences(userId);
+    const hydrationGoal = prefs?.hydrationGoalOz ?? 64;
+    
+    // Get active workout plan to determine rest days
+    const workoutPlan = await this.getActiveWorkoutPlan(userId);
+    let restDays: number[] = []; // 0 = Sunday, 1 = Monday, etc.
+    
+    if (workoutPlan?.workoutSchedule) {
+      try {
+        const schedule = typeof workoutPlan.workoutSchedule === 'string' 
+          ? JSON.parse(workoutPlan.workoutSchedule) 
+          : workoutPlan.workoutSchedule;
+        
+        // Extract rest days from workout plan schedule
+        // workoutSchedule format: [{ day: "Monday", workoutId: "uuid" }, ...]
+        // Days without workoutId or with workoutId "rest" are rest days
+        if (Array.isArray(schedule)) {
+          const dayMap: Record<string, number> = {
+            'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
+            'thursday': 4, 'friday': 5, 'saturday': 6
+          };
+          
+          schedule.forEach((item: any) => {
+            const dayIndex = dayMap[item.day?.toLowerCase()];
+            if (dayIndex !== undefined && (!item.workoutId || item.workoutId === 'rest' || item.isRestDay)) {
+              restDays.push(dayIndex);
+            }
+          });
+        }
+      } catch (e) {
+        // If parsing fails, assume no rest days
+      }
+    }
+
+    // Get overall streak
+    const streaks = await this.getAllUserStreaks(userId);
+    const overallStreak = streaks.find(s => s.streakType === 'overall');
+    
+    // Get month's data (30 days ending today)
+    const today = new Date();
+    today.setHours(12, 0, 0, 0); // Set to noon to avoid timezone edge cases
+    const startOfMonth = new Date(today);
+    startOfMonth.setDate(today.getDate() - 29); // 30 days total including today
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    // Calculate today's date string using local date parts
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    
+    const monthlyProgress: Array<{
+      date: string;
+      percentage: number;
+      isRestDay: boolean;
+      breakdown: {
+        workout: { done: boolean; isRestDay: boolean };
+        nutrition: { score: number; mealsLogged: number; mainMeals: number; goal: number };
+        supplements: { taken: number; total: number };
+        water: { current: number; goal: number };
+        lifestyle: { sleepLogged: boolean; energyLogged: boolean; moodLogged: boolean; complete: boolean };
+      };
+    }> = [];
+
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(startOfMonth);
+      date.setDate(startOfMonth.getDate() + i);
+      // Use local date parts instead of ISO string to avoid timezone issues
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      const dayOfWeek = date.getDay();
+      
+      // Get daily log for water/supplement details
+      const dailyLog = await this.getDailyLog(userId, date);
+      
+      // Rest day: manual override OR scheduled rest day from workout plan
+      const isRestDay = dailyLog?.isRestDay || restDays.includes(dayOfWeek);
+      
+      // Get daily completion data
+      const completion = await this.getDailyCompletion(userId, date);
+      
+      // Get workout logs for this day
+      const workoutLogs = await this.getWorkoutLogsForDate(userId, date);
+      const workoutDone = workoutLogs.length > 0;
+      
+      // Get meals logged for this day
+      const mealsLogged = await this.getMealLogsForDay(userId, date);
+      const uniqueMealTypes = new Set(mealsLogged.map(m => m.mealType));
+      // Count main meals (breakfast, lunch, dinner) as goal of 3
+      const mainMealsLogged = (['breakfast', 'lunch', 'dinner'] as const).filter(type => uniqueMealTypes.has(type)).length;
+      
+      // Calculate breakdown
+      const breakdown = {
+        workout: { 
+          done: workoutDone, 
+          isRestDay 
+        },
+        nutrition: { 
+          score: completion?.nutritionScore ? Math.round(parseFloat(completion.nutritionScore) * 100) : 0,
+          mealsLogged: mealsLogged.length,
+          mainMeals: mainMealsLogged,
+          goal: 3 // 3 main meals is the standard goal
+        },
+        supplements: { 
+          taken: [
+            dailyLog?.supplementMorning,
+            dailyLog?.supplementAfternoon,
+            dailyLog?.supplementEvening
+          ].filter(Boolean).length,
+          total: 3 
+        },
+        water: { 
+          current: dailyLog?.waterIntakeOz || 0, 
+          goal: hydrationGoal 
+        },
+        lifestyle: { 
+          // Check directly if user logged sleep, energy, and mood
+          sleepLogged: !!dailyLog?.sleepQuality,
+          energyLogged: !!dailyLog?.energyLevel,
+          moodLogged: !!dailyLog?.moodLevel,
+          complete: !!(dailyLog?.sleepQuality && dailyLog?.energyLevel && dailyLog?.moodLevel)
+        },
+      };
+      
+      // Calculate percentage based on enabled categories
+      const enabled = {
+        workout: prefs?.trackWorkouts !== false,
+        nutrition: prefs?.trackNutrition !== false,
+        supplements: prefs?.trackSupplements !== false,
+        water: hydrationGoal > 0,
+        lifestyle: prefs?.trackLifestyle !== false,
+      };
+      
+      let completed = 0;
+      let total = 0;
+      
+      if (enabled.workout) {
+        total++;
+        if (isRestDay || workoutDone) completed++;
+      }
+      if (enabled.nutrition) {
+        total++;
+        // Count as complete if user logged ANY meal
+        if (breakdown.nutrition.mealsLogged > 0) completed++;
+      }
+      if (enabled.supplements) {
+        total++;
+        if (breakdown.supplements.taken >= breakdown.supplements.total) completed++;
+      }
+      if (enabled.water) {
+        total++;
+        if (breakdown.water.current >= breakdown.water.goal) completed++;
+      }
+      if (enabled.lifestyle) {
+        total++;
+        // Lifestyle complete if user logged sleep, energy, AND mood
+        if (breakdown.lifestyle.complete) completed++;
+      }
+      
+      const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+      
+      monthlyProgress.push({
+        date: dateStr,
+        percentage,
+        isRestDay,
+        breakdown,
+      });
+    }
+    
+    // Find today's data from monthlyProgress
+    const todayData = monthlyProgress.find(d => d.date === todayStr);
+    
+    // Calculate current streak from monthlyProgress (count consecutive 100% days from today backwards)
+    let calculatedCurrentStreak = 0;
+    for (let i = monthlyProgress.length - 1; i >= 0; i--) {
+      if (monthlyProgress[i].percentage === 100) {
+        calculatedCurrentStreak++;
+      } else {
+        break; // Stop at first non-100% day
+      }
+    }
+    
+    // Calculate longest streak from monthlyProgress (last 30 days only)
+    // We use calculated value only since completion rules may have changed
+    let calculatedLongestStreak = 0;
+    let tempStreak = 0;
+    for (const day of monthlyProgress) {
+      if (day.percentage === 100) {
+        tempStreak++;
+        calculatedLongestStreak = Math.max(calculatedLongestStreak, tempStreak);
+      } else {
+        tempStreak = 0;
+      }
+    }
+    
+    console.log('📅 Smart Streak dates:', { todayStr, lastProgressDate: monthlyProgress[monthlyProgress.length - 1]?.date, found: !!todayData });
+    
+    return {
+      currentStreak: calculatedCurrentStreak,
+      longestStreak: calculatedLongestStreak, // Only use calculated value from last 30 days
+      monthlyProgress,
+      todayBreakdown: todayData?.breakdown ?? null,
+    };
+  }
+
+  // Get workout logs for a specific date
+  async getWorkoutLogsForDate(userId: string, date: Date): Promise<WorkoutLog[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return await db
+      .select()
+      .from(workoutLogs)
+      .where(and(
+        eq(workoutLogs.userId, userId),
+        gte(workoutLogs.completedAt, startOfDay),
+        lte(workoutLogs.completedAt, endOfDay)
       ));
   }
 
@@ -2924,6 +3633,119 @@ export class DrizzleStorage implements IStorage {
       .orderBy(desc(workoutLogs.completedAt));
   }
 
+  async deleteWorkoutLog(userId: string, logId: string): Promise<boolean> {
+    const result = await db
+      .delete(workoutLogs)
+      .where(and(eq(workoutLogs.id, logId), eq(workoutLogs.userId, userId)));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Exercise Records - for weight suggestions and manual PRs
+  async getExerciseRecord(userId: string, exerciseName: string): Promise<ExerciseRecord | undefined> {
+    const [record] = await db
+      .select()
+      .from(exerciseRecords)
+      .where(and(
+        eq(exerciseRecords.userId, userId),
+        eq(exerciseRecords.exerciseName, exerciseName)
+      ));
+    return record;
+  }
+
+  async getExerciseRecords(userId: string): Promise<ExerciseRecord[]> {
+    return await db
+      .select()
+      .from(exerciseRecords)
+      .where(eq(exerciseRecords.userId, userId))
+      .orderBy(desc(exerciseRecords.updatedAt));
+  }
+
+  async getTrackedPRs(userId: string): Promise<ExerciseRecord[]> {
+    return await db
+      .select()
+      .from(exerciseRecords)
+      .where(and(
+        eq(exerciseRecords.userId, userId),
+        eq(exerciseRecords.isPrTracked, true)
+      ))
+      .orderBy(desc(exerciseRecords.prWeight));
+  }
+
+  async upsertExerciseRecord(userId: string, exerciseName: string, data: {
+    lastWeight?: number;
+    lastReps?: number;
+    prWeight?: number;
+    prReps?: number;
+    isPrTracked?: boolean;
+  }): Promise<ExerciseRecord> {
+    const existing = await this.getExerciseRecord(userId, exerciseName);
+    
+    if (existing) {
+      const updates: Partial<ExerciseRecord> = {
+        updatedAt: new Date(),
+      };
+      
+      // Update last logged weight/reps
+      if (data.lastWeight !== undefined) {
+        updates.lastWeight = data.lastWeight;
+        updates.lastReps = data.lastReps ?? null;
+        updates.lastLoggedAt = new Date();
+      }
+      
+      // Update PR if explicitly setting or if new weight is higher
+      if (data.isPrTracked !== undefined) {
+        updates.isPrTracked = data.isPrTracked;
+      }
+      if (data.prWeight !== undefined) {
+        updates.prWeight = data.prWeight;
+        updates.prReps = data.prReps ?? null;
+        updates.prDate = new Date();
+      }
+      
+      const [updated] = await db
+        .update(exerciseRecords)
+        .set(updates)
+        .where(eq(exerciseRecords.id, existing.id))
+        .returning();
+      return updated;
+    }
+
+    // Create new record
+    const [created] = await db
+      .insert(exerciseRecords)
+      .values({
+        userId,
+        exerciseName,
+        lastWeight: data.lastWeight ?? null,
+        lastReps: data.lastReps ?? null,
+        lastLoggedAt: data.lastWeight ? new Date() : null,
+        prWeight: data.prWeight ?? null,
+        prReps: data.prReps ?? null,
+        prDate: data.prWeight ? new Date() : null,
+        isPrTracked: data.isPrTracked ?? false,
+      })
+      .returning();
+    return created;
+  }
+
+  async deleteExercisePR(userId: string, exerciseName: string): Promise<boolean> {
+    const existing = await this.getExerciseRecord(userId, exerciseName);
+    if (!existing) return false;
+    
+    const [updated] = await db
+      .update(exerciseRecords)
+      .set({
+        isPrTracked: false,
+        prWeight: null,
+        prReps: null,
+        prDate: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(exerciseRecords.id, existing.id))
+      .returning();
+    return !!updated;
+  }
+
   async getWorkoutPreferences(userId: string): Promise<WorkoutPreferences | undefined> {
     const [prefs] = await db
       .select()
@@ -2942,18 +3764,28 @@ export class DrizzleStorage implements IStorage {
         .where(eq(workoutPreferences.id, existing.id))
         .returning();
       return updated;
-    } else {
-      const [created] = await db
-        .insert(workoutPreferences)
-        .values({ ...prefs, userId } as any)
-        .returning();
-      return created;
     }
+
+    const payload: InsertWorkoutPreferences = {
+      userId,
+      preferredDays: (prefs.preferredDays ?? ['Monday', 'Wednesday', 'Friday']) as string[],
+      preferredTime: prefs.preferredTime ?? '07:00',
+      smsEnabled: prefs.smsEnabled ?? false,
+      calendarSync: prefs.calendarSync ?? false,
+    };
+
+    const [created] = await db
+      .insert(workoutPreferences)
+      .values(payload as any)
+      .returning();
+    return created;
   }
 
-  // Grocery Lists
   async createGroceryList(list: InsertGroceryList): Promise<GroceryList> {
-    const [created] = await db.insert(groceryLists).values(list).returning();
+    const [created] = await db
+      .insert(groceryLists)
+      .values(list)
+      .returning();
     return created;
   }
 
@@ -3013,6 +3845,34 @@ export class DrizzleStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  // Tracking Preferences (which categories count toward streaks/consistency)
+  async getTrackingPreferences(userId: string): Promise<TrackingPreferences | undefined> {
+    const [prefs] = await db
+      .select()
+      .from(trackingPreferences)
+      .where(eq(trackingPreferences.userId, userId));
+    return prefs;
+  }
+
+  async upsertTrackingPreferences(userId: string, prefs: Partial<InsertTrackingPreferences>): Promise<TrackingPreferences> {
+    const existing = await this.getTrackingPreferences(userId);
+
+    if (existing) {
+      const [updated] = await db
+        .update(trackingPreferences)
+        .set({ ...prefs, updatedAt: new Date() } as any)
+        .where(eq(trackingPreferences.id, existing.id))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db
+      .insert(trackingPreferences)
+      .values({ ...prefs, userId } as any)
+      .returning();
+    return created;
   }
 
   // Meal Plans

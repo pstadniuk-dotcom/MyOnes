@@ -5,18 +5,18 @@
 import { describe, it, expect } from 'vitest';
 
 // Import the shared ingredients catalog
-import { BASE_FORMULAS, INDIVIDUAL_INGREDIENTS } from '../../shared/ingredients';
+import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS } from '../../shared/ingredients';
 
 describe('Ingredient Catalog', () => {
-  describe('Base Formulas', () => {
-    it('should have base formulas defined', () => {
-      expect(BASE_FORMULAS).toBeDefined();
-      expect(Array.isArray(BASE_FORMULAS)).toBe(true);
-      expect(BASE_FORMULAS.length).toBeGreaterThan(0);
+  describe('System Supports', () => {
+    it('should have system supports defined', () => {
+      expect(SYSTEM_SUPPORTS).toBeDefined();
+      expect(Array.isArray(SYSTEM_SUPPORTS)).toBe(true);
+      expect(SYSTEM_SUPPORTS.length).toBeGreaterThan(0);
     });
 
-    it('each base formula should have required fields', () => {
-      BASE_FORMULAS.forEach((formula) => {
+    it('each system support should have required fields', () => {
+      SYSTEM_SUPPORTS.forEach((formula) => {
         expect(formula.name).toBeDefined();
         expect(typeof formula.name).toBe('string');
         expect(formula.doseMg).toBeDefined();
@@ -25,8 +25,8 @@ describe('Ingredient Catalog', () => {
       });
     });
 
-    it('base formula names should be unique', () => {
-      const names = BASE_FORMULAS.map((f) => f.name);
+    it('system support names should be unique', () => {
+      const names = SYSTEM_SUPPORTS.map((f) => f.name);
       const uniqueNames = new Set(names);
       expect(uniqueNames.size).toBe(names.length);
     });

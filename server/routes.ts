@@ -15,12 +15,13 @@ import { signupSchema, loginSchema, labReportUploadSchema, userConsentSchema, in
 import { ObjectStorageService } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { analyzeLabReport } from "./fileAnalysis";
-import { getIngredientDose, isValidIngredient, BASE_FORMULAS, INDIVIDUAL_INGREDIENTS, BASE_FORMULA_DETAILS, normalizeIngredientName, findIngredientByName } from "@shared/ingredients";
+import { getIngredientDose, isValidIngredient, SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, SYSTEM_SUPPORT_DETAILS, normalizeIngredientName, findIngredientByName } from "@shared/ingredients";
 import { sendNotificationEmail } from "./emailService";
 import { sendNotificationSms, sendRawSms } from "./smsService";
 import type { User, Notification, NotificationPref } from "@shared/schema";
 import { buildGPT4Prompt, buildO1MiniPrompt, type PromptContext } from "./prompt-builder";
 import { buildNutritionPlanPrompt, buildWorkoutPlanPrompt, buildLifestylePlanPrompt, buildRecipePrompt } from "./optimize-prompts";
+import { analyzeWorkoutHistory, formatAnalysisForPrompt } from "./workoutAnalysis";
 import { parseAiJson } from "./utils/parseAiJson";
 import { normalizePlanContent, DEFAULT_MEAL_TYPES } from "./optimize-normalizer";
 import { nanoid } from "nanoid";
@@ -183,7 +184,7 @@ function normalizeModel(provider: 'openai'|'anthropic', model: string | undefine
 // Simple Anthropic Messages API caller (non-streaming). We simulate streaming by chunking the final text.
 function buildCreateFormulaTool() {
   const approvedNames = [
-    ...BASE_FORMULAS.map(b => b.name),
+    ...SYSTEM_SUPPORTS.map(b => b.name),
     ...INDIVIDUAL_INGREDIENTS.map(i => i.name)
   ];
   return {
@@ -368,7 +369,7 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
   
   // Verify all ingredients are approved
   const approvedNames = new Set([
-    ...BASE_FORMULAS.map(f => f.name),
+    ...SYSTEM_SUPPORTS.map(f => f.name),
     ...INDIVIDUAL_INGREDIENTS.map(i => i.name)
   ]);
   
@@ -378,16 +379,23 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
     }
   }
   
-  // 🚨 CRITICAL: Validate base formulas have FIXED dosages (cannot be adjusted)
+  // 🚨 CRITICAL: Validate system supports use valid dose multiples (1x, 2x, or 3x)
+  // system supports can now be dosed at 1x, 2x, or 3x their base amount
   if (formula.bases && formula.bases.length > 0) {
     for (const base of formula.bases) {
-      const catalogBase = BASE_FORMULAS.find(f => f.name === base.ingredient);
-      if (catalogBase && base.amount !== catalogBase.doseMg) {
-        errors.push(
-          `Base formula "${base.ingredient}" has FIXED dosage of ${catalogBase.doseMg}mg and cannot be adjusted (attempted: ${base.amount}mg). ` +
-          `You can only add/remove entire base formulas, not change their amounts. ` +
-          `To make room, remove individual ingredients or entire base formulas instead.`
-        );
+      const catalogBase = SYSTEM_SUPPORTS.find(f => f.name === base.ingredient);
+      if (catalogBase) {
+        const baseDose = catalogBase.doseMg;
+        const validDoses = [baseDose, baseDose * 2, baseDose * 3];
+        
+        // Check if the amount is a valid multiple (1x, 2x, or 3x)
+        if (!validDoses.includes(base.amount)) {
+          errors.push(
+            `system support "${base.ingredient}" must be dosed at 1x (${baseDose}mg), 2x (${baseDose * 2}mg), or 3x (${baseDose * 3}mg). ` +
+            `Attempted: ${base.amount}mg. ` +
+            `Use 1x for mild support, 2x for moderate issues, 3x for therapeutic intervention.`
+          );
+        }
       }
     }
   }
@@ -480,7 +488,7 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 // Helper function to check if an ingredient is approved (uses shared normalization)
-// Checks against BOTH base formulas and individual ingredients to be category-agnostic
+// Checks against BOTH system supports and individual ingredients to be category-agnostic
 function isIngredientApproved(ingredientName: string, approvedSet: Set<string>): boolean {
   // Use shared normalizeIngredientName which strips potency qualifiers, extraction ratios, etc.
   const normalized = normalizeIngredientName(ingredientName);
@@ -508,12 +516,12 @@ function isIngredientApproved(ingredientName: string, approvedSet: Set<string>):
 
 // SINGLE SOURCE OF TRUTH: Use shared ingredient catalog for validation
 // This ensures prompts and validation are always in sync
-const APPROVED_BASE_FORMULAS = new Set(BASE_FORMULAS.map(f => f.name));
+const APPROVED_SYSTEM_SUPPORTS = new Set(SYSTEM_SUPPORTS.map(f => f.name));
 const APPROVED_INDIVIDUAL_INGREDIENTS = new Set(INDIVIDUAL_INGREDIENTS.map(i => i.name));
 
 // Combined set of ALL approved ingredients (bases + individuals) for category-agnostic validation
 const ALL_APPROVED_INGREDIENTS = new Set([
-  ...Array.from(APPROVED_BASE_FORMULAS),
+  ...Array.from(APPROVED_SYSTEM_SUPPORTS),
   ...Array.from(APPROVED_INDIVIDUAL_INGREDIENTS)
 ]);
 
@@ -545,7 +553,7 @@ function normalizePromptFormula(formula?: Awaited<ReturnType<typeof storage.getC
 
 // SINGLE SOURCE OF TRUTH: Build canonical doses from shared ingredient catalog
 const CANONICAL_DOSES_MG = Object.fromEntries(
-  [...BASE_FORMULAS, ...INDIVIDUAL_INGREDIENTS].map(ing => [ing.name, ing.doseMg])
+  [...SYSTEM_SUPPORTS, ...INDIVIDUAL_INGREDIENTS].map(ing => [ing.name, ing.doseMg])
 );
 
 // Dose parsing utility that converts string doses to numeric mg
@@ -601,7 +609,7 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
   
   // Validate bases with CATEGORY-AGNOSTIC flexible matching
   if (!formula.bases || formula.bases.length === 0) {
-    errors.push('Formula must include at least one base formula');
+    errors.push('Formula must include at least one system support');
   } else {
     for (const base of formula.bases) {
       // Use category-agnostic validation - checks against ALL approved ingredients
@@ -951,16 +959,16 @@ function validateAndCorrectIngredientNames(formula: any): {
   
   console.log('🔍 POST-GENERATION VALIDATOR: Checking ingredient names...');
   
-  // Validate and correct base formulas
+  // Validate and correct system supports
   for (let i = 0; i < correctedFormula.bases.length; i++) {
     const base = correctedFormula.bases[i];
     const originalName = base.ingredient;
     const normalizedName = normalizeIngredientName(originalName);
-    const catalogBase = BASE_FORMULAS.find(f => f.name.toLowerCase() === normalizedName.toLowerCase());
+    const catalogBase = SYSTEM_SUPPORTS.find(f => f.name.toLowerCase() === normalizedName.toLowerCase());
     
     if (!catalogBase) {
-      errors.push(`❌ BASE FORMULA NOT FOUND: "${originalName}" (normalized to "${normalizedName}") is not in the approved catalog. Available base formulas: ${BASE_FORMULAS.map(f => f.name).join(', ')}`);
-      console.log(`❌ Invalid base formula: "${originalName}"`);
+      errors.push(`❌ system support NOT FOUND: "${originalName}" (normalized to "${normalizedName}") is not in the approved catalog. Available system supports: ${SYSTEM_SUPPORTS.map(f => f.name).join(', ')}`);
+      console.log(`❌ Invalid system support: "${originalName}"`);
     } else if (originalName !== catalogBase.name) {
       warnings.push(`⚠️ AUTO-CORRECTED: "${originalName}" → "${catalogBase.name}"`);
       correctedFormula.bases[i].ingredient = catalogBase.name;
@@ -1136,7 +1144,7 @@ IF the user says ANYTHING like:
 THEN you MUST follow this EXACT workflow:
 
 STEP 1 - IMMEDIATELY analyze their current formula (if they have one)
-- Review what base formulas and individual ingredients they already have
+- Review what system supports and individual ingredients they already have
 - Identify what health areas are already covered
 - Example: "I can see your current formula (Pete v1, 4860mg) includes Heart Support and Liver Support..."
 
@@ -1171,7 +1179,7 @@ DO NOT output the JSON formula block when user:
 - Has not yet confirmed
 
 WHEN USER CONFIRMS, immediately output the COMPLETE JSON block (using proper markdown code fence) with:
-- ALL existing base formulas from their current formula
+- ALL existing system supports from their current formula
 - ALL existing individual ingredients from their current formula
 - PLUS all new ingredients you suggested
 - Accurate totalMg calculation (recommend 4500-5500mg for best value, but any amount is acceptable)
@@ -1179,7 +1187,7 @@ WHEN USER CONFIRMS, immediately output the COMPLETE JSON block (using proper mar
 🚨 CRITICAL JSON GENERATION RULE FOR EXISTING FORMULAS 🚨
 
 When user confirms additions to their EXISTING formula, your JSON MUST include:
-1. ALL base formulas from their current formula (carried over unchanged)
+1. ALL system supports from their current formula (carried over unchanged)
 2. ALL individual ingredients from their current formula (carried over unchanged)
 3. PLUS the new ingredients you're adding
 4. Calculate accurate total (recommend 4500-5500mg for optimal value, but honor user preferences)
@@ -1233,7 +1241,7 @@ When a user has an existing formula, you will see it in your context like this:
 
 📦 CURRENT ACTIVE FORMULA (Version X):
 [CUSTOM BUILT] or [AI-GENERATED] - indicates if user manually created it or AI created it
-Base Formulas:
+system supports:
 - Formula Name (dose)
 Individual Additions:
 - Ingredient Name (dose)
@@ -1292,26 +1300,26 @@ This is critically important for legal compliance:
 === 🚨 CRITICAL INGREDIENT RULES (READ FIRST) 🚨 ===
 
 **RULE #1: ONLY use ingredients from the approved catalog below**
-- You can ONLY recommend the 32 base formulas and 29 individual ingredients listed in this prompt
+- You can ONLY recommend the 32 system supports and 29 individual ingredients listed in this prompt
 - If a user mentions they currently take supplements NOT in our catalog, acknowledge them but DO NOT include them in your formula
 - Users' current supplements are for REFERENCE ONLY - they help you understand their concerns, but you must work within our catalog
 
 **RULE #2: NEVER make up or modify formula names**
 - ❌ BAD: "Brain Support", "Brain Health Blend", "Cognitive Support", "Memory Formula"
-- ✅ GOOD: Only use exact names from the 32 approved base formulas (scroll down to see full list)
-- If we don't have a specific base formula for something (e.g., brain health), use INDIVIDUAL INGREDIENTS instead
+- ✅ GOOD: Only use exact names from the 32 approved system supports (scroll down to see full list)
+- If we don't have a specific system support for something (e.g., brain health), use INDIVIDUAL INGREDIENTS instead
 
 **RULE #3: What to do when users ask for ingredients we don't have**
 - User asks: "I want Vitamin D3 for immunity"
 - You say: "While we don't have Vitamin D3 in our current catalog, I can include Immune-C which has powerful immune-supporting ingredients like Vitamin C, Zinc, and Echinacea that will help achieve similar goals."
 
 **RULE #4: Common brain/cognitive support approach**
-- We do NOT have "Brain Support" or "Cognitive Support" base formulas
+- We do NOT have "Brain Support" or "Cognitive Support" system supports
 - For brain/memory/cognitive health, use these INDIVIDUAL INGREDIENTS:
   * Ginko Biloba Extract 24% (60-120mg) - memory, cognitive function
   * Phosphatidylcholine 40% (300-600mg) - cognitive function, brain health
   * Omega 3 algae omega (300-500mg) - brain function, mental clarity
-- Combine these individual ingredients with other appropriate base formulas based on user's overall health needs (e.g., Heart Support for cardiovascular health, Liver Support for detox)
+- Combine these individual ingredients with other appropriate system supports based on user's overall health needs (e.g., Heart Support for cardiovascular health, Liver Support for detox)
 
 === CONSULTATION APPROACH (MOST IMPORTANT) ===
 
@@ -1400,7 +1408,7 @@ If user tries to rush you or asks "what should I take?", politely explain:
 === CRITICAL FORMULATION RULES ===
 
 1. FORMULA STRUCTURE:
-   - Every formula MUST include 2-3 BASE FORMULAS from our library
+   - Every formula MUST include 2-3 system supports from our library
    - Then add 5-7 INDIVIDUAL INGREDIENTS on top of bases
    - NEVER use ingredients outside our approved catalog
    - If an ingredient isn't listed below, you CANNOT use it
@@ -1408,7 +1416,7 @@ If user tries to rush you or asks "what should I take?", politely explain:
 2. CAPSULE SPECIFICATIONS (UPDATED FOR 00 SIZE CAPSULES):
    - Size 00 capsules: 700-850mg capacity (industry standard)
    - RECOMMENDED DAILY TOTAL: **4500-5500mg** (optimal value for cost-effectiveness and therapeutic benefit)
-   - Base formulas total: ~2500-3500mg (select 2-3 base formulas)
+   - system supports total: ~2500-3500mg (select 2-3 system supports)
    - Individual additions: ~2000-2000mg (select 5-7 individual ingredients at ~300mg each)
    - Capsule count: 6-8 capsules per day (at ~750mg per capsule = optimal 00 fill)
    - Always ask user preference for AM/PM split or suggest 4 caps AM, 4 caps PM for convenience
@@ -1501,7 +1509,7 @@ For ingredients with ranges, you can choose ANY dosage within the min-max range:
 
 **REMEMBER:** The validation system will AUTOMATICALLY REJECT any formula that violates these dosage limits. There are NO exceptions.
 
-=== APPROVED BASE FORMULAS (18 TOTAL) ===
+=== APPROVED system supports (18 TOTAL) ===
 CRITICAL: You can ONLY use these exact formulas. Do not create formulas outside this list.
 
 1. Adrenal Support - Endocrine/Metabolism
@@ -1601,7 +1609,7 @@ CRITICAL: You can ONLY use these exact formulas. Do not create formulas outside 
     Dose: 1-3x daily | Best for: Thyroid function, metabolism
 
 === APPROVED INDIVIDUAL INGREDIENTS (EXACT LIST - 37 TOTAL) ===
-Add these ON TOP of base formulas. 
+Add these ON TOP of system supports. 
 
 ⚠️ CRITICAL VALIDATION RULE ⚠️
 You MUST ONLY use ingredients from this EXACT list below. NEVER suggest, recommend, or include ANY ingredient not explicitly listed here.
@@ -1702,7 +1710,7 @@ MEDICAL HISTORY:
 
 === BIOMARKER-TO-INGREDIENT MAPPING (CRITICAL REFERENCE) ===
 
-When analyzing blood tests, use this mapping to select appropriate base formulas and individual ingredients from our approved catalog:
+When analyzing blood tests, use this mapping to select appropriate system supports and individual ingredients from our approved catalog:
 
 🔴 CARDIOVASCULAR BIOMARKERS:
 • Total Cholesterol >200 mg/dL or LDL >100 mg/dL
@@ -1897,8 +1905,8 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
       - "Each capsule contains approximately [Y]mg of therapeutic compounds"
       - "I recommend [X] in the morning with breakfast and [X] in the evening with dinner"
    
-   c) **Base Formulas - Explain Each One**:
-      For EACH base formula you're including:
+   c) **system supports - Explain Each One**:
+      For EACH system support you're including:
       - Name it clearly
       - List its 3-4 KEY active ingredients (from the catalog above)
       - Explain WHY you chose it - tie to SPECIFIC things they told you
@@ -1926,7 +1934,7 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
       - Example: "The Ginger in your formula may have mild blood-thinning properties, so just monitor if you're taking aspirin..."
 
 3. CAPSULE CALCULATION (Calculate and present clearly):
-   - Base formulas total: Calculate exact mg (e.g., "Base formulas: 1,350mg")
+   - system supports total: Calculate exact mg (e.g., "system supports: 1,350mg")
    - Individual additions total: Calculate exact mg (e.g., "Individual ingredients: 1,650mg") 
    - Daily total: Show clearly (e.g., "Total daily: 3,000mg = 4 capsules")
    - Capsule count: Based on size (e.g., "4 capsules at 750mg each (Size 00)")
@@ -1942,16 +1950,29 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    This is NON-NEGOTIABLE and the ONLY way formulas get saved to the database.
    
    ⚠️ VALIDATION REQUIREMENTS - READ CAREFULLY ⚠️
-   - ALL base formula names MUST match EXACTLY from the 32 approved base formulas list above (scroll up to see full list)
+   - ALL system support names MUST match EXACTLY from the 32 approved system supports list above (scroll up to see full list)
    - ALL individual ingredient names MUST match EXACTLY from the 29 approved individual ingredients list above (scroll up to see full list)
    - Use EXACT capitalization and specifications (e.g., "Ginko Biloba Extract 24%" not "Ginkgo Biloba")
    - NEVER include ingredients not in the approved catalog (if not listed above, DON'T use it)
-   - NEVER EVER make up formula names like "Brain Support", "Brain Health Blend", "Cognitive Support Mix", "Memory Formula" - ONLY use the exact names from approved base formulas
+   - NEVER EVER make up formula names like "Brain Support", "Brain Health Blend", "Cognitive Support Mix", "Memory Formula" - ONLY use the exact names from approved system supports
    - If user mentions ingredients they currently take (e.g., "I take Vitamin D3"), DO NOT include them unless they're in our approved catalog
    - When users want brain/cognitive support, use individual ingredients (Ginko Biloba, Phosphatidylcholine, Omega 3) NOT made-up "Brain Support" formulas
    - If you use an unapproved ingredient or made-up formula name, the entire formula will be REJECTED and NOT saved
    
    === CRITICAL CALCULATION RULES (READ BEFORE CREATING JSON) ===
+   
+   🔴🔴🔴 STEP 1: ALWAYS SHOW YOUR MATH BEFORE THE JSON BLOCK 🔴🔴🔴
+   
+   Before creating the JSON, you MUST write out your calculation like this:
+   "**Formula Calculation:**
+   - Heart Support: 450mg
+   - Liver Support: 500mg  
+   - Ashwagandha: 600mg
+   - CoQ10: 200mg
+   - Omega-3: 800mg
+   **Running Total: 450 + 500 + 600 + 200 + 800 = 2550mg** ✅ Under 5500mg limit"
+   
+   If your running total exceeds 5500mg, STOP and remove ingredients before creating the JSON!
    
    RULE 1 - EXACT DOSAGES FOR FIXED-DOSE INGREDIENTS:
    Some ingredients CANNOT be adjusted - they have ONE fixed dosage only:
@@ -1963,29 +1984,30 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    • Add up EVERY ingredient (bases + additions)
    • Use a calculator - do NOT estimate
    • Your totalMg MUST equal the sum of all ingredients
-   • Maximum allowed: 5500mg
+   • ⚠️ HARD LIMIT: 5500mg MAXIMUM - formulas over this are REJECTED
    • Backend will verify - mismatches = REJECTION
    
    Example:
    Heart Support (450) + Ashwagandha (600) + CoQ10 (200) + L-Theanine (400) 
    + Broccoli (200) + Red Ginseng (200)
-   + NAD+ (100) + Fulvic Acid (250) + Camu Camu (2500) + Curcumin (400) 
+   + NAD+ (100) + Fulvic Acid (250) + Curcumin (400) 
    + InnoSlim (250)
-   = 5350mg ← This is what you put in "totalMg"
+   = 3050mg ← This is what you put in "totalMg"
    
    RULE 3 - MAXIMUM LIMIT CHECK:
-   • If your total > 5500mg, you MUST reduce:
+   • If your total > 5500mg, you MUST reduce BEFORE creating JSON:
      - Remove some ingredients
      - Use lower dosages (for range-based ingredients)
-     - Choose fewer base formulas
+     - Choose fewer system supports
+   • DO NOT create JSON with total > 5500mg - it will be rejected!
    
    🔴🔴🔴 MANDATORY: You MUST copy this exact format below. Replace the example data with your formula, but keep the JSON structure identical. 🔴🔴🔴
    
    ⚠️ CRITICAL CATEGORIZATION RULES:
-   - "bases" array = ONLY the 18 approved BASE FORMULAS (Heart Support, Liver Support, Adrenal Support, etc.)
+   - "bases" array = ONLY the 18 approved system supports (Heart Support, Liver Support, Adrenal Support, etc.)
    - "additions" array = ONLY the 29 approved INDIVIDUAL INGREDIENTS (Magnesium, Omega 3 algae omega, Turmeric, etc.)
    - NEVER put individual ingredients in "bases" array
-   - NEVER put base formulas in "additions" array
+   - NEVER put system supports in "additions" array
    
    Format it EXACTLY like this with triple backticks and "json" tag (replace \` with actual backticks):
    
@@ -2017,28 +2039,29 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    
    Example calculation (with actual ingredients from your formula):
    Heart Support: 450mg
+   + Liver Support: 500mg
    + Ashwagandha: 600mg
    + CoEnzyme Q10: 200mg
    + L-Theanine: 400mg
-   + Broccoli Concentrate: 200mg
-   + Red Ginseng: 200mg
-   + NAD+: 100mg
-   + Fulvic Acid: 250mg
-   + Camu Camu: 2500mg
+   + Omega 3 algae omega: 800mg
+   + Magnesium: 400mg
    + Curcumin: 400mg
-   + InnoSlim: 250mg
-   = 5350mg total ← THIS is the correct totalMg
+   + NAD+: 100mg
+   + Ginko Biloba Extract 24%: 200mg
+   = 4050mg total ← THIS is the correct totalMg (under 5500mg limit ✅)
    
    ⚠️ If your totalMg doesn't match your ingredients, the formula will be REJECTED!
    The backend validates your math and will reject formulas with calculation errors.
    
+   ⚠️ If your total exceeds 5500mg, the formula will be REJECTED! Reduce ingredients first.
+   
    �🔍 QUICK CHECK BEFORE SUBMITTING:
-   - Verify all "bases" items are from the 32 BASE FORMULAS list (scroll up to check)
+   - Verify all "bases" items are from the 32 system supports list (scroll up to check)
    - Verify all "additions" items are from the 29 INDIVIDUAL INGREDIENTS list (scroll up to check)
    - Calculate accurate totalMg (recommend suggesting 4500-5500mg range for optimal value)
    
    REQUIRED FIELDS:
-   - bases: array of base formulas (MUST use exact names from approved 32 base formulas)
+   - bases: array of system supports (MUST use exact names from approved 32 system supports)
    - additions: array of individual ingredients (MUST use exact names from approved 29 individual ingredients)
    - totalMg: total daily formula weight in mg (number)
    - warnings: array of any drug interactions or contraindications
@@ -2048,7 +2071,7 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    🔴 FINAL CHECKPOINT BEFORE SENDING: 🔴
    Before you send your response, verify:
    ✓ Did I include the JSON block in triple backticks with "json" tag exactly as shown in example?
-   ✓ Did I use ONLY approved base formula names (check the list above)?
+   ✓ Did I use ONLY approved system support names (check the list above)?
    ✓ Did I use ONLY approved individual ingredient names (check the list above)?
    ✓ Did I include all required fields (bases, additions, totalMg, warnings, rationale, disclaimers)?
    
@@ -2805,7 +2828,7 @@ ${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sorted
           
           if (customBases.length > 0 || customIndividuals.length > 0) {
             const allCustomizations = [
-              ...customBases.map(c => `  • ${c.ingredient} (${c.amount}${c.unit}) - User added base formula`),
+              ...customBases.map(c => `  • ${c.ingredient} (${c.amount}${c.unit}) - User added system support`),
               ...customIndividuals.map(c => `  • ${c.ingredient} (${c.amount}${c.unit}) - User added individual ingredient`)
             ];
             customizationsText = `\n\nUser Manual Customizations:\n${allCustomizations.join('\n')}`;
@@ -2816,7 +2839,7 @@ ${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sorted
 📦 CURRENT ACTIVE FORMULA: "${activeFormula.name || 'Unnamed'}" (Version ${activeFormula.version || 1})
 ${activeFormula.userCreated ? '[CUSTOM BUILT] - User manually created this formula without AI assistance' : '[AI-GENERATED] - AI created and optimized this formula'}
 
-Base Formulas${activeFormula.userCreated ? '' : ' (AI-Recommended)'}:
+system supports${activeFormula.userCreated ? '' : ' (AI-Recommended)'}:
 ${basesText}
 
 Individual Additions${activeFormula.userCreated ? '' : ' (AI-Recommended)'}:
@@ -2826,10 +2849,10 @@ Total Daily Dose: ${activeFormula.totalMg}mg
 Target Range: 4500-5500mg (00 capsule capacity)
 
 ⚠️ IMPORTANT: When analyzing blood tests and making recommendations:
-- Review this COMPLETE formula FIRST (including all base formulas, additions, AND user customizations)
+- Review this COMPLETE formula FIRST (including all system supports, additions, AND user customizations)
 - Identify what's working and what might need adjustment
 - Calculate the gap: Current ${activeFormula.totalMg}mg → Target 4500-5500mg = ${Math.max(0, 4500 - activeFormula.totalMg)}mg minimum addition needed (${5500 - activeFormula.totalMg}mg maximum capacity available)
-- Suggest specific base formulas or individual ingredients from the approved catalog to ADD
+- Suggest specific system supports or individual ingredients from the approved catalog to ADD
 - Explain which current ingredients to keep, increase, or remove based on lab results
 - Show your math: "Current XYZ 450mg + Adding ABC 300mg = 750mg total for cardiovascular support"
 
@@ -2973,7 +2996,7 @@ Verify: 4500mg ≤ New Total ≤ 5500mg
 - Group related markers under category headers
 - Use horizontal rules (---) to separate sections
 - Keep it scannable and clean
-- Only use ingredients from the approved 32 base formulas + 29 individual ingredients
+- Only use ingredients from the approved 32 system supports + 29 individual ingredients
 ` : ''}
 
 INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
@@ -3044,7 +3067,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
             // Anthropic expects system separately and no 'system' items in messages
             const systemPrompt = conversationHistory[0]?.content || '';
-            const msgs = conversationHistory.slice(1).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+            // Filter out any messages with empty content (Anthropic requires non-empty content)
+            const msgs = conversationHistory.slice(1)
+              .filter(m => m.content && m.content.trim().length > 0)
+              .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+            
+            // Ensure we have at least the current user message
+            if (msgs.length === 0 || msgs[msgs.length - 1]?.role !== 'user') {
+              msgs.push({ role: 'user', content: messageWithFileContext });
+            }
 
             // Non-streaming call, will simulate streaming below
             const { text: fullText, toolJsonBlock } = await callAnthropic(systemPrompt, msgs, model, 0.7, 3000, true);
@@ -3363,7 +3394,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               validationErrorMessage += `❌ **Problem:** Your formula totals ${validation.calculatedTotalMg}mg, which exceeds the maximum safe limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg.\n\n`;
               validationErrorMessage += `🚨 **CRITICAL REMINDER:** When you create a formula, it REPLACES the entire existing formula. You are creating a COMPLETE formula from scratch (0mg → up to 5500mg), NOT adding to an existing formula.\n\n`;
               validationErrorMessage += `**Required Fix:** Your new COMPLETE formula must total ≤5500mg. Reduce by ${validation.calculatedTotalMg - FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg by:\n`;
-              validationErrorMessage += `- Removing some base formulas (e.g., remove Beta Max saves 2500mg)\n`;
+              validationErrorMessage += `- Removing some system supports (e.g., remove Beta Max saves 2500mg)\n`;
               validationErrorMessage += `- Removing some individual ingredients\n`;
               validationErrorMessage += `- Reducing dosages of flexible ingredients (e.g., Curcumin 600mg → 400mg)\n`;
               validationErrorMessage += `- Prioritizing the most critical health goals\n\n`;
@@ -3374,7 +3405,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               
               sendSSE({
                 type: 'error',
-                error: `⚠️ Formula exceeds maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg.\n\nCalculated total: ${validation.calculatedTotalMg}mg\n\nPlease create a smaller formula by:\n- Using fewer base formulas\n- Reducing individual ingredient doses\n- Focusing on your top priority health goals`,
+                error: `⚠️ Formula exceeds maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg.\n\nCalculated total: ${validation.calculatedTotalMg}mg\n\nPlease create a smaller formula by:\n- Using fewer system supports\n- Reducing individual ingredient doses\n- Focusing on your top priority health goals`,
                 sessionId: chatSession?.id
               });
             } else if (hasUnapprovedIngredient) {
@@ -3469,11 +3500,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           console.error('❌ FORMULA EXTRACTION FAILURE: NO ```json block found in AI response!');
           console.log('🔍 Searching for other patterns...');
           // Check if AI outputted formula without proper formatting
-          if (fullResponse.includes('bases') || fullResponse.includes('additions') || 
-              fullResponse.includes('Base Formulas') || fullResponse.includes('Individual Ingredients') ||
-              fullResponse.includes('optimized formula') || fullResponse.includes('your formula') ||
-              fullResponse.includes('create a formula') || fullResponse.includes('formula that addresses')) {
-            console.error('⚠️ CRITICAL: FOUND formula keywords but NOT in ```json block format!');
+          // Only trigger error if AI explicitly claimed to have created/built a formula
+          const claimsFormulaCreation = 
+              fullResponse.toLowerCase().includes("here's your formula") ||
+              fullResponse.toLowerCase().includes("here is your formula") ||
+              fullResponse.toLowerCase().includes("i've created") ||
+              fullResponse.toLowerCase().includes("i have created") ||
+              fullResponse.toLowerCase().includes("your new formula") ||
+              fullResponse.toLowerCase().includes("your updated formula") ||
+              fullResponse.toLowerCase().includes("here's the formula") ||
+              fullResponse.toLowerCase().includes("presenting your formula");
+          
+          if (claimsFormulaCreation) {
+            console.error('⚠️ CRITICAL: AI claimed to create a formula but NOT in ```json block format!');
             console.error('⚠️ This formula will NOT be saved! AI needs to output JSON block.');
             
             // Append error message that AI will see in chat history
@@ -3570,7 +3609,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           // to handle cases where AI might miscategorize a base as an addition or vice versa
           console.log('🔍 Validating', extractedFormula.bases.length, 'bases +', extractedFormula.additions.length, 'additions against approved catalog');
           
-          // Validate base formulas (category-agnostic - checks against ALL approved ingredients)
+          // Validate system supports (category-agnostic - checks against ALL approved ingredients)
           for (const base of extractedFormula.bases) {
             const ingredientName = base.ingredient;
             if (!ingredientName || !isAnyIngredientApproved(ingredientName)) {
@@ -3743,6 +3782,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
       
       // Send completion event with transformed formula for frontend
+      console.log('📤 SSE COMPLETE: formulaForDisplay exists?', !!formulaForDisplay);
+      console.log('📤 SSE COMPLETE: savedFormula exists?', !!savedFormula);
+      if (formulaForDisplay) {
+        console.log('📤 SSE COMPLETE: formula bases count:', formulaForDisplay.bases?.length);
+        console.log('📤 SSE COMPLETE: formula totalMg:', formulaForDisplay.totalMg);
+      }
       sendSSE({
         type: 'complete',
         formula: formulaForDisplay,
@@ -4322,6 +4367,408 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     } catch (error) {
       console.error('Get dashboard data error:', error);
       res.status(500).json({ error: 'Failed to fetch dashboard data' });
+    }
+  });
+
+  // ============================================================================
+  // WELLNESS DASHBOARD AGGREGATOR
+  // Central nervous system for health tracking - combines optimize data
+  // ============================================================================
+  app.get('/api/dashboard/wellness', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      // Calculate week boundaries (Sunday-Saturday)
+      const dayOfWeek = today.getDay();
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - dayOfWeek);
+      weekStart.setHours(0, 0, 0, 0);
+      
+      // 30 days ago for heatmap
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+      // Fetch all data in parallel for efficiency
+      const [
+        workoutPlan,
+        nutritionPlan,
+        lifestylePlan,
+        currentFormula,
+        todayLog,
+        weekLogs,
+        monthLogs,
+        workoutLogs,
+        streaks,
+        wearableConnections
+      ] = await Promise.all([
+        storage.getActiveOptimizePlan(userId, 'workout'),
+        storage.getActiveOptimizePlan(userId, 'nutrition'),
+        storage.getActiveOptimizePlan(userId, 'lifestyle'),
+        storage.getCurrentFormulaByUser(userId),
+        storage.getDailyLog(userId, today),
+        storage.listDailyLogs(userId, weekStart, today),
+        storage.listDailyLogs(userId, thirtyDaysAgo, today),
+        storage.getAllWorkoutLogs(userId),
+        Promise.all([
+          storage.getUserStreak(userId, 'overall'),
+          storage.getUserStreak(userId, 'workout'),
+          storage.getUserStreak(userId, 'nutrition'),
+          storage.getUserStreak(userId, 'lifestyle')
+        ]),
+        storage.getWearableConnections(userId)
+      ]);
+
+      const [overallStreak, workoutStreak, nutritionStreak, lifestyleStreak] = streaks;
+      const hasOptimizeSetup = !!(workoutPlan || nutritionPlan || lifestylePlan);
+      const hasWearableConnected = wearableConnections.length > 0;
+
+      // ========== TODAY'S PLAN ==========
+      const todayDayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][today.getDay()];
+      
+      // Find today's workout from the plan
+      let todayWorkout = null;
+      let hasWorkoutToday = false;
+      const workoutContent = workoutPlan?.content as { weekPlan?: any[] } | undefined;
+      
+      if (workoutContent?.weekPlan) {
+        const weekPlan = workoutContent.weekPlan;
+        
+        todayWorkout = weekPlan.find((day: any) => {
+          // Use dayName (the actual day name like "Friday"), not day (which is just the day number)
+          const dayName = day.dayName || '';
+          return typeof dayName === 'string' && 
+                 dayName.toLowerCase() === todayDayName.toLowerCase() && 
+                 !day.isRestDay;
+        });
+        hasWorkoutToday = !!todayWorkout;
+      }
+
+      // Check if today's workout was logged
+      const todayWorkoutCompleted = workoutLogs.some(log => {
+        const logDate = new Date(log.completedAt);
+        return logDate >= todayStart && logDate <= today;
+      });
+
+      // Find today's meals from nutrition plan
+      let todaysMeals: { type: string; name: string; calories?: number }[] = [];
+      const nutritionContent = nutritionPlan?.content as { mealPlan?: Record<string, any[]> } | undefined;
+      if (nutritionContent?.mealPlan) {
+        const mealPlan = nutritionContent.mealPlan;
+        const todayMeals = mealPlan[todayDayName.toLowerCase()] || mealPlan[Object.keys(mealPlan)[0]];
+        if (todayMeals && Array.isArray(todayMeals)) {
+          todaysMeals = todayMeals.map((meal: any) => ({
+            type: meal.type || meal.mealType || 'meal',
+            name: meal.name || meal.recipe || meal.description || 'Planned meal',
+            calories: meal.calories
+          }));
+        }
+      }
+
+      // Calculate capsules per dose based on formula
+      const totalCapsules = currentFormula ? Math.ceil(currentFormula.totalMg / 750) : 6; // ~750mg per capsule
+      const capsulesPerDose = Math.ceil(totalCapsules / 3); // Split into 3 doses
+
+      // Debug logging for supplement values
+      console.log('🧪 Wellness API - todayLog supplement values:', {
+        supplementMorning: todayLog?.supplementMorning,
+        supplementAfternoon: todayLog?.supplementAfternoon,
+        supplementEvening: todayLog?.supplementEvening,
+        logId: todayLog?.id,
+      });
+
+      const todayPlan = {
+        supplementsTaken: todayLog?.supplementsTaken || false,
+        supplementMorning: todayLog?.supplementMorning || false,
+        supplementAfternoon: todayLog?.supplementAfternoon || false,
+        supplementEvening: todayLog?.supplementEvening || false,
+        supplementDosesTaken: [
+          todayLog?.supplementMorning,
+          todayLog?.supplementAfternoon,
+          todayLog?.supplementEvening
+        ].filter(Boolean).length,
+        supplementDosesTotal: 3,
+        capsulesPerDose,
+        totalCapsules,
+        formulaName: currentFormula ? `Formula v${currentFormula.version}` : undefined,
+        dosageInfo: currentFormula ? `${currentFormula.totalMg}mg daily` : undefined,
+        
+        hasWorkoutToday,
+        workoutName: todayWorkout?.workout?.name || todayWorkout?.title,
+        workoutExerciseCount: todayWorkout?.workout?.exercises?.length || 0,
+        workoutDurationMinutes: todayWorkout?.workout?.durationMinutes || 45,
+        workoutCompleted: todayWorkoutCompleted,
+        isRestDay: todayLog?.isRestDay || false,
+        
+        hasMealPlan: !!nutritionPlan,
+        mealsPlanned: todaysMeals.length,
+        mealsLogged: (todayLog?.mealsLogged as string[]) || [],
+        todaysMeals,
+        
+        waterIntakeOz: todayLog?.waterIntakeOz || 0,
+        waterGoalOz: 100,
+        
+        energyLevel: todayLog?.energyLevel,
+        moodLevel: todayLog?.moodLevel,
+        sleepQuality: todayLog?.sleepQuality
+      };
+
+      // ========== WEEKLY PROGRESS ==========
+      // Count workouts this week from workout logs (more accurate than daily logs)
+      const weekWorkoutLogs = workoutLogs.filter(log => {
+        const logDate = new Date(log.completedAt);
+        return logDate >= weekStart && logDate <= today;
+      });
+      
+      // Get planned workouts per week from plan
+      let plannedWorkoutsPerWeek = 0;
+      if (workoutContent?.weekPlan) {
+        plannedWorkoutsPerWeek = workoutContent.weekPlan
+          .filter((day: any) => !day.isRestDay).length;
+      }
+      
+      // Count days with nutrition logged this week
+      const nutritionDaysLogged = weekLogs.filter(log => 
+        log.nutritionCompleted || (log.mealsLogged && (log.mealsLogged as string[]).length > 0)
+      ).length;
+      
+      // Count days supplements taken this week
+      const supplementDaysTaken = weekLogs.filter(log => log.supplementsTaken).length;
+      
+      // Days elapsed this week (1-7)
+      const daysElapsedThisWeek = Math.min(dayOfWeek + 1, 7);
+
+      const weeklyProgress = {
+        workouts: {
+          completed: weekWorkoutLogs.length,
+          total: plannedWorkoutsPerWeek || daysElapsedThisWeek,
+          percentage: plannedWorkoutsPerWeek > 0 
+            ? Math.round((weekWorkoutLogs.length / plannedWorkoutsPerWeek) * 100)
+            : 0
+        },
+        nutrition: {
+          daysLogged: nutritionDaysLogged,
+          totalDays: daysElapsedThisWeek,
+          percentage: Math.round((nutritionDaysLogged / daysElapsedThisWeek) * 100)
+        },
+        supplements: {
+          daysTaken: supplementDaysTaken,
+          totalDays: daysElapsedThisWeek,
+          percentage: Math.round((supplementDaysTaken / daysElapsedThisWeek) * 100)
+        },
+        overallScore: Math.round(
+          ((weekWorkoutLogs.length / (plannedWorkoutsPerWeek || 1)) * 40) +
+          ((nutritionDaysLogged / daysElapsedThisWeek) * 30) +
+          ((supplementDaysTaken / daysElapsedThisWeek) * 30)
+        )
+      };
+
+      // ========== STREAKS & HEATMAP ==========
+      // Build 30-day activity map for heatmap
+      const activityMap: { date: string; level: 0 | 1 | 2 | 3 | 4; activities: string[] }[] = [];
+      
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const dateStr = format(date, 'yyyy-MM-dd');
+        
+        // Find log for this date
+        const dayLog = monthLogs.find(log => {
+          const logDate = new Date(log.logDate);
+          return format(logDate, 'yyyy-MM-dd') === dateStr;
+        });
+        
+        // Check if workout was done this day
+        const hadWorkout = workoutLogs.some(log => {
+          const logDate = new Date(log.completedAt);
+          return format(logDate, 'yyyy-MM-dd') === dateStr;
+        });
+        
+        const activities: string[] = [];
+        if (hadWorkout) activities.push('workout');
+        if (dayLog?.nutritionCompleted || (dayLog?.mealsLogged as string[])?.length > 0) activities.push('nutrition');
+        if (dayLog?.supplementsTaken) activities.push('supplements');
+        
+        // Level: 0 = nothing, 1 = 1 activity, 2 = 2 activities, 3 = 3 activities, 4 = all + high ratings
+        let level: 0 | 1 | 2 | 3 | 4 = Math.min(activities.length, 3) as 0 | 1 | 2 | 3;
+        if (activities.length >= 3 && dayLog?.energyLevel && dayLog.energyLevel >= 4) {
+          level = 4;
+        }
+        
+        activityMap.push({ date: dateStr, level, activities });
+      }
+
+      const streakData = {
+        overall: {
+          current: overallStreak?.currentStreak || 0,
+          longest: overallStreak?.longestStreak || 0,
+          lastLoggedDate: overallStreak?.lastLoggedDate?.toISOString()
+        },
+        workout: {
+          current: workoutStreak?.currentStreak || 0,
+          longest: workoutStreak?.longestStreak || 0
+        },
+        nutrition: {
+          current: nutritionStreak?.currentStreak || 0,
+          longest: nutritionStreak?.longestStreak || 0
+        },
+        activityMap
+      };
+
+      // ========== PERSONAL RECORDS ==========
+      const personalRecords: { exerciseName: string; weight: number; previousWeight?: number; date: string; isNew: boolean }[] = [];
+      const prMap: Record<string, { weight: number; date: string; previousWeight?: number }> = {};
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 7);
+
+      // Process all workout logs to find PRs
+      const sortedWorkoutLogs = [...workoutLogs].sort(
+        (a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime()
+      );
+
+      sortedWorkoutLogs.forEach(log => {
+        const exercises = log.exercisesCompleted as any[];
+        if (!exercises) return;
+        
+        exercises.forEach((ex: any) => {
+          if (!ex.sets || !Array.isArray(ex.sets)) return;
+          
+          ex.sets.forEach((set: any) => {
+            const weight = Number(set.weight) || 0;
+            if (weight <= 0) return;
+            
+            if (!prMap[ex.name] || weight > prMap[ex.name].weight) {
+              const previousWeight = prMap[ex.name]?.weight;
+              prMap[ex.name] = {
+                weight,
+                date: log.completedAt.toISOString(),
+                previousWeight
+              };
+            }
+          });
+        });
+      });
+
+      // Convert to array and check if new (within 7 days)
+      Object.entries(prMap).forEach(([exerciseName, data]) => {
+        const prDate = new Date(data.date);
+        personalRecords.push({
+          exerciseName,
+          weight: data.weight,
+          previousWeight: data.previousWeight,
+          date: data.date,
+          isNew: prDate >= sevenDaysAgo
+        });
+      });
+
+      // Sort by most recent, then by weight
+      personalRecords.sort((a, b) => {
+        if (a.isNew && !b.isNew) return -1;
+        if (!a.isNew && b.isNew) return 1;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+
+      // ========== INSIGHTS ==========
+      const insights: { id: string; type: string; icon: string; message: string; metric?: string; change?: number }[] = [];
+      
+      // Streak achievements
+      if (overallStreak && overallStreak.currentStreak >= 7) {
+        insights.push({
+          id: 'streak-week',
+          type: 'streak',
+          icon: '🔥',
+          message: `${overallStreak.currentStreak} day streak! Keep the momentum going.`,
+          metric: `${overallStreak.currentStreak} days`
+        });
+      } else if (overallStreak && overallStreak.currentStreak >= 3) {
+        insights.push({
+          id: 'streak-building',
+          type: 'streak',
+          icon: '⚡',
+          message: `${overallStreak.currentStreak} day streak building! ${7 - overallStreak.currentStreak} more days to hit a week.`,
+          metric: `${overallStreak.currentStreak} days`
+        });
+      }
+
+      // New PR celebration
+      const newPRs = personalRecords.filter(pr => pr.isNew);
+      if (newPRs.length > 0) {
+        insights.push({
+          id: 'new-pr',
+          type: 'achievement',
+          icon: '🏆',
+          message: `New PR on ${newPRs[0].exerciseName}! ${newPRs[0].weight} lbs`,
+          metric: `+${(newPRs[0].weight - (newPRs[0].previousWeight || 0))} lbs`
+        });
+      }
+
+      // Weekly workout completion
+      if (weeklyProgress.workouts.percentage >= 100) {
+        insights.push({
+          id: 'workouts-complete',
+          type: 'achievement',
+          icon: '💪',
+          message: 'All planned workouts completed this week!',
+          metric: `${weekWorkoutLogs.length} workouts`
+        });
+      } else if (weeklyProgress.workouts.percentage >= 75) {
+        insights.push({
+          id: 'workouts-almost',
+          type: 'suggestion',
+          icon: '🎯',
+          message: `Almost there! ${plannedWorkoutsPerWeek - weekWorkoutLogs.length} more workout${plannedWorkoutsPerWeek - weekWorkoutLogs.length > 1 ? 's' : ''} to hit your weekly goal.`
+        });
+      }
+
+      // Total workouts milestone
+      if (workoutLogs.length > 0 && workoutLogs.length % 10 === 0) {
+        insights.push({
+          id: 'total-workouts',
+          type: 'achievement',
+          icon: '🎉',
+          message: `${workoutLogs.length} total workouts logged! Incredible consistency.`,
+          metric: `${workoutLogs.length} workouts`
+        });
+      } else if (workoutLogs.length > 0) {
+        insights.push({
+          id: 'workout-count',
+          type: 'improvement',
+          icon: '📈',
+          message: `You've completed ${workoutLogs.length} workouts so far.`,
+          metric: `${workoutLogs.length} total`
+        });
+      }
+
+      // Supplement consistency
+      if (weeklyProgress.supplements.percentage >= 100) {
+        insights.push({
+          id: 'supplements-perfect',
+          type: 'achievement',
+          icon: '💊',
+          message: 'Perfect supplement consistency this week!'
+        });
+      }
+
+      // Limit insights to avoid overwhelm
+      const limitedInsights = insights.slice(0, 4);
+
+      // ========== RESPONSE ==========
+      res.json({
+        today: todayPlan,
+        weeklyProgress,
+        streaks: streakData,
+        personalRecords: personalRecords.slice(0, 10),
+        insights: limitedInsights,
+        hasOptimizeSetup,
+        hasWearableConnected,
+        lastUpdated: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Get wellness dashboard error:', error);
+      res.status(500).json({ error: 'Failed to fetch wellness data' });
     }
   });
 
@@ -5466,7 +5913,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/ingredients/catalog', requireAuth, async (req: any, res: any) => {
     try {
       res.json({
-        baseFormulas: BASE_FORMULAS,
+        systemSupports: SYSTEM_SUPPORTS,
         individualIngredients: INDIVIDUAL_INGREDIENTS
       });
     } catch (error) {
@@ -5475,15 +5922,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
-  // Get detailed base formula breakdowns (ingredient compositions)
+  // Get detailed system support breakdowns (ingredient compositions)
   app.get('/api/ingredients/base-details', requireAuth, async (req: any, res: any) => {
     try {
       res.json({
-        baseFormulaDetails: BASE_FORMULA_DETAILS
+        systemSupportDetails: SYSTEM_SUPPORT_DETAILS
       });
     } catch (error) {
-      console.error('Error fetching base formula details:', error);
-      res.status(500).json({ error: 'Failed to fetch base formula details' });
+      console.error('Error fetching system support details:', error);
+      res.status(500).json({ error: 'Failed to fetch system support details' });
     }
   });
 
@@ -5547,7 +5994,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const ingredientName = req.params.ingredientName;
       
-      // Use unified lookup function to pull from INDIVIDUAL_INGREDIENTS and BASE_FORMULA_DETAILS
+      // Add no-cache headers to ensure fresh data
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      
+      // Use unified lookup function to pull from INDIVIDUAL_INGREDIENTS and SYSTEM_SUPPORT_DETAILS
       const comprehensiveInfo = getComprehensiveIngredientInfo(ingredientName);
       
       const ingredientInfo = {
@@ -5566,6 +6018,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         researchBacking: comprehensiveInfo.researchBacking
       };
 
+      console.log(`🔍 INGREDIENT API: ${ingredientName} -> benefits:`, ingredientInfo.benefits);
       res.json(ingredientInfo);
     } catch (error) {
       console.error('Error fetching ingredient information:', error);
@@ -5573,26 +6026,68 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
-  // Get research citations for a specific ingredient
+  // Get research citations for a specific ingredient - uses pre-built research data
   app.get('/api/ingredients/:ingredientName/research', requireAuth, async (req: any, res: any) => {
     try {
       const ingredientName = req.params.ingredientName;
       
-      // Fetch research citations from database
-      const citations = await storage.getResearchCitationsForIngredient(ingredientName);
+      // Import pre-built research data
+      const { getIngredientResearch } = await import('@shared/ingredient-research');
+      const research = getIngredientResearch(ingredientName);
       
-      res.json({
-        ingredientName,
-        citations,
-        totalCitations: citations.length
-      });
+      // Add no-cache headers to ensure fresh data
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      
+      if (research) {
+        // Convert pre-built research to citation format
+        const citations = research.studies.map((study, index) => ({
+          id: `${ingredientName}-${index}`,
+          ingredientName,
+          citationTitle: study.title,
+          journal: study.journal,
+          publicationYear: study.year,
+          authors: study.authors,
+          findings: study.findings,
+          sampleSize: study.sampleSize || null,
+          pubmedUrl: study.pubmedUrl || null,
+          evidenceLevel: study.evidenceLevel,
+          studyType: study.studyType,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }));
+        
+        res.json({
+          ingredientName,
+          summary: research.summary,
+          keyBenefits: research.keyBenefits,
+          safetyProfile: research.safetyProfile,
+          recommendedFor: research.recommendedFor,
+          citations,
+          totalCitations: citations.length
+        });
+      } else {
+        // Fallback to database if no pre-built research
+        const dbCitations = await storage.getResearchCitationsForIngredient(ingredientName);
+        res.json({
+          ingredientName,
+          summary: null,
+          keyBenefits: [],
+          safetyProfile: null,
+          recommendedFor: [],
+          citations: dbCitations,
+          totalCitations: dbCitations.length
+        });
+      }
     } catch (error) {
       console.error('Error fetching research citations:', error);
       res.status(500).json({ error: 'Failed to fetch research citations' });
     }
   });
 
-  // Unified ingredient lookup function - sources from INDIVIDUAL_INGREDIENTS and BASE_FORMULA_DETAILS
+  // Unified ingredient lookup function - sources from INDIVIDUAL_INGREDIENTS and SYSTEM_SUPPORT_DETAILS
   // Uses shared normalizeIngredientName and findIngredientByName from @shared/ingredients
   function getComprehensiveIngredientInfo(ingredientName: string): {
     benefits: string[];
@@ -5634,8 +6129,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       };
     }
 
-    // 2. Check if it's an active ingredient in a base formula (use canonical name)
-    for (const formula of BASE_FORMULA_DETAILS) {
+    // 2. Check if it's an active ingredient in a system support (use canonical name)
+    for (const formula of SYSTEM_SUPPORT_DETAILS) {
       const activeIngredient = formula.activeIngredients?.find(
         ai => ai.name.toLowerCase() === canonicalName.toLowerCase()
       );
@@ -5656,19 +6151,36 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
     }
 
-    // 3. Check if it's a base formula itself (use canonical name)
-    const baseFormula = BASE_FORMULAS.find(
+    // 3. Check if it's a system support itself (use canonical name)
+    const baseFormula = SYSTEM_SUPPORTS.find(
       ing => ing.name.toLowerCase() === canonicalName.toLowerCase()
     );
 
     if (baseFormula) {
-      const formulaDetails = BASE_FORMULA_DETAILS.find(
+      const formulaDetails = SYSTEM_SUPPORT_DETAILS.find(
         f => f.name.toLowerCase() === canonicalName.toLowerCase()
       );
       
+      // Build comprehensive benefits list from description and active ingredients
+      const benefits: string[] = [];
+      if (formulaDetails?.description) {
+        benefits.push(formulaDetails.description);
+      }
+      // Add unique benefits from active ingredients
+      if (formulaDetails?.activeIngredients) {
+        const ingredientBenefits = formulaDetails.activeIngredients
+          .flatMap(ai => ai.benefits || [])
+          .filter((benefit, index, self) => self.indexOf(benefit) === index) // Remove duplicates
+          .slice(0, 6); // Limit to 6 additional benefits
+        benefits.push(...ingredientBenefits);
+      }
+      if (benefits.length === 0) {
+        benefits.push('Comprehensive system support');
+      }
+      
       return {
-        benefits: formulaDetails?.description ? [formulaDetails.description] : ['Comprehensive base formula'],
-        category: 'Base Formula',
+        benefits,
+        category: 'system support',
         type: formulaDetails?.systemSupported || 'Multi-System Support',
         suggestedUse: formulaDetails?.suggestedDosage || '1x daily',
         standardDose: baseFormula.doseMg,
@@ -6257,14 +6769,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
-  // Test endpoint for notification system (no auth required for testing)
-  app.post('/api/test-notification', async (req, res) => {
+  // Test endpoint for notification system (admin only for security)
+  app.post('/api/test-notification', requireAuth, async (req: Request, res) => {
     try {
-      const { userId } = req.body;
-      
-      if (!userId) {
-        return res.status(400).json({ error: 'userId is required' });
-      }
+      // Only allow users to test notifications for themselves
+      const userId = req.userId!;
       
       const user = await storage.getUser(userId);
       if (!user) {
@@ -7366,6 +7875,106 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Get smart streak data with percentage-based daily progress and rest day detection
+  app.get('/api/optimize/streaks/smart', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const smartData = await storage.getSmartStreakData(userId);
+      
+      // Debug logging for today's breakdown
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      console.log('🧮 Smart Streak Data for today:', {
+        currentStreak: smartData.currentStreak,
+        todayBreakdown: smartData.todayBreakdown,
+        todayProgress: smartData.monthlyProgress.find((d: { date: string }) => d.date === todayStr),
+      });
+      
+      res.json(smartData);
+    } catch (error) {
+      console.error('Error fetching smart streak data:', error);
+      res.status(500).json({ error: 'Failed to fetch smart streak data' });
+    }
+  });
+
+  // Get comprehensive streak summary with daily scores and weekly progress
+  app.get('/api/optimize/streaks/summary', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const summary = await storage.getStreakSummary(userId);
+      res.json(summary);
+    } catch (error) {
+      console.error('Error fetching streak summary:', error);
+      res.status(500).json({ error: 'Failed to fetch streak summary' });
+    }
+  });
+
+  // Tracking preferences (which categories count toward streaks/consistency)
+  app.get('/api/optimize/tracking-preferences', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const prefs = await storage.getTrackingPreferences(userId);
+      res.json(prefs || {
+        trackNutrition: true,
+        trackWorkouts: true,
+        trackSupplements: true,
+        trackLifestyle: true,
+        hydrationGoalOz: null,
+        pauseUntil: null,
+      });
+    } catch (error) {
+      console.error('Error fetching tracking preferences:', error);
+      res.status(500).json({ error: 'Failed to fetch tracking preferences' });
+    }
+  });
+
+  app.post('/api/optimize/tracking-preferences', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { trackNutrition, trackWorkouts, trackSupplements, trackLifestyle, hydrationGoalOz, pauseUntil } = req.body || {};
+
+      const prefs = await storage.upsertTrackingPreferences(userId, {
+        trackNutrition,
+        trackWorkouts,
+        trackSupplements,
+        trackLifestyle,
+        hydrationGoalOz,
+        pauseUntil,
+      });
+
+      // Refresh streaks to reflect new preferences
+      await storage.updateAllStreaks(userId, new Date());
+      const summary = await storage.getStreakSummary(userId);
+
+      res.json({ success: true, prefs, summary });
+    } catch (error) {
+      console.error('Error saving tracking preferences:', error);
+      res.status(500).json({ error: 'Failed to save tracking preferences' });
+    }
+  });
+
+  // Recalculate today's scores (useful after logging activities)
+  app.post('/api/optimize/streaks/recalculate', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { date } = req.body;
+      const logDate = date ? new Date(date) : new Date();
+      
+      // Calculate and save all scores, then update all streaks
+      const streakResults = await storage.updateAllStreaks(userId, logDate);
+      const summary = await storage.getStreakSummary(userId);
+      
+      res.json({ 
+        success: true, 
+        updatedStreaks: streakResults,
+        summary 
+      });
+    } catch (error) {
+      console.error('Error recalculating streaks:', error);
+      res.status(500).json({ error: 'Failed to recalculate streaks' });
+    }
+  });
+
   // Generate optimize plans (nutrition, workout, lifestyle)
   app.post('/api/optimize/plans/generate', requireAuth, async (req, res) => {
     try {
@@ -7432,7 +8041,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             prompt = buildNutritionPlanPrompt(optimizeContext);
             break;
           case 'workout':
-            prompt = buildWorkoutPlanPrompt(optimizeContext);
+            // Fetch historical workout analysis for intelligent progression
+            try {
+              const workoutAnalysis = await analyzeWorkoutHistory(userId);
+              const historyContext = workoutAnalysis.allTime.totalWorkouts > 0 
+                ? formatAnalysisForPrompt(workoutAnalysis)
+                : undefined;
+              
+              if (historyContext) {
+                console.log(`📊 Including workout history: ${workoutAnalysis.allTime.totalWorkouts} workouts, ${workoutAnalysis.allTime.avgWorkoutsPerWeek} avg/week`);
+              } else {
+                console.log(`📊 No workout history found for user`);
+              }
+              
+              prompt = buildWorkoutPlanPrompt(optimizeContext, undefined, historyContext);
+            } catch (historyError) {
+              console.log(`⚠️ Could not fetch workout history, generating without:`, historyError);
+              prompt = buildWorkoutPlanPrompt(optimizeContext);
+            }
             break;
           case 'lifestyle':
             prompt = buildLifestylePlanPrompt(optimizeContext);
@@ -7785,6 +8411,243 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
     }
   });
 
+  // Log detailed meal with AI nutrition analysis
+  app.post('/api/optimize/nutrition/log-meal-detailed', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { mealType, description, isFromPlan, planMealName, manualNutrition } = req.body;
+
+      if (!mealType || !description) {
+        return res.status(400).json({ error: 'mealType and description are required' });
+      }
+
+      let nutritionData = manualNutrition || null;
+
+      // Use AI to analyze the meal if no manual nutrition provided
+      if (!nutritionData) {
+        try {
+          const openai = new OpenAI();
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: `You are an expert nutritionist analyzing meals for accurate calorie and macro tracking. 
+
+IMPORTANT GUIDELINES:
+- Be REALISTIC about portion sizes - most home-cooked meals have larger portions than you might assume
+- ALWAYS include cooking oils, butter, or fats typically used in preparation (usually 1-2 tbsp = 100-200 extra calories)
+- Eggs: 1 large egg = ~70-90 calories (depends on size and cooking method)
+- When in doubt, estimate on the HIGHER end to avoid underreporting
+- Consider that restaurants and home cooking often use more fat than "healthy" recipes suggest
+
+Return ONLY a JSON object with these values:
+{
+  "calories": <number - be realistic, most meals are 300-800 cal>,
+  "protein": <number in grams>,
+  "carbs": <number in grams>,
+  "fat": <number in grams - remember cooking fats!>,
+  "fiber": <number in grams>,
+  "sugar": <number in grams>,
+  "sodium": <number in mg>
+}
+
+Return ONLY the JSON, no explanation.`
+              },
+              {
+                role: 'user',
+                content: `Analyze this meal and provide accurate nutrition data: ${description}`
+              }
+            ],
+            temperature: 0.2,
+            max_tokens: 200,
+          });
+
+          const content = completion.choices[0]?.message?.content || '';
+          // Extract JSON from response
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            nutritionData = JSON.parse(jsonMatch[0]);
+          }
+        } catch (aiError) {
+          console.error('AI nutrition analysis failed:', aiError);
+          // Continue without nutrition data
+        }
+      }
+
+      // Create the meal log
+      const mealLog = await storage.createMealLog({
+        userId,
+        mealType: mealType.toLowerCase(),
+        customMealName: description.slice(0, 255),
+        customMealDescription: description,
+        loggedAt: new Date(),
+        servings: 1,
+        calories: nutritionData?.calories || null,
+        proteinGrams: nutritionData?.protein || null,
+        carbsGrams: nutritionData?.carbs || null,
+        fatGrams: nutritionData?.fat || null,
+        fiberGrams: nutritionData?.fiber || null,
+        sugarGrams: nutritionData?.sugar || null,
+        sodiumMg: nutritionData?.sodium || null,
+        isFromPlan: isFromPlan || false,
+        planMealName: planMealName || null,
+      });
+
+      // Also update daily log mealsLogged array
+      const today = new Date();
+      const existingLog = await storage.getDailyLog(userId, today);
+      const mealsLogged = new Set<string>(
+        Array.isArray(existingLog?.mealsLogged) ? existingLog!.mealsLogged : [],
+      );
+      mealsLogged.add(mealType.toLowerCase());
+
+      if (existingLog) {
+        await storage.updateDailyLog(existingLog.id, {
+          mealsLogged: Array.from(mealsLogged),
+          nutritionCompleted: mealsLogged.size >= 3,
+        });
+      } else {
+        await storage.createDailyLog({
+          userId,
+          logDate: today,
+          mealsLogged: Array.from(mealsLogged),
+          nutritionCompleted: mealsLogged.size >= 3,
+          workoutCompleted: false,
+          supplementsTaken: false,
+        });
+      }
+
+      res.json({
+        success: true,
+        mealLog,
+        nutritionData,
+      });
+    } catch (error) {
+      console.error('❌ Error logging detailed meal:', error);
+      res.status(500).json({ error: 'Failed to log meal' });
+    }
+  });
+
+  // Get today's meal logs and nutrition totals
+  app.get('/api/optimize/nutrition/today', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const today = new Date();
+      
+      const meals = await storage.getMealLogsForDay(userId, today);
+      const totals = await storage.getTodayNutritionTotals(userId);
+      const dailyLog = await storage.getDailyLog(userId, today);
+
+      res.json({
+        meals,
+        totals,
+        waterIntakeOz: dailyLog?.waterIntakeOz || 0,
+        mealsLogged: dailyLog?.mealsLogged || [],
+      });
+    } catch (error) {
+      console.error('❌ Error getting today nutrition:', error);
+      res.status(500).json({ error: 'Failed to get nutrition data' });
+    }
+  });
+
+  // Get meal log history
+  app.get('/api/optimize/nutrition/history', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      const meals = await storage.getMealLogsHistory(userId, limit);
+
+      res.json({ meals });
+    } catch (error) {
+      console.error('❌ Error getting meal history:', error);
+      res.status(500).json({ error: 'Failed to get meal history' });
+    }
+  });
+
+  // Delete a meal log
+  app.delete('/api/optimize/nutrition/meal/:mealId', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { mealId } = req.params;
+
+      const deleted = await storage.deleteMealLog(userId, mealId);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Meal log not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('❌ Error deleting meal log:', error);
+      res.status(500).json({ error: 'Failed to delete meal log' });
+    }
+  });
+
+  // Log water intake
+  app.post('/api/optimize/nutrition/log-water', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { amountOz } = req.body;
+
+      if (typeof amountOz !== 'number' || amountOz < 0) {
+        return res.status(400).json({ error: 'Valid amountOz is required' });
+      }
+
+      const today = new Date();
+      const existingLog = await storage.getDailyLog(userId, today);
+
+      let updatedLog;
+      const newWaterTotal = (existingLog?.waterIntakeOz || 0) + amountOz;
+
+      if (existingLog) {
+        updatedLog = await storage.updateDailyLog(existingLog.id, {
+          waterIntakeOz: newWaterTotal,
+        });
+      } else {
+        updatedLog = await storage.createDailyLog({
+          userId,
+          logDate: today,
+          waterIntakeOz: newWaterTotal,
+          mealsLogged: [],
+          nutritionCompleted: false,
+          workoutCompleted: false,
+          supplementsTaken: false,
+        });
+      }
+
+      res.json({
+        success: true,
+        waterIntakeOz: newWaterTotal,
+        log: updatedLog,
+      });
+    } catch (error) {
+      console.error('❌ Error logging water:', error);
+      res.status(500).json({ error: 'Failed to log water intake' });
+    }
+  });
+
+  // Reset water intake (for new day or manual reset)
+  app.post('/api/optimize/nutrition/reset-water', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const today = new Date();
+      const existingLog = await storage.getDailyLog(userId, today);
+
+      if (existingLog) {
+        await storage.updateDailyLog(existingLog.id, {
+          waterIntakeOz: 0,
+        });
+      }
+
+      res.json({ success: true, waterIntakeOz: 0 });
+    } catch (error) {
+      console.error('❌ Error resetting water:', error);
+      res.status(500).json({ error: 'Failed to reset water intake' });
+    }
+  });
+
   // Get workout logs history
   app.get('/api/optimize/workout/logs', requireAuth, async (req, res) => {
     try {
@@ -7795,10 +8658,62 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
       const logs = await storage.listWorkoutLogs(userId, limit, offset);
       const total = logs.length; // TODO: Add count query for pagination
 
+      // Debug: Log what we're returning
+      console.log('📊 Returning workout logs:', { 
+        count: logs.length, 
+        firstLogExercises: logs[0]?.exercisesCompleted ? JSON.stringify(logs[0].exercisesCompleted).substring(0, 500) : 'NO_DATA'
+      });
+
       res.json({ logs, total, limit, offset });
     } catch (error) {
       console.error('❌ Error fetching workout logs:', error);
       res.status(500).json({ error: 'Failed to fetch workout logs' });
+    }
+  });
+
+  // Get workout historical analysis for AI-powered progression
+  app.get('/api/optimize/workout/historical-analysis', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      
+      console.log('📊 Generating workout historical analysis for user:', userId);
+      
+      const analysis = await analyzeWorkoutHistory(userId);
+      
+      console.log('📊 Analysis complete:', { 
+        totalWorkouts: analysis.allTime.totalWorkouts,
+        lastWeekWorkouts: analysis.lastWeek?.workoutsCompleted || 0,
+        prCount: analysis.allTime.personalRecords.length
+      });
+      
+      res.json(analysis);
+    } catch (error) {
+      console.error('❌ Error generating workout analysis:', error);
+      res.status(500).json({ error: 'Failed to generate workout analysis' });
+    }
+  });
+
+  // Delete a workout log
+  app.delete('/api/optimize/workout/logs/:logId', requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { logId } = req.params;
+
+      if (!logId) {
+        return res.status(400).json({ error: 'logId is required' });
+      }
+
+      const deleted = await storage.deleteWorkoutLog(userId, logId);
+
+      if (!deleted) {
+        return res.status(404).json({ error: 'Workout log not found or not authorized' });
+      }
+
+      console.log('🗑️ Workout log deleted:', { userId, logId });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('❌ Error deleting workout log:', error);
+      res.status(500).json({ error: 'Failed to delete workout log' });
     }
   });
 
@@ -7817,7 +8732,11 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
       } = req.body;
 
       console.log('📝 Creating workout log:', { userId, workoutId, completedAt, exerciseCount: exercisesCompleted?.length });
-      console.log('🏋️ Exercises received:', JSON.stringify(exercisesCompleted, null, 2));
+      // Log just the first exercise to verify structure without overwhelming output
+      console.log('🏋️ First exercise data:', { 
+        firstExercise: exercisesCompleted?.[0] ? JSON.stringify(exercisesCompleted[0]) : 'NONE',
+        exerciseNames: exercisesCompleted?.map((e: any) => e.name) || []
+      });
 
       if (!completedAt) {
         return res.status(400).json({ error: 'completedAt is required' });
@@ -7834,8 +8753,11 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
         notes: notes || null,
       });
 
-      console.log('✅ Workout log created:', log.id);
-      console.log('📊 Stored exercises:', JSON.stringify(log.exercisesCompleted, null, 2));
+      console.log('✅ Workout log created:', { logId: log.id });
+      console.log('📊 Stored exercises count:', { 
+        storedCount: (log.exercisesCompleted as any)?.length,
+        firstStored: (log.exercisesCompleted as any)?.[0] ? JSON.stringify((log.exercisesCompleted as any)[0]) : 'NONE'
+      });
 
       // Also update daily log for backward compatibility
       try {
@@ -8055,6 +8977,8 @@ Return ONLY valid JSON in this exact format:
 
   // General daily log endpoint (Quick Log)
   app.post('/api/optimize/daily-logs', requireAuth, async (req, res) => {
+    console.log('🚀🚀🚀 DAILY LOG POST ROUTE HIT 🚀🚀🚀', new Date().toISOString());
+    process.stdout.write('STDOUT: Daily log POST hit\n');
     try {
       const userId = req.userId!;
       const {
@@ -8062,12 +8986,24 @@ Return ONLY valid JSON in this exact format:
         nutritionCompleted,
         workoutCompleted,
         supplementsTaken,
+        supplementMorning,
+        supplementAfternoon,
+        supplementEvening,
         waterIntakeOz,
         energyLevel,
         moodLevel,
         sleepQuality,
+        isRestDay,
         notes,
       } = req.body ?? {};
+
+      // Debug logging for incoming request
+      console.log('📝 Daily log POST - incoming body:', {
+        supplementMorning,
+        supplementAfternoon,
+        supplementEvening,
+        userId: userId.substring(0, 8) + '...',
+      });
 
       const logDate = date ? new Date(date) : new Date();
       if (Number.isNaN(logDate.getTime())) {
@@ -8091,6 +9027,22 @@ Return ONLY valid JSON in this exact format:
 
       const existingLog = await storage.getDailyLog(userId, logDate);
 
+      // Handle granular supplement tracking
+      const resolvedMorning = typeof supplementMorning === 'boolean' 
+        ? supplementMorning 
+        : existingLog?.supplementMorning ?? false;
+      const resolvedAfternoon = typeof supplementAfternoon === 'boolean' 
+        ? supplementAfternoon 
+        : existingLog?.supplementAfternoon ?? false;
+      const resolvedEvening = typeof supplementEvening === 'boolean' 
+        ? supplementEvening 
+        : existingLog?.supplementEvening ?? false;
+      
+      // supplementsTaken is true if any dose was taken (for backwards compatibility)
+      const resolvedSupplementsTaken = typeof supplementsTaken === 'boolean'
+        ? supplementsTaken
+        : ((resolvedMorning || resolvedAfternoon || resolvedEvening) || (existingLog?.supplementsTaken ?? false));
+
       const resolvedLog = {
         nutritionCompleted: typeof nutritionCompleted === 'boolean'
           ? nutritionCompleted
@@ -8098,9 +9050,13 @@ Return ONLY valid JSON in this exact format:
         workoutCompleted: typeof workoutCompleted === 'boolean'
           ? workoutCompleted
           : existingLog?.workoutCompleted ?? false,
-        supplementsTaken: typeof supplementsTaken === 'boolean'
-          ? supplementsTaken
-          : existingLog?.supplementsTaken ?? false,
+        supplementsTaken: resolvedSupplementsTaken,
+        supplementMorning: resolvedMorning,
+        supplementAfternoon: resolvedAfternoon,
+        supplementEvening: resolvedEvening,
+        isRestDay: typeof isRestDay === 'boolean'
+          ? isRestDay
+          : existingLog?.isRestDay ?? false,
         waterIntakeOz: normalizeWater(waterIntakeOz) ?? existingLog?.waterIntakeOz ?? null,
         energyLevel: clampRating(energyLevel) ?? existingLog?.energyLevel ?? null,
         moodLevel: clampRating(moodLevel) ?? existingLog?.moodLevel ?? null,
@@ -8113,6 +9069,12 @@ Return ONLY valid JSON in this exact format:
       let updatedLog: OptimizeDailyLog | undefined;
       if (existingLog) {
         updatedLog = await storage.updateDailyLog(existingLog.id, resolvedLog);
+        console.log('📝 Daily log updated:', {
+          logId: existingLog.id,
+          supplementMorning: resolvedLog.supplementMorning,
+          supplementAfternoon: resolvedLog.supplementAfternoon,
+          supplementEvening: resolvedLog.supplementEvening,
+        });
         await storage.updateUserStreak(userId, logDate);
       } else {
         updatedLog = await storage.createDailyLog({
@@ -8121,6 +9083,14 @@ Return ONLY valid JSON in this exact format:
           mealsLogged: [],
           ...resolvedLog,
         });
+        console.log('📝 Daily log created:', {
+          logId: updatedLog?.id,
+          supplementMorning: resolvedLog.supplementMorning,
+          supplementAfternoon: resolvedLog.supplementAfternoon,
+          supplementEvening: resolvedLog.supplementEvening,
+        });
+        // Also update streak when creating new log
+        await storage.updateUserStreak(userId, logDate);
       }
 
       const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle'] as const;
@@ -8583,7 +9553,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
     }
 
     try {
-      // Search for 1 video
+      // Search for multiple videos and randomly select one for variety
       // Handle ESM/CommonJS interop issues with youtube-sr
       const searchFn = (YouTube as any).search || (YouTube as any).default?.search;
       
@@ -8591,10 +9561,12 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
         throw new Error('YouTube.search is not a function');
       }
 
-      const videos = await searchFn(query, { limit: 1 });
+      const videos = await searchFn(query, { limit: 10 });
       
       if (videos && videos.length > 0) {
-        const video = videos[0];
+        // Randomly select a video from results for variety
+        const randomIndex = Math.floor(Math.random() * videos.length);
+        const video = videos[randomIndex];
         res.json({
           videoId: video.id,
           title: video.title,
@@ -8617,11 +9589,78 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
       const userId = req.userId!;
       const logs = await storage.getAllWorkoutLogs(userId);
 
+      // Helper to identify muscle groups from exercise name
+      function identifyMuscleGroup(exerciseName: string): string[] {
+        const name = exerciseName.toLowerCase();
+        const groups: string[] = [];
+        
+        // Chest
+        if (name.includes('bench') || name.includes('push-up') || name.includes('pushup') || name.includes('push up') || 
+            name.includes('chest') || name.includes('fly') || name.includes('pec') || name.includes('dip')) {
+          groups.push('Chest');
+        }
+        // Shoulders
+        if (name.includes('shoulder') || name.includes('press') || name.includes('lateral') || name.includes('delt') || 
+            name.includes('overhead') || name.includes('raise') || name.includes('military')) {
+          groups.push('Shoulders');
+        }
+        // Back
+        if (name.includes('row') || name.includes('pull') || name.includes('lat') || name.includes('back') || 
+            name.includes('chin') || name.includes('shrug')) {
+          groups.push('Back');
+        }
+        // Biceps
+        if (name.includes('curl') || name.includes('bicep')) {
+          groups.push('Biceps');
+        }
+        // Triceps
+        if (name.includes('tricep') || name.includes('extension') || name.includes('pushdown') || name.includes('skull')) {
+          groups.push('Triceps');
+        }
+        // Quads/Legs
+        if (name.includes('squat') || name.includes('leg') || name.includes('quad') || name.includes('lunge') || 
+            name.includes('jump') || name.includes('step') || name.includes('knee') || name.includes('sled')) {
+          groups.push('Legs');
+        }
+        // Hamstrings
+        if (name.includes('deadlift') || name.includes('hamstring') || name.includes('rdl') || name.includes('good morning')) {
+          groups.push('Hamstrings');
+        }
+        // Calves
+        if (name.includes('calf') || name.includes('calves')) {
+          groups.push('Calves');
+        }
+        // Glutes
+        if (name.includes('glute') || name.includes('hip thrust') || name.includes('bridge')) {
+          groups.push('Glutes');
+        }
+        // Core
+        if (name.includes('ab') || name.includes('core') || name.includes('plank') || name.includes('crunch') || 
+            name.includes('twist') || name.includes('sit-up') || name.includes('situp') || name.includes('hollow')) {
+          groups.push('Core');
+        }
+        // Olympic/Power lifts - Full Body
+        if (name.includes('clean') || name.includes('snatch') || name.includes('jerk') || name.includes('thruster')) {
+          groups.push('Full Body');
+        }
+        
+        // Skip warmups/cooldowns - don't count them as "Other"
+        if (name.includes('warmup') || name.includes('warm-up') || name.includes('warm up') || 
+            name.includes('cooldown') || name.includes('cool-down') || name.includes('cool down') ||
+            name.includes('stretch') || name.includes('pose') || name.includes('mobility')) {
+          // Return the groups found, or skip entirely if none
+          return groups.length > 0 ? groups : [];
+        }
+        
+        return groups.length > 0 ? groups : ['Other'];
+      }
+
       // Process logs for analytics
       const volumeByWeek: Record<string, number> = {};
       const personalRecords: Record<string, { weight: number, date: string }> = {};
       const workoutsByWeek: Record<string, number> = {};
       const exerciseCounts: Record<string, number> = {};
+      const muscleGroupCounts: Record<string, number> = {};
       
       // Calculate Duration this week
       const currentWeekStart = startOfWeek(new Date());
@@ -8639,10 +9678,17 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
         // Volume & PRs
         let logVolume = 0;
         const exercises = log.exercisesCompleted as any;
+        
         if (exercises && Array.isArray(exercises)) {
           exercises.forEach((ex: any) => {
             // Track exercise frequency
             exerciseCounts[ex.name] = (exerciseCounts[ex.name] || 0) + 1;
+            
+            // Track muscle group counts
+            const muscleGroups = identifyMuscleGroup(ex.name);
+            muscleGroups.forEach(group => {
+              muscleGroupCounts[group] = (muscleGroupCounts[group] || 0) + 1;
+            });
 
             if (ex.sets && Array.isArray(ex.sets)) {
               ex.sets.forEach((set: any) => {
@@ -8718,6 +9764,11 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
+      // Muscle Group Breakdown
+      const muscleGroupBreakdown = Object.entries(muscleGroupCounts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count);
+
       res.json({
         volumeChartData,
         personalRecords,
@@ -8725,7 +9776,8 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
         currentStreak,
         totalWorkouts: logs.length,
         topExercises,
-        durationThisWeek
+        durationThisWeek,
+        muscleGroupBreakdown
       });
 
     } catch (error) {
@@ -8737,3 +9789,4 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
   const httpServer = createServer(app);
   return httpServer;
 }
+

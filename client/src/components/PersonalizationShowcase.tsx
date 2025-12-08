@@ -195,7 +195,7 @@ export default function PersonalizationShowcase() {
                   {/* Chat Header */}
                   <div className="flex items-center gap-3 pb-4 border-b border-border/50">
                     <div className="w-12 h-12 flex items-center justify-center">
-                      <img src="/Ones Logo Green.svg" alt="ONES" className="w-full h-full object-contain" />
+                      <img src="/ones-logo-icon.svg" alt="ONES" className="w-full h-full object-contain" />
                     </div>
                     <div>
                       <div className="font-semibold text-[#1B4332]">ONES</div>

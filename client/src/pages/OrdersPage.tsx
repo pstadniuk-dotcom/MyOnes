@@ -5,6 +5,16 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -64,6 +74,7 @@ const getStatusColor = (status: string) => {
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState('subscription');
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -196,7 +207,12 @@ export default function OrdersPage() {
   };
 
   const handleCancelSubscription = () => {
+    setShowCancelDialog(true);
+  };
+
+  const confirmCancelSubscription = () => {
     updateSubscriptionMutation.mutate({ status: 'cancelled' });
+    setShowCancelDialog(false);
   };
 
   const handleRemovePaymentMethod = (paymentMethodId: string) => {
@@ -205,82 +221,109 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6" data-testid="page-orders">
+      {/* Cancel Subscription Confirmation Dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel your subscription? You will lose access to:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Your personalized supplement formula</li>
+                <li>AI health consultations</li>
+                <li>Monthly formula deliveries</li>
+              </ul>
+              <p className="mt-3 font-medium">This action cannot be undone.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmCancelSubscription}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Yes, Cancel Subscription
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-orders-title">
+          <h1 className="text-3xl font-bold tracking-tight text-[#1B4332]" data-testid="text-orders-title">
             Orders & Billing
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-[#52796F]">
             Manage your subscription, view orders, and update payment methods
           </p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="subscription" data-testid="tab-subscription">Subscription</TabsTrigger>
-          <TabsTrigger value="orders" data-testid="tab-orders">Order History</TabsTrigger>
-          <TabsTrigger value="billing" data-testid="tab-billing">Billing</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 bg-[#FAF7F2]">
+          <TabsTrigger value="subscription" data-testid="tab-subscription" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">Subscription</TabsTrigger>
+          <TabsTrigger value="orders" data-testid="tab-orders" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">Order History</TabsTrigger>
+          <TabsTrigger value="billing" data-testid="tab-billing" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">Billing</TabsTrigger>
         </TabsList>
 
         <TabsContent value="subscription" className="space-y-6">
           {/* Current Subscription */}
-          <Card data-testid="section-subscription-overview">
+          <Card data-testid="section-subscription-overview" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                     <Package className="w-5 h-5" />
                     {subscription?.plan || 'No Subscription'}
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-[#52796F]">
                     {subscription && (
                       <>Next billing: {subscription.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}</>
                     )}
                   </CardDescription>
                 </div>
-                <Badge className={subscription?.status === 'active' ? 'bg-green-100 text-green-800' : ''}>
+                <Badge className={subscription?.status === 'active' ? 'bg-[#1B4332] text-white' : 'bg-[#52796F]/20 text-[#52796F]'}>
                   {subscription?.status || 'inactive'}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-4 md:grid-cols-3">
-                <Card>
+                <Card className="bg-white border-[#1B4332]/10">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Monthly Price</span>
+                      <DollarSign className="w-4 h-4 text-[#52796F]" />
+                      <span className="text-sm font-medium text-[#52796F]">Monthly Price</span>
                     </div>
-                    <div className="text-2xl font-bold">${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}</div>
+                    <div className="text-2xl font-bold text-[#1B4332]">${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}</div>
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="bg-white border-[#52796F]/10">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Next Billing</span>
+                      <Calendar className="w-4 h-4 text-[#52796F]" />
+                      <span className="text-sm font-medium text-[#52796F]">Next Billing</span>
                     </div>
-                    <div className="text-lg font-semibold">
+                    <div className="text-lg font-semibold text-[#1B4332]">
                       {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="bg-white border-[#D4A574]/10">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Package className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Formula Version</span>
+                      <Package className="w-4 h-4 text-[#52796F]" />
+                      <span className="text-sm font-medium text-[#52796F]">Formula Version</span>
                     </div>
-                    <div className="text-lg font-semibold">Current</div>
+                    <div className="text-lg font-semibold text-[#D4A574]">Current</div>
                   </CardContent>
                 </Card>
               </div>
 
-              <Separator />
+              <Separator className="bg-[#52796F]/20" />
 
               <div className="flex gap-3">
                 <Button 
@@ -288,11 +331,12 @@ export default function OrdersPage() {
                   data-testid="button-pause-subscription"
                   onClick={handlePauseSubscription}
                   disabled={updateSubscriptionMutation.isPending || subscription?.status !== 'active'}
+                  className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
                 >
                   <Pause className="w-4 h-4 mr-2" />
                   Pause Subscription
                 </Button>
-                <Button variant="outline" data-testid="button-change-plan">
+                <Button variant="outline" data-testid="button-change-plan" className="border-[#52796F] text-[#52796F] hover:bg-[#52796F] hover:text-white">
                   Change Plan
                 </Button>
                 <Button 
@@ -308,9 +352,9 @@ export default function OrdersPage() {
           </Card>
 
           {/* Upcoming Delivery */}
-          <Card data-testid="section-upcoming-delivery">
+          <Card data-testid="section-upcoming-delivery" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                 <Truck className="w-5 h-5" />
                 Upcoming Delivery
               </CardTitle>
@@ -318,16 +362,16 @@ export default function OrdersPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="font-medium text-[#1B4332]">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
+                  <p className="text-sm text-[#52796F]">
                     Expected delivery: {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-[#52796F]">
                     Current Formula • ${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}
                   </p>
                 </div>
                 <div className="text-right">
-                  <Badge variant="outline">Scheduled</Badge>
+                  <Badge variant="outline" className="border-[#D4A574] text-[#D4A574]">Scheduled</Badge>
                 </div>
               </div>
             </CardContent>
@@ -335,13 +379,13 @@ export default function OrdersPage() {
         </TabsContent>
 
         <TabsContent value="orders" className="space-y-6">
-          <Card data-testid="section-order-history">
+          <Card data-testid="section-order-history" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                 <Package className="w-5 h-5" />
                 Order History
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-[#52796F]">
                 View all your past supplement orders and deliveries
               </CardDescription>
             </CardHeader>
@@ -349,26 +393,26 @@ export default function OrdersPage() {
               <div className="space-y-4">
                 {!orders || orders.length === 0 ? (
                   <div className="text-center py-8">
-                    <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No orders found</p>
+                    <Package className="w-12 h-12 text-[#52796F] mx-auto mb-4" />
+                    <p className="text-[#52796F]">No orders found</p>
                   </div>
                 ) : (
                   orders.map((order) => (
-                  <Card key={order.id} className="border-l-4 border-l-muted" data-testid={`order-${order.id}`}>
+                  <Card key={order.id} className="border-l-4 border-l-[#1B4332] bg-white" data-testid={`order-${order.id}`}>
                     <CardContent className="pt-4">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-2">
                             {getStatusIcon(order.status)}
-                            <span className="font-medium">{order.id}</span>
+                            <span className="font-medium text-[#1B4332]">{order.id}</span>
                           </div>
                           <Badge className={getStatusColor(order.status)}>
                             {order.status}
                           </Badge>
                         </div>
                         <div className="text-right">
-                          <div className="font-medium">$89.99</div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="font-medium text-[#1B4332]">$89.99</div>
+                          <div className="text-sm text-[#52796F]">
                             Formula v{order.formulaVersion}
                           </div>
                         </div>
@@ -376,20 +420,20 @@ export default function OrdersPage() {
 
                       <div className="grid gap-4 md:grid-cols-3 text-sm">
                         <div>
-                          <span className="text-muted-foreground">Placed:</span>
-                          <div>{new Date(order.placedAt).toLocaleDateString()}</div>
+                          <span className="text-[#52796F]">Placed:</span>
+                          <div className="text-[#1B4332]">{new Date(order.placedAt).toLocaleDateString()}</div>
                         </div>
                         {order.shippedAt && (
                           <div>
-                            <span className="text-muted-foreground">Shipped:</span>
-                            <div>{new Date(order.shippedAt).toLocaleDateString()}</div>
+                            <span className="text-[#52796F]">Shipped:</span>
+                            <div className="text-[#1B4332]">{new Date(order.shippedAt).toLocaleDateString()}</div>
                           </div>
                         )}
                       </div>
 
                       {order.status === 'shipped' && order.trackingUrl && (
-                        <div className="mt-4 pt-4 border-t">
-                          <Button variant="outline" size="sm" asChild data-testid={`button-track-${order.id}`}>
+                        <div className="mt-4 pt-4 border-t border-[#52796F]/20">
+                          <Button variant="outline" size="sm" asChild data-testid={`button-track-${order.id}`} className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white">
                             <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer">
                               <ExternalLink className="w-4 h-4 mr-2" />
                               Track Package
@@ -408,19 +452,19 @@ export default function OrdersPage() {
 
         <TabsContent value="billing" className="space-y-6">
           {/* Payment Methods */}
-          <Card data-testid="section-payment-methods">
+          <Card data-testid="section-payment-methods" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                     <CreditCard className="w-5 h-5" />
                     Payment Methods
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-[#52796F]">
                     Manage your saved payment methods
                   </CardDescription>
                 </div>
-                <Button data-testid="button-add-payment-method">
+                <Button data-testid="button-add-payment-method" className="bg-[#1B4332] hover:bg-[#1B4332]/90 text-white">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Method
                 </Button>
@@ -430,25 +474,25 @@ export default function OrdersPage() {
               <div className="space-y-3">
                 {!paymentMethods || paymentMethods.length === 0 ? (
                   <div className="text-center py-8">
-                    <CreditCard className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No payment methods found</p>
-                    <p className="text-sm text-muted-foreground mt-2">Add a payment method to get started</p>
+                    <CreditCard className="w-12 h-12 text-[#52796F] mx-auto mb-4" />
+                    <p className="text-[#52796F]">No payment methods found</p>
+                    <p className="text-sm text-[#52796F] mt-2">Add a payment method to get started</p>
                   </div>
                 ) : (
                   paymentMethods.map((method) => (
-                    <div key={method.id} className="flex items-center justify-between p-4 border rounded-lg" data-testid={`payment-method-${method.id}`}>
+                    <div key={method.id} className="flex items-center justify-between p-4 border border-[#52796F]/20 rounded-lg bg-white" data-testid={`payment-method-${method.id}`}>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-6 bg-muted rounded flex items-center justify-center">
-                        <CreditCard className="w-4 h-4" />
+                      <div className="w-10 h-6 bg-[#1B4332]/10 rounded flex items-center justify-center">
+                        <CreditCard className="w-4 h-4 text-[#1B4332]" />
                       </div>
                       <div>
-                        <div className="font-medium">
+                        <div className="font-medium text-[#1B4332]">
                           {method.brand?.toUpperCase()} ****{method.last4}
                         </div>
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm">Edit</Button>
+                      <Button variant="outline" size="sm" className="border-[#52796F] text-[#52796F]">Edit</Button>
                       <Button 
                         variant="destructive" 
                         size="sm"
@@ -466,12 +510,12 @@ export default function OrdersPage() {
           </Card>
 
           {/* Billing History */}
-          <Card data-testid="section-billing-history">
+          <Card data-testid="section-billing-history" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Billing History</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-[#1B4332]">Billing History</CardTitle>
+                  <CardDescription className="text-[#52796F]">
                     Download invoices and view payment history
                   </CardDescription>
                 </div>
@@ -481,32 +525,32 @@ export default function OrdersPage() {
               <div className="space-y-3">
                 {!billingHistory || billingHistory.length === 0 ? (
                   <div className="text-center py-8">
-                    <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No billing history found</p>
-                    <p className="text-sm text-muted-foreground mt-2">Your payment history will appear here</p>
+                    <Calendar className="w-12 h-12 text-[#52796F] mx-auto mb-4" />
+                    <p className="text-[#52796F]">No billing history found</p>
+                    <p className="text-sm text-[#52796F] mt-2">Your payment history will appear here</p>
                   </div>
                 ) : (
                   billingHistory.map((record) => (
-                    <div key={record.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div key={record.id} className="flex items-center justify-between p-4 border border-[#52796F]/20 rounded-lg bg-white">
                       <div className="flex items-center gap-3">
                         {record.status === 'paid' ? (
-                          <CheckCircle className="w-5 h-5 text-green-600" />
+                          <CheckCircle className="w-5 h-5 text-[#1B4332]" />
                         ) : record.status === 'pending' ? (
-                          <Clock className="w-5 h-5 text-yellow-600" />
+                          <Clock className="w-5 h-5 text-[#D4A574]" />
                         ) : (
                           <AlertCircle className="w-5 h-5 text-red-600" />
                         )}
                         <div>
-                          <div className="font-medium">{record.description}</div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="font-medium text-[#1B4332]">{record.description}</div>
+                          <div className="text-sm text-[#52796F]">
                             {record.status === 'paid' ? 'Paid' : record.status === 'pending' ? 'Pending' : 'Failed'} on {new Date(record.date).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="font-medium">${record.amount.toFixed(2)}</span>
+                        <span className="font-medium text-[#1B4332]">${record.amount.toFixed(2)}</span>
                         {record.invoiceUrl && record.status === 'paid' && (
-                          <Button variant="outline" size="sm" data-testid="button-download-invoice">
+                          <Button variant="outline" size="sm" data-testid="button-download-invoice" className="border-[#1B4332] text-[#1B4332]">
                             <Download className="w-4 h-4" />
                           </Button>
                         )}

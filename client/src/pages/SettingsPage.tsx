@@ -175,20 +175,20 @@ export default function SettingsPage() {
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight" data-testid="heading-settings">Settings</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-3xl font-bold tracking-tight text-[#1B4332]" data-testid="heading-settings">Settings</h2>
+          <p className="text-[#52796F]">
             Manage your account settings and preferences
           </p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="account" data-testid="tab-account">
+        <TabsList className="grid w-full grid-cols-2 bg-[#FAF7F2]">
+          <TabsTrigger value="account" data-testid="tab-account" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">
             <Lock className="w-4 h-4 mr-2" />
             Account
           </TabsTrigger>
-          <TabsTrigger value="notifications" data-testid="tab-notifications">
+          <TabsTrigger value="notifications" data-testid="tab-notifications" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">
             <Bell className="w-4 h-4 mr-2" />
             Notifications
           </TabsTrigger>
@@ -197,13 +197,13 @@ export default function SettingsPage() {
         {/* Account Settings Tab */}
         <TabsContent value="account" className="space-y-6">
           {/* Password Change */}
-          <Card data-testid="section-password">
+          <Card data-testid="section-password" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                 <Lock className="w-5 h-5" />
                 Change Password
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-[#52796F]">
                 Update your password to keep your account secure
               </CardDescription>
             </CardHeader>
@@ -248,7 +248,7 @@ export default function SettingsPage() {
                     required
                   />
                 </div>
-                <Button type="submit" data-testid="button-update-password">
+                <Button type="submit" data-testid="button-update-password" className="bg-[#1B4332] hover:bg-[#1B4332]/90 text-white">
                   Update Password
                 </Button>
               </form>
@@ -258,16 +258,16 @@ export default function SettingsPage() {
           {/* Theme settings removed: app is light-only */}
 
           {/* Privacy & Security Notice */}
-          <Card data-testid="section-privacy">
+          <Card data-testid="section-privacy" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                 <Shield className="w-5 h-5" />
                 Privacy & Security
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="p-4 bg-muted/30 rounded-lg">
-                <p className="text-sm text-muted-foreground">
+              <div className="p-4 bg-[#1B4332]/5 rounded-lg border border-[#1B4332]/10">
+                <p className="text-sm text-[#52796F]">
                   Your health data is encrypted and stored securely. We never sell or share your personal 
                   information with third parties. You can request to download or delete your data at 
                   any time by contacting support.
@@ -279,13 +279,13 @@ export default function SettingsPage() {
 
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
-          <Card data-testid="section-notifications">
+          <Card data-testid="section-notifications" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                 <Bell className="w-5 h-5" />
                 Notification Preferences
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-[#52796F]">
                 Choose what updates you want to receive
               </CardDescription>
             </CardHeader>
@@ -678,6 +678,7 @@ export default function SettingsPage() {
                     onClick={saveNotificationSettings} 
                     disabled={saveNotificationsMutation.isPending}
                     data-testid="button-save-notifications"
+                    className="bg-[#1B4332] hover:bg-[#1B4332]/90 text-white"
                   >
                     {saveNotificationsMutation.isPending ? 'Saving...' : 'Save Notification Settings'}
                   </Button>

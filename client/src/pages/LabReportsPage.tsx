@@ -323,8 +323,8 @@ export default function LabReportsPage() {
     <div className="max-w-4xl mx-auto space-y-6" data-testid="page-lab-reports">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-semibold text-foreground mb-1">Lab Reports</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-3xl font-semibold text-[#1B4332] mb-1">Lab Reports</h1>
+        <p className="text-[#52796F]">
           Upload and manage your blood tests, medical reports, and health documents
         </p>
       </div>
@@ -340,13 +340,13 @@ export default function LabReportsPage() {
       />
 
       {/* Upload Section */}
-      <Card data-testid="section-upload">
+      <Card data-testid="section-upload" className="bg-[#FAF7F2] border-[#52796F]/20">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-[#1B4332]">
             <Upload className="w-5 h-5" />
             Upload New Report
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-[#52796F]">
             Upload blood work, urine tests, or other medical documents (PDF, JPG, PNG)
           </CardDescription>
         </CardHeader>
@@ -356,7 +356,7 @@ export default function LabReportsPage() {
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
               data-testid="button-upload-report"
-              className="flex-1"
+              className="flex-1 bg-[#1B4332] hover:bg-[#1B4332]/90 text-white"
             >
               {isUploading ? (
                 <>
@@ -375,7 +375,7 @@ export default function LabReportsPage() {
               disabled={isUploading}
               variant="outline"
               data-testid="button-manual-entry"
-              className="flex-1"
+              className="flex-1 border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
             >
               <ClipboardPaste className="w-4 h-4 mr-2" />
               Paste Results
@@ -385,13 +385,13 @@ export default function LabReportsPage() {
       </Card>
 
       {/* Lab Reports List */}
-      <Card data-testid="section-lab-reports-list">
+      <Card data-testid="section-lab-reports-list" className="bg-[#FAF7F2] border-[#52796F]/20">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-[#1B4332]">
             <FileText className="w-5 h-5" />
             Your Lab Reports
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-[#52796F]">
             {labReports?.length || 0} {labReports?.length === 1 ? 'report' : 'reports'} uploaded
           </CardDescription>
         </CardHeader>
@@ -401,20 +401,20 @@ export default function LabReportsPage() {
               <LabReportsSkeleton />
             ) : labReports && labReports.length > 0 ? (
               labReports.map((report) => (
-                <Card key={report.id} className="border-l-4 border-l-primary" data-testid={`report-${report.id}`}>
+                <Card key={report.id} className="border-l-4 border-l-[#1B4332] bg-white" data-testid={`report-${report.id}`}>
                   <CardContent className="pt-4">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <h4 className="font-medium">{report.originalFileName}</h4>
-                        <p className="text-sm text-muted-foreground">
+                        <h4 className="font-medium text-[#1B4332]">{report.originalFileName}</h4>
+                        <p className="text-sm text-[#52796F]">
                           Uploaded on {new Date(report.uploadedAt).toLocaleDateString()}
                         </p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-[#52796F]">
                           {report.fileSize ? `${(report.fileSize / 1024 / 1024).toFixed(2)} MB` : ''} • {report.type}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="default">
+                        <Badge variant="default" className="bg-[#1B4332]">
                           Encrypted
                         </Badge>
                         <Button 
@@ -432,15 +432,16 @@ export default function LabReportsPage() {
               ))
             ) : (
               <div className="text-center py-8">
-                <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                <h3 className="text-lg font-medium mb-2">No lab reports yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <FileText className="w-12 h-12 mx-auto text-[#52796F] mb-3" />
+                <h3 className="text-lg font-medium mb-2 text-[#1B4332]">No lab reports yet</h3>
+                <p className="text-sm text-[#52796F] mb-4">
                   Upload your blood work, urine tests, or other medical documents to help optimize your formula.
                 </p>
                 <Button 
                   onClick={() => fileInputRef.current?.click()}
                   variant="outline"
                   data-testid="button-upload-first"
+                  className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Upload Your First Report

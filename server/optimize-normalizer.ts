@@ -229,10 +229,49 @@ export function normalizePlanContent(planType: PlanType, content: AnyRecord | un
       break;
     case 'lifestyle':
     default:
-      safeContent.weekPlan = buildSevenDayPlan(weekPlan, planType, normalizeLifestyleDay);
+      // New lifestyle structure - no weekPlan needed
       safeContent.autoHealMeta = autoHealMeta;
-      safeContent.sleepProtocols = Array.isArray(safeContent.sleepProtocols) ? safeContent.sleepProtocols : [];
-      safeContent.stressProtocols = Array.isArray(safeContent.stressProtocols) ? safeContent.stressProtocols : [];
+      
+      // Morning Intentions
+      safeContent.morningIntentions = safeContent.morningIntentions || {
+        title: 'Morning Intention Setting',
+        wakeTime: '6:30 AM',
+        routine: [],
+        affirmation: 'I am ready to embrace today with purpose and clarity.',
+        youtubeSearch: 'morning motivation affirmations 10 minutes'
+      };
+      
+      // Evening Routine
+      safeContent.eveningRoutine = safeContent.eveningRoutine || {
+        title: 'Evening Wind-Down',
+        startTime: '9:00 PM',
+        bedtime: '10:30 PM',
+        routine: [],
+        youtubeSearch: 'guided sleep meditation 10 minutes'
+      };
+      
+      // Stress Tools
+      safeContent.stressTools = safeContent.stressTools || {
+        title: 'Daily Stress Management',
+        techniques: [],
+        emergencyReset: 'Take 10 deep breaths and step outside for fresh air.'
+      };
+      
+      // Weekly Focus
+      safeContent.weeklyFocus = safeContent.weeklyFocus || {
+        theme: 'Building Healthy Habits',
+        description: 'Focus on consistency this week.',
+        actionItems: [],
+        youtubeSearch: null
+      };
+      
+      // Sleep Targets
+      safeContent.sleepTargets = safeContent.sleepTargets || {
+        targetHours: 8,
+        bedtime: '10:30 PM',
+        wakeTime: '6:30 AM',
+        tips: []
+      };
       break;
   }
 
