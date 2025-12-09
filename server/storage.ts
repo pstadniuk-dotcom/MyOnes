@@ -3406,6 +3406,65 @@ export class DrizzleStorage implements IStorage {
       };
     }> = [];
 
+    // OPTIMIZATION: Batch fetch all data for 30 days in a few queries instead of 120+ individual queries
+    const endOfMonth = new Date(today);
+    endOfMonth.setHours(23, 59, 59, 999);
+    
+    // Batch fetch all daily logs for the month
+    const allDailyLogs = await this.listDailyLogs(userId, startOfMonth, endOfMonth);
+    const dailyLogsByDate = new Map<string, typeof allDailyLogs[0]>();
+    allDailyLogs.forEach(log => {
+      const logDate = new Date(log.logDate);
+      const dateStr = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}-${String(logDate.getDate()).padStart(2, '0')}`;
+      dailyLogsByDate.set(dateStr, log);
+    });
+    
+    // Batch fetch all daily completions for the month
+    const allCompletions = await db
+      .select()
+      .from(dailyCompletions)
+      .where(and(
+        eq(dailyCompletions.userId, userId),
+        gte(dailyCompletions.logDate, startOfMonth.toISOString().split('T')[0]),
+        lte(dailyCompletions.logDate, endOfMonth.toISOString().split('T')[0])
+      ));
+    const completionsByDate = new Map<string, typeof allCompletions[0]>();
+    allCompletions.forEach(c => completionsByDate.set(c.logDate, c));
+    
+    // Batch fetch all workout logs for the month
+    const allWorkoutLogs = await db
+      .select()
+      .from(workoutLogs)
+      .where(and(
+        eq(workoutLogs.userId, userId),
+        gte(workoutLogs.completedAt, startOfMonth),
+        lte(workoutLogs.completedAt, endOfMonth)
+      ));
+    const workoutLogsByDate = new Map<string, typeof allWorkoutLogs>();
+    allWorkoutLogs.forEach(log => {
+      const logDate = new Date(log.completedAt);
+      const dateStr = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}-${String(logDate.getDate()).padStart(2, '0')}`;
+      if (!workoutLogsByDate.has(dateStr)) workoutLogsByDate.set(dateStr, []);
+      workoutLogsByDate.get(dateStr)!.push(log);
+    });
+    
+    // Batch fetch all meal logs for the month
+    const allMealLogs = await db
+      .select()
+      .from(mealLogs)
+      .where(and(
+        eq(mealLogs.userId, userId),
+        gte(mealLogs.loggedAt, startOfMonth),
+        lte(mealLogs.loggedAt, endOfMonth)
+      ));
+    const mealLogsByDate = new Map<string, typeof allMealLogs>();
+    allMealLogs.forEach(log => {
+      const logDate = new Date(log.loggedAt);
+      const dateStr = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}-${String(logDate.getDate()).padStart(2, '0')}`;
+      if (!mealLogsByDate.has(dateStr)) mealLogsByDate.set(dateStr, []);
+      mealLogsByDate.get(dateStr)!.push(log);
+    });
+
     for (let i = 0; i < 30; i++) {
       const date = new Date(startOfMonth);
       date.setDate(startOfMonth.getDate() + i);
@@ -3413,21 +3472,21 @@ export class DrizzleStorage implements IStorage {
       const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       const dayOfWeek = date.getDay();
       
-      // Get daily log for water/supplement details
-      const dailyLog = await this.getDailyLog(userId, date);
+      // Get daily log from batch (no DB call)
+      const dailyLog = dailyLogsByDate.get(dateStr);
       
       // Rest day: manual override OR scheduled rest day from workout plan
       const isRestDay = dailyLog?.isRestDay || restDays.includes(dayOfWeek);
       
-      // Get daily completion data
-      const completion = await this.getDailyCompletion(userId, date);
+      // Get daily completion data from batch (no DB call)
+      const completion = completionsByDate.get(dateStr);
       
-      // Get workout logs for this day
-      const workoutLogs = await this.getWorkoutLogsForDate(userId, date);
-      const workoutDone = workoutLogs.length > 0;
+      // Get workout logs for this day from batch (no DB call)
+      const dayWorkoutLogs = workoutLogsByDate.get(dateStr) || [];
+      const workoutDone = dayWorkoutLogs.length > 0;
       
-      // Get meals logged for this day
-      const mealsLogged = await this.getMealLogsForDay(userId, date);
+      // Get meals logged for this day from batch (no DB call)
+      const mealsLogged = mealLogsByDate.get(dateStr) || [];
       const uniqueMealTypes = new Set(mealsLogged.map(m => m.mealType));
       // Count main meals (breakfast, lunch, dinner) as goal of 3
       const mainMealsLogged = (['breakfast', 'lunch', 'dinner'] as const).filter(type => uniqueMealTypes.has(type)).length;
