@@ -109,12 +109,18 @@ export default function TrackingPage() {
   });
 
   // Mutation for logging water intake with optimistic update
+  // Uses the dedicated log-water endpoint which adds server-side (prevents race conditions)
   const logWaterAmount = useMutation({
     mutationFn: async (oz: number) => {
-      return apiRequest('/api/optimize/daily-logs', {
+      const res = await apiRequest('/api/optimize/nutrition/log-water', {
         method: 'POST',
-        body: JSON.stringify({ waterIntakeOz: (wellnessData?.today.waterIntakeOz || 0) + oz }),
+        body: JSON.stringify({ amountOz: oz }),
       });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to log water');
+      }
+      return res.json();
     },
     onMutate: async (oz) => {
       // Cancel outgoing refetches
@@ -144,6 +150,8 @@ export default function TrackingPage() {
       }
     },
     onSettled: () => {
+      // Refetch to get server-confirmed value
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
       // Delay streak refresh to let backend catch up
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
