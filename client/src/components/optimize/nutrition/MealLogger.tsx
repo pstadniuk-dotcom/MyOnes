@@ -194,10 +194,17 @@ export function MealLogger({ todayPlanMeals, onMealLogged }: MealLoggerProps) {
       }
       return res.json();
     },
+    onMutate: () => {
+      // Close modal immediately for snappy feel
+      setIsOpen(false);
+    },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/nutrition/today'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/nutrition/history'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+      // Batch invalidations with slight delay for smoother experience
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/optimize/nutrition/today'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/optimize/nutrition/history'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+      }, 200);
       
       const nutrition = data.nutritionData;
       toast({
@@ -207,7 +214,6 @@ export function MealLogger({ todayPlanMeals, onMealLogged }: MealLoggerProps) {
           : 'Your meal has been recorded.',
       });
       
-      setIsOpen(false);
       setMealType('');
       setDescription('');
       setIsFromPlan(false);
@@ -215,6 +221,8 @@ export function MealLogger({ todayPlanMeals, onMealLogged }: MealLoggerProps) {
       onMealLogged?.();
     },
     onError: (error: Error) => {
+      // Reopen modal on error so user can retry
+      setIsOpen(true);
       toast({
         variant: 'destructive',
         title: 'Failed to log meal',

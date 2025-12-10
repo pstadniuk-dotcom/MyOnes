@@ -32,10 +32,13 @@ export function HydrationTracker({ currentOz = 0, goalOz = 100, onUpdate }: Hydr
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [customAmount, setCustomAmount] = useState(8);
+  const [optimisticOz, setOptimisticOz] = useState<number | null>(null);
 
-  const percentage = Math.min((currentOz / goalOz) * 100, 100);
-  const remaining = Math.max(goalOz - currentOz, 0);
-  const glassesEquivalent = Math.round(currentOz / 8);
+  // Use optimistic value if available, otherwise use prop
+  const displayOz = optimisticOz !== null ? optimisticOz : currentOz;
+  const percentage = Math.min((displayOz / goalOz) * 100, 100);
+  const remaining = Math.max(goalOz - displayOz, 0);
+  const glassesEquivalent = Math.round(displayOz / 8);
 
   const logWater = useMutation({
     mutationFn: async (amountOz: number) => {
@@ -46,9 +49,21 @@ export function HydrationTracker({ currentOz = 0, goalOz = 100, onUpdate }: Hydr
       }
       return res.json();
     },
+    onMutate: (amountOz: number) => {
+      // Optimistic update - immediately show new value
+      const newTotal = (optimisticOz !== null ? optimisticOz : currentOz) + amountOz;
+      setOptimisticOz(newTotal);
+    },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/nutrition/today'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+      // Sync with server value
+      setOptimisticOz(data.waterIntakeOz);
+      
+      // Delay query invalidation to prevent UI flicker
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/optimize/nutrition/today'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+        setOptimisticOz(null); // Clear optimistic value after sync
+      }, 300);
       
       if (data.waterIntakeOz >= goalOz) {
         toast({
@@ -65,6 +80,8 @@ export function HydrationTracker({ currentOz = 0, goalOz = 100, onUpdate }: Hydr
       onUpdate?.();
     },
     onError: (error: Error) => {
+      // Rollback optimistic update
+      setOptimisticOz(null);
       toast({
         variant: 'destructive',
         title: 'Failed to log water',
