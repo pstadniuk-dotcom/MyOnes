@@ -8069,46 +8069,37 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
         console.log(`📝 Prompt built, length: ${prompt.length} chars`);
 
-        // Always use GPT-4o for Optimize plan generation (faster and more reliable)
-        console.log(`🧠 Using AI: OpenAI / gpt-4o`);
+        // Use Claude Haiku 4.5 for Optimize plan generation (fast and cost-effective)
+        // Sonnet 4.5 is reserved for consultations where quality matters more
+        console.log(`🧠 Using AI: Anthropic / claude-haiku-4-5 (fast plan generation)`);
         console.log(`📏 Estimated prompt tokens: ~${Math.ceil(prompt.length / 4)} (prompt length / 4)`);
         
         let planContent: any;
         let rationale = '';
 
         try {
-          // OpenAI GPT-4o (using 2024-08-06 model which supports 16k output tokens)
-          console.log('⏳ Calling OpenAI API (Single Pass)...');
-          const response = await openai.chat.completions.create({
-            model: 'gpt-4o-2024-08-06', // Explicitly use the model with 16k output token limit
-            messages: [
-              { 
-                role: 'system', 
-                content: "You are a clinical nutrition expert. You MUST generate a complete 7-day meal plan (Monday-Sunday). Do not stop early. The response must be valid JSON containing all 7 days."
-              },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 16000,
-          });
-
-          // Log token usage
-          if (response.usage) {
-            console.log(`📊 Token Usage:`);
-            console.log(`   - Prompt tokens: ${response.usage.prompt_tokens}`);
-            console.log(`   - Completion tokens: ${response.usage.completion_tokens}`);
-            console.log(`   - Total tokens: ${response.usage.total_tokens}`);
-            console.log(`   - Max allowed: 16000`);
-          }
+          // Claude Haiku 4.5 - fast and reliable for structured plan generation
+          console.log('⏳ Calling Anthropic API (Haiku 4.5)...');
           
-          // Check finish reason
-          const finishReason = response.choices[0].finish_reason;
-          console.log(`🏁 Finish reason: ${finishReason}`);
-          if (finishReason === 'length') {
-            console.log(`   ❌ CRITICAL: Response was truncated due to max_tokens limit!`);
-          }
+          const systemPrompt = planType === 'nutrition' 
+            ? "You are a clinical nutrition expert. You MUST generate a complete 7-day meal plan (Monday-Sunday). Do not stop early. The response must be valid JSON containing all 7 days."
+            : planType === 'workout'
+            ? "You are an expert fitness coach. Generate a complete weekly workout plan. The response must be valid JSON."
+            : "You are a wellness and lifestyle expert. Generate a comprehensive lifestyle optimization plan. The response must be valid JSON.";
+          
+          const startTime = Date.now();
+          const aiResponse = await callAnthropic(
+            systemPrompt,
+            [{ role: 'user', content: prompt }],
+            'claude-haiku-4-5',
+            0.7,
+            8000,  // max tokens for response
+            false  // no tools needed for plan generation
+          );
+          const elapsedMs = Date.now() - startTime;
+          console.log(`⏱️ Haiku response time: ${elapsedMs}ms`);
 
-          const content = response.choices[0].message.content || '{}';
+          const content = aiResponse.text || '{}';
           
           console.log('📦 Normalizing OpenAI plan JSON');
           planContent = parseAiJson(content);
