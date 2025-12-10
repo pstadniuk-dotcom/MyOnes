@@ -229,6 +229,101 @@ function buildCreateFormulaTool() {
   };
 }
 
+// Helper for retry/backoff
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// TRUE STREAMING Anthropic API caller - sends chunks as they arrive
+async function* streamAnthropic(
+  systemPrompt: string,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  model: string,
+  temperature = 0.7,
+  maxTokens = 3000,
+  useTools = true
+): AsyncGenerator<{ type: 'text' | 'tool_use'; content: string; toolInput?: any }, void, unknown> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('Anthropic API key not configured');
+  }
+
+  const tools = useTools ? [buildCreateFormulaTool()] : undefined;
+
+  const payload = {
+    model: model || 'claude-sonnet-4-5',
+    max_tokens: maxTokens,
+    temperature,
+    system: systemPrompt,
+    messages,
+    tools,
+    tool_choice: useTools ? { type: 'auto' } : undefined,
+    stream: true,  // Enable streaming!
+  } as any;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY!,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Anthropic API HTTP ${res.status}: ${text}`);
+  }
+
+  if (!res.body) {
+    throw new Error('No response body from Anthropic streaming API');
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let currentToolInput = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]' || !data) continue;
+
+        try {
+          const event = JSON.parse(data);
+          
+          // Handle different event types
+          if (event.type === 'content_block_delta') {
+            if (event.delta?.type === 'text_delta' && event.delta?.text) {
+              yield { type: 'text', content: event.delta.text };
+            } else if (event.delta?.type === 'input_json_delta' && event.delta?.partial_json) {
+              currentToolInput += event.delta.partial_json;
+            }
+          } else if (event.type === 'content_block_stop' && currentToolInput) {
+            // Tool use completed, parse and yield
+            try {
+              const toolInput = JSON.parse(currentToolInput);
+              yield { type: 'tool_use', content: '```json\n' + JSON.stringify(toolInput, null, 2) + '\n```', toolInput };
+            } catch {}
+            currentToolInput = '';
+          }
+        } catch (parseErr) {
+          // Skip unparseable lines
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 async function callAnthropic(
   systemPrompt: string,
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
@@ -242,9 +337,6 @@ async function callAnthropic(
   }
 
   const tools = useTools ? [buildCreateFormulaTool()] : undefined;
-
-  // helper for retry/backoff
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const payload = {
     model: model || 'claude-sonnet-4-5',
@@ -3077,18 +3169,25 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               msgs.push({ role: 'user', content: messageWithFileContext });
             }
 
-            // Non-streaming call, will simulate streaming below
-            const { text: fullText, toolJsonBlock } = await callAnthropic(systemPrompt, msgs, model, 0.7, 3000, true);
-
-            // Simulate streaming by splitting into chunks
+            // TRUE STREAMING - send chunks as they arrive from Anthropic
+            console.log('🌊 Using TRUE Anthropic streaming...');
             let fullResponseLocal = '';
             let chunkIndex = 0;
-            const chunkSize = 400;
-            for (let i = 0; i < fullText.length; i += chunkSize) {
-              const content = fullText.slice(i, i + chunkSize);
-              fullResponseLocal += content;
-              chunkIndex++;
-              sendSSE({ type: 'chunk', content, sessionId: chatSession?.id, chunkIndex });
+            let toolJsonBlock: string | undefined;
+
+            try {
+              for await (const chunk of streamAnthropic(systemPrompt, msgs, model, 0.7, 3000, true)) {
+                if (chunk.type === 'text') {
+                  fullResponseLocal += chunk.content;
+                  chunkIndex++;
+                  sendSSE({ type: 'chunk', content: chunk.content, sessionId: chatSession?.id, chunkIndex });
+                } else if (chunk.type === 'tool_use') {
+                  toolJsonBlock = chunk.content;
+                }
+              }
+            } catch (streamErr: any) {
+              console.error('❌ Anthropic streaming error:', streamErr.message);
+              throw streamErr;
             }
 
             // If a tool result provided structured JSON, append it as final chunk
@@ -3101,7 +3200,6 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             // Reuse downstream extraction/validation by assigning fullResponse
             fullResponse = fullResponseLocal;
             // Skip OpenAI streaming loop and jump to extraction block below
-            // Use a labeled block to break out cleanly
             // eslint-disable-next-line no-labels
             break;
           } else {
@@ -8029,10 +8127,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         preferences: preferences || {},
       };
 
-      const results: Record<string, any> = {};
-      
-      for (const planType of planTypes) {
-        console.log(`🤖 Generating ${planType} plan...`);
+      // Helper function to generate a single plan - used for parallel execution
+      async function generateSinglePlan(planType: string): Promise<{ planType: string; plan: any }> {
+        console.log(`🤖 [${planType}] Starting plan generation...`);
         let prompt: string;
         
         // Select prompt builder based on plan type
@@ -8041,22 +8138,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             prompt = buildNutritionPlanPrompt(optimizeContext);
             break;
           case 'workout':
-            // Fetch historical workout analysis for intelligent progression
             try {
               const workoutAnalysis = await analyzeWorkoutHistory(userId);
               const historyContext = workoutAnalysis.allTime.totalWorkouts > 0 
-                ? formatAnalysisForPrompt(workoutAnalysis)
-                : undefined;
-              
-              if (historyContext) {
-                console.log(`📊 Including workout history: ${workoutAnalysis.allTime.totalWorkouts} workouts, ${workoutAnalysis.allTime.avgWorkoutsPerWeek} avg/week`);
-              } else {
-                console.log(`📊 No workout history found for user`);
-              }
-              
+                ? formatAnalysisForPrompt(workoutAnalysis) : undefined;
               prompt = buildWorkoutPlanPrompt(optimizeContext, undefined, historyContext);
-            } catch (historyError) {
-              console.log(`⚠️ Could not fetch workout history, generating without:`, historyError);
+            } catch {
               prompt = buildWorkoutPlanPrompt(optimizeContext);
             }
             break;
@@ -8064,23 +8151,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             prompt = buildLifestylePlanPrompt(optimizeContext);
             break;
           default:
-            return res.status(400).json({ error: `Invalid plan type: ${planType}` });
+            throw new Error(`Invalid plan type: ${planType}`);
         }
 
-        console.log(`📝 Prompt built, length: ${prompt.length} chars`);
-
-        // Use Claude Haiku 4.5 for Optimize plan generation (fast and cost-effective)
-        // Sonnet 4.5 is reserved for consultations where quality matters more
-        console.log(`🧠 Using AI: Anthropic / claude-haiku-4-5 (fast plan generation)`);
-        console.log(`📏 Estimated prompt tokens: ~${Math.ceil(prompt.length / 4)} (prompt length / 4)`);
+        console.log(`📝 [${planType}] Prompt built, length: ${prompt.length} chars`);
         
         let planContent: any;
         let rationale = '';
 
         try {
-          // Claude Haiku 4.5 - fast and reliable for structured plan generation
-          console.log('⏳ Calling Anthropic API (Haiku 4.5)...');
-          
           const systemPrompt = planType === 'nutrition' 
             ? "You are a clinical nutrition expert. You MUST generate a complete 7-day meal plan (Monday-Sunday). Do not stop early. The response must be valid JSON containing all 7 days."
             : planType === 'workout'
@@ -8088,84 +8167,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             : "You are a wellness and lifestyle expert. Generate a comprehensive lifestyle optimization plan. The response must be valid JSON.";
           
           const startTime = Date.now();
-          const aiResponse = await callAnthropic(
-            systemPrompt,
-            [{ role: 'user', content: prompt }],
-            'claude-haiku-4-5',
-            0.7,
-            8000,  // max tokens for response
-            false  // no tools needed for plan generation
-          );
-          const elapsedMs = Date.now() - startTime;
-          console.log(`⏱️ Haiku response time: ${elapsedMs}ms`);
+          const aiResponse = await callAnthropic(systemPrompt, [{ role: 'user', content: prompt }], 'claude-haiku-4-5', 0.7, 8000, false);
+          console.log(`⏱️ [${planType}] Haiku response: ${Date.now() - startTime}ms`);
 
-          const content = aiResponse.text || '{}';
-          
-          console.log('📦 Normalizing OpenAI plan JSON');
-          planContent = parseAiJson(content);
-          
-          console.log(`📊 Parsed plan has ${planContent.weekPlan?.length || 0} days total`);
-          if (planContent.weekPlan?.[0]) {
-             console.log('🔍 Day 1 preview:', JSON.stringify(planContent.weekPlan[0], null, 2));
-          }
-          
-          console.log(`✅ AI response received, length: ${content.length} chars`);
-          console.log(`🔍 First 500 chars: ${content.substring(0, 500)}`);
-          console.log(`🔍 Last 500 chars: ${content.substring(Math.max(0, content.length - 500))}`);
-          
-          // Write full response to temp file for debugging
-          const fs = await import('fs');
-          const tempFile = `./ai-response-${planType}-${Date.now()}.json`;
-          await fs.promises.writeFile(tempFile, content, 'utf-8');
-          console.log(`💾 Full AI response saved to: ${tempFile}`);
-          
-          console.log('📦 Normalizing OpenAI plan JSON');
-          planContent = parseAiJson(content);
-          
-          // Deep debugging
-          console.log(`\n🔍 DEEP DEBUG - Raw Plan Content Structure:`);
-          console.log(`   - Has weekPlan property: ${!!planContent.weekPlan}`);
-          console.log(`   - weekPlan is array: ${Array.isArray(planContent.weekPlan)}`);
-          console.log(`   - weekPlan length: ${planContent.weekPlan?.length || 0}`);
-          
-          if (planContent.weekPlan && Array.isArray(planContent.weekPlan)) {
-            console.log(`   - Days in weekPlan: ${planContent.weekPlan.map((d: any) => d.dayName || d.day || 'unnamed').join(', ')}`);
-            console.log(`   - Day 1 has ${planContent.weekPlan[0]?.meals?.length || 0} meals`);
-            if (planContent.weekPlan.length < 7) {
-              console.log(`   ⚠️  WARNING: Only ${planContent.weekPlan.length} days generated, expected 7!`);
-              console.log(`   - Content length: ${content.length} characters`);
-              console.log(`   - Last day generated: ${planContent.weekPlan[planContent.weekPlan.length - 1]?.dayName || 'unknown'}`);
-            }
-          } else {
-            console.log(`   ❌ weekPlan is not a valid array!`);
-          }
-          
-          rationale = planContent.weeklyGuidance || planContent.programOverview || planContent.focusAreas || 'Personalized plan generated';
-          
-          // Ensure rationale is not empty or generic if possible
-          if (!rationale || rationale === 'Personalized plan generated') {
-             console.log('⚠️ Rationale was empty or generic, attempting to extract from other fields');
-             if (planContent.personalizationNotes) {
-                rationale = `Based on your profile: ${JSON.stringify(planContent.personalizationNotes)}`;
-             }
-          }
+          planContent = parseAiJson(aiResponse.text || '{}');
+          rationale = planContent.weeklyGuidance || planContent.programOverview || 'Personalized plan generated';
         } catch (aiError) {
-          console.error(`❌ AI generation error for ${planType}:`, aiError);
-          planContent = { error: 'Failed to generate plan', details: aiError instanceof Error ? aiError.message : 'Unknown error' };
+          console.error(`❌ [${planType}] AI error:`, aiError);
+          planContent = { error: 'Failed to generate plan' };
           rationale = 'AI generation failed';
         }
 
         const normalizedContent = normalizePlanContent(planType as 'nutrition' | 'workout' | 'lifestyle', planContent);
-
-        console.log(`\n🔧 AFTER NORMALIZATION:`);
-        console.log(`   - normalizedContent.weekPlan length: ${normalizedContent.weekPlan?.length || 0}`);
-        if (normalizedContent.weekPlan) {
-          console.log(`   - Normalized days: ${normalizedContent.weekPlan.map((d: any) => d.dayName || d.day).join(', ')}`);
-          console.log(`   - autoHealMeta.missingDays: ${normalizedContent.autoHealMeta?.missingDays}`);
-        }
-
-        console.log(`💾 Saving ${planType} plan to database...`);
-        // Save plan to database
+        
         const plan = await storage.createOptimizePlan({
           userId,
           planType,
@@ -8177,12 +8191,23 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           isActive: true,
         });
         
-        console.log(`✅ ${planType} plan saved with ID: ${plan.id}`);
-        results[planType] = plan;
+        console.log(`✅ [${planType}] Plan saved: ${plan.id}`);
+        return { planType, plan };
       }
 
-      console.log('🎉 All plans generated successfully');
+      // PARALLEL PLAN GENERATION - run all plans simultaneously!
+      console.log(`🚀 Generating ${planTypes.length} plans IN PARALLEL: ${planTypes.join(', ')}`);
+      const parallelStartTime = Date.now();
       
+      const planResults = await Promise.all(planTypes.map((pt: string) => generateSinglePlan(pt)));
+      
+      const results: Record<string, any> = {};
+      for (const { planType, plan } of planResults) {
+        results[planType] = plan;
+      }
+      
+      console.log(`🎉 All ${planTypes.length} plans generated in ${Date.now() - parallelStartTime}ms (PARALLEL)`);
+
       // Auto-generate grocery list if nutrition plan was created
       if (results.nutrition && planTypes.includes('nutrition')) {
         console.log('🛒 Auto-generating grocery list for nutrition plan...');

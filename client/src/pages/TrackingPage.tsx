@@ -98,13 +98,17 @@ export default function TrackingPage() {
       }
     },
     onSettled: () => {
+      // Debounce the refetch - only refetch wellness data after mutation settles
+      // The streak recalculation happens server-side in the daily-logs endpoint
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
-      apiRequest('/api/optimize/streaks/recalculate', { method: 'POST', body: '{}' });
+      // Delay streak refresh slightly to let backend catch up
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+      }, 500);
     },
   });
 
-  // Mutation for logging water intake
+  // Mutation for logging water intake with optimistic update
   const logWaterAmount = useMutation({
     mutationFn: async (oz: number) => {
       return apiRequest('/api/optimize/daily-logs', {
@@ -112,9 +116,38 @@ export default function TrackingPage() {
         body: JSON.stringify({ waterIntakeOz: (wellnessData?.today.waterIntakeOz || 0) + oz }),
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+    onMutate: async (oz) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/dashboard/wellness'] });
+      
+      // Snapshot current value
+      const previousWellness = queryClient.getQueryData<WellnessData>(['/api/dashboard/wellness']);
+      
+      // Optimistically update water intake
+      if (previousWellness) {
+        const newWaterIntake = (previousWellness.today.waterIntakeOz || 0) + oz;
+        queryClient.setQueryData<WellnessData>(['/api/dashboard/wellness'], {
+          ...previousWellness,
+          today: {
+            ...previousWellness.today,
+            waterIntakeOz: newWaterIntake,
+          },
+        });
+      }
+      
+      return { previousWellness };
+    },
+    onError: (_err, _oz, context) => {
+      // Rollback on error
+      if (context?.previousWellness) {
+        queryClient.setQueryData(['/api/dashboard/wellness'], context.previousWellness);
+      }
+    },
+    onSettled: () => {
+      // Delay streak refresh to let backend catch up
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+      }, 500);
     },
   });
 
