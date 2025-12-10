@@ -24,6 +24,7 @@ import { buildNutritionPlanPrompt, buildWorkoutPlanPrompt, buildLifestylePlanPro
 import { analyzeWorkoutHistory, formatAnalysisForPrompt } from "./workoutAnalysis";
 import { parseAiJson } from "./utils/parseAiJson";
 import { normalizePlanContent, DEFAULT_MEAL_TYPES } from "./optimize-normalizer";
+import { getUserLocalMidnight } from "./utils/timezone";
 import { nanoid } from "nanoid";
 import { startOfWeek, endOfWeek, subWeeks, format, parseISO, differenceInWeeks, differenceInDays, isSameDay } from "date-fns";
 
@@ -4475,7 +4476,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/dashboard/wellness', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      const today = new Date();
+      
+      // Get user's timezone for correct day boundary
+      const user = await storage.getUser(userId);
+      const userTimezone = user?.timezone || 'America/New_York';
+      const today = getUserLocalMidnight(userTimezone);
       const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       
       // Calculate week boundaries (Sunday-Saturday)
@@ -8514,7 +8519,11 @@ Return ONLY the JSON, no explanation.`
       });
 
       // Also update daily log mealsLogged array
-      const today = new Date();
+      // Get user's timezone for correct day boundary
+      const user = await storage.getUser(userId);
+      const userTimezone = user?.timezone || 'America/New_York';
+      const today = getUserLocalMidnight(userTimezone);
+      
       const existingLog = await storage.getDailyLog(userId, today);
       const mealsLogged = new Set<string>(
         Array.isArray(existingLog?.mealsLogged) ? existingLog!.mealsLogged : [],
@@ -8552,7 +8561,11 @@ Return ONLY the JSON, no explanation.`
   app.get('/api/optimize/nutrition/today', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      const today = new Date();
+      
+      // Get user's timezone for correct day boundary
+      const user = await storage.getUser(userId);
+      const userTimezone = user?.timezone || 'America/New_York';
+      const today = getUserLocalMidnight(userTimezone);
       
       const meals = await storage.getMealLogsForDay(userId, today);
       const totals = await storage.getTodayNutritionTotals(userId);
@@ -8614,7 +8627,11 @@ Return ONLY the JSON, no explanation.`
         return res.status(400).json({ error: 'Valid amountOz is required' });
       }
 
-      const today = new Date();
+      // Get user's timezone for correct day boundary
+      const user = await storage.getUser(userId);
+      const userTimezone = user?.timezone || 'America/New_York';
+      const today = getUserLocalMidnight(userTimezone);
+      
       const existingLog = await storage.getDailyLog(userId, today);
 
       let updatedLog;
@@ -8651,7 +8668,12 @@ Return ONLY the JSON, no explanation.`
   app.post('/api/optimize/nutrition/reset-water', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      const today = new Date();
+      
+      // Get user's timezone for correct day boundary
+      const user = await storage.getUser(userId);
+      const userTimezone = user?.timezone || 'America/New_York';
+      const today = getUserLocalMidnight(userTimezone);
+      
       const existingLog = await storage.getDailyLog(userId, today);
 
       if (existingLog) {
