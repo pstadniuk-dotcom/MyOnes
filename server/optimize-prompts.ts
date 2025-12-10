@@ -139,16 +139,16 @@ Return compact JSON. Each meal needs: mealType, name (MAKE IT APPETIZING!), 5-7 
   "macroTargets": {"dailyCalories": 2200, "proteinGrams": 165, "carbsGrams": 220, "fatGrams": 73},
   "weekPlan": [
     {"day": 1, "dayName": "Monday", "meals": [
-      {"mealType": "breakfast", "name": "Mediterranean Shakshuka with Feta & Za'atar", "cuisine": "Mediterranean", "ingredients": ["eggs", "tomatoes", "bell peppers", "onion", "feta cheese", "za'atar", "olive oil"], "instructions": "Sauté peppers and onions until soft, add crushed tomatoes and simmer 10 mins. Create wells and crack in eggs, cover until set. Top with crumbled feta and za'atar.", "prepTimeMinutes": 20, "macros": {"calories": 450, "protein": 28, "carbs": 20, "fats": 28}, "healthBenefits": "Protein-rich start with anti-inflammatory lycopene from tomatoes"},
-      {"mealType": "snack", "name": "Greek Yogurt Parfait", "cuisine": "American", "ingredients": ["Greek yogurt", "mixed berries", "honey", "granola"], "instructions": "Layer yogurt with berries, drizzle honey, top with granola.", "prepTimeMinutes": 3, "macros": {"calories": 250, "protein": 18, "carbs": 30, "fats": 6}, "healthBenefits": "Probiotics and antioxidants"},
-      {"mealType": "lunch", "name": "Grilled Chimichurri Steak Salad", "cuisine": "Latin American", "ingredients": ["flank steak", "mixed greens", "cherry tomatoes", "red onion", "avocado", "chimichurri sauce", "lime"], "instructions": "Season steak and grill to medium-rare, let rest 5 mins then slice against grain. Toss greens with tomatoes, onion, and avocado. Top with steak slices and drizzle chimichurri.", "prepTimeMinutes": 25, "macros": {"calories": 520, "protein": 42, "carbs": 15, "fats": 32}, "healthBenefits": "Iron-rich beef with heart-healthy fats from avocado"},
-      {"mealType": "snack", "name": "Apple Slices with Almond Butter", "cuisine": "American", "ingredients": ["apple", "almond butter"], "instructions": "Slice apple and serve with almond butter for dipping.", "prepTimeMinutes": 2, "macros": {"calories": 200, "protein": 5, "carbs": 25, "fats": 10}, "healthBenefits": "Fiber and healthy fats for sustained energy"},
-      {"mealType": "dinner", "name": "Crispy Teriyaki Salmon with Sesame Bok Choy", "cuisine": "Asian", "ingredients": ["salmon fillet", "teriyaki sauce", "bok choy", "sesame oil", "garlic", "ginger", "sesame seeds", "brown rice"], "instructions": "Pan-sear salmon skin-side down until crispy, flip and glaze with teriyaki. Separately sauté bok choy with garlic, ginger, and sesame oil. Serve over brown rice, garnish with sesame seeds.", "prepTimeMinutes": 30, "macros": {"calories": 580, "protein": 45, "carbs": 40, "fats": 24}, "healthBenefits": "Omega-3 fatty acids for brain health and inflammation reduction"}
+      {"mealType": "breakfast", "name": "CREATIVE RESTAURANT-QUALITY NAME", "cuisine": "VARY CUISINE", "ingredients": ["5-7 ingredients"], "instructions": "2-3 sentences with cooking tips", "prepTimeMinutes": 20, "macros": {"calories": 450, "protein": 28, "carbs": 20, "fats": 28}, "healthBenefits": "Specific health benefit"},
+      {"mealType": "snack", "name": "...", ...},
+      {"mealType": "lunch", "name": "...", ...},
+      {"mealType": "snack", "name": "...", ...},
+      {"mealType": "dinner", "name": "...", ...}
     ], "dailyTotals": {"calories": 2000, "protein": 138, "carbs": 130, "fat": 100}},
-    {"day": 2, "dayName": "Tuesday", "meals": [5 varied meals with different cuisines], "dailyTotals": {}},
-    {"day": 3, "dayName": "Wednesday", "meals": [5 varied meals], "dailyTotals": {}},
-    {"day": 4, "dayName": "Thursday", "meals": [5 varied meals], "dailyTotals": {}},
-    {"day": 5, "dayName": "Friday", "meals": [5 varied meals], "dailyTotals": {}},
+    {"day": 2, "dayName": "Tuesday", "meals": [5 DIFFERENT meals - new cuisines, new proteins], "dailyTotals": {}},
+    {"day": 3, "dayName": "Wednesday", "meals": [5 DIFFERENT meals], "dailyTotals": {}},
+    {"day": 4, "dayName": "Thursday", "meals": [5 DIFFERENT meals], "dailyTotals": {}},
+    {"day": 5, "dayName": "Friday", "meals": [5 DIFFERENT meals], "dailyTotals": {}},
     {"day": 6, "dayName": "Saturday", "meals": [5 SPECIAL weekend meals - slightly more elaborate], "dailyTotals": {}},
     {"day": 7, "dayName": "Sunday", "meals": [5 SPECIAL weekend meals - can include brunch], "dailyTotals": {}}
   ],
@@ -156,6 +156,8 @@ Return compact JSON. Each meal needs: mealType, name (MAKE IT APPETIZING!), 5-7 
   "weeklyGuidance": "Detailed, personalized explanation referencing specific profile data and lab results (e.g. 'Designed for your 34yo metabolism and elevated LDL...')",
   "personalizationNotes": {"healthProfileInsights": ["insight based on actual profile"], "labInsightsAddressed": ["lab-specific recommendation"], "supplementCoordination": "how meals complement supplements", "goalAlignment": "how plan supports stated goals"}
 }
+
+**BE CREATIVE:** Do NOT copy any example meals. Generate unique, varied meals each time. Every regeneration should produce a completely different plan.
 
 **CRITICAL MEAL NAMING:** Names should sound like a restaurant menu, not a hospital cafeteria. Examples:
 ✅ "Honey Garlic Glazed Pork Tenderloin with Roasted Sweet Potato Mash"
