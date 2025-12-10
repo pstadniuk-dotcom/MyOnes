@@ -3,6 +3,7 @@ import { db } from "./db";
 import { encryptToken, decryptToken } from "./tokenEncryption";
 import { encryptField, decryptField, encryptFieldSafe, decryptFieldSafe } from "./fieldEncryption";
 import { logger } from "./logger";
+import { getUserLocalMidnight, getUserLocalDateString } from "./utils/timezone";
 import {
   users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
@@ -3334,7 +3335,7 @@ export class DrizzleStorage implements IStorage {
   }
 
   // Get smart streak data with percentage-based daily progress and rest day detection
-  async getSmartStreakData(userId: string): Promise<{
+  async getSmartStreakData(userId: string, userTimezone: string = 'America/New_York'): Promise<{
     currentStreak: number;
     longestStreak: number;
     monthlyProgress: Array<{
@@ -3395,15 +3396,14 @@ export class DrizzleStorage implements IStorage {
     const streaks = await this.getAllUserStreaks(userId);
     const overallStreak = streaks.find(s => s.streakType === 'overall');
     
-    // Get month's data (30 days ending today)
-    const today = new Date();
-    today.setHours(12, 0, 0, 0); // Set to noon to avoid timezone edge cases
+    // Get month's data (30 days ending today in user's timezone)
+    const today = getUserLocalMidnight(userTimezone);
     const startOfMonth = new Date(today);
     startOfMonth.setDate(today.getDate() - 29); // 30 days total including today
     startOfMonth.setHours(0, 0, 0, 0);
     
-    // Calculate today's date string using local date parts
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    // Calculate today's date string in user's timezone
+    const todayStr = getUserLocalDateString(userTimezone);
     
     const monthlyProgress: Array<{
       date: string;

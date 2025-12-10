@@ -55,15 +55,8 @@ export function HydrationTracker({ currentOz = 0, goalOz = 100, onUpdate }: Hydr
       setOptimisticOz(newTotal);
     },
     onSuccess: (data) => {
-      // Sync with server value
+      // Keep optimistic value synced with server response - don't clear it yet
       setOptimisticOz(data.waterIntakeOz);
-      
-      // Delay query invalidation to prevent UI flicker
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/optimize/nutrition/today'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
-        setOptimisticOz(null); // Clear optimistic value after sync
-      }, 300);
       
       if (data.waterIntakeOz >= goalOz) {
         toast({
@@ -87,6 +80,15 @@ export function HydrationTracker({ currentOz = 0, goalOz = 100, onUpdate }: Hydr
         title: 'Failed to log water',
         description: error.message,
       });
+    },
+    onSettled: () => {
+      // Invalidate queries after mutation settles, then clear optimistic state
+      // after queries have had time to refetch
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/nutrition/today'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+      setTimeout(() => {
+        setOptimisticOz(null);
+      }, 1000); // Give queries time to refetch before clearing
     },
   });
 
