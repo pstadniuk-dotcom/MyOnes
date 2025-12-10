@@ -2698,6 +2698,18 @@ export class DrizzleStorage implements IStorage {
   // ===== OPTIMIZE FEATURE OPERATIONS =====
   
   // Optimize Plans
+  async deactivateOldPlans(userId: string, planType: 'nutrition' | 'workout' | 'lifestyle'): Promise<void> {
+    await db
+      .update(optimizePlans)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(
+        eq(optimizePlans.userId, userId),
+        eq(optimizePlans.planType, planType),
+        eq(optimizePlans.isActive, true)
+      ));
+    console.log(`🔄 Deactivated old ${planType} plans for user`);
+  }
+
   async createOptimizePlan(plan: InsertOptimizePlan): Promise<OptimizePlan> {
     const [created] = await db.insert(optimizePlans).values(plan).returning();
     return created;

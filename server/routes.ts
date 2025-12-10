@@ -8180,6 +8180,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
         const normalizedContent = normalizePlanContent(planType as 'nutrition' | 'workout' | 'lifestyle', planContent);
         
+        // IMPORTANT: Deactivate old plans of this type before creating new one
+        await storage.deactivateOldPlans(userId, planType as 'nutrition' | 'workout' | 'lifestyle');
+        
         const plan = await storage.createOptimizePlan({
           userId,
           planType,
