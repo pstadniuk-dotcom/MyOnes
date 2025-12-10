@@ -1,3 +1,4 @@
+import { useRef, useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Activity } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -26,6 +27,10 @@ function TrackingSkeleton() {
 
 export default function TrackingPage() {
   const queryClient = useQueryClient();
+  
+  // Debounce refs to prevent rapid-fire clicks
+  const waterDebounceRef = useRef<boolean>(false);
+  const supplementDebounceRef = useRef<boolean>(false);
 
   // Wellness data (for today at a glance and personal records)
   const { data: wellnessData, isLoading: wellnessLoading } = useQuery<WellnessData>({
@@ -155,9 +160,25 @@ export default function TrackingPage() {
       // Delay streak refresh to let backend catch up
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+        waterDebounceRef.current = false; // Allow new water logs
       }, 500);
     },
   });
+
+  // Debounced handlers to prevent rapid-fire clicks
+  const handleLogWater = useCallback((oz: number) => {
+    if (waterDebounceRef.current || logWaterAmount.isPending) return;
+    waterDebounceRef.current = true;
+    logWaterAmount.mutate(oz);
+  }, [logWaterAmount]);
+
+  const handleLogSupplement = useCallback((dose: 'morning' | 'afternoon' | 'evening', taken: boolean) => {
+    if (supplementDebounceRef.current || logSupplementDose.isPending) return;
+    supplementDebounceRef.current = true;
+    logSupplementDose.mutate({ dose, taken });
+    // Reset after a delay
+    setTimeout(() => { supplementDebounceRef.current = false; }, 500);
+  }, [logSupplementDose]);
 
   const wellness = wellnessData || emptyWellnessData;
   const prefs = trackingPrefs || defaultTrackingPreferences;
@@ -217,8 +238,8 @@ export default function TrackingPage() {
                 if (enabled.lifestyle && breakdown.lifestyle.complete) completed++;
                 return Math.round((completed / enabledCount) * 100);
               })() : undefined}
-              onLogSupplementDose={(dose, taken) => logSupplementDose.mutate({ dose, taken })}
-              onLogWaterAmount={(oz) => logWaterAmount.mutate(oz)}
+              onLogSupplementDose={handleLogSupplement}
+              onLogWaterAmount={handleLogWater}
             />
             {smartStreakData ? (
               <SmartStreakCard 
