@@ -24,7 +24,7 @@ import { buildNutritionPlanPrompt, buildWorkoutPlanPrompt, buildLifestylePlanPro
 import { analyzeWorkoutHistory, formatAnalysisForPrompt } from "./workoutAnalysis";
 import { parseAiJson } from "./utils/parseAiJson";
 import { normalizePlanContent, DEFAULT_MEAL_TYPES } from "./optimize-normalizer";
-import { getUserLocalMidnight } from "./utils/timezone";
+import { getUserLocalMidnight, getUserLocalDateString } from "./utils/timezone";
 import { nanoid } from "nanoid";
 import { startOfWeek, endOfWeek, subWeeks, format, parseISO, differenceInWeeks, differenceInDays, isSameDay } from "date-fns";
 
@@ -7982,11 +7982,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/optimize/streaks/smart', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      const smartData = await storage.getSmartStreakData(userId);
+      
+      // Get user's timezone for correct day boundary
+      const user = await storage.getUser(userId);
+      const userTimezone = user?.timezone || 'America/New_York';
+      
+      const smartData = await storage.getSmartStreakData(userId, userTimezone);
       
       // Debug logging for today's breakdown
-      const today = new Date();
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const todayStr = getUserLocalDateString(userTimezone);
       console.log('🧮 Smart Streak Data for today:', {
         currentStreak: smartData.currentStreak,
         todayBreakdown: smartData.todayBreakdown,
@@ -9043,14 +9047,17 @@ Return ONLY valid JSON in this exact format:
         supplementMorning,
         supplementAfternoon,
         supplementEvening,
+        isRestDay,
         userId: userId.substring(0, 8) + '...',
       });
 
-      const logDate = date ? new Date(date) : new Date();
+      // Get user's timezone for correct day boundary
+      const user = await storage.getUser(userId);
+      const userTimezone = user?.timezone || 'America/New_York';
+      const logDate = date ? new Date(date) : getUserLocalMidnight(userTimezone);
       if (Number.isNaN(logDate.getTime())) {
         return res.status(400).json({ error: 'Invalid date value' });
       }
-      logDate.setHours(12, 0, 0, 0);
 
       const clampRating = (value: unknown) => {
         if (value === undefined || value === null || value === '') return null;

@@ -102,7 +102,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
     },
   });
 
-  // Toggle rest day mutation
+  // Toggle rest day mutation with optimistic update
   const toggleRestDay = useMutation({
     mutationFn: async (isRestDay: boolean) => {
       const response = await apiRequest('/api/optimize/daily-logs', {
@@ -112,9 +112,39 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
       if (!response.ok) throw new Error('Failed to toggle rest day');
       return response.json();
     },
-    onSuccess: () => {
+    onMutate: async (isRestDay) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/dashboard/wellness'] });
+      
+      // Snapshot current value
+      const previousWellness = queryClient.getQueryData(['/api/dashboard/wellness']);
+      
+      // Optimistically update
+      queryClient.setQueryData(['/api/dashboard/wellness'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          today: {
+            ...old.today,
+            isRestDay,
+          },
+        };
+      });
+      
+      return { previousWellness };
+    },
+    onError: (_err, _isRestDay, context) => {
+      // Rollback on error
+      if (context?.previousWellness) {
+        queryClient.setQueryData(['/api/dashboard/wellness'], context.previousWellness);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+      // Delay streak refresh to let backend catch up
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+      }, 500);
     },
   });
 
