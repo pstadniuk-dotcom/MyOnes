@@ -995,10 +995,10 @@ export default function ConsultationPage() {
   console.log('🔍 RENDER STATE - isTyping:', isTyping, 'thinkingMessage:', thinkingMessage);
 
   return (
-    <div className="flex h-full max-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
-      {/* History Sidebar */}
+    <div className="flex h-full min-h-dvh md:max-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
+      {/* History Sidebar - Hidden on mobile, shown on desktop */}
       {showHistory && (
-        <div className="w-80 border-r bg-background/80 backdrop-blur-sm flex flex-col">
+        <div className="hidden md:flex w-80 border-r bg-background/80 backdrop-blur-sm flex-col">
           <div className="p-4 border-b bg-gradient-to-br from-primary/10 to-secondary/10">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Consultation History</h3>
@@ -1081,18 +1081,20 @@ export default function ConsultationPage() {
         {/* Modern Gradient Header */}
         <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 border-b backdrop-blur-sm">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-secondary/5 opacity-50"></div>
-          <div className="relative p-6">
+          <div className="relative p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-consultation-title">
-                  Ones AI Consultation
+                <h1 className="text-lg md:text-2xl font-bold flex items-center gap-2" data-testid="text-consultation-title">
+                  <span className="hidden sm:inline">Ones AI Consultation</span>
+                  <span className="sm:hidden">AI Consultation</span>
                   <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
                     <Sparkles className="w-3 h-3 mr-1" />
-                    AI-Powered
+                    <span className="hidden sm:inline">AI-Powered</span>
+                    <span className="sm:hidden">AI</span>
                   </Badge>
                 </h1>
                 <div className="flex items-center gap-2 mt-1">
-                  <p className="text-sm text-muted-foreground">Your personalized supplement consultant</p>
+                  <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">Your personalized supplement consultant</p>
                   {isConnected && (
                     <Badge variant="outline" className="text-xs text-green-600 border-green-200 bg-green-50">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
@@ -1409,22 +1411,22 @@ export default function ConsultationPage() {
               </div>
             )}
             
-            {/* Input Area */}
-            <div className="flex space-x-3 items-end">
+            {/* Input Area - Mobile optimized */}
+            <div className="flex space-x-2 md:space-x-3 items-end">
               <div className="flex-1 space-y-2">
                 <Textarea
                   ref={textareaRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyPress}
-                  placeholder="Ask about your supplement formula, health goals, or upload lab results..."
-                  className="min-h-[44px] max-h-[120px] resize-none"
+                  placeholder="Ask about supplements, health goals..."
+                  className="min-h-[48px] max-h-[120px] resize-none text-base"
                   rows={1}
                   disabled={isTyping}
                   data-testid="input-consultation-message"
                 />
-                {/* Quick Actions */}
-                <div className="flex items-center justify-between">
+                {/* Quick Actions - Hidden on mobile */}
+                <div className="hidden md:flex items-center justify-between">
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <FileText className="w-3 h-3" />
                     <span>Upload files or type your question</span>
@@ -1438,20 +1440,20 @@ export default function ConsultationPage() {
                 </div>
               </div>
               
-              {/* Action Buttons */}
+              {/* Action Buttons - Larger on mobile */}
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={handleFileUpload}
                   disabled={isUploading}
-                  className="flex-shrink-0 hover-elevate"
+                  className="flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback"
                   data-testid="button-upload-file"
                 >
                   {isUploading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-5 h-5 md:w-4 md:h-4 animate-spin" />
                   ) : (
-                    <Upload className="w-4 h-4" />
+                    <Upload className="w-5 h-5 md:w-4 md:h-4" />
                   )}
                 </Button>
                 
@@ -1460,15 +1462,15 @@ export default function ConsultationPage() {
                   size="icon"
                   onClick={handleVoiceInput}
                   disabled={isRecording || isTyping}
-                  className={`flex-shrink-0 hover-elevate ${isRecording ? 'bg-red-50 border-red-200' : ''}`}
+                  className={`flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback ${isRecording ? 'bg-red-50 border-red-200' : ''}`}
                   data-testid="button-voice-input"
                 >
                   {isRecording ? (
                     <div className="flex items-center">
-                      <Mic className="w-4 h-4 text-red-500 animate-pulse" />
+                      <Mic className="w-5 h-5 md:w-4 md:h-4 text-red-500 animate-pulse" />
                     </div>
                   ) : (
-                    <Mic className="w-4 h-4" />
+                    <Mic className="w-5 h-5 md:w-4 md:h-4" />
                   )}
                 </Button>
                 
@@ -1476,13 +1478,13 @@ export default function ConsultationPage() {
                   onClick={() => handleSendMessage(inputValue, uploadedFiles)}
                   size="icon"
                   disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isTyping}
-                  className="flex-shrink-0 hover-elevate"
+                  className="flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback"
                   data-testid="button-send-message"
                 >
                   {isTyping ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-5 h-5 md:w-4 md:h-4 animate-spin" />
                   ) : (
-                    <Send className="w-4 h-4" />
+                    <Send className="w-5 h-5 md:w-4 md:h-4" />
                   )}
                 </Button>
               </div>

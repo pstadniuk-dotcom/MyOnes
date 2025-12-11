@@ -504,4 +504,193 @@
     min-width: min(90vw, 800px) !important;
     width: min(90vw, 800px) !important;
   }
+
+  /* ============================================
+     MOBILE RESPONSIVENESS UTILITIES
+     ============================================ */
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe area insets for notched devices (iPhone X+) */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+  .safe-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  .safe-y {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-all {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* Margin variants for safe areas */
+  .mt-safe {
+    margin-top: env(safe-area-inset-top);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Touch feedback animations */
+  .touch-feedback {
+    transition: transform 100ms ease-out, opacity 100ms ease-out;
+  }
+  .touch-feedback:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+  .touch-feedback-strong {
+    transition: transform 100ms ease-out, opacity 100ms ease-out;
+  }
+  .touch-feedback-strong:active {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+
+  /* Dynamic viewport height (accounts for mobile browser chrome) */
+  .h-dvh {
+    height: 100dvh;
+  }
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+  .max-h-dvh {
+    max-height: 100dvh;
+  }
+
+  /* Mobile-specific text truncation */
+  .truncate-mobile {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Snap scroll utilities */
+  .snap-x-mandatory {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .snap-start {
+    scroll-snap-align: start;
+  }
+  .snap-center {
+    scroll-snap-align: center;
+  }
+
+  /* Mobile card spacing */
+  .mobile-card-padding {
+    padding: 0.75rem;
+  }
+  @media (min-width: 640px) {
+    .mobile-card-padding {
+      padding: 1rem;
+    }
+  }
+  @media (min-width: 768px) {
+    .mobile-card-padding {
+      padding: 1.5rem;
+    }
+  }
+
+  /* Bottom nav spacing helper - adds padding to account for fixed bottom nav */
+  .pb-bottom-nav {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+
+  /* Disable hover effects on touch devices */
+  @media (hover: none) and (pointer: coarse) {
+    .hover-none\:bg-transparent:hover {
+      background-color: transparent;
+    }
+  }
+
+  /* ============================================
+     ACCESSIBILITY IMPROVEMENTS
+     ============================================ */
+
+  /* Improve focus ring visibility on mobile */
+  @media (max-width: 768px) {
+    *:focus-visible {
+      outline: 2px solid hsl(var(--primary));
+      outline-offset: 2px;
+    }
+  }
+
+  /* Reduce motion for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    
+    .touch-feedback:active,
+    .touch-feedback-strong:active {
+      transform: none;
+    }
+  }
+
+  /* Larger touch targets helper */
+  .touch-target-44 {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Accessible tap highlight for iOS */
+  .tap-highlight-none {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Mobile text size adjustments to prevent zoom on input focus */
+  @media (max-width: 768px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="tel"],
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Pull-to-refresh prevention (when you want to prevent it) */
+  .no-pull-refresh {
+    overscroll-behavior-y: contain;
+  }
+
+  /* Smooth scroll for cards and lists */
+  .momentum-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* High contrast mode improvements */
+  @media (prefers-contrast: high) {
+    .touch-feedback:active {
+      outline: 2px solid currentColor;
+    }
+  }
 }

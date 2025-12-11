@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { 
   Droplets, 
   Plus, 
@@ -31,6 +32,7 @@ const QUICK_ADD_OPTIONS = [
 export function HydrationTracker({ currentOz = 0, goalOz = 100, onUpdate }: HydrationTrackerProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [customAmount, setCustomAmount] = useState(8);
   const [optimisticOz, setOptimisticOz] = useState<number | null>(null);
 
@@ -158,7 +160,7 @@ export function HydrationTracker({ currentOz = 0, goalOz = 100, onUpdate }: Hydr
           </div>
         </div>
 
-        {/* Quick add buttons */}
+        {/* Quick add buttons - larger touch targets on mobile */}
         <div className="grid grid-cols-4 gap-2">
           {QUICK_ADD_OPTIONS.map((option) => (
             <Button
@@ -167,46 +169,50 @@ export function HydrationTracker({ currentOz = 0, goalOz = 100, onUpdate }: Hydr
               size="sm"
               onClick={() => logWater.mutate(option.oz)}
               disabled={logWater.isPending}
-              className="flex flex-col h-auto py-2 px-1 bg-white hover:bg-blue-50 border-blue-200"
+              className={`flex flex-col h-auto bg-white hover:bg-blue-50 border-blue-200 touch-feedback ${
+                isMobile ? 'py-3 px-2' : 'py-2 px-1'
+              }`}
             >
-              <GlassWater className="h-4 w-4 text-blue-500 mb-1" />
-              <span className="font-medium text-xs">{option.label}</span>
+              <GlassWater className={`text-blue-500 mb-1 ${isMobile ? 'h-5 w-5' : 'h-4 w-4'}`} />
+              <span className={`font-medium ${isMobile ? 'text-sm' : 'text-xs'}`}>{option.label}</span>
             </Button>
           ))}
         </div>
 
-        {/* Custom amount */}
-        <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-blue-100">
+        {/* Custom amount - larger on mobile */}
+        <div className={`flex items-center gap-2 bg-white rounded-lg border border-blue-100 ${
+          isMobile ? 'p-3' : 'p-2'
+        }`}>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setCustomAmount(Math.max(1, customAmount - 4))}
-            className="h-8 w-8 p-0"
+            className={`p-0 touch-feedback ${isMobile ? 'h-10 w-10' : 'h-8 w-8'}`}
           >
-            <Minus className="h-4 w-4" />
+            <Minus className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
           </Button>
           <div className="flex-1 text-center">
-            <span className="font-bold text-blue-600">{customAmount}</span>
-            <span className="text-muted-foreground text-sm"> oz</span>
+            <span className={`font-bold text-blue-600 ${isMobile ? 'text-xl' : 'text-base'}`}>{customAmount}</span>
+            <span className={`text-muted-foreground ${isMobile ? 'text-base' : 'text-sm'}`}> oz</span>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setCustomAmount(customAmount + 4)}
-            className="h-8 w-8 p-0"
+            className={`p-0 touch-feedback ${isMobile ? 'h-10 w-10' : 'h-8 w-8'}`}
           >
-            <Plus className="h-4 w-4" />
+            <Plus className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
           </Button>
           <Button
             size="sm"
             onClick={() => logWater.mutate(customAmount)}
             disabled={logWater.isPending}
-            className="bg-blue-500 hover:bg-blue-600"
+            className={`bg-blue-500 hover:bg-blue-600 touch-feedback ${isMobile ? 'h-10 px-4' : ''}`}
           >
             {logWater.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className={`animate-spin ${isMobile ? 'h-5 w-5' : 'h-4 w-4'}`} />
             ) : (
-              <Plus className="h-4 w-4" />
+              <Plus className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
             )}
           </Button>
         </div>

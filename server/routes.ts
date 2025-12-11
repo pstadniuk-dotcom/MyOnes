@@ -4482,6 +4482,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const userTimezone = user?.timezone || 'America/New_York';
       const today = getUserLocalMidnight(userTimezone);
       const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      // End of day for upper bound comparisons (23:59:59.999)
+      const todayEnd = new Date(todayStart);
+      todayEnd.setHours(23, 59, 59, 999);
       
       // Calculate week boundaries (Sunday-Saturday)
       const dayOfWeek = today.getDay();
@@ -4552,7 +4555,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Check if today's workout was logged
       const todayWorkoutCompleted = workoutLogs.some(log => {
         const logDate = new Date(log.completedAt);
-        return logDate >= todayStart && logDate <= today;
+        return logDate >= todayStart && logDate <= todayEnd;
       });
 
       // Find today's meals from nutrition plan
@@ -4622,7 +4625,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Count workouts this week from workout logs (more accurate than daily logs)
       const weekWorkoutLogs = workoutLogs.filter(log => {
         const logDate = new Date(log.completedAt);
-        return logDate >= weekStart && logDate <= today;
+        return logDate >= weekStart && logDate <= todayEnd;
       });
       
       // Get planned workouts per week from plan
@@ -8748,6 +8751,14 @@ Return ONLY the JSON, no explanation.`
         return res.status(400).json({ error: 'logId is required' });
       }
 
+      // First, get the log to find its date (for daily log update)
+      const allLogs = await storage.getAllWorkoutLogs(userId);
+      const logToDelete = allLogs.find(log => log.id === logId);
+      
+      if (!logToDelete) {
+        return res.status(404).json({ error: 'Workout log not found or not authorized' });
+      }
+
       const deleted = await storage.deleteWorkoutLog(userId, logId);
 
       if (!deleted) {
@@ -8755,6 +8766,35 @@ Return ONLY the JSON, no explanation.`
       }
 
       console.log('🗑️ Workout log deleted:', { userId, logId });
+
+      // BUG-019 FIX: Check if any other workout logs exist for this date
+      // If not, update daily log to set workoutCompleted: false
+      try {
+        const logDate = new Date(logToDelete.completedAt);
+        const logDateStart = new Date(logDate);
+        logDateStart.setHours(0, 0, 0, 0);
+        const logDateEnd = new Date(logDateStart);
+        logDateEnd.setHours(23, 59, 59, 999);
+
+        // Check if any other workout logs exist for this date
+        const remainingLogsForDate = allLogs.filter(log => {
+          if (log.id === logId) return false; // Exclude the deleted one
+          const d = new Date(log.completedAt);
+          return d >= logDateStart && d <= logDateEnd;
+        });
+
+        if (remainingLogsForDate.length === 0) {
+          // No more workouts for this date - update daily log
+          const dailyLog = await storage.getDailyLog(userId, logDateStart);
+          if (dailyLog && dailyLog.workoutCompleted) {
+            await storage.updateDailyLog(dailyLog.id, { workoutCompleted: false });
+            console.log('📅 Updated daily log workoutCompleted to false for:', logDateStart.toISOString().split('T')[0]);
+          }
+        }
+      } catch (dailyLogError) {
+        console.warn('⚠️ Could not update daily log after deletion (non-fatal):', dailyLogError);
+      }
+
       res.json({ success: true });
     } catch (error) {
       console.error('❌ Error deleting workout log:', error);

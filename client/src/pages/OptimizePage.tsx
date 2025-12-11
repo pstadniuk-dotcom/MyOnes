@@ -188,15 +188,15 @@ export default function OptimizePage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl space-y-6">
+    <div className="container mx-auto px-4 md:p-6 max-w-7xl space-y-6">
 
       {/* Header Section */}
       <div className="flex flex-col gap-6">
         <div>
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
             Optimize
           </h1>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground text-base md:text-lg">
             Your AI-powered health optimization dashboard
           </p>
         </div>

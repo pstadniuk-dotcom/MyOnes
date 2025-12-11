@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileScrollableTabs } from '@/components/mobile';
 import { 
   Salad, 
   Sparkles,
@@ -82,6 +84,7 @@ const getPlanStartDate = (createdAt?: string) => {
 export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: NutritionPlanTabProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   
   // Check for view=log URL parameter to auto-switch to log tab
   const getViewParam = () => {
@@ -217,6 +220,9 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
         description: "Please try again later.",
         variant: "destructive",
       });
+      // Clear any pending recipe state on error
+      setViewingRecipe(null);
+      setIsRecipeOpen(false);
     }
   });
 
@@ -530,36 +536,70 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
         </CardHeader>
         <CardContent>
           <Tabs value={activeDay} onValueChange={setActiveDay} className="space-y-6">
-            {/* Day Selector */}
-            <TabsList className="w-full grid grid-cols-7 gap-2 bg-transparent p-0 h-auto">
-              {weekTabs.map((day, idx) => {
-                const isToday = idx === new Date().getDay() - 1 || (new Date().getDay() === 0 && idx === 6);
-                
-                return (
-                  <TabsTrigger
-                    key={day.value}
-                    value={day.value}
-                    className={`
-                      flex flex-col gap-2 p-3 rounded-xl border-2 transition-all
-                      data-[state=active]:border-primary data-[state=active]:bg-primary/5
-                      ${isToday ? 'ring-2 ring-primary/20' : ''}
-                    `}
-                  >
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {day.tabLabel}
-                    </span>
-                    <span className="text-sm font-semibold">
-                      {day.dateLabel.split(' ')[1]}
-                    </span>
-                    {isToday && (
-                      <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-primary/10 text-primary">
-                        Today
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
+            {/* Day Selector - Scrollable on mobile */}
+            {isMobile ? (
+              <MobileScrollableTabs>
+                <TabsList className="flex gap-2 bg-transparent p-0 h-auto w-max">
+                  {weekTabs.map((day, idx) => {
+                    const isToday = idx === new Date().getDay() - 1 || (new Date().getDay() === 0 && idx === 6);
+                    
+                    return (
+                      <TabsTrigger
+                        key={day.value}
+                        value={day.value}
+                        className={`
+                          flex flex-col gap-1.5 p-3 rounded-xl border-2 transition-all snap-start min-w-[72px]
+                          data-[state=active]:border-primary data-[state=active]:bg-primary/5
+                          ${isToday ? 'ring-2 ring-primary/20' : ''}
+                        `}
+                      >
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {day.tabLabel}
+                        </span>
+                        <span className="text-sm font-semibold">
+                          {day.dateLabel.split(' ')[1]}
+                        </span>
+                        {isToday && (
+                          <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-primary/10 text-primary">
+                            Today
+                          </Badge>
+                        )}
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+              </MobileScrollableTabs>
+            ) : (
+              <TabsList className="w-full grid grid-cols-7 gap-2 bg-transparent p-0 h-auto">
+                {weekTabs.map((day, idx) => {
+                  const isToday = idx === new Date().getDay() - 1 || (new Date().getDay() === 0 && idx === 6);
+                  
+                  return (
+                    <TabsTrigger
+                      key={day.value}
+                      value={day.value}
+                      className={`
+                        flex flex-col gap-2 p-3 rounded-xl border-2 transition-all
+                        data-[state=active]:border-primary data-[state=active]:bg-primary/5
+                        ${isToday ? 'ring-2 ring-primary/20' : ''}
+                      `}
+                    >
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {day.tabLabel}
+                      </span>
+                      <span className="text-sm font-semibold">
+                        {day.dateLabel.split(' ')[1]}
+                      </span>
+                      {isToday && (
+                        <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-primary/10 text-primary">
+                          Today
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            )}
 
             {/* Day Content */}
                 {weekTabs.map((day) => (
