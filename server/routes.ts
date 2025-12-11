@@ -2598,6 +2598,116 @@ export async function registerRoutes(
     res.json({ message: 'Logged out successfully' });
   });
 
+  // Forgot password - send reset email
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      // Rate limit: 3 requests per 15 minutes per IP
+      const clientIP = getClientIP(req);
+      const rateLimit = checkRateLimit(`forgot-password-${clientIP}`, 3, 15 * 60 * 1000);
+      if (!rateLimit.allowed) {
+        return res.status(429).json({ 
+          error: 'Too many password reset requests. Please try again later.',
+          retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
+        });
+      }
+
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+      
+      // Always return success to prevent email enumeration
+      if (!user) {
+        console.log(`Password reset requested for non-existent email: ${email}`);
+        return res.json({ message: 'If an account exists with this email, a password reset link has been sent.' });
+      }
+
+      // Generate reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+
+      // Store token in database
+      await storage.createPasswordResetToken(user.id, resetToken, expiresAt);
+
+      // Send reset email
+      const resetUrl = `${process.env.FRONTEND_URL || 'https://my-ones.vercel.app'}/reset-password?token=${resetToken}`;
+      
+      try {
+        await sendNotificationEmail({
+          to: user.email,
+          subject: 'Reset Your ONES Password',
+          type: 'system',
+          title: 'Password Reset Request',
+          content: `
+            <p>Hi ${user.name},</p>
+            <p>We received a request to reset your password for your ONES account.</p>
+            <p>Click the button below to reset your password:</p>
+          `,
+          actionUrl: resetUrl,
+          actionText: 'Reset Password',
+        });
+        console.log(`Password reset email sent to: ${user.email}`);
+      } catch (emailError) {
+        console.error('Failed to send password reset email:', emailError);
+        // Don't expose email sending failure to user
+      }
+
+      res.json({ message: 'If an account exists with this email, a password reset link has been sent.' });
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ error: 'Failed to process password reset request' });
+    }
+  });
+
+  // Reset password with token
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      
+      if (!token || !password) {
+        return res.status(400).json({ error: 'Token and password are required' });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+
+      // Find and validate token
+      const resetToken = await storage.getPasswordResetToken(token);
+      
+      if (!resetToken) {
+        return res.status(400).json({ error: 'Invalid or expired reset link' });
+      }
+
+      if (resetToken.used) {
+        return res.status(400).json({ error: 'This reset link has already been used' });
+      }
+
+      if (new Date() > resetToken.expiresAt) {
+        return res.status(400).json({ error: 'This reset link has expired' });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Update user password
+      await storage.updateUserPassword(resetToken.userId, hashedPassword);
+
+      // Mark token as used
+      await storage.markPasswordResetTokenUsed(token);
+
+      console.log(`Password reset successful for user: ${resetToken.userId}`);
+      res.json({ message: 'Password reset successful. You can now log in with your new password.' });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ error: 'Failed to reset password' });
+    }
+  });
+
   app.get('/api/auth/me', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!; // TypeScript assertion: userId is guaranteed to be set after requireAuth

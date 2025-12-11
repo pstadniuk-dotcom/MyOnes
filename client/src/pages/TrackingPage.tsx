@@ -190,10 +190,10 @@ export default function TrackingPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-6xl mx-auto space-y-6" data-testid="page-tracking">
+      <div className="w-full px-4 py-4 md:max-w-6xl md:mx-auto space-y-4 md:space-y-6" data-testid="page-tracking">
         <div>
-          <h1 className="text-2xl font-semibold text-[#1B4332] mb-1">Tracking</h1>
-          <p className="text-[#52796F]">Monitor your daily progress and streaks</p>
+          <h1 className="text-xl md:text-2xl font-semibold text-[#1B4332] mb-1">Tracking</h1>
+          <p className="text-sm md:text-base text-[#52796F]">Monitor your daily progress</p>
         </div>
         <TrackingSkeleton />
       </div>
@@ -201,23 +201,23 @@ export default function TrackingPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6" data-testid="page-tracking">
+    <div className="w-full px-4 py-4 md:max-w-6xl md:mx-auto space-y-4 md:space-y-6" data-testid="page-tracking">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-[#1B4332] mb-1">Tracking</h1>
-        <p className="text-[#52796F]">Monitor your daily progress and streaks</p>
+        <h1 className="text-xl md:text-2xl font-semibold text-[#1B4332] mb-1">Tracking</h1>
+        <p className="text-sm md:text-base text-[#52796F]">Monitor your daily progress</p>
       </div>
 
       {hasData ? (
         <div className="space-y-4">
           {/* Section Header */}
-          <h2 className="text-lg font-semibold text-[#1B4332] flex items-center gap-2">
+          <h2 className="text-base md:text-lg font-semibold text-[#1B4332] flex items-center gap-2">
             <Activity className="h-5 w-5" />
             Today's Wellness
           </h2>
           
           {/* Main Layout: Today at a Glance + Smart Streak Card */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             <TodayAtGlanceCard 
               data={wellness.today}
               trackingPrefs={prefs}
@@ -257,11 +257,11 @@ export default function TrackingPage() {
       ) : (
         // Empty state for users without tracking data
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-[#1B4332] flex items-center gap-2">
+          <h2 className="text-base md:text-lg font-semibold text-[#1B4332] flex items-center gap-2">
             <Activity className="h-5 w-5" />
             Get Started with Tracking
           </h2>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             <TodayAtGlanceEmpty />
             <SmartStreakCardEmpty />
           </div>

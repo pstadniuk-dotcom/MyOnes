@@ -386,18 +386,18 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
     <div className="space-y-6">
       {/* Main Tab Navigation */}
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
-          <TabsTrigger value="plan" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="plan" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
             <ClipboardList className="h-4 w-4" />
             <span className="hidden sm:inline">Meal Plan</span>
             <span className="sm:hidden">Plan</span>
           </TabsTrigger>
-          <TabsTrigger value="log" className="flex items-center gap-2">
+          <TabsTrigger value="log" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
             <Utensils className="h-4 w-4" />
             <span className="hidden sm:inline">Log Meals</span>
             <span className="sm:hidden">Log</span>
           </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
+          <TabsTrigger value="history" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
             <History className="h-4 w-4" />
             <span>History</span>
           </TabsTrigger>
@@ -406,9 +406,9 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
         {/* ===== MEAL PLAN TAB ===== */}
         <TabsContent value="plan" className="space-y-6 mt-0">
           {/* Header Actions */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
                   Active Plan
                 </Badge>
@@ -420,25 +420,29 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
                 Week of {weekRangeLabel}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
               <Button 
                 variant="outline"
                 onClick={() => setShowGroceryList(true)}
-                className="shadow-sm"
+                className="shadow-sm flex-1 sm:flex-none"
+                size="sm"
               >
                 <ShoppingBasket className="mr-2 h-4 w-4" />
-                Grocery List
+                <span className="hidden sm:inline">Grocery List</span>
+                <span className="sm:hidden">Groceries</span>
               </Button>
               <Button 
                 variant="outline" 
                 onClick={() => generatePlan.mutate()}
                 disabled={generatePlan.isPending}
-                className="shadow-sm"
+                className="shadow-sm flex-1 sm:flex-none"
+                size="sm"
               >
                 {generatePlan.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Regenerating...
+                    <span className="hidden sm:inline">Regenerating...</span>
+                    <span className="sm:hidden">...</span>
                   </>
                 ) : (
                   <>

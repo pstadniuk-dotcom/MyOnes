@@ -12,7 +12,7 @@ import {
   researchCitations, wearableConnections, appSettings, reviewSchedules,
   optimizePlans, optimizeDailyLogs, workoutPlans, workouts, workoutLogs, workoutPreferences,
   mealPlans, recipes, mealLogs, groceryLists, optimizeSmsPreferences, trackingPreferences, userStreaks,
-  dailyCompletions, weeklySummaries, exerciseRecords,
+  dailyCompletions, weeklySummaries, exerciseRecords, passwordResetTokens,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -65,6 +65,12 @@ export interface IStorage {
   listAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
+  updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
+  
+  // Password reset operations
+  createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
+  getPasswordResetToken(token: string): Promise<{ userId: string; expiresAt: Date; used: boolean } | undefined>;
+  markPasswordResetTokenUsed(token: string): Promise<void>;
   
   // Health Profile operations
   getHealthProfile(userId: string): Promise<HealthProfile | undefined>;
@@ -535,6 +541,62 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error updating user:', error);
       return undefined;
+    }
+  }
+
+  async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
+    try {
+      await db
+        .update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.id, userId));
+    } catch (error) {
+      console.error('Error updating user password:', error);
+      throw error;
+    }
+  }
+
+  // Password reset operations
+  async createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void> {
+    try {
+      await db.insert(passwordResetTokens).values({
+        userId,
+        token,
+        expiresAt,
+      });
+    } catch (error) {
+      console.error('Error creating password reset token:', error);
+      throw error;
+    }
+  }
+
+  async getPasswordResetToken(token: string): Promise<{ userId: string; expiresAt: Date; used: boolean } | undefined> {
+    try {
+      const [result] = await db
+        .select()
+        .from(passwordResetTokens)
+        .where(eq(passwordResetTokens.token, token));
+      if (!result) return undefined;
+      return {
+        userId: result.userId,
+        expiresAt: result.expiresAt,
+        used: result.used,
+      };
+    } catch (error) {
+      console.error('Error getting password reset token:', error);
+      return undefined;
+    }
+  }
+
+  async markPasswordResetTokenUsed(token: string): Promise<void> {
+    try {
+      await db
+        .update(passwordResetTokens)
+        .set({ used: true })
+        .where(eq(passwordResetTokens.token, token));
+    } catch (error) {
+      console.error('Error marking password reset token as used:', error);
+      throw error;
     }
   }
 

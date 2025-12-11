@@ -44,9 +44,11 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
   useEffect(() => {
     if (isMobile && scrollRef.current && todayIndex >= 0) {
       const scrollContainer = scrollRef.current;
-      const cardWidth = 280 + 12; // card width + gap
+      // Use container width for responsive card sizing
+      const containerWidth = scrollContainer.offsetWidth;
+      const cardWidth = Math.min(containerWidth - 32, 320) + 12; // card width + gap
       scrollContainer.scrollTo({
-        left: todayIndex * cardWidth - 16, // offset for padding
+        left: todayIndex * cardWidth,
         behavior: 'smooth'
       });
       setActiveIndex(todayIndex);
@@ -57,7 +59,8 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
   const handleScroll = () => {
     if (scrollRef.current) {
       const scrollLeft = scrollRef.current.scrollLeft;
-      const cardWidth = 280 + 12;
+      const containerWidth = scrollRef.current.offsetWidth;
+      const cardWidth = Math.min(containerWidth - 32, 320) + 12;
       const newIndex = Math.round(scrollLeft / cardWidth);
       if (newIndex !== activeIndex && newIndex >= 0 && newIndex < weekPlan.length) {
         setActiveIndex(newIndex);
@@ -73,7 +76,7 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
         <div 
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex overflow-x-auto snap-x-mandatory gap-3 pb-2 -mx-4 px-4 scrollbar-hide"
+          className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 scrollbar-hide"
         >
           {weekPlan.map((day: any, index: number) => {
             const dayDate = weekDates[index];
@@ -83,7 +86,7 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
             return (
               <div
                 key={index}
-                className="snap-start flex-shrink-0 w-[280px]"
+                className="snap-start flex-shrink-0 w-[calc(100vw-4rem)] max-w-[320px]"
               >
                 <Card 
                   className={cn(
@@ -161,9 +164,10 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
               key={i}
               onClick={() => {
                 if (scrollRef.current) {
-                  const cardWidth = 280 + 12;
+                  const containerWidth = scrollRef.current.offsetWidth;
+                  const cardWidth = Math.min(containerWidth - 32, 320) + 12;
                   scrollRef.current.scrollTo({
-                    left: i * cardWidth - 16,
+                    left: i * cardWidth,
                     behavior: 'smooth'
                   });
                 }

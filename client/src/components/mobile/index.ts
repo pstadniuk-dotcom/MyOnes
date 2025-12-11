@@ -11,3 +11,9 @@ export {
   ResponsiveDialogFooter,
   ResponsiveDialogClose,
 } from './ResponsiveDialog';
+export {
+  MobilePageWrapper,
+  MobilePageHeader,
+  MobileSection,
+  MobileFullWidthCard,
+} from './MobilePageWrapper';

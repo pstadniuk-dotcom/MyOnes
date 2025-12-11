@@ -1,12 +1,12 @@
-import { Home, Sparkles, ClipboardList, User } from 'lucide-react';
+import { MessageSquare, FlaskConical, Sparkles, ClipboardList } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/dashboard', icon: Home, label: 'Home', exact: true },
+  { href: '/dashboard/chat', icon: MessageSquare, label: 'AI Chat', exact: false },
+  { href: '/dashboard/formula', icon: FlaskConical, label: 'Formula', exact: false },
   { href: '/dashboard/optimize', icon: Sparkles, label: 'Optimize', exact: false },
   { href: '/dashboard/optimize/tracking', icon: ClipboardList, label: 'Log', exact: true },
-  { href: '/dashboard/profile', icon: User, label: 'Profile', exact: false },
 ];
 
 export function MobileBottomNav() {
@@ -21,6 +21,10 @@ export function MobileBottomNav() {
     if (item.href === '/dashboard/optimize') {
       return location.startsWith('/dashboard/optimize') && !location.includes('/tracking');
     }
+    // For chat, also match consultation
+    if (item.href === '/dashboard/chat') {
+      return location === '/dashboard/chat' || location === '/dashboard/consultation';
+    }
     return location.startsWith(item.href);
   };
   
@@ -30,7 +34,7 @@ export function MobileBottomNav() {
       role="navigation"
       aria-label="Main navigation"
     >
-      <div className="flex items-center justify-around h-16 px-2 max-w-lg mx-auto">
+      <div className="flex items-center justify-around h-16 px-1">
         {navItems.map((item) => {
           const active = isActive(item);
           
@@ -38,8 +42,8 @@ export function MobileBottomNav() {
             <Link key={item.href} href={item.href}>
               <button
                 className={cn(
-                  "flex flex-col items-center justify-center w-16 h-14 rounded-xl transition-all duration-200",
-                  "touch-feedback",
+                  "flex flex-col items-center justify-center flex-1 h-14 rounded-xl transition-all duration-200",
+                  "touch-feedback min-w-0",
                   active 
                     ? "text-[#1B4332]" 
                     : "text-[#52796F] hover:text-[#1B4332]"
@@ -49,12 +53,12 @@ export function MobileBottomNav() {
               >
                 <item.icon 
                   className={cn(
-                    "h-6 w-6 mb-0.5 transition-all duration-200",
+                    "h-5 w-5 mb-0.5 transition-all duration-200",
                     active && "stroke-[2.5]"
                   )} 
                 />
                 <span className={cn(
-                  "text-[10px] leading-tight",
+                  "text-[10px] leading-tight truncate max-w-full px-1",
                   active ? "font-semibold" : "font-medium"
                 )}>
                   {item.label}
