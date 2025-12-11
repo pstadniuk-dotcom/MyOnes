@@ -995,7 +995,7 @@ export default function ConsultationPage() {
   console.log('🔍 RENDER STATE - isTyping:', isTyping, 'thinkingMessage:', thinkingMessage);
 
   return (
-    <div className="flex h-full min-h-dvh md:max-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
+    <div className="flex h-full min-h-[calc(100dvh-8rem)] md:min-h-dvh md:max-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
       {/* History Sidebar - Hidden on mobile, shown on desktop */}
       {showHistory && (
         <div className="hidden md:flex w-80 border-r bg-background/80 backdrop-blur-sm flex-col">

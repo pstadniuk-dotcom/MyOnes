@@ -42,22 +42,28 @@ app.use((req, res, next) => {
 
 // CORS middleware - SECURITY: Only allow explicit origins (no wildcard fallback)
 const isProduction = process.env.NODE_ENV === 'production';
-const allowedOrigins = [
+const allowedOriginsList = [
   'https://my-ones.vercel.app',
   'https://myones.ai',
   'https://www.myones.ai',
-  // Vercel preview deployments - add specific ones as needed
-  'https://my-ones-jnsk1y9e1-pstadniuk-dotcoms-projects.vercel.app',
-  'https://my-ones-210a7gjcx-pstadniuk-dotcoms-projects.vercel.app',
   // Local development only
   ...(!isProduction ? ['http://localhost:5000', 'http://localhost:5173', 'http://127.0.0.1:5000', 'http://127.0.0.1:5173'] : [])
 ];
 
+// Check if origin is allowed (includes Vercel preview deployments)
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return false;
+  if (allowedOriginsList.includes(origin)) return true;
+  // Allow all Vercel preview deployments for this project
+  if (origin.match(/^https:\/\/my-ones(-[a-z0-9]+)?(-pstadniuk-dotcoms-projects)?\.vercel\.app$/)) return true;
+  return false;
+}
+
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+  if (isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin!);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma');
@@ -67,7 +73,7 @@ app.use((req, res, next) => {
   
   // Handle preflight
   if (req.method === 'OPTIONS') {
-    if (origin && allowedOrigins.includes(origin)) {
+    if (isAllowedOrigin(origin)) {
       return res.sendStatus(200);
     }
     // Don't explicitly reject - just don't set CORS headers

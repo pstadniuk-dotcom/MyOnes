@@ -112,14 +112,14 @@ export default function HomePage() {
   const { metrics, profileChecklist, currentFormula, isNewUser } = dashboardData || {};
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6" data-testid="page-home">
+    <div className="w-full px-4 py-4 md:max-w-6xl md:mx-auto space-y-4 md:space-y-6" data-testid="page-home">
       {/* Personal Greeting - V2 Branding */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-[#1B4332] mb-1" data-testid="text-greeting">
+          <h1 className="text-xl md:text-3xl font-semibold text-[#1B4332] mb-1" data-testid="text-greeting">
             Long live {userName}.
           </h1>
-          <p className="text-[#52796F]">
+          <p className="text-sm md:text-base text-[#52796F]">
             {isNewUser 
               ? "Start your personalized supplement journey" 
               : "Your health journey overview"
@@ -129,7 +129,7 @@ export default function HomePage() {
       </div>
 
       {/* Quick Stats - V2 Styled Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-3">
         {/* Profile Completeness */}
         <Card 
           data-testid="card-profile-completeness" 

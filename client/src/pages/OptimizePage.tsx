@@ -188,15 +188,15 @@ export default function OptimizePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 md:p-6 max-w-7xl space-y-6">
+    <div className="w-full px-4 py-4 md:container md:mx-auto md:p-6 md:max-w-7xl space-y-4 md:space-y-6">
 
       {/* Header Section */}
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 md:gap-6">
         <div>
-          <h1 className="text-2xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-xl md:text-4xl font-bold mb-1 md:mb-2 bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
             Optimize
           </h1>
-          <p className="text-muted-foreground text-base md:text-lg">
+          <p className="text-muted-foreground text-sm md:text-lg">
             Your AI-powered health optimization dashboard
           </p>
         </div>
@@ -206,25 +206,25 @@ export default function OptimizePage() {
       <Tabs value={activePlanTab} onValueChange={(value) => {
         setActivePlanTab(value as typeof activePlanTab);
         navigate(`/dashboard/optimize/${value}`);
-      }} className="space-y-8">
-        <TabsList className="h-auto w-full rounded-xl border bg-muted/20 p-1 grid grid-cols-2 md:grid-cols-3 gap-1">
+      }} className="space-y-4 md:space-y-8">
+        <TabsList className="h-auto w-full rounded-xl border bg-muted/20 p-1 grid grid-cols-3 gap-1">
           {planSections.map((section) => {
             const Icon = section.icon;
             return (
               <TabsTrigger
                 key={section.key}
                 value={section.key}
-                className="w-full justify-start rounded-lg border border-transparent px-3 py-2 text-left transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                className="w-full justify-center md:justify-start rounded-lg border border-transparent px-2 md:px-3 py-2 text-center md:text-left transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
               >
-                <div className="flex items-center gap-2.5 overflow-hidden">
-                  <div className={`h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0 ${
+                <div className="flex flex-col md:flex-row items-center gap-1 md:gap-2.5 overflow-hidden">
+                  <div className={`h-7 w-7 md:h-8 md:w-8 rounded-md flex items-center justify-center flex-shrink-0 ${
                     activePlanTab === section.key ? section.badgeClass : 'bg-muted text-muted-foreground'
                   }`}>
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-3.5 w-3.5 md:h-4 md:w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-foreground truncate">{section.title}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">{section.description}</p>
+                    <p className="text-xs md:text-sm font-semibold text-foreground truncate">{section.title}</p>
+                    <p className="text-[9px] md:text-[10px] text-muted-foreground truncate hidden md:block">{section.description}</p>
                   </div>
                 </div>
               </TabsTrigger>
@@ -232,8 +232,8 @@ export default function OptimizePage() {
           })}
         </TabsList>
 
-        {/* Reminders Setup Prompt */}
-        <Card className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 border-none">
+        {/* Reminders Setup Prompt - Hidden on mobile to save space */}
+        <Card className="hidden md:block bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 border-none">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -284,8 +284,8 @@ export default function OptimizePage() {
           </CardContent>
         </Card>
         {planSections.map((section) => (
-          <TabsContent key={section.key} value={section.key} className="mt-0 space-y-6">
-            <div className="rounded-3xl border bg-card/70 p-6 shadow-sm">
+          <TabsContent key={section.key} value={section.key} className="mt-0 space-y-4 md:space-y-6">
+            <div className="rounded-xl md:rounded-3xl border bg-card/70 p-3 md:p-6 shadow-sm">
               {section.content}
             </div>
           </TabsContent>

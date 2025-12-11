@@ -1,12 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Progress } from '@/components/ui/progress';
-import { Dumbbell, Sparkles, Calendar, History, BarChart3, PlayCircle, Info, ExternalLink, Shuffle, Edit, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Dumbbell, Sparkles, Calendar, History, BarChart3, PlayCircle, Info, ExternalLink, Shuffle, CheckCircle2, XCircle, Clock, Zap } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +13,9 @@ import { WorkoutSchedule } from './workout/WorkoutSchedule';
 import { WorkoutHistory } from './workout/WorkoutHistory';
 import { WorkoutAnalytics } from './workout/WorkoutAnalytics';
 import { WorkoutPreferencesDialog } from './workout/WorkoutPreferencesDialog';
-import { DynamicExerciseLogger } from './workout/DynamicExerciseLogger';
+import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 interface WorkoutPlanTabProps {
   plan: any;
@@ -28,53 +28,17 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showPreferences, setShowPreferences] = useState(false);
-  const [loggingExercise, setLoggingExercise] = useState<any>(null);
-  const [completedExercises, setCompletedExercises] = useState<Record<string, any>>({});
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(-1);
   const [playingVideo, setPlayingVideo] = useState<{ id: string; title: string } | null>(null);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('schedule');
-  const [showIncompleteAlert, setShowIncompleteAlert] = useState(false);
-
-  // Generate a stable key for workout progress storage
-  // Uses plan ID + day name since workout.id might not exist
-  const getWorkoutStorageKey = (workout: any, dayIndex: number) => {
-    const planId = plan?.id || 'unknown';
-    const dayName = workout?.dayName || `day_${dayIndex}`;
-    return `workout_progress_${planId}_${dayName}`;
-  };
-
-  // Load progress from local storage when workout is selected
-  useEffect(() => {
-    if (selectedWorkout && selectedDayIndex !== -1 && plan?.id) {
-      const key = getWorkoutStorageKey(selectedWorkout, selectedDayIndex);
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          console.log('📂 Loaded workout progress from storage:', key, parsed);
-          setCompletedExercises(parsed);
-        } catch (e) {
-          console.error("Failed to parse saved workout progress", e);
-          setCompletedExercises({});
-        }
-      } else {
-        setCompletedExercises({});
-      }
-    }
-  }, [selectedWorkout?.dayName, selectedDayIndex, plan?.id]);
-
-  // Save progress to local storage whenever it changes
-  useEffect(() => {
-    if (selectedWorkout && selectedDayIndex !== -1 && plan?.id) {
-      const key = getWorkoutStorageKey(selectedWorkout, selectedDayIndex);
-      if (Object.keys(completedExercises).length > 0) {
-        console.log('💾 Saving workout progress to storage:', key, completedExercises);
-        localStorage.setItem(key, JSON.stringify(completedExercises));
-      }
-    }
-  }, [completedExercises, selectedWorkout?.dayName, selectedDayIndex, plan?.id]);
+  const [showLogDialog, setShowLogDialog] = useState(false);
+  const [showSkipDialog, setShowSkipDialog] = useState(false);
+  const [logDuration, setLogDuration] = useState(45);
+  const [logDifficulty, setLogDifficulty] = useState(3);
+  const [logNotes, setLogNotes] = useState('');
+  const [skipReason, setSkipReason] = useState('');
 
   const { data: workoutLogsData } = useQuery<any>({
     queryKey: ['/api/optimize/workout/logs'],
@@ -149,21 +113,27 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
     },
   });
 
-  const finishWorkout = useMutation({
+  const logWorkout = useMutation({
     mutationFn: async () => {
-      const exercisesCompleted = Object.values(completedExercises);
-      
-      console.log('🏋️ Finishing workout with exercises:', exercisesCompleted);
-      console.log('📋 Completed exercises state:', completedExercises);
+      console.log('🏋️ Logging workout:', selectedWorkout?.workout?.name);
       
       const res = await apiRequest('POST', '/api/optimize/workout/logs', {
         workoutId: selectedWorkout?.workout?.id,
         workoutName: selectedWorkout?.workout?.name || selectedWorkout?.day || 'Workout',
         completedAt: new Date().toISOString(),
-        durationActual: selectedWorkout?.workout?.durationMinutes || 45,
-        difficultyRating: 3, // Default
-        notes: "Logged via Quick Log",
-        exercisesCompleted,
+        durationActual: logDuration,
+        difficultyRating: logDifficulty,
+        notes: logNotes || "Completed workout",
+        exercisesCompleted: selectedWorkout?.workout?.exercises?.map((ex: any) => ({
+          name: ex.name,
+          skipped: false,
+          sets: Array.from({ length: ex.sets || 3 }, (_, i) => ({
+            setNumber: i + 1,
+            completed: true,
+            reps: typeof ex.reps === 'string' ? parseInt(ex.reps) || 10 : ex.reps || 10,
+            weight: 0
+          }))
+        })) || [],
       });
       
       if (!res.ok) {
@@ -175,18 +145,66 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/analytics/workout'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
       
-      // Clear local storage for this workout using the same key function
-      if (selectedWorkout && selectedDayIndex !== -1 && plan?.id) {
-        const key = getWorkoutStorageKey(selectedWorkout, selectedDayIndex);
-        console.log('🗑️ Clearing workout progress from storage:', key);
-        localStorage.removeItem(key);
-      }
+      setShowLogDialog(false);
+      setLogDuration(45);
+      setLogDifficulty(3);
+      setLogNotes('');
+      setSelectedWorkout(null);
+      setSelectedDayIndex(-1);
       
-      setCompletedExercises({});
       toast({
-        title: 'Workout Logged!',
-        description: 'Great job! Your progress has been saved.',
+        title: '💪 Workout Logged!',
+        description: 'Great job completing your workout!',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  });
+
+  const skipWorkout = useMutation({
+    mutationFn: async () => {
+      console.log('⏭️ Skipping workout:', selectedWorkout?.workout?.name);
+      
+      const res = await apiRequest('POST', '/api/optimize/workout/logs', {
+        workoutId: selectedWorkout?.workout?.id,
+        workoutName: selectedWorkout?.workout?.name || selectedWorkout?.day || 'Workout',
+        completedAt: new Date().toISOString(),
+        durationActual: 0,
+        difficultyRating: 0,
+        notes: skipReason || "Skipped workout",
+        exercisesCompleted: selectedWorkout?.workout?.exercises?.map((ex: any) => ({
+          name: ex.name,
+          skipped: true,
+          sets: []
+        })) || [],
+        skipped: true,
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to skip workout');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/analytics/workout'] });
+      
+      setShowSkipDialog(false);
+      setSkipReason('');
+      setSelectedWorkout(null);
+      setSelectedDayIndex(-1);
+      
+      toast({
+        title: 'Workout Skipped',
+        description: 'Rest is important too. Stay consistent!',
       });
     },
     onError: (error: Error) => {
@@ -228,26 +246,16 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
   const handleWorkoutClick = (workout: any, index: number) => {
     setSelectedWorkout(workout);
     setSelectedDayIndex(index);
-    // Don't open dialog immediately, show details below instead
-    // setShowLogDialog(true);
+    // Set default duration from workout plan
+    setLogDuration(workout?.workout?.durationMinutes || 45);
   };
 
-  const handleWorkoutLogged = () => {
-    // Move to next unlogged workout
-    const weekPlan = plan?.content?.weekPlan || [];
-    
-    // Find next workout day (skip rest days)
-    for (let i = selectedDayIndex + 1; i < weekPlan.length; i++) {
-      if (!weekPlan[i].isRestDay) {
-        setSelectedWorkout(weekPlan[i]);
-        setSelectedDayIndex(i);
-        return;
-      }
-    }
-    
-    // If no more workouts this week, clear selection
-    setSelectedWorkout(null);
-    setSelectedDayIndex(-1);
+  const handleLogClick = () => {
+    setShowLogDialog(true);
+  };
+
+  const handleSkipClick = () => {
+    setShowSkipDialog(true);
   };
 
   const handleSwitchExercise = (exerciseIndex: number) => {
@@ -281,56 +289,6 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
       });
     } finally {
       setIsVideoLoading(false);
-    }
-  };
-
-  const handleSaveLog = (data: any) => {
-    if (!loggingExercise) return;
-    
-    setCompletedExercises(prev => ({
-      ...prev,
-      [loggingExercise.name]: {
-        name: loggingExercise.name,
-        skipped: false,
-        ...data
-      }
-    }));
-    setLoggingExercise(null);
-    toast({ 
-      title: "Exercise Logged", 
-      description: `${loggingExercise.name} saved.` 
-    });
-  };
-
-  const handleSkipExercise = (exerciseName: string) => {
-    setCompletedExercises(prev => ({
-      ...prev,
-      [exerciseName]: {
-        name: exerciseName,
-        skipped: true,
-        sets: [],
-        totalSets: 0,
-        completedSets: 0,
-        totalVolume: 0
-      }
-    }));
-    setLoggingExercise(null);
-    toast({ 
-      title: "Exercise Skipped", 
-      description: `${exerciseName} marked as skipped.`,
-      variant: "default"
-    });
-  };
-
-  const handleFinishClick = () => {
-    const totalExercises = selectedWorkout?.workout?.exercises?.length || 0;
-    const accountedFor = Object.keys(completedExercises).length;
-    
-    // Allow finishing if all exercises are accounted for (logged or skipped)
-    if (accountedFor < totalExercises) {
-      setShowIncompleteAlert(true);
-    } else {
-      finishWorkout.mutate();
     }
   };
 
@@ -369,18 +327,20 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
         </Card>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="schedule" className="flex items-center gap-2">
+          <TabsList className="w-full grid grid-cols-3">
+            <TabsTrigger value="schedule" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
               <Calendar className="h-4 w-4" />
-              Schedule
+              <span className="hidden sm:inline">Schedule</span>
+              <span className="sm:hidden">Plan</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
+            <TabsTrigger value="history" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
               <History className="h-4 w-4" />
               History
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <TabsTrigger value="analytics" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
               <BarChart3 className="h-4 w-4" />
-              Analytics
+              <span className="hidden sm:inline">Analytics</span>
+              <span className="sm:hidden">Stats</span>
             </TabsTrigger>
           </TabsList>
 
@@ -438,33 +398,27 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
                           {selectedWorkout.dayName} • {selectedWorkout.workout?.durationMinutes} min • {selectedWorkout.workout?.type}
                         </CardDescription>
                       </div>
-                      <Button 
-                        onClick={handleFinishClick} 
-                        size="lg"
-                        className="w-full sm:w-auto animate-in fade-in zoom-in duration-300"
-                        disabled={finishWorkout.isPending}
-                      >
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Finish Workout
-                      </Button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Progress</span>
-                        <span className="font-medium">
-                          {Object.values(completedExercises).filter((e: any) => !e.skipped).length} logged
-                          {Object.values(completedExercises).filter((e: any) => e.skipped).length > 0 && (
-                            <span className="text-orange-500 ml-1">
-                              • {Object.values(completedExercises).filter((e: any) => e.skipped).length} skipped
-                            </span>
-                          )}
-                          <span className="text-muted-foreground ml-1">
-                            / {selectedWorkout.workout?.exercises?.length || 0}
-                          </span>
-                        </span>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <Button 
+                          onClick={handleLogClick} 
+                          size="lg"
+                          className="flex-1 sm:flex-initial animate-in fade-in zoom-in duration-300 bg-green-600 hover:bg-green-700"
+                          disabled={logWorkout.isPending || skipWorkout.isPending}
+                        >
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          Log Workout
+                        </Button>
+                        <Button 
+                          onClick={handleSkipClick} 
+                          variant="outline"
+                          size="lg"
+                          className="flex-1 sm:flex-initial animate-in fade-in zoom-in duration-300 border-orange-300 text-orange-600 hover:bg-orange-50"
+                          disabled={logWorkout.isPending || skipWorkout.isPending}
+                        >
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Skip
+                        </Button>
                       </div>
-                      <Progress value={(Object.keys(completedExercises).length / (selectedWorkout.workout?.exercises?.length || 1)) * 100} className="h-2" />
                     </div>
                   </div>
                 </CardHeader>
@@ -500,32 +454,11 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
 
                       <div className="grid gap-3 md:grid-cols-2">
                         {selectedWorkout.workout?.exercises?.map((ex: any, i: number) => {
-                          const exerciseState = completedExercises[ex.name];
-                          const isLogged = exerciseState && !exerciseState.skipped;
-                          const isSkipped = exerciseState?.skipped;
-                          
                           return (
-                            <div key={i} className={`p-4 rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow ${isSkipped ? 'opacity-60 bg-orange-50/30' : ''}`}>
+                            <div key={i} className="p-4 rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow">
                               <div className="flex justify-between items-start mb-2">
                                 <div className="font-semibold text-lg flex-1">{ex.name}</div>
                                 <div className="flex items-center gap-2">
-                                  <Button
-                                    variant={exerciseState ? "default" : "outline"}
-                                    size="sm"
-                                    className={`h-7 px-2 text-xs gap-1 ${
-                                      isLogged ? "bg-green-600 hover:bg-green-700" : 
-                                      isSkipped ? "bg-orange-500 hover:bg-orange-600" : ""
-                                    }`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setLoggingExercise(ex);
-                                    }}
-                                  >
-                                    {isLogged ? <CheckCircle2 className="h-3 w-3" /> : 
-                                     isSkipped ? <AlertCircle className="h-3 w-3" /> : 
-                                     <Edit className="h-3 w-3" />}
-                                    {isLogged ? "Logged" : isSkipped ? "Skipped" : "Log"}
-                                  </Button>
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -643,52 +576,163 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!loggingExercise} onOpenChange={(open) => !open && setLoggingExercise(null)}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* Log Workout Dialog */}
+      <Dialog open={showLogDialog} onOpenChange={setShowLogDialog}>
+        <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
-            <DialogTitle>Log {loggingExercise?.name}</DialogTitle>
-            <DialogDescription className="flex items-center gap-2 mt-2">
-              <Info className="h-4 w-4 text-muted-foreground" />
-              {loggingExercise && (
-                <span className="text-sm">
-                  Prescribed: {loggingExercise.sets} sets × {loggingExercise.reps} reps
-                  {loggingExercise.weight && ` @ ${loggingExercise.weight} lbs`}
-                </span>
-              )}
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Log Workout
+            </DialogTitle>
+            <DialogDescription>
+              {selectedWorkout?.workout?.name} - {selectedWorkout?.dayName}
             </DialogDescription>
           </DialogHeader>
-          {loggingExercise && (
-            <DynamicExerciseLogger
-              exercise={loggingExercise}
-              onSave={handleSaveLog}
-              onSkip={handleSkipExercise}
-              onCancel={() => setLoggingExercise(null)}
-              initialData={completedExercises[loggingExercise.name]}
-            />
-          )}
+          
+          <div className="space-y-6 py-4">
+            {/* Duration */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <Label className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  Duration
+                </Label>
+                <span className="text-sm font-medium">{logDuration} min</span>
+              </div>
+              <Slider 
+                value={[logDuration]} 
+                min={10} 
+                max={120} 
+                step={5} 
+                onValueChange={(vals) => setLogDuration(vals[0])} 
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>10 min</span>
+                <span>60 min</span>
+                <span>120 min</span>
+              </div>
+            </div>
+
+            {/* Difficulty */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <Label className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-muted-foreground" />
+                  How hard was it?
+                </Label>
+                <span className="text-sm font-medium">
+                  {logDifficulty <= 2 ? 'Easy' : logDifficulty <= 4 ? 'Moderate' : 'Hard'}
+                </span>
+              </div>
+              <Slider 
+                value={[logDifficulty]} 
+                min={1} 
+                max={5} 
+                step={1} 
+                onValueChange={(vals) => setLogDifficulty(vals[0])} 
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Easy</span>
+                <span>Moderate</span>
+                <span>Hard</span>
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Textarea 
+                value={logNotes}
+                onChange={(e) => setLogNotes(e.target.value)}
+                placeholder="How did the workout feel? Any PRs?"
+                className="resize-none"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button 
+              variant="outline" 
+              className="flex-1"
+              onClick={() => setShowLogDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="flex-1 bg-green-600 hover:bg-green-700"
+              onClick={() => logWorkout.mutate()}
+              disabled={logWorkout.isPending}
+            >
+              {logWorkout.isPending ? 'Logging...' : 'Log Workout'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showIncompleteAlert} onOpenChange={setShowIncompleteAlert}>
-        <AlertDialogContent className="sm:max-w-[400px]">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Complete All Exercises</AlertDialogTitle>
-          </AlertDialogHeader>
-          <div className="mt-2 text-sm text-muted-foreground">
-            You have unlogged exercises in this workout. Please log all exercises before finishing the workout.
+      {/* Skip Workout Dialog */}
+      <Dialog open={showSkipDialog} onOpenChange={setShowSkipDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-orange-500" />
+              Skip Workout
+            </DialogTitle>
+            <DialogDescription>
+              {selectedWorkout?.workout?.name} - {selectedWorkout?.dayName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              That's okay! Rest days happen. Why are you skipping today?
+            </p>
+            
+            <div className="grid grid-cols-2 gap-2">
+              {['Tired / Recovery', 'Busy / No time', 'Feeling unwell', 'Other'].map((reason) => (
+                <Button
+                  key={reason}
+                  variant={skipReason === reason ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setSkipReason(reason)}
+                >
+                  {reason}
+                </Button>
+              ))}
+            </div>
+
+            <Textarea 
+              value={skipReason.startsWith('Other') || !['Tired / Recovery', 'Busy / No time', 'Feeling unwell', 'Other'].includes(skipReason) ? skipReason : ''}
+              onChange={(e) => setSkipReason(e.target.value)}
+              placeholder="Add a note (optional)"
+              className="resize-none"
+              rows={2}
+            />
           </div>
-          <AlertDialogFooter className="flex justify-end gap-2 mt-4">
-            <AlertDialogCancel asChild>
-              <Button variant="outline">Go Back</Button>
-            </AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button onClick={() => setShowIncompleteAlert(false)}>
-                Understood
-              </Button>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
+          <div className="flex gap-3 pt-2">
+            <Button 
+              variant="outline" 
+              className="flex-1"
+              onClick={() => {
+                setShowSkipDialog(false);
+                setSkipReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="outline"
+              className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
+              onClick={() => skipWorkout.mutate()}
+              disabled={skipWorkout.isPending}
+            >
+              {skipWorkout.isPending ? 'Skipping...' : 'Skip Workout'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

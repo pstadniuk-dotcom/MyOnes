@@ -133,11 +133,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Compact mobile header */}
         <MobileHeader />
         
-        {/* Main content with safe areas and bottom nav spacing */}
-        <main className="flex-1 overflow-auto safe-x pb-bottom-nav">
-          <div className="px-4 py-3">
-            {children}
-          </div>
+        {/* Main content - no extra padding, let pages control their own layout */}
+        <main className="flex-1 overflow-auto pb-20">
+          {children}
         </main>
         
         {/* Bottom navigation - thumb zone optimized */}

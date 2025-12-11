@@ -327,44 +327,50 @@ export default function MyFormulaPage() {
   }
 
   return (
-    <div className="space-y-6" data-testid="page-my-formula">
+    <div className="w-full px-4 py-4 md:px-0 space-y-4 md:space-y-6" data-testid="page-my-formula">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-formula-title">
+          <h1 className="text-xl md:text-3xl font-bold tracking-tight" data-testid="text-formula-title">
             My Formula
           </h1>
-          <p className="text-muted-foreground">
-            Your personalized supplement formula, optimized by Ones AI
+          <p className="text-sm md:text-base text-muted-foreground">
+            Your personalized supplement formula
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {selectedFormula && (
-            <Badge variant="secondary" className="text-sm" data-testid="badge-formula-version">
+            <Badge variant="secondary" className="text-xs sm:text-sm" data-testid="badge-formula-version">
               <FlaskConical className="w-3 h-3 mr-1" />
-              {selectedFormula.name || `Version ${selectedFormula.version}`}
-              {selectedFormula.id === currentFormula?.id && ' (Newest)'}
+              <span className="hidden sm:inline">{selectedFormula.name || `Version ${selectedFormula.version}`}</span>
+              <span className="sm:hidden">v{selectedFormula.version}</span>
+              {selectedFormula.id === currentFormula?.id && ' (New)'}
             </Badge>
           )}
           <Button 
             variant="default" 
-            className="gap-2 bg-primary hover:bg-primary/90" 
+            className="gap-1.5 sm:gap-2 bg-primary hover:bg-primary/90 text-xs sm:text-sm" 
+            size="sm"
             data-testid="button-order-formula"
             disabled={!selectedFormula}
             onClick={() => setShowOrderConfirmation(true)}
           >
             <ShoppingCart className="w-4 h-4" />
-            Order Your Formula
+            <span className="hidden sm:inline">Order Your Formula</span>
+            <span className="sm:hidden">Order</span>
           </Button>
         </div>
       </div>
 
       {/* Main Content Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="formulas" data-testid="tab-my-formulas">My Formulas</TabsTrigger>
-          <TabsTrigger value="ingredients" data-testid="tab-ingredients">Ingredients</TabsTrigger>
-          <TabsTrigger value="actions" data-testid="tab-actions">Actions</TabsTrigger>
+          <TabsTrigger value="formulas" className="text-xs sm:text-sm" data-testid="tab-my-formulas">
+            <span className="hidden sm:inline">My Formulas</span>
+            <span className="sm:hidden">Formulas</span>
+          </TabsTrigger>
+          <TabsTrigger value="ingredients" className="text-xs sm:text-sm" data-testid="tab-ingredients">Ingredients</TabsTrigger>
+          <TabsTrigger value="actions" className="text-xs sm:text-sm" data-testid="tab-actions">Actions</TabsTrigger>
         </TabsList>
 
         {/* My Formulas Tab - Grid of all formulas */}
