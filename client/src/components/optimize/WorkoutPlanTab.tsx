@@ -146,6 +146,7 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/analytics/workout'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
       
       setShowLogDialog(false);
       setLogDuration(45);
@@ -196,6 +197,8 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/analytics/workout'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
       
       setShowSkipDialog(false);
       setSkipReason('');
