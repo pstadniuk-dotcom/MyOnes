@@ -298,37 +298,37 @@ export default function AIChat() {
         )}
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t border-card-border">
+      {/* Input Area - Fixed at bottom on mobile */}
+      <div className="p-4 border-t border-card-border bg-background safe-bottom">
         <div className="flex space-x-2">
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Tell me about your health goals..."
-            className="flex-1"
+            className="flex-1 h-11 text-base"
             data-testid="input-chat-message"
           />
           <Button
             variant="outline"
             size="icon"
             onClick={handleVoiceInput}
-            className={`micro-bounce transition-all duration-300 ${isListening ? 'bg-red-500 text-white border-red-600 animate-pulse' : ''}`}
+            className={`h-11 w-11 micro-bounce transition-all duration-300 touch-feedback ${isListening ? 'bg-red-500 text-white border-red-600 animate-pulse' : ''}`}
             data-testid="button-voice-input"
           >
-            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </Button>
           <Button
             onClick={handleSendMessage}
             size="icon"
             disabled={!inputValue.trim() || isTyping}
-            className="micro-bounce micro-glow transition-all duration-300"
+            className="h-11 w-11 micro-bounce micro-glow transition-all duration-300 touch-feedback"
             data-testid="button-send-message"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-5 h-5" />
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-xs text-muted-foreground mt-2 hidden md:block">
           Click the mic to speak, then click send when done
           {sessionId && <span className="ml-2 text-green-600">• Connected</span>}
         </p>

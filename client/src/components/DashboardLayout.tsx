@@ -22,6 +22,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'wouter';
 import { useTimezoneSync } from '@/hooks/use-timezone';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileBottomNav, MobileHeader } from '@/components/mobile';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -114,6 +116,9 @@ function UserDropdown() {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   // Auto-sync user's timezone for SMS reminder scheduling
   useTimezoneSync();
+  
+  // Check if we're on mobile
+  const isMobile = useIsMobile();
 
   // Custom sidebar width for dashboard
   const style = {
@@ -121,6 +126,27 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     "--sidebar-width-icon": "4rem",   // icon width when collapsed
   };
 
+  // Mobile layout: compact header + bottom nav
+  if (isMobile) {
+    return (
+      <div className="flex flex-col min-h-dvh bg-[#FAF7F2]">
+        {/* Compact mobile header */}
+        <MobileHeader />
+        
+        {/* Main content with safe areas and bottom nav spacing */}
+        <main className="flex-1 overflow-auto safe-x pb-bottom-nav">
+          <div className="px-4 py-3">
+            {children}
+          </div>
+        </main>
+        
+        {/* Bottom navigation - thumb zone optimized */}
+        <MobileBottomNav />
+      </div>
+    );
+  }
+
+  // Desktop layout: sidebar + header
   return (
     <SidebarProvider defaultOpen={true} style={style as React.CSSProperties}>
       <div className="flex h-screen w-full bg-[#FAF7F2]">

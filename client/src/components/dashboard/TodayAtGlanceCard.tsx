@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,6 +46,7 @@ interface TodayAtGlanceCardProps {
 
 export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogSupplements, onLogWater, onLogWaterAmount, onLogSupplementDose }: TodayAtGlanceCardProps) {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [waterInput, setWaterInput] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [localPrefs, setLocalPrefs] = useState<TrackingPreferences>(trackingPrefs || {});
@@ -297,83 +299,83 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
 
         {/* Supplements - Inline dose tracking */}
         {showSupplements && (data.formulaName ? (
-          <div className="p-3 rounded-xl bg-white border border-[#1B4332]/10">
+          <div className="p-3 md:p-4 rounded-xl bg-white border border-[#1B4332]/10">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className={cn(
-                  "p-1.5 rounded-lg",
+                  "p-2.5 md:p-1.5 rounded-lg flex-shrink-0",
                   allSupplementsTaken ? 'bg-green-100' : 'bg-[#1B4332]/10'
                 )}>
                   <Pill className={cn(
-                    "h-4 w-4",
+                    "h-5 w-5 md:h-4 md:w-4",
                     allSupplementsTaken ? 'text-green-600' : 'text-[#1B4332]'
                   )} />
                 </div>
                 <div>
-                  <p className="font-medium text-sm text-[#1B4332]">Supplements</p>
-                  <p className="text-[11px] text-[#52796F]">{capsulesPerDose} capsules per dose</p>
+                  <p className="font-medium text-sm md:text-base text-[#1B4332]">Supplements</p>
+                  <p className="text-xs text-[#52796F]">{capsulesPerDose} capsules per dose</p>
                 </div>
               </div>
               {allSupplementsTaken && (
-                <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5 py-0">
+                <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5 py-0 flex-shrink-0">
                   <Check className="h-2.5 w-2.5 mr-0.5" />
                   Done
                 </Badge>
               )}
             </div>
-            {/* Compact dose buttons */}
+            {/* Dose buttons - larger touch targets on mobile */}
             <div className="flex gap-2">
               <button
                 onClick={() => onLogSupplementDose?.('morning', !data.supplementMorning)}
                 className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all",
+                  "flex-1 flex items-center justify-center gap-1.5 py-3 md:py-2 px-2 rounded-lg text-sm md:text-xs font-medium transition-all touch-feedback",
                   data.supplementMorning 
                     ? "bg-green-100 text-green-700 border border-green-200" 
                     : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-[#1B4332]/5 hover:border-[#1B4332]/20"
                 )}
               >
-                <Sunrise className="h-3.5 w-3.5" />
+                <Sunrise className="h-4 w-4 md:h-3.5 md:w-3.5" />
                 <span>AM</span>
-                {data.supplementMorning && <Check className="h-3 w-3" />}
+                {data.supplementMorning && <Check className="h-3.5 w-3.5 md:h-3 md:w-3" />}
               </button>
               <button
                 onClick={() => onLogSupplementDose?.('afternoon', !data.supplementAfternoon)}
                 className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all",
+                  "flex-1 flex items-center justify-center gap-1.5 py-3 md:py-2 px-2 rounded-lg text-sm md:text-xs font-medium transition-all touch-feedback",
                   data.supplementAfternoon 
                     ? "bg-green-100 text-green-700 border border-green-200" 
                     : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-[#1B4332]/5 hover:border-[#1B4332]/20"
                 )}
               >
-                <Sun className="h-3.5 w-3.5" />
+                <Sun className="h-4 w-4 md:h-3.5 md:w-3.5" />
                 <span>Noon</span>
-                {data.supplementAfternoon && <Check className="h-3 w-3" />}
+                {data.supplementAfternoon && <Check className="h-3.5 w-3.5 md:h-3 md:w-3" />}
               </button>
               <button
                 onClick={() => onLogSupplementDose?.('evening', !data.supplementEvening)}
                 className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all",
+                  "flex-1 flex items-center justify-center gap-1.5 py-3 md:py-2 px-2 rounded-lg text-sm md:text-xs font-medium transition-all touch-feedback",
                   data.supplementEvening 
                     ? "bg-green-100 text-green-700 border border-green-200" 
                     : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-[#1B4332]/5 hover:border-[#1B4332]/20"
                 )}
               >
-                <Sunset className="h-3.5 w-3.5" />
+                <Sunset className="h-4 w-4 md:h-3.5 md:w-3.5" />
                 <span>PM</span>
-                {data.supplementEvening && <Check className="h-3 w-3" />}
+                {data.supplementEvening && <Check className="h-3.5 w-3.5 md:h-3 md:w-3" />}
               </button>
             </div>
           </div>
         ) : (
           <Link href="/dashboard/chat">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-dashed border-[#1B4332]/20 hover:border-[#1B4332]/40 transition-all cursor-pointer">
+            <div className="flex items-center justify-between p-3 md:p-4 rounded-xl bg-white border border-dashed border-[#1B4332]/20 hover:border-[#1B4332]/40 transition-all cursor-pointer touch-feedback">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-[#1B4332]/5">
-                  <Pill className="h-4 w-4 text-[#1B4332]/50" />
+                <div className="p-2.5 md:p-1.5 rounded-lg bg-[#1B4332]/5 flex-shrink-0">
+                  <Pill className="h-5 w-5 md:h-4 md:w-4 text-[#1B4332]/50" />
                 </div>
                 <div>
-                  <p className="font-medium text-sm text-[#1B4332]">No Formula Yet</p>
-                  <p className="text-[11px] text-[#52796F]">Chat to create your formula</p>
+                  <p className="font-medium text-sm md:text-base text-[#1B4332]">No Formula Yet</p>
+                  <p className="text-xs text-[#52796F]">Chat to create your formula</p>
                 </div>
               </div>
               <ChevronRight className="h-4 w-4 text-[#52796F]" />
@@ -383,10 +385,11 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
 
         {/* Today's Workout */}
         {showWorkouts && (
-          <div className="p-3 rounded-xl bg-white border border-[#1B4332]/10">
-            <div className="flex items-center justify-between">
-              <Link href="/dashboard/optimize/workout" className="flex items-center gap-3 flex-1">
-                <div className={`p-2 rounded-lg ${
+          <div className="p-3 md:p-4 rounded-xl bg-white border border-[#1B4332]/10">
+            {/* Mobile: Stack layout / Desktop: Row layout */}
+            <div className={isMobile ? "space-y-3" : "flex items-center justify-between"}>
+              <Link href="/dashboard/optimize/workout" className={isMobile ? "flex items-center gap-3" : "flex items-center gap-3 flex-1"}>
+                <div className={`p-2.5 md:p-2 rounded-lg flex-shrink-0 ${
                   data.workoutCompleted || data.isRestDay 
                     ? 'bg-green-100' 
                     : data.hasWorkoutToday 
@@ -401,14 +404,23 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                         : 'text-gray-400'
                   }`} />
                 </div>
-                <div>
-                  <p className="font-medium text-sm text-[#1B4332]">
-                    {data.isRestDay 
-                      ? 'Rest Day' 
-                      : data.hasWorkoutToday 
-                        ? data.workoutName || 'Today\'s Workout' 
-                        : 'No Workout Scheduled'}
-                  </p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm md:text-base text-[#1B4332] truncate">
+                      {data.isRestDay 
+                        ? 'Rest Day' 
+                        : data.hasWorkoutToday 
+                          ? data.workoutName || 'Today\'s Workout' 
+                          : 'No Workout Scheduled'}
+                    </p>
+                    {/* Status badge inline on mobile */}
+                    {isMobile && (data.workoutCompleted || data.isRestDay) && (
+                      <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5 py-0 flex-shrink-0">
+                        <Check className="h-2.5 w-2.5 mr-0.5" />
+                        {data.workoutCompleted ? 'Done' : 'Rest'}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-[#52796F]">
                     {data.isRestDay 
                       ? 'Taking a recovery day'
@@ -420,40 +432,50 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                   </p>
                 </div>
               </Link>
-              <div className="flex items-center gap-2">
+              
+              {/* Action buttons - full width on mobile */}
+              <div className={isMobile ? "flex gap-2 w-full" : "flex items-center gap-2 flex-shrink-0"}>
                 {data.workoutCompleted ? (
-                  <Badge className="bg-green-100 text-green-700 border-green-200">
-                    <Check className="h-3 w-3 mr-1" />
-                    Done
-                  </Badge>
+                  !isMobile && (
+                    <Badge className="bg-green-100 text-green-700 border-green-200">
+                      <Check className="h-3 w-3 mr-1" />
+                      Done
+                    </Badge>
+                  )
                 ) : data.isRestDay ? (
-                  <Badge className="bg-green-100 text-green-700 border-green-200">
-                    <Check className="h-3 w-3 mr-1" />
-                    Rest
-                  </Badge>
+                  !isMobile && (
+                    <Badge className="bg-green-100 text-green-700 border-green-200">
+                      <Check className="h-3 w-3 mr-1" />
+                      Rest
+                    </Badge>
+                  )
                 ) : (
                   <>
                     <Button 
                       size="sm" 
                       variant="outline"
-                      className="text-xs border-gray-200 text-gray-600 hover:bg-gray-50"
+                      className={`text-xs border-gray-200 text-gray-600 hover:bg-gray-50 touch-feedback ${
+                        isMobile ? 'flex-1 h-10' : ''
+                      }`}
                       onClick={(e) => {
                         e.preventDefault();
                         toggleRestDay.mutate(true);
                       }}
                       disabled={toggleRestDay.isPending}
                     >
-                      <Moon className="h-3 w-3 mr-1" />
+                      <Moon className="h-3.5 w-3.5 mr-1.5" />
                       Rest Day
                     </Button>
                     {data.hasWorkoutToday && (
-                      <Link href="/dashboard/optimize/workout">
+                      <Link href="/dashboard/optimize/workout" className={isMobile ? 'flex-1' : ''}>
                         <Button 
                           size="sm" 
-                          className="text-xs bg-[#D4A574] hover:bg-[#C49464] text-white"
+                          className={`text-xs bg-[#D4A574] hover:bg-[#C49464] text-white touch-feedback ${
+                            isMobile ? 'w-full h-10' : ''
+                          }`}
                         >
-                          Start
-                          <ChevronRight className="h-3 w-3 ml-1" />
+                          Start Workout
+                          <ChevronRight className="h-3.5 w-3.5 ml-1" />
                         </Button>
                       </Link>
                     )}
@@ -463,11 +485,11 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
             </div>
             {/* Undo rest day option */}
             {data.isRestDay && !data.workoutCompleted && (
-              <div className="mt-2 pt-2 border-t border-gray-100">
+              <div className="mt-3 pt-3 border-t border-gray-100">
                 <Button 
                   size="sm" 
                   variant="ghost"
-                  className="text-xs text-gray-500 hover:text-gray-700 w-full"
+                  className="text-xs text-gray-500 hover:text-gray-700 w-full h-9"
                   onClick={() => toggleRestDay.mutate(false)}
                   disabled={toggleRestDay.isPending}
                 >
@@ -481,31 +503,33 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
         {/* Today's Meals - Clickable */}
         {showNutrition && (
           <Link href="/dashboard/optimize/nutrition?view=log">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#1B4332]/10 hover:border-[#1B4332]/30 hover:shadow-sm transition-all cursor-pointer group">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${mealsLoggedCount > 0 ? 'bg-green-100' : 'bg-[#1B4332]/10'}`}>
+            <div className="flex items-center justify-between p-3 md:p-4 rounded-xl bg-white border border-[#1B4332]/10 hover:border-[#1B4332]/30 hover:shadow-sm transition-all cursor-pointer group touch-feedback">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className={`p-2.5 md:p-2 rounded-lg flex-shrink-0 ${mealsLoggedCount > 0 ? 'bg-green-100' : 'bg-[#1B4332]/10'}`}>
                   <Utensils className={`h-5 w-5 ${mealsLoggedCount > 0 ? 'text-green-600' : 'text-[#1B4332]'}`} />
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium text-sm text-[#1B4332]">Nutrition</p>
-                  <p className="text-xs text-[#52796F]">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm md:text-base text-[#1B4332]">Nutrition</p>
+                  <p className="text-xs text-[#52796F] truncate">
                     {mealsLoggedCount > 0 ? `${mealsLoggedCount} meal${mealsLoggedCount !== 1 ? 's' : ''} logged today` : 'Track your meals'}
                   </p>
                 </div>
               </div>
               {mealsLoggedCount > 0 ? (
-                <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">
+                <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 flex-shrink-0">
                   <Check className="h-3 w-3 mr-1" />
-                  Logged
+                  <span className="hidden sm:inline">Logged</span>
+                  <span className="sm:hidden">✓</span>
                 </Badge>
               ) : (
                 <Button 
                   size="sm" 
                   variant="outline" 
-                  className="text-xs border-[#1B4332]/20 text-[#1B4332] group-hover:bg-[#1B4332] group-hover:text-white"
+                  className="text-xs border-[#1B4332]/20 text-[#1B4332] group-hover:bg-[#1B4332] group-hover:text-white flex-shrink-0"
                 >
                   <Plus className="h-3 w-3 mr-1" />
-                  Log Meal
+                  <span className="hidden sm:inline">Log Meal</span>
+                  <span className="sm:hidden">Log</span>
                 </Button>
               )}
             </div>
@@ -514,59 +538,63 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
 
         {/* Water Intake - With input */}
         {showHydration && (
-          <div className="p-3 rounded-xl bg-white border border-[#1B4332]/10">
+          <div className="p-3 md:p-4 rounded-xl bg-white border border-[#1B4332]/10">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${waterPercentage >= 100 ? 'bg-blue-100' : 'bg-blue-50'}`}>
+                <div className={`p-2.5 md:p-2 rounded-lg flex-shrink-0 ${waterPercentage >= 100 ? 'bg-blue-100' : 'bg-blue-50'}`}>
                   <Droplets className={`h-5 w-5 ${waterPercentage >= 100 ? 'text-blue-600' : 'text-blue-400'}`} />
                 </div>
                 <div>
-                  <p className="font-medium text-sm text-[#1B4332]">Hydration</p>
+                  <p className="font-medium text-sm md:text-base text-[#1B4332]">Hydration</p>
                   <p className="text-xs text-[#52796F]">{data.waterIntakeOz} / {data.waterGoalOz || hydrationGoal} oz</p>
                 </div>
               </div>
               {waterPercentage >= 100 && (
-                <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                <Badge className="bg-blue-100 text-blue-700 border-blue-200 flex-shrink-0">
                   <Check className="h-3 w-3 mr-1" />
-                  Goal Met
+                  <span className="hidden sm:inline">Goal Met</span>
+                  <span className="sm:hidden">✓</span>
                 </Badge>
               )}
             </div>
             <Progress 
               value={waterPercentage} 
-              className="h-2 bg-blue-100 mb-3"
+              className="h-2.5 md:h-2 bg-blue-100 mb-3"
             />
-            {/* Quick add buttons + custom input */}
-            <div className="flex items-center gap-2">
-              <Button 
-                size="sm" 
-                variant="outline"
-                className="text-xs border-blue-200 text-blue-600 hover:bg-blue-50 flex-shrink-0"
-                onClick={() => onLogWaterAmount?.(8)}
-              >
-                +8 oz
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline"
-                className="text-xs border-blue-200 text-blue-600 hover:bg-blue-50 flex-shrink-0"
-                onClick={() => onLogWaterAmount?.(16)}
-              >
-                +16 oz
-              </Button>
-              <div className="flex-1 flex items-center gap-1">
+            {/* Quick add buttons + custom input - stacked on very small screens */}
+            <div className={isMobile ? "space-y-2" : "flex items-center gap-2"}>
+              <div className="flex gap-2">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="text-xs border-blue-200 text-blue-600 hover:bg-blue-50 flex-1 sm:flex-none h-10 sm:h-8 touch-feedback"
+                  onClick={() => onLogWaterAmount?.(8)}
+                >
+                  +8 oz
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="text-xs border-blue-200 text-blue-600 hover:bg-blue-50 flex-1 sm:flex-none h-10 sm:h-8 touch-feedback"
+                  onClick={() => onLogWaterAmount?.(16)}
+                >
+                  +16 oz
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
                 <Input
                   type="number"
+                  inputMode="numeric"
                   placeholder="oz"
                   value={waterInput}
                   onChange={(e) => setWaterInput(e.target.value)}
-                  className="h-8 text-xs w-16"
+                  className="h-10 sm:h-8 text-base sm:text-xs w-20 sm:w-16"
                   min="1"
                   max="64"
                 />
                 <Button 
                   size="sm" 
-                  className="text-xs bg-blue-600 hover:bg-blue-700 text-white h-8 px-2"
+                  className="text-xs bg-blue-600 hover:bg-blue-700 text-white h-10 sm:h-8 px-3 sm:px-2 touch-feedback"
                   onClick={() => {
                     const oz = parseInt(waterInput);
                     if (oz > 0) {

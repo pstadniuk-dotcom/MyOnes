@@ -2907,24 +2907,32 @@ export class DrizzleStorage implements IStorage {
       return;
     }
 
-    // Calculate if streak continues
-    const yesterday24h = new Date();
-    yesterday24h.setDate(yesterday24h.getDate() - 1);
-    yesterday24h.setHours(0, 0, 0, 0);
+    // Calculate if streak continues using the logDate as reference point
+    // This ensures timezone consistency - we compare dates, not exact times
+    const logDateNormalized = new Date(logDate);
+    logDateNormalized.setHours(0, 0, 0, 0);
+    
+    const yesterdayFromLogDate = new Date(logDateNormalized);
+    yesterdayFromLogDate.setDate(yesterdayFromLogDate.getDate() - 1);
     
     const lastLoggedDate = streak.lastLoggedDate ? new Date(streak.lastLoggedDate) : null;
     lastLoggedDate?.setHours(0, 0, 0, 0);
 
     let newCurrentStreak = streak.currentStreak;
     
+    // Check if this is the same day as last log (don't double count)
+    if (lastLoggedDate && lastLoggedDate.getTime() === logDateNormalized.getTime()) {
+      // Same day - don't change streak
+      return;
+    }
+    
     // Check if logged yesterday (streak continues)
-    if (lastLoggedDate && lastLoggedDate.getTime() === yesterday24h.getTime()) {
+    if (lastLoggedDate && lastLoggedDate.getTime() === yesterdayFromLogDate.getTime()) {
       newCurrentStreak += 1;
-    } else if (!lastLoggedDate || lastLoggedDate.getTime() < yesterday24h.getTime()) {
+    } else if (!lastLoggedDate || lastLoggedDate.getTime() < yesterdayFromLogDate.getTime()) {
       // Streak broken - reset to 1
       newCurrentStreak = 1;
     }
-    // If logged today already, don't change streak
 
     const newLongestStreak = Math.max(newCurrentStreak, streak.longestStreak);
 
@@ -3584,13 +3592,15 @@ export class DrizzleStorage implements IStorage {
     // Find today's data from monthlyProgress
     const todayData = monthlyProgress.find(d => d.date === todayStr);
     
-    // Calculate current streak from monthlyProgress (count consecutive 100% days from today backwards)
+    // Calculate current streak from monthlyProgress (count consecutive days with >= 50% completion from today backwards)
+    // Using 50% threshold to be more encouraging while still requiring meaningful effort
+    const STREAK_THRESHOLD = 50;
     let calculatedCurrentStreak = 0;
     for (let i = monthlyProgress.length - 1; i >= 0; i--) {
-      if (monthlyProgress[i].percentage === 100) {
+      if (monthlyProgress[i].percentage >= STREAK_THRESHOLD || monthlyProgress[i].isRestDay) {
         calculatedCurrentStreak++;
       } else {
-        break; // Stop at first non-100% day
+        break; // Stop at first day below threshold
       }
     }
     
@@ -3599,7 +3609,7 @@ export class DrizzleStorage implements IStorage {
     let calculatedLongestStreak = 0;
     let tempStreak = 0;
     for (const day of monthlyProgress) {
-      if (day.percentage === 100) {
+      if (day.percentage >= STREAK_THRESHOLD || day.isRestDay) {
         tempStreak++;
         calculatedLongestStreak = Math.max(calculatedLongestStreak, tempStreak);
       } else {

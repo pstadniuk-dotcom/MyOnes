@@ -175,9 +175,12 @@ export default function TrackingPage() {
   const handleLogSupplement = useCallback((dose: 'morning' | 'afternoon' | 'evening', taken: boolean) => {
     if (supplementDebounceRef.current || logSupplementDose.isPending) return;
     supplementDebounceRef.current = true;
-    logSupplementDose.mutate({ dose, taken });
-    // Reset after a delay
-    setTimeout(() => { supplementDebounceRef.current = false; }, 500);
+    logSupplementDose.mutate({ dose, taken }, {
+      // Reset debounce ref in onSettled to ensure it works even on error
+      onSettled: () => {
+        supplementDebounceRef.current = false;
+      },
+    });
   }, [logSupplementDose]);
 
   const wellness = wellnessData || emptyWellnessData;
