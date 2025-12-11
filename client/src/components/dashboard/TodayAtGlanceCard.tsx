@@ -12,6 +12,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Pill, 
   Dumbbell, 
@@ -25,7 +34,9 @@ import {
   Sunrise,
   Sunset,
   Plus,
-  Settings2
+  Settings2,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { cn } from '@/lib/utils';
@@ -50,6 +61,12 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
   const [waterInput, setWaterInput] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [localPrefs, setLocalPrefs] = useState<TrackingPreferences>(trackingPrefs || {});
+  const [showLogDialog, setShowLogDialog] = useState(false);
+  const [showSkipDialog, setShowSkipDialog] = useState(false);
+  const [logDuration, setLogDuration] = useState(data.workoutDurationMinutes || 45);
+  const [logDifficulty, setLogDifficulty] = useState(3);
+  const [logNotes, setLogNotes] = useState('');
+  const [skipReason, setSkipReason] = useState('');
   
   // Preferences with defaults
   const showSupplements = trackingPrefs?.trackSupplements !== false;
@@ -147,6 +164,55 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
       }, 500);
+    },
+  });
+
+  // Quick log workout mutation
+  const logWorkout = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('/api/optimize/workout/logs', {
+        method: 'POST',
+        body: JSON.stringify({
+          workoutName: data.workoutName || 'Today\'s Workout',
+          completedAt: new Date().toISOString(),
+          durationActual: logDuration,
+          difficultyRating: logDifficulty,
+          notes: logNotes || "Completed workout",
+          exercisesCompleted: [],
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to log workout');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+      setShowLogDialog(false);
+      setLogDuration(data.workoutDurationMinutes || 45);
+      setLogDifficulty(3);
+      setLogNotes('');
+    },
+  });
+
+  // Quick skip workout mutation (marks as rest day)
+  const skipWorkout = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('/api/optimize/daily-logs', {
+        method: 'POST',
+        body: JSON.stringify({ isRestDay: true }),
+      });
+      if (!response.ok) throw new Error('Failed to skip workout');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+      setShowSkipDialog(false);
+      setSkipReason('');
     },
   });
 
@@ -446,7 +512,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                   !isMobile && (
                     <Badge className="bg-green-100 text-green-700 border-green-200">
                       <Check className="h-3 w-3 mr-1" />
-                      Rest
+                      Skipped
                     </Badge>
                   )
                 ) : (
@@ -454,36 +520,37 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                     <Button 
                       size="sm" 
                       variant="outline"
-                      className={`text-xs border-gray-200 text-gray-600 hover:bg-gray-50 touch-feedback ${
+                      className={`text-xs border-orange-200 text-orange-600 hover:bg-orange-50 touch-feedback ${
                         isMobile ? 'flex-1 h-10' : ''
                       }`}
                       onClick={(e) => {
                         e.preventDefault();
-                        toggleRestDay.mutate(true);
+                        setShowSkipDialog(true);
                       }}
-                      disabled={toggleRestDay.isPending}
+                      disabled={skipWorkout.isPending || logWorkout.isPending}
                     >
-                      <Moon className="h-3.5 w-3.5 mr-1.5" />
-                      Rest Day
+                      <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                      Skip
                     </Button>
-                    {data.hasWorkoutToday && (
-                      <Link href="/dashboard/optimize/workout" className={isMobile ? 'flex-1' : ''}>
-                        <Button 
-                          size="sm" 
-                          className={`text-xs bg-[#D4A574] hover:bg-[#C49464] text-white touch-feedback ${
-                            isMobile ? 'w-full h-10' : ''
-                          }`}
-                        >
-                          Start Workout
-                          <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                        </Button>
-                      </Link>
-                    )}
+                    <Button 
+                      size="sm" 
+                      className={`text-xs bg-green-600 hover:bg-green-700 text-white touch-feedback ${
+                        isMobile ? 'flex-1 h-10' : ''
+                      }`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setShowLogDialog(true);
+                      }}
+                      disabled={skipWorkout.isPending || logWorkout.isPending}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                      Log Workout
+                    </Button>
                   </>
                 )}
               </div>
             </div>
-            {/* Undo rest day option */}
+            {/* Undo skip option */}
             {data.isRestDay && !data.workoutCompleted && (
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <Button 
@@ -493,7 +560,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                   onClick={() => toggleRestDay.mutate(false)}
                   disabled={toggleRestDay.isPending}
                 >
-                  Undo rest day
+                  Undo skip
                 </Button>
               </div>
             )}
@@ -652,6 +719,136 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
           </div>
         )}
       </CardContent>
+
+      {/* Log Workout Dialog */}
+      <Dialog open={showLogDialog} onOpenChange={setShowLogDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Log Workout
+            </DialogTitle>
+            <DialogDescription>
+              {data.workoutName || 'Today\'s Workout'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-5 py-4">
+            {/* Duration */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label className="text-sm">Duration</Label>
+                <span className="text-sm font-medium">{logDuration} min</span>
+              </div>
+              <Slider 
+                value={[logDuration]} 
+                min={10} 
+                max={120} 
+                step={5} 
+                onValueChange={(vals) => setLogDuration(vals[0])} 
+              />
+            </div>
+
+            {/* Difficulty */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label className="text-sm">How hard was it?</Label>
+                <span className="text-sm font-medium">
+                  {logDifficulty <= 2 ? 'Easy' : logDifficulty <= 4 ? 'Moderate' : 'Hard'}
+                </span>
+              </div>
+              <Slider 
+                value={[logDifficulty]} 
+                min={1} 
+                max={5} 
+                step={1} 
+                onValueChange={(vals) => setLogDifficulty(vals[0])} 
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label className="text-sm">Notes (optional)</Label>
+              <Textarea 
+                value={logNotes}
+                onChange={(e) => setLogNotes(e.target.value)}
+                placeholder="How did it feel?"
+                className="resize-none h-16"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button 
+              variant="outline" 
+              className="flex-1"
+              onClick={() => setShowLogDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="flex-1 bg-green-600 hover:bg-green-700"
+              onClick={() => logWorkout.mutate()}
+              disabled={logWorkout.isPending}
+            >
+              {logWorkout.isPending ? 'Logging...' : 'Log Workout'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Skip Workout Dialog */}
+      <Dialog open={showSkipDialog} onOpenChange={setShowSkipDialog}>
+        <DialogContent className="sm:max-w-[350px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-orange-500" />
+              Skip Today's Workout
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              No worries! Rest is important too. Why are you skipping?
+            </p>
+            
+            <div className="grid grid-cols-2 gap-2">
+              {['Tired', 'Busy', 'Not feeling well', 'Other'].map((reason) => (
+                <Button
+                  key={reason}
+                  variant={skipReason === reason ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setSkipReason(reason)}
+                >
+                  {reason}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button 
+              variant="outline" 
+              className="flex-1"
+              onClick={() => {
+                setShowSkipDialog(false);
+                setSkipReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="outline"
+              className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
+              onClick={() => skipWorkout.mutate()}
+              disabled={skipWorkout.isPending}
+            >
+              {skipWorkout.isPending ? 'Skipping...' : 'Skip'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
