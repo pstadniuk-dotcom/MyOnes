@@ -24,7 +24,7 @@ import { buildNutritionPlanPrompt, buildWorkoutPlanPrompt, buildLifestylePlanPro
 import { analyzeWorkoutHistory, formatAnalysisForPrompt } from "./workoutAnalysis";
 import { parseAiJson } from "./utils/parseAiJson";
 import { normalizePlanContent, DEFAULT_MEAL_TYPES } from "./optimize-normalizer";
-import { getUserLocalMidnight, getUserLocalDateString } from "./utils/timezone";
+import { getUserLocalMidnight, getUserLocalDateString, toUserLocalDateString } from "./utils/timezone";
 import { nanoid } from "nanoid";
 import { startOfWeek, endOfWeek, subWeeks, format, parseISO, differenceInWeeks, differenceInDays, isSameDay } from "date-fns";
 
@@ -4662,10 +4662,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         hasWorkoutToday = !!todayWorkout;
       }
 
-      // Check if today's workout was logged
+      // Check if today's workout was logged (using user's timezone for date comparison)
+      const todayDateStr = getUserLocalDateString(userTimezone);
       const todayWorkoutCompleted = workoutLogs.some(log => {
-        const logDate = new Date(log.completedAt);
-        return logDate >= todayStart && logDate <= todayEnd;
+        const logDateStr = toUserLocalDateString(new Date(log.completedAt), userTimezone);
+        return logDateStr === todayDateStr;
       });
 
       // Find today's meals from nutrition plan

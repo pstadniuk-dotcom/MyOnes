@@ -71,14 +71,14 @@ export function WorkoutHistory({ logs, onDelete, isDeleting }: WorkoutHistoryPro
   };
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <Calendar className="h-5 w-5" />
           Workout History
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="overflow-hidden">
         {logs.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             No workouts logged yet. Start training!
@@ -94,15 +94,15 @@ export function WorkoutHistory({ logs, onDelete, isDeleting }: WorkoutHistoryPro
 
               return (
                 <div key={log.id} className="border rounded-lg overflow-hidden">
-                  <div className="p-4 bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
+                  <div className="p-3 sm:p-4 bg-gray-50">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between">
+                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                         <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 overflow-hidden">
                           <div className="font-medium truncate">
                             {log.workoutName || "Workout Session"}
                           </div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground truncate">
                             {format(new Date(log.completedAt), 'PPP')}
                             {log.durationActual && ` • ${log.durationActual} min`}
                             {log.difficultyRating && ` • Difficulty ${log.difficultyRating}/5`}
@@ -110,26 +110,26 @@ export function WorkoutHistory({ logs, onDelete, isDeleting }: WorkoutHistoryPro
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-2 ml-4">
+                      <div className="flex items-center gap-2 ml-7 sm:ml-4 flex-wrap justify-end">
                         {hasExerciseData && (
                           <>
                             {/* Completion percentage */}
-                            <div className="text-right mr-2">
-                              <div className="text-xs text-gray-500">Completed</div>
-                              <div className="font-semibold text-sm">
+                            <div className="text-right mr-1 sm:mr-2">
+                              <div className="text-[10px] sm:text-xs text-gray-500">Completed</div>
+                              <div className="font-semibold text-xs sm:text-sm">
                                 {completionStats.percentage}%
                                 {completionStats.skipped > 0 && (
-                                  <span className="text-xs text-orange-500 ml-1">
-                                    ({completionStats.skipped} skipped)
+                                  <span className="text-[10px] sm:text-xs text-orange-500 ml-1">
+                                    ({completionStats.skipped} skip)
                                   </span>
                                 )}
                               </div>
                             </div>
                             {/* Volume */}
                             {totalVolume > 0 && (
-                              <div className="text-right mr-2">
-                                <div className="text-xs text-gray-500">Volume</div>
-                                <div className="font-semibold text-sm">{totalVolume.toLocaleString()} lbs</div>
+                              <div className="text-right mr-1 sm:mr-2 hidden xs:block">
+                                <div className="text-[10px] sm:text-xs text-gray-500">Volume</div>
+                                <div className="font-semibold text-xs sm:text-sm">{totalVolume.toLocaleString()} lbs</div>
                               </div>
                             )}
                             <Button
@@ -180,7 +180,7 @@ export function WorkoutHistory({ logs, onDelete, isDeleting }: WorkoutHistoryPro
                   </div>
 
                   {isExpanded && hasExerciseData && (
-                    <div className="p-4 space-y-4 border-t">
+                    <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 border-t overflow-hidden">
                       {log.exercisesCompleted.map((exercise: any, exIdx: number) => {
                         // Handle skipped exercises
                         if (exercise.skipped) {
@@ -232,7 +232,7 @@ export function WorkoutHistory({ logs, onDelete, isDeleting }: WorkoutHistoryPro
                             
                             {/* Strength exercise sets */}
                             {isStrength && exercise.sets && Array.isArray(exercise.sets) && (
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 overflow-hidden">
                                 {exercise.sets.map((set: any, setIdx: number) => {
                                   // Consider a set "done" if completed or has weight+reps
                                   const isDone = set.completed || (set.weight > 0 && set.reps > 0);
@@ -266,7 +266,7 @@ export function WorkoutHistory({ logs, onDelete, isDeleting }: WorkoutHistoryPro
                             
                             {/* Timed exercise sets */}
                             {isTimed && exercise.sets && Array.isArray(exercise.sets) && (
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 overflow-hidden">
                                 {exercise.sets.map((set: any, setIdx: number) => (
                                   <div
                                     key={setIdx}
@@ -291,8 +291,8 @@ export function WorkoutHistory({ logs, onDelete, isDeleting }: WorkoutHistoryPro
                             
                             {/* Cardio summary */}
                             {isCardio && exercise.summary && (
-                              <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
-                                <div className="grid grid-cols-3 gap-4">
+                              <div className="bg-blue-50 border border-blue-200 rounded p-2 sm:p-3 text-sm overflow-hidden">
+                                <div className="grid grid-cols-3 gap-2 sm:gap-4">
                                   {exercise.summary.duration && (
                                     <div>
                                       <div className="text-xs text-gray-600">Duration</div>

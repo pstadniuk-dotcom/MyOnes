@@ -386,27 +386,25 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
     <div className="space-y-6">
       {/* Main Tab Navigation */}
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="plan" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
-            <ClipboardList className="h-4 w-4" />
-            <span className="hidden sm:inline">Meal Plan</span>
-            <span className="sm:hidden">Plan</span>
+        <TabsList className="grid w-full grid-cols-3 h-auto p-1.5 gap-1.5">
+          <TabsTrigger value="plan" className="flex flex-col items-center justify-center gap-1 py-3 text-sm">
+            <ClipboardList className="h-6 w-6" />
+            <span className="font-medium">Plan</span>
           </TabsTrigger>
-          <TabsTrigger value="log" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
-            <Utensils className="h-4 w-4" />
-            <span className="hidden sm:inline">Log Meals</span>
-            <span className="sm:hidden">Log</span>
+          <TabsTrigger value="log" className="flex flex-col items-center justify-center gap-1 py-3 text-sm">
+            <Utensils className="h-6 w-6" />
+            <span className="font-medium">Log</span>
           </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
-            <History className="h-4 w-4" />
-            <span>History</span>
+          <TabsTrigger value="history" className="flex flex-col items-center justify-center gap-1 py-3 text-sm">
+            <History className="h-6 w-6" />
+            <span className="font-medium">History</span>
           </TabsTrigger>
         </TabsList>
 
         {/* ===== MEAL PLAN TAB ===== */}
         <TabsContent value="plan" className="space-y-6 mt-0">
           {/* Header Actions */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex flex-col gap-3">
             <div>
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
@@ -420,33 +418,32 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
                 Week of {weekRangeLabel}
               </p>
             </div>
-            <div className="flex gap-2 w-full sm:w-auto">
+            <div className="flex gap-3 w-full justify-center">
               <Button 
                 variant="outline"
                 onClick={() => setShowGroceryList(true)}
-                className="shadow-sm flex-1 sm:flex-none"
-                size="sm"
+                className="shadow-sm flex-1 max-w-[180px]"
+                size="lg"
               >
-                <ShoppingBasket className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Grocery List</span>
-                <span className="sm:hidden">Groceries</span>
+                <ShoppingBasket className="mr-2 h-5 w-5" />
+                Grocery List
               </Button>
               <Button 
                 variant="outline" 
                 onClick={() => generatePlan.mutate()}
                 disabled={generatePlan.isPending}
-                className="shadow-sm flex-1 sm:flex-none"
-                size="sm"
+                className="shadow-sm flex-1 max-w-[180px]"
+                size="lg"
               >
                 {generatePlan.isPending ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     <span className="hidden sm:inline">Regenerating...</span>
                     <span className="sm:hidden">...</span>
                   </>
                 ) : (
                   <>
-                    <RefreshCw className="mr-2 h-4 w-4" />
+                    <RefreshCw className="mr-2 h-5 w-5" />
                     Regenerate
                   </>
                 )}
@@ -543,7 +540,7 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
             {/* Day Selector - Scrollable on mobile */}
             {isMobile ? (
               <MobileScrollableTabs>
-                <TabsList className="flex gap-2 bg-transparent p-0 h-auto w-max">
+                <TabsList className="flex gap-3 !bg-transparent p-0 h-auto w-max">
                   {weekTabs.map((day, idx) => {
                     const isToday = idx === new Date().getDay() - 1 || (new Date().getDay() === 0 && idx === 6);
                     
@@ -552,19 +549,19 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
                         key={day.value}
                         value={day.value}
                         className={`
-                          flex flex-col gap-1.5 p-3 rounded-xl border-2 transition-all snap-start min-w-[72px]
+                          flex flex-col items-center gap-2 py-4 px-5 rounded-xl border-2 transition-all snap-start min-w-[80px]
                           data-[state=active]:border-primary data-[state=active]:bg-primary/5
                           ${isToday ? 'ring-2 ring-primary/20' : ''}
                         `}
                       >
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className="text-sm font-medium text-muted-foreground">
                           {day.tabLabel}
                         </span>
-                        <span className="text-sm font-semibold">
+                        <span className="text-lg font-bold">
                           {day.dateLabel.split(' ')[1]}
                         </span>
                         {isToday && (
-                          <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-primary/10 text-primary">
+                          <Badge variant="secondary" className="text-xs py-0.5 px-2 bg-primary/10 text-primary">
                             Today
                           </Badge>
                         )}
@@ -632,7 +629,7 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
 
                 {/* Meals */}
                     {day.planDay?.meals ? (
-                  <div className="grid gap-3">
+                  <div className="flex flex-col gap-4 w-full">
                     {day.planDay.meals.map((meal: any, idx: number) => {
                       const mealId = `${day.value}-${meal.mealType}-${idx}`;
                       const isSwapping = swappingMeal === mealId;
@@ -640,43 +637,50 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
                       return (
                         <Card 
                           key={mealId} 
-                          className="group hover:shadow-md transition-all hover:border-primary/20 relative overflow-hidden"
+                          className="w-full shadow-sm border-muted"
                         >
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Badge 
-                                    variant="outline" 
-                                    className="text-xs capitalize bg-primary/5 text-primary border-primary/20"
-                                  >
-                                    {meal.mealType}
-                                  </Badge>
-                                  {meal.macros?.calories && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {meal.macros.calories} cal
-                                    </span>
-                                  )}
-                                </div>
-                                <h4 className="font-semibold text-lg mb-2">{meal.name}</h4>
-                                {meal.healthBenefits && (
-                                  <p className="text-sm text-muted-foreground mb-2 flex items-start gap-2">
-                                    <Sparkles className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                                    {meal.healthBenefits}
-                                  </p>
-                                )}
-                                {meal.ingredients && meal.ingredients.length > 0 && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {meal.ingredients.slice(0, 3).join(' • ')}
-                                    {meal.ingredients.length > 3 && ` +${meal.ingredients.length - 3} more`}
-                                  </p>
+                          <CardContent className="p-5">
+                            <div className="flex flex-col gap-3">
+                              {/* Header row with meal type and calories */}
+                              <div className="flex items-center justify-between">
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-sm capitalize bg-primary/5 text-primary border-primary/20 px-3 py-1"
+                                >
+                                  {meal.mealType}
+                                </Badge>
+                                {meal.macros?.calories && (
+                                  <span className="text-sm font-medium text-muted-foreground">
+                                    {meal.macros.calories} cal
+                                  </span>
                                 )}
                               </div>
                               
-                              <div className={`flex flex-col gap-1 transition-all ${isSwapping ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                              {/* Meal name */}
+                              <h4 className="font-semibold text-xl leading-tight">{meal.name}</h4>
+                              
+                              {/* Health benefits */}
+                              {meal.healthBenefits && (
+                                <p className="text-sm text-muted-foreground leading-relaxed flex items-start gap-2">
+                                  <Sparkles className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                                  {meal.healthBenefits}
+                                </p>
+                              )}
+                              
+                              {/* Ingredients preview */}
+                              {meal.ingredients && meal.ingredients.length > 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                  {meal.ingredients.slice(0, 4).join(' • ')}
+                                  {meal.ingredients.length > 4 && ` +${meal.ingredients.length - 4} more`}
+                                </p>
+                              )}
+                              
+                              {/* Action buttons - always visible */}
+                              <div className="flex gap-2 pt-2 border-t mt-1">
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
+                                  className="flex-1"
                                   onClick={() => generateRecipe.mutate({ 
                                     mealName: meal.name, 
                                     ingredients: meal.ingredients || [] 
@@ -687,8 +691,9 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
                                   Recipe
                                 </Button>
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
+                                  className="flex-1"
                                   onClick={() => swapMeal.mutate({ 
                                     dayIndex: day.planDay.day - 1, 
                                     mealType: meal.mealType,
@@ -764,8 +769,8 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
           />
         )}
 
-        {/* Meal Logger and Hydration Tracker side by side */}
-        <div className="grid lg:grid-cols-2 gap-6">
+        {/* Meal Logger and Hydration Tracker - stacked on mobile, side by side on desktop */}
+        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 w-full">
           <MealLogger 
             todayPlanMeals={todayPlanMeals}
             onMealLogged={() => refetchTodayNutrition()}
@@ -779,7 +784,7 @@ export function NutritionPlanTab({ plan, healthProfile, dailyLogsByDate }: Nutri
       </TabsContent>
 
       {/* ===== HISTORY TAB ===== */}
-      <TabsContent value="history" className="space-y-6 mt-0">
+      <TabsContent value="history" className="space-y-4 mt-0 w-full">
         <NutritionHistory />
       </TabsContent>
       </Tabs>

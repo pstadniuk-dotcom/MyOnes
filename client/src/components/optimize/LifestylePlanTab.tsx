@@ -204,9 +204,9 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
   return (
     <div className="space-y-6">
       {/* Header Actions */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
               Active Protocol
             </Badge>
@@ -218,24 +218,27 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
             Your personalized morning, evening, and stress management routines
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => generatePlan.mutate()}
-          disabled={generatePlan.isPending}
-          className="shadow-sm"
-        >
-          {generatePlan.isPending ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Regenerating...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Regenerate
-            </>
-          )}
-        </Button>
+        <div className="flex justify-center w-full">
+          <Button 
+            variant="outline" 
+            size="lg"
+            onClick={() => generatePlan.mutate()}
+            disabled={generatePlan.isPending}
+            className="shadow-sm w-full max-w-[200px]"
+          >
+            {generatePlan.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Regenerating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-5 w-5" />
+                Regenerate
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Rationale */}
@@ -256,32 +259,32 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
       {/* Morning Intentions */}
       <Card className="shadow-lg border-yellow-200">
         <CardHeader className="bg-gradient-to-r from-yellow-50 to-transparent">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Sun className="h-6 w-6 text-yellow-600" />
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Sun className="h-7 w-7 text-yellow-600" />
                 Morning Intentions
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-base mt-1">
                 {morningIntentions.theme || 'Start your day with purpose'}
               </CardDescription>
             </div>
             <Button
               variant="outline"
-              size="sm"
+              size="lg"
               onClick={() => handleWatchVideo(
                 morningIntentions.youtubeSearch || 'morning motivation affirmations 10 minutes',
                 'Morning Motivation'
               )}
               disabled={isVideoLoading}
-              className="text-yellow-700 border-yellow-300 hover:bg-yellow-50"
+              className="text-yellow-700 border-yellow-300 hover:bg-yellow-50 w-full"
             >
               {isVideoLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
                 <>
-                  <Youtube className="h-4 w-4 mr-2" />
-                  Find Motivation
+                  <Youtube className="h-5 w-5 mr-2" />
+                  Find Motivation Video
                 </>
               )}
             </Button>
@@ -290,36 +293,36 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
         <CardContent className="pt-6 space-y-4">
           {/* Affirmation */}
           {morningIntentions.affirmation && (
-            <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200 text-center">
-              <p className="text-lg font-medium text-yellow-900 italic">
+            <div className="p-5 rounded-lg bg-yellow-50 border border-yellow-200 text-center">
+              <p className="text-xl font-medium text-yellow-900 italic leading-relaxed">
                 "{morningIntentions.affirmation}"
               </p>
-              <p className="text-xs text-yellow-700 mt-2">Daily Affirmation</p>
+              <p className="text-sm text-yellow-700 mt-3">Daily Affirmation</p>
             </div>
           )}
 
           {/* Morning Steps */}
           {morningRoutine.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="font-semibold text-sm text-yellow-800 flex items-center gap-2">
-                <Sunrise className="h-4 w-4" />
+            <div className="space-y-3">
+              <h4 className="font-semibold text-base text-yellow-800 flex items-center gap-2">
+                <Sunrise className="h-5 w-5" />
                 Morning Routine Steps
               </h4>
               {morningRoutine.map((step: any, idx: number) => (
-                <div key={idx} className="flex items-start gap-3 p-3 bg-gradient-to-r from-yellow-50 to-transparent rounded-lg border border-yellow-100">
-                  <div className="h-6 w-6 rounded-full bg-yellow-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                <div key={idx} className="flex items-start gap-4 p-4 bg-gradient-to-r from-yellow-50 to-transparent rounded-lg border border-yellow-100">
+                  <div className="h-8 w-8 rounded-full bg-yellow-500 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
                     {step.step || idx + 1}
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-yellow-900">{step.action}</p>
+                    <p className="font-semibold text-lg text-yellow-900">{step.action}</p>
                     {step.duration && (
-                      <Badge variant="secondary" className="mt-1 text-xs bg-yellow-100 text-yellow-700">
-                        <Clock className="h-3 w-3 mr-1" />
+                      <Badge variant="secondary" className="mt-2 text-sm bg-yellow-100 text-yellow-700 px-3 py-1">
+                        <Clock className="h-4 w-4 mr-1" />
                         {step.duration}
                       </Badge>
                     )}
                     {(step.why || step.reason) && (
-                      <p className="text-sm text-muted-foreground mt-1">{step.why || step.reason}</p>
+                      <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{step.why || step.reason}</p>
                     )}
                   </div>
                 </div>
@@ -342,32 +345,32 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
       {/* Evening Wind-Down */}
       <Card className="shadow-lg border-indigo-200">
         <CardHeader className="bg-gradient-to-r from-indigo-50 to-transparent">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Moon className="h-6 w-6 text-indigo-600" />
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Moon className="h-7 w-7 text-indigo-600" />
                 Evening Wind-Down
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-base mt-1">
                 Prepare your body and mind for restful sleep
               </CardDescription>
             </div>
             <Button
               variant="outline"
-              size="sm"
+              size="lg"
               onClick={() => handleWatchVideo(
                 eveningRoutine.youtubeSearch || 'guided sleep meditation 10 minutes',
                 'Sleep Meditation'
               )}
               disabled={isVideoLoading}
-              className="text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+              className="text-indigo-700 border-indigo-300 hover:bg-indigo-50 w-full"
             >
               {isVideoLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
                 <>
-                  <Youtube className="h-4 w-4 mr-2" />
-                  Sleep Meditation
+                  <Youtube className="h-5 w-5 mr-2" />
+                  Sleep Meditation Video
                 </>
               )}
             </Button>
@@ -375,25 +378,25 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
           {/* Sleep Schedule */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             <div className="p-4 rounded-lg bg-indigo-50 border border-indigo-100 text-center">
-              <AlarmClock className="h-5 w-5 mx-auto text-indigo-600 mb-1" />
-              <p className="text-xs text-indigo-600 font-medium">Wind-Down</p>
-              <p className="text-lg font-bold text-indigo-900">
+              <AlarmClock className="h-6 w-6 mx-auto text-indigo-600 mb-2" />
+              <p className="text-sm text-indigo-600 font-medium">Wind-Down</p>
+              <p className="text-xl font-bold text-indigo-900">
                 {eveningRoutine.startTime || '9:00 PM'}
               </p>
             </div>
             <div className="p-4 rounded-lg bg-indigo-50 border border-indigo-100 text-center">
-              <BedDouble className="h-5 w-5 mx-auto text-indigo-600 mb-1" />
-              <p className="text-xs text-indigo-600 font-medium">Bedtime</p>
-              <p className="text-lg font-bold text-indigo-900">
+              <BedDouble className="h-6 w-6 mx-auto text-indigo-600 mb-2" />
+              <p className="text-sm text-indigo-600 font-medium">Bedtime</p>
+              <p className="text-xl font-bold text-indigo-900">
                 {eveningRoutine.bedtime || sleepTargets.bedtime || '10:30 PM'}
               </p>
             </div>
             <div className="p-4 rounded-lg bg-indigo-50 border border-indigo-100 text-center">
-              <Sunrise className="h-5 w-5 mx-auto text-indigo-600 mb-1" />
-              <p className="text-xs text-indigo-600 font-medium">Wake Time</p>
-              <p className="text-lg font-bold text-indigo-900">
+              <Sunrise className="h-6 w-6 mx-auto text-indigo-600 mb-2" />
+              <p className="text-sm text-indigo-600 font-medium">Wake Time</p>
+              <p className="text-xl font-bold text-indigo-900">
                 {morningIntentions.wakeTime || sleepTargets.wakeTime || '6:30 AM'}
               </p>
             </div>
@@ -401,19 +404,19 @@ export function LifestylePlanTab({ plan, healthProfile }: LifestylePlanTabProps)
 
           {/* Evening Steps */}
           {eveningRoutineSteps.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="font-semibold text-sm text-indigo-800 flex items-center gap-2">
-                <Moon className="h-4 w-4" />
+            <div className="space-y-3">
+              <h4 className="font-semibold text-base text-indigo-800 flex items-center gap-2">
+                <Moon className="h-5 w-5" />
                 Wind-Down Steps
               </h4>
               {eveningRoutineSteps.map((step: any, idx: number) => (
-                <div key={idx} className="flex items-start gap-3 p-3 bg-gradient-to-r from-indigo-50 to-transparent rounded-lg border border-indigo-100">
-                  <div className="h-6 w-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                <div key={idx} className="flex items-start gap-4 p-4 bg-gradient-to-r from-indigo-50 to-transparent rounded-lg border border-indigo-100">
+                  <div className="h-8 w-8 rounded-full bg-indigo-500 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
                     {step.step || idx + 1}
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-indigo-900">{step.action}</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
+                    <p className="font-semibold text-lg text-indigo-900">{step.action}</p>
+                    <div className="flex flex-wrap gap-2 mt-2">
                       {step.time && (
                         <Badge variant="secondary" className="text-xs bg-indigo-100 text-indigo-700">
                           <Clock className="h-3 w-3 mr-1" />

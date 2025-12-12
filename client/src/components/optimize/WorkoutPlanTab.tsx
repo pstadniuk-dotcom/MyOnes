@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Dumbbell, Sparkles, Calendar, History, BarChart3, PlayCircle, Info, ExternalLink, Shuffle, CheckCircle2, XCircle, Clock, Zap } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
+import { Dumbbell, Sparkles, Calendar, History, BarChart3, PlayCircle, Info, ExternalLink, Shuffle, CheckCircle2, Save, Clock } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -13,9 +16,7 @@ import { WorkoutSchedule } from './workout/WorkoutSchedule';
 import { WorkoutHistory } from './workout/WorkoutHistory';
 import { WorkoutAnalytics } from './workout/WorkoutAnalytics';
 import { WorkoutPreferencesDialog } from './workout/WorkoutPreferencesDialog';
-import { Slider } from '@/components/ui/slider';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { DynamicExerciseLogger } from './workout/DynamicExerciseLogger';
 
 interface WorkoutPlanTabProps {
   plan: any;
@@ -33,12 +34,35 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
   const [playingVideo, setPlayingVideo] = useState<{ id: string; title: string } | null>(null);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('schedule');
-  const [showLogDialog, setShowLogDialog] = useState(false);
-  const [showSkipDialog, setShowSkipDialog] = useState(false);
-  const [logDuration, setLogDuration] = useState(45);
-  const [logDifficulty, setLogDifficulty] = useState(3);
-  const [logNotes, setLogNotes] = useState('');
-  const [skipReason, setSkipReason] = useState('');
+  
+  // Workout Logging State
+  const [completedExercises, setCompletedExercises] = useState<Record<string, any>>({});
+  const [loggingExercise, setLoggingExercise] = useState<any>(null);
+  const [showFinishDialog, setShowFinishDialog] = useState(false);
+  const [finishDuration, setFinishDuration] = useState(45);
+  const [finishDifficulty, setFinishDifficulty] = useState(3);
+  const [finishNotes, setFinishNotes] = useState('');
+
+  // Load drafts from local storage when workout is selected
+  useEffect(() => {
+    if (selectedWorkout?.workout?.exercises) {
+      const loaded: Record<string, any> = {};
+      selectedWorkout.workout.exercises.forEach((ex: any) => {
+        const storageKey = `workout_draft_${ex.name.replace(/\s+/g, '_')}`;
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          try {
+            loaded[ex.name] = JSON.parse(saved);
+          } catch (e) {
+            console.error("Failed to parse draft", e);
+          }
+        }
+      });
+      if (Object.keys(loaded).length > 0) {
+        setCompletedExercises(prev => ({ ...prev, ...loaded }));
+      }
+    }
+  }, [selectedWorkout]);
 
   const { data: workoutLogsData } = useQuery<any>({
     queryKey: ['/api/optimize/workout/logs'],
@@ -113,27 +137,35 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
     },
   });
 
-  const logWorkout = useMutation({
+  const finishWorkout = useMutation({
     mutationFn: async () => {
-      console.log('🏋️ Logging workout:', selectedWorkout?.workout?.name);
-      
+      const exercisesList = selectedWorkout?.workout?.exercises?.map((ex: any) => {
+        const log = completedExercises[ex.name];
+        if (log) {
+          return {
+            name: ex.name,
+            skipped: false,
+            sets: log.sets,
+            duration: log.duration,
+            distance: log.distance,
+            intensity: log.intensity,
+          };
+        }
+        return {
+          name: ex.name,
+          skipped: true,
+          sets: []
+        };
+      }) || [];
+
       const res = await apiRequest('POST', '/api/optimize/workout/logs', {
         workoutId: selectedWorkout?.workout?.id,
         workoutName: selectedWorkout?.workout?.name || selectedWorkout?.day || 'Workout',
         completedAt: new Date().toISOString(),
-        durationActual: logDuration,
-        difficultyRating: logDifficulty,
-        notes: logNotes || "Completed workout",
-        exercisesCompleted: selectedWorkout?.workout?.exercises?.map((ex: any) => ({
-          name: ex.name,
-          skipped: false,
-          sets: Array.from({ length: ex.sets || 3 }, (_, i) => ({
-            setNumber: i + 1,
-            completed: true,
-            reps: typeof ex.reps === 'string' ? parseInt(ex.reps) || 10 : ex.reps || 10,
-            weight: 0
-          }))
-        })) || [],
+        durationActual: finishDuration,
+        difficultyRating: finishDifficulty,
+        notes: finishNotes || "Completed workout",
+        exercisesCompleted: exercisesList,
       });
       
       if (!res.ok) {
@@ -142,22 +174,23 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
       }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/analytics/workout'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ['/api/optimize/workout/logs'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/optimize/analytics/workout'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/dashboard/wellness'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/optimize/streaks/smart'] });
       
-      setShowLogDialog(false);
-      setLogDuration(45);
-      setLogDifficulty(3);
-      setLogNotes('');
+      setShowFinishDialog(false);
+      setCompletedExercises({});
       setSelectedWorkout(null);
       setSelectedDayIndex(-1);
+      setFinishDuration(45);
+      setFinishDifficulty(3);
+      setFinishNotes('');
       
       toast({
-        title: '💪 Workout Logged!',
-        description: 'Great job completing your workout!',
+        title: '💪 Workout Completed!',
+        description: 'Great job! Your workout has been logged.',
       });
     },
     onError: (error: Error) => {
@@ -169,55 +202,7 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
     }
   });
 
-  const skipWorkout = useMutation({
-    mutationFn: async () => {
-      console.log('⏭️ Skipping workout:', selectedWorkout?.workout?.name);
-      
-      const res = await apiRequest('POST', '/api/optimize/workout/logs', {
-        workoutId: selectedWorkout?.workout?.id,
-        workoutName: selectedWorkout?.workout?.name || selectedWorkout?.day || 'Workout',
-        completedAt: new Date().toISOString(),
-        durationActual: 0,
-        difficultyRating: 0,
-        notes: skipReason || "Skipped workout",
-        exercisesCompleted: selectedWorkout?.workout?.exercises?.map((ex: any) => ({
-          name: ex.name,
-          skipped: true,
-          sets: []
-        })) || [],
-        skipped: true,
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to skip workout');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/analytics/workout'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
-      
-      setShowSkipDialog(false);
-      setSkipReason('');
-      setSelectedWorkout(null);
-      setSelectedDayIndex(-1);
-      
-      toast({
-        title: 'Workout Skipped',
-        description: 'Rest is important too. Stay consistent!',
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  });
+
 
   const deleteWorkoutLog = useMutation({
     mutationFn: async (logId: string) => {
@@ -249,16 +234,6 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
   const handleWorkoutClick = (workout: any, index: number) => {
     setSelectedWorkout(workout);
     setSelectedDayIndex(index);
-    // Set default duration from workout plan
-    setLogDuration(workout?.workout?.durationMinutes || 45);
-  };
-
-  const handleLogClick = () => {
-    setShowLogDialog(true);
-  };
-
-  const handleSkipClick = () => {
-    setShowSkipDialog(true);
   };
 
   const handleSwitchExercise = (exerciseIndex: number) => {
@@ -296,20 +271,18 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Workout Tracker</h2>
-          <p className="text-muted-foreground">
-            Your professional training schedule and analytics.
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Workout Tracker</h2>
+          <p className="text-sm text-muted-foreground truncate">
+            Your training schedule and analytics.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowPreferences(true)}>
-            <Sparkles className="mr-2 h-4 w-4" />
-            {plan ? 'Regenerate Plan' : 'Create Plan'}
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={() => setShowPreferences(true)} className="flex-shrink-0">
+          <Sparkles className="mr-1.5 h-4 w-4" />
+          {plan ? 'Regenerate' : 'Create'}
+        </Button>
       </div>
 
       {!plan ? (
@@ -329,33 +302,31 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
           </CardContent>
         </Card>
       ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="schedule" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
-              <Calendar className="h-4 w-4" />
-              <span className="hidden sm:inline">Schedule</span>
-              <span className="sm:hidden">Plan</span>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3">
+          <TabsList className="grid w-full grid-cols-3 h-auto p-1.5 gap-1.5">
+            <TabsTrigger value="schedule" className="flex flex-col items-center justify-center gap-1 py-3 text-sm">
+              <Calendar className="h-6 w-6" />
+              <span className="font-medium">Schedule</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
-              <History className="h-4 w-4" />
-              History
+            <TabsTrigger value="history" className="flex flex-col items-center justify-center gap-1 py-3 text-sm">
+              <History className="h-6 w-6" />
+              <span className="font-medium">History</span>
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Analytics</span>
-              <span className="sm:hidden">Stats</span>
+            <TabsTrigger value="analytics" className="flex flex-col items-center justify-center gap-1 py-3 text-sm">
+              <BarChart3 className="h-6 w-6" />
+              <span className="font-medium">Stats</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="schedule" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>{plan.content?.programOverview?.focus || "Weekly Schedule"}</CardTitle>
-                <CardDescription>
+          <TabsContent value="schedule" className="space-y-3">
+            <Card className="overflow-hidden">
+              <CardHeader className="px-3 py-3 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">{plan.content?.programOverview?.focus || "Weekly Schedule"}</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
                   {plan.content?.programOverview?.durationWeeks || 8}-week program • {plan.content?.programOverview?.daysPerWeek || 3} days/week
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-0 pb-3 sm:p-6 sm:pt-0">
                 <WorkoutSchedule plan={plan} onWorkoutClick={handleWorkoutClick} workoutLogs={workoutLogs} />
               </CardContent>
             </Card>
@@ -401,27 +372,16 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
                           {selectedWorkout.dayName} • {selectedWorkout.workout?.durationMinutes} min • {selectedWorkout.workout?.type}
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2 w-full sm:w-auto">
-                        <Button 
-                          onClick={handleLogClick} 
-                          size="lg"
-                          className="flex-1 sm:flex-initial animate-in fade-in zoom-in duration-300 bg-green-600 hover:bg-green-700"
-                          disabled={logWorkout.isPending || skipWorkout.isPending}
-                        >
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Log Workout
-                        </Button>
-                        <Button 
-                          onClick={handleSkipClick} 
-                          variant="outline"
-                          size="lg"
-                          className="flex-1 sm:flex-initial animate-in fade-in zoom-in duration-300 border-orange-300 text-orange-600 hover:bg-orange-50"
-                          disabled={logWorkout.isPending || skipWorkout.isPending}
-                        >
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Skip
-                        </Button>
-                      </div>
+                      <Button 
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedWorkout(null);
+                          setSelectedDayIndex(-1);
+                        }}
+                      >
+                        Close
+                      </Button>
                     </div>
                   </div>
                 </CardHeader>
@@ -485,6 +445,24 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
                                     <PlayCircle className="h-3 w-3" />
                                     Watch
                                   </Button>
+                                  <Button
+                                    variant={completedExercises[ex.name] ? "default" : "ghost"}
+                                    size="sm"
+                                    className={`h-7 px-2 text-xs gap-1 ${completedExercises[ex.name] ? 'bg-green-600 hover:bg-green-700' : 'text-green-600 hover:text-green-700 hover:bg-green-50'}`}
+                                    onClick={() => setLoggingExercise(ex)}
+                                  >
+                                    {completedExercises[ex.name] ? (
+                                      <>
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        Done
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Save className="h-3 w-3" />
+                                        Log
+                                      </>
+                                    )}
+                                  </Button>
                                   <div className="text-xs font-mono bg-muted px-2 py-1 rounded">
                                     {ex.sets} × {ex.reps}
                                   </div>
@@ -512,6 +490,18 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
                             </div>
                           );
                         })}
+                      </div>
+
+                      <div className="mt-6 flex justify-end">
+                        <Button 
+                          size="lg" 
+                          className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                          disabled={Object.keys(completedExercises).length === 0}
+                          onClick={() => setShowFinishDialog(true)}
+                        >
+                          <CheckCircle2 className="mr-2 h-5 w-5" />
+                          Finish Workout ({Object.keys(completedExercises).length}/{selectedWorkout.workout?.exercises?.length})
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -579,161 +569,95 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
         </DialogContent>
       </Dialog>
 
-      {/* Log Workout Dialog */}
-      <Dialog open={showLogDialog} onOpenChange={setShowLogDialog}>
-        <DialogContent className="sm:max-w-[450px]">
+      {/* Exercise Logging Dialog */}
+      <Dialog open={!!loggingExercise} onOpenChange={(open) => !open && setLoggingExercise(null)}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              Log Workout
-            </DialogTitle>
+            <DialogTitle>{loggingExercise?.name}</DialogTitle>
             <DialogDescription>
-              {selectedWorkout?.workout?.name} - {selectedWorkout?.dayName}
+              Log your sets, reps, and weight.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-6 py-4">
-            {/* Duration */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <Label className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  Duration
-                </Label>
-                <span className="text-sm font-medium">{logDuration} min</span>
-              </div>
-              <Slider 
-                value={[logDuration]} 
-                min={10} 
-                max={120} 
-                step={5} 
-                onValueChange={(vals) => setLogDuration(vals[0])} 
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>10 min</span>
-                <span>60 min</span>
-                <span>120 min</span>
-              </div>
-            </div>
-
-            {/* Difficulty */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <Label className="flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-muted-foreground" />
-                  How hard was it?
-                </Label>
-                <span className="text-sm font-medium">
-                  {logDifficulty <= 2 ? 'Easy' : logDifficulty <= 4 ? 'Moderate' : 'Hard'}
-                </span>
-              </div>
-              <Slider 
-                value={[logDifficulty]} 
-                min={1} 
-                max={5} 
-                step={1} 
-                onValueChange={(vals) => setLogDifficulty(vals[0])} 
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Easy</span>
-                <span>Moderate</span>
-                <span>Hard</span>
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label>Notes (optional)</Label>
-              <Textarea 
-                value={logNotes}
-                onChange={(e) => setLogNotes(e.target.value)}
-                placeholder="How did the workout feel? Any PRs?"
-                className="resize-none"
-                rows={2}
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <Button 
-              variant="outline" 
-              className="flex-1"
-              onClick={() => setShowLogDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              className="flex-1 bg-green-600 hover:bg-green-700"
-              onClick={() => logWorkout.mutate()}
-              disabled={logWorkout.isPending}
-            >
-              {logWorkout.isPending ? 'Logging...' : 'Log Workout'}
-            </Button>
-          </div>
+          {loggingExercise && (
+            <DynamicExerciseLogger
+              exercise={loggingExercise}
+              initialData={completedExercises[loggingExercise.name]}
+              onSave={(data) => {
+                setCompletedExercises(prev => ({
+                  ...prev,
+                  [loggingExercise.name]: data
+                }));
+                setLoggingExercise(null);
+                toast({
+                  title: 'Exercise Logged',
+                  description: `${loggingExercise.name} marked as complete.`,
+                });
+              }}
+              onCancel={() => setLoggingExercise(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
-      {/* Skip Workout Dialog */}
-      <Dialog open={showSkipDialog} onOpenChange={setShowSkipDialog}>
+      {/* Finish Workout Dialog */}
+      <Dialog open={showFinishDialog} onOpenChange={setShowFinishDialog}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <XCircle className="h-5 w-5 text-orange-500" />
-              Skip Workout
-            </DialogTitle>
+            <DialogTitle>Finish Workout</DialogTitle>
             <DialogDescription>
-              {selectedWorkout?.workout?.name} - {selectedWorkout?.dayName}
+              Great job! How was the workout?
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              That's okay! Rest days happen. Why are you skipping today?
-            </p>
-            
-            <div className="grid grid-cols-2 gap-2">
-              {['Tired / Recovery', 'Busy / No time', 'Feeling unwell', 'Other'].map((reason) => (
-                <Button
-                  key={reason}
-                  variant={skipReason === reason ? 'default' : 'outline'}
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => setSkipReason(reason)}
-                >
-                  {reason}
-                </Button>
-              ))}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label>Duration</Label>
+                <span className="text-sm font-medium">{finishDuration} min</span>
+              </div>
+              <Slider 
+                value={[finishDuration]} 
+                min={10} 
+                max={120} 
+                step={5} 
+                onValueChange={(vals) => setFinishDuration(vals[0])} 
+              />
             </div>
 
-            <Textarea 
-              value={skipReason.startsWith('Other') || !['Tired / Recovery', 'Busy / No time', 'Feeling unwell', 'Other'].includes(skipReason) ? skipReason : ''}
-              onChange={(e) => setSkipReason(e.target.value)}
-              placeholder="Add a note (optional)"
-              className="resize-none"
-              rows={2}
-            />
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label>Difficulty</Label>
+                <span className="text-sm font-medium">
+                  {finishDifficulty <= 2 ? 'Easy' : finishDifficulty <= 4 ? 'Moderate' : 'Hard'}
+                </span>
+              </div>
+              <Slider 
+                value={[finishDifficulty]} 
+                min={1} 
+                max={5} 
+                step={1} 
+                onValueChange={(vals) => setFinishDifficulty(vals[0])} 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea 
+                value={finishNotes}
+                onChange={(e) => setFinishNotes(e.target.value)}
+                placeholder="How did it feel?"
+                className="resize-none"
+              />
+            </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <Button 
-              variant="outline" 
-              className="flex-1"
-              onClick={() => {
-                setShowSkipDialog(false);
-                setSkipReason('');
-              }}
-            >
-              Cancel
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFinishDialog(false)}>Cancel</Button>
+            <Button onClick={() => finishWorkout.mutate()} disabled={finishWorkout.isPending}>
+              {finishWorkout.isPending ? 'Saving...' : 'Complete Workout'}
             </Button>
-            <Button 
-              variant="outline"
-              className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
-              onClick={() => skipWorkout.mutate()}
-              disabled={skipWorkout.isPending}
-            >
-              {skipWorkout.isPending ? 'Skipping...' : 'Skip Workout'}
-            </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,8 +42,9 @@ import { Link } from 'wouter';
 import { cn } from '@/lib/utils';
 import type { TodayPlan } from '@/types/wellness';
 import type { TrackingPreferences } from '@/types/tracking';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
+import { LogWorkoutDialog } from '@/components/optimize/workout/LogWorkoutDialog';
 
 interface TodayAtGlanceCardProps {
   data: TodayPlan;
@@ -63,10 +64,31 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
   const [localPrefs, setLocalPrefs] = useState<TrackingPreferences>(trackingPrefs || {});
   const [showLogDialog, setShowLogDialog] = useState(false);
   const [showSkipDialog, setShowSkipDialog] = useState(false);
-  const [logDuration, setLogDuration] = useState(data.workoutDurationMinutes || 45);
-  const [logDifficulty, setLogDifficulty] = useState(3);
-  const [logNotes, setLogNotes] = useState('');
   const [skipReason, setSkipReason] = useState('');
+  
+  // Fetch workout plan for detailed logging
+  const { data: workoutPlan } = useQuery<any>({
+    queryKey: ['/api/optimize/plans', 'workout'],
+    queryFn: async () => {
+      const response = await apiRequest('/api/optimize/plans?type=workout', { method: 'GET' });
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: showLogDialog, // Only fetch when dialog opens
+  });
+  
+  // Get today's workout from the plan
+  const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const todayWorkout = workoutPlan?.content?.weeklySchedule?.find(
+    (day: any) => day.day?.toLowerCase() === todayDayName.toLowerCase()
+  );
+  
+  // Build selectedWorkout object for LogWorkoutDialog
+  const selectedWorkout = todayWorkout ? {
+    workout: todayWorkout.workout,
+    day: todayWorkout.day,
+    dayName: todayWorkout.day,
+  } : null;
   
   // Preferences with defaults
   const showSupplements = trackingPrefs?.trackSupplements !== false;
@@ -167,38 +189,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
     },
   });
 
-  // Quick log workout mutation
-  const logWorkout = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('/api/optimize/workout/logs', {
-        method: 'POST',
-        body: JSON.stringify({
-          workoutName: data.workoutName || 'Today\'s Workout',
-          completedAt: new Date().toISOString(),
-          durationActual: logDuration,
-          difficultyRating: logDifficulty,
-          notes: logNotes || "Completed workout",
-          exercisesCompleted: [],
-        }),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to log workout');
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
-      setShowLogDialog(false);
-      setLogDuration(data.workoutDurationMinutes || 45);
-      setLogDifficulty(3);
-      setLogNotes('');
-    },
-  });
-
-  // Quick skip workout mutation (marks as rest day)
+  // Quick skip workout mutation (marks as rest day) with optimistic update
   const skipWorkout = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('/api/optimize/daily-logs', {
@@ -208,9 +199,54 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
       if (!response.ok) throw new Error('Failed to skip workout');
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+    onMutate: async () => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/dashboard/wellness'] });
+      await queryClient.cancelQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+      
+      // Snapshot current values
+      const previousWellness = queryClient.getQueryData(['/api/dashboard/wellness']);
+      const previousStreaks = queryClient.getQueryData(['/api/optimize/streaks/smart']);
+      
+      // Optimistically update as rest day
+      queryClient.setQueryData(['/api/dashboard/wellness'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          today: {
+            ...old.today,
+            isRestDay: true,
+          },
+        };
+      });
+      
+      // Optimistically update streak data
+      queryClient.setQueryData(['/api/optimize/streaks/smart'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          todayBreakdown: old.todayBreakdown ? {
+            ...old.todayBreakdown,
+            workout: { done: false, isRestDay: true }
+          } : old.todayBreakdown,
+        };
+      });
+      
+      return { previousWellness, previousStreaks };
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousWellness) {
+        queryClient.setQueryData(['/api/dashboard/wellness'], context.previousWellness);
+      }
+      if (context?.previousStreaks) {
+        queryClient.setQueryData(['/api/optimize/streaks/smart'], context.previousStreaks);
+      }
+    },
+    onSuccess: async () => {
+      // Use refetchQueries to ensure we wait for fresh data
+      await queryClient.refetchQueries({ queryKey: ['/api/dashboard/wellness'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/optimize/streaks/smart'] });
       setShowSkipDialog(false);
       setSkipReason('');
     },
@@ -527,7 +563,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                         e.preventDefault();
                         setShowSkipDialog(true);
                       }}
-                      disabled={skipWorkout.isPending || logWorkout.isPending}
+                      disabled={skipWorkout.isPending}
                     >
                       <XCircle className="h-3.5 w-3.5 mr-1.5" />
                       Skip
@@ -541,7 +577,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                         e.preventDefault();
                         setShowLogDialog(true);
                       }}
-                      disabled={skipWorkout.isPending || logWorkout.isPending}
+                      disabled={skipWorkout.isPending}
                     >
                       <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                       Log Workout
@@ -721,81 +757,17 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
       </CardContent>
 
       {/* Log Workout Dialog */}
-      <Dialog open={showLogDialog} onOpenChange={setShowLogDialog}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              Log Workout
-            </DialogTitle>
-            <DialogDescription>
-              {data.workoutName || 'Today\'s Workout'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-5 py-4">
-            {/* Duration */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label className="text-sm">Duration</Label>
-                <span className="text-sm font-medium">{logDuration} min</span>
-              </div>
-              <Slider 
-                value={[logDuration]} 
-                min={10} 
-                max={120} 
-                step={5} 
-                onValueChange={(vals) => setLogDuration(vals[0])} 
-              />
-            </div>
-
-            {/* Difficulty */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label className="text-sm">How hard was it?</Label>
-                <span className="text-sm font-medium">
-                  {logDifficulty <= 2 ? 'Easy' : logDifficulty <= 4 ? 'Moderate' : 'Hard'}
-                </span>
-              </div>
-              <Slider 
-                value={[logDifficulty]} 
-                min={1} 
-                max={5} 
-                step={1} 
-                onValueChange={(vals) => setLogDifficulty(vals[0])} 
-              />
-            </div>
-
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label className="text-sm">Notes (optional)</Label>
-              <Textarea 
-                value={logNotes}
-                onChange={(e) => setLogNotes(e.target.value)}
-                placeholder="How did it feel?"
-                className="resize-none h-16"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <Button 
-              variant="outline" 
-              className="flex-1"
-              onClick={() => setShowLogDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              className="flex-1 bg-green-600 hover:bg-green-700"
-              onClick={() => logWorkout.mutate()}
-              disabled={logWorkout.isPending}
-            >
-              {logWorkout.isPending ? 'Logging...' : 'Log Workout'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Log Workout Dialog - Full detailed logging with sets/weights/PRs */}
+      <LogWorkoutDialog
+        open={showLogDialog}
+        onOpenChange={setShowLogDialog}
+        selectedWorkout={selectedWorkout}
+        onSuccess={() => {
+          queryClient.refetchQueries({ queryKey: ['/api/optimize/workout/logs'] });
+          queryClient.refetchQueries({ queryKey: ['/api/dashboard/wellness'] });
+          queryClient.refetchQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+        }}
+      />
 
       {/* Skip Workout Dialog */}
       <Dialog open={showSkipDialog} onOpenChange={setShowSkipDialog}>

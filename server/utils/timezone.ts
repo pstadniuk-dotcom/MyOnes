@@ -100,3 +100,22 @@ export function isUserLocalYesterday(date: Date, userTimezone: string = 'America
     return false;
   }
 }
+
+/**
+ * Convert a UTC timestamp to the user's local date string (YYYY-MM-DD)
+ * Critical for grouping logs by the user's perceived day
+ */
+export function toUserLocalDateString(date: Date, userTimezone: string = 'America/New_York'): string {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: userTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return formatter.format(date);
+  } catch (error) {
+    console.error(`Invalid timezone "${userTimezone}", using UTC:`, error);
+    return date.toISOString().slice(0, 10);
+  }
+}

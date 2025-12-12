@@ -82,14 +82,6 @@ export function MobileScrollableTabs({
           <ChevronRight className="h-4 w-4" />
         </button>
       )}
-
-      {/* Gradient fades to indicate more content */}
-      {showLeftArrow && !showArrows && (
-        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent pointer-events-none z-10" />
-      )}
-      {showRightArrow && !showArrows && (
-        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none z-10" />
-      )}
     </div>
   );
 }

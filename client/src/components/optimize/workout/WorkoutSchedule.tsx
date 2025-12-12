@@ -40,14 +40,14 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
   // Find today's index for initial scroll position
   const todayIndex = weekDates.findIndex(date => isToday(date));
 
+  // Card width calculation: min(88vw, 320px) + gap for snap math (keeps full card visible and centered)
+  const getCardWidth = () => Math.min(window.innerWidth * 0.88, 320) + 12;
+
   // Auto-scroll to today on mobile
   useEffect(() => {
     if (isMobile && scrollRef.current && todayIndex >= 0) {
-      const scrollContainer = scrollRef.current;
-      // Use container width for responsive card sizing
-      const containerWidth = scrollContainer.offsetWidth;
-      const cardWidth = Math.min(containerWidth - 32, 320) + 12; // card width + gap
-      scrollContainer.scrollTo({
+      const cardWidth = getCardWidth();
+      scrollRef.current.scrollTo({
         left: todayIndex * cardWidth,
         behavior: 'smooth'
       });
@@ -59,8 +59,7 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
   const handleScroll = () => {
     if (scrollRef.current) {
       const scrollLeft = scrollRef.current.scrollLeft;
-      const containerWidth = scrollRef.current.offsetWidth;
-      const cardWidth = Math.min(containerWidth - 32, 320) + 12;
+      const cardWidth = getCardWidth();
       const newIndex = Math.round(scrollLeft / cardWidth);
       if (newIndex !== activeIndex && newIndex >= 0 && newIndex < weekPlan.length) {
         setActiveIndex(newIndex);
@@ -76,7 +75,8 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
         <div 
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 scrollbar-hide"
+          className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 scrollbar-hide px-4 justify-center"
+          style={{ scrollPaddingLeft: '16px', scrollPaddingRight: '16px' }}
         >
           {weekPlan.map((day: any, index: number) => {
             const dayDate = weekDates[index];
@@ -86,75 +86,93 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
             return (
               <div
                 key={index}
-                className="snap-start flex-shrink-0 w-[calc(100vw-4rem)] max-w-[320px]"
+                className="snap-center flex-shrink-0"
+                style={{ width: 'min(88vw, 320px)' }}
               >
                 <Card 
                   className={cn(
-                    "cursor-pointer touch-feedback transition-all h-full relative",
-                    day.isRestDay ? "opacity-70 bg-muted/50" : "border-l-4 border-l-primary",
-                    isCurrentDay && "ring-2 ring-primary ring-offset-2",
-                    isCompleted && !day.isRestDay && "bg-green-50/50 border-l-green-500"
+                    "transition-all h-full relative overflow-hidden bg-white",
+                    "mx-auto",
+                    day.isRestDay ? "opacity-75 bg-muted/40" : "border border-slate-200 shadow-sm",
+                    isCurrentDay && !isCompleted && "border-2 border-[#1B4332]/60",
+                    isCompleted && !day.isRestDay && "border-2 border-green-500/70 bg-green-50/60"
                   )}
-                  onClick={() => !day.isRestDay && onWorkoutClick(day, index)}
                 >
                   {isCompleted && !day.isRestDay && (
-                    <div className="absolute top-3 right-3">
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    <div className="absolute top-2 right-2 bg-white/85 rounded-full p-1 shadow-sm">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
                     </div>
                   )}
-                  <CardHeader className="p-4 pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
+                  <CardContent className="p-4 pb-5">
+                    <div className="flex flex-col gap-2">
+                      {/* Day header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "font-bold text-base",
+                            isCurrentDay && "text-primary"
+                          )}>
+                            {day.dayName}
+                          </span>
+                          {day.isRestDay && (
+                            <Badge variant="outline" className="text-xs">Rest</Badge>
+                          )}
+                        </div>
                         <span className={cn(
-                          "font-semibold text-base",
-                          isCurrentDay && "text-primary"
-                        )}>
-                          {day.dayName}
-                        </span>
-                        <span className={cn(
-                          "text-sm ml-2",
-                          isCurrentDay ? "text-primary font-medium" : "text-muted-foreground"
+                          "text-xs font-medium",
+                          isCurrentDay ? "text-primary" : "text-muted-foreground"
                         )}>
                           {format(dayDate, 'MMM d')}
                           {isCurrentDay && " • Today"}
                         </span>
                       </div>
-                      {day.isRestDay && (
-                        <Badge variant="outline" className="text-xs">Rest</Badge>
+                      
+                      {day.isRestDay ? (
+                        <p className="text-sm text-muted-foreground">
+                          Active recovery or complete rest
+                        </p>
+                      ) : (
+                        <>
+                          {/* Workout name */}
+                          <h4 className="font-semibold text-lg leading-tight pr-2">
+                            {day.workout?.name || "Workout"}
+                          </h4>
+                          
+                          {/* Workout details */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span>{day.workout?.durationMinutes || 45} min</span>
+                            </div>
+                            <Badge variant="secondary" className="text-xs">
+                              {day.workout?.exercises?.length || 0} exercises
+                            </Badge>
+                            {day.workout?.type && (
+                              <Badge variant="outline" className="text-xs capitalize">
+                                {day.workout.type.replace('_', ' ')}
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          {/* Action button */}
+                          <Button 
+                            className="w-full mt-3" 
+                            size="sm"
+                            variant={isCompleted ? "outline" : "default"}
+                            onClick={() => onWorkoutClick(day, index)}
+                            data-testid="workout-log-button"
+                          >
+                            {isCompleted ? 'View Details' : 'Start & Log'}
+                          </Button>
+                        </>
                       )}
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0">
-                    {day.isRestDay ? (
-                      <p className="text-sm text-muted-foreground">
-                        Active recovery or complete rest
-                      </p>
-                    ) : (
-                      <div className="space-y-3">
-                        <p className="font-medium text-base">
-                          {day.workout?.name || "Workout"}
-                        </p>
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <Clock className="h-4 w-4" />
-                            <span>{day.workout?.durationMinutes || 45}m</span>
-                          </div>
-                          <Badge variant="secondary" className="text-xs">
-                            {day.workout?.exercises?.length || 0} exercises
-                          </Badge>
-                        </div>
-                        {day.workout?.type && (
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {day.workout.type.replace('_', ' ')}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               </div>
             );
           })}
+          
         </div>
         
         {/* Scroll indicator dots */}
@@ -164,8 +182,7 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
               key={i}
               onClick={() => {
                 if (scrollRef.current) {
-                  const containerWidth = scrollRef.current.offsetWidth;
-                  const cardWidth = Math.min(containerWidth - 32, 320) + 12;
+                  const cardWidth = getCardWidth();
                   scrollRef.current.scrollTo({
                     left: i * cardWidth,
                     behavior: 'smooth'
@@ -254,6 +271,17 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
                         </Badge>
                       )}
                     </div>
+                    <Button 
+                      className="w-full mt-2" 
+                      size="sm"
+                      variant={isCompleted ? "outline" : "default"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onWorkoutClick(day, index);
+                      }}
+                    >
+                      {isCompleted ? 'View Details' : 'Start & Log'}
+                    </Button>
                   </div>
                 )}
               </CardContent>

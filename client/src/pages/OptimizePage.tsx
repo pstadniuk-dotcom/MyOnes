@@ -207,25 +207,22 @@ export default function OptimizePage() {
         setActivePlanTab(value as typeof activePlanTab);
         navigate(`/dashboard/optimize/${value}`);
       }} className="space-y-4 md:space-y-8">
-        <TabsList className="h-auto w-full rounded-xl border bg-muted/20 p-1 grid grid-cols-3 gap-1">
+        <TabsList className="h-auto w-full rounded-xl border bg-muted/20 p-1.5 grid grid-cols-3 gap-1.5">
           {planSections.map((section) => {
             const Icon = section.icon;
             return (
               <TabsTrigger
                 key={section.key}
                 value={section.key}
-                className="w-full justify-center md:justify-start rounded-lg border border-transparent px-2 md:px-3 py-2 text-center md:text-left transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                className="w-full justify-center rounded-lg border border-transparent px-3 py-3 md:py-2.5 text-center transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
               >
-                <div className="flex flex-col md:flex-row items-center gap-1 md:gap-2.5 overflow-hidden">
-                  <div className={`h-7 w-7 md:h-8 md:w-8 rounded-md flex items-center justify-center flex-shrink-0 ${
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className={`h-9 w-9 md:h-8 md:w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     activePlanTab === section.key ? section.badgeClass : 'bg-muted text-muted-foreground'
                   }`}>
-                    <Icon className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                    <Icon className="h-4.5 w-4.5 md:h-4 md:w-4" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs md:text-sm font-semibold text-foreground truncate">{section.title}</p>
-                    <p className="text-[9px] md:text-[10px] text-muted-foreground truncate hidden md:block">{section.description}</p>
-                  </div>
+                  <p className="text-sm md:text-sm font-semibold text-foreground">{section.title}</p>
                 </div>
               </TabsTrigger>
             );
@@ -285,7 +282,7 @@ export default function OptimizePage() {
         </Card>
         {planSections.map((section) => (
           <TabsContent key={section.key} value={section.key} className="mt-0 space-y-4 md:space-y-6">
-            <div className="rounded-xl md:rounded-3xl border bg-card/70 p-3 md:p-6 shadow-sm">
+            <div className="rounded-xl md:rounded-3xl border bg-card/70 px-2 py-3 md:p-6 shadow-sm">
               {section.content}
             </div>
           </TabsContent>
