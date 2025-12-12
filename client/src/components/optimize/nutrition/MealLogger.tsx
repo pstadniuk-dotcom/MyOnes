@@ -284,14 +284,14 @@ export function MealLogger({ todayPlanMeals, onMealLogged }: MealLoggerProps) {
     MEAL_TYPES.find(m => m.value === type) || MEAL_TYPES[0];
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <Utensils className="h-5 w-5 text-primary" />
           Log a Meal
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 overflow-hidden">
         {/* Custom meal logging - PRIMARY ACTION */}
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
@@ -408,25 +408,25 @@ export function MealLogger({ todayPlanMeals, onMealLogged }: MealLoggerProps) {
                     <Button
                       key={idx}
                       variant="outline"
-                      className="justify-start h-auto py-2.5 px-3"
+                      className="justify-start h-auto py-2.5 px-3 w-full overflow-hidden"
                       onClick={() => handleLogPlanMeal(meal)}
                       disabled={logMeal.isPending}
                     >
-                      <div className="flex items-center gap-3 w-full">
-                        <div className={`p-1.5 rounded-md ${typeInfo.color}`}>
+                      <div className="flex items-center gap-3 w-full min-w-0 overflow-hidden">
+                        <div className={`p-1.5 rounded-md flex-shrink-0 ${typeInfo.color}`}>
                           <Icon className="h-3.5 w-3.5" />
                         </div>
-                        <div className="flex-1 text-left">
-                          <div className="font-medium text-sm">{meal.name}</div>
-                          <div className="text-xs text-muted-foreground capitalize">
+                        <div className="flex-1 text-left min-w-0 overflow-hidden">
+                          <div className="font-medium text-sm truncate">{meal.name}</div>
+                          <div className="text-xs text-muted-foreground capitalize truncate">
                             {meal.mealType}
                             {meal.macros?.calories && ` • ${meal.macros.calories} cal`}
                           </div>
                         </div>
                         {logMeal.isPending && selectedPlanMeal === meal.name ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
                         ) : (
-                          <CheckCircle2 className="h-4 w-4 text-muted-foreground/50" />
+                          <CheckCircle2 className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />
                         )}
                       </div>
                     </Button>

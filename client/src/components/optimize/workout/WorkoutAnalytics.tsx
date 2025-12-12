@@ -70,56 +70,56 @@ export function WorkoutAnalytics() {
   return (
     <div className="space-y-6">
       {/* Hero Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-200/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Streak</CardTitle>
-            <Flame className="h-5 w-5 text-orange-500" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-200/50 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Active Streak</CardTitle>
+            <Flame className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-orange-600">{data.currentStreak}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-2xl sm:text-3xl font-bold text-orange-600">{data.currentStreak}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 truncate">
               {data.currentStreak > 7 ? '🔥 On fire!' : 'Days in a row'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-200/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Week</CardTitle>
-            <Target className="h-5 w-5 text-blue-500" />
+        <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-200/50 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">This Week</CardTitle>
+            <Target className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 flex-shrink-0" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold text-blue-600">{workoutsThisWeek}</span>
-              <span className="text-sm text-muted-foreground">/ {weeklyGoal}</span>
+              <span className="text-2xl sm:text-3xl font-bold text-blue-600">{workoutsThisWeek}</span>
+              <span className="text-xs sm:text-sm text-muted-foreground">/ {weeklyGoal}</span>
             </div>
             <Progress value={weeklyProgress} className="h-1.5 mt-2" />
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-200/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Workouts</CardTitle>
-            <TrendingUp className="h-5 w-5 text-green-500" />
+        <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-200/50 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Workouts</CardTitle>
+            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600">{data.totalWorkouts}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Lifetime sessions
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-2xl sm:text-3xl font-bold text-green-600">{data.totalWorkouts}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+              Lifetime
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-200/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Time This Week</CardTitle>
-            <Clock className="h-5 w-5 text-purple-500" />
+        <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-200/50 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Time This Week</CardTitle>
+            <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500 flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-purple-600">{data.durationThisWeek || 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Minutes trained
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-2xl sm:text-3xl font-bold text-purple-600">{data.durationThisWeek || 0}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+              Minutes
             </p>
           </CardContent>
         </Card>
@@ -127,19 +127,19 @@ export function WorkoutAnalytics() {
 
       {/* Completion Rate Card */}
       {(data.totalExercisesLogged || data.totalExercisesSkipped) ? (
-        <Card className="bg-gradient-to-r from-teal-50 to-cyan-50 border-teal-200/50">
+        <Card className="bg-gradient-to-r from-teal-50 to-cyan-50 border-teal-200/50 overflow-hidden">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Target className="h-5 w-5 text-teal-600" />
-              Exercise Completion Rate
+            <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+              <Target className="h-4 w-4 sm:h-5 sm:w-5 text-teal-600 flex-shrink-0" />
+              <span className="truncate">Exercise Completion</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-6">
-              <div className="flex-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-teal-600">{data.completionRate || 100}%</span>
-                  <span className="text-sm text-muted-foreground">of exercises completed</span>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className="text-3xl sm:text-4xl font-bold text-teal-600">{data.completionRate || 100}%</span>
+                  <span className="text-xs sm:text-sm text-muted-foreground">completed</span>
                 </div>
                 <Progress value={data.completionRate || 100} className="h-2 mt-3" />
                 <div className="flex justify-between text-xs text-muted-foreground mt-2">
@@ -148,7 +148,7 @@ export function WorkoutAnalytics() {
                 </div>
               </div>
               {data.mostSkippedExercises && data.mostSkippedExercises.length > 0 && (
-                <div className="border-l pl-6 hidden md:block">
+                <div className="border-t sm:border-t-0 sm:border-l pt-4 sm:pt-0 sm:pl-6 hidden sm:block">
                   <div className="text-xs font-medium text-muted-foreground mb-2">Most Skipped</div>
                   <div className="space-y-1">
                     {data.mostSkippedExercises.slice(0, 3).map((ex, i) => (
@@ -167,26 +167,26 @@ export function WorkoutAnalytics() {
       ) : null}
 
       {/* Volume Progression Chart - Enhanced */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      <Card className="overflow-hidden">
+        <CardHeader className="p-3 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
                 Volume Progression
               </CardTitle>
-              <CardDescription>Total weight lifted (lbs) per week</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">Total weight lifted per week</CardDescription>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold">{lastWeekVolume.toLocaleString()} lbs</div>
-              <div className={`text-sm flex items-center gap-1 justify-end ${volumeChange >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+            <div className="text-left sm:text-right">
+              <div className="text-xl sm:text-2xl font-bold">{lastWeekVolume.toLocaleString()} lbs</div>
+              <div className={`text-xs sm:text-sm flex items-center gap-1 sm:justify-end ${volumeChange >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                 {volumeChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingUp className="h-3 w-3 rotate-180" />}
                 {volumeChange >= 0 ? '+' : ''}{volumeChange}% vs last week
               </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="h-[280px]">
+        <CardContent className="h-[220px] sm:h-[280px] p-2 sm:p-6 pt-0">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data.volumeChartData}>
               <defs>
@@ -230,15 +230,15 @@ export function WorkoutAnalytics() {
       </Card>
 
       {/* Weekly Consistency Bar Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
+      <Card className="overflow-hidden">
+        <CardHeader className="p-3 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
             Weekly Consistency
           </CardTitle>
-          <CardDescription>Workouts completed per week (last 8 weeks)</CardDescription>
+          <CardDescription className="text-xs sm:text-sm">Workouts per week (last 8 weeks)</CardDescription>
         </CardHeader>
-        <CardContent className="h-[200px]">
+        <CardContent className="h-[160px] sm:h-[200px] p-2 sm:p-6 pt-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.consistencyData.slice(-8)}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" opacity={0.5} />
@@ -361,34 +361,34 @@ export function WorkoutAnalytics() {
       </div>
 
       {/* Lifetime Stats Summary */}
-      <Card className="bg-gradient-to-r from-slate-900 to-slate-800 text-white">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Zap className="h-5 w-5 text-yellow-400" />
+      <Card className="bg-gradient-to-r from-slate-900 to-slate-800 text-white overflow-hidden">
+        <CardHeader className="p-3 sm:p-6">
+          <CardTitle className="text-white flex items-center gap-2 text-base sm:text-lg">
+            <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 flex-shrink-0" />
             Lifetime Summary
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div>
-              <div className="text-3xl font-bold text-yellow-400">{totalVolume.toLocaleString()}</div>
-              <div className="text-sm text-slate-400">Total lbs lifted</div>
+        <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            <div className="min-w-0">
+              <div className="text-xl sm:text-3xl font-bold text-yellow-400 truncate">{totalVolume.toLocaleString()}</div>
+              <div className="text-xs sm:text-sm text-slate-400">Total lbs</div>
             </div>
-            <div>
-              <div className="text-3xl font-bold text-green-400">{data.totalWorkouts}</div>
-              <div className="text-sm text-slate-400">Workouts completed</div>
+            <div className="min-w-0">
+              <div className="text-xl sm:text-3xl font-bold text-green-400">{data.totalWorkouts}</div>
+              <div className="text-xs sm:text-sm text-slate-400">Workouts</div>
             </div>
-            <div>
-              <div className="text-3xl font-bold text-blue-400">
+            <div className="min-w-0">
+              <div className="text-xl sm:text-3xl font-bold text-blue-400">
                 {Math.round((data.durationThisWeek || 0) * (data.consistencyData.length || 1) / 60)}
               </div>
-              <div className="text-sm text-slate-400">Hours trained (est.)</div>
+              <div className="text-xs sm:text-sm text-slate-400">Hours (est.)</div>
             </div>
-            <div>
-              <div className="text-3xl font-bold text-purple-400">
+            <div className="min-w-0">
+              <div className="text-xl sm:text-3xl font-bold text-purple-400">
                 {Object.keys(data.personalRecords).length}
               </div>
-              <div className="text-sm text-slate-400">Personal records</div>
+              <div className="text-xs sm:text-sm text-slate-400">PRs</div>
             </div>
           </div>
         </CardContent>

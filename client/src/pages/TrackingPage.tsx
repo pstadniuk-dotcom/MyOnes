@@ -12,6 +12,36 @@ import { emptyWellnessData } from '@/types/wellness';
 import type { TrackingPreferences } from '@/types/tracking';
 import { defaultTrackingPreferences } from '@/types/tracking';
 
+// Derive today's completion percent from live wellness data (optimistically updated)
+function getTodayPercentage(
+  wellness: WellnessData,
+  prefs: TrackingPreferences
+) {
+  const enabled = {
+    workout: prefs.trackWorkouts !== false,
+    nutrition: prefs.trackNutrition !== false,
+    supplements: prefs.trackSupplements !== false,
+    water: true,
+    lifestyle: prefs.trackLifestyle !== false,
+  };
+
+  const enabledCount = Object.values(enabled).filter(Boolean).length;
+  if (enabledCount === 0) return 0;
+
+  const workoutDone = enabled.workout && (wellness.today.isRestDay || wellness.today.workoutCompleted);
+  const nutritionDone = enabled.nutrition && ((wellness.today.mealsLogged?.length || 0) > 0);
+  const supplementsDone = enabled.supplements && (
+    wellness.today.supplementDosesTaken >= (wellness.today.supplementDosesTotal || 3)
+  );
+  const waterDone = enabled.water && (
+    wellness.today.waterIntakeOz >= (wellness.today.waterGoalOz || 0)
+  );
+  const lifestyleDone = enabled.lifestyle && false; // No explicit lifestyle flag in wellness.today yet
+
+  const completed = [workoutDone, nutritionDone, supplementsDone, waterDone, lifestyleDone].filter(Boolean).length;
+  return Math.round((completed / enabledCount) * 100);
+}
+
 function TrackingSkeleton() {
   return (
     <div className="space-y-4">
@@ -188,6 +218,8 @@ export default function TrackingPage() {
   const hasData = wellness.today.hasWorkoutToday || wellness.today.hasMealPlan || wellness.hasOptimizeSetup;
   const isLoading = wellnessLoading || streakLoading;
 
+  const todayPercentage = getTodayPercentage(wellness, prefs);
+
   if (isLoading) {
     return (
       <div className="w-full px-4 py-4 md:max-w-6xl md:mx-auto space-y-4 md:space-y-6" data-testid="page-tracking">
@@ -221,26 +253,7 @@ export default function TrackingPage() {
             <TodayAtGlanceCard 
               data={wellness.today}
               trackingPrefs={prefs}
-              todayPercentage={smartStreakData ? (() => {
-                const breakdown = smartStreakData.todayBreakdown;
-                if (!breakdown) return 0;
-                const enabled = {
-                  workout: prefs.trackWorkouts !== false,
-                  nutrition: prefs.trackNutrition !== false,
-                  supplements: prefs.trackSupplements !== false,
-                  water: true,
-                  lifestyle: prefs.trackLifestyle !== false,
-                };
-                const enabledCount = Object.values(enabled).filter(Boolean).length;
-                if (enabledCount === 0) return 0;
-                let completed = 0;
-                if (enabled.workout && (breakdown.workout.isRestDay || breakdown.workout.done)) completed++;
-                if (enabled.nutrition && breakdown.nutrition.mealsLogged > 0) completed++;
-                if (enabled.supplements && breakdown.supplements.taken >= breakdown.supplements.total) completed++;
-                if (enabled.water && breakdown.water.current >= breakdown.water.goal) completed++;
-                if (enabled.lifestyle && breakdown.lifestyle.complete) completed++;
-                return Math.round((completed / enabledCount) * 100);
-              })() : undefined}
+              todayPercentage={todayPercentage}
               onLogSupplementDose={handleLogSupplement}
               onLogWaterAmount={handleLogWater}
             />

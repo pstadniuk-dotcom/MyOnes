@@ -1168,7 +1168,7 @@ export default function ConsultationPage() {
 
         {/* Messages Area */}
         <ScrollArea className="flex-1" data-testid="container-chat-messages">
-          <div className="p-6 space-y-6">
+          <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
             {filteredMessages.map((message, index) => {
               // System messages render differently
               if (message.sender === 'system') {
@@ -1193,29 +1193,30 @@ export default function ConsultationPage() {
                   data-testid={`message-${message.sender}-${message.id}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl p-5 space-y-3 ${
+                    className={`max-w-[95%] sm:max-w-[85%] rounded-2xl p-3 sm:p-5 space-y-3 overflow-hidden ${
                       message.sender === 'user'
                         ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-lg'
                         : 'bg-background/80 backdrop-blur-sm text-foreground border shadow-md'
                     } ${message.sender === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
                   >
-                  <div className={`flex items-start gap-4 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-                    {message.sender === 'ai' && (
-                      <img 
-                        src="/ones-logo-icon.svg" 
-                        alt="ONES" 
-                        className={`h-9 w-9 flex-shrink-0 ${!message.content && (isTyping || thinkingMessage) ? 'animate-spin' : ''}`}
-                      />
-                    )}
-                    {message.sender === 'user' && (
-                      <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-white/30 dark:ring-white/20">
-                        <AvatarFallback className="bg-white/30 dark:bg-white/20 text-white dark:text-white">
-                          <User className="w-5 h-5" />
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
+                  <div>
+                    {/* Header with avatar, name, timestamp */}
+                    <div className={`flex items-center gap-2 mb-2 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+                      {message.sender === 'ai' && (
+                        <img 
+                          src="/ones-logo-icon.svg" 
+                          alt="ONES" 
+                          className={`h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0 ${!message.content && (isTyping || thinkingMessage) ? 'animate-spin' : ''}`}
+                        />
+                      )}
+                      {message.sender === 'user' && (
+                        <Avatar className="h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0 ring-2 ring-white/30 dark:ring-white/20">
+                          <AvatarFallback className="bg-white/30 dark:bg-white/20 text-white dark:text-white">
+                            <User className="w-4 h-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                      <div className="flex items-center gap-2">
                         <span className={`text-xs font-medium ${message.sender === 'user' ? 'text-white/90 dark:text-white/90' : 'text-muted-foreground'}`}>
                           {message.sender === 'user' ? 'You' : 'Ones AI'}
                         </span>
@@ -1243,7 +1244,10 @@ export default function ConsultationPage() {
                           <Share2 className="w-3 h-3" />
                         </Button>
                       </div>
-                      
+                    </div>
+                    
+                    {/* Message content - left aligned */}
+                    <div className="w-full">
                       {/* Show thinking indicator if AI message is empty/thinking */}
                       {message.sender === 'ai' && !message.content && (isTyping || thinkingMessage) ? (
                         <p className="text-sm text-muted-foreground">
@@ -1270,8 +1274,8 @@ export default function ConsultationPage() {
                       
                       {/* Enhanced formula visualization with animations */}
                       {message.formula && (
-                        <div className="mt-4 p-4 bg-card rounded-lg border animate-in fade-in-50 duration-500">
-                          <div className="flex items-center justify-between mb-3">
+                        <div className="mt-4 p-3 sm:p-4 bg-card rounded-lg border animate-in fade-in-50 duration-500 overflow-hidden">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                             <h4 className="font-semibold text-base flex items-center gap-2 text-primary">
                               <CheckCircle className="w-5 h-5 text-green-500 animate-in zoom-in-50 duration-700" />
                               Your Personalized Formula
@@ -1294,27 +1298,27 @@ export default function ConsultationPage() {
                                 {message.formula.bases.map((base, idx) => (
                                   <div 
                                     key={idx} 
-                                    className="flex items-center justify-between p-3 bg-muted/50 rounded border hover-elevate cursor-pointer group"
+                                    className="flex items-start sm:items-center justify-between gap-2 p-2 sm:p-3 bg-muted/50 rounded border hover-elevate cursor-pointer group"
                                     style={{ animationDelay: `${idx * 100}ms` }}
                                   >
-                                    <div className="flex-1">
+                                    <div className="flex-1 min-w-0">
                                       <span className="font-medium text-sm">{base.name}</span>
-                                      {base.purpose && <p className="text-xs text-muted-foreground mt-1">{base.purpose}</p>}
+                                      {base.purpose && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{base.purpose}</p>}
                                     </div>
-                                    <Badge variant="secondary" className="text-xs font-semibold">{base.dose}</Badge>
+                                    <Badge variant="secondary" className="text-xs font-semibold flex-shrink-0">{base.dose}</Badge>
                                   </div>
                                 ))}
                                 {message.formula.additions.map((addition, idx) => (
                                   <div 
                                     key={idx} 
-                                    className="flex items-center justify-between p-3 bg-muted/30 rounded border-dashed border hover-elevate cursor-pointer"
+                                    className="flex items-start sm:items-center justify-between gap-2 p-2 sm:p-3 bg-muted/30 rounded border-dashed border hover-elevate cursor-pointer"
                                     style={{ animationDelay: `${((message.formula?.bases?.length || 0) + idx) * 100}ms` }}
                                   >
-                                    <div className="flex-1">
+                                    <div className="flex-1 min-w-0">
                                       <span className="font-medium text-sm">{addition.name}</span>
-                                      {addition.purpose && <p className="text-xs text-muted-foreground mt-1">{addition.purpose}</p>}
+                                      {addition.purpose && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{addition.purpose}</p>}
                                     </div>
-                                    <Badge variant="outline" className="text-xs font-semibold">{addition.dose}</Badge>
+                                    <Badge variant="outline" className="text-xs font-semibold flex-shrink-0">{addition.dose}</Badge>
                                   </div>
                                 ))}
                               </div>
@@ -1379,8 +1383,8 @@ export default function ConsultationPage() {
         </ScrollArea>
         
         {/* Modern Input Area */}
-        <div className="border-t bg-background/95 backdrop-blur-sm">
-          <div className="p-4 space-y-4">
+        <div className="border-t bg-background/95 backdrop-blur-sm safe-bottom">
+          <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
             {/* Uploaded Files Preview */}
             {uploadedFiles.length > 0 && (
               <div className="space-y-2">
@@ -1411,82 +1415,85 @@ export default function ConsultationPage() {
               </div>
             )}
             
-            {/* Input Area - Mobile optimized */}
-            <div className="flex space-x-2 md:space-x-3 items-end">
-              <div className="flex-1 space-y-2">
-                <Textarea
-                  ref={textareaRef}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  placeholder="Ask about supplements, health goals..."
-                  className="min-h-[48px] max-h-[120px] resize-none text-base"
-                  rows={1}
-                  disabled={isTyping}
-                  data-testid="input-consultation-message"
-                />
-                {/* Quick Actions - Hidden on mobile */}
-                <div className="hidden md:flex items-center justify-between">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <FileText className="w-3 h-3" />
-                    <span>Upload files or type your question</span>
-                  </div>
+            {/* Input Area - Full width textarea with buttons below */}
+            <div className="space-y-3">
+              <Textarea
+                ref={textareaRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Ask about supplements, health goals..."
+                className="w-full min-h-[48px] max-h-[120px] resize-none text-base"
+                rows={1}
+                disabled={isTyping}
+                data-testid="input-consultation-message"
+              />
+              
+              {/* Buttons Row */}
+              <div className="flex items-center justify-between">
+                {/* Left side - hints (desktop only) */}
+                <div className="hidden md:flex items-center gap-1 text-xs text-muted-foreground">
+                  <FileText className="w-3 h-3" />
+                  <span>Upload files or type your question</span>
                   {draftSaved && inputValue.trim().length > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-green-600">
+                    <span className="flex items-center gap-1 ml-3 text-green-600">
                       <CheckCircle className="w-3 h-3" />
-                      <span>Draft saved</span>
-                    </div>
+                      Draft saved
+                    </span>
                   )}
                 </div>
-              </div>
-              
-              {/* Action Buttons - Larger on mobile */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleFileUpload}
-                  disabled={isUploading}
-                  className="flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback"
-                  data-testid="button-upload-file"
-                >
-                  {isUploading ? (
-                    <Loader2 className="w-5 h-5 md:w-4 md:h-4 animate-spin" />
-                  ) : (
-                    <Upload className="w-5 h-5 md:w-4 md:h-4" />
-                  )}
-                </Button>
                 
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleVoiceInput}
-                  disabled={isRecording || isTyping}
-                  className={`flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback ${isRecording ? 'bg-red-50 border-red-200' : ''}`}
-                  data-testid="button-voice-input"
-                >
-                  {isRecording ? (
-                    <div className="flex items-center">
-                      <Mic className="w-5 h-5 md:w-4 md:h-4 text-red-500 animate-pulse" />
-                    </div>
-                  ) : (
-                    <Mic className="w-5 h-5 md:w-4 md:h-4" />
-                  )}
-                </Button>
+                {/* Spacer for mobile to push buttons right */}
+                <div className="md:hidden flex-1" />
                 
-                <Button
-                  onClick={() => handleSendMessage(inputValue, uploadedFiles)}
-                  size="icon"
-                  disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isTyping}
-                  className="flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback"
-                  data-testid="button-send-message"
-                >
-                  {isTyping ? (
-                    <Loader2 className="w-5 h-5 md:w-4 md:h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-5 h-5 md:w-4 md:h-4" />
-                  )}
-                </Button>
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleFileUpload}
+                    disabled={isUploading}
+                    className="flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback"
+                    data-testid="button-upload-file"
+                  >
+                    {isUploading ? (
+                      <Loader2 className="w-5 h-5 md:w-4 md:h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-5 h-5 md:w-4 md:h-4" />
+                    )}
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleVoiceInput}
+                    disabled={isRecording || isTyping}
+                    className={`flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback ${isRecording ? 'bg-red-50 border-red-200' : ''}`}
+                    data-testid="button-voice-input"
+                  >
+                    {isRecording ? (
+                      <div className="flex items-center">
+                        <Mic className="w-5 h-5 md:w-4 md:h-4 text-red-500 animate-pulse" />
+                      </div>
+                    ) : (
+                      <Mic className="w-5 h-5 md:w-4 md:h-4" />
+                    )}
+                  </Button>
+                  
+                  <Button
+                    onClick={() => handleSendMessage(inputValue, uploadedFiles)}
+                    size="icon"
+                    disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isTyping}
+                    className="flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback"
+                    data-testid="button-send-message"
+                  >
+                    {isTyping ? (
+                      <Loader2 className="w-5 h-5 md:w-4 md:h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-5 h-5 md:w-4 md:h-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
             

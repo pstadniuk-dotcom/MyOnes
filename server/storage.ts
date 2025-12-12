@@ -3,7 +3,7 @@ import { db } from "./db";
 import { encryptToken, decryptToken } from "./tokenEncryption";
 import { encryptField, decryptField, encryptFieldSafe, decryptFieldSafe } from "./fieldEncryption";
 import { logger } from "./logger";
-import { getUserLocalMidnight, getUserLocalDateString } from "./utils/timezone";
+import { getUserLocalMidnight, getUserLocalDateString, toUserLocalDateString } from "./utils/timezone";
 import {
   users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
   subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
@@ -3525,7 +3525,8 @@ export class DrizzleStorage implements IStorage {
     const workoutLogsByDate = new Map<string, typeof allWorkoutLogs>();
     allWorkoutLogs.forEach(log => {
       const logDate = new Date(log.completedAt);
-      const dateStr = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}-${String(logDate.getDate()).padStart(2, '0')}`;
+      // Use user's timezone to determine which day the workout was logged
+      const dateStr = toUserLocalDateString(logDate, userTimezone);
       if (!workoutLogsByDate.has(dateStr)) workoutLogsByDate.set(dateStr, []);
       workoutLogsByDate.get(dateStr)!.push(log);
     });
@@ -3542,7 +3543,8 @@ export class DrizzleStorage implements IStorage {
     const mealLogsByDate = new Map<string, typeof allMealLogs>();
     allMealLogs.forEach(log => {
       const logDate = new Date(log.loggedAt);
-      const dateStr = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}-${String(logDate.getDate()).padStart(2, '0')}`;
+      // Use user's timezone to determine which day the meal was logged
+      const dateStr = toUserLocalDateString(logDate, userTimezone);
       if (!mealLogsByDate.has(dateStr)) mealLogsByDate.set(dateStr, []);
       mealLogsByDate.get(dateStr)!.push(log);
     });
@@ -3550,8 +3552,8 @@ export class DrizzleStorage implements IStorage {
     for (let i = 0; i < 30; i++) {
       const date = new Date(startOfMonth);
       date.setDate(startOfMonth.getDate() + i);
-      // Use local date parts instead of ISO string to avoid timezone issues
-      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      // Use user's local date string for the day
+      const dateStr = toUserLocalDateString(date, userTimezone);
       const dayOfWeek = date.getDay();
       
       // Get daily log from batch (no DB call)
@@ -3658,7 +3660,24 @@ export class DrizzleStorage implements IStorage {
     // Using 50% threshold to be more encouraging while still requiring meaningful effort
     const STREAK_THRESHOLD = 50;
     let calculatedCurrentStreak = 0;
-    for (let i = monthlyProgress.length - 1; i >= 0; i--) {
+    
+    // Start from the end (today) and work backwards
+    // If today is incomplete (< threshold), skip it and start counting from yesterday
+    // This way, the streak isn't broken just because you haven't finished today's tasks yet
+    let startIndex = monthlyProgress.length - 1;
+    if (startIndex >= 0 && monthlyProgress[startIndex].date === todayStr) {
+      const todayPercentage = monthlyProgress[startIndex].percentage;
+      const todayIsRestDay = monthlyProgress[startIndex].isRestDay;
+      if (todayPercentage >= STREAK_THRESHOLD || todayIsRestDay) {
+        // Today counts toward streak
+        calculatedCurrentStreak++;
+      }
+      // Move to yesterday regardless (either today counted or it's still in progress)
+      startIndex--;
+    }
+    
+    // Now count consecutive days from yesterday backwards
+    for (let i = startIndex; i >= 0; i--) {
       if (monthlyProgress[i].percentage >= STREAK_THRESHOLD || monthlyProgress[i].isRestDay) {
         calculatedCurrentStreak++;
       } else {

@@ -79,24 +79,24 @@ export function ExerciseLogForm({
   const isNewPr = suggestedWeight && maxWeight > suggestedWeight;
 
   return (
-    <Card className={isPrMarked ? 'ring-2 ring-yellow-400' : ''}>
+    <Card className={`overflow-hidden ${isPrMarked ? 'ring-2 ring-yellow-400' : ''}`}>
       <CardHeader className="p-3 sm:p-6">
         <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-base sm:text-lg">{exercise.name}</span>
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span className="text-base sm:text-lg truncate">{exercise.name}</span>
             {suggestedWeight && suggestedWeight > 0 && (
-              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded whitespace-nowrap">
                 Last: {suggestedWeight}lbs × {lastReps || exercise.reps}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm font-normal text-gray-600">
+          <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm font-normal text-gray-600 flex-shrink-0">
             <span>{completedSets}/{exercise.sets} sets</span>
             <span className="whitespace-nowrap">{totalVolume.toLocaleString()} lbs</span>
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 p-3 sm:p-6 pt-0 sm:pt-0">{sets.map((set, index) => (
+      <CardContent className="space-y-3 p-3 sm:p-6 pt-0 sm:pt-0 overflow-hidden">{sets.map((set, index) => (
           <SetLogger
             key={index}
             setNumber={index + 1}
@@ -108,26 +108,26 @@ export function ExerciseLogForm({
         ))}
         
         {/* PR Toggle Button - Always visible */}
-        <div className="pt-2 flex items-center gap-3 border-t mt-2">
+        <div className="pt-2 flex flex-wrap items-center gap-2 sm:gap-3 border-t mt-2">
           <Button
             type="button"
             variant={isPrMarked ? "default" : "outline"}
             size="sm"
             onClick={() => onTogglePr?.(exercise.name)}
             disabled={completedSets === 0}
-            className={isPrMarked ? "bg-yellow-500 hover:bg-yellow-600 text-white" : ""}
+            className={`flex-shrink-0 ${isPrMarked ? "bg-yellow-500 hover:bg-yellow-600 text-white" : ""}`}
           >
             <Trophy className="h-4 w-4 mr-1" />
-            {isPrMarked ? 'PR Marked! 🎉' : 'Save as PR'}
+            {isPrMarked ? 'PR! 🎉' : 'Save PR'}
           </Button>
           {completedSets === 0 && (
             <span className="text-xs text-muted-foreground">
-              Complete a set to save as PR
+              Complete a set to save PR
             </span>
           )}
           {isNewPr && !isPrMarked && completedSets > 0 && (
             <span className="text-xs text-green-600 font-medium">
-              🔥 New personal best! ({maxWeight}lbs vs {suggestedWeight}lbs)
+              🔥 New best! ({maxWeight} vs {suggestedWeight}lbs)
             </span>
           )}
         </div>
