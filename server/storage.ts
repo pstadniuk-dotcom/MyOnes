@@ -3475,6 +3475,14 @@ export class DrizzleStorage implements IStorage {
     // Calculate today's date string in user's timezone
     const todayStr = getUserLocalDateString(userTimezone);
     
+    console.log('🔍 Smart Streak init:', { 
+      userTimezone, 
+      todayUTC: today.toISOString(), 
+      todayStr,
+      startOfMonthUTC: startOfMonth.toISOString(),
+      todayGetDate: today.getDate()
+    });
+    
     const monthlyProgress: Array<{
       date: string;
       percentage: number;
@@ -3555,6 +3563,12 @@ export class DrizzleStorage implements IStorage {
       date.setDate(startOfMonth.getDate() + i);
       // Use user's local date string for the day
       const dateStr = toUserLocalDateString(date, userTimezone);
+      
+      // Debug: Log first, middle, and last iterations
+      if (i === 0 || i === 14 || i === 29) {
+        console.log(`🔍 Progress loop i=${i}: startOfMonth.getDate()=${startOfMonth.getDate()}, date=${date.toISOString()}, dateStr=${dateStr}`);
+      }
+      
       const dayOfWeek = date.getDay();
       
       // Get daily log from batch (no DB call)
