@@ -365,12 +365,19 @@ export default function MyFormulaPage() {
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="formulas" className="text-xs sm:text-sm" data-testid="tab-my-formulas">
+          <TabsTrigger value="formulas" className="text-xs sm:text-sm gap-1.5" data-testid="tab-my-formulas">
+            <FlaskConical className="h-4 w-4 sm:hidden" />
             <span className="hidden sm:inline">My Formulas</span>
             <span className="sm:hidden">Formulas</span>
           </TabsTrigger>
-          <TabsTrigger value="ingredients" className="text-xs sm:text-sm" data-testid="tab-ingredients">Ingredients</TabsTrigger>
-          <TabsTrigger value="actions" className="text-xs sm:text-sm" data-testid="tab-actions">Actions</TabsTrigger>
+          <TabsTrigger value="ingredients" className="text-xs sm:text-sm gap-1.5" data-testid="tab-ingredients">
+            <Beaker className="h-4 w-4 sm:hidden" />
+            <span>Ingredients</span>
+          </TabsTrigger>
+          <TabsTrigger value="actions" className="text-xs sm:text-sm gap-1.5" data-testid="tab-actions">
+            <Sparkles className="h-4 w-4 sm:hidden" />
+            <span>Actions</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* My Formulas Tab - Grid of all formulas */}

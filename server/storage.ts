@@ -3497,7 +3497,8 @@ export class DrizzleStorage implements IStorage {
     const dailyLogsByDate = new Map<string, typeof allDailyLogs[0]>();
     allDailyLogs.forEach(log => {
       const logDate = new Date(log.logDate);
-      const dateStr = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}-${String(logDate.getDate()).padStart(2, '0')}`;
+      // Use user's timezone to determine which day the log belongs to (consistent with lookup key)
+      const dateStr = toUserLocalDateString(logDate, userTimezone);
       dailyLogsByDate.set(dateStr, log);
     });
     

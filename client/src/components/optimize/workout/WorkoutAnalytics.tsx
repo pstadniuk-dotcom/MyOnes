@@ -31,6 +31,9 @@ interface WorkoutAnalyticsData {
 export function WorkoutAnalytics() {
   const { data, isLoading } = useQuery<WorkoutAnalyticsData>({
     queryKey: ['/api/optimize/analytics/workout'],
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
   if (isLoading) {

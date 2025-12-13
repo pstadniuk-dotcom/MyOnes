@@ -35,8 +35,7 @@ import {
   Sunset,
   Plus,
   Settings2,
-  CheckCircle2,
-  XCircle
+  CheckCircle2
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { cn } from '@/lib/utils';
@@ -63,8 +62,6 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [localPrefs, setLocalPrefs] = useState<TrackingPreferences>(trackingPrefs || {});
   const [showLogDialog, setShowLogDialog] = useState(false);
-  const [showSkipDialog, setShowSkipDialog] = useState(false);
-  const [skipReason, setSkipReason] = useState('');
   
   // Fetch workout plan for detailed logging
   const { data: workoutPlan } = useQuery<any>({
@@ -186,69 +183,6 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
       }, 500);
-    },
-  });
-
-  // Quick skip workout mutation (marks as rest day) with optimistic update
-  const skipWorkout = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('/api/optimize/daily-logs', {
-        method: 'POST',
-        body: JSON.stringify({ isRestDay: true }),
-      });
-      if (!response.ok) throw new Error('Failed to skip workout');
-      return response.json();
-    },
-    onMutate: async () => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['/api/dashboard/wellness'] });
-      await queryClient.cancelQueries({ queryKey: ['/api/optimize/streaks/smart'] });
-      
-      // Snapshot current values
-      const previousWellness = queryClient.getQueryData(['/api/dashboard/wellness']);
-      const previousStreaks = queryClient.getQueryData(['/api/optimize/streaks/smart']);
-      
-      // Optimistically update as rest day
-      queryClient.setQueryData(['/api/dashboard/wellness'], (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          today: {
-            ...old.today,
-            isRestDay: true,
-          },
-        };
-      });
-      
-      // Optimistically update streak data
-      queryClient.setQueryData(['/api/optimize/streaks/smart'], (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          todayBreakdown: old.todayBreakdown ? {
-            ...old.todayBreakdown,
-            workout: { done: false, isRestDay: true }
-          } : old.todayBreakdown,
-        };
-      });
-      
-      return { previousWellness, previousStreaks };
-    },
-    onError: (_err, _variables, context) => {
-      // Rollback on error
-      if (context?.previousWellness) {
-        queryClient.setQueryData(['/api/dashboard/wellness'], context.previousWellness);
-      }
-      if (context?.previousStreaks) {
-        queryClient.setQueryData(['/api/optimize/streaks/smart'], context.previousStreaks);
-      }
-    },
-    onSuccess: async () => {
-      // Use refetchQueries to ensure we wait for fresh data
-      await queryClient.refetchQueries({ queryKey: ['/api/dashboard/wellness'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/optimize/streaks/smart'] });
-      setShowSkipDialog(false);
-      setSkipReason('');
     },
   });
 
@@ -552,37 +486,19 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                     </Badge>
                   )
                 ) : (
-                  <>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      className={`text-xs border-orange-200 text-orange-600 hover:bg-orange-50 touch-feedback ${
-                        isMobile ? 'flex-1 h-10' : ''
-                      }`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setShowSkipDialog(true);
-                      }}
-                      disabled={skipWorkout.isPending}
-                    >
-                      <XCircle className="h-3.5 w-3.5 mr-1.5" />
-                      Skip
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      className={`text-xs bg-green-600 hover:bg-green-700 text-white touch-feedback ${
-                        isMobile ? 'flex-1 h-10' : ''
-                      }`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setShowLogDialog(true);
-                      }}
-                      disabled={skipWorkout.isPending}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                      Log Workout
-                    </Button>
-                  </>
+                  <Button 
+                    size="sm" 
+                    className={`text-xs bg-green-600 hover:bg-green-700 text-white touch-feedback ${
+                      isMobile ? 'flex-1 h-10' : ''
+                    }`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowLogDialog(true);
+                    }}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                    Log Workout
+                  </Button>
                 )}
               </div>
             </div>
@@ -769,58 +685,6 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
         }}
       />
 
-      {/* Skip Workout Dialog */}
-      <Dialog open={showSkipDialog} onOpenChange={setShowSkipDialog}>
-        <DialogContent className="sm:max-w-[350px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <XCircle className="h-5 w-5 text-orange-500" />
-              Skip Today's Workout
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              No worries! Rest is important too. Why are you skipping?
-            </p>
-            
-            <div className="grid grid-cols-2 gap-2">
-              {['Tired', 'Busy', 'Not feeling well', 'Other'].map((reason) => (
-                <Button
-                  key={reason}
-                  variant={skipReason === reason ? 'default' : 'outline'}
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => setSkipReason(reason)}
-                >
-                  {reason}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <Button 
-              variant="outline" 
-              className="flex-1"
-              onClick={() => {
-                setShowSkipDialog(false);
-                setSkipReason('');
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="outline"
-              className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
-              onClick={() => skipWorkout.mutate()}
-              disabled={skipWorkout.isPending}
-            >
-              {skipWorkout.isPending ? 'Skipping...' : 'Skip'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 }

@@ -6,8 +6,7 @@ import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startSmsReminderScheduler } from "./smsReminderScheduler";
-import { startTokenRefreshScheduler } from "./tokenRefreshScheduler";
-import { startWearableDataScheduler } from "./wearableDataScheduler";
+// Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./logger";
 
 const app = express();
@@ -191,11 +190,8 @@ app.use((req, res, next) => {
       // Start SMS reminder scheduler
       startSmsReminderScheduler();
       
-      // Start wearable token refresh scheduler
-      startTokenRefreshScheduler();
-      
-      // Start wearable data sync scheduler
-      startWearableDataScheduler();
+      // Note: Wearable data sync is now handled via Junction webhooks
+      // No polling schedulers needed - data is pushed to /api/webhooks/junction
     });
 
     server.on('error', (e: any) => {

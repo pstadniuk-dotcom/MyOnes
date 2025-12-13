@@ -72,13 +72,16 @@ export default function HeroSectionV2() {
             </div>
             
             {/* Mini Progression */}
-            <div className="flex flex-wrap items-center gap-2 pt-4 text-sm">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-4 text-sm">
               <span className="text-[#1B4332] font-medium">Consultation</span>
-              <span className="text-[#1B4332]/40">→</span>
+              <span className="text-[#1B4332]/40 hidden sm:inline">→</span>
+              <span className="text-[#1B4332]/40 sm:hidden">•</span>
               <span className="text-[#1B4332] font-medium">Upload Labs</span>
-              <span className="text-[#1B4332]/40">→</span>
+              <span className="text-[#1B4332]/40 hidden sm:inline">→</span>
+              <span className="text-[#1B4332]/40 sm:hidden">•</span>
               <span className="text-[#1B4332] font-medium">Your Capsule</span>
-              <span className="text-[#1B4332]/40">→</span>
+              <span className="text-[#1B4332]/40 hidden sm:inline">→</span>
+              <span className="text-[#1B4332]/40 sm:hidden">•</span>
               <span className="text-[#1B4332] font-medium">Sync Wearables</span>
             </div>
           </div>

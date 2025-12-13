@@ -40,6 +40,7 @@ import {
   formulasRoutes,
   ingredientsRoutes,
   wearablesRoutes,
+  webhooksRoutes,
   optimizeRoutes
 } from "./routes/index";
 
@@ -699,12 +700,14 @@ function parseDoseToMg(doseString: string, ingredientName: string): number {
 function validateAndCalculateFormula(formula: any): { isValid: boolean, calculatedTotalMg: number, errors: string[] } {
   const errors: string[] = [];
   let calculatedTotal = 0;
+  let ingredientCount = 0;
   
   // Validate bases with CATEGORY-AGNOSTIC flexible matching
   if (!formula.bases || formula.bases.length === 0) {
     errors.push('Formula must include at least one system support');
   } else {
     for (const base of formula.bases) {
+      ingredientCount++;
       // Use category-agnostic validation - checks against ALL approved ingredients
       if (!isAnyIngredientApproved(base.ingredient)) {
         errors.push(`UNAUTHORIZED INGREDIENT: "${base.ingredient}" is not in the approved catalog. Formula REJECTED.`);
@@ -718,12 +721,32 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
         errors.push(`Invalid amount for base: ${base.ingredient}`);
       }
       calculatedTotal += mgAmount;
+
+      // 🆕 Validate global minimum dose
+      if (mgAmount < FORMULA_LIMITS.MIN_INGREDIENT_DOSE) {
+        errors.push(`Ingredient "${base.ingredient}" below minimum dose of ${FORMULA_LIMITS.MIN_INGREDIENT_DOSE}mg (attempted: ${mgAmount}mg)`);
+      }
+
+      // 🆕 Validate system support multiples (1x, 2x, 3x)
+      const catalogBase = SYSTEM_SUPPORTS.find(f => f.name === base.ingredient);
+      if (catalogBase) {
+        const baseDose = catalogBase.doseMg;
+        const validDoses = [baseDose, baseDose * 2, baseDose * 3];
+        if (!validDoses.includes(mgAmount)) {
+          errors.push(
+            `system support "${base.ingredient}" must be dosed at 1x (${baseDose}mg), 2x (${baseDose * 2}mg), or 3x (${baseDose * 3}mg). ` +
+            `Attempted: ${mgAmount}mg. ` +
+            `Use 1x for mild support, 2x for moderate issues, 3x for therapeutic intervention.`
+          );
+        }
+      }
     }
   }
   
   // Validate additions with CATEGORY-AGNOSTIC flexible matching
   if (formula.additions) {
     for (const addition of formula.additions) {
+      ingredientCount++;
       // Use category-agnostic validation - checks against ALL approved ingredients
       if (!isAnyIngredientApproved(addition.ingredient)) {
         errors.push(`UNAUTHORIZED INGREDIENT: "${addition.ingredient}" is not in the approved catalog. Formula REJECTED.`);
@@ -737,7 +760,34 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
         errors.push(`Invalid amount for addition: ${addition.ingredient}`);
       }
       calculatedTotal += mgAmount;
+
+      // 🆕 Validate global minimum dose
+      if (mgAmount < FORMULA_LIMITS.MIN_INGREDIENT_DOSE) {
+        errors.push(`Ingredient "${addition.ingredient}" below minimum dose of ${FORMULA_LIMITS.MIN_INGREDIENT_DOSE}mg (attempted: ${mgAmount}mg)`);
+      }
+
+      // 🆕 Validate individual ingredient ranges
+      const individualIngredient = INDIVIDUAL_INGREDIENTS.find(i => i.name === addition.ingredient);
+      if (individualIngredient) {
+        if (individualIngredient.doseRangeMin && mgAmount < individualIngredient.doseRangeMin) {
+          errors.push(
+            `"${addition.ingredient}" below allowed minimum of ${individualIngredient.doseRangeMin}mg (attempted: ${mgAmount}mg). ` +
+            `Allowed range: ${individualIngredient.doseRangeMin}-${individualIngredient.doseRangeMax}mg`
+          );
+        }
+        if (individualIngredient.doseRangeMax && mgAmount > individualIngredient.doseRangeMax) {
+          errors.push(
+            `"${addition.ingredient}" exceeds allowed maximum of ${individualIngredient.doseRangeMax}mg (attempted: ${mgAmount}mg). ` +
+            `Allowed range: ${individualIngredient.doseRangeMin}-${individualIngredient.doseRangeMax}mg`
+          );
+        }
+      }
     }
+  }
+
+  // Check total ingredient count
+  if (ingredientCount > FORMULA_LIMITS.MAX_INGREDIENT_COUNT) {
+    errors.push(`Formula exceeds maximum ingredient count of ${FORMULA_LIMITS.MAX_INGREDIENT_COUNT} (attempted: ${ingredientCount})`);
   }
   
   // Validate daily total doesn't exceed maximum for 00 capsule size safety (with tolerance)
@@ -1060,8 +1110,15 @@ function validateAndCorrectIngredientNames(formula: any): {
     const catalogBase = SYSTEM_SUPPORTS.find(f => f.name.toLowerCase() === normalizedName.toLowerCase());
     
     if (!catalogBase) {
-      errors.push(`❌ system support NOT FOUND: "${originalName}" (normalized to "${normalizedName}") is not in the approved catalog. Available system supports: ${SYSTEM_SUPPORTS.map(f => f.name).join(', ')}`);
-      console.log(`❌ Invalid system support: "${originalName}"`);
+      // Instead of erroring, remove the invalid ingredient and add a warning
+      const warningMsg = `Removed unapproved system support: "${originalName}"`;
+      warnings.push(warningMsg);
+      if (!correctedFormula.warnings) correctedFormula.warnings = [];
+      correctedFormula.warnings.push(warningMsg);
+      
+      console.log(`⚠️ REMOVED invalid system support: "${originalName}"`);
+      correctedFormula.bases.splice(i, 1);
+      i--; // Adjust index since we removed an element
     } else if (originalName !== catalogBase.name) {
       warnings.push(`⚠️ AUTO-CORRECTED: "${originalName}" → "${catalogBase.name}"`);
       correctedFormula.bases[i].ingredient = catalogBase.name;
@@ -1079,8 +1136,15 @@ function validateAndCorrectIngredientNames(formula: any): {
     const catalogIngredient = INDIVIDUAL_INGREDIENTS.find(ing => ing.name.toLowerCase() === normalizedName.toLowerCase());
     
     if (!catalogIngredient) {
-      errors.push(`❌ INDIVIDUAL INGREDIENT NOT FOUND: "${originalName}" (normalized to "${normalizedName}") is not in the approved catalog. Available individual ingredients: ${INDIVIDUAL_INGREDIENTS.slice(0, 10).map(i => i.name).join(', ')}... (${INDIVIDUAL_INGREDIENTS.length} total)`);
-      console.log(`❌ Invalid individual ingredient: "${originalName}"`);
+      // Instead of erroring, remove the invalid ingredient and add a warning
+      const warningMsg = `Removed unapproved ingredient: "${originalName}"`;
+      warnings.push(warningMsg);
+      if (!correctedFormula.warnings) correctedFormula.warnings = [];
+      correctedFormula.warnings.push(warningMsg);
+      
+      console.log(`⚠️ REMOVED invalid individual ingredient: "${originalName}"`);
+      correctedFormula.additions.splice(i, 1);
+      i--; // Adjust index since we removed an element
     } else if (originalName !== catalogIngredient.name) {
       warnings.push(`⚠️ AUTO-CORRECTED: "${originalName}" → "${catalogIngredient.name}"`);
       correctedFormula.additions[i].ingredient = catalogIngredient.name;
@@ -1100,6 +1164,81 @@ function validateAndCorrectIngredientNames(formula: any): {
 
 // Complete ONES AI system prompt
 const ONES_AI_SYSTEM_PROMPT = `You are ONES AI, a functional medicine practitioner and supplement formulation specialist. You conduct thorough health consultations similar to a medical doctor's visit before creating personalized formulas.
+
+=== 🚨 RESPONSE LENGTH & CONVERSATION FLOW (READ FIRST) 🚨 ===
+
+**CRITICAL: Keep responses SHORT and CONVERSATIONAL**
+
+You are a health practitioner having a CONVERSATION, not writing a medical report.
+
+**MAXIMUM RESPONSE LENGTH:**
+- Normal responses: 200-400 words maximum
+- Blood test analysis: 400-600 words maximum (summarize, don't list everything)
+- Formula recommendations: 300-500 words maximum (formula JSON is separate)
+
+**NEVER DO THESE:**
+❌ List every single biomarker from blood tests (summarize TOP 3-5 CRITICAL findings only)
+❌ Create numbered priority lists with 8+ items
+❌ Show your calculation work ("5818mg... that's over... let me adjust... 5768mg...")
+❌ Write multi-paragraph explanations for each ingredient
+❌ Include "COMPREHENSIVE HEALTH ANALYSIS" style headers
+❌ Write so much that the response gets cut off and user must say "continue"
+
+**ALWAYS DO THESE:**
+✅ Summarize blood tests in 2-3 key points (e.g., "Your cardiovascular markers need attention - LDL is high, HDL is low, and your omega-3 levels are critically deficient")
+✅ Focus on TOP 3 priorities maximum, not 8
+✅ Ask checkpoint questions before proceeding (e.g., "Would you like me to explain these findings in detail, or move forward with a formula?")
+✅ Calculate dosages silently - only show the final formula total
+✅ Keep ingredient explanations to one sentence each
+✅ Be conversational, not clinical
+
+**BLOOD TEST ANALYSIS FORMAT (when user asks to analyze labs):**
+
+WRONG (too long):
+"CARDIOVASCULAR HEALTH (Priority: CRITICAL)
+LDL-Cholesterol: 151 mg/dL ⬆️ HIGH
+Target: <100 mg/dL (optimal <70 mg/dL)
+Elevated LDL is THE primary driver of atherosclerosis...
+[continues for 3000+ words listing every biomarker]"
+
+CORRECT (conversational summary):
+"I've reviewed your blood work. Three things stand out that we should address:
+
+1. Your cardiovascular markers need attention - LDL is 151 (should be under 100), and your HDL is low at 38. Combined with elevated ApoB, this puts you at increased heart disease risk.
+
+2. Your omega-3 levels are critically low at 2.6% (target is 8%+). This affects both heart and brain health.
+
+3. Your homocysteine is elevated at 13.7, which is another cardiovascular risk factor.
+
+The good news: your blood sugar, thyroid, and liver markers all look healthy.
+
+Would you like me to recommend a formula targeting these cardiovascular concerns, or do you want more detail on any of these findings first?"
+
+**FORMULA RECOMMENDATION FORMAT:**
+
+WRONG (showing work):
+"TOTAL: 5818mg - Wait, that's 318mg over. Let me adjust...
+Reduce Garlic from 200mg to 150mg. New total: 5768mg. Still over...
+Reduce Ginkgo from 240mg to 120mg..."
+
+CORRECT (clean output):
+"Based on your blood work, here's what I recommend:
+
+- Heart Support (1378mg) - therapeutic dose for your cardiovascular markers
+- Omega-3 (1000mg) - to address your deficiency
+- Curcumin (600mg) - anti-inflammatory support
+- Ashwagandha (600mg) - stress and cortisol management
+- Magnesium (400mg) - cardiovascular and blood pressure support
+
+Total: 4978mg
+
+This formula targets your elevated LDL, low HDL, omega-3 deficiency, and high homocysteine. Should I create this for you?"
+
+**CHECKPOINT QUESTIONS (use these to pace the conversation):**
+- "Would you like me to explain any of these findings in more detail?"
+- "Should I proceed with a formula recommendation, or do you have questions first?"
+- "Does this approach make sense for your goals?"
+- "Would you like me to add anything else, or does this formula look good?"
 
 === ⚠️ CRITICAL FORMATTING RULES - FOLLOW EXACTLY ===
 
@@ -2359,8 +2498,11 @@ export async function registerRoutes(
   // Ingredients routes: /api/ingredients/*
   app.use('/api/ingredients', ingredientsRoutes);
   
-  // Wearables routes: /api/wearables/* - OAuth, device connections
+  // Wearables routes: /api/wearables/* - Junction (Vital) integration
   app.use('/api/wearables', wearablesRoutes);
+  
+  // Webhooks routes: /api/webhooks/* - Junction webhooks
+  app.use('/api/webhooks', webhooksRoutes);
   
   // Optimize routes: /api/optimize/* - plans, logs, grocery lists
   app.use('/api/optimize', optimizeRoutes);
@@ -7597,464 +7739,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
-  // ===== WEARABLE DEVICE INTEGRATION ROUTES =====
-  
-  // Get user's connected wearable devices
-  app.get('/api/wearables/connections', requireAuth, async (req, res) => {
-    try {
-      const userId = req.userId!;
-      const connections = await storage.getWearableConnections(userId);
-      res.json(connections);
-    } catch (error) {
-      console.error('Error fetching wearable connections:', error);
-      res.status(500).json({ error: 'Failed to fetch wearable connections' });
-    }
-  });
-
-  // Initiate OAuth flow for a wearable device
-  app.get('/api/wearables/connect/:provider', requireAuth, async (req, res) => {
-    try {
-      const { provider } = req.params;
-      const userId = req.userId!;
-      
-      if (!['fitbit', 'oura', 'whoop'].includes(provider)) {
-        return res.status(400).json({ error: 'Invalid provider' });
-      }
-
-      // Generate state token for CSRF protection
-      const state = crypto.randomBytes(32).toString('hex');
-      
-      // Store state in session
-      if (!req.session) {
-        req.session = {} as any;
-      }
-      (req.session as any).oauthState = state;
-      (req.session as any).oauthUserId = userId;
-      (req.session as any).oauthProvider = provider;
-
-      let authUrl = '';
-      // Build redirect URI - use env var if set (for production), otherwise use request host (for dev)
-      const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-      const redirectUri = `${baseUrl}/api/wearables/callback/${provider}`;
-
-      if (provider === 'fitbit') {
-        const clientId = process.env.FITBIT_CLIENT_ID;
-        if (!clientId) {
-          return res.status(500).json({ error: 'Fitbit credentials not configured' });
-        }
-        
-        const scopes = [
-          'activity', 'heartrate', 'sleep', 'profile', 'oxygen_saturation',
-          'respiratory_rate', 'temperature', 'cardio_fitness'
-        ];
-        
-        authUrl = `https://www.fitbit.com/oauth2/authorize?` +
-          `response_type=code&` +
-          `client_id=${clientId}&` +
-          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-          `scope=${encodeURIComponent(scopes.join(' '))}&` +
-          `state=${state}`;
-      }
-      else if (provider === 'oura') {
-        const clientId = process.env.OURA_CLIENT_ID;
-        if (!clientId) {
-          return res.status(500).json({ error: 'Oura credentials not configured' });
-        }
-        
-        authUrl = `https://cloud.ouraring.com/oauth/authorize?` +
-          `response_type=code&` +
-          `client_id=${clientId}&` +
-          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-          `state=${state}`;
-      }
-      else if (provider === 'whoop') {
-        const clientId = process.env.WHOOP_CLIENT_ID;
-        if (!clientId) {
-          return res.status(500).json({ error: 'WHOOP credentials not configured' });
-        }
-        
-        const scopes = ['read:recovery', 'read:cycles', 'read:sleep', 'read:workout', 'offline'];
-        
-        authUrl = `https://api.prod.whoop.com/oauth/oauth2/auth?` +
-          `response_type=code&` +
-          `client_id=${clientId}&` +
-          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-          `scope=${encodeURIComponent(scopes.join(' '))}&` +
-          `state=${state}`;
-      }
-
-      res.json({ authUrl });
-    } catch (error) {
-      console.error('Error initiating OAuth flow:', error);
-      res.status(500).json({ error: 'Failed to initiate OAuth flow' });
-    }
-  });
-
-  // OAuth callback handler
-  app.get('/api/wearables/callback/:provider', async (req, res) => {
-    try {
-      const { provider } = req.params;
-      const { code, state, error: oauthError } = req.query;
-
-      if (oauthError) {
-        console.error(`OAuth error from ${provider}:`, oauthError);
-        return res.redirect(`/dashboard?error=${encodeURIComponent(`Failed to connect ${provider}`)}`);
-      }
-
-      // Verify state for CSRF protection
-      const sessionState = (req.session as any)?.oauthState;
-      if (!sessionState || sessionState !== state) {
-        console.error('OAuth state mismatch');
-        return res.redirect('/dashboard?error=invalid_state');
-      }
-
-      const userId = (req.session as any)?.oauthUserId;
-      if (!userId) {
-        console.error('No user ID in session');
-        return res.redirect('/dashboard?error=session_expired');
-      }
-
-      // Exchange code for tokens
-  let tokenData: any = null;
-  // Build redirect URI dynamically from the incoming request to avoid env mismatches
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const redirectUri = `${baseUrl}/api/wearables/callback/${provider}`;
-
-      if (provider === 'fitbit') {
-        const clientId = process.env.FITBIT_CLIENT_ID;
-        const clientSecret = process.env.FITBIT_CLIENT_SECRET;
-        
-        if (!clientId || !clientSecret) {
-          throw new Error('Fitbit credentials not configured');
-        }
-
-        const tokenResponse = await fetch('https://api.fitbit.com/oauth2/token', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            grant_type: 'authorization_code',
-            code: code as string,
-            redirect_uri: redirectUri
-          }).toString()
-        });
-
-        if (!tokenResponse.ok) {
-          const errorText = await tokenResponse.text();
-          console.error('Fitbit token exchange error:', errorText);
-          throw new Error('Failed to exchange code for tokens');
-        }
-
-        tokenData = await tokenResponse.json();
-      }
-      else if (provider === 'oura') {
-        const clientId = process.env.OURA_CLIENT_ID;
-        const clientSecret = process.env.OURA_CLIENT_SECRET;
-        
-        if (!clientId || !clientSecret) {
-          throw new Error('Oura credentials not configured');
-        }
-
-        const tokenResponse = await fetch('https://api.ouraring.com/oauth/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            grant_type: 'authorization_code',
-            code: code as string,
-            redirect_uri: redirectUri,
-            client_id: clientId,
-            client_secret: clientSecret
-          }).toString()
-        });
-
-        if (!tokenResponse.ok) {
-          const errorText = await tokenResponse.text();
-          console.error('Oura token exchange error:', errorText);
-          throw new Error('Failed to exchange code for tokens');
-        }
-
-        tokenData = await tokenResponse.json();
-      }
-      else if (provider === 'whoop') {
-        const clientId = process.env.WHOOP_CLIENT_ID;
-        const clientSecret = process.env.WHOOP_CLIENT_SECRET;
-        
-        if (!clientId || !clientSecret) {
-          throw new Error('WHOOP credentials not configured');
-        }
-
-        const tokenResponse = await fetch('https://api.prod.whoop.com/oauth/oauth2/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            grant_type: 'authorization_code',
-            code: code as string,
-            redirect_uri: redirectUri,
-            client_id: clientId,
-            client_secret: clientSecret
-          }).toString()
-        });
-
-        if (!tokenResponse.ok) {
-          const errorText = await tokenResponse.text();
-          console.error('WHOOP token exchange error:', errorText);
-          throw new Error('Failed to exchange code for tokens');
-        }
-
-        tokenData = await tokenResponse.json();
-      }
-
-      // Calculate token expiration
-      const expiresAt = tokenData.expires_in 
-        ? new Date(Date.now() + tokenData.expires_in * 1000) 
-        : null;
-
-      // Save connection to database
-      await storage.createWearableConnection({
-        userId,
-        provider: provider as 'fitbit' | 'oura' | 'whoop',
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token || null,
-        tokenExpiresAt: expiresAt,
-        providerUserId: tokenData.user_id || null,
-        scopes: tokenData.scope ? tokenData.scope.split(' ') : [],
-        status: 'connected'
-      });
-
-      // Clear session OAuth data
-      delete (req.session as any).oauthState;
-      delete (req.session as any).oauthUserId;
-      delete (req.session as any).oauthProvider;
-
-      // Redirect to dashboard with success message
-      res.redirect('/dashboard?success=device_connected');
-    } catch (error) {
-      console.error('Error in OAuth callback:', error);
-      res.redirect(`/dashboard?error=${encodeURIComponent('Failed to connect device')}`);
-    }
-  });
-
-  // Disconnect a wearable device
-  app.post('/api/wearables/disconnect/:connectionId', requireAuth, async (req, res) => {
-    try {
-      const userId = req.userId!;
-      const { connectionId } = req.params;
-
-      await storage.disconnectWearableDevice(userId, connectionId);
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error disconnecting wearable:', error);
-      if (error instanceof Error && error.message === 'Connection not found') {
-        return res.status(404).json({ error: 'Connection not found' });
-      }
-      res.status(500).json({ error: 'Failed to disconnect device' });
-    }
-  });
-
-  // Manual sync endpoint - trigger data sync for user's wearables
-  app.post('/api/wearables/sync', requireAuth, async (req, res) => {
-    try {
-      const userId = req.userId!;
-      const { syncOuraData, syncFitbitData } = await import('./wearableDataSync');
-      // syncWhoopData disabled - requires business API access
-      
-      const connections = await storage.getWearableConnections(userId);
-      const results = [];
-      
-      for (const connection of connections) {
-        if (connection.status !== 'connected') continue;
-        
-        let result;
-        if (connection.provider === 'oura') {
-          result = await syncOuraData(userId, connection, storage, 7);
-        } else if (connection.provider === 'fitbit') {
-          result = await syncFitbitData(userId, connection, storage, 7);
-        }
-        // WHOOP sync disabled - requires business partnership API access
-        // else if (connection.provider === 'whoop') {
-        //   result = await syncWhoopData(userId, connection, storage, 7);
-        // }
-        
-        if (result) {
-          results.push({ provider: connection.provider, ...result });
-        }
-      }
-      
-      if (results.length === 0) {
-        return res.status(404).json({ error: 'No wearables connected' });
-      }
-      
-      const totalDays = results.reduce((sum, r) => sum + r.daysSynced, 0);
-      const anySuccess = results.some(r => r.success);
-      
-      res.json({ 
-        success: anySuccess,
-        results,
-        totalDaysSynced: totalDays,
-      });
-    } catch (error) {
-      console.error('Error in manual sync:', error);
-      res.status(500).json({ error: 'Failed to sync data' });
-    }
-  });
-
-  // Get normalized biometric data for a date range
-  app.get('/api/wearables/biometric-data', requireAuth, async (req, res) => {
-    try {
-      const userId = req.userId!;
-      const { startDate, endDate, provider } = req.query;
-      
-      if (!startDate || !endDate) {
-        return res.status(400).json({ error: 'startDate and endDate are required' });
-      }
-      
-      const start = new Date(startDate as string);
-      const end = new Date(endDate as string);
-      
-      // Get raw biometric data
-      const rawData = await storage.getBiometricData(userId, start, end);
-      
-      // Filter by provider if specified
-      const filteredData = provider 
-        ? rawData.filter(d => d.provider === provider)
-        : rawData;
-      
-      // Normalize the data
-      const { normalizeBiometricData } = await import('./wearableDataNormalizer');
-      const normalizedData = filteredData.map(d => normalizeBiometricData(d));
-      
-      res.json({ data: normalizedData });
-    } catch (error) {
-      console.error('Error fetching biometric data:', error);
-      res.status(500).json({ error: 'Failed to fetch biometric data' });
-    }
-  });
-
-  // Get merged biometric data (combines data from all providers by date)
-  app.get('/api/wearables/biometric-data/merged', requireAuth, async (req, res) => {
-    try {
-      const userId = req.userId!;
-      const { startDate, endDate } = req.query;
-      
-      if (!startDate || !endDate) {
-        return res.status(400).json({ error: 'startDate and endDate are required' });
-      }
-      
-      const start = new Date(startDate as string);
-      const end = new Date(endDate as string);
-      
-      // Get raw biometric data
-      const rawData = await storage.getBiometricData(userId, start, end);
-      
-      if (rawData.length === 0) {
-        return res.json({ data: [] });
-      }
-      
-      // Normalize all data
-      const { normalizeBiometricData, mergeMultiProviderData } = await import('./wearableDataNormalizer');
-      const normalizedData = rawData.map(d => normalizeBiometricData(d));
-      
-      // Group by date and merge
-      const dataByDate = new Map<string, typeof normalizedData>();
-      normalizedData.forEach(d => {
-        const dateKey = d.date.toISOString().split('T')[0];
-        if (!dataByDate.has(dateKey)) {
-          dataByDate.set(dateKey, []);
-        }
-        dataByDate.get(dateKey)!.push(d);
-      });
-      
-      // Merge data for each date
-      const mergedData = Array.from(dataByDate.values()).map(dataArray => {
-        return dataArray.length > 1 
-          ? mergeMultiProviderData(dataArray)
-          : dataArray[0];
-      });
-      
-      // Sort by date
-      mergedData.sort((a, b) => a.date.getTime() - b.date.getTime());
-      
-      res.json({ data: mergedData });
-    } catch (error) {
-      console.error('Error fetching merged biometric data:', error);
-      res.status(500).json({ error: 'Failed to fetch merged biometric data' });
-    }
-  });
-
-  // Get biometric trends and insights
-  app.get('/api/wearables/insights', requireAuth, async (req, res) => {
-    try {
-      const userId = req.userId!;
-      const days = parseInt(req.query.days as string) || 30;
-      
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-      
-      // Get merged biometric data
-      const rawData = await storage.getBiometricData(userId, startDate, endDate);
-      
-      if (rawData.length === 0) {
-        return res.json({ 
-          insights: {
-            sleep: null,
-            heart: null,
-            recovery: null,
-            activity: null,
-          },
-          message: 'No data available for insights',
-        });
-      }
-      
-      const { normalizeBiometricData, calculateTrend, calculateSleepQuality } = await import('./wearableDataNormalizer');
-      const normalizedData = rawData.map(d => normalizeBiometricData(d));
-      
-      // Calculate trends
-      const sleepDurations = normalizedData.map(d => d.sleep.totalMinutes).filter(Boolean) as number[];
-      const sleepScores = normalizedData.map(d => d.sleep.score || calculateSleepQuality(d.sleep)).filter(Boolean) as number[];
-      const hrvValues = normalizedData.map(d => d.heart.hrvMs).filter(Boolean) as number[];
-      const restingHRs = normalizedData.map(d => d.heart.restingRate).filter(Boolean) as number[];
-      const recoveryScores = normalizedData.map(d => d.recovery.score).filter(Boolean) as number[];
-      const steps = normalizedData.map(d => d.activity.steps).filter(Boolean) as number[];
-      
-      const insights = {
-        sleep: sleepDurations.length > 0 ? {
-          averageMinutes: Math.round(sleepDurations.reduce((a, b) => a + b, 0) / sleepDurations.length),
-          averageScore: Math.round(sleepScores.reduce((a, b) => a + b, 0) / sleepScores.length),
-          trend: calculateTrend(sleepDurations),
-          qualityTrend: calculateTrend(sleepScores),
-        } : null,
-        
-        heart: hrvValues.length > 0 || restingHRs.length > 0 ? {
-          averageHRV: hrvValues.length > 0 ? Math.round(hrvValues.reduce((a, b) => a + b, 0) / hrvValues.length) : null,
-          averageRestingHR: restingHRs.length > 0 ? Math.round(restingHRs.reduce((a, b) => a + b, 0) / restingHRs.length) : null,
-          hrvTrend: hrvValues.length > 0 ? calculateTrend(hrvValues) : null,
-          restingHRTrend: restingHRs.length > 0 ? calculateTrend(restingHRs) : null,
-        } : null,
-        
-        recovery: recoveryScores.length > 0 ? {
-          averageScore: Math.round(recoveryScores.reduce((a, b) => a + b, 0) / recoveryScores.length),
-          trend: calculateTrend(recoveryScores),
-        } : null,
-        
-        activity: steps.length > 0 ? {
-          averageSteps: Math.round(steps.reduce((a, b) => a + b, 0) / steps.length),
-          trend: calculateTrend(steps),
-        } : null,
-      };
-      
-      res.json({ insights, daysAnalyzed: days });
-    } catch (error) {
-      console.error('Error calculating insights:', error);
-      res.status(500).json({ error: 'Failed to calculate insights' });
-    }
-  });
+  // ===== WEARABLE DEVICE INTEGRATION =====
+  // Wearable routes are now handled by Junction (Vital) integration
+  // See: server/routes/junction.routes.ts (mounted at /api/wearables)
+  // All OAuth, data sync, and token refresh is handled by Junction API + webhooks
 
   // ===== OPTIMIZE FEATURE ROUTES =====
   
@@ -9174,6 +8862,7 @@ Return ONLY valid JSON in this exact format:
   // General daily log endpoint (Quick Log)
   app.post('/api/optimize/daily-logs', requireAuth, async (req, res) => {
     console.log('🚀🚀🚀 DAILY LOG POST ROUTE HIT 🚀🚀🚀', new Date().toISOString());
+    console.log('🔍 RAW BODY:', JSON.stringify(req.body));
     process.stdout.write('STDOUT: Daily log POST hit\n');
     try {
       const userId = req.userId!;
@@ -9264,6 +8953,13 @@ Return ONLY valid JSON in this exact format:
           ? notes.trim()
           : existingLog?.notes ?? null,
       };
+
+      // Debug isRestDay value
+      console.log('🏃 Rest Day Debug:', {
+        incomingIsRestDay: isRestDay,
+        existingIsRestDay: existingLog?.isRestDay,
+        resolvedIsRestDay: resolvedLog.isRestDay,
+      });
 
       let updatedLog: OptimizeDailyLog | undefined;
       if (existingLog) {
@@ -9911,14 +9607,30 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
       });
 
       // Format Volume Chart Data
-      const volumeChartData = Object.entries(volumeByWeek)
-        .map(([date, volume]) => ({ date, volume }))
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      // Ensure we have data points for recent weeks even if volume is 0
+      const today = new Date();
+      const weeksToShow = 8;
+      const volumeChartData = [];
+      
+      for (let i = weeksToShow - 1; i >= 0; i--) {
+        const d = subWeeks(today, i);
+        const weekStart = format(startOfWeek(d), 'yyyy-MM-dd');
+        volumeChartData.push({
+          date: weekStart,
+          volume: volumeByWeek[weekStart] || 0
+        });
+      }
 
       // Format Consistency Data
-      const consistencyData = Object.entries(workoutsByWeek)
-        .map(([week, count]) => ({ week, count }))
-        .sort((a, b) => new Date(a.week).getTime() - new Date(b.week).getTime());
+      const consistencyData = [];
+      for (let i = weeksToShow - 1; i >= 0; i--) {
+        const d = subWeeks(today, i);
+        const weekStart = format(startOfWeek(d), 'yyyy-MM-dd');
+        consistencyData.push({
+          week: weekStart,
+          count: workoutsByWeek[weekStart] || 0
+        });
+      }
 
       // Calculate Daily Streak
       let currentStreak = 0;

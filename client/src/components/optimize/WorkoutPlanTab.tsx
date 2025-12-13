@@ -175,10 +175,15 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
       return res.json();
     },
     onSuccess: async () => {
+      // Invalidate queries to force a refetch
+      await queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/optimize/analytics/workout'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
+      
+      // Also refetch immediately to be sure
       await queryClient.refetchQueries({ queryKey: ['/api/optimize/workout/logs'] });
       await queryClient.refetchQueries({ queryKey: ['/api/optimize/analytics/workout'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/dashboard/wellness'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/optimize/streaks/smart'] });
       
       setShowFinishDialog(false);
       setCompletedExercises({});
@@ -419,9 +424,14 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
                         {selectedWorkout.workout?.exercises?.map((ex: any, i: number) => {
                           return (
                             <div key={i} className="p-4 rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow">
-                              <div className="flex justify-between items-start mb-2">
-                                <div className="font-semibold text-lg flex-1">{ex.name}</div>
-                                <div className="flex items-center gap-2">
+                              <div className="flex flex-col gap-2 mb-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="font-semibold text-base sm:text-lg flex-1">{ex.name}</div>
+                                  <div className="text-xs font-mono bg-muted px-2 py-1 rounded whitespace-nowrap">
+                                    {ex.sets} × {ex.reps}
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -435,7 +445,7 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 px-2 text-[10px] gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    className="h-7 px-2 text-xs gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleWatchVideo(ex.name);
@@ -463,9 +473,6 @@ export function WorkoutPlanTab({ plan, healthProfile, dailyLogsByDate, logsLoadi
                                       </>
                                     )}
                                   </Button>
-                                  <div className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                                    {ex.sets} × {ex.reps}
-                                  </div>
                                 </div>
                               </div>
                               

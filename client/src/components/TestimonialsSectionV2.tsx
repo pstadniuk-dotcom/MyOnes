@@ -46,7 +46,7 @@ export default function TestimonialsSectionV2() {
         </div>
 
         {/* Testimonials Grid */}
-        <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
           {testimonials.map((testimonial, index) => (
             <div
               key={index}
@@ -84,7 +84,7 @@ export default function TestimonialsSectionV2() {
         </div>
 
         {/* Bottom stats */}
-        <div className="mt-16 grid grid-cols-3 gap-8 max-w-2xl mx-auto text-center">
+        <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 max-w-2xl mx-auto text-center">
           <div>
             <div className="text-3xl md:text-4xl font-light text-[#1B4332]">2,000+</div>
             <div className="text-sm text-[#52796F] mt-1">Clinical Patients</div>
