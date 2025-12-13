@@ -131,6 +131,12 @@ VITE_ENABLE_WEARABLES=true
 VITE_APP_ENV=production
 ```
 
+**⚠️ CRITICAL:** The `VITE_API_BASE` variable is **required** for the frontend to communicate with the backend.
+- Must be an absolute URL (include `https://`)
+- Must point to your Railway backend URL
+- If missing, the build will fail with a validation error
+- See [Login/Signup Troubleshooting Guide](docs/LOGIN_SIGNUP_TROUBLESHOOTING.md) if you encounter issues
+
 #### 3.3 Build Settings (Auto-detected from vercel.json)
 - Build Command: `npm run build`
 - Output Directory: `dist/public`
@@ -202,6 +208,14 @@ app.use(cors({
 
 ## Troubleshooting
 
+### Login/Signup Issues ⚠️
+**Most Common Issue:** Missing or incorrect `VITE_API_BASE` configuration
+
+If users cannot log in or sign up:
+1. Check that `VITE_API_BASE` is set in Vercel environment variables
+2. Verify the URL is correct (should be your Railway backend URL)
+3. See detailed guide: **[Login/Signup Troubleshooting Guide](docs/LOGIN_SIGNUP_TROUBLESHOOTING.md)**
+
 ### Database Connection Issues
 Run the diagnostic script:
 ```bash
@@ -214,14 +228,16 @@ node test-supabase.mjs
 - Check Node version compatibility
 
 ### Vercel Build Fails
-- Check build logs
-- Verify VITE_API_BASE is set
-- Check that client build works locally: `npm run build`
+- **If build fails with environment variable error:** This is expected! Set `VITE_API_BASE` in Vercel
+- Check build logs for specific errors
+- Verify VITE_API_BASE is set correctly
+- Check that client build works locally: `VITE_API_BASE=https://your-backend.up.railway.app npm run build`
 
 ### API Calls Fail (CORS)
 - Add Railway URL to CORS whitelist
 - Check browser console for errors
 - Verify VITE_API_BASE in Vercel env vars
+- See [Login/Signup Troubleshooting Guide](docs/LOGIN_SIGNUP_TROUBLESHOOTING.md)
 
 ---
 
