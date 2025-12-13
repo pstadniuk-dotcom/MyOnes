@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ApiConfigError } from "@/components/ApiConfigError";
+import { isApiConfigurationValid } from "@/lib/api";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ProtectedAdminRoute from "@/components/ProtectedAdminRoute";
 import NotFound from "@/pages/not-found";
@@ -249,6 +251,12 @@ function MainRouter() {
 }
 
 function App() {
+  // Check API configuration before rendering the app
+  // In production, this prevents confusing errors when VITE_API_BASE is missing
+  if (!isApiConfigurationValid()) {
+    return <ApiConfigError />;
+  }
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>

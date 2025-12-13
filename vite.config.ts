@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "url";
+import { validateEnvPlugin } from "./vite-plugin-validate-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,6 +10,12 @@ const __dirname = path.dirname(__filename);
 export default defineConfig({
   plugins: [
     react(),
+    // Validate environment variables during production builds
+    validateEnvPlugin({
+      requiredInProduction: ['VITE_API_BASE'],
+      urlVariables: ['VITE_API_BASE'],
+      failOnError: true, // Fail build if validation fails
+    }),
   ],
   resolve: {
     alias: {
