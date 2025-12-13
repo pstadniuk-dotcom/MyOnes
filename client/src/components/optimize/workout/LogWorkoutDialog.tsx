@@ -157,6 +157,9 @@ export function LogWorkoutDialog({ open, onOpenChange, selectedWorkout, onSucces
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/workout/logs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/daily'] });
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/exercise-records'] });
+      // Update tracking page progress
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
       onOpenChange(false);
       const prCount = prsToSave.size;
       toast({

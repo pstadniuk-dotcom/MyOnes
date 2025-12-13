@@ -36,7 +36,10 @@ function getTodayPercentage(
   const waterDone = enabled.water && (
     wellness.today.waterIntakeOz >= (wellness.today.waterGoalOz || 0)
   );
-  const lifestyleDone = enabled.lifestyle && false; // No explicit lifestyle flag in wellness.today yet
+  // Lifestyle is complete when sleep, energy, and mood are all logged
+  const lifestyleDone = enabled.lifestyle && !!(
+    wellness.today.sleepQuality && wellness.today.energyLevel && wellness.today.moodLevel
+  );
 
   const completed = [workoutDone, nutritionDone, supplementsDone, waterDone, lifestyleDone].filter(Boolean).length;
   return Math.round((completed / enabledCount) * 100);

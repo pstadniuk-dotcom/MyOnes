@@ -98,11 +98,6 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
                     isCompleted && !day.isRestDay && "border-2 border-green-500/70 bg-green-50/60"
                   )}
                 >
-                  {isCompleted && !day.isRestDay && (
-                    <div className="absolute top-2 right-2 bg-white/85 rounded-full p-1 shadow-sm">
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    </div>
-                  )}
                   <CardContent className="p-4 pb-5">
                     <div className="flex flex-col gap-2">
                       {/* Day header */}
@@ -118,13 +113,20 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
                             <Badge variant="outline" className="text-xs">Rest</Badge>
                           )}
                         </div>
-                        <span className={cn(
-                          "text-xs font-medium",
-                          isCurrentDay ? "text-primary" : "text-muted-foreground"
-                        )}>
-                          {format(dayDate, 'MMM d')}
-                          {isCurrentDay && " • Today"}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn(
+                            "text-xs font-medium",
+                            isCurrentDay ? "text-primary" : "text-muted-foreground"
+                          )}>
+                            {format(dayDate, 'MMM d')}
+                            {isCurrentDay && " • Today"}
+                          </span>
+                          {isCompleted && !day.isRestDay && (
+                            <div className="bg-white/85 rounded-full p-0.5 shadow-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            </div>
+                          )}
+                        </div>
                       </div>
                       
                       {day.isRestDay ? (

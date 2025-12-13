@@ -72,6 +72,9 @@ export const users = pgTable("users", {
   reminderLunch: text("reminder_lunch").default('12:00').notNull(),
   reminderDinner: text("reminder_dinner").default('18:00').notNull(),
   
+  // Junction (Vital) wearables integration
+  junctionUserId: text("junction_user_id"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

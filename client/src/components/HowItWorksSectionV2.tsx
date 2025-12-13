@@ -51,7 +51,7 @@ export default function HowItWorksSectionV2() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-6">
           {steps.map((step, index) => {
             const Icon = step.icon;
             return (

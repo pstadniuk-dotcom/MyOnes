@@ -4,133 +4,91 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Watch, Activity, Heart, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import { useState } from 'react';
-import fitbitIcon from '@assets/Fitbit_app_icon_1763160710769.png';
-import ouraIcon from '@assets/ŌURA_idZ5mfVnXd_2_1763160796894.jpeg';
-import whoopIcon from '@assets/WHOOP_idNTL3Ndjp_1_1763160952445.png';
+import { 
+  Watch, 
+  Activity, 
+  Heart, 
+  CheckCircle2, 
+  XCircle, 
+  Loader2,
+  Link as LinkIcon,
+  ExternalLink,
+  RefreshCw,
+  Plus,
+  Sparkles
+} from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface WearableConnection {
   id: string;
   userId: string;
-  provider: 'fitbit' | 'oura' | 'whoop'; // apple disabled - requires native iOS app
+  provider: string;
+  providerName: string;
   status: 'connected' | 'disconnected' | 'error';
   connectedAt: string;
   lastSyncedAt: string | null;
-  providerUserId: string | null;
+  source: 'junction';
+  logo?: string;
 }
 
-// Real company logos as inline SVG components (used as fallback)
-const WhoopLogo = () => (
-  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
-    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
-    <text x="12" y="16" fontSize="10" fontWeight="bold" textAnchor="middle" fill="currentColor">W</text>
-  </svg>
-);
+// Priority providers for ONES - Activity focused
+// Junction API provides logos at: https://storage.googleapis.com/vital-assets/{slug}.png
+const PRIORITY_PROVIDERS = [
+  { slug: 'garmin', name: 'Garmin', priority: 1, description: 'Fitness watches & GPS', logo: 'https://storage.googleapis.com/vital-assets/garmin.png' },
+  { slug: 'google_fit', name: 'Google Fit', priority: 2, description: 'Android health platform', logo: 'https://storage.googleapis.com/vital-assets/googlefit.png' },
+  { slug: 'fitbit', name: 'Fitbit', priority: 3, description: 'Activity trackers', logo: 'https://storage.googleapis.com/vital-assets/fitbit.png' },
+  { slug: 'oura', name: 'Oura Ring', priority: 4, description: 'Sleep & recovery tracking', logo: 'https://storage.googleapis.com/vital-assets/oura.png' },
+  { slug: 'whoop_v2', name: 'WHOOP', priority: 5, description: 'Strain & recovery coach', logo: 'https://storage.googleapis.com/vital-assets/whoop.png' },
+  { slug: 'peloton', name: 'Peloton', priority: 6, description: 'Connected fitness', logo: 'https://storage.googleapis.com/vital-assets/peloton.png' },
+  { slug: 'freestyle_libre', name: 'Freestyle Libre', priority: 7, description: 'Continuous glucose monitoring', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Abbott_Laboratories_logo.svg/200px-Abbott_Laboratories_logo.svg.png' },
+];
 
-const OuraLogo = () => (
-  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
-    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" fill="none"/>
-    <rect x="8" y="2" width="8" height="2" fill="currentColor"/>
-  </svg>
-);
-
-// Optional image paths (served from client/public). We try several extensions in order.
-const PROVIDER_IMAGES: Record<'fitbit' | 'oura' | 'apple', string[] | null> = {
-  fitbit: [fitbitIcon],
-  oura: [ouraIcon],
-  // whoop: [whoopIcon], // Disabled - requires business API access
-  apple: null,
+const PROVIDER_COLORS: Record<string, { color: string; bgColor: string }> = {
+  garmin: { color: 'text-blue-600', bgColor: 'bg-blue-50' },
+  google_fit: { color: 'text-green-600', bgColor: 'bg-green-50' },
+  fitbit: { color: 'text-[#00B0B9]', bgColor: 'bg-[#00B0B9]/10' },
+  oura: { color: 'text-[#0B0F1C]', bgColor: 'bg-slate-100' },
+  whoop_v2: { color: 'text-black', bgColor: 'bg-yellow-50' },
+  whoop: { color: 'text-black', bgColor: 'bg-yellow-50' },
+  peloton: { color: 'text-red-600', bgColor: 'bg-red-50' },
+  freestyle_libre: { color: 'text-blue-500', bgColor: 'bg-blue-50' },
 };
 
-function ProviderLogo({
-  provider,
-  Inline,
-  name,
-}: {
-  provider: 'fitbit' | 'oura' | 'apple'; // whoop disabled
-  Inline: React.ComponentType;
-  name: string;
-}) {
-  const [idx, setIdx] = useState(0);
-  const candidates = PROVIDER_IMAGES[provider];
-  const src = candidates?.[idx];
-  if (!src) return <Inline />;
+function ProviderLogo({ provider, logo, size = 'md' }: { provider: string; logo?: string; size?: 'sm' | 'md' | 'lg' }) {
+  const [imgError, setImgError] = useState(false);
+  const sizeClasses = {
+    sm: 'h-5 w-5',
+    md: 'h-8 w-8',
+    lg: 'h-12 w-12',
+  };
+  
+  // Try provider logo from Junction API
+  const logoUrl = logo || `https://storage.googleapis.com/vital-assets/${provider}.png`;
+  
+  if (imgError) {
+    return <Watch className={`${sizeClasses[size]} text-muted-foreground`} />;
+  }
+  
   return (
     <img
-      src={src}
-      alt={`${name} logo`}
-      className="h-6 w-6 object-contain rounded-md"
-      onError={() => {
-        // advance to next candidate, or fall back to inline
-        setIdx((i) => i + 1);
-      }}
-      loading="lazy"
-      decoding="async"
+      src={logoUrl}
+      alt={`${provider} logo`}
+      className={`${sizeClasses[size]} object-contain rounded-md`}
+      onError={() => setImgError(true)}
     />
   );
 }
 
-const FitbitLogo = () => (
-  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
-    <circle cx="6" cy="12" r="1.5"/>
-    <circle cx="9" cy="9" r="1.8"/>
-    <circle cx="9" cy="15" r="1.8"/>
-    <circle cx="12" cy="6" r="2"/>
-    <circle cx="12" cy="12" r="2.2"/>
-    <circle cx="12" cy="18" r="2"/>
-    <circle cx="15" cy="9" r="1.8"/>
-    <circle cx="15" cy="15" r="1.8"/>
-    <circle cx="18" cy="12" r="1.5"/>
-  </svg>
-);
-
-const AppleLogo = () => (
-  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
-    <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-  </svg>
-);
-
-const PROVIDER_INFO = {
-  fitbit: {
-    name: 'Fitbit',
-    description: 'Track steps, heart rate, sleep, and daily activity',
-    logo: FitbitLogo,
-    color: 'text-[#00B0B9]',
-    bgColor: 'bg-[#00B0B9]/10',
-  },
-  oura: {
-    name: 'Oura Ring',
-    description: 'Monitor sleep quality, HRV, and recovery metrics',
-    logo: OuraLogo,
-    color: 'text-[#0B0F1C]',
-    bgColor: 'bg-slate-100',
-  },
-  // WHOOP temporarily disabled - requires business partnership API access
-  // whoop: {
-  //   name: 'WHOOP',
-  //   description: 'Analyze strain, recovery, and sleep performance',
-  //   logo: WhoopLogo,
-  //   color: 'text-[#000000]',
-  //   bgColor: 'bg-slate-100',
-  // },
-  // Apple Watch temporarily disabled - requires native iOS app for data sync
-  // apple: {
-  //   name: 'Apple Watch',
-  //   description: 'Sync health data from Apple Health and Apple Watch',
-  //   logo: AppleLogo,
-  //   color: 'text-slate-800',
-  //   bgColor: 'bg-slate-100',
-  // },
-};
-
 export default function WearablesPage() {
   const { toast } = useToast();
+  const [isConnecting, setIsConnecting] = useState(false);
 
+  // Fetch connected devices
   const { data: connections = [], isLoading } = useQuery<WearableConnection[]>({
     queryKey: ['/api/wearables/connections'],
   });
 
+  // Disconnect mutation
   const disconnectMutation = useMutation({
     mutationFn: async (connectionId: string) => {
       const response = await apiRequest('POST', `/api/wearables/disconnect/${connectionId}`);
@@ -152,38 +110,52 @@ export default function WearablesPage() {
     },
   });
 
-  const handleConnect = async (provider: 'fitbit' | 'oura') => {
-    // Apple Watch integration removed - requires native iOS app
-    // if (provider === 'apple') {
-    //   toast({
-    //     title: 'Coming Soon',
-    //     description: 'Apple Watch integration will be available soon!',
-    //   });
-    //   return;
-    // }
+  // Sync mutation
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/wearables/sync');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/wearables/connections'] });
+      toast({
+        title: 'Sync initiated',
+        description: 'Your wearable data is being synced.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Sync failed',
+        description: 'Failed to sync data. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
 
+  // Handle connect - opens Junction Link widget
+  const handleConnect = async () => {
+    setIsConnecting(true);
     try {
-      // Use apiRequest so the Authorization header is included from localStorage
-      const res = await apiRequest('GET', `/api/wearables/connect/${provider}`);
-
+      const res = await apiRequest('GET', '/api/wearables/connect');
+      
       if (res.status === 401) {
         toast({
           title: 'Authentication required',
           description: 'Please log in to connect your wearable.',
           variant: 'destructive',
         });
-        // Send user to login; after login they can return to Wearables
         window.location.href = '/login?next=/dashboard/wearables';
         return;
       }
 
-  const data = await res.json();
-      if (data?.authUrl) {
-        window.location.href = data.authUrl;
+      const data = await res.json();
+      if (data?.linkUrl) {
+        // Redirect to Junction Link widget
+        window.location.href = data.linkUrl;
       } else {
         toast({
           title: 'Connection error',
-          description: data?.error || 'Failed to start the OAuth flow.',
+          description: data?.error || 'Failed to start the connection flow.',
           variant: 'destructive',
         });
       }
@@ -194,15 +166,13 @@ export default function WearablesPage() {
         description: 'Could not reach the server. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      setIsConnecting(false);
     }
   };
 
   const handleDisconnect = (connectionId: string) => {
     disconnectMutation.mutate(connectionId);
-  };
-
-  const getConnectionStatus = (provider: 'fitbit' | 'oura') => {
-    return connections.find((conn) => conn.provider === provider);
   };
 
   if (isLoading) {
@@ -215,35 +185,58 @@ export default function WearablesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Wearable Devices</h1>
-        <p className="text-muted-foreground mt-2">
-          Connect your fitness trackers to personalize your supplement formula based on your activity, sleep, and recovery data.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Wearable Devices</h1>
+          <p className="text-muted-foreground mt-2">
+            Connect your fitness trackers to personalize your supplement formula based on your activity, sleep, and recovery data.
+          </p>
+        </div>
+        
+        <div className="flex gap-2">
+          {connections.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+            >
+              {syncMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Sync Data
+            </Button>
+          )}
+          <Button onClick={handleConnect} disabled={isConnecting}>
+            {isConnecting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="mr-2 h-4 w-4" />
+            )}
+            Connect Device
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {(Object.keys(PROVIDER_INFO) as Array<'fitbit' | 'oura'>).map((provider) => {
-          const info = PROVIDER_INFO[provider];
-          const connection = getConnectionStatus(provider);
-          const Logo = info.logo;
-
-          return (
-            <Card key={provider} className="relative overflow-hidden" data-testid={`card-wearable-${provider}`}>
-              <div className={`absolute top-0 right-0 w-32 h-32 ${info.bgColor} rounded-full -mr-16 -mt-16 opacity-20`} />
-              
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className={`p-3 rounded-lg ${info.bgColor}`}>
-                    <div className={info.color}>
-                      <ProviderLogo provider={provider} Inline={Logo} name={info.name} />
+      {/* Connected Devices */}
+      {connections.length > 0 ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {connections.map((connection) => {
+            const colors = PROVIDER_COLORS[connection.provider] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
+            
+            return (
+              <Card key={connection.id} className="relative overflow-hidden">
+                <div className={`absolute top-0 right-0 w-32 h-32 ${colors.bgColor} rounded-full -mr-16 -mt-16 opacity-20`} />
+                
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className={`p-3 rounded-lg ${colors.bgColor}`}>
+                      <ProviderLogo provider={connection.provider} logo={connection.logo} size="md" />
                     </div>
-                  </div>
-                  {connection && (
                     <Badge 
                       variant={connection.status === 'connected' ? 'default' : connection.status === 'error' ? 'destructive' : 'secondary'}
-                      className="gap-1" 
-                      data-testid={`badge-status-${provider}`}
+                      className="gap-1"
                     >
                       {connection.status === 'connected' ? (
                         <><CheckCircle2 className="h-3 w-3" /> Connected</>
@@ -253,84 +246,125 @@ export default function WearablesPage() {
                         <><XCircle className="h-3 w-3" /> Disconnected</>
                       )}
                     </Badge>
-                  )}
-                </div>
-                <CardTitle className="mt-4">{info.name}</CardTitle>
-                <CardDescription>{info.description}</CardDescription>
-              </CardHeader>
+                  </div>
+                  <CardTitle className="mt-4">{connection.providerName}</CardTitle>
+                  <CardDescription>
+                    Syncing activity, sleep & recovery data
+                  </CardDescription>
+                </CardHeader>
 
-              <CardContent className="space-y-4">
-                {connection ? (
+                <CardContent className="space-y-4">
                   <div className="space-y-3">
                     <div className="text-sm space-y-1">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          {connection.status === 'connected' ? 'Connected' : connection.status === 'error' ? 'Last connected' : 'Disconnected'}
-                        </span>
-                        <span className="font-medium" data-testid={`text-connected-date-${provider}`}>
+                        <span className="text-muted-foreground">Connected</span>
+                        <span className="font-medium">
                           {new Date(connection.connectedAt).toLocaleDateString()}
                         </span>
                       </div>
                       {connection.lastSyncedAt && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Last synced</span>
-                          <span className="font-medium" data-testid={`text-last-synced-${provider}`}>
+                          <span className="font-medium">
                             {new Date(connection.lastSyncedAt).toLocaleDateString()}
                           </span>
                         </div>
                       )}
-                      {connection.status === 'error' && (
-                        <p className="text-sm text-destructive" data-testid={`text-error-message-${provider}`}>
-                          Sync error. Please reconnect your device.
-                        </p>
-                      )}
                     </div>
                     
-                    {connection.status === 'connected' ? (
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => handleDisconnect(connection.id)}
-                        disabled={disconnectMutation.isPending}
-                        data-testid={`button-disconnect-${provider}`}
-                      >
-                        {disconnectMutation.isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Disconnecting...
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="mr-2 h-4 w-4" />
-                            Disconnect
-                          </>
-                        )}
-                      </Button>
-                    ) : (
-                      <Button
-                        className="w-full"
-                        onClick={() => handleConnect(provider)}
-                        data-testid={`button-reconnect-${provider}`}
-                      >
-                        Reconnect {info.name}
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => handleDisconnect(connection.id)}
+                      disabled={disconnectMutation.isPending}
+                    >
+                      {disconnectMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Disconnecting...
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Disconnect
+                        </>
+                      )}
+                    </Button>
                   </div>
-                ) : (
-                  <Button
-                    className="w-full"
-                    onClick={() => handleConnect(provider)}
-                    data-testid={`button-connect-${provider}`}
-                  >
-                    Connect {info.name}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Watch className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">No devices connected</h3>
+            <p className="text-muted-foreground text-center max-w-md mb-4">
+              Connect your wearable device to get personalized supplement recommendations based on your activity, sleep, and recovery data.
+            </p>
+            <Button onClick={handleConnect} disabled={isConnecting}>
+              {isConnecting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <LinkIcon className="mr-2 h-4 w-4" />
+              )}
+              Connect Your First Device
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
+      {/* Priority Providers */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Featured Integrations
+          </CardTitle>
+          <CardDescription>
+            Connect your favorite fitness tracker to unlock personalized supplement recommendations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {PRIORITY_PROVIDERS.map((provider) => {
+              const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
+              const isConnected = connections.some(c => c.provider === provider.slug || c.provider === provider.slug.replace('_v2', ''));
+              
+              return (
+                <div 
+                  key={provider.slug} 
+                  className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                    isConnected 
+                      ? 'border-green-500 bg-green-50/50' 
+                      : 'border-transparent bg-muted/30 hover:bg-muted/50 hover:border-muted-foreground/20'
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg ${colors.bgColor}`}>
+                    <ProviderLogo provider={provider.slug} logo={provider.logo} size="md" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{provider.name}</span>
+                      {isConnected && <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{provider.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            Click "Connect Device" above to link any of these providers. Historical data (up to 180 days) will be automatically imported for AI analysis.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* How It Works */}
       {connections.length > 0 && (
         <Card>
           <CardHeader>
@@ -349,7 +383,7 @@ export default function WearablesPage() {
                   <h4 className="font-medium">Data Collection</h4>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  We securely sync your sleep, activity, and recovery metrics daily
+                  We securely sync your sleep, activity, and recovery metrics daily via Junction
                 </p>
               </div>
 

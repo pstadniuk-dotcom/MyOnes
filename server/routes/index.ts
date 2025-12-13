@@ -32,7 +32,9 @@ export { default as consentsRoutes } from './consents.routes';
 export { default as filesRoutes } from './files.routes';
 export { default as formulasRoutes } from './formulas.routes';
 export { default as ingredientsRoutes } from './ingredients.routes';
-export { default as wearablesRoutes } from './wearables.routes';
+// Junction-based wearables integration (replaces direct OAuth)
+export { default as wearablesRoutes } from './junction.routes';
+export { default as webhooksRoutes } from './webhooks.routes';
 export { default as optimizeRoutes } from './optimize.routes';
 
 // Export middleware for use in routes.ts during migration

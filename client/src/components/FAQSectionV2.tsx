@@ -57,9 +57,9 @@ export default function FAQSectionV2() {
             >
               <button
                 onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                className="w-full px-8 py-6 text-left flex items-center justify-between gap-4 hover:bg-[#F5F0E8] transition-colors"
+                className="w-full px-5 sm:px-8 py-5 sm:py-6 text-left flex items-center justify-between gap-4 hover:bg-[#F5F0E8] transition-colors"
               >
-                <span className="text-lg font-medium text-[#1B4332]">
+                <span className="text-base sm:text-lg font-medium text-[#1B4332]">
                   {faq.question}
                 </span>
                 <ChevronDown 
@@ -74,8 +74,8 @@ export default function FAQSectionV2() {
                   openIndex === index ? "max-h-96" : "max-h-0"
                 }`}
               >
-                <div className="px-8 pb-6">
-                  <p className="text-[#52796F] leading-relaxed">
+                <div className="px-5 sm:px-8 pb-5 sm:pb-6">
+                  <p className="text-[#52796F] leading-relaxed text-sm sm:text-base">
                     {faq.answer}
                   </p>
                 </div>

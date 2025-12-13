@@ -496,7 +496,7 @@ export default function SettingsPage() {
                                       setNotifications({ ...notifications, pillsTimeSlot: value })
                                     }
                                   >
-                                    <SelectTrigger className="w-[140px]">
+                                    <SelectTrigger className="w-full sm:w-[140px]">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -507,14 +507,14 @@ export default function SettingsPage() {
                                   </Select>
                                 </div>
                                 {notifications.pillsTimeSlot === 'custom' && (
-                                  <div className="ml-7">
+                                  <div className="ml-0 sm:ml-7 mt-2 sm:mt-0">
                                     <Input
                                       type="time"
                                       value={notifications.pillsCustomTime}
                                       onChange={(e) =>
                                         setNotifications({ ...notifications, pillsCustomTime: e.target.value })
                                       }
-                                      className="w-[140px]"
+                                      className="w-full sm:w-[140px]"
                                     />
                                   </div>
                                 )}
@@ -534,7 +534,7 @@ export default function SettingsPage() {
                                       setNotifications({ ...notifications, workoutTimeSlot: value })
                                     }
                                   >
-                                    <SelectTrigger className="w-[140px]">
+                                    <SelectTrigger className="w-full sm:w-[140px]">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -545,14 +545,14 @@ export default function SettingsPage() {
                                   </Select>
                                 </div>
                                 {notifications.workoutTimeSlot === 'custom' && (
-                                  <div className="ml-7">
+                                  <div className="ml-0 sm:ml-7 mt-2 sm:mt-0">
                                     <Input
                                       type="time"
                                       value={notifications.workoutCustomTime}
                                       onChange={(e) =>
                                         setNotifications({ ...notifications, workoutCustomTime: e.target.value })
                                       }
-                                      className="w-[140px]"
+                                      className="w-full sm:w-[140px]"
                                     />
                                   </div>
                                 )}
@@ -572,7 +572,7 @@ export default function SettingsPage() {
                                       setNotifications({ ...notifications, nutritionTimeSlot: value })
                                     }
                                   >
-                                    <SelectTrigger className="w-[140px]">
+                                    <SelectTrigger className="w-full sm:w-[140px]">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -583,14 +583,14 @@ export default function SettingsPage() {
                                   </Select>
                                 </div>
                                 {notifications.nutritionTimeSlot === 'custom' && (
-                                  <div className="ml-7">
+                                  <div className="ml-0 sm:ml-7 mt-2 sm:mt-0">
                                     <Input
                                       type="time"
                                       value={notifications.nutritionCustomTime}
                                       onChange={(e) =>
                                         setNotifications({ ...notifications, nutritionCustomTime: e.target.value })
                                       }
-                                      className="w-[140px]"
+                                      className="w-full sm:w-[140px]"
                                     />
                                   </div>
                                 )}
@@ -610,7 +610,7 @@ export default function SettingsPage() {
                                       setNotifications({ ...notifications, lifestyleTimeSlot: value })
                                     }
                                   >
-                                    <SelectTrigger className="w-[140px]">
+                                    <SelectTrigger className="w-full sm:w-[140px]">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -621,14 +621,14 @@ export default function SettingsPage() {
                                   </Select>
                                 </div>
                                 {notifications.lifestyleTimeSlot === 'custom' && (
-                                  <div className="ml-7">
+                                  <div className="ml-0 sm:ml-7 mt-2 sm:mt-0">
                                     <Input
                                       type="time"
                                       value={notifications.lifestyleCustomTime}
                                       onChange={(e) =>
                                         setNotifications({ ...notifications, lifestyleCustomTime: e.target.value })
                                       }
-                                      className="w-[140px]"
+                                      className="w-full sm:w-[140px]"
                                     />
                                   </div>
                                 )}
