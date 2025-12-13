@@ -3470,7 +3470,8 @@ export class DrizzleStorage implements IStorage {
     const today = getUserLocalMidnight(userTimezone);
     const startOfMonth = new Date(today);
     startOfMonth.setDate(today.getDate() - 29); // 30 days total including today
-    startOfMonth.setHours(0, 0, 0, 0);
+    // IMPORTANT: Keep noon UTC (12:00) to avoid timezone edge cases
+    // Setting to midnight UTC would make the date appear as "yesterday" in western timezones
     
     // Calculate today's date string in user's timezone
     const todayStr = getUserLocalDateString(userTimezone);
