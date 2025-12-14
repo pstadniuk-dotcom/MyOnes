@@ -310,8 +310,8 @@ export function generateFormulaPDF(
 
         const ingredientsList = systemSupport.activeIngredients.map((ing) => {
           const ingName = typeof ing === 'string' ? ing : ing.name;
-          const ingAmount = typeof ing === 'string' ? '' : ` (${ing.amount || 'various'})`;
-          return `• ${ingName}${ingAmount}`;
+          // Amounts hidden - proprietary formulation
+          return `• ${ingName}`;
         });
 
         baseContent.push({

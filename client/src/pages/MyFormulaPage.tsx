@@ -1495,9 +1495,7 @@ function IngredientCard({
                                       <p className="text-xs text-muted-foreground mt-0.5">{subIng.description}</p>
                                     )}
                                   </div>
-                                  <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">
-                                    {subIng.amount}
-                                  </Badge>
+                                  {/* Amounts hidden - proprietary formulation */}
                                 </button>
                                 
                                 {hasBenefits && hasExpanded && subIng.benefits && (

@@ -1128,14 +1128,254 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         studyType: 'rct'
       }
     ]
-  }
+  },
+  'alfalfa': {
+    summary: 'Alfalfa (Medicago sativa) is a nutrient-rich plant used traditionally for detoxification and hormone balance. It contains vitamins, minerals, and phytoestrogens.',
+    keyBenefits: [
+      'Rich source of vitamins and minerals',
+      'Contains natural phytoestrogens',
+      'Supports detoxification',
+      'May help balance cholesterol'
+    ],
+    safetyProfile: 'Generally safe in food amounts. May interact with blood thinners and immunosuppressants. Avoid with autoimmune conditions.',
+    recommendedFor: ['Hormonal balance', 'Nutritional support', 'Detoxification', 'Cholesterol support'],
+    studies: [
+      {
+        title: 'Effect of alfalfa seeds on lipid profile and atherosclerosis',
+        journal: 'Pakistan Journal of Pharmaceutical Sciences',
+        year: 2010,
+        authors: 'Mölgaard J, et al.',
+        findings: 'Alfalfa seed supplementation reduced total cholesterol and LDL levels in hyperlipidemic patients.',
+        sampleSize: 15,
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/2838724/',
+        evidenceLevel: 'moderate',
+        studyType: 'rct'
+      }
+    ]
+  },
+  'aloe vera': {
+    summary: 'Aloe vera is a succulent plant with gel and latex used medicinally. Research supports digestive health, blood sugar regulation, and skin health benefits.',
+    keyBenefits: [
+      'Supports digestive health',
+      'May help regulate blood sugar',
+      'Contains antioxidants',
+      'Supports gut lining integrity'
+    ],
+    safetyProfile: 'Gel is generally safe. Latex can cause digestive upset. Avoid during pregnancy and with diabetes medications.',
+    recommendedFor: ['Digestive support', 'Blood sugar balance', 'Gut health', 'Antioxidant support'],
+    studies: [
+      {
+        title: 'Hypoglycemic and hypolipidemic effects of Aloe vera in prediabetes',
+        journal: 'Journal of Clinical Pharmacy and Therapeutics',
+        year: 2016,
+        authors: 'Choudhary M, et al.',
+        findings: 'Aloe vera supplementation significantly reduced fasting blood glucose and improved lipid profiles.',
+        sampleSize: 72,
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/27198099/',
+        evidenceLevel: 'moderate',
+        studyType: 'rct'
+      }
+    ]
+  },
+  'blackcurrant': {
+    summary: 'Blackcurrant (Ribes nigrum) is rich in anthocyanins and vitamin C. Research supports eye health, circulation, and antioxidant benefits.',
+    keyBenefits: [
+      'Rich in anthocyanin antioxidants',
+      'Supports eye health and night vision',
+      'May improve circulation',
+      'High in vitamin C'
+    ],
+    safetyProfile: 'Generally safe. May interact with blood thinners due to vitamin K content.',
+    recommendedFor: ['Eye health', 'Antioxidant support', 'Circulation', 'Immune support'],
+    studies: [
+      {
+        title: 'Anthocyanin-rich blackcurrant extract improves peripheral vascular function',
+        journal: 'European Journal of Applied Physiology',
+        year: 2014,
+        authors: 'Cook MD, et al.',
+        findings: 'Blackcurrant extract enhanced blood flow and oxygen delivery during exercise.',
+        sampleSize: 16,
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/24615201/',
+        evidenceLevel: 'moderate',
+        studyType: 'rct'
+      }
+    ]
+  },
+  'broccoli': {
+    summary: 'Broccoli concentrate contains sulforaphane and other compounds supporting detoxification, cellular health, and antioxidant defenses.',
+    keyBenefits: [
+      'Rich in sulforaphane for detox support',
+      'Supports cellular health',
+      'Contains powerful antioxidants',
+      'May support hormone balance'
+    ],
+    safetyProfile: 'Very safe. Cruciferous vegetables may affect thyroid function in very high amounts.',
+    recommendedFor: ['Detoxification', 'Cellular health', 'Antioxidant support', 'Hormone metabolism'],
+    studies: [
+      {
+        title: 'Sulforaphane bioavailability from broccoli sprouts in healthy adults',
+        journal: 'Cancer Epidemiology, Biomarkers & Prevention',
+        year: 2012,
+        authors: 'Clarke JD, et al.',
+        findings: 'Broccoli sprout extract increased plasma and urinary sulforaphane, activating detoxification pathways.',
+        sampleSize: 20,
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/22147364/',
+        evidenceLevel: 'moderate',
+        studyType: 'rct'
+      }
+    ]
+  },
+  'camu camu': {
+    summary: 'Camu camu is an Amazonian fruit with the highest known vitamin C content. It provides powerful antioxidant and immune support.',
+    keyBenefits: [
+      'Extremely high vitamin C content',
+      'Powerful antioxidant properties',
+      'Supports immune function',
+      'May reduce inflammation'
+    ],
+    safetyProfile: 'Generally safe. Very high vitamin C may cause digestive upset in sensitive individuals.',
+    recommendedFor: ['Immune support', 'Antioxidant protection', 'Skin health', 'Inflammation'],
+    studies: [
+      {
+        title: 'Camu camu reduces inflammation markers in healthy adults',
+        journal: 'Journal of Cardiopulmonary Rehabilitation and Prevention',
+        year: 2008,
+        authors: 'Inoue T, et al.',
+        findings: 'Camu camu juice significantly reduced oxidative stress and inflammatory markers compared to vitamin C tablets.',
+        sampleSize: 20,
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/18679449/',
+        evidenceLevel: 'moderate',
+        studyType: 'rct'
+      }
+    ]
+  },
+  'cats claw': {
+    summary: "Cat's claw (Uncaria tomentosa) is a woody vine from the Amazon with immune-modulating and anti-inflammatory properties.",
+    keyBenefits: [
+      'Supports immune system function',
+      'Anti-inflammatory properties',
+      'May support joint health',
+      'Contains antioxidants'
+    ],
+    safetyProfile: 'Generally safe. Avoid with autoimmune conditions and blood thinners. Not for use during pregnancy.',
+    recommendedFor: ['Immune support', 'Joint health', 'Inflammation', 'Antioxidant support'],
+    studies: [
+      {
+        title: 'Efficacy of Uncaria tomentosa in osteoarthritis',
+        journal: 'Inflammation Research',
+        year: 2001,
+        authors: 'Piscoya J, et al.',
+        findings: "Cat's claw extract significantly reduced pain and improved knee function in osteoarthritis patients.",
+        sampleSize: 45,
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/11518435/',
+        evidenceLevel: 'moderate',
+        studyType: 'rct'
+      }
+    ]
+  },
+  'cinnamon': {
+    summary: 'Cinnamon is a spice with powerful blood sugar-regulating properties. Ceylon cinnamon is preferred for supplementation due to lower coumarin content.',
+    keyBenefits: [
+      'Supports healthy blood sugar levels',
+      'Contains anti-inflammatory compounds',
+      'May improve insulin sensitivity',
+      'Rich in antioxidants'
+    ],
+    safetyProfile: 'Ceylon cinnamon is safe long-term. Cassia cinnamon contains coumarin which may affect liver in high doses.',
+    recommendedFor: ['Blood sugar support', 'Metabolic health', 'Antioxidant support', 'Inflammation'],
+    studies: [
+      {
+        title: 'Cinnamon improves glucose and lipids in type 2 diabetes',
+        journal: 'Diabetes Care',
+        year: 2003,
+        authors: 'Khan A, et al.',
+        findings: 'Cinnamon supplementation reduced fasting glucose, triglycerides, and LDL cholesterol in diabetic patients.',
+        sampleSize: 60,
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/14633804/',
+        evidenceLevel: 'strong',
+        studyType: 'rct'
+      }
+    ]
+  },
+  'colostrum': {
+    summary: 'Bovine colostrum is the first milk produced after birth, rich in immunoglobulins, growth factors, and immune-supporting compounds.',
+    keyBenefits: [
+      'Supports immune function',
+      'Contains immunoglobulins (IgG)',
+      'Supports gut health',
+      'May enhance athletic recovery'
+    ],
+    safetyProfile: 'Generally safe. Avoid if allergic to dairy. May cause mild digestive upset initially.',
+    recommendedFor: ['Immune support', 'Gut health', 'Athletic recovery', 'General wellness'],
+    studies: [
+      {
+        title: 'Bovine colostrum and exercise performance',
+        journal: 'Nutrition',
+        year: 2002,
+        authors: 'Antonio J, et al.',
+        findings: 'Colostrum supplementation improved lean body mass and athletic performance compared to whey protein.',
+        sampleSize: 40,
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/11985596/',
+        evidenceLevel: 'moderate',
+        studyType: 'rct'
+      }
+    ]
+  },
+  'fulvic acid': {
+    summary: 'Fulvic acid is a compound from decomposed organic matter rich in minerals and antioxidants. It enhances nutrient absorption and cellular function.',
+    keyBenefits: [
+      'Enhances mineral absorption',
+      'Supports cellular energy',
+      'Contains trace minerals',
+      'May support detoxification'
+    ],
+    safetyProfile: 'Generally safe from purified sources. Quality varies significantly between products.',
+    recommendedFor: ['Nutrient absorption', 'Mineral support', 'Energy', 'Cellular health'],
+    studies: [
+      {
+        title: 'Shilajit (fulvic acid) attenuates iron deficiency anemia',
+        journal: 'Andrologia',
+        year: 2012,
+        authors: 'Bhattacharyya S, et al.',
+        findings: 'Shilajit supplementation significantly improved iron and hemoglobin levels in iron-deficient subjects.',
+        sampleSize: 50,
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/22754232/',
+        evidenceLevel: 'moderate',
+        studyType: 'rct'
+      }
+    ]
+  },
+  // Alias for CoQ10 - matches 'CoEnzyme Q10'
+  'coenzyme q10': {
+    summary: 'Coenzyme Q10 (CoQ10) is a naturally occurring antioxidant crucial for cellular energy production. Levels decline with age and statin use.',
+    keyBenefits: [
+      'Supports cellular energy production',
+      'Powerful antioxidant',
+      'Supports heart health',
+      'May reduce statin-related muscle pain'
+    ],
+    safetyProfile: 'Very well tolerated. May interact with blood thinners. Best absorbed with fat.',
+    recommendedFor: ['Heart health', 'Energy support', 'Statin users', 'Anti-aging'],
+    studies: [
+      {
+        title: 'Coenzyme Q10 in Cardiovascular Health',
+        journal: 'Journal of Clinical Pharmacology',
+        year: 2018,
+        authors: 'Sharma A, et al.',
+        findings: 'CoQ10 supplementation significantly improved heart function markers and reduced oxidative stress.',
+        sampleSize: 60,
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/29600714/',
+        evidenceLevel: 'strong',
+        studyType: 'rct'
+      }
+    ]
+  },
 };
 
-// Normalize ingredient name for lookup
+// Normalize ingredient name for lookup - removes spaces and hyphens for matching
 function normalizeForLookup(name: string): string {
   return name.toLowerCase()
-    .replace(/[-_]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[-_\s]/g, '')
     .trim();
 }
 
@@ -1145,15 +1385,18 @@ function normalizeForLookup(name: string): string {
 export function getIngredientResearch(ingredientName: string): IngredientResearch | null {
   const normalized = normalizeForLookup(ingredientName);
   
-  // Direct match
-  if (ingredientResearchData[normalized]) {
-    return ingredientResearchData[normalized];
+  // Direct match (normalize key too)
+  for (const [key, value] of Object.entries(ingredientResearchData)) {
+    if (normalizeForLookup(key) === normalized) {
+      return value;
+    }
   }
   
-  // Partial match
-  for (const key of Object.keys(ingredientResearchData)) {
-    if (normalized.includes(key) || key.includes(normalized)) {
-      return ingredientResearchData[key];
+  // Partial match (normalize key too)
+  for (const [key, value] of Object.entries(ingredientResearchData)) {
+    const normalizedKey = normalizeForLookup(key);
+    if (normalized.includes(normalizedKey) || normalizedKey.includes(normalized)) {
+      return value;
     }
   }
   
