@@ -75,8 +75,11 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
         <div 
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 scrollbar-hide px-4 justify-center"
-          style={{ scrollPaddingLeft: '16px', scrollPaddingRight: '16px' }}
+          className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 scrollbar-hide"
+          style={{ 
+            paddingLeft: 'max(16px, calc((100vw - min(88vw, 320px)) / 2))',
+            paddingRight: 'max(16px, calc((100vw - min(88vw, 320px)) / 2))'
+          }}
         >
           {weekPlan.map((day: any, index: number) => {
             const dayDate = weekDates[index];
