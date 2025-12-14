@@ -15,6 +15,21 @@ import logger from '../logger';
 
 const router = Router();
 
+// Safe URI decode that handles already-decoded or malformed URIs
+function safeDecodeURIComponent(str: string): string {
+  try {
+    return decodeURIComponent(str);
+  } catch (e) {
+    // If decoding fails, try to handle double-encoded strings
+    try {
+      return decodeURIComponent(decodeURIComponent(str));
+    } catch (e2) {
+      // Return as-is if all decoding fails
+      return str;
+    }
+  }
+}
+
 // Get ingredient catalog for customization UI
 router.get('/catalog', requireAuth, async (req, res) => {
   try {
@@ -44,7 +59,7 @@ router.get('/base-details', requireAuth, async (req, res) => {
 router.get('/:ingredientName', requireAuth, async (req, res) => {
   try {
     const { ingredientName } = req.params;
-    const decodedName = decodeURIComponent(ingredientName);
+    const decodedName = safeDecodeURIComponent(ingredientName);
     
     // Search in individual ingredients
     const ingredient = findIngredientByName(decodedName);
@@ -64,7 +79,7 @@ router.get('/:ingredientName', requireAuth, async (req, res) => {
 router.get('/:ingredientName/research', requireAuth, async (req, res) => {
   try {
     const { ingredientName } = req.params;
-    const decodedName = decodeURIComponent(ingredientName);
+    const decodedName = safeDecodeURIComponent(ingredientName);
     
     // Search for ingredient
     const ingredient = findIngredientByName(decodedName);
