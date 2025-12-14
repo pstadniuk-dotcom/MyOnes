@@ -3,7 +3,8 @@ import twilio from 'twilio';
 // Initialize Twilio with credentials from environment variables
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+// Support both TWILIO_PHONE_NUMBER and TWILIO_FROM for flexibility
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_FROM;
 
 let twilioClient: ReturnType<typeof twilio> | null = null;
 
