@@ -3517,7 +3517,11 @@ export class DrizzleStorage implements IStorage {
     }> = [];
 
     // OPTIMIZATION: Batch fetch all data for 30 days in a few queries instead of 120+ individual queries
+    // Extend endOfMonth by 24h to capture logs that are "today" in user's western timezone
+    // but stored with a UTC timestamp that's technically "tomorrow" in UTC
+    // E.g., a workout logged at 6pm LA time on Dec 14 is stored as Dec 15 02:00 UTC
     const endOfMonth = new Date(today);
+    endOfMonth.setDate(endOfMonth.getDate() + 1);
     endOfMonth.setHours(23, 59, 59, 999);
     
     // Batch fetch all daily logs for the month
