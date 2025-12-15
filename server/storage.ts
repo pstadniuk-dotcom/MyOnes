@@ -3648,6 +3648,11 @@ export class DrizzleStorage implements IStorage {
       };
       
       // Calculate percentage based on enabled categories
+      // KEY INSIGHT: For PAST days, only count categories where user actually logged data
+      // This prevents retroactively penalizing users when they add new tracking categories
+      // For TODAY, use the current tracking preferences as the goal
+      const isToday = dateStr === todayStr;
+      
       const enabled = {
         workout: prefs?.trackWorkouts !== false,
         nutrition: prefs?.trackNutrition !== false,
@@ -3659,26 +3664,32 @@ export class DrizzleStorage implements IStorage {
       let completed = 0;
       let total = 0;
       
-      if (enabled.workout) {
+      // For past days: only count a category if user logged something for it
+      // For today: count all enabled categories (user should complete them)
+      const workoutHasData = isRestDay || workoutDone;
+      const nutritionHasData = breakdown.nutrition.mealsLogged > 0;
+      const supplementsHasData = breakdown.supplements.taken > 0;
+      const waterHasData = breakdown.water.current > 0;
+      const lifestyleHasData = breakdown.lifestyle.sleepLogged || breakdown.lifestyle.energyLogged || breakdown.lifestyle.moodLogged;
+      
+      if (enabled.workout && (isToday || workoutHasData)) {
         total++;
-        if (isRestDay || workoutDone) completed++;
+        if (workoutHasData) completed++;
       }
-      if (enabled.nutrition) {
+      if (enabled.nutrition && (isToday || nutritionHasData)) {
         total++;
-        // Count as complete if user logged ANY meal
-        if (breakdown.nutrition.mealsLogged > 0) completed++;
+        if (nutritionHasData) completed++;
       }
-      if (enabled.supplements) {
+      if (enabled.supplements && (isToday || supplementsHasData)) {
         total++;
         if (breakdown.supplements.taken >= breakdown.supplements.total) completed++;
       }
-      if (enabled.water) {
+      if (enabled.water && (isToday || waterHasData)) {
         total++;
         if (breakdown.water.current >= breakdown.water.goal) completed++;
       }
-      if (enabled.lifestyle) {
+      if (enabled.lifestyle && (isToday || lifestyleHasData)) {
         total++;
-        // Lifestyle complete if user logged sleep, energy, AND mood
         if (breakdown.lifestyle.complete) completed++;
       }
       
