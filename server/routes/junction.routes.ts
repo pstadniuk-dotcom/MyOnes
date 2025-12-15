@@ -475,7 +475,7 @@ router.get('/available-providers', requireAuth, async (_req: Request, res: Respo
     { slug: 'oura', name: 'Oura Ring', priority: 4, category: 'sleep', description: 'Sleep & recovery tracking', logo: 'https://storage.googleapis.com/vital-assets/oura.png', historicalDays: 180 },
     { slug: 'whoop_v2', name: 'WHOOP', priority: 5, category: 'fitness', description: 'Strain & recovery coach', logo: 'https://storage.googleapis.com/vital-assets/whoop.png', historicalDays: 180 },
     { slug: 'peloton', name: 'Peloton', priority: 6, category: 'fitness', description: 'Connected fitness', logo: 'https://storage.googleapis.com/vital-assets/peloton.png', historicalDays: 180 },
-    { slug: 'freestyle_libre', name: 'Freestyle Libre', priority: 7, category: 'cgm', description: 'Continuous glucose monitoring', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Abbott_Laboratories_logo.svg/200px-Abbott_Laboratories_logo.svg.png', historicalDays: 90 },
+    { slug: 'freestyle_libre', name: 'Freestyle Libre', priority: 7, category: 'cgm', description: 'Continuous glucose monitoring', logo: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iNDAiIGZpbGw9IiMwMDQ4OGEiIHJ4PSI0Ii8+PHRleHQgeD0iNTAiIHk9IjI2IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QWJib3R0PC90ZXh0Pjwvc3ZnPg==', historicalDays: 90 },
   ];
 
   res.json({ providers });

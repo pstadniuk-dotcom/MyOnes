@@ -362,7 +362,10 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
             {/* Dose buttons - larger touch targets on mobile */}
             <div className="flex gap-2">
               <button
-                onClick={() => onLogSupplementDose?.('morning', !data.supplementMorning)}
+                onClick={() => {
+                  console.log('🖱️ AM button clicked, data.supplementMorning:', data.supplementMorning);
+                  onLogSupplementDose?.('morning', !data.supplementMorning);
+                }}
                 className={cn(
                   "flex-1 flex items-center justify-center gap-1.5 py-3 md:py-2 px-2 rounded-lg text-sm md:text-xs font-medium transition-all touch-feedback",
                   data.supplementMorning 
@@ -375,7 +378,10 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                 {data.supplementMorning && <Check className="h-3.5 w-3.5 md:h-3 md:w-3" />}
               </button>
               <button
-                onClick={() => onLogSupplementDose?.('afternoon', !data.supplementAfternoon)}
+                onClick={() => {
+                  console.log('🖱️ Noon button clicked, data.supplementAfternoon:', data.supplementAfternoon);
+                  onLogSupplementDose?.('afternoon', !data.supplementAfternoon);
+                }}
                 className={cn(
                   "flex-1 flex items-center justify-center gap-1.5 py-3 md:py-2 px-2 rounded-lg text-sm md:text-xs font-medium transition-all touch-feedback",
                   data.supplementAfternoon 
@@ -388,7 +394,10 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                 {data.supplementAfternoon && <Check className="h-3.5 w-3.5 md:h-3 md:w-3" />}
               </button>
               <button
-                onClick={() => onLogSupplementDose?.('evening', !data.supplementEvening)}
+                onClick={() => {
+                  console.log('🖱️ PM button clicked, data.supplementEvening:', data.supplementEvening);
+                  onLogSupplementDose?.('evening', !data.supplementEvening);
+                }}
                 className={cn(
                   "flex-1 flex items-center justify-center gap-1.5 py-3 md:py-2 px-2 rounded-lg text-sm md:text-xs font-medium transition-all touch-feedback",
                   data.supplementEvening 

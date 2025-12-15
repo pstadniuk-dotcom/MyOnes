@@ -4731,8 +4731,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       
       // Get user's timezone for correct day boundary
       const user = await storage.getUser(userId);
+      console.log('🔍 GET /api/dashboard/wellness - User lookup:', {
+        userId,
+        userFound: !!user,
+        userTimezoneFromDB: user?.timezone,
+        userEmail: user?.email?.substring(0, 10) + '...',
+      });
       const userTimezone = user?.timezone || 'America/New_York';
       const today = getUserLocalMidnight(userTimezone);
+      console.log('🗓️ GET /api/dashboard/wellness - Date Debug:', {
+        userTimezone,
+        todayISO: today.toISOString(),
+        serverTimeUTC: new Date().toISOString(),
+      });
       const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       // End of day for upper bound comparisons (23:59:59.999)
       const todayEnd = new Date(todayStart);
@@ -4836,6 +4847,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         supplementAfternoon: todayLog?.supplementAfternoon,
         supplementEvening: todayLog?.supplementEvening,
         logId: todayLog?.id,
+        logDate: todayLog?.logDate,
+        todayUsed: today.toISOString(),
+        userTimezone,
       });
 
       const todayPlan = {
@@ -8893,8 +8907,21 @@ Return ONLY valid JSON in this exact format:
 
       // Get user's timezone for correct day boundary
       const user = await storage.getUser(userId);
+      console.log('🔍 POST /api/optimize/daily-logs - User lookup:', {
+        userId,
+        userFound: !!user,
+        userTimezoneFromDB: user?.timezone,
+        userEmail: user?.email?.substring(0, 10) + '...',
+      });
       const userTimezone = user?.timezone || 'America/New_York';
       const logDate = date ? new Date(date) : getUserLocalMidnight(userTimezone);
+      console.log('🗓️ POST /api/optimize/daily-logs - Date Debug:', {
+        userTimezone,
+        logDateISO: logDate.toISOString(),
+        logDateLocal: logDate.toString(),
+        bodyDate: date,
+        serverTimeUTC: new Date().toISOString(),
+      });
       if (Number.isNaN(logDate.getTime())) {
         return res.status(400).json({ error: 'Invalid date value' });
       }
