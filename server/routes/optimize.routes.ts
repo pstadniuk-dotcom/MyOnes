@@ -20,6 +20,7 @@ import { requireAuth } from './middleware';
 import { buildNutritionPlanPrompt, buildWorkoutPlanPrompt, buildLifestylePlanPrompt, buildRecipePrompt } from '../optimize-prompts';
 import { parseAiJson } from '../utils/parseAiJson';
 import { normalizePlanContent, DEFAULT_MEAL_TYPES } from '../optimize-normalizer';
+import { getUserLocalMidnight } from '../utils/timezone';
 import logger from '../logger';
 import type { OptimizeDailyLog } from '@shared/schema';
 
@@ -639,22 +640,31 @@ router.post('/daily-logs', requireAuth, async (req, res) => {
       energyLevel,
       moodLevel,
       sleepQuality,
+      isRestDay,
       notes,
     } = req.body ?? {};
 
+    // Get user's timezone for correct day boundary
+    const user = await storage.getUser(userId);
+    const userTimezone = user?.timezone || 'America/New_York';
+    
     // Debug logging for incoming request
-    console.log('📝 Daily log POST - incoming body:', {
+    console.log('📝 [optimize.routes] Daily log POST:', {
       supplementMorning,
       supplementAfternoon,
       supplementEvening,
+      isRestDay,
+      userTimezone,
       userId: userId.substring(0, 8) + '...',
     });
 
-    const logDate = date ? new Date(date) : new Date();
+    // Use user's timezone to calculate the correct date
+    const logDate = date ? new Date(date) : getUserLocalMidnight(userTimezone);
     if (Number.isNaN(logDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date value' });
     }
-    logDate.setHours(12, 0, 0, 0);
+    
+    console.log('🗓️ [optimize.routes] Calculated logDate:', logDate.toISOString());
 
     const clampRating = (value: unknown) => {
       if (value === undefined || value === null || value === '') return null;
