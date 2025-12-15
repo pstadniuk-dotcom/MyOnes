@@ -2461,6 +2461,25 @@ export async function registerRoutes(
     res.json({ status: 'ok' });
   });
 
+  // Debug endpoint to verify database connectivity and user timezone
+  app.get('/api/debug/user/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUser(userId);
+      res.json({
+        serverTime: new Date().toISOString(),
+        userFound: !!user,
+        userId: user?.id,
+        email: user?.email?.substring(0, 10) + '...',
+        timezone: user?.timezone,
+        timezoneType: typeof user?.timezone,
+        calculatedDate: getUserLocalMidnight(user?.timezone || 'America/New_York').toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   // ============================================================
   // MODULAR ROUTES (migrated from inline definitions)
   // These routes have been extracted to server/routes/*.routes.ts
