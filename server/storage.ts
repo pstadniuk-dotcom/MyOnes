@@ -2828,10 +2828,22 @@ export class DrizzleStorage implements IStorage {
   }
 
   async getDailyLog(userId: string, date: Date): Promise<OptimizeDailyLog | undefined> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    // The input date is typically from getUserLocalMidnight() which returns noon UTC
+    // for a specific calendar date. We want to find logs for that calendar date.
+    // Use the year/month/day from the input date to create UTC boundaries.
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    const day = date.getUTCDate();
+    
+    const startOfDay = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+    const endOfDay = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+
+    console.log('🔍 getDailyLog - Date lookup:', {
+      inputDate: date.toISOString(),
+      startOfDay: startOfDay.toISOString(),
+      endOfDay: endOfDay.toISOString(),
+      userId: userId.substring(0, 8) + '...',
+    });
 
     const [log] = await db
       .select()
@@ -2842,6 +2854,13 @@ export class DrizzleStorage implements IStorage {
         lte(optimizeDailyLogs.logDate, endOfDay)
       ))
       .limit(1);
+    
+    console.log('🔍 getDailyLog - Result:', {
+      found: !!log,
+      logId: log?.id,
+      logDate: log?.logDate?.toISOString?.() || log?.logDate,
+    });
+    
     return log;
   }
 

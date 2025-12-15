@@ -86,21 +86,28 @@ export default function TrackingPage() {
   // Mutation for logging supplement doses with optimistic update
   const logSupplementDose = useMutation({
     mutationFn: async ({ dose, taken }: { dose: 'morning' | 'afternoon' | 'evening', taken: boolean }) => {
+      console.log('🚀 mutationFn executing:', { dose, taken });
       const payload: Record<string, boolean> = {};
       if (dose === 'morning') payload.supplementMorning = taken;
       if (dose === 'afternoon') payload.supplementAfternoon = taken;
       if (dose === 'evening') payload.supplementEvening = taken;
       
+      console.log('📤 Sending payload to /api/optimize/daily-logs:', payload);
       const response = await apiRequest('/api/optimize/daily-logs', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
       
+      console.log('📥 Response status:', response.status);
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Response error:', errorText);
         throw new Error(`Failed to log supplement: ${response.status}`);
       }
       
-      return response.json();
+      const result = await response.json();
+      console.log('✅ Response data:', result);
+      return result;
     },
     onMutate: async ({ dose, taken }) => {
       // Cancel outgoing refetches
@@ -206,11 +213,17 @@ export default function TrackingPage() {
   }, [logWaterAmount]);
 
   const handleLogSupplement = useCallback((dose: 'morning' | 'afternoon' | 'evening', taken: boolean) => {
-    if (supplementDebounceRef.current || logSupplementDose.isPending) return;
+    console.log('🧪 handleLogSupplement called:', { dose, taken, debounceRef: supplementDebounceRef.current, isPending: logSupplementDose.isPending });
+    if (supplementDebounceRef.current || logSupplementDose.isPending) {
+      console.log('🚫 Blocked by debounce or pending state');
+      return;
+    }
     supplementDebounceRef.current = true;
+    console.log('✅ Calling logSupplementDose.mutate...');
     logSupplementDose.mutate({ dose, taken }, {
       // Reset debounce ref in onSettled to ensure it works even on error
       onSettled: () => {
+        console.log('🔄 Mutation settled, resetting debounce ref');
         supplementDebounceRef.current = false;
       },
     });
