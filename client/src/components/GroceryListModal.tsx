@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ShoppingBasket, Check, RefreshCw, Share2 } from 'lucide-react';
+import { Loader2, ShoppingBasket, Check, RefreshCw, Share2, Info } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getQueryFn } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -149,6 +149,14 @@ export function GroceryListModal({ open, onOpenChange }: GroceryListModalProps) 
           <DialogDescription>
             Ingredients aggregated from your 7-day meal plan.
           </DialogDescription>
+          {groceryList && (
+            <div className="flex items-start gap-2 mt-3 p-2.5 bg-amber-50 dark:bg-amber-950/30 rounded-md border border-amber-200 dark:border-amber-800">
+              <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                If you swap or modify meals in your plan, tap "Regenerate" below to update this list.
+              </p>
+            </div>
+          )}
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden py-4">
