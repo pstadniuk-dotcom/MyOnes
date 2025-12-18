@@ -4117,6 +4117,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Also clean up any stray code markers that might remain
       fullResponse = fullResponse.replace(/`{1,3}/g, '').trim();
       
+      // 🧹 CLEAN UP FORMULA CALCULATION ITERATIONS
+      // Remove patterns like "TOTAL: 6178mg ❌ Over by..." and iteration attempts
+      // This strips out the AI "showing work" that users shouldn't see
+      fullResponse = fullResponse
+        // Remove lines showing totals that are over limit (with ❌)
+        .replace(/TOTAL:\s*\d+mg\s*❌[^\n]*/gi, '')
+        // Remove "Let me optimize/recalculate" style lines
+        .replace(/Let me (optimize|recalculate|try again|adjust)[^\n]*\n?/gi, '')
+        // Remove bullet point lists that show iteration attempts (ingredient + mg pattern repeated)
+        .replace(/(-\s+[A-Za-z\s]+(?:\([^)]*\))?:\s*\d+mg[^\n]*\n){3,}TOTAL:\s*\d+mg\s*❌[^\n]*/gi, '')
+        // Remove "Still X mg over" patterns
+        .replace(/Still\s+\d+mg\s+over[^\n]*/gi, '')
+        // Remove "Over by X mg" patterns  
+        .replace(/Over\s+by\s+\d+mg[^\n]*/gi, '')
+        // Clean up multiple consecutive newlines left behind
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+      
       // Send health data update notification if applicable
       if (healthDataUpdated) {
         sendSSE({
