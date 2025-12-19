@@ -91,7 +91,7 @@ export function StreakRewardsCard() {
 
   return (
     <Card className={cn(
-      "bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 transition-all overflow-hidden",
+      "bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 transition-all overflow-hidden h-full",
       isUrgent && "border-amber-300 bg-gradient-to-br from-amber-50/50 to-white"
     )}>
       <CardHeader className="pb-3">
