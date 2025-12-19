@@ -14,6 +14,7 @@ import {
   Dumbbell,
   Heart,
 } from 'lucide-react';
+import { FEATURES, isOptimizeEnabled } from '@/config/features';
 import {
   Sidebar,
   SidebarContent,
@@ -152,6 +153,8 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Optimize Section - Hidden when features are disabled */}
+        {isOptimizeEnabled() && (
         <SidebarGroup className="mt-4">
           <SidebarGroupLabel className="text-[#52796F] text-xs font-medium uppercase tracking-wider px-3 mb-2">
             Optimize
@@ -182,6 +185,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        )}
 
         <SidebarGroup className="mt-4">
           <SidebarGroupLabel className="text-[#52796F] text-xs font-medium uppercase tracking-wider px-3 mb-2">

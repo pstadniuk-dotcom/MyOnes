@@ -41,7 +41,8 @@ import {
   ingredientsRoutes,
   wearablesRoutes,
   webhooksRoutes,
-  optimizeRoutes
+  optimizeRoutes,
+  streaksRoutes
 } from "./routes/index";
 
 type GroceryListItem = {
@@ -2525,6 +2526,9 @@ export async function registerRoutes(
   
   // Optimize routes: /api/optimize/* - plans, logs, grocery lists
   app.use('/api/optimize', optimizeRoutes);
+  
+  // Streaks routes: /api/streaks/* - streak rewards system
+  app.use('/api/streaks', streaksRoutes);
   
   // ============================================================
   // LEGACY INLINE ROUTES (to be migrated)

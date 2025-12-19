@@ -36,6 +36,7 @@ export { default as ingredientsRoutes } from './ingredients.routes';
 export { default as wearablesRoutes } from './junction.routes';
 export { default as webhooksRoutes } from './webhooks.routes';
 export { default as optimizeRoutes } from './optimize.routes';
+export { default as streaksRoutes } from './streaks.routes';
 
 // Export middleware for use in routes.ts during migration
 export {
