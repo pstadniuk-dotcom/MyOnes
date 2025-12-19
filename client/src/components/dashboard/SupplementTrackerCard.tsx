@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Check, Sun, Cloud, Moon, Pill, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,24 +15,29 @@ interface SupplementDose {
   taken: boolean;
 }
 
-interface SupplementTrackerCardProps {
-  supplementMorning?: boolean;
-  supplementAfternoon?: boolean;
-  supplementEvening?: boolean;
-  totalDoses?: number;
-  isLoading?: boolean;
+interface WellnessData {
+  todayPlan?: {
+    supplementMorning?: boolean;
+    supplementAfternoon?: boolean;
+    supplementEvening?: boolean;
+    supplementDosesTotal?: number;
+  };
 }
 
-export function SupplementTrackerCard({
-  supplementMorning = false,
-  supplementAfternoon = false,
-  supplementEvening = false,
-  totalDoses = 3,
-  isLoading = false,
-}: SupplementTrackerCardProps) {
+export function SupplementTrackerCard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [pendingDose, setPendingDose] = useState<string | null>(null);
+
+  // Fetch wellness data to get current supplement status
+  const { data: wellnessData, isLoading } = useQuery<WellnessData>({
+    queryKey: ['/api/dashboard/wellness'],
+  });
+
+  const supplementMorning = wellnessData?.todayPlan?.supplementMorning ?? false;
+  const supplementAfternoon = wellnessData?.todayPlan?.supplementAfternoon ?? false;
+  const supplementEvening = wellnessData?.todayPlan?.supplementEvening ?? false;
+  const totalDoses = wellnessData?.todayPlan?.supplementDosesTotal ?? 3;
 
   const doses: SupplementDose[] = [
     { time: 'morning', label: 'Morning', icon: Sun, taken: supplementMorning },
