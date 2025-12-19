@@ -6,47 +6,33 @@ const pool = new Pool({
 });
 
 try {
-  // Check user's timezone
-  const user = await pool.query(`
-    SELECT id, email, timezone, created_at
-    FROM users 
-    WHERE id = '1f7f26d5-bcc7-46f0-a671-c7a793432be1'
-  `);
-  console.log('User:', user.rows[0]);
-  
-  // Calculate what date the server would use
-  const userTimezone = user.rows[0]?.timezone || 'America/New_York';
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: userTimezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const userDateString = formatter.format(new Date());
-  console.log('\nUser timezone:', userTimezone);
-  console.log('User local date:', userDateString);
-  console.log('Server UTC time:', new Date().toISOString());
-  
-  // Show expected date range for today
-  const [year, month, day] = userDateString.split('-').map(Number);
-  const noonUTC = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
-  console.log('\nExpected noon UTC date:', noonUTC.toISOString());
-  
-  // Now check logs for that date
-  const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-  const endOfDay = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
-  console.log('\nQuery range:');
-  console.log('  Start:', startOfDay.toISOString());
-  console.log('  End:', endOfDay.toISOString());
-  
+  // Check today's log
   const logs = await pool.query(`
-    SELECT id, log_date, supplement_morning, supplement_afternoon, supplement_evening
+    SELECT id, log_date, supplement_morning, supplement_afternoon, supplement_evening, created_at
     FROM optimize_daily_logs 
     WHERE user_id = '1f7f26d5-bcc7-46f0-a671-c7a793432be1'
-    AND log_date >= $1 AND log_date <= $2
-  `, [startOfDay.toISOString(), endOfDay.toISOString()]);
-  console.log('\nLogs found for today:', logs.rows);
+    ORDER BY created_at DESC
+    LIMIT 5
+  `);
+  console.log('Recent daily logs:');
+  logs.rows.forEach(row => {
+    console.log({
+      id: row.id.substring(0, 8),
+      logDate: row.log_date,
+      morning: row.supplement_morning,
+      afternoon: row.supplement_afternoon,
+      evening: row.supplement_evening,
+    });
+  });
   
+  // Check streaks
+  const streaks = await pool.query(`
+    SELECT streak_type, current_streak, longest_streak, last_logged_date
+    FROM user_streaks 
+    WHERE user_id = '1f7f26d5-bcc7-46f0-a671-c7a793432be1'
+  `);
+  console.log('\nUser streaks:');
+  streaks.rows.forEach(row => console.log(row));
 } catch (e) {
   console.error('Error:', e.message);
 } finally {

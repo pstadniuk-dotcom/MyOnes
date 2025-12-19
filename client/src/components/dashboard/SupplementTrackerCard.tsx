@@ -40,6 +40,10 @@ export function SupplementTrackerCard() {
     queryKey: ['/api/dashboard/wellness'],
   });
 
+  // Debug: Log what data we receive
+  console.log('🧪 SupplementTrackerCard - wellnessData:', wellnessData);
+  console.log('🧪 SupplementTrackerCard - todayPlan:', wellnessData?.todayPlan);
+
   // Use server data, optimistic state is just for immediate feedback during mutation
   // Once mutation settles and data refetches, server data takes over
   const serverMorning = wellnessData?.todayPlan?.supplementMorning ?? false;
