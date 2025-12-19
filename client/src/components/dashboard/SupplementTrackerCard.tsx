@@ -28,15 +28,22 @@ export function SupplementTrackerCard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [pendingDose, setPendingDose] = useState<string | null>(null);
+  // Local optimistic state for immediate UI feedback
+  const [optimisticState, setOptimisticState] = useState<{
+    morning?: boolean;
+    afternoon?: boolean;
+    evening?: boolean;
+  }>({});
 
   // Fetch wellness data to get current supplement status
   const { data: wellnessData, isLoading } = useQuery<WellnessData>({
     queryKey: ['/api/dashboard/wellness'],
   });
 
-  const supplementMorning = wellnessData?.todayPlan?.supplementMorning ?? false;
-  const supplementAfternoon = wellnessData?.todayPlan?.supplementAfternoon ?? false;
-  const supplementEvening = wellnessData?.todayPlan?.supplementEvening ?? false;
+  // Use optimistic state if available, otherwise use server data
+  const supplementMorning = optimisticState.morning ?? wellnessData?.todayPlan?.supplementMorning ?? false;
+  const supplementAfternoon = optimisticState.afternoon ?? wellnessData?.todayPlan?.supplementAfternoon ?? false;
+  const supplementEvening = optimisticState.evening ?? wellnessData?.todayPlan?.supplementEvening ?? false;
   const totalDoses = wellnessData?.todayPlan?.supplementDosesTotal ?? 3;
 
   const doses: SupplementDose[] = [
@@ -65,11 +72,16 @@ export function SupplementTrackerCard() {
       }
       return response.json();
     },
-    onMutate: async ({ dose }) => {
+    onMutate: async ({ dose, taken }) => {
       setPendingDose(dose);
+      // Optimistically update UI immediately
+      setOptimisticState(prev => ({
+        ...prev,
+        [dose]: taken,
+      }));
     },
-    onSuccess: (_, { dose, taken }) => {
-      // Invalidate queries to refresh data
+    onSuccess: (_, { taken }) => {
+      // Invalidate queries to refresh data from server
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
       queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
       queryClient.invalidateQueries({ queryKey: ['/api/streaks/rewards'] });
@@ -81,15 +93,29 @@ export function SupplementTrackerCard() {
         });
       }
     },
-    onError: () => {
+    onError: (_, { dose }) => {
+      // Revert optimistic update on error
+      setOptimisticState(prev => {
+        const newState = { ...prev };
+        delete newState[dose];
+        return newState;
+      });
       toast({
         variant: 'destructive',
         title: 'Error',
         description: 'Failed to log dose. Please try again.',
       });
     },
-    onSettled: () => {
+    onSettled: (_, __, { dose }) => {
       setPendingDose(null);
+      // Clear optimistic state for this dose after server responds
+      setTimeout(() => {
+        setOptimisticState(prev => {
+          const newState = { ...prev };
+          delete newState[dose];
+          return newState;
+        });
+      }, 500);
     },
   });
 
@@ -123,7 +149,7 @@ export function SupplementTrackerCard() {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-3">
           {doses.map((dose) => {
             const Icon = dose.icon;
             const isPending = pendingDose === dose.time;
@@ -133,7 +159,7 @@ export function SupplementTrackerCard() {
                 key={dose.time}
                 variant="outline"
                 className={cn(
-                  "h-auto py-3 px-2 flex flex-col items-center gap-1.5 transition-all",
+                  "h-auto py-4 px-3 flex flex-col items-center gap-2 transition-all min-h-[100px]",
                   "border-[#1B4332]/10 hover:border-[#1B4332]/30",
                   dose.taken && "bg-green-50 border-green-200 hover:bg-green-100 hover:border-green-300",
                   isPending && "opacity-70"
@@ -142,25 +168,28 @@ export function SupplementTrackerCard() {
                 disabled={isPending}
               >
                 <div className={cn(
-                  "h-8 w-8 rounded-full flex items-center justify-center transition-colors",
+                  "h-12 w-12 rounded-full flex items-center justify-center transition-colors",
                   dose.taken 
                     ? "bg-green-500 text-white" 
                     : "bg-[#1B4332]/5 text-[#52796F]"
                 )}>
                   {isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-6 w-6 animate-spin" />
                   ) : dose.taken ? (
-                    <Check className="h-4 w-4" />
+                    <Check className="h-6 w-6" />
                   ) : (
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-6 w-6" />
                   )}
                 </div>
                 <span className={cn(
-                  "text-xs font-medium",
+                  "text-sm font-medium",
                   dose.taken ? "text-green-700" : "text-[#52796F]"
                 )}>
                   {dose.label}
                 </span>
+                {dose.taken && (
+                  <span className="text-xs text-green-600">✓ Taken</span>
+                )}
               </Button>
             );
           })}
