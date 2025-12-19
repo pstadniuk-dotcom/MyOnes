@@ -40,10 +40,16 @@ export function SupplementTrackerCard() {
     queryKey: ['/api/dashboard/wellness'],
   });
 
-  // Use optimistic state if available, otherwise use server data
-  const supplementMorning = optimisticState.morning ?? wellnessData?.todayPlan?.supplementMorning ?? false;
-  const supplementAfternoon = optimisticState.afternoon ?? wellnessData?.todayPlan?.supplementAfternoon ?? false;
-  const supplementEvening = optimisticState.evening ?? wellnessData?.todayPlan?.supplementEvening ?? false;
+  // Use server data, optimistic state is just for immediate feedback during mutation
+  // Once mutation settles and data refetches, server data takes over
+  const serverMorning = wellnessData?.todayPlan?.supplementMorning ?? false;
+  const serverAfternoon = wellnessData?.todayPlan?.supplementAfternoon ?? false;
+  const serverEvening = wellnessData?.todayPlan?.supplementEvening ?? false;
+  
+  // Only use optimistic state while mutation is pending
+  const supplementMorning = pendingDose === 'morning' ? (optimisticState.morning ?? serverMorning) : serverMorning;
+  const supplementAfternoon = pendingDose === 'afternoon' ? (optimisticState.afternoon ?? serverAfternoon) : serverAfternoon;
+  const supplementEvening = pendingDose === 'evening' ? (optimisticState.evening ?? serverEvening) : serverEvening;
   const totalDoses = wellnessData?.todayPlan?.supplementDosesTotal ?? 3;
 
   const doses: SupplementDose[] = [
@@ -106,16 +112,10 @@ export function SupplementTrackerCard() {
         description: 'Failed to log dose. Please try again.',
       });
     },
-    onSettled: (_, __, { dose }) => {
+    onSettled: () => {
       setPendingDose(null);
-      // Clear optimistic state for this dose after server responds
-      setTimeout(() => {
-        setOptimisticState(prev => {
-          const newState = { ...prev };
-          delete newState[dose];
-          return newState;
-        });
-      }, 500);
+      // Don't clear optimistic state here - let the refetched data overwrite it naturally
+      // The queryClient.invalidateQueries will refetch and update the UI
     },
   });
 
@@ -128,7 +128,7 @@ export function SupplementTrackerCard() {
   }
 
   return (
-    <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 transition-all">
+    <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 transition-all h-full">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold text-[#1B4332] flex items-center gap-2">

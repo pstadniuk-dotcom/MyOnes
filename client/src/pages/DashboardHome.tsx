@@ -206,7 +206,7 @@ export default function HomePage() {
 
       {/* Supplement Tracking & Streak Rewards - Only show for users with formula */}
       {currentFormula && FEATURES.STREAK_REWARDS && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 items-stretch">
           <SupplementTrackerCard />
           <StreakRewardsCard />
         </div>
