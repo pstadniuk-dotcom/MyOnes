@@ -16,7 +16,7 @@ interface SupplementDose {
 }
 
 interface WellnessData {
-  todayPlan?: {
+  today?: {
     supplementMorning?: boolean;
     supplementAfternoon?: boolean;
     supplementEvening?: boolean;
@@ -42,19 +42,19 @@ export function SupplementTrackerCard() {
 
   // Debug: Log what data we receive
   console.log('🧪 SupplementTrackerCard - wellnessData:', wellnessData);
-  console.log('🧪 SupplementTrackerCard - todayPlan:', wellnessData?.todayPlan);
+  console.log('🧪 SupplementTrackerCard - today:', wellnessData?.today);
 
   // Use server data, optimistic state is just for immediate feedback during mutation
   // Once mutation settles and data refetches, server data takes over
-  const serverMorning = wellnessData?.todayPlan?.supplementMorning ?? false;
-  const serverAfternoon = wellnessData?.todayPlan?.supplementAfternoon ?? false;
-  const serverEvening = wellnessData?.todayPlan?.supplementEvening ?? false;
+  const serverMorning = wellnessData?.today?.supplementMorning ?? false;
+  const serverAfternoon = wellnessData?.today?.supplementAfternoon ?? false;
+  const serverEvening = wellnessData?.today?.supplementEvening ?? false;
   
   // Only use optimistic state while mutation is pending
   const supplementMorning = pendingDose === 'morning' ? (optimisticState.morning ?? serverMorning) : serverMorning;
   const supplementAfternoon = pendingDose === 'afternoon' ? (optimisticState.afternoon ?? serverAfternoon) : serverAfternoon;
   const supplementEvening = pendingDose === 'evening' ? (optimisticState.evening ?? serverEvening) : serverEvening;
-  const totalDoses = wellnessData?.todayPlan?.supplementDosesTotal ?? 3;
+  const totalDoses = wellnessData?.today?.supplementDosesTotal ?? 3;
 
   const doses: SupplementDose[] = [
     { time: 'morning', label: 'Morning', icon: Sun, taken: supplementMorning },
