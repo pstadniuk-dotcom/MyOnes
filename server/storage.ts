@@ -2973,7 +2973,7 @@ export class DrizzleStorage implements IStorage {
   }
 
   // User Streaks
-  async getUserStreak(userId: string, streakType: 'overall' | 'nutrition' | 'workout' | 'lifestyle'): Promise<UserStreak | undefined> {
+  async getUserStreak(userId: string, streakType: 'overall' | 'nutrition' | 'workout' | 'lifestyle' | 'supplements'): Promise<UserStreak | undefined> {
     const [streak] = await db
       .select()
       .from(userStreaks)
@@ -3240,7 +3240,7 @@ export class DrizzleStorage implements IStorage {
     const dateStr = logDate.toISOString().split('T')[0];
     
     // Get or create streak record
-    let streak = await this.getUserStreak(userId, streakType as 'overall' | 'nutrition' | 'workout' | 'lifestyle');
+    let streak = await this.getUserStreak(userId, streakType as 'overall' | 'nutrition' | 'workout' | 'lifestyle' | 'supplements');
     
     if (!streak) {
       // Create new streak for this category
@@ -4154,22 +4154,13 @@ export class DrizzleStorage implements IStorage {
     daysUntilDeadline: number | null;
   }> {
     try {
+      // Get streak from user_streaks table (supplements streak)
+      const streak = await this.getUserStreak(userId, 'supplements') 
+        || await this.getUserStreak(userId, 'overall');
+      
       const [user] = await db.select().from(users).where(eq(users.id, userId));
-      if (!user) {
-        return {
-          currentStreak: 0,
-          discountEarned: 0,
-          discountTier: 'Building',
-          lastOrderDate: null,
-          reorderWindowStart: null,
-          reorderDeadline: null,
-          streakStatus: 'building',
-          daysUntilReorderWindow: null,
-          daysUntilDeadline: null,
-        };
-      }
-
-      const currentStreak = user.streakCurrentDays || 0;
+      
+      const currentStreak = streak?.currentStreak || 0;
       const { discount, tier } = this.calculateDiscountTier(currentStreak);
       const now = new Date();
       
@@ -4177,24 +4168,24 @@ export class DrizzleStorage implements IStorage {
       let daysUntilReorderWindow: number | null = null;
       let daysUntilDeadline: number | null = null;
       
-      if (user.reorderWindowStart) {
+      if (user?.reorderWindowStart) {
         const windowDiff = Math.ceil((user.reorderWindowStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         daysUntilReorderWindow = windowDiff > 0 ? windowDiff : 0;
       }
       
-      if (user.reorderDeadline) {
+      if (user?.reorderDeadline) {
         const deadlineDiff = Math.ceil((user.reorderDeadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         daysUntilDeadline = deadlineDiff > 0 ? deadlineDiff : 0;
       }
 
       return {
         currentStreak,
-        discountEarned: user.streakDiscountEarned || discount,
+        discountEarned: discount,
         discountTier: tier,
-        lastOrderDate: user.lastOrderDate || null,
-        reorderWindowStart: user.reorderWindowStart || null,
-        reorderDeadline: user.reorderDeadline || null,
-        streakStatus: (user.streakStatus as any) || 'building',
+        lastOrderDate: user?.lastOrderDate || null,
+        reorderWindowStart: user?.reorderWindowStart || null,
+        reorderDeadline: user?.reorderDeadline || null,
+        streakStatus: (user?.streakStatus as any) || 'building',
         daysUntilReorderWindow,
         daysUntilDeadline,
       };

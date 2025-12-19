@@ -30,11 +30,6 @@ export interface StreakRewardsData {
   daysUntilDeadline: number | null;
 }
 
-interface StreakRewardsCardProps {
-  data?: StreakRewardsData;
-  isLoading?: boolean;
-}
-
 function getCurrentTier(streak: number) {
   // Find the highest tier the user has reached
   let currentTier = null;
@@ -65,7 +60,12 @@ function getProgressToNextTier(streak: number) {
   return Math.min(progress, 100);
 }
 
-export function StreakRewardsCard({ data, isLoading }: StreakRewardsCardProps) {
+export function StreakRewardsCard() {
+  // Fetch streak rewards data
+  const { data, isLoading } = useQuery<StreakRewardsData>({
+    queryKey: ['/api/streaks/rewards'],
+  });
+
   if (isLoading) {
     return <StreakRewardsCardSkeleton />;
   }

@@ -9038,7 +9038,8 @@ Return ONLY valid JSON in this exact format:
           supplementAfternoon: resolvedLog.supplementAfternoon,
           supplementEvening: resolvedLog.supplementEvening,
         });
-        await storage.updateUserStreak(userId, logDate);
+        // Update all category streaks including supplements
+        await storage.updateAllStreaks(userId, logDate);
       } else {
         updatedLog = await storage.createDailyLog({
           userId,
@@ -9052,8 +9053,8 @@ Return ONLY valid JSON in this exact format:
           supplementAfternoon: resolvedLog.supplementAfternoon,
           supplementEvening: resolvedLog.supplementEvening,
         });
-        // Also update streak when creating new log
-        await storage.updateUserStreak(userId, logDate);
+        // Update all category streaks including supplements
+        await storage.updateAllStreaks(userId, logDate);
       }
 
       const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle'] as const;
