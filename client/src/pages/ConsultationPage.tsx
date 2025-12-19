@@ -134,8 +134,10 @@ export default function ConsultationPage() {
   // Refs and hooks
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const userHasScrolledUp = useRef(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -294,13 +296,56 @@ export default function ConsultationPage() {
     }
   }, [user?.name, isNewSession, messages.length, isLoadingHistory, historyData?.sessions]);
   
-  // Auto-scroll to bottom when new messages arrive
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Check if user is near the bottom of the scroll container
+  const isNearBottom = useCallback(() => {
+    const endElement = messagesEndRef.current;
+    if (!endElement) return true;
+    
+    // Check if the end marker is visible in the viewport
+    const rect = endElement.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    // Consider "near bottom" if the end marker is within 200px of viewport bottom
+    return rect.top < viewportHeight + 200;
   }, []);
 
+  // Handle scroll events to track if user scrolled up
+  const handleScroll = useCallback(() => {
+    userHasScrolledUp.current = !isNearBottom();
+  }, [isNearBottom]);
+
+  // Set up scroll listener on the ScrollArea viewport
   useEffect(() => {
-    scrollToBottom();
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+    
+    // Find the actual scrollable viewport (Radix ScrollArea creates a nested structure)
+    const viewport = scrollContainer.closest('[data-radix-scroll-area-viewport]') || 
+                     scrollContainer.parentElement?.querySelector('[data-radix-scroll-area-viewport]');
+    
+    if (viewport) {
+      viewport.addEventListener('scroll', handleScroll, { passive: true });
+      return () => viewport.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
+
+  // Auto-scroll to bottom when new messages arrive (only if user hasn't scrolled up)
+  const scrollToBottom = useCallback((force = false) => {
+    if (force || !userHasScrolledUp.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
+
+  // Reset scroll tracking when user sends a new message
+  const resetScrollTracking = useCallback(() => {
+    userHasScrolledUp.current = false;
+    scrollToBottom(true);
+  }, [scrollToBottom]);
+
+  useEffect(() => {
+    // Only auto-scroll if user hasn't scrolled up to read
+    if (!userHasScrolledUp.current) {
+      scrollToBottom();
+    }
   }, [messages, scrollToBottom]);
 
   // Auto-resize textarea
@@ -347,6 +392,7 @@ export default function ConsultationPage() {
     initialInputRef.current = ''; // Clear voice input reference
     setIsTyping(true);
     setUploadedFiles([]);
+    resetScrollTracking(); // Force scroll to bottom when user sends a message
     
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), 120000);
@@ -1167,8 +1213,14 @@ export default function ConsultationPage() {
         </div>
 
         {/* Messages Area */}
-        <ScrollArea className="flex-1" data-testid="container-chat-messages">
-          <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+        <ScrollArea 
+          className="flex-1" 
+          data-testid="container-chat-messages"
+        >
+          <div 
+            className="p-3 sm:p-6 space-y-4 sm:space-y-6"
+            ref={scrollContainerRef}
+          >
             {filteredMessages.map((message, index) => {
               // System messages render differently
               if (message.sender === 'system') {

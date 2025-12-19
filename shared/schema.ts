@@ -75,6 +75,14 @@ export const users = pgTable("users", {
   // Junction (Vital) wearables integration
   junctionUserId: text("junction_user_id"),
   
+  // Streak Rewards System
+  streakCurrentDays: integer("streak_current_days").default(0).notNull(),
+  streakDiscountEarned: integer("streak_discount_earned").default(0).notNull(), // 0-20 percent
+  lastOrderDate: timestamp("last_order_date"),
+  reorderWindowStart: timestamp("reorder_window_start"),  // Day 75 from last order
+  reorderDeadline: timestamp("reorder_deadline"),         // Day 95 from last order (5-day grace)
+  streakStatus: text("streak_status").default('building').notNull(), // 'building' | 'ready' | 'warning' | 'grace' | 'lapsed'
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

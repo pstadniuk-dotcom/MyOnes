@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ApiConfigError } from "@/components/ApiConfigError";
 import { isApiConfigurationValid } from "@/lib/api";
+import { FEATURES, isOptimizeEnabled } from "@/config/features";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ProtectedAdminRoute from "@/components/ProtectedAdminRoute";
 import NotFound from "@/pages/not-found";
@@ -147,18 +148,28 @@ function MainRouter() {
         </ProtectedRoute>
       </Route>
       <Route path="/dashboard/optimize/tracking">
-        <ProtectedRoute>
-          <DashboardLayout>
-            <TrackingPage />
-          </DashboardLayout>
-        </ProtectedRoute>
+        {/* Redirect to dashboard if tracking page is disabled */}
+        {!FEATURES.TRACKING_PAGE ? (
+          <Redirect to="/dashboard" />
+        ) : (
+          <ProtectedRoute>
+            <DashboardLayout>
+              <TrackingPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        )}
       </Route>
       <Route path="/dashboard/optimize/:tab?">
-        <ProtectedRoute>
-          <DashboardLayout>
-            <OptimizePage />
-          </DashboardLayout>
-        </ProtectedRoute>
+        {/* Redirect to dashboard if optimize features are disabled */}
+        {!isOptimizeEnabled() ? (
+          <Redirect to="/dashboard" />
+        ) : (
+          <ProtectedRoute>
+            <DashboardLayout>
+              <OptimizePage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        )}
       </Route>
       
       <Route path="/dashboard/wearables">

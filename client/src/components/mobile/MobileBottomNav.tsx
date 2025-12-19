@@ -8,29 +8,46 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { FEATURES, isOptimizeEnabled } from '@/config/features';
 
-const navItems = [
-  { href: '/dashboard/chat', icon: MessageSquare, label: 'AI Chat', exact: false },
-  { href: '/dashboard/formula', icon: FlaskConical, label: 'Formula', exact: false },
-  { href: '/dashboard/optimize', icon: Sparkles, label: 'Optimize', exact: false },
-  { href: '/dashboard/optimize/tracking', icon: ClipboardList, label: 'Log', exact: true },
+// Base nav items - filtered based on feature flags
+const allNavItems = [
+  { href: '/dashboard/chat', icon: MessageSquare, label: 'AI Chat', exact: false, requiresFeature: null },
+  { href: '/dashboard/formula', icon: FlaskConical, label: 'Formula', exact: false, requiresFeature: null },
+  { href: '/dashboard/optimize', icon: Sparkles, label: 'Optimize', exact: false, requiresFeature: 'OPTIMIZE' as const },
+  { href: '/dashboard/optimize/tracking', icon: ClipboardList, label: 'Log', exact: true, requiresFeature: 'TRACKING_PAGE' as const },
+  { href: '/dashboard', icon: Home, label: 'Home', exact: true, requiresFeature: null },
 ];
 
-// Full menu items for the slide-up sheet
-const menuItems = [
-  { href: '/dashboard', icon: Home, label: 'Dashboard', description: 'Your health overview' },
-  { href: '/dashboard/chat', icon: MessageSquare, label: 'AI Chat', description: 'Talk to your health AI' },
-  { href: '/dashboard/formula', icon: FlaskConical, label: 'My Formula', description: 'Your supplement formula' },
-  { href: '/dashboard/optimize', icon: Sparkles, label: 'Optimize', description: 'Nutrition, workout & lifestyle' },
-  { href: '/dashboard/optimize/tracking', icon: Activity, label: 'Daily Log', description: 'Track your progress' },
-  { href: '/dashboard/lab-reports', icon: FileText, label: 'Lab Results', description: 'Upload and analyze labs' },
-  { href: '/dashboard/profile', icon: User, label: 'Profile', description: 'Your health profile' },
-  { href: '/dashboard/settings', icon: Settings, label: 'Settings', description: 'App preferences' },
+// Full menu items for the slide-up sheet - filtered based on feature flags
+const allMenuItems = [
+  { href: '/dashboard', icon: Home, label: 'Dashboard', description: 'Your health overview', requiresFeature: null },
+  { href: '/dashboard/chat', icon: MessageSquare, label: 'AI Chat', description: 'Talk to your health AI', requiresFeature: null },
+  { href: '/dashboard/formula', icon: FlaskConical, label: 'My Formula', description: 'Your supplement formula', requiresFeature: null },
+  { href: '/dashboard/optimize', icon: Sparkles, label: 'Optimize', description: 'Nutrition, workout & lifestyle', requiresFeature: 'OPTIMIZE' as const },
+  { href: '/dashboard/optimize/tracking', icon: Activity, label: 'Daily Log', description: 'Track your progress', requiresFeature: 'TRACKING_PAGE' as const },
+  { href: '/dashboard/lab-reports', icon: FileText, label: 'Lab Results', description: 'Upload and analyze labs', requiresFeature: null },
+  { href: '/dashboard/profile', icon: User, label: 'Profile', description: 'Your health profile', requiresFeature: null },
+  { href: '/dashboard/settings', icon: Settings, label: 'Settings', description: 'App preferences', requiresFeature: null },
 ];
+
+// Filter items based on feature flags
+function filterByFeature<T extends { requiresFeature: string | null }>(items: T[]): T[] {
+  return items.filter(item => {
+    if (item.requiresFeature === null) return true;
+    if (item.requiresFeature === 'OPTIMIZE') return isOptimizeEnabled();
+    if (item.requiresFeature === 'TRACKING_PAGE') return FEATURES.TRACKING_PAGE;
+    return true;
+  });
+}
 
 export function MobileBottomNav() {
   const [location, navigate] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  
+  // Filter nav items based on feature flags
+  const navItems = filterByFeature(allNavItems);
+  const menuItems = filterByFeature(allMenuItems);
   
   const isActive = (item: typeof navItems[0]) => {
     if (item.exact) {

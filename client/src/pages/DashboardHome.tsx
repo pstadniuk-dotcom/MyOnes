@@ -21,6 +21,9 @@ import type { Formula } from '@shared/schema';
 import { calculateDosage } from '@/lib/utils';
 import { useState } from 'react';
 import { ProfileCompletionDialog } from '@/components/ProfileCompletionDialog';
+import { SupplementTrackerCard } from '@/components/dashboard/SupplementTrackerCard';
+import { StreakRewardsCard } from '@/components/dashboard/StreakRewardsCard';
+import { FEATURES } from '@/config/features';
 
 // Map next actions to their appropriate routes
 function getNextActionRoute(nextAction: string): string {
@@ -201,6 +204,14 @@ export default function HomePage() {
         </Card>
       </div>
 
+      {/* Supplement Tracking & Streak Rewards - Only show for users with formula */}
+      {currentFormula && FEATURES.STREAK_REWARDS && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <SupplementTrackerCard />
+          <StreakRewardsCard />
+        </div>
+      )}
+
       {/* New User Onboarding - V2 Styled */}
       {isNewUser && (
         <Card className="border-[#1B4332]/20 bg-gradient-to-r from-[#1B4332]/5 to-[#52796F]/10" data-testid="card-onboarding">
@@ -350,17 +361,17 @@ export default function HomePage() {
             </Link>
           </Card>
 
-          <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-track-progress">
-            <Link href="/dashboard/optimize/tracking">
+          <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-view-orders">
+            <Link href="/dashboard/orders">
               <CardHeader className="space-y-0 pb-3">
                 <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
-                  <TrendingUp className="w-4 h-4 text-[#1B4332]" />
-                  Track Progress
+                  <Package className="w-4 h-4 text-[#1B4332]" />
+                  View Orders
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-[#52796F]">
-                  View your wellness streaks and daily progress
+                  Track your supplement orders and shipping status
                 </p>
               </CardContent>
             </Link>
