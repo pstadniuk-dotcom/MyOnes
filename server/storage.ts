@@ -3237,7 +3237,9 @@ export class DrizzleStorage implements IStorage {
     logDate: Date,
     threshold: number = 0.50
   ): Promise<UserStreak> {
-    const dateStr = logDate.toISOString().split('T')[0];
+    // Use date strings (YYYY-MM-DD) for comparison to avoid timezone issues
+    // logDate is already in user's local date context (from getUserLocalMidnight)
+    const logDateStr = logDate.toISOString().split('T')[0];
     
     // Get or create streak record
     let streak = await this.getUserStreak(userId, streakType as 'overall' | 'nutrition' | 'workout' | 'lifestyle' | 'supplements');
@@ -3250,46 +3252,67 @@ export class DrizzleStorage implements IStorage {
         currentStreak: todayScore >= threshold ? 1 : 0,
         longestStreak: todayScore >= threshold ? 1 : 0,
         lastLoggedDate: logDate,
-        lastCompletedDate: todayScore >= threshold ? dateStr : null
+        lastCompletedDate: todayScore >= threshold ? logDateStr : null
       }).returning();
+      console.log(`🔥 Created ${streakType} streak for user ${userId.substring(0, 8)}...: ${created.currentStreak} days`);
       return created;
     }
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    // Calculate yesterday's date string based on logDate, not server time
+    const logDateObj = new Date(logDateStr + 'T12:00:00Z'); // Use noon UTC to avoid edge cases
+    const yesterdayObj = new Date(logDateObj);
+    yesterdayObj.setUTCDate(yesterdayObj.getUTCDate() - 1);
+    const yesterdayStr = yesterdayObj.toISOString().split('T')[0];
     
-    const lastCompleted = streak.lastCompletedDate ? new Date(streak.lastCompletedDate) : null;
-    lastCompleted?.setHours(0, 0, 0, 0);
+    // Get last completed date as string (already stored as YYYY-MM-DD or similar)
+    const lastCompletedStr = streak.lastCompletedDate 
+      ? (typeof streak.lastCompletedDate === 'string' 
+          ? streak.lastCompletedDate.split('T')[0] 
+          : new Date(streak.lastCompletedDate).toISOString().split('T')[0])
+      : null;
     
     let newCurrentStreak = streak.currentStreak;
     
+    console.log(`🔍 ${streakType} streak check:`, {
+      logDateStr,
+      yesterdayStr,
+      lastCompletedStr,
+      todayScore,
+      threshold,
+      currentStreak: streak.currentStreak
+    });
+    
     // Score meets threshold
     if (todayScore >= threshold) {
-      if (!lastCompleted) {
+      if (!lastCompletedStr) {
         // First completion ever
         newCurrentStreak = 1;
-      } else if (lastCompleted.getTime() === yesterday.getTime()) {
+        console.log(`🔥 ${streakType}: First completion ever, streak = 1`);
+      } else if (lastCompletedStr === yesterdayStr) {
         // Completed yesterday - streak continues
         newCurrentStreak = streak.currentStreak + 1;
-      } else if (lastCompleted.getTime() === today.getTime()) {
+        console.log(`🔥 ${streakType}: Streak continues from yesterday, now ${newCurrentStreak}`);
+      } else if (lastCompletedStr === logDateStr) {
         // Already logged today - no change
-        newCurrentStreak = streak.currentStreak;
+        console.log(`🔥 ${streakType}: Already logged today, streak unchanged at ${newCurrentStreak}`);
       } else {
-        // Gap in completions - check grace period (28 hours for late logging)
-        const hoursAgo = (today.getTime() - lastCompleted.getTime()) / (1000 * 60 * 60);
-        if (hoursAgo <= 52) { // ~2 days grace
+        // Gap in completions - check if within 2 day grace period
+        const lastCompletedDate = new Date(lastCompletedStr + 'T12:00:00Z');
+        const daysDiff = Math.floor((logDateObj.getTime() - lastCompletedDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff <= 2) { // Within 2 day grace period
           newCurrentStreak = streak.currentStreak + 1;
+          console.log(`🔥 ${streakType}: Within grace period (${daysDiff} days), streak = ${newCurrentStreak}`);
         } else {
           newCurrentStreak = 1; // Reset streak
+          console.log(`🔥 ${streakType}: Gap too large (${daysDiff} days), reset to 1`);
         }
       }
     } else {
-      // Score below threshold
-      if (lastCompleted && lastCompleted.getTime() < yesterday.getTime()) {
+      // Score below threshold - check if we should break the streak
+      if (lastCompletedStr && lastCompletedStr < yesterdayStr) {
         // More than a day since last completion - break streak
         newCurrentStreak = 0;
+        console.log(`🔥 ${streakType}: Score below threshold and streak broken, reset to 0`);
       }
     }
     
@@ -3301,11 +3324,13 @@ export class DrizzleStorage implements IStorage {
         currentStreak: newCurrentStreak,
         longestStreak: newLongestStreak,
         lastLoggedDate: logDate,
-        lastCompletedDate: todayScore >= threshold ? dateStr : streak.lastCompletedDate,
+        lastCompletedDate: todayScore >= threshold ? logDateStr : streak.lastCompletedDate,
         updatedAt: new Date()
       })
       .where(eq(userStreaks.id, streak.id))
       .returning();
+    
+    console.log(`🔥 Updated ${streakType} streak: ${streak.currentStreak} -> ${newCurrentStreak} (longest: ${newLongestStreak})`);
     
     return updated;
   }
@@ -3314,6 +3339,16 @@ export class DrizzleStorage implements IStorage {
   async updateAllStreaks(userId: string, logDate: Date): Promise<{ [key: string]: UserStreak }> {
     // First calculate and save daily scores
     const completion = await this.calculateAndSaveDailyScores(userId, logDate);
+    
+    console.log('📊 updateAllStreaks - Daily scores calculated:', {
+      userId: userId.substring(0, 8) + '...',
+      logDate: logDate.toISOString(),
+      nutritionScore: completion.nutritionScore,
+      workoutScore: completion.workoutScore,
+      supplementScore: completion.supplementScore,
+      lifestyleScore: completion.lifestyleScore,
+      dailyScore: completion.dailyScore,
+    });
     
     // Define thresholds for each category
     const thresholds = {
@@ -3326,22 +3361,24 @@ export class DrizzleStorage implements IStorage {
     
     const results: { [key: string]: UserStreak } = {};
     
-    // Update each category streak
-    if (completion.nutritionScore) {
+    // Update each category streak - always update if score exists (even if 0)
+    if (completion.nutritionScore !== null && completion.nutritionScore !== undefined) {
       results.nutrition = await this.updateCategoryStreak(userId, 'nutrition', parseFloat(completion.nutritionScore), logDate, thresholds.nutrition);
     }
-    if (completion.workoutScore) {
+    if (completion.workoutScore !== null && completion.workoutScore !== undefined) {
       results.workout = await this.updateCategoryStreak(userId, 'workout', parseFloat(completion.workoutScore), logDate, thresholds.workout);
     }
-    if (completion.supplementScore) {
+    if (completion.supplementScore !== null && completion.supplementScore !== undefined) {
       results.supplements = await this.updateCategoryStreak(userId, 'supplements', parseFloat(completion.supplementScore), logDate, thresholds.supplements);
     }
-    if (completion.lifestyleScore) {
+    if (completion.lifestyleScore !== null && completion.lifestyleScore !== undefined) {
       results.lifestyle = await this.updateCategoryStreak(userId, 'lifestyle', parseFloat(completion.lifestyleScore), logDate, thresholds.lifestyle);
     }
-    if (completion.dailyScore) {
+    if (completion.dailyScore !== null && completion.dailyScore !== undefined) {
       results.overall = await this.updateCategoryStreak(userId, 'overall', parseFloat(completion.dailyScore), logDate, thresholds.overall);
     }
+    
+    console.log('📊 updateAllStreaks - Streaks updated:', Object.keys(results));
     
     return results;
   }
