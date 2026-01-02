@@ -2981,6 +2981,49 @@ export class DrizzleStorage implements IStorage {
         eq(userStreaks.userId, userId),
         eq(userStreaks.streakType, streakType)
       ));
+    
+    // If no streak exists, return undefined
+    if (!streak) return undefined;
+    
+    // Validate streak against current date - reset if gap is too large
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    // Get last completed date as string
+    const lastCompletedStr = streak.lastCompletedDate 
+      ? (typeof streak.lastCompletedDate === 'string' 
+          ? streak.lastCompletedDate.split('T')[0] 
+          : new Date(streak.lastCompletedDate).toISOString().split('T')[0])
+      : null;
+    
+    if (lastCompletedStr && streak.currentStreak > 0) {
+      // Calculate days since last completion
+      const lastDate = new Date(lastCompletedStr + 'T12:00:00Z');
+      const todayDate = new Date(todayStr + 'T12:00:00Z');
+      const daysSinceLast = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // If more than 2 days have passed (allowing 1 day grace), reset the streak
+      // Day 0 = same day, Day 1 = yesterday (still valid), Day 2+ = streak broken
+      if (daysSinceLast > 2) {
+        console.log(`⚠️ Streak ${streakType} for user ${userId.substring(0, 8)}... is stale (${daysSinceLast} days since last completion). Resetting to 0.`);
+        
+        // Update the database to reset the streak
+        await db
+          .update(userStreaks)
+          .set({
+            currentStreak: 0,
+            updatedAt: new Date()
+          })
+          .where(eq(userStreaks.id, streak.id));
+        
+        // Return the corrected streak
+        return {
+          ...streak,
+          currentStreak: 0
+        };
+      }
+    }
+    
     return streak;
   }
 
