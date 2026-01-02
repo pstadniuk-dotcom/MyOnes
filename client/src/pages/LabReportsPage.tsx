@@ -402,10 +402,10 @@ export default function LabReportsPage() {
             ) : labReports && labReports.length > 0 ? (
               labReports.map((report) => (
                 <Card key={report.id} className="border-l-4 border-l-[#1B4332] bg-white" data-testid={`report-${report.id}`}>
-                  <CardContent className="pt-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h4 className="font-medium text-[#1B4332]">{report.originalFileName}</h4>
+                  <CardContent className="pt-4 px-3 sm:px-6">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-medium text-[#1B4332] truncate">{report.originalFileName}</h4>
                         <p className="text-sm text-[#52796F]">
                           Uploaded on {new Date(report.uploadedAt).toLocaleDateString()}
                         </p>
@@ -413,13 +413,14 @@ export default function LabReportsPage() {
                           {report.fileSize ? `${(report.fileSize / 1024 / 1024).toFixed(2)} MB` : ''} • {report.type}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="default" className="bg-[#1B4332]">
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant="default" className="bg-[#1B4332] text-xs whitespace-nowrap">
                           Encrypted
                         </Badge>
                         <Button 
                           variant="ghost" 
                           size="icon"
+                          className="h-8 w-8 flex-shrink-0"
                           onClick={() => setFileToDelete(report.id)}
                           data-testid={`button-delete-${report.id}`}
                         >

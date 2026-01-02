@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageSquare, FlaskConical, Sparkles, ClipboardList, Menu, Home, User, Settings, FileText, Activity, ChevronUp, X } from 'lucide-react';
+import { MessageSquare, FlaskConical, Sparkles, ClipboardList, Menu, Home, User, Settings, FileText, Activity, ChevronUp, X, Watch } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import {
@@ -16,7 +16,7 @@ const allNavItems = [
   { href: '/dashboard/formula', icon: FlaskConical, label: 'Formula', exact: false, requiresFeature: null },
   { href: '/dashboard/optimize', icon: Sparkles, label: 'Optimize', exact: false, requiresFeature: 'OPTIMIZE' as const },
   { href: '/dashboard/optimize/tracking', icon: ClipboardList, label: 'Log', exact: true, requiresFeature: 'TRACKING_PAGE' as const },
-  { href: '/dashboard', icon: Home, label: 'Home', exact: true, requiresFeature: null },
+  { href: '/dashboard/wearables', icon: Watch, label: 'Wearables', exact: true, requiresFeature: null },
 ];
 
 // Full menu items for the slide-up sheet - filtered based on feature flags
@@ -26,6 +26,7 @@ const allMenuItems = [
   { href: '/dashboard/formula', icon: FlaskConical, label: 'My Formula', description: 'Your supplement formula', requiresFeature: null },
   { href: '/dashboard/optimize', icon: Sparkles, label: 'Optimize', description: 'Nutrition, workout & lifestyle', requiresFeature: 'OPTIMIZE' as const },
   { href: '/dashboard/optimize/tracking', icon: Activity, label: 'Daily Log', description: 'Track your progress', requiresFeature: 'TRACKING_PAGE' as const },
+  { href: '/dashboard/wearables', icon: Watch, label: 'Wearables', description: 'Connect fitness trackers', requiresFeature: null },
   { href: '/dashboard/lab-reports', icon: FileText, label: 'Lab Results', description: 'Upload and analyze labs', requiresFeature: null },
   { href: '/dashboard/profile', icon: User, label: 'Profile', description: 'Your health profile', requiresFeature: null },
   { href: '/dashboard/settings', icon: Settings, label: 'Settings', description: 'App preferences', requiresFeature: null },
