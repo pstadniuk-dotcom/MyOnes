@@ -184,21 +184,24 @@ export default function WearablesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6 px-1 sm:px-0">
+      {/* Header - Stack on mobile */}
+      <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Wearable Devices</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1B4332]">Wearable Devices</h1>
+          <p className="text-sm sm:text-base text-[#52796F] mt-2">
             Connect your fitness trackers to personalize your supplement formula based on your activity, sleep, and recovery data.
           </p>
         </div>
         
-        <div className="flex gap-2">
+        {/* Buttons - Full width on mobile */}
+        <div className="flex flex-col sm:flex-row gap-2">
           {connections.length > 0 && (
             <Button
               variant="outline"
               onClick={() => syncMutation.mutate()}
               disabled={syncMutation.isPending}
+              className="w-full sm:w-auto border-[#1B4332] text-[#1B4332]"
             >
               {syncMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -208,7 +211,11 @@ export default function WearablesPage() {
               Sync Data
             </Button>
           )}
-          <Button onClick={handleConnect} disabled={isConnecting}>
+          <Button 
+            onClick={handleConnect} 
+            disabled={isConnecting}
+            className="w-full sm:w-auto bg-[#1B4332] hover:bg-[#1B4332]/90"
+          >
             {isConnecting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -221,22 +228,22 @@ export default function WearablesPage() {
 
       {/* Connected Devices */}
       {connections.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {connections.map((connection) => {
             const colors = PROVIDER_COLORS[connection.provider] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
             
             return (
-              <Card key={connection.id} className="relative overflow-hidden">
-                <div className={`absolute top-0 right-0 w-32 h-32 ${colors.bgColor} rounded-full -mr-16 -mt-16 opacity-20`} />
+              <Card key={connection.id} className="relative overflow-hidden bg-[#FAF7F2] border-[#52796F]/20">
+                <div className={`absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 ${colors.bgColor} rounded-full -mr-12 sm:-mr-16 -mt-12 sm:-mt-16 opacity-20`} />
                 
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className={`p-3 rounded-lg ${colors.bgColor}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className={`p-2 sm:p-3 rounded-lg ${colors.bgColor}`}>
                       <ProviderLogo provider={connection.provider} logo={connection.logo} size="md" />
                     </div>
                     <Badge 
                       variant={connection.status === 'connected' ? 'default' : connection.status === 'error' ? 'destructive' : 'secondary'}
-                      className="gap-1"
+                      className="gap-1 text-xs whitespace-nowrap bg-[#1B4332]"
                     >
                       {connection.status === 'connected' ? (
                         <><CheckCircle2 className="h-3 w-3" /> Connected</>
@@ -247,66 +254,69 @@ export default function WearablesPage() {
                       )}
                     </Badge>
                   </div>
-                  <CardTitle className="mt-4">{connection.providerName}</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="mt-3 text-lg text-[#1B4332]">{connection.providerName}</CardTitle>
+                  <CardDescription className="text-[#52796F]">
                     Syncing activity, sleep & recovery data
                   </CardDescription>
                 </CardHeader>
 
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="text-sm space-y-1">
+                <CardContent className="space-y-3 pt-0">
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-[#52796F]">Connected</span>
+                      <span className="font-medium text-[#1B4332]">
+                        {new Date(connection.connectedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {connection.lastSyncedAt && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Connected</span>
-                        <span className="font-medium">
-                          {new Date(connection.connectedAt).toLocaleDateString()}
+                        <span className="text-[#52796F]">Last synced</span>
+                        <span className="font-medium text-[#1B4332]">
+                          {new Date(connection.lastSyncedAt).toLocaleDateString()}
                         </span>
                       </div>
-                      {connection.lastSyncedAt && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Last synced</span>
-                          <span className="font-medium">
-                            {new Date(connection.lastSyncedAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => handleDisconnect(connection.id)}
-                      disabled={disconnectMutation.isPending}
-                    >
-                      {disconnectMutation.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Disconnecting...
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Disconnect
-                        </>
-                      )}
-                    </Button>
+                    )}
                   </div>
+                  
+                  <Button
+                    variant="outline"
+                    className="w-full border-red-300 text-red-600 hover:bg-red-50"
+                    onClick={() => handleDisconnect(connection.id)}
+                    disabled={disconnectMutation.isPending}
+                    size="sm"
+                  >
+                    {disconnectMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Disconnecting...
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Disconnect
+                      </>
+                    )}
+                  </Button>
                 </CardContent>
               </Card>
             );
           })}
         </div>
       ) : (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
-              <Watch className="h-6 w-6 text-muted-foreground" />
+        <Card className="border-dashed bg-[#FAF7F2] border-[#52796F]/30">
+          <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 px-4">
+            <div className="h-12 w-12 rounded-full bg-[#1B4332]/10 flex items-center justify-center mb-4">
+              <Watch className="h-6 w-6 text-[#1B4332]" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">No devices connected</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-4">
+            <h3 className="text-lg font-semibold mb-2 text-[#1B4332]">No devices connected</h3>
+            <p className="text-[#52796F] text-center text-sm sm:text-base max-w-md mb-4">
               Connect your wearable device to get personalized supplement recommendations based on your activity, sleep, and recovery data.
             </p>
-            <Button onClick={handleConnect} disabled={isConnecting}>
+            <Button 
+              onClick={handleConnect} 
+              disabled={isConnecting}
+              className="w-full sm:w-auto bg-[#1B4332] hover:bg-[#1B4332]/90"
+            >
               {isConnecting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -319,18 +329,18 @@ export default function WearablesPage() {
       )}
 
       {/* Priority Providers */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
+      <Card className="bg-[#FAF7F2] border-[#52796F]/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-[#1B4332]">
+            <Sparkles className="h-5 w-5 text-[#1B4332]" />
             Featured Integrations
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-[#52796F]">
             Connect your favorite fitness tracker to unlock personalized supplement recommendations
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {PRIORITY_PROVIDERS.map((provider) => {
               const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
               const isConnected = connections.some(c => c.provider === provider.slug || c.provider === provider.slug.replace('_v2', ''));
@@ -338,27 +348,27 @@ export default function WearablesPage() {
               return (
                 <div 
                   key={provider.slug} 
-                  className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                  className={`flex items-center gap-3 p-3 sm:p-4 rounded-xl border-2 transition-all ${
                     isConnected 
                       ? 'border-green-500 bg-green-50/50' 
-                      : 'border-transparent bg-muted/30 hover:bg-muted/50 hover:border-muted-foreground/20'
+                      : 'border-transparent bg-white/50 hover:bg-white hover:border-[#1B4332]/20'
                   }`}
                 >
-                  <div className={`p-2 rounded-lg ${colors.bgColor}`}>
+                  <div className={`p-2 rounded-lg ${colors.bgColor} flex-shrink-0`}>
                     <ProviderLogo provider={provider.slug} logo={provider.logo} size="md" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{provider.name}</span>
+                      <span className="font-medium truncate text-[#1B4332]">{provider.name}</span>
                       {isConnected && <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />}
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">{provider.description}</p>
+                    <p className="text-xs text-[#52796F] truncate">{provider.description}</p>
                   </div>
                 </div>
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground mt-4">
+          <p className="text-xs text-[#52796F] mt-4">
             Click "Connect Device" above to link any of these providers. Historical data (up to 180 days) will be automatically imported for AI analysis.
           </p>
         </CardContent>
@@ -366,47 +376,47 @@ export default function WearablesPage() {
 
       {/* How It Works */}
       {connections.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>How It Works</CardTitle>
-            <CardDescription>
+        <Card className="bg-[#FAF7F2] border-[#52796F]/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-[#1B4332]">How It Works</CardTitle>
+            <CardDescription className="text-[#52796F]">
               Your connected devices help us optimize your supplement formula
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <CardContent>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-sm font-semibold text-primary">1</span>
+                  <div className="h-8 w-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-semibold text-[#1B4332]">1</span>
                   </div>
-                  <h4 className="font-medium">Data Collection</h4>
+                  <h4 className="font-medium text-[#1B4332]">Data Collection</h4>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  We securely sync your sleep, activity, and recovery metrics daily via Junction
+                <p className="text-sm text-[#52796F] pl-10">
+                  We securely sync your sleep, activity, and recovery metrics daily
                 </p>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-sm font-semibold text-primary">2</span>
+                  <div className="h-8 w-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-semibold text-[#1B4332]">2</span>
                   </div>
-                  <h4 className="font-medium">AI Analysis</h4>
+                  <h4 className="font-medium text-[#1B4332]">AI Analysis</h4>
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-[#52796F] pl-10">
                   Our AI identifies trends and patterns in your biometric data
                 </p>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-sm font-semibold text-primary">3</span>
+                  <div className="h-8 w-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-semibold text-[#1B4332]">3</span>
                   </div>
-                  <h4 className="font-medium">Personalization</h4>
+                  <h4 className="font-medium text-[#1B4332]">Personalization</h4>
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-[#52796F] pl-10">
                   Your formula is automatically adjusted based on your body's needs
                 </p>
               </div>
