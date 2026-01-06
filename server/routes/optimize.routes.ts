@@ -727,7 +727,8 @@ router.post('/daily-logs', requireAuth, async (req, res) => {
         supplementAfternoon: resolvedLog.supplementAfternoon,
         supplementEvening: resolvedLog.supplementEvening,
       });
-      await storage.updateUserStreak(userId, logDate);
+      // Update all category streaks including supplements
+      await storage.updateAllStreaks(userId, logDate);
     } else {
       updatedLog = await storage.createDailyLog({
         userId,
@@ -741,9 +742,11 @@ router.post('/daily-logs', requireAuth, async (req, res) => {
         supplementAfternoon: resolvedLog.supplementAfternoon,
         supplementEvening: resolvedLog.supplementEvening,
       });
+      // Update all category streaks including supplements
+      await storage.updateAllStreaks(userId, logDate);
     }
 
-    const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle'] as const;
+    const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle', 'supplements'] as const;
     const streaks = {} as Record<typeof streakTypes[number], any>;
     for (const type of streakTypes) {
       streaks[type] = (await storage.getUserStreak(userId, type)) ?? null;
