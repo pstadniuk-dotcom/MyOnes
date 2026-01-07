@@ -131,14 +131,26 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const aiRuntimeSettings: { provider?: 'openai' | 'anthropic'; model?: string; updatedAt?: string; source?: 'override' | 'env' } = {};
 
 const ALLOWED_MODELS: Record<'openai'|'anthropic', string[]> = {
-  openai: ['gpt-4o', 'gpt-5'],
+  openai: [
+    // GPT-5.2 series (latest)
+    'gpt-5.2', 'gpt-5.2-pro',
+    // GPT-5 series
+    'gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-5-pro',
+    // GPT-4.1 series
+    'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
+    // GPT-4o series
+    'gpt-4o', 'gpt-4o-mini',
+    // o-series reasoning models
+    'o3', 'o3-mini', 'o3-pro', 'o4-mini'
+  ],
   anthropic: [
-    'claude-sonnet-4-5-20250929',
-    'claude-sonnet-4-5',
-    'claude-haiku-4-5-20251001',
-    'claude-haiku-4-5',
-    'claude-opus-4-1-20250805',
-    'claude-opus-4-1',
+    // Claude 4.5 (latest)
+    'claude-opus-4-5-20251101', 'claude-opus-4-5',
+    'claude-sonnet-4-5-20250929', 'claude-sonnet-4-5',
+    'claude-haiku-4-5-20251001', 'claude-haiku-4-5',
+    // Claude 4.1 (previous)
+    'claude-opus-4-1-20250805', 'claude-opus-4-1',
+    // Claude 3.5 (legacy)
     'claude-3-5-sonnet-20241022',
     'claude-3-5-haiku-20241022'
   ]
