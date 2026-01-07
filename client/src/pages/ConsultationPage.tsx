@@ -135,9 +135,13 @@ export default function ConsultationPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const userHasScrolledUp = useRef(false);
+  const lastScrollTop = useRef(0);
+  const isUserScrolling = useRef(false);
+  const scrollLockTimeout = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -296,22 +300,51 @@ export default function ConsultationPage() {
     }
   }, [user?.name, isNewSession, messages.length, isLoadingHistory, historyData?.sessions]);
   
-  // Check if user is near the bottom of the scroll container
+  // Check if user is near the bottom of the scroll container using scroll position math
   const isNearBottom = useCallback(() => {
-    const endElement = messagesEndRef.current;
-    if (!endElement) return true;
+    const viewport = scrollViewportRef.current;
+    if (!viewport) return true;
     
-    // Check if the end marker is visible in the viewport
-    const rect = endElement.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    // Consider "near bottom" if the end marker is within 200px of viewport bottom
-    return rect.top < viewportHeight + 200;
+    const { scrollTop, scrollHeight, clientHeight } = viewport;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    // Consider "near bottom" if within 150px of the bottom
+    return distanceFromBottom < 150;
   }, []);
 
   // Handle scroll events to track if user scrolled up
   const handleScroll = useCallback(() => {
-    userHasScrolledUp.current = !isNearBottom();
+    const viewport = scrollViewportRef.current;
+    if (!viewport) return;
+    
+    const currentScrollTop = viewport.scrollTop;
+    
+    // If user is actively scrolling (touch/wheel) and scrolled up, mark as scrolled up
+    if (isUserScrolling.current && currentScrollTop < lastScrollTop.current - 10) {
+      userHasScrolledUp.current = true;
+    }
+    
+    // If user scrolls back to near bottom, re-enable auto-scroll
+    if (isNearBottom()) {
+      userHasScrolledUp.current = false;
+    }
+    
+    lastScrollTop.current = currentScrollTop;
   }, [isNearBottom]);
+
+  // Handle user-initiated scroll (touch or wheel) to differentiate from programmatic scrolls
+  const handleUserScrollStart = useCallback(() => {
+    isUserScrolling.current = true;
+    
+    // Clear any existing timeout
+    if (scrollLockTimeout.current) {
+      clearTimeout(scrollLockTimeout.current);
+    }
+    
+    // Reset after 150ms of no scroll activity
+    scrollLockTimeout.current = setTimeout(() => {
+      isUserScrolling.current = false;
+    }, 150);
+  }, []);
 
   // Set up scroll listener on the ScrollArea viewport
   useEffect(() => {
@@ -323,30 +356,77 @@ export default function ConsultationPage() {
                      scrollContainer.parentElement?.querySelector('[data-radix-scroll-area-viewport]');
     
     if (viewport) {
+      // Store ref to viewport for position calculations
+      scrollViewportRef.current = viewport as HTMLDivElement;
+      
       viewport.addEventListener('scroll', handleScroll, { passive: true });
-      return () => viewport.removeEventListener('scroll', handleScroll);
+      // Track user-initiated scrolling via touch and wheel events
+      viewport.addEventListener('touchstart', handleUserScrollStart, { passive: true });
+      viewport.addEventListener('touchmove', handleUserScrollStart, { passive: true });
+      viewport.addEventListener('wheel', handleUserScrollStart, { passive: true });
+      
+      return () => {
+        viewport.removeEventListener('scroll', handleScroll);
+        viewport.removeEventListener('touchstart', handleUserScrollStart);
+        viewport.removeEventListener('touchmove', handleUserScrollStart);
+        viewport.removeEventListener('wheel', handleUserScrollStart);
+        if (scrollLockTimeout.current) {
+          clearTimeout(scrollLockTimeout.current);
+        }
+      };
     }
-  }, [handleScroll]);
+  }, [handleScroll, handleUserScrollStart]);
 
   // Auto-scroll to bottom when new messages arrive (only if user hasn't scrolled up)
   const scrollToBottom = useCallback((force = false) => {
     if (force || !userHasScrolledUp.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // Use requestAnimationFrame for smoother scrolling on mobile
+      requestAnimationFrame(() => {
+        const viewport = scrollViewportRef.current;
+        if (viewport) {
+          // For programmatic scroll, use scrollTop directly for more control
+          // This is smoother than scrollIntoView on mobile during streaming
+          viewport.scrollTo({
+            top: viewport.scrollHeight,
+            behavior: force ? 'instant' : 'smooth'
+          });
+        } else {
+          // Fallback to scrollIntoView if viewport ref not available
+          messagesEndRef.current?.scrollIntoView({ behavior: force ? 'instant' : 'smooth' });
+        }
+      });
     }
   }, []);
 
   // Reset scroll tracking when user sends a new message
   const resetScrollTracking = useCallback(() => {
     userHasScrolledUp.current = false;
+    isUserScrolling.current = false;
     scrollToBottom(true);
   }, [scrollToBottom]);
 
   useEffect(() => {
     // Only auto-scroll if user hasn't scrolled up to read
+    // Add a small delay to let the DOM update first
     if (!userHasScrolledUp.current) {
-      scrollToBottom();
+      // Use instant scroll during streaming to prevent janky animations
+      const isStreamingMessage = messages.length > 0 && 
+        messages[messages.length - 1]?.sender === 'ai' && 
+        isTyping;
+      
+      if (isStreamingMessage) {
+        // During streaming, scroll immediately without animation
+        requestAnimationFrame(() => {
+          const viewport = scrollViewportRef.current;
+          if (viewport && !userHasScrolledUp.current) {
+            viewport.scrollTop = viewport.scrollHeight;
+          }
+        });
+      } else {
+        scrollToBottom();
+      }
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, scrollToBottom, isTyping]);
 
   // Auto-resize textarea
   useEffect(() => {
