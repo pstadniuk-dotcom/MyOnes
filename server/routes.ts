@@ -190,8 +190,10 @@ function normalizeModel(provider: 'openai'|'anthropic', model: string | undefine
   // Common OpenAI aliases
   if (provider === 'openai') {
     const lower = m.toLowerCase();
-    if (/^gpt5|gpt-5|gpt_5/.test(lower)) return 'gpt-5';
-    if (/^gpt4o|gpt-4o|gpt_4o/.test(lower)) return 'gpt-4o';
+    // Only normalize basic gpt5 without version suffix to gpt-5
+    if (/^gpt5$|^gpt-5$|^gpt_5$/i.test(lower)) return 'gpt-5';
+    // Normalize gpt4o variants
+    if (/^gpt4o$|^gpt-4o$|^gpt_4o$/i.test(lower)) return 'gpt-4o';
   }
   return m;
 }
@@ -7503,8 +7505,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             { role: 'system', content: system },
             { role: 'user', content: userMsg }
           ],
-          max_completion_tokens: 10,
-          temperature: 0
+          max_completion_tokens: 10
         });
         const content = completion.choices?.[0]?.message?.content || '';
         return res.json({ ok: true, provider, model, hasKey: !!process.env.OPENAI_API_KEY, sample: content.slice(0, 60) });
