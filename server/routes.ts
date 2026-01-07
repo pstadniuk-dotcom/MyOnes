@@ -3487,7 +3487,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               model: model,
               messages: conversationHistory,
               stream: true,
-              max_tokens: 3000,
+              max_completion_tokens: 3000,
               temperature: 0.7
             };
             const streamPromise = openai.chat.completions.create(modelConfig);
@@ -7491,7 +7491,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             { role: 'system', content: system },
             { role: 'user', content: userMsg }
           ],
-          max_tokens: 10,
+          max_completion_tokens: 10,
           temperature: 0
         });
         const content = completion.choices?.[0]?.message?.content || '';
@@ -8345,7 +8345,7 @@ Return ONLY the JSON, no explanation.`
               }
             ],
             temperature: 0.2,
-            max_tokens: 200,
+            max_completion_tokens: 200,
           });
 
           const content = completion.choices[0]?.message?.content || '';
@@ -9167,7 +9167,7 @@ Return ONLY a valid JSON object with this EXACT structure (no markdown, no code 
           model: model || 'gpt-4o',
           messages: [{ role: 'user', content: swapPrompt }],
           temperature: 0.9,
-          max_tokens: 800
+          max_completion_tokens: 800
         });
         const rawResponse = completion.choices[0]?.message?.content?.trim() || '{}';
         newMeal = parseAiJson(rawResponse);
@@ -9259,7 +9259,7 @@ Return ONLY a valid JSON object with this EXACT structure (no markdown, no code 
           model: model || 'gpt-4o',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.7,
-          max_tokens: 1000
+          max_completion_tokens: 1000
         });
         const rawResponse = completion.choices[0]?.message?.content?.trim() || '{}';
         recipe = parseAiJson(rawResponse);
