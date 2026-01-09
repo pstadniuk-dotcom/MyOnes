@@ -115,11 +115,20 @@ export function buildO1MiniPrompt(context: PromptContext): string {
 4. **Top 5 findings ONLY** when analyzing blood work - skip minor deviations
 5. **One line per biomarker**: "**LDL: 151** (target <100) - cardiovascular risk"
 
-**FORMULA RESPONSE TEMPLATE (Follow exactly):**
+**FORMULA RESPONSE TEMPLATE (Follow when creating/updating formulas):**
 1. Quick Summary (2-3 sentences)
 2. Key Findings (5 bullet points max, one line each)
-3. Formula JSON block
+3. Formula JSON block (ONLY if user is asking for supplement formula changes)
 4. Key Warnings (3-5 bullets max, only if critical)
+
+**🚨 WHEN TO SKIP THE FORMULA JSON BLOCK:**
+- User asks about peptides, medications, or things we don't sell → NO formula JSON
+- User asks for workout plans, nutrition advice, or lifestyle guidance → NO formula JSON
+- User asks general health questions → NO formula JSON
+- User is just chatting or asking follow-up questions → NO formula JSON
+- ONLY output formula JSON when user explicitly requests supplement formula changes
+
+**If no formula change is needed, just respond conversationally without any JSON block.**
 
 **BIOMARKER FORMAT:**
 ❌ WRONG: "LDL-Cholesterol: 151 mg/dL ⬆️ HIGH\nTarget: <100 mg/dL (optimal <70 mg/dL)\nThis is 51% above optimal and significantly increases atherosclerosis risk."
