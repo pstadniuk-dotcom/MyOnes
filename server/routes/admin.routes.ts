@@ -269,71 +269,36 @@ router.post('/support-tickets/:id/reply', requireAdmin, async (req, res) => {
 // ========================================
 
 /**
- * GET /api/admin/conversations
- * List all conversations with messages (paginated)
+ * GET /api/admin/conversations/stats
+ * Get conversation statistics
+ * NOTE: Must be defined BEFORE /conversations/:sessionId to avoid route conflict
  */
-router.get('/conversations', requireAdmin, async (req, res) => {
+router.get('/conversations/stats', requireAdmin, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
-    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
-    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+    const days = parseInt(req.query.days as string) || 30;
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
 
-    const result = await storage.getAllConversations(limit, offset, startDate, endDate);
+    const { total: totalMessages } = await storage.getAllUserMessages(1, startDate, endDate);
+    const { total: totalConversations } = await storage.getAllConversations(1, 0, startDate, endDate);
 
     res.json({
-      conversations: result.conversations.map(conv => ({
-        sessionId: conv.session.id,
-        status: conv.session.status,
-        createdAt: conv.session.createdAt,
-        user: conv.user,
-        messageCount: conv.messageCount,
-        // Include first user message as preview
-        preview: conv.messages.find(m => m.role === 'user')?.content?.slice(0, 150) || 'No messages'
-      })),
-      total: result.total,
-      limit,
-      offset
+      dateRange: { start: startDate, end: endDate },
+      totalConversations,
+      totalUserMessages: totalMessages,
+      averageMessagesPerConversation: totalConversations > 0 ? Math.round(totalMessages / totalConversations) : 0
     });
   } catch (error) {
-    logger.error('Error fetching conversations', { error });
-    res.status(500).json({ error: 'Failed to fetch conversations' });
-  }
-});
-
-/**
- * GET /api/admin/conversations/:sessionId
- * Get full conversation details with all messages
- */
-router.get('/conversations/:sessionId', requireAdmin, async (req, res) => {
-  try {
-    const result = await storage.getConversationDetails(req.params.sessionId);
-
-    if (!result) {
-      return res.status(404).json({ error: 'Conversation not found' });
-    }
-
-    res.json({
-      session: result.session,
-      user: result.user,
-      messages: result.messages.map(m => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        model: m.model,
-        formula: m.formula,
-        createdAt: m.createdAt
-      }))
-    });
-  } catch (error) {
-    logger.error('Error fetching conversation details', { error });
-    res.status(500).json({ error: 'Failed to fetch conversation details' });
+    logger.error('Error fetching conversation stats', { error });
+    res.status(500).json({ error: 'Failed to fetch conversation stats' });
   }
 });
 
 /**
  * GET /api/admin/conversations/insights/latest
  * Get the most recent AI-generated insights
+ * NOTE: Must be defined BEFORE /conversations/:sessionId to avoid route conflict
  */
 router.get('/conversations/insights/latest', requireAdmin, async (req, res) => {
   try {
@@ -359,6 +324,7 @@ router.get('/conversations/insights/latest', requireAdmin, async (req, res) => {
 /**
  * POST /api/admin/conversations/insights/generate
  * Generate AI-powered insights from all user conversations
+ * NOTE: Must be defined BEFORE /conversations/:sessionId to avoid route conflict
  */
 router.post('/conversations/insights/generate', requireAdmin, async (req, res) => {
   try {
@@ -507,28 +473,66 @@ Be specific and quantify where possible. Return ONLY valid JSON.`;
 });
 
 /**
- * GET /api/admin/conversations/stats
- * Get conversation statistics
+ * GET /api/admin/conversations
+ * List all conversations with messages (paginated)
  */
-router.get('/conversations/stats', requireAdmin, async (req, res) => {
+router.get('/conversations', requireAdmin, async (req, res) => {
   try {
-    const days = parseInt(req.query.days as string) || 30;
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
 
-    const { total: totalMessages } = await storage.getAllUserMessages(1, startDate, endDate);
-    const { total: totalConversations } = await storage.getAllConversations(1, 0, startDate, endDate);
+    const result = await storage.getAllConversations(limit, offset, startDate, endDate);
 
     res.json({
-      dateRange: { start: startDate, end: endDate },
-      totalConversations,
-      totalUserMessages: totalMessages,
-      averageMessagesPerConversation: totalConversations > 0 ? Math.round(totalMessages / totalConversations) : 0
+      conversations: result.conversations.map(conv => ({
+        sessionId: conv.session.id,
+        status: conv.session.status,
+        createdAt: conv.session.createdAt,
+        user: conv.user,
+        messageCount: conv.messageCount,
+        // Include first user message as preview
+        preview: conv.messages.find(m => m.role === 'user')?.content?.slice(0, 150) || 'No messages'
+      })),
+      total: result.total,
+      limit,
+      offset
     });
   } catch (error) {
-    logger.error('Error fetching conversation stats', { error });
-    res.status(500).json({ error: 'Failed to fetch conversation stats' });
+    logger.error('Error fetching conversations', { error });
+    res.status(500).json({ error: 'Failed to fetch conversations' });
+  }
+});
+
+/**
+ * GET /api/admin/conversations/:sessionId
+ * Get full conversation details with all messages
+ * NOTE: Must be defined AFTER all other /conversations/* routes to avoid conflicts
+ */
+router.get('/conversations/:sessionId', requireAdmin, async (req, res) => {
+  try {
+    const result = await storage.getConversationDetails(req.params.sessionId);
+
+    if (!result) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    res.json({
+      session: result.session,
+      user: result.user,
+      messages: result.messages.map(m => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        model: m.model,
+        formula: m.formula,
+        createdAt: m.createdAt
+      }))
+    });
+  } catch (error) {
+    logger.error('Error fetching conversation details', { error });
+    res.status(500).json({ error: 'Failed to fetch conversation details' });
   }
 });
 
