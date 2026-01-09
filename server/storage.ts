@@ -4419,6 +4419,267 @@ export class DrizzleStorage implements IStorage {
       console.error('Error updating streak statuses:', error);
     }
   }
+
+  // ========================================
+  // Admin Conversation Intelligence Methods
+  // ========================================
+
+  /**
+   * Get all conversations with messages for admin insight analysis
+   * Returns paginated list of chat sessions with user info and messages
+   */
+  async getAllConversations(limit: number = 50, offset: number = 0, startDate?: Date, endDate?: Date): Promise<{
+    conversations: Array<{
+      session: ChatSession;
+      user: { id: string; name: string; email: string };
+      messages: Message[];
+      messageCount: number;
+    }>;
+    total: number;
+  }> {
+    try {
+      // Build date filter conditions
+      const dateConditions = [];
+      if (startDate) {
+        dateConditions.push(gte(chatSessions.createdAt, startDate));
+      }
+      if (endDate) {
+        dateConditions.push(lte(chatSessions.createdAt, endDate));
+      }
+
+      // Get total count
+      const [{ count: totalCount }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(chatSessions)
+        .where(dateConditions.length > 0 ? and(...dateConditions) : undefined);
+
+      // Get sessions with user info
+      const sessionsWithUsers = await db
+        .select({
+          session: chatSessions,
+          userId: chatSessions.userId,
+          userName: users.name,
+          userEmail: users.email
+        })
+        .from(chatSessions)
+        .innerJoin(users, eq(chatSessions.userId, users.id))
+        .where(dateConditions.length > 0 ? and(...dateConditions) : undefined)
+        .orderBy(desc(chatSessions.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      // Get messages for each session
+      const conversations = await Promise.all(
+        sessionsWithUsers.map(async ({ session, userId, userName, userEmail }) => {
+          const sessionMessages = await db
+            .select()
+            .from(messages)
+            .where(eq(messages.sessionId, session.id))
+            .orderBy(messages.createdAt);
+
+          return {
+            session,
+            user: { id: userId, name: userName, email: userEmail },
+            messages: sessionMessages,
+            messageCount: sessionMessages.length
+          };
+        })
+      );
+
+      return {
+        conversations,
+        total: Number(totalCount)
+      };
+    } catch (error) {
+      console.error('Error getting all conversations:', error);
+      throw new Error('Failed to get conversations');
+    }
+  }
+
+  /**
+   * Get a single conversation's full details
+   */
+  async getConversationDetails(sessionId: string): Promise<{
+    session: ChatSession;
+    user: { id: string; name: string; email: string };
+    messages: Message[];
+  } | null> {
+    try {
+      const [sessionWithUser] = await db
+        .select({
+          session: chatSessions,
+          userId: users.id,
+          userName: users.name,
+          userEmail: users.email
+        })
+        .from(chatSessions)
+        .innerJoin(users, eq(chatSessions.userId, users.id))
+        .where(eq(chatSessions.id, sessionId));
+
+      if (!sessionWithUser) {
+        return null;
+      }
+
+      const sessionMessages = await db
+        .select()
+        .from(messages)
+        .where(eq(messages.sessionId, sessionId))
+        .orderBy(messages.createdAt);
+
+      return {
+        session: sessionWithUser.session,
+        user: {
+          id: sessionWithUser.userId,
+          name: sessionWithUser.userName,
+          email: sessionWithUser.userEmail
+        },
+        messages: sessionMessages
+      };
+    } catch (error) {
+      console.error('Error getting conversation details:', error);
+      throw new Error('Failed to get conversation details');
+    }
+  }
+
+  /**
+   * Get all user messages (not AI responses) for insight analysis
+   * This is what we feed to AI for product insights
+   */
+  async getAllUserMessages(limit: number = 1000, startDate?: Date, endDate?: Date): Promise<{
+    messages: Array<{
+      content: string;
+      createdAt: Date;
+      sessionId: string;
+      userId: string;
+    }>;
+    total: number;
+  }> {
+    try {
+      const dateConditions = [eq(messages.role, 'user')];
+      if (startDate) {
+        dateConditions.push(gte(messages.createdAt, startDate));
+      }
+      if (endDate) {
+        dateConditions.push(lte(messages.createdAt, endDate));
+      }
+
+      // Get total count
+      const [{ count: totalCount }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(messages)
+        .where(and(...dateConditions));
+
+      // Get messages with session info to get userId
+      const userMessages = await db
+        .select({
+          content: messages.content,
+          createdAt: messages.createdAt,
+          sessionId: messages.sessionId,
+          userId: chatSessions.userId
+        })
+        .from(messages)
+        .innerJoin(chatSessions, eq(messages.sessionId, chatSessions.id))
+        .where(and(...dateConditions))
+        .orderBy(desc(messages.createdAt))
+        .limit(limit);
+
+      return {
+        messages: userMessages,
+        total: Number(totalCount)
+      };
+    } catch (error) {
+      console.error('Error getting user messages:', error);
+      throw new Error('Failed to get user messages');
+    }
+  }
+
+  /**
+   * Store conversation insights generated by AI
+   */
+  async saveConversationInsights(insights: {
+    generatedAt: Date;
+    dateRange: { start: Date; end: Date };
+    messageCount: number;
+    summary: string;
+    ingredientRequests: Array<{ name: string; count: number; available: boolean }>;
+    featureRequests: Array<{ feature: string; count: number; category: string }>;
+    commonQuestions: Array<{ question: string; count: number }>;
+    sentimentOverview: { positive: number; neutral: number; negative: number };
+    rawAnalysis: string;
+  }): Promise<void> {
+    try {
+      // Convert dates to ISO strings for JSON storage
+      const insightsData = {
+        ...insights,
+        generatedAt: insights.generatedAt.toISOString(),
+        dateRange: {
+          start: insights.dateRange.start.toISOString(),
+          end: insights.dateRange.end.toISOString()
+        }
+      };
+
+      // Store in app_settings with a unique key per generation
+      const key = `conversation_insights_${insights.generatedAt.toISOString()}`;
+      await db.insert(appSettings).values({
+        key,
+        value: insightsData
+      }).onConflictDoUpdate({
+        target: appSettings.key,
+        set: { value: insightsData, updatedAt: new Date() }
+      });
+
+      // Also update "latest" pointer
+      await db.insert(appSettings).values({
+        key: 'conversation_insights_latest',
+        value: insightsData
+      }).onConflictDoUpdate({
+        target: appSettings.key,
+        set: { value: insightsData, updatedAt: new Date() }
+      });
+    } catch (error) {
+      console.error('Error saving conversation insights:', error);
+      throw new Error('Failed to save conversation insights');
+    }
+  }
+
+  /**
+   * Get the latest conversation insights
+   */
+  async getLatestConversationInsights(): Promise<{
+    generatedAt: Date;
+    dateRange: { start: Date; end: Date };
+    messageCount: number;
+    summary: string;
+    ingredientRequests: Array<{ name: string; count: number; available: boolean }>;
+    featureRequests: Array<{ feature: string; count: number; category: string }>;
+    commonQuestions: Array<{ question: string; count: number }>;
+    sentimentOverview: { positive: number; neutral: number; negative: number };
+    rawAnalysis: string;
+  } | null> {
+    try {
+      const [setting] = await db
+        .select()
+        .from(appSettings)
+        .where(eq(appSettings.key, 'conversation_insights_latest'));
+
+      if (!setting) {
+        return null;
+      }
+
+      const data = setting.value as any;
+      return {
+        ...data,
+        generatedAt: new Date(data.generatedAt),
+        dateRange: {
+          start: new Date(data.dateRange.start),
+          end: new Date(data.dateRange.end)
+        }
+      };
+    } catch (error) {
+      console.error('Error getting conversation insights:', error);
+      return null;
+    }
+  }
 }
 
 
