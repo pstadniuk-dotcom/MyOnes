@@ -234,7 +234,7 @@ export default function AdminDashboardPage() {
         }} />
 
         {/* Quick Links */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Card 
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => setLocation('/admin/users')}
@@ -246,6 +246,21 @@ export default function AdminDashboardPage() {
               </CardTitle>
               <CardDescription>
                 View and manage all users
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          
+          <Card 
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setLocation('/admin/conversations')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Conversations
+              </CardTitle>
+              <CardDescription>
+                Browse chats &amp; generate insights
               </CardDescription>
             </CardHeader>
           </Card>
