@@ -134,6 +134,9 @@ export const healthProfiles = pgTable("health_profiles", {
   medications: json("medications").$type<string[]>().default([]),
   allergies: json("allergies").$type<string[]>().default([]),
   
+  // Health goals (e.g., "gut health", "brain optimization", "energy", "sleep")
+  healthGoals: json("health_goals").$type<string[]>().default([]),
+  
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
