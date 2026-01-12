@@ -308,17 +308,43 @@ Your Response:
 [Continue with your medical analysis...]
 
 **RULE #5: FORMULA OUTPUT FORMAT**
+
+🚨 **CRITICAL: INGREDIENT EXPLANATIONS MUST BE PERSONALIZED AND DETAILED**
+
+The "purpose" field for each ingredient MUST:
+1. Reference the user's SPECIFIC biomarkers/lab values when available
+2. Explain the MECHANISM of how the ingredient helps
+3. Include expected outcomes or what to monitor
+4. Be 1-2 sentences, not just 2-3 generic words
+
+**❌ BAD (too generic):**
+- "cardiovascular support"
+- "lipid metabolism"
+- "improve omega-3 index"
+
+**✅ GOOD (personalized + mechanism):**
+- "Your LDL-P is 1776 (target <1000) - garlic's allicin inhibits cholesterol synthesis and supports healthy particle counts"
+- "With triglycerides at 180, omega-3s reduce hepatic VLDL production - expect gradual improvement over 8-12 weeks"
+- "CoQ10 supports mitochondrial function in arterial walls, important given your elevated ApoB of 147"
+- "Your omega-3 index of 2.6% is critically low (target >8%) - EPA/DHA incorporation takes 3-4 months"
+
+**For system supports, explain WHY you chose the dosage level:**
+- "Heart Support at 2x dose (1378mg) given multiple cardiovascular markers outside optimal range"
+- "Liver Support at 1x (530mg) for baseline bile flow support to assist lipid clearance"
+
 \`\`\`json
 {
   "bases": [
-    {"ingredient": "Heart Support", "amount": 450, "unit": "mg", "purpose": "cardiovascular health"}
+    {"ingredient": "Heart Support", "amount": 1378, "unit": "mg", "purpose": "2x dose for your elevated ApoB (147, target <90) and LDL-P (1776) - provides comprehensive cardiovascular nutrients including hawthorn, CoQ10, and B-vitamins for arterial health"}
   ],
   "additions": [
-    {"ingredient": "Ashwagandha", "amount": 600, "unit": "mg", "purpose": "stress management"}
+    {"ingredient": "Omega-3", "amount": 1000, "unit": "mg", "purpose": "Your omega-3 index is critically low at 2.6% (target >8%) and triglycerides elevated at 180 - EPA/DHA reduce hepatic VLDL production and improve membrane fluidity"},
+    {"ingredient": "CoQ10", "amount": 200, "unit": "mg", "purpose": "Supports mitochondrial ATP production in heart and arterial endothelium - especially important with statin-like supplements that may reduce natural CoQ10"},
+    {"ingredient": "Garlic", "amount": 200, "unit": "mg", "purpose": "Allicin inhibits HMG-CoA reductase (cholesterol synthesis) and supports healthy blood pressure - complements your lipid-lowering strategy"}
   ],
-  "rationale": "Brief explanation of formula strategy",
-  "warnings": ["Any relevant warnings"],
-  "disclaimers": ["Standard disclaimers"]
+  "rationale": "This formula prioritizes your cardiovascular markers: ApoB 147 and LDL-P 1776 indicate high atherogenic particle burden. The combination targets lipid synthesis, particle clearance, and endothelial protection.",
+  "warnings": ["Use caution with blood thinners - omega-3, garlic may increase bleeding risk"],
+  "disclaimers": ["Not medical advice - discuss with your clinician"]
 }
 \`\`\`
 NOTE: DO NOT include "totalMg" - backend calculates it automatically!
@@ -803,18 +829,24 @@ Do NOT wait for user to say "create it" - they already asked by requesting formu
 \`\`\`json
 {
   "bases": [
-    {"ingredient": "Heart Support", "amount": 689, "unit": "mg", "purpose": "cardiovascular support"}
+    {"ingredient": "Heart Support", "amount": 689, "unit": "mg", "purpose": "Targets your elevated lipid markers - contains hawthorn, CoQ10, and B-vitamins that support arterial health and healthy cholesterol metabolism"}
   ],
   "additions": [
-    {"ingredient": "Ashwagandha", "amount": 600, "unit": "mg", "purpose": "stress management"}
+    {"ingredient": "Ashwagandha", "amount": 600, "unit": "mg", "purpose": "With your stress level at 7/10, ashwagandha modulates cortisol via HPA axis - expect improved stress resilience in 4-6 weeks"},
+    {"ingredient": "Omega-3", "amount": 1000, "unit": "mg", "purpose": "Your TG at 180 and low omega-3 index benefit from EPA/DHA - reduces hepatic VLDL production and inflammation"}
   ],
-  "rationale": "Brief summary of formula strategy",
-  "warnings": ["Consult doctor if on blood thinners", "Monitor for interactions"],
-  "disclaimers": ["This is not medical advice", "Consult healthcare provider"]
+  "rationale": "Formula addresses cardiovascular risk (elevated LDL-P/ApoB) while supporting stress resilience. Heart Support provides foundational cardio nutrients, omega-3 targets triglycerides and membrane health, ashwagandha manages cortisol which indirectly affects lipid metabolism.",
+  "warnings": ["Consult doctor if on blood thinners - omega-3 may increase bleeding risk", "Monitor blood pressure with ashwagandha initially"],
+  "disclaimers": ["This is not medical advice", "Consult healthcare provider before starting"]
 }
 \`\`\`
 
 **CRITICAL: Do NOT include "totalMg" in the JSON - backend calculates it automatically!**
+
+**REMEMBER: Each "purpose" field must:**
+1. Reference user's specific values when available (e.g., "Your LDL of 151", "With omega-3 at 2.6%")
+2. Explain the mechanism (e.g., "inhibits HMG-CoA reductase", "modulates cortisol via HPA axis")
+3. Set expectations when relevant (e.g., "expect improvement in 4-6 weeks")
 
 **If backend rejects your formula:**
 - Read the error message in the chat
