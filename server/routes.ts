@@ -6343,6 +6343,81 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Archive a formula (soft delete)
+  app.post('/api/users/me/formula/:formulaId/archive', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId;
+      const { formulaId } = req.params;
+
+      // Get the formula to verify ownership
+      const formula = await storage.getFormula(formulaId);
+      
+      if (!formula || formula.userId !== userId) {
+        return res.status(404).json({ error: 'Formula not found or access denied' });
+      }
+
+      if (formula.archivedAt) {
+        return res.status(400).json({ error: 'Formula is already archived' });
+      }
+
+      // Archive the formula
+      const archivedFormula = await storage.archiveFormula(formulaId);
+
+      res.json({ 
+        success: true,
+        formula: archivedFormula,
+        message: 'Formula archived successfully'
+      });
+    } catch (error) {
+      console.error('Error archiving formula:', error);
+      res.status(500).json({ error: 'Failed to archive formula' });
+    }
+  });
+
+  // Restore an archived formula
+  app.post('/api/users/me/formula/:formulaId/restore', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId;
+      const { formulaId } = req.params;
+
+      // Get the formula to verify ownership
+      const formula = await storage.getFormula(formulaId);
+      
+      if (!formula || formula.userId !== userId) {
+        return res.status(404).json({ error: 'Formula not found or access denied' });
+      }
+
+      if (!formula.archivedAt) {
+        return res.status(400).json({ error: 'Formula is not archived' });
+      }
+
+      // Restore the formula
+      const restoredFormula = await storage.restoreFormula(formulaId);
+
+      res.json({ 
+        success: true,
+        formula: restoredFormula,
+        message: 'Formula restored successfully'
+      });
+    } catch (error) {
+      console.error('Error restoring formula:', error);
+      res.status(500).json({ error: 'Failed to restore formula' });
+    }
+  });
+
+  // Get user's archived formulas
+  app.get('/api/users/me/formula/archived', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId;
+      const archivedFormulas = await storage.getArchivedFormulas(userId);
+      
+      res.json({ archived: archivedFormulas });
+    } catch (error) {
+      console.error('Error fetching archived formulas:', error);
+      res.status(500).json({ error: 'Failed to fetch archived formulas' });
+    }
+  });
+
   // Get ingredient catalog for customization UI
   app.get('/api/ingredients/catalog', requireAuth, async (req: any, res: any) => {
     try {
