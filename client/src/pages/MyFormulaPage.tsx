@@ -60,6 +60,7 @@ interface Formula {
   disclaimers?: string[];
   notes?: string;
   createdAt: Date;
+  archivedAt?: Date | null;
   changes?: {
     id: string;
     summary: string;
@@ -146,6 +147,13 @@ export default function MyFormulaPage() {
     enabled: !!user?.id
   });
 
+  const { data: archivedData, isLoading: isLoadingArchived } = useQuery<{ archived: Formula[] }>({
+    queryKey: ['/api/users/me/formula/archived'],
+    enabled: !!user?.id
+  });
+
+  const [showArchived, setShowArchived] = useState(false);
+
   const { data: comparisonData } = useQuery<FormulaComparison>({
     queryKey: ['/api/users/me/formula/compare', selectedVersions[0], selectedVersions[1]],
     enabled: selectedVersions.length === 2
@@ -204,6 +212,48 @@ export default function MyFormulaPage() {
       toast({
         title: 'Error renaming formula',
         description: error.message || 'Failed to rename formula',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const archiveFormulaMutation = useMutation({
+    mutationFn: (formulaId: string) =>
+      apiRequest('POST', `/api/users/me/formula/${formulaId}/archive`, {}).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/current'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/history'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/archived'] });
+      toast({
+        title: 'Formula archived',
+        description: 'Your formula has been archived. You can restore it anytime.'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error archiving formula',
+        description: error.message || 'Failed to archive formula',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const restoreFormulaMutation = useMutation({
+    mutationFn: (formulaId: string) =>
+      apiRequest('POST', `/api/users/me/formula/${formulaId}/restore`, {}).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/current'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/history'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/archived'] });
+      toast({
+        title: 'Formula restored',
+        description: 'Your formula has been restored and is now active.'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error restoring formula',
+        description: error.message || 'Failed to restore formula',
         variant: 'destructive'
       });
     }
@@ -387,28 +437,57 @@ export default function MyFormulaPage() {
               {[1, 2, 3].map(i => <Skeleton key={i} className="h-64" />)}
             </div>
           ) : allFormulas && allFormulas.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {allFormulas.map((formula) => (
-                <FormulaCard
-                  key={formula.id}
-                  formula={formula}
-                  isSelected={selectedFormulaId === formula.id}
-                  isExpanded={expandedFormulaId === formula.id}
-                  isNewest={formula.id === currentFormula?.id}
-                  onSelect={() => setSelectedFormulaId(formula.id)}
-                  onToggleExpand={() => setExpandedFormulaId(
-                    expandedFormulaId === formula.id ? null : formula.id
-                  )}
-                  onRename={(id, currentName) => {
-                    setRenamingFormulaId(id);
-                    setNewFormulaName(currentName || '');
-                  }}
-                  getIndividualIngredientDetails={getIndividualIngredientDetails}
-                  expandedIndividualIngredients={expandedIndividualIngredients}
-                  setExpandedIndividualIngredients={setExpandedIndividualIngredients}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {allFormulas.map((formula) => (
+                  <FormulaCard
+                    key={formula.id}
+                    formula={formula}
+                    isSelected={selectedFormulaId === formula.id}
+                    isExpanded={expandedFormulaId === formula.id}
+                    isNewest={formula.id === currentFormula?.id}
+                    onSelect={() => setSelectedFormulaId(formula.id)}
+                    onToggleExpand={() => setExpandedFormulaId(
+                      expandedFormulaId === formula.id ? null : formula.id
+                    )}
+                    onRename={(id, currentName) => {
+                      setRenamingFormulaId(id);
+                      setNewFormulaName(currentName || '');
+                    }}
+                    onArchive={(id) => archiveFormulaMutation.mutate(id)}
+                    isArchiving={archiveFormulaMutation.isPending}
+                    getIndividualIngredientDetails={getIndividualIngredientDetails}
+                    expandedIndividualIngredients={expandedIndividualIngredients}
+                    setExpandedIndividualIngredients={setExpandedIndividualIngredients}
+                  />
+                ))}
+              </div>
+              
+              {/* Archived Formulas Section */}
+              {(archivedData?.archived?.length || 0) > 0 && (
+                <Collapsible open={showArchived} onOpenChange={setShowArchived}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="w-full">
+                      <Archive className="w-4 h-4 mr-2" />
+                      {showArchived ? 'Hide' : 'View'} Archived Formulas ({archivedData?.archived?.length || 0})
+                      {showArchived ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-4">
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {archivedData?.archived?.map((formula) => (
+                        <ArchivedFormulaCard 
+                          key={formula.id} 
+                          formula={formula} 
+                          onRestore={(id) => restoreFormulaMutation.mutate(id)}
+                          isRestoring={restoreFormulaMutation.isPending}
+                        />
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </>
           ) : (
             <Card>
               <CardContent className="pt-6 text-center text-muted-foreground">
@@ -831,12 +910,14 @@ interface FormulaCardProps {
   onSelect: () => void;
   onToggleExpand: () => void;
   onRename: (formulaId: string, currentName?: string) => void;
+  onArchive: (formulaId: string) => void;
+  isArchiving?: boolean;
   getIndividualIngredientDetails: (ingredientName: string) => { name: string; doseMg: number; category: string; description?: string; benefits?: string[] } | undefined;
   expandedIndividualIngredients: Record<string, boolean>;
   setExpandedIndividualIngredients: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
-function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onToggleExpand, onRename, getIndividualIngredientDetails, expandedIndividualIngredients, setExpandedIndividualIngredients }: FormulaCardProps) {
+function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onToggleExpand, onRename, onArchive, isArchiving, getIndividualIngredientDetails, expandedIndividualIngredients, setExpandedIndividualIngredients }: FormulaCardProps) {
   const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
   const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
   const createdDate = new Date(formula.createdAt).toLocaleDateString();
@@ -1061,25 +1142,126 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
           </CollapsibleContent>
         </Collapsible>
         
-        {/* Select Button */}
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          {/* Select Button */}
+          <Button 
+            variant={isSelected ? "secondary" : "default"}
+            size="sm"
+            className="flex-1"
+            onClick={onSelect}
+            data-testid={`button-select-formula-${formula.version}`}
+          >
+            {isSelected ? (
+              <>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Selected
+              </>
+            ) : (
+              <>
+                <Target className="w-4 h-4 mr-2" />
+                Select
+              </>
+            )}
+          </Button>
+          
+          {/* Archive Button */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="outline"
+                size="sm"
+                className="text-muted-foreground hover:text-orange-600 hover:border-orange-300"
+                data-testid={`button-archive-formula-${formula.version}`}
+                disabled={isArchiving}
+              >
+                <Archive className="w-4 h-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Archive this formula?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will hide "{formula.name || `Version ${formula.version}`}" from your active formulas. 
+                  You can restore it anytime from the archived section.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={() => onArchive(formula.id)}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  Archive
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Archived Formula Card Component
+interface ArchivedFormulaCardProps {
+  formula: Formula;
+  onRestore: (formulaId: string) => void;
+  isRestoring?: boolean;
+}
+
+function ArchivedFormulaCard({ formula, onRestore, isRestoring }: ArchivedFormulaCardProps) {
+  const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
+  const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
+  const createdDate = new Date(formula.createdAt).toLocaleDateString();
+  const archivedDate = formula.archivedAt ? new Date(formula.archivedAt).toLocaleDateString() : '';
+  
+  return (
+    <Card className="relative opacity-75 hover:opacity-100 transition-opacity border-dashed">
+      {/* Archived Badge */}
+      <div className="absolute top-3 right-3">
+        <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
+          <Archive className="w-3 h-3 mr-1" />
+          Archived
+        </Badge>
+      </div>
+      
+      <CardHeader className="pb-4">
+        <div className="pr-20">
+          <CardTitle className="text-lg flex items-center gap-1.5">
+            <FlaskConical className="w-4 h-4 text-muted-foreground" />
+            <span className="text-muted-foreground">{formula.name || `Version ${formula.version}`}</span>
+          </CardTitle>
+          <CardDescription className="text-xs mt-1.5">
+            Created {createdDate} • Archived {archivedDate}
+          </CardDescription>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="space-y-4">
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col items-center justify-center p-2 bg-muted/20 rounded-lg">
+            <div className="font-medium text-muted-foreground">{totalIngredients}</div>
+            <div className="text-xs text-muted-foreground">Ingredients</div>
+          </div>
+          <div className="flex flex-col items-center justify-center p-2 bg-muted/20 rounded-lg">
+            <div className="font-medium text-muted-foreground">{formula.totalMg}mg</div>
+            <div className="text-xs text-muted-foreground">Total</div>
+          </div>
+        </div>
+        
+        {/* Restore Button */}
         <Button 
-          variant={isSelected ? "secondary" : "default"}
+          variant="outline"
           size="sm"
           className="w-full"
-          onClick={onSelect}
-          data-testid={`button-select-formula-${formula.version}`}
+          onClick={() => onRestore(formula.id)}
+          disabled={isRestoring}
+          data-testid={`button-restore-formula-${formula.version}`}
         >
-          {isSelected ? (
-            <>
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Selected
-            </>
-          ) : (
-            <>
-              <Target className="w-4 h-4 mr-2" />
-              Select This Formula
-            </>
-          )}
+          <RotateCcw className="w-4 h-4 mr-2" />
+          {isRestoring ? 'Restoring...' : 'Restore Formula'}
         </Button>
       </CardContent>
     </Card>

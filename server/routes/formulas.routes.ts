@@ -447,6 +447,121 @@ router.patch('/:formulaId/rename', requireAuth, async (req, res) => {
   }
 });
 
+// Archive a formula (soft delete)
+router.post('/:formulaId/archive', requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const { formulaId } = req.params;
+
+    // Get the formula to verify ownership
+    const formula = await storage.getFormula(formulaId);
+    
+    if (!formula || formula.userId !== userId) {
+      return res.status(404).json({ error: 'Formula not found or access denied' });
+    }
+
+    if (formula.archivedAt) {
+      return res.status(400).json({ error: 'Formula is already archived' });
+    }
+
+    // Archive the formula
+    const archivedFormula = await storage.archiveFormula(formulaId);
+
+    // 📬 Create notification for formula archival
+    try {
+      await storage.createNotification({
+        userId,
+        type: 'formula_update',
+        title: `Formula V${formula.version} Archived`,
+        content: formula.name 
+          ? `Your formula "${formula.name}" has been archived. You can restore it anytime from the archived formulas section.`
+          : `Your formula (version ${formula.version}) has been archived. You can restore it anytime from the archived formulas section.`,
+        formulaId: archivedFormula.id,
+        metadata: { 
+          actionUrl: '/dashboard/my-formula', 
+          icon: 'archive', 
+          priority: 'low' 
+        }
+      });
+    } catch (notifError) {
+      logger.error('Failed to create archive notification:', notifError);
+    }
+
+    res.json({ 
+      success: true,
+      formula: archivedFormula,
+      message: 'Formula archived successfully'
+    });
+  } catch (error) {
+    logger.error('Error archiving formula:', error);
+    res.status(500).json({ error: 'Failed to archive formula' });
+  }
+});
+
+// Restore an archived formula
+router.post('/:formulaId/restore', requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const { formulaId } = req.params;
+
+    // Get the formula to verify ownership
+    const formula = await storage.getFormula(formulaId);
+    
+    if (!formula || formula.userId !== userId) {
+      return res.status(404).json({ error: 'Formula not found or access denied' });
+    }
+
+    if (!formula.archivedAt) {
+      return res.status(400).json({ error: 'Formula is not archived' });
+    }
+
+    // Restore the formula
+    const restoredFormula = await storage.restoreFormula(formulaId);
+
+    // 📬 Create notification for formula restoration
+    try {
+      await storage.createNotification({
+        userId,
+        type: 'formula_update',
+        title: `Formula V${formula.version} Restored`,
+        content: formula.name 
+          ? `Your formula "${formula.name}" has been restored and is now active again.`
+          : `Your formula (version ${formula.version}) has been restored and is now active again.`,
+        formulaId: restoredFormula.id,
+        metadata: { 
+          actionUrl: '/dashboard/my-formula', 
+          icon: 'refresh', 
+          priority: 'low' 
+        }
+      });
+    } catch (notifError) {
+      logger.error('Failed to create restore notification:', notifError);
+    }
+
+    res.json({ 
+      success: true,
+      formula: restoredFormula,
+      message: 'Formula restored successfully'
+    });
+  } catch (error) {
+    logger.error('Error restoring formula:', error);
+    res.status(500).json({ error: 'Failed to restore formula' });
+  }
+});
+
+// Get user's archived formulas
+router.get('/archived', requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const archivedFormulas = await storage.getArchivedFormulas(userId);
+    
+    res.json({ archived: archivedFormulas });
+  } catch (error) {
+    logger.error('Error fetching archived formulas:', error);
+    res.status(500).json({ error: 'Failed to fetch archived formulas' });
+  }
+});
+
 // ==================== REVIEW SCHEDULE ENDPOINTS ====================
 
 // Get review schedule for a formula
