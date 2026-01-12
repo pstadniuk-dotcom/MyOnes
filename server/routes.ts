@@ -641,12 +641,13 @@ function isAnyIngredientApproved(ingredientName: string): boolean {
 
 function normalizePromptHealthProfile(profile?: Awaited<ReturnType<typeof storage.getHealthProfile>>): PromptContext['healthProfile'] | undefined {
   if (!profile) return undefined;
-  const { conditions, medications, allergies, ...rest } = profile;
+  const { conditions, medications, allergies, healthGoals, ...rest } = profile;
   return {
     ...rest,
     conditions: conditions ?? undefined,
     medications: medications ?? undefined,
     allergies: allergies ?? undefined,
+    healthGoals: healthGoals ?? undefined,
   };
 }
 
@@ -3947,6 +3948,18 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           const existingProfile = await storage.getHealthProfile(userId);
           
           // Merge with existing data (new data takes precedence)
+          // For healthGoals, merge arrays to accumulate goals over time
+          let mergedHealthGoals = existingProfile?.healthGoals || [];
+          if (healthData.healthGoals && Array.isArray(healthData.healthGoals)) {
+            // Add new goals that aren't already in the list (case-insensitive dedup)
+            const existingLower = mergedHealthGoals.map((g: string) => g.toLowerCase());
+            for (const goal of healthData.healthGoals) {
+              if (!existingLower.includes(goal.toLowerCase())) {
+                mergedHealthGoals.push(goal);
+              }
+            }
+          }
+          
           const mergedData = {
             age: healthData.age ?? existingProfile?.age,
             sex: healthData.sex ?? existingProfile?.sex,
@@ -3963,6 +3976,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             conditions: healthData.conditions ?? existingProfile?.conditions,
             medications: healthData.medications ?? existingProfile?.medications,
             allergies: healthData.allergies ?? existingProfile?.allergies,
+            healthGoals: mergedHealthGoals.length > 0 ? mergedHealthGoals : undefined,
           };
           
           // Validate merged data against schema before persisting

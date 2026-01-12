@@ -19,6 +19,7 @@ export interface HealthProfile {
   conditions?: string[];
   medications?: string[];
   allergies?: string[];
+  healthGoals?: string[];
   updatedAt: Date;
 }
 
@@ -256,6 +257,7 @@ ${isAdvancedUser ? `
 - Allergies
 - Sleep hours, exercise frequency, stress level
 - Smoking status, alcohol consumption
+- **Health goals** (e.g., "gut health", "brain optimization", "energy", "better sleep", "stress relief", "longevity", "heart health")
 
 🚨 **CRITICAL: If user provides health data in their FIRST message, output health-data block IMMEDIATELY in your first response!**
 
@@ -274,7 +276,8 @@ ${isAdvancedUser ? `
   "exerciseDaysPerWeek": 3,
   "stressLevel": 5,
   "smokingStatus": "never",
-  "alcoholDrinksPerWeek": 3
+  "alcoholDrinksPerWeek": 3,
+  "healthGoals": ["gut health", "brain optimization", "energy"]
 }
 \`\`\`
 
@@ -286,13 +289,14 @@ ${isAdvancedUser ? `
 3. Only include fields they actually mentioned - leave out unknown fields
 4. The user CANNOT see this block - it's processed by the backend
 5. If they share data in their FIRST message, output the block immediately
+6. **ALWAYS capture health goals** - if user says "I want to improve my gut" → healthGoals: ["gut health"]
 
 **Example Response:**
 
-User: "I'm a 40 year old male, 6'6", 235 lbs, taking Sertraline 25mg, exercise 3x per week"
+User: "I'm a 40 year old male, 6'6", 235 lbs, taking Sertraline 25mg, exercise 3x per week. I want to focus on gut and brain health."
 
 Your Response:
-"Thank you for sharing those details. I can see you're already taking Sertraline, which is an SSRI antidepressant. This is important to know for supplement interactions..."
+"Thank you for sharing those details. I can see you're already taking Sertraline, which is an SSRI antidepressant. This is important to know for supplement interactions. Your focus on gut and brain health is excellent - there's strong research connecting the gut-brain axis..."
 
 \`\`\`health-data
 {
@@ -301,7 +305,8 @@ Your Response:
   "heightCm": 198,
   "weightLbs": 235,
   "medications": ["Sertraline 25mg"],
-  "exerciseDaysPerWeek": 3
+  "exerciseDaysPerWeek": 3,
+  "healthGoals": ["gut health", "brain optimization"]
 }
 \`\`\`
 
@@ -348,6 +353,20 @@ The "purpose" field for each ingredient MUST:
 }
 \`\`\`
 NOTE: DO NOT include "totalMg" - backend calculates it automatically!
+
+**🚨 MANDATORY: AFTER THE JSON BLOCK, EXPLAIN YOUR REASONING 🚨**
+
+After outputting the formula JSON, you MUST include a brief explanation section that covers:
+
+1. **Why this combination?** - Explain how the ingredients work together synergistically
+2. **What's the strategy?** - What's the overall approach (e.g., "cardiovascular protection + metabolic support")
+3. **What to expect** - Timeline for when they might notice effects (e.g., "Omega-3 takes 8-12 weeks to improve lipid panels")
+4. **How this targets YOUR goals** - Connect directly to what the user said they want to improve
+
+**Example explanation after JSON:**
+> "I've designed this formula around your primary concerns: gut health and cognitive function. The **Gut Health Support** provides prebiotic fiber and digestive enzymes to restore your microbiome, while **Phosphatidylcholine** supports both gut lining repair AND brain cell membrane health - it's doing double duty. The **Lion's Mane** adds nerve growth factor support for memory and focus. You should notice digestive improvements within 2-3 weeks, while cognitive benefits typically take 4-8 weeks of consistent use. I chose 2x dosing on the gut support because you mentioned significant bloating - we can scale back once symptoms improve."
+
+**This explanation is NON-OPTIONAL. Users need to understand WHY you chose what you chose.**
 
 === 🧠 ADAPTIVE CONSULTATION APPROACH ===
 
@@ -613,6 +632,15 @@ WRONG: Keep all 4000mg + add Hawthorn 100mg + Garlic 200mg = 4300mg total ❌
   if (context.healthProfile) {
     const profile = context.healthProfile;
     prompt += `\n=== 📊 USER HEALTH PROFILE ===\n\n`;
+    
+    // Health goals are the MOST IMPORTANT context - show first
+    if (profile.healthGoals && profile.healthGoals.length > 0) {
+      prompt += `🎯 **PRIMARY HEALTH GOALS:** ${profile.healthGoals.join(', ')}\n`;
+      prompt += `⚠️ CRITICAL: Every ingredient recommendation MUST directly support one or more of these goals. Explain the connection explicitly.\n\n`;
+    } else {
+      prompt += `🎯 **PRIMARY HEALTH GOALS:** Not yet captured\n`;
+      prompt += `⚠️ If the user mentions ANY health goals (e.g., "gut health", "brain optimization", "energy", "sleep", "stress relief", "longevity"), capture them in your health-data JSON response.\n\n`;
+    }
     
     if (profile.age) prompt += `Age: ${profile.age}\n`;
     if (profile.sex) prompt += `Sex: ${profile.sex}\n`;
