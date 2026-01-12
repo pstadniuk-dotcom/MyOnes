@@ -1,4 +1,4 @@
-import { eq, desc, and, isNull, gte, lte, lt, gt, or, ilike, sql, count, inArray } from "drizzle-orm";
+import { eq, desc, and, isNull, isNotNull, gte, lte, lt, gt, or, ilike, sql, count, inArray } from "drizzle-orm";
 import { db } from "./db";
 import { encryptToken, decryptToken } from "./tokenEncryption";
 import { encryptField, decryptField, encryptFieldSafe, decryptFieldSafe } from "./fieldEncryption";
@@ -93,11 +93,14 @@ export interface IStorage {
   getFormula(id: string): Promise<Formula | undefined>;
   createFormula(formula: InsertFormula): Promise<Formula>;
   getCurrentFormulaByUser(userId: string): Promise<Formula | undefined>;
-  getFormulaHistory(userId: string): Promise<Formula[]>;
+  getFormulaHistory(userId: string, includeArchived?: boolean): Promise<Formula[]>;
+  getArchivedFormulas(userId: string): Promise<Formula[]>;
   updateFormulaVersion(userId: string, updates: Partial<InsertFormula>): Promise<Formula>;
   getFormulaByUserAndVersion(userId: string, version: number): Promise<Formula | undefined>;
   updateFormulaCustomizations(formulaId: string, customizations: { addedBases?: any[], addedIndividuals?: any[] }, newTotalMg: number): Promise<Formula>;
   updateFormulaName(formulaId: string, name: string): Promise<Formula>;
+  archiveFormula(formulaId: string): Promise<Formula>;
+  restoreFormula(formulaId: string): Promise<Formula>;
   
   // Formula Version Change operations
   createFormulaVersionChange(change: InsertFormulaVersionChange): Promise<FormulaVersionChange>;
@@ -854,7 +857,7 @@ export class DrizzleStorage implements IStorage {
       const [formula] = await db
         .select()
         .from(formulas)
-        .where(eq(formulas.userId, userId))
+        .where(and(eq(formulas.userId, userId), isNull(formulas.archivedAt)))
         .orderBy(desc(formulas.createdAt))
         .limit(1);
       return formula || undefined;
@@ -864,16 +867,66 @@ export class DrizzleStorage implements IStorage {
     }
   }
 
-  async getFormulaHistory(userId: string): Promise<Formula[]> {
+  async getFormulaHistory(userId: string, includeArchived: boolean = false): Promise<Formula[]> {
     try {
+      const whereClause = includeArchived 
+        ? eq(formulas.userId, userId)
+        : and(eq(formulas.userId, userId), isNull(formulas.archivedAt));
       return await db
         .select()
         .from(formulas)
-        .where(eq(formulas.userId, userId))
+        .where(whereClause)
         .orderBy(desc(formulas.createdAt));
     } catch (error) {
       console.error('Error getting formula history:', error);
       return [];
+    }
+  }
+
+  async getArchivedFormulas(userId: string): Promise<Formula[]> {
+    try {
+      return await db
+        .select()
+        .from(formulas)
+        .where(and(eq(formulas.userId, userId), isNotNull(formulas.archivedAt)))
+        .orderBy(desc(formulas.archivedAt));
+    } catch (error) {
+      console.error('Error getting archived formulas:', error);
+      return [];
+    }
+  }
+
+  async archiveFormula(formulaId: string): Promise<Formula> {
+    try {
+      const [formula] = await db
+        .update(formulas)
+        .set({ archivedAt: new Date() })
+        .where(eq(formulas.id, formulaId))
+        .returning();
+      if (!formula) {
+        throw new Error('Formula not found');
+      }
+      return formula;
+    } catch (error) {
+      console.error('Error archiving formula:', error);
+      throw new Error('Failed to archive formula');
+    }
+  }
+
+  async restoreFormula(formulaId: string): Promise<Formula> {
+    try {
+      const [formula] = await db
+        .update(formulas)
+        .set({ archivedAt: null })
+        .where(eq(formulas.id, formulaId))
+        .returning();
+      if (!formula) {
+        throw new Error('Formula not found');
+      }
+      return formula;
+    } catch (error) {
+      console.error('Error restoring formula:', error);
+      throw new Error('Failed to restore formula');
     }
   }
 

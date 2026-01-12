@@ -182,6 +182,7 @@ export const formulas = pgTable("formulas", {
   disclaimers: json("disclaimers").$type<string[]>().default([]),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  archivedAt: timestamp("archived_at"), // Null = active, timestamp = archived
 });
 
 // Formula version changes for tracking modifications
