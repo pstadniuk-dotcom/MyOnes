@@ -51,6 +51,7 @@ import UserManagementPage from "@/pages/admin/UserManagementPage";
 import UserDetailPage from "@/pages/admin/UserDetailPage";
 import AdminSupportTicketsPage from "@/pages/admin/AdminSupportTicketsPage";
 import ConversationsPage from "@/pages/admin/ConversationsPage";
+import OrdersManagementPage from "@/pages/admin/OrdersManagementPage";
 
 // Import shared/public components
 import SharedFormulaPage from "@/pages/SharedFormulaPage";
@@ -249,6 +250,11 @@ function MainRouter() {
       <Route path="/admin/conversations">
         <ProtectedAdminRoute>
           <ConversationsPage />
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/orders">
+        <ProtectedAdminRoute>
+          <OrdersManagementPage />
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/support-tickets/:id">

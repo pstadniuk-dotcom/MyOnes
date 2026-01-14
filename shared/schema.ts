@@ -363,6 +363,15 @@ export const appSettings = pgTable("app_settings", {
   updatedBy: varchar("updated_by").references(() => users.id, { onDelete: "set null" })
 });
 
+// Admin notes on users - internal notes for admin team
+export const userAdminNotes = pgTable("user_admin_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  adminId: varchar("admin_id").notNull().references(() => users.id, { onDelete: "set null" }),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // User notification preferences
 export const notificationPrefs = pgTable("notification_prefs", {
   userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
@@ -498,6 +507,11 @@ export const insertAppSettingSchema = createInsertSchema(appSettings).omit({
   updatedAt: true,
 });
 
+export const insertUserAdminNoteSchema = createInsertSchema(userAdminNotes).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertNotificationPrefSchema = createInsertSchema(notificationPrefs).omit({
   updatedAt: true,
 });
@@ -565,6 +579,10 @@ export type ReviewSchedule = typeof reviewSchedules.$inferSelect;
 // App settings types
 export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;
 export type AppSetting = typeof appSettings.$inferSelect;
+
+// User admin notes types
+export type InsertUserAdminNote = z.infer<typeof insertUserAdminNoteSchema>;
+export type UserAdminNote = typeof userAdminNotes.$inferSelect;
 
 // Auth-specific schemas
 export const signupSchema = z.object({

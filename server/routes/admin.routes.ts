@@ -536,4 +536,243 @@ router.get('/conversations/:sessionId', requireAdmin, async (req, res) => {
   }
 });
 
+// ========================================
+// Advanced Analytics Routes
+// ========================================
+
+/**
+ * GET /api/admin/analytics/funnel
+ * Get conversion funnel data (signup -> profile -> formula -> order -> reorder)
+ * 90-day order cycle: reorder expected around day 75-95
+ */
+router.get('/analytics/funnel', requireAdmin, async (req, res) => {
+  try {
+    const funnel = await storage.getConversionFunnel();
+    res.json(funnel);
+  } catch (error) {
+    logger.error('Error fetching funnel data', { error });
+    res.status(500).json({ error: 'Failed to fetch funnel data' });
+  }
+});
+
+/**
+ * GET /api/admin/analytics/cohorts
+ * Get cohort retention data based on 90-day order cycles
+ */
+router.get('/analytics/cohorts', requireAdmin, async (req, res) => {
+  try {
+    const months = parseInt(req.query.months as string) || 6;
+    const cohorts = await storage.getCohortRetention(months);
+    res.json(cohorts);
+  } catch (error) {
+    logger.error('Error fetching cohort data', { error });
+    res.status(500).json({ error: 'Failed to fetch cohort data' });
+  }
+});
+
+/**
+ * GET /api/admin/analytics/reorder-health
+ * Get reorder health metrics (who's due, overdue, at risk)
+ * Based on 90-day supply cycle
+ */
+router.get('/analytics/reorder-health', requireAdmin, async (req, res) => {
+  try {
+    const health = await storage.getReorderHealth();
+    res.json(health);
+  } catch (error) {
+    logger.error('Error fetching reorder health', { error });
+    res.status(500).json({ error: 'Failed to fetch reorder health' });
+  }
+});
+
+/**
+ * GET /api/admin/analytics/formula-insights
+ * Get popular ingredients, formula patterns, customization trends
+ */
+router.get('/analytics/formula-insights', requireAdmin, async (req, res) => {
+  try {
+    const insights = await storage.getFormulaInsights();
+    res.json(insights);
+  } catch (error) {
+    logger.error('Error fetching formula insights', { error });
+    res.status(500).json({ error: 'Failed to fetch formula insights' });
+  }
+});
+
+/**
+ * GET /api/admin/analytics/pending-actions
+ * Get counts of items requiring admin attention
+ */
+router.get('/analytics/pending-actions', requireAdmin, async (req, res) => {
+  try {
+    const pending = await storage.getPendingActions();
+    res.json(pending);
+  } catch (error) {
+    logger.error('Error fetching pending actions', { error });
+    res.status(500).json({ error: 'Failed to fetch pending actions' });
+  }
+});
+
+/**
+ * GET /api/admin/activity-feed
+ * Get live activity feed (recent signups, orders, support tickets)
+ */
+router.get('/activity-feed', requireAdmin, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 20;
+    const feed = await storage.getActivityFeed(limit);
+    res.json(feed);
+  } catch (error) {
+    logger.error('Error fetching activity feed', { error });
+    res.status(500).json({ error: 'Failed to fetch activity feed' });
+  }
+});
+
+// ========================================
+// Order Management Routes
+// ========================================
+
+/**
+ * GET /api/admin/orders
+ * Get all orders with filtering and pagination
+ */
+router.get('/orders', requireAdmin, async (req, res) => {
+  try {
+    const status = req.query.status as string;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+
+    const result = await storage.getAllOrders({ status, limit, offset, startDate, endDate });
+    res.json(result);
+  } catch (error) {
+    logger.error('Error fetching orders', { error });
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+/**
+ * PATCH /api/admin/orders/:id/status
+ * Update order status
+ */
+router.patch('/orders/:id/status', requireAdmin, async (req, res) => {
+  try {
+    const { status, trackingUrl } = req.body;
+    const order = await storage.updateOrderStatus(req.params.id, status, trackingUrl);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    res.json(order);
+  } catch (error) {
+    logger.error('Error updating order status', { error });
+    res.status(500).json({ error: 'Failed to update order status' });
+  }
+});
+
+// ========================================
+// User Notes Routes
+// ========================================
+
+/**
+ * GET /api/admin/users/:id/notes
+ * Get admin notes for a user
+ */
+router.get('/users/:id/notes', requireAdmin, async (req, res) => {
+  try {
+    const notes = await storage.getUserAdminNotes(req.params.id);
+    res.json(notes);
+  } catch (error) {
+    logger.error('Error fetching user notes', { error });
+    res.status(500).json({ error: 'Failed to fetch user notes' });
+  }
+});
+
+/**
+ * POST /api/admin/users/:id/notes
+ * Add admin note to a user
+ */
+router.post('/users/:id/notes', requireAdmin, async (req, res) => {
+  try {
+    const { content } = req.body;
+    const adminId = req.userId!;
+    const note = await storage.addUserAdminNote(req.params.id, adminId, content);
+    res.json(note);
+  } catch (error) {
+    logger.error('Error adding user note', { error });
+    res.status(500).json({ error: 'Failed to add user note' });
+  }
+});
+
+// ========================================
+// Export Routes
+// ========================================
+
+/**
+ * GET /api/admin/export/users
+ * Export users as CSV
+ */
+router.get('/export/users', requireAdmin, async (req, res) => {
+  try {
+    const filter = req.query.filter as string || 'all';
+    const users = await storage.exportUsers(filter);
+    
+    // Build CSV
+    const headers = ['ID', 'Name', 'Email', 'Phone', 'Created At', 'Has Formula', 'Has Orders', 'Total Spent'];
+    const rows = users.map(u => [
+      u.id,
+      `"${(u.name || '').replace(/"/g, '""')}"`,
+      u.email,
+      u.phone || '',
+      u.createdAt,
+      u.hasFormula ? 'Yes' : 'No',
+      u.orderCount > 0 ? 'Yes' : 'No',
+      `$${(u.totalSpent / 100).toFixed(2)}`
+    ].join(','));
+    
+    const csv = [headers.join(','), ...rows].join('\n');
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="users-export-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    logger.error('Error exporting users', { error });
+    res.status(500).json({ error: 'Failed to export users' });
+  }
+});
+
+/**
+ * GET /api/admin/export/orders
+ * Export orders as CSV
+ */
+router.get('/export/orders', requireAdmin, async (req, res) => {
+  try {
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+    const orders = await storage.exportOrders(startDate, endDate);
+    
+    // Build CSV
+    const headers = ['Order ID', 'User Name', 'User Email', 'Status', 'Amount', 'Supply (Days)', 'Placed At', 'Shipped At'];
+    const rows = orders.map(o => [
+      o.id,
+      `"${(o.userName || '').replace(/"/g, '""')}"`,
+      o.userEmail,
+      o.status,
+      `$${(o.amountCents / 100).toFixed(2)}`,
+      o.supplyMonths ? o.supplyMonths * 30 : 90, // Default 90 days
+      o.placedAt,
+      o.shippedAt || ''
+    ].join(','));
+    
+    const csv = [headers.join(','), ...rows].join('\n');
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="orders-export-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    logger.error('Error exporting orders', { error });
+    res.status(500).json({ error: 'Failed to export orders' });
+  }
+});
+
 export default router;

@@ -24,6 +24,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { UserAdminNotes } from '@/components/admin/UserAdminNotes';
 
 // Types
 interface UserDetail {
@@ -339,6 +340,9 @@ export default function UserDetailPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Admin Notes */}
+        <UserAdminNotes userId={user.id} />
 
         {/* Activity Tabs */}
         <Card data-testid="card-activity-tabs">
