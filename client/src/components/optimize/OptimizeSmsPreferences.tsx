@@ -209,6 +209,7 @@ export function OptimizeSmsPreferencesDialog() {
               )}
             </div>
 
+            {/* Workout Reminder - Hidden for now
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
@@ -235,6 +236,7 @@ export function OptimizeSmsPreferencesDialog() {
                 </div>
               )}
             </div>
+            */}
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">

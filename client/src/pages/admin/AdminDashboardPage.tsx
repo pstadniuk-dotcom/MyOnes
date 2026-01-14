@@ -12,7 +12,8 @@ import {
   TrendingUp,
   UserCheck,
   Clock,
-  MessageSquare
+  MessageSquare,
+  Download
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useEffect, useMemo, useState } from 'react';
@@ -28,6 +29,14 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Settings2, ArrowRight } from 'lucide-react';
+
+// Import new admin components
+import { ConversionFunnel } from '@/components/admin/ConversionFunnel';
+import { CohortRetentionChart } from '@/components/admin/CohortRetentionChart';
+import { ReorderHealthWidget } from '@/components/admin/ReorderHealthWidget';
+import { PendingActionsWidget } from '@/components/admin/PendingActionsWidget';
+import { ActivityFeed } from '@/components/admin/ActivityFeed';
+import { FormulaInsightsWidget } from '@/components/admin/FormulaInsightsWidget';
 import { apiRequest } from '@/lib/queryClient';
 
 // Types for API responses
@@ -217,10 +226,14 @@ export default function AdminDashboardPage() {
               Admin Dashboard
             </h1>
             <p className="text-muted-foreground">
-              Overview of platform metrics and user activity
+              Overview of platform metrics and user activity (90-day order cycles)
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => window.open('/api/admin/export/users', '_blank')}>
+              <Download className="h-4 w-4 mr-2" />
+              Export Users
+            </Button>
             <Button variant="outline" onClick={() => setLocation('/dashboard')} data-testid="button-go-to-dashboard">
               Go to Dashboard
               <ArrowRight className="h-4 w-4 ml-2" />
@@ -228,13 +241,16 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
+        {/* Pending Actions - Most Important */}
+        <PendingActionsWidget />
+
         {/* AI Settings */}
         <AISettingsCard onChanged={() => {
           queryClient.invalidateQueries({ queryKey: ['/api/admin/ai-settings'] });
         }} />
 
         {/* Quick Links */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-5">
           <Card 
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => setLocation('/admin/users')}
@@ -252,6 +268,21 @@ export default function AdminDashboardPage() {
           
           <Card 
             className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setLocation('/admin/orders')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Order Management
+              </CardTitle>
+              <CardDescription>
+                View &amp; update orders
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          
+          <Card 
+            className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => setLocation('/admin/conversations')}
           >
             <CardHeader>
@@ -260,7 +291,7 @@ export default function AdminDashboardPage() {
                 Conversations
               </CardTitle>
               <CardDescription>
-                Browse chats &amp; generate insights
+                Browse chats &amp; insights
               </CardDescription>
             </CardHeader>
           </Card>
@@ -275,7 +306,7 @@ export default function AdminDashboardPage() {
                 Support Tickets
               </CardTitle>
               <CardDescription>
-                Manage user support requests
+                Manage support requests
               </CardDescription>
             </CardHeader>
           </Card>
@@ -290,11 +321,14 @@ export default function AdminDashboardPage() {
                 Analytics
               </CardTitle>
               <CardDescription>
-                View detailed platform analytics
+                Platform analytics
               </CardDescription>
             </CardHeader>
           </Card>
         </div>
+
+        {/* Conversion Funnel */}
+        <ConversionFunnel />
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="section-stats-cards">
@@ -487,6 +521,18 @@ export default function AdminDashboardPage() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Reorder Health & Activity Feed Side by Side */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ReorderHealthWidget />
+          <ActivityFeed />
+        </div>
+
+        {/* Cohort Retention & Formula Insights */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <CohortRetentionChart />
+          <FormulaInsightsWidget />
         </div>
       </div>
     </div>

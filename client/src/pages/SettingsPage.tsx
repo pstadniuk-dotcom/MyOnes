@@ -520,7 +520,7 @@ export default function SettingsPage() {
                                 )}
                               </div>
 
-                              {/* Workout Reminders */}
+                              {/* Workout Reminders - Hidden for now
                               <div className="p-3 rounded-lg border bg-card space-y-3">
                                 <div className="flex items-center gap-3">
                                   <Dumbbell className="w-4 h-4 text-blue-600" />
@@ -557,8 +557,9 @@ export default function SettingsPage() {
                                   </div>
                                 )}
                               </div>
+                              */}
 
-                              {/* Nutrition Tips */}
+                              {/* Nutrition Tips - Hidden for now
                               <div className="p-3 rounded-lg border bg-card space-y-3">
                                 <div className="flex items-center gap-3">
                                   <Salad className="w-4 h-4 text-green-600" />
@@ -595,8 +596,9 @@ export default function SettingsPage() {
                                   </div>
                                 )}
                               </div>
+                              */}
 
-                              {/* Lifestyle & Wellness */}
+                              {/* Lifestyle & Wellness - Hidden for now
                               <div className="p-3 rounded-lg border bg-card space-y-3">
                                 <div className="flex items-center gap-3">
                                   <Heart className="w-4 h-4 text-purple-600" />
@@ -633,6 +635,7 @@ export default function SettingsPage() {
                                   </div>
                                 )}
                               </div>
+                              */}
                             </div>
                           </div>
                           
@@ -644,27 +647,21 @@ export default function SettingsPage() {
                                 <p className="text-xs font-medium text-green-800 mb-1">☀️ Morning ({notifications.reminderMorning})</p>
                                 <p className="text-sm text-green-900">
                                   "⚗️ ONES: Good morning! 
-                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'morning') && "💊 Take 3 capsules with breakfast. "}
-                                  {notifications.workoutTimeSlot === 'morning' && "💪 Today's workout: Upper Body Strength. "}
-                                  {notifications.nutritionTimeSlot === 'morning' && "🥗 Tip: Start your day with protein!"}"
+                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'morning') && "💊 Take 3 capsules with breakfast."}"
                                 </p>
                               </div>
                               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                 <p className="text-xs font-medium text-blue-800 mb-1">🌤️ Afternoon ({notifications.reminderAfternoon})</p>
                                 <p className="text-sm text-blue-900">
                                   "⚗️ ONES: Afternoon check-in! 
-                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'afternoon') && "💊 Take 2 capsules with lunch. "}
-                                  {notifications.workoutTimeSlot === 'afternoon' && "💪 Time to work out! "}
-                                  {notifications.nutritionTimeSlot === 'afternoon' && "💧 Stay hydrated!"}"
+                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'afternoon') && "💊 Take 2 capsules with lunch."}"
                                 </p>
                               </div>
                               <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
                                 <p className="text-xs font-medium text-purple-800 mb-1">🌙 Evening ({notifications.reminderEvening})</p>
                                 <p className="text-sm text-purple-900">
                                   "⚗️ ONES: Evening reminder! 
-                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'evening') && "💊 Take 2 capsules with dinner. "}
-                                  {notifications.workoutTimeSlot === 'evening' && "💪 Evening workout time! "}
-                                  {notifications.lifestyleTimeSlot === 'evening' && "❤️ Wind down before bed for better sleep."}"
+                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'evening') && "💊 Take 2 capsules with dinner."}"
                                 </p>
                               </div>
                             </div>
