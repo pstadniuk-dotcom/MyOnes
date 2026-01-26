@@ -22,6 +22,8 @@ import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
 import { buildApiUrl } from '@/lib/api';
 import { Link } from 'wouter';
 import ThinkingIndicator from '@/components/ThinkingIndicator';
+import { CapsuleSelectionModal } from '@/components/CapsuleSelectionModal';
+import { type CapsuleCount } from '@/lib/utils';
 
 interface Message {
   id: string;
@@ -127,6 +129,16 @@ export default function ConsultationPage() {
   const [selectedFormula, setSelectedFormula] = useState<any>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  
+  // Capsule selection modal state
+  const [showCapsuleModal, setShowCapsuleModal] = useState(false);
+  const [capsuleRecommendation, setCapsuleRecommendation] = useState<{
+    recommendedCapsules: CapsuleCount;
+    reasoning: string;
+    priorities: string[];
+    estimatedAmazonCost: number;
+  } | null>(null);
+  const [pendingCapsuleSelection, setPendingCapsuleSelection] = useState<CapsuleCount | null>(null);
   
   // Draft autosave key
   const DRAFT_KEY = 'consultation_draft';
@@ -583,6 +595,11 @@ export default function ConsultationPage() {
                     sender: 'system',
                     timestamp: new Date()
                   }]);
+                } else if (data.type === 'capsule_recommendation') {
+                  // AI is recommending a capsule count - show the selection modal
+                  console.log('💊 Capsule recommendation received:', data.data);
+                  setCapsuleRecommendation(data.data);
+                  setShowCapsuleModal(true);
                 } else if (data.type === 'complete') {
                   completed = true;
                   setThinkingMessage(null); // Clear thinking status
@@ -1116,6 +1133,25 @@ export default function ConsultationPage() {
       msg.content.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [messages, searchTerm]);
+
+  // Handle capsule selection from modal
+  const handleCapsuleSelection = useCallback(async (capsuleCount: CapsuleCount) => {
+    console.log('💊 User selected', capsuleCount, 'capsules');
+    setPendingCapsuleSelection(capsuleCount);
+    setShowCapsuleModal(false);
+    
+    // Send a message to the AI to proceed with the selected capsule count
+    const selectionMessage = `I'd like to proceed with ${capsuleCount} capsules per day. Please create my formula.`;
+    setInputValue(selectionMessage);
+    
+    // Auto-send after a brief delay
+    setTimeout(() => {
+      const sendButton = document.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
+      if (sendButton) {
+        sendButton.click();
+      }
+    }, 100);
+  }, []);
 
   // Debug: Log render state
   console.log('🔍 RENDER STATE - isTyping:', isTyping, 'thinkingMessage:', thinkingMessage);
@@ -1673,6 +1709,19 @@ export default function ConsultationPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Capsule Selection Modal */}
+      <CapsuleSelectionModal
+        open={showCapsuleModal}
+        onOpenChange={setShowCapsuleModal}
+        recommendedCapsules={capsuleRecommendation?.recommendedCapsules || 9}
+        onSelect={handleCapsuleSelection}
+        reasoning={capsuleRecommendation?.reasoning}
+        amazonComparison={capsuleRecommendation ? {
+          amazonPrice: capsuleRecommendation.estimatedAmazonCost,
+          ingredientCount: capsuleRecommendation.priorities?.length ? capsuleRecommendation.priorities.length * 3 : 10
+        } : undefined}
+      />
     </div>
   );
 }

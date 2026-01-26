@@ -85,8 +85,37 @@ router.get('/users', requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /api/admin/users/:id/timeline
+ * Get user's complete activity timeline
+ * NOTE: More specific routes with path parameters MUST come BEFORE generic :id routes
+ */
+router.get('/users/:id/timeline', requireAdmin, async (req, res) => {
+  try {
+    logger.info('Fetching user timeline', { userId: req.params.id });
+    const timeline = await storage.getUserTimeline(req.params.id);
+    const { password, ...sanitizedUser } = timeline.user;
+    
+    res.json({
+      ...timeline,
+      user: sanitizedUser
+    });
+  } catch (error) {
+    logger.error('Error fetching user timeline', { 
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.params.id 
+    });
+    if (error instanceof Error && error.message === 'User not found') {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.status(500).json({ error: 'Failed to fetch user timeline' });
+  }
+});
+
+/**
  * GET /api/admin/users/:id
  * Get detailed user information
+ * NOTE: Generic :id route MUST come AFTER more specific routes like :id/timeline
  */
 router.get('/users/:id', requireAdmin, async (req, res) => {
   try {
@@ -100,28 +129,6 @@ router.get('/users/:id', requireAdmin, async (req, res) => {
   } catch (error) {
     logger.error('Error fetching user details', { error });
     res.status(500).json({ error: 'Failed to fetch user details' });
-  }
-});
-
-/**
- * GET /api/admin/users/:id/timeline
- * Get user's complete activity timeline
- */
-router.get('/users/:id/timeline', requireAdmin, async (req, res) => {
-  try {
-    const timeline = await storage.getUserTimeline(req.params.id);
-    const { password, ...sanitizedUser } = timeline.user;
-    
-    res.json({
-      ...timeline,
-      user: sanitizedUser
-    });
-  } catch (error) {
-    logger.error('Error fetching user timeline', { error });
-    if (error instanceof Error && error.message === 'User not found') {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    res.status(500).json({ error: 'Failed to fetch user timeline' });
   }
 });
 
