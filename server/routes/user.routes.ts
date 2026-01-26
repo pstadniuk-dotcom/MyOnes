@@ -60,6 +60,8 @@ router.post('/me/health-profile', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     
+    logger.info('Health profile save request', { userId, body: req.body });
+    
     // Validate request body with proper Zod schema
     const healthProfileUpdate = insertHealthProfileSchema.omit({ userId: true }).parse({
       age: req.body.age,
@@ -79,28 +81,37 @@ router.post('/me/health-profile', requireAuth, async (req, res) => {
       allergies: req.body.allergies
     });
 
+    logger.info('Health profile validated', { userId, validatedData: healthProfileUpdate });
+
     // Check if profile exists
     const existingProfile = await storage.getHealthProfile(userId);
+    
+    logger.info('Existing profile check', { userId, hasExisting: !!existingProfile });
     
     let healthProfile;
     if (existingProfile) {
       healthProfile = await storage.updateHealthProfile(userId, healthProfileUpdate);
+      logger.info('Health profile updated', { userId, result: !!healthProfile });
     } else {
       healthProfile = await storage.createHealthProfile({
         userId,
         ...healthProfileUpdate
       });
+      logger.info('Health profile created', { userId, result: !!healthProfile });
     }
 
     res.json(healthProfile);
   } catch (error) {
     if (error instanceof z.ZodError) {
+      logger.error('Health profile validation error', { error: error.errors });
       return res.status(400).json({ 
         error: 'Invalid health profile data', 
         details: error.errors 
       });
     }
-    logger.error('Save health profile error', { error });
+    logger.error('Save health profile error', { 
+      error: error instanceof Error ? { message: error.message, stack: error.stack } : error 
+    });
     res.status(500).json({ error: 'Failed to save health profile' });
   }
 });

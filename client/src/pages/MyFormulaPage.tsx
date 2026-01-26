@@ -55,6 +55,8 @@ interface Formula {
     addedIndividuals?: FormulaIngredient[];
   };
   totalMg: number;
+  targetCapsules?: number;
+  recommendedCapsules?: number;
   rationale?: string;
   warnings?: string[];
   disclaimers?: string[];
@@ -655,12 +657,12 @@ export default function MyFormulaPage() {
                         Daily Dosage Instructions
                       </h4>
                       <span className="font-medium text-base" data-testid="text-order-dosage">
-                        {calculateDosage(selectedFormula.totalMg).display}
+                        {calculateDosage(selectedFormula.totalMg, selectedFormula.targetCapsules || undefined).display}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Take {calculateDosage(selectedFormula.totalMg).perMeal} capsules with each meal (morning, lunch, dinner) • 
-                      {calculateDosage(selectedFormula.totalMg).total} capsules per day
+                      Take {calculateDosage(selectedFormula.totalMg, selectedFormula.targetCapsules || undefined).perMeal} capsules with each meal (morning, lunch, dinner) • 
+                      {selectedFormula.targetCapsules || calculateDosage(selectedFormula.totalMg).total} capsules per day
                     </p>
                   </div>
                   
@@ -1002,11 +1004,11 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm text-muted-foreground whitespace-nowrap">Daily Dosage:</span>
             <span className="font-medium text-sm tabular-nums" data-testid={`text-formula-dosage-${formula.version}`}>
-              {calculateDosage(formula.totalMg).display}
+              {calculateDosage(formula.totalMg, formula.targetCapsules || undefined).display}
             </span>
           </div>
           <div className="text-xs text-muted-foreground text-center tabular-nums">
-            {calculateDosage(formula.totalMg).total} capsules/day • {formula.totalMg}mg total
+            {formula.targetCapsules || calculateDosage(formula.totalMg).total} capsules/day • {formula.totalMg}mg total
           </div>
         </div>
         

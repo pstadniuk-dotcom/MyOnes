@@ -107,7 +107,7 @@ export const newsletterSubscribers = pgTable("newsletter_subscribers", {
 // Health profiles for personalized recommendations
 export const healthProfiles = pgTable("health_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
   
   // Basic demographics
   age: integer("age"),
@@ -180,6 +180,11 @@ export const formulas = pgTable("formulas", {
     addedIndividuals?: Array<{ingredient: string, amount: number, unit: string}>;
   }>().default({}),
   totalMg: integer("total_mg").notNull(),
+  
+  // Capsule count selection (3, 6, 9, 12, or 15 capsules per day)
+  targetCapsules: integer("target_capsules").default(9), // User's selected capsule count
+  recommendedCapsules: integer("recommended_capsules"), // AI's recommended capsule count
+  
   rationale: text("rationale"),
   warnings: json("warnings").$type<string[]>().default([]),
   disclaimers: json("disclaimers").$type<string[]>().default([]),

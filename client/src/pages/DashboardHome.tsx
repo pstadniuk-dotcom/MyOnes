@@ -18,7 +18,7 @@ import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import type { Formula } from '@shared/schema';
-import { calculateDosage } from '@/lib/utils';
+import { calculateDosage, CAPSULE_TIER_INFO, type CapsuleCount } from '@/lib/utils';
 import { useState } from 'react';
 import { ProfileCompletionDialog } from '@/components/ProfileCompletionDialog';
 import { SupplementTrackerCard } from '@/components/dashboard/SupplementTrackerCard';
@@ -222,37 +222,97 @@ export default function HomePage() {
                   Welcome to ONES AI
                 </h2>
                 <p className="text-[#52796F]">
-                  Let's create your personalized supplement formula. Our AI will analyze your health profile to recommend the perfect blend.
+                  Let's create your personalized supplement formula. First, tell us about yourself so our AI can make the best recommendations.
                 </p>
               </div>
               
+              {/* Step 1: Health Profile */}
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1B4332] text-white text-sm font-medium">
-                    1
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
+                    (metrics?.profileCompleteness || 0) >= 50 
+                      ? 'bg-green-600 text-white' 
+                      : 'bg-[#1B4332] text-white'
+                  }`}>
+                    {(metrics?.profileCompleteness || 0) >= 50 ? '✓' : '1'}
                   </div>
-                  <span className="text-sm text-[#1B4332]">Start with an AI consultation</span>
+                  <div className="flex-1">
+                    <span className="text-sm text-[#1B4332] font-medium">Complete your health profile</span>
+                    <p className="text-xs text-[#52796F]">
+                      {(metrics?.profileCompleteness || 0) >= 50 
+                        ? `${metrics?.profileCompleteness}% complete` 
+                        : 'Age, medications, health goals & more'}
+                    </p>
+                  </div>
+                  {(metrics?.profileCompleteness || 0) < 50 && (
+                    <Button asChild variant="outline" size="sm" className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white rounded-full">
+                      <Link href="/dashboard/profile?tab=profile">
+                        Start
+                      </Link>
+                    </Button>
+                  )}
                 </div>
+
+                {/* Step 2: Upload Blood Tests (Optional) */}
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1B4332]/10 text-[#52796F] text-sm font-medium">
                     2
                   </div>
-                  <span className="text-sm text-[#52796F]">Get personalized formula</span>
+                  <div className="flex-1">
+                    <span className="text-sm text-[#52796F]">Upload blood tests</span>
+                    <p className="text-xs text-[#52796F]/70">Optional but recommended for precision</p>
+                  </div>
+                  <Button asChild variant="ghost" size="sm" className="text-[#52796F] hover:text-[#1B4332] hover:bg-[#1B4332]/5 rounded-full">
+                    <Link href="/dashboard/lab-reports">
+                      <Upload className="w-4 h-4" />
+                    </Link>
+                  </Button>
                 </div>
+
+                {/* Step 3: AI Consultation */}
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1B4332]/10 text-[#52796F] text-sm font-medium">
                     3
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-sm text-[#52796F]">Start AI consultation</span>
+                    <p className="text-xs text-[#52796F]/70">Get your personalized formula</p>
+                  </div>
+                </div>
+
+                {/* Step 4: Receive Formula */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1B4332]/10 text-[#52796F] text-sm font-medium">
+                    4
                   </div>
                   <span className="text-sm text-[#52796F]">Receive supplements monthly</span>
                 </div>
               </div>
 
-              <Button asChild className="gap-2 bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-6" data-testid="button-start-consultation">
-                <Link href="/dashboard/chat">
-                  <PlayCircle className="w-4 h-4" />
-                  Start Consultation
-                </Link>
-              </Button>
+              {/* Conditional CTA based on profile completeness */}
+              {(metrics?.profileCompleteness || 0) < 50 ? (
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button asChild className="gap-2 bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-6" data-testid="button-complete-profile">
+                    <Link href="/dashboard/profile?tab=profile">
+                      <Sparkles className="w-4 h-4" />
+                      Complete Health Profile
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="gap-2 border-[#1B4332]/30 text-[#52796F] hover:bg-[#1B4332]/5 rounded-full px-6" data-testid="button-start-consultation">
+                    <Link href="/dashboard/chat">
+                      <MessageSquare className="w-4 h-4" />
+                      Skip to Consultation
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <Button asChild className="gap-2 bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-6" data-testid="button-start-consultation">
+                  <Link href="/dashboard/chat">
+                    <PlayCircle className="w-4 h-4" />
+                    Start AI Consultation
+                  </Link>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -284,22 +344,27 @@ export default function HomePage() {
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-[#52796F]">Daily Dosage</span>
                   <span className="font-medium text-base text-[#1B4332]" data-testid="text-dosage-display">
-                    {calculateDosage(currentFormula.totalMg).display}
+                    {calculateDosage(currentFormula.totalMg, currentFormula.targetCapsules || undefined).display}
                   </span>
                 </div>
                 <p className="text-xs text-[#52796F]">
-                  {calculateDosage(currentFormula.totalMg).total} capsules per day ({currentFormula.totalMg}mg total)
+                  {currentFormula.targetCapsules || calculateDosage(currentFormula.totalMg).total} capsules per day ({currentFormula.totalMg}mg total)
+                  {currentFormula.targetCapsules && CAPSULE_TIER_INFO[currentFormula.targetCapsules as CapsuleCount] && (
+                    <span className="ml-1">• {CAPSULE_TIER_INFO[currentFormula.targetCapsules as CapsuleCount].label}</span>
+                  )}
                 </p>
               </div>
 
-              {/* Dosage Progress */}
+              {/* Dosage Progress - now based on capsule budget */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-[#52796F]">Capsule Fill (4500-5500mg)</span>
+                  <span className="text-[#52796F]">
+                    Capsule Fill ({currentFormula.targetCapsules || 9} caps = {((currentFormula.targetCapsules || 9) * 550).toLocaleString()}mg)
+                  </span>
                   <span className="font-medium text-[#1B4332]">{currentFormula.totalMg}mg</span>
                 </div>
                 <Progress 
-                  value={Math.min((currentFormula.totalMg / 5500) * 100, 100)} 
+                  value={Math.min((currentFormula.totalMg / ((currentFormula.targetCapsules || 9) * 550)) * 100, 100)} 
                   className="h-2 bg-[#1B4332]/10"
                 />
               </div>

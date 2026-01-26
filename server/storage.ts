@@ -93,6 +93,7 @@ export interface IStorage {
   getFormula(id: string): Promise<Formula | undefined>;
   createFormula(formula: InsertFormula): Promise<Formula>;
   getCurrentFormulaByUser(userId: string): Promise<Formula | undefined>;
+  getActiveFormulasByUser(userId: string): Promise<Formula[]>; // Returns ALL active (non-archived) formulas
   getFormulaHistory(userId: string, includeArchived?: boolean): Promise<Formula[]>;
   getArchivedFormulas(userId: string): Promise<Formula[]>;
   updateFormulaVersion(userId: string, updates: Partial<InsertFormula>): Promise<Formula>;
@@ -626,18 +627,53 @@ export class DrizzleStorage implements IStorage {
       const [profile] = await db.select().from(healthProfiles).where(eq(healthProfiles.userId, userId));
       if (!profile) return undefined;
       
-      // Decrypt sensitive medical fields
+      // Decrypt sensitive medical fields with error handling for each field
+      let conditions: string[] = [];
+      let medications: string[] = [];
+      let allergies: string[] = [];
+      
+      try {
+        if (profile.conditions) {
+          // Check if it's already a plain array (not encrypted)
+          if (Array.isArray(profile.conditions)) {
+            conditions = profile.conditions;
+          } else if (typeof profile.conditions === 'string') {
+            conditions = JSON.parse(decryptField(profile.conditions));
+          }
+        }
+      } catch (decryptError) {
+        console.error('Error decrypting conditions, using empty array:', decryptError);
+      }
+      
+      try {
+        if (profile.medications) {
+          if (Array.isArray(profile.medications)) {
+            medications = profile.medications;
+          } else if (typeof profile.medications === 'string') {
+            medications = JSON.parse(decryptField(profile.medications));
+          }
+        }
+      } catch (decryptError) {
+        console.error('Error decrypting medications, using empty array:', decryptError);
+      }
+      
+      try {
+        if (profile.allergies) {
+          if (Array.isArray(profile.allergies)) {
+            allergies = profile.allergies;
+          } else if (typeof profile.allergies === 'string') {
+            allergies = JSON.parse(decryptField(profile.allergies));
+          }
+        }
+      } catch (decryptError) {
+        console.error('Error decrypting allergies, using empty array:', decryptError);
+      }
+      
       return {
         ...profile,
-        conditions: profile.conditions
-          ? JSON.parse(decryptField(profile.conditions as any))
-          : [],
-        medications: profile.medications
-          ? JSON.parse(decryptField(profile.medications as any))
-          : [],
-        allergies: profile.allergies
-          ? JSON.parse(decryptField(profile.allergies as any))
-          : []
+        conditions,
+        medications,
+        allergies
       };
     } catch (error) {
       console.error('Error getting health profile:', error);
@@ -701,13 +737,17 @@ export class DrizzleStorage implements IStorage {
           ? (updates.allergies && updates.allergies.length > 0
             ? encryptField(JSON.stringify(updates.allergies))
             : null)
-          : undefined
+          : undefined,
+        // Always update the timestamp
+        updatedAt: new Date()
       };
       
-      // Remove undefined values
+      // Remove undefined values (but keep null values)
       const cleanUpdates = Object.fromEntries(
         Object.entries(encryptedUpdates).filter(([_, v]) => v !== undefined)
       );
+      
+      console.log('Updating health profile:', { userId, fieldsToUpdate: Object.keys(cleanUpdates) });
       
       const [profile] = await db
         .update(healthProfiles)
@@ -715,7 +755,10 @@ export class DrizzleStorage implements IStorage {
         .where(eq(healthProfiles.userId, userId))
         .returning();
       
-      if (!profile) return undefined;
+      if (!profile) {
+        console.error('Health profile update returned no result for userId:', userId);
+        return undefined;
+      }
       
       // Decrypt for return
       return {
@@ -732,7 +775,8 @@ export class DrizzleStorage implements IStorage {
       };
     } catch (error) {
       console.error('Error updating health profile:', error);
-      return undefined;
+      // Re-throw to allow proper error handling upstream
+      throw error;
     }
   }
 
@@ -864,6 +908,19 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Error getting current formula by user:', error);
       return undefined;
+    }
+  }
+
+  async getActiveFormulasByUser(userId: string): Promise<Formula[]> {
+    try {
+      return await db
+        .select()
+        .from(formulas)
+        .where(and(eq(formulas.userId, userId), isNull(formulas.archivedAt)))
+        .orderBy(desc(formulas.createdAt));
+    } catch (error) {
+      console.error('Error getting active formulas by user:', error);
+      return [];
     }
   }
 
@@ -2251,17 +2308,28 @@ export class DrizzleStorage implements IStorage {
     fileUploads: FileUpload[];
   }> {
     try {
+      console.log('getUserTimeline: Fetching user', userId);
       const [user] = await db.select().from(users).where(eq(users.id, userId));
       if (!user) {
         throw new Error('User not found');
       }
       
+      console.log('getUserTimeline: Fetching health profile');
       const [healthProfile] = await db.select().from(healthProfiles).where(eq(healthProfiles.userId, userId));
+      
+      console.log('getUserTimeline: Fetching formulas');
       const userFormulas = await db.select().from(formulas).where(eq(formulas.userId, userId)).orderBy(desc(formulas.createdAt));
+      
+      console.log('getUserTimeline: Fetching orders');
       const userOrders = await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.placedAt));
+      
+      console.log('getUserTimeline: Fetching chat sessions');
       const userChatSessions = await db.select().from(chatSessions).where(eq(chatSessions.userId, userId)).orderBy(desc(chatSessions.createdAt));
+      
+      console.log('getUserTimeline: Fetching file uploads');
       const userFileUploads = await db.select().from(fileUploads).where(eq(fileUploads.userId, userId)).orderBy(desc(fileUploads.uploadedAt));
       
+      console.log('getUserTimeline: Enriching orders with formula details');
       // Enrich orders with formula details
       const enrichedOrders = await Promise.all(
         userOrders.map(async (order) => {
@@ -2278,6 +2346,7 @@ export class DrizzleStorage implements IStorage {
         })
       );
       
+      console.log('getUserTimeline: Success for user', userId);
       return {
         user,
         healthProfile: healthProfile || undefined,
@@ -4983,10 +5052,21 @@ export class DrizzleStorage implements IStorage {
     popularBases: Array<{ name: string; count: number; percentage: number }>;
     popularAdditions: Array<{ name: string; count: number; percentage: number }>;
     customizationRate: number;
+    unusedSystemSupports: string[];
+    unusedIndividuals: string[];
+    totalAvailableSystemSupports: number;
+    totalAvailableIndividuals: number;
   }> {
+    // Import ingredient catalogs
+    const { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS } = await import('@shared/ingredients');
+    
     try {
       const allFormulas = await db.select().from(formulas);
       const totalFormulas = allFormulas.length;
+
+      // Get all available ingredient names
+      const allSystemSupportNames = SYSTEM_SUPPORTS.map(s => s.name);
+      const allIndividualNames = INDIVIDUAL_INGREDIENTS.map(i => i.name);
 
       if (totalFormulas === 0) {
         return {
@@ -4995,7 +5075,11 @@ export class DrizzleStorage implements IStorage {
           averageTotalMg: 0,
           popularBases: [],
           popularAdditions: [],
-          customizationRate: 0
+          customizationRate: 0,
+          unusedSystemSupports: allSystemSupportNames,
+          unusedIndividuals: allIndividualNames,
+          totalAvailableSystemSupports: allSystemSupportNames.length,
+          totalAvailableIndividuals: allIndividualNames.length
         };
       }
 
@@ -5026,6 +5110,13 @@ export class DrizzleStorage implements IStorage {
         }
       }
 
+      // Find unused ingredients
+      const usedSystemSupports = new Set(Object.keys(baseCounts));
+      const usedIndividuals = new Set(Object.keys(additionCounts));
+      
+      const unusedSystemSupports = allSystemSupportNames.filter(name => !usedSystemSupports.has(name));
+      const unusedIndividuals = allIndividualNames.filter(name => !usedIndividuals.has(name));
+
       // Sort and format popular ingredients
       const popularBases = Object.entries(baseCounts)
         .sort((a, b) => b[1] - a[1])
@@ -5051,7 +5142,11 @@ export class DrizzleStorage implements IStorage {
         averageTotalMg: Math.round(totalMg / totalFormulas),
         popularBases,
         popularAdditions,
-        customizationRate: Math.round((customizedCount / totalFormulas) * 100)
+        customizationRate: Math.round((customizedCount / totalFormulas) * 100),
+        unusedSystemSupports,
+        unusedIndividuals,
+        totalAvailableSystemSupports: allSystemSupportNames.length,
+        totalAvailableIndividuals: allIndividualNames.length
       };
     } catch (error) {
       console.error('Error getting formula insights:', error);
@@ -5061,7 +5156,11 @@ export class DrizzleStorage implements IStorage {
         averageTotalMg: 0,
         popularBases: [],
         popularAdditions: [],
-        customizationRate: 0
+        customizationRate: 0,
+        unusedSystemSupports: [],
+        unusedIndividuals: [],
+        totalAvailableSystemSupports: 0,
+        totalAvailableIndividuals: 0
       };
     }
   }

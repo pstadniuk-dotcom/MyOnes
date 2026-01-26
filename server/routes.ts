@@ -427,20 +427,56 @@ async function callAnthropic(
 
 // SECURITY: Immutable formula limits - CANNOT be changed by user requests or AI prompts
 const FORMULA_LIMITS = {
-  MAX_TOTAL_DOSAGE: 5500,        // Maximum total daily dosage in mg
+  CAPSULE_CAPACITY_MG: 550,      // Each capsule holds 550mg
+  VALID_CAPSULE_COUNTS: [6, 9, 12, 15] as const, // Allowed capsule counts (minimum 6)
+  DEFAULT_CAPSULE_COUNT: 9,      // Default if not specified
   DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance (0.9%) for rounding/calculation differences
   MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg (lowered to allow clinically valid low-dose ingredients like Lutein 5mg, Resveratrol 20mg)
+  MIN_INGREDIENT_COUNT: 8,       // Minimum number of unique ingredients per formula
   MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
+
+// Pricing per capsule count (monthly)
+const CAPSULE_PRICING: Record<number, number> = {
+  6: 89,
+  9: 119,
+  12: 149,
+  15: 179,
+};
+
+// Estimate Amazon cost for equivalent supplements
+function estimateAmazonCost(ingredientCount: number): number {
+  // Average cost per supplement on Amazon is ~$18/month
+  // This is a conservative estimate for quality supplements
+  const avgCostPerSupplement = 18;
+  return ingredientCount * avgCostPerSupplement;
+}
+
+// Calculate max dosage based on capsule count
+function getMaxDosageForCapsules(targetCapsules: number): number {
+  const validCount = FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(targetCapsules as any) 
+    ? targetCapsules 
+    : FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+  return validCount * FORMULA_LIMITS.CAPSULE_CAPACITY_MG;
+}
 
 // Validation function to enforce immutable limits
 function validateFormulaLimits(formula: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
-  // Check total dosage limit (with tolerance)
-  const maxWithTolerance = FORMULA_LIMITS.MAX_TOTAL_DOSAGE + FORMULA_LIMITS.DOSAGE_TOLERANCE;
+  // Determine capsule-based max dosage
+  const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+  const maxDosage = getMaxDosageForCapsules(targetCapsules);
+  const maxWithTolerance = maxDosage + FORMULA_LIMITS.DOSAGE_TOLERANCE;
+  
+  // Validate targetCapsules is a valid option
+  if (formula.targetCapsules && !FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(formula.targetCapsules)) {
+    errors.push(`Invalid capsule count: ${formula.targetCapsules}. Must be one of: ${FORMULA_LIMITS.VALID_CAPSULE_COUNTS.join(', ')}`);
+  }
+  
+  // Check total dosage limit based on capsule count
   if (formula.totalMg > maxWithTolerance) {
-    errors.push(`Formula exceeds maximum dosage limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (${maxWithTolerance}mg with tolerance) (attempted: ${formula.totalMg}mg)`);
+    errors.push(`Formula exceeds ${targetCapsules}-capsule budget of ${maxDosage}mg (${maxWithTolerance}mg with tolerance). Attempted: ${formula.totalMg}mg. Reduce ingredients or increase capsule count.`);
   }
   
   // Validate all ingredients (bases + additions)
@@ -471,9 +507,14 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
     }
   }
   
-  // Check total ingredient count
+  // Check total ingredient count - maximum
   if (allIngredients.length > FORMULA_LIMITS.MAX_INGREDIENT_COUNT) {
     errors.push(`Formula exceeds maximum ingredient count of ${FORMULA_LIMITS.MAX_INGREDIENT_COUNT} (attempted: ${allIngredients.length})`);
+  }
+  
+  // Check total ingredient count - minimum (must have at least 8 unique ingredients)
+  if (allIngredients.length < FORMULA_LIMITS.MIN_INGREDIENT_COUNT) {
+    errors.push(`Formula must contain at least ${FORMULA_LIMITS.MIN_INGREDIENT_COUNT} ingredients for comprehensive support (has: ${allIngredients.length})`);
   }
   
   // Verify all ingredients are approved
@@ -806,10 +847,12 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
     errors.push(`Formula exceeds maximum ingredient count of ${FORMULA_LIMITS.MAX_INGREDIENT_COUNT} (attempted: ${ingredientCount})`);
   }
   
-  // Validate daily total doesn't exceed maximum for 00 capsule size safety (with tolerance)
-  const maxWithTolerance = FORMULA_LIMITS.MAX_TOTAL_DOSAGE + FORMULA_LIMITS.DOSAGE_TOLERANCE;
+  // Validate daily total based on target capsule count
+  const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+  const maxDosageForCapsules = getMaxDosageForCapsules(targetCapsules);
+  const maxWithTolerance = maxDosageForCapsules + FORMULA_LIMITS.DOSAGE_TOLERANCE;
   if (calculatedTotal > maxWithTolerance) {
-    errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (${maxWithTolerance}mg with tolerance) for 00 capsule safety limit.`);
+    errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum ${maxDosageForCapsules}mg (${maxWithTolerance}mg with tolerance) for ${targetCapsules}-capsule protocol.`);
   }
   
   // Validate capsule sizing if provided (00 capsules hold approximately 700-850mg)
@@ -826,9 +869,9 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
       }
     }
     
-    // Validate capsule count is reasonable for daily regimen (6-8 capsules for 4500-5500mg range)
-    if (formula.capsulesPerDay < 5 || formula.capsulesPerDay > 10) {
-      errors.push(`Capsule count out of range: ${formula.capsulesPerDay}. Recommend 6-8 capsules per day for optimal 00 capsule fill.`);
+    // Validate capsule count is valid option
+    if (!FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(formula.capsulesPerDay as any)) {
+      errors.push(`Invalid capsule count: ${formula.capsulesPerDay}. Must be one of: ${FORMULA_LIMITS.VALID_CAPSULE_COUNTS.join(', ')}`);
     }
   }
   
@@ -1096,6 +1139,7 @@ const FormulaExtractionSchema = z.object({
     purpose: z.string()
   })),
   totalMg: z.number().optional(), // Made optional - backend calculates if missing
+  targetCapsules: z.number().optional(), // User's selected capsule count (3, 6, 9, 12, 15)
   warnings: z.array(z.string()),
   rationale: z.string(),
   disclaimers: z.array(z.string())
@@ -3671,10 +3715,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           validatedFormula.totalMg = validation.calculatedTotalMg;
           console.log('✅ Using backend-calculated totalMg:', validatedFormula.totalMg, 'mg');
           
-          // 🔧 AUTO-CORRECT: If formula exceeds 5500mg by a small amount, remove largest additions
-          const maxWithTolerance = FORMULA_LIMITS.MAX_TOTAL_DOSAGE + FORMULA_LIMITS.DOSAGE_TOLERANCE;
+          // 🔧 AUTO-CORRECT: If formula exceeds capsule budget by a small amount, remove largest additions
+          const targetCaps = validatedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+          const maxDosage = getMaxDosageForCapsules(targetCaps);
+          const maxWithTolerance = maxDosage + FORMULA_LIMITS.DOSAGE_TOLERANCE;
           if (validation.calculatedTotalMg > maxWithTolerance) {
-            const overage = validation.calculatedTotalMg - FORMULA_LIMITS.MAX_TOTAL_DOSAGE;
+            const overage = validation.calculatedTotalMg - maxDosage;
             const overagePercent = (overage / validation.calculatedTotalMg) * 100;
             
             // Only auto-correct if overage is < 10% (e.g., 5700mg → 5500mg is 3.6% overage)
@@ -3786,21 +3832,21 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                 sessionId: chatSession?.id
               });
             } else if (hasTotalDosageError) {
-              validationErrorMessage += `❌ **Problem:** Your formula totals ${validation.calculatedTotalMg}mg, which exceeds the maximum safe limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg.\n\n`;
-              validationErrorMessage += `🚨 **CRITICAL REMINDER:** When you create a formula, it REPLACES the entire existing formula. You are creating a COMPLETE formula from scratch (0mg → up to 5500mg), NOT adding to an existing formula.\n\n`;
-              validationErrorMessage += `**Required Fix:** Your new COMPLETE formula must total ≤5500mg. Reduce by ${validation.calculatedTotalMg - FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg by:\n`;
-              validationErrorMessage += `- Removing some system supports (e.g., remove Beta Max saves 2500mg)\n`;
+              const formulaTargetCaps = validatedFormula?.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+              const formulaMaxDosage = getMaxDosageForCapsules(formulaTargetCaps);
+              validationErrorMessage += `❌ **Problem:** Your formula totals ${validation.calculatedTotalMg}mg, which exceeds the ${formulaTargetCaps}-capsule budget of ${formulaMaxDosage}mg.\n\n`;
+              validationErrorMessage += `🚨 **CRITICAL REMINDER:** When you create a formula, it REPLACES the entire existing formula. You are creating a COMPLETE formula from scratch (0mg → up to ${formulaMaxDosage}mg), NOT adding to an existing formula.\n\n`;
+              validationErrorMessage += `**Required Fix:** Your new COMPLETE formula must total ≤${formulaMaxDosage}mg. Reduce by ${validation.calculatedTotalMg - formulaMaxDosage}mg by:\n`;
+              validationErrorMessage += `- Removing some system supports (e.g., remove Beta Max saves 650mg)\n`;
               validationErrorMessage += `- Removing some individual ingredients\n`;
               validationErrorMessage += `- Reducing dosages of flexible ingredients (e.g., Curcumin 600mg → 400mg)\n`;
-              validationErrorMessage += `- Prioritizing the most critical health goals\n\n`;
-              validationErrorMessage += `**Example:** If user has cardiovascular concerns + digestion issues:\n`;
-              validationErrorMessage += `✓ CORRECT: Heart Support 450mg + Hawthorn Berry 100mg + Garlic 200mg + CoQ10 200mg + Curcumin 400mg + Ashwagandha 600mg + L-Theanine 400mg + NAD+ 100mg = 2450mg\n`;
-              validationErrorMessage += `✗ WRONG: Trying to fit 13 ingredients totaling 6282mg\n\n`;
-              validationErrorMessage += `Please create a corrected formula with the COMPLETE ingredient list (bases + additions) that totals ≤5500mg.`;
+              validationErrorMessage += `- Prioritizing the most critical health goals\n`;
+              validationErrorMessage += `- Or increase capsule count if user agrees (e.g., 9 → 12 capsules)\n\n`;
+              validationErrorMessage += `Please create a corrected formula with the COMPLETE ingredient list (bases + additions) that totals ≤${formulaMaxDosage}mg.`;
               
               sendSSE({
                 type: 'error',
-                error: `⚠️ Formula exceeds maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg.\n\nCalculated total: ${validation.calculatedTotalMg}mg\n\nPlease create a smaller formula by:\n- Using fewer system supports\n- Reducing individual ingredient doses\n- Focusing on your top priority health goals`,
+                error: `⚠️ Formula exceeds ${formulaTargetCaps}-capsule budget of ${formulaMaxDosage}mg.\n\nCalculated total: ${validation.calculatedTotalMg}mg\n\nPlease create a smaller formula by:\n- Using fewer system supports\n- Reducing individual ingredient doses\n- Focusing on your top priority health goals\n- Or suggest increasing capsule count`,
                 sessionId: chatSession?.id
               });
             } else if (hasUnapprovedIngredient) {
@@ -3934,6 +3980,28 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       } catch (e) {
         console.error('❌ FORMULA EXTRACTION ERROR:', e);
         console.log('No valid formula JSON found in response');
+      }
+
+      // Extract capsule recommendation from response if present
+      let capsuleRecommendation = null;
+      try {
+        const capsuleRecMatch = fullResponse.match(/```capsule-recommendation\s*({[\s\S]*?})\s*```/);
+        if (capsuleRecMatch) {
+          capsuleRecommendation = JSON.parse(capsuleRecMatch[1]);
+          console.log('📊 Extracted capsule recommendation:', capsuleRecommendation);
+          
+          // Send capsule recommendation to client via SSE
+          sendSSE({
+            type: 'capsule_recommendation',
+            data: capsuleRecommendation,
+            sessionId: chatSession?.id
+          });
+          
+          // Remove the capsule-recommendation block from fullResponse before displaying
+          fullResponse = fullResponse.replace(/```capsule-recommendation\s*{[\s\S]*?}\s*```\s*/g, '').trim();
+        }
+      } catch (e) {
+        console.log('No valid capsule recommendation found in response:', e);
       }
 
       // Extract health data from response if present
@@ -4071,7 +4139,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             rationale: extractedFormula.rationale,
             warnings: extractedFormula.warnings || [],
             disclaimers: extractedFormula.disclaimers || [],
-            version: nextVersion
+            version: nextVersion,
+            targetCapsules: extractedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT,
           };
           
           // 🔒 SECURITY: Validate formula against immutable limits
@@ -4080,7 +4149,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             console.error('🚨 SECURITY: Formula rejected - violates immutable limits!');
             console.error('🚨 Validation errors:', limitValidation.errors);
             console.error('🚨 Attempted totalMg:', formulaData.totalMg);
-            console.error('🚨 Max allowed:', FORMULA_LIMITS.MAX_TOTAL_DOSAGE);
+            console.error('🚨 Target capsules:', formulaData.targetCapsules);
+            console.error('🚨 Max allowed for capsules:', getMaxDosageForCapsules(formulaData.targetCapsules || 9));
             
             // Log potential security issue
             console.warn('⚠️ SECURITY ALERT: Formula validation failed');
@@ -5977,6 +6047,30 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
 
+  // Get ALL active (non-archived) formulas for user - supports multiple formulas
+  app.get('/api/users/me/formulas/active', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.userId!;
+      const activeFormulas = await storage.getActiveFormulasByUser(userId);
+      
+      // Calculate capsule info for each formula
+      const formulasWithCapsuleInfo = activeFormulas.map(formula => ({
+        ...formula,
+        capsuleInfo: {
+          targetCapsules: formula.targetCapsules || 9,
+          perMeal: Math.ceil((formula.targetCapsules || 9) / 3),
+          budgetMg: (formula.targetCapsules || 9) * 550,
+          utilizationPercent: Math.round((formula.totalMg / ((formula.targetCapsules || 9) * 550)) * 100)
+        }
+      }));
+      
+      res.json({ formulas: formulasWithCapsuleInfo });
+    } catch (error) {
+      console.error('Error fetching active formulas:', error);
+      res.status(500).json({ error: 'Failed to fetch active formulas' });
+    }
+  });
+
   // Get formula version history for user
   app.get('/api/users/me/formula/history', requireAuth, async (req: any, res: any) => {
     try {
@@ -6082,10 +6176,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         return res.status(404).json({ error: 'Formula not found or access denied' });
       }
 
-      // Validate that reverting to this formula doesn't exceed maximum dosage
-      if (originalFormula.totalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
+      // Validate that reverting to this formula doesn't exceed its capsule budget
+      const originalCapsules = originalFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+      const maxForOriginal = getMaxDosageForCapsules(originalCapsules);
+      if (originalFormula.totalMg > maxForOriginal) {
         return res.status(400).json({ 
-          error: `Cannot revert to this formula as it exceeds the maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (this version has ${originalFormula.totalMg}mg). This formula was created before dosage limits were enforced. Please create a new formula instead.` 
+          error: `Cannot revert to this formula as it exceeds the ${originalCapsules}-capsule budget of ${maxForOriginal}mg (this version has ${originalFormula.totalMg}mg). This formula may have been created before capsule limits were enforced. Please create a new formula instead.` 
         });
       }
 
@@ -6184,11 +6280,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         }
       }
 
-      // Validate that new total doesn't exceed maximum
-      if (newTotalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
+      // Validate that new total doesn't exceed capsule budget
+      const formulaCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+      const maxForFormula = getMaxDosageForCapsules(formulaCapsules);
+      if (newTotalMg > maxForFormula) {
         const addedMg = newTotalMg - formula.totalMg;
         return res.status(400).json({ 
-          error: `Adding these ingredients would exceed the maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg. Current formula: ${formula.totalMg}mg, Adding: ${addedMg}mg, New total would be: ${newTotalMg}mg. Please remove some ingredients first or add fewer ingredients.` 
+          error: `Adding these ingredients would exceed the ${formulaCapsules}-capsule budget of ${maxForFormula}mg. Current formula: ${formula.totalMg}mg, Adding: ${addedMg}mg, New total would be: ${newTotalMg}mg. Please remove some ingredients first or increase your capsule count.` 
         });
       }
 
@@ -6214,7 +6312,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.post('/api/users/me/formula/custom', requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.userId;
-      const { name, bases, individuals } = req.body;
+      const { name, bases, individuals, targetCapsules } = req.body;
 
       // Validate that at least one ingredient is provided
       if ((!bases || bases.length === 0) && (!individuals || individuals.length === 0)) {
@@ -6254,10 +6352,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         }
       }
 
-      // Validate dosage limits
-      if (totalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
+      // Validate dosage limits based on target capsules
+      const userTargetCapsules = targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+      const maxForUserCapsules = getMaxDosageForCapsules(userTargetCapsules);
+      if (totalMg > maxForUserCapsules) {
         return res.status(400).json({ 
-          error: `Total dosage of ${totalMg}mg exceeds the maximum safe limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg. Please remove some ingredients.` 
+          error: `Total dosage of ${totalMg}mg exceeds the ${userTargetCapsules}-capsule budget of ${maxForUserCapsules}mg. Please remove some ingredients or increase capsule count.` 
         });
       }
 
@@ -7740,167 +7840,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     }
   });
   
-  // Admin: Get detailed user information
-  app.get('/api/admin/users/:id', requireAdmin, async (req, res) => {
-    try {
-      const user = await storage.getUserById(req.params.id);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      
-      // Sanitize user to remove sensitive fields
-      const { password, ...sanitizedUser } = user;
-      res.json(sanitizedUser);
-    } catch (error) {
-      console.error('Error fetching user details:', error);
-      res.status(500).json({ error: 'Failed to fetch user details' });
-    }
-  });
+  // Admin: Get detailed user information - MIGRATED to admin.routes.ts
+  // (Removed duplicate route - see admin.routes.ts /users/:id)
   
   // Admin: Get today's orders
-  app.get('/api/admin/orders/today', requireAdmin, async (req, res) => {
-    try {
-      const orders = await storage.getTodaysOrders();
-      res.json(orders);
-    } catch (error) {
-      console.error('Error fetching today\'s orders:', error);
-      res.status(500).json({ error: 'Failed to fetch today\'s orders' });
-    }
-  });
+  // NOTE: This route is also in admin.routes.ts - keeping for backward compatibility during migration
+  // TODO: Remove once admin.routes.ts migration is verified
   
-  // Admin: Get user timeline (complete activity history)
-  app.get('/api/admin/users/:id/timeline', requireAdmin, async (req, res) => {
-    try {
-      const timeline = await storage.getUserTimeline(req.params.id);
-      
-      // Sanitize user to remove sensitive fields
-      const { password, ...sanitizedUser } = timeline.user;
-      
-      res.json({
-        ...timeline,
-        user: sanitizedUser
-      });
-    } catch (error) {
-      console.error('Error fetching user timeline:', error);
-      if (error instanceof Error && error.message === 'User not found') {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      res.status(500).json({ error: 'Failed to fetch user timeline' });
-    }
-  });
-
-  // Admin: Get all support tickets
-  app.get('/api/admin/support-tickets', requireAdmin, async (req, res) => {
-    try {
-      const status = (req.query.status as string) || 'all';
-      const limit = parseInt(req.query.limit as string) || 50;
-      const offset = parseInt(req.query.offset as string) || 0;
-      
-      const result = await storage.listAllSupportTickets(status, limit, offset);
-      res.json(result);
-    } catch (error) {
-      console.error('Error fetching support tickets:', error);
-      res.status(500).json({ error: 'Failed to fetch support tickets' });
-    }
-  });
-
-  // Admin: Get support ticket details with responses
-  app.get('/api/admin/support-tickets/:id', requireAdmin, async (req, res) => {
-    try {
-      const ticket = await storage.getSupportTicket(req.params.id);
-      if (!ticket) {
-        return res.status(404).json({ error: 'Support ticket not found' });
-      }
-
-      const responses = await storage.listSupportTicketResponses(req.params.id);
-      const user = await storage.getUserById(ticket.userId);
-
-      res.json({
-        ticket,
-        responses,
-        user: user ? { id: user.id, name: user.name, email: user.email } : null
-      });
-    } catch (error) {
-      console.error('Error fetching support ticket details:', error);
-      res.status(500).json({ error: 'Failed to fetch support ticket details' });
-    }
-  });
-
-  // Admin: Update support ticket
-  app.patch('/api/admin/support-tickets/:id', requireAdmin, async (req, res) => {
-    try {
-      const allowedUpdates = ['status', 'priority', 'adminNotes'];
-      const updates: any = {};
-      
-      for (const key of allowedUpdates) {
-        if (req.body[key] !== undefined) {
-          updates[key] = req.body[key];
-        }
-      }
-
-      const ticket = await storage.updateSupportTicket(req.params.id, updates);
-      if (!ticket) {
-        return res.status(404).json({ error: 'Support ticket not found' });
-      }
-
-      res.json(ticket);
-    } catch (error) {
-      console.error('Error updating support ticket:', error);
-      res.status(500).json({ error: 'Failed to update support ticket' });
-    }
-  });
-
-  // Admin: Reply to support ticket
-  app.post('/api/admin/support-tickets/:id/reply', requireAdmin, async (req, res) => {
-    try {
-      const ticketId = req.params.id;
-      const { message } = req.body;
-
-      if (!message || typeof message !== 'string') {
-        return res.status(400).json({ error: 'Message is required' });
-      }
-
-      const ticket = await storage.getSupportTicket(ticketId);
-      if (!ticket) {
-        return res.status(404).json({ error: 'Support ticket not found' });
-      }
-
-      const response = await storage.createSupportTicketResponse({
-        ticketId,
-        userId: req.userId!,
-        message,
-        isStaff: true
-      });
-
-      // Send email notification to user
-      try {
-        const user = await storage.getUserById(ticket.userId);
-        if (user) {
-          const ticketUrl = `https://myones.ai/support/tickets/${ticketId}`;
-          await sendNotificationEmail({
-            to: user.email,
-            subject: `Response to: ${ticket.subject}`,
-            title: 'Support Team Response',
-            content: `
-              <strong>Ticket Subject:</strong> ${ticket.subject}<br/>
-              <strong>Response:</strong> ${message}
-            `,
-            actionUrl: ticketUrl,
-            actionText: 'View Ticket',
-            type: 'system'
-          });
-          console.log(`📧 Support response email sent to user ${user.email}`);
-        }
-      } catch (emailError) {
-        console.error('Failed to send response notification email:', emailError);
-      }
-
-      res.json({ response });
-    } catch (error) {
-      console.error('Error replying to support ticket:', error);
-      res.status(500).json({ error: 'Failed to reply to support ticket' });
-    }
-  });
+  // Admin: Get all support tickets - MIGRATED to admin.routes.ts
+  // The following admin routes have been migrated to admin.routes.ts:
+  // - /api/admin/users/:id/timeline
+  // - /api/admin/users/:id
+  // - /api/admin/orders/today
+  // - /api/admin/support-tickets (GET, GET/:id, PATCH/:id, POST/:id/reply)
+  // These duplicate routes are removed to avoid conflicts
 
   // ===== WEARABLE DEVICE INTEGRATION =====
   // Wearable routes are now handled by Junction (Vital) integration
