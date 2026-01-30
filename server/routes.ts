@@ -432,7 +432,7 @@ const FORMULA_LIMITS = {
   DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance for rounding differences
   BUDGET_TOLERANCE_PERCENT: 0.05, // Allow 5% over capsule budget
   MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg
-  MIN_INGREDIENT_COUNT: 6,       // Minimum number of unique ingredients per formula (lowered from 8 to support 6-cap formulas)
+  MIN_INGREDIENT_COUNT: 8,       // Minimum number of unique ingredients per formula
   MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
 
@@ -522,9 +522,9 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
     errors.push(`Formula exceeds maximum ingredient count of ${FORMULA_LIMITS.MAX_INGREDIENT_COUNT} (attempted: ${allIngredients.length})`);
   }
   
-  // Check total ingredient count - minimum (must have at least 8 unique ingredients)
+  // Check total ingredient count - minimum for comprehensive formulas
   if (allIngredients.length < FORMULA_LIMITS.MIN_INGREDIENT_COUNT) {
-    errors.push(`Formula must contain at least ${FORMULA_LIMITS.MIN_INGREDIENT_COUNT} ingredients for comprehensive support (has: ${allIngredients.length})`);
+    errors.push(`Formula needs more ingredients for comprehensive support (internal validation)`);
   }
   
   // Verify all ingredients are approved
@@ -859,7 +859,7 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
   
   // Check minimum ingredient count
   if (ingredientCount < FORMULA_LIMITS.MIN_INGREDIENT_COUNT) {
-    errors.push(`Formula must contain at least ${FORMULA_LIMITS.MIN_INGREDIENT_COUNT} ingredients for comprehensive support (has: ${ingredientCount})`);
+    errors.push(`Formula needs additional ingredients for comprehensive support (internal validation)`);
   }
   
   // Validate daily total based on target capsule count (with 5% tolerance)
@@ -3879,21 +3879,17 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             let validationErrorMessage = '\n\n---\n\n⚠️ **VALIDATION ERROR - Formula Rejected**\n\n';
             
             if (hasMinIngredientError) {
-              // Minimum ingredient count not met
-              validationErrorMessage += `❌ **Problem:** Your formula doesn't have enough ingredients.\n\n`;
-              validationErrorMessage += `**Error:**\n${criticalErrors.filter(e => e.includes('at least') || e.includes('comprehensive support')).map(e => `- ${e}`).join('\n')}\n\n`;
-              validationErrorMessage += `🚨 **CRITICAL RULE:** Every formula must contain at least ${FORMULA_LIMITS.MIN_INGREDIENT_COUNT} unique ingredients.\n\n`;
+              // Minimum ingredient count not met - internal rule, don't expose to user
+              // AI sees this message to fix the formula, but user sees a friendly version
+              validationErrorMessage += `❌ **Problem:** Formula needs more comprehensive coverage.\n\n`;
               validationErrorMessage += `**How to Fix:**\n`;
               validationErrorMessage += `- Add more ingredients to address additional health goals\n`;
               validationErrorMessage += `- Include complementary ingredients for synergistic effects\n`;
               validationErrorMessage += `- Consider adding foundational support ingredients\n\n`;
-              validationErrorMessage += `Please create a corrected formula with at least ${FORMULA_LIMITS.MIN_INGREDIENT_COUNT} ingredients.`;
+              validationErrorMessage += `Please create a more comprehensive formula with additional beneficial ingredients.`;
               
-              sendSSE({
-                type: 'error',
-                error: `⚠️ Formula needs more ingredients:\n\n${criticalErrors.filter(e => e.includes('at least') || e.includes('comprehensive support')).map(e => `❌ ${e}`).join('\n\n')}\n\nPlease add more ingredients to create a comprehensive formula.`,
-                sessionId: chatSession?.id
-              });
+              // Don't show an error to user - just let AI retry silently
+              // The AI will see the validation error in the message history and fix it
             } else if (hasIngredientDosageViolation) {
               // Specific ingredient violated its allowed dosage range
               validationErrorMessage += `❌ **Problem:** One or more ingredients violate their allowed dosage ranges.\n\n`;

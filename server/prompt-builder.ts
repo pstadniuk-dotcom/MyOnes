@@ -285,11 +285,11 @@ Before outputting ANY formula JSON, you MUST:
 3. Verify total is within the user's capsule budget (with 5% tolerance)
 4. If over budget, REMOVE ingredients before creating the JSON
 
-**Typical safe formula patterns based on capsule count (MINIMUM 8 ingredients required):**
-- 6 capsules (max 3,465mg with 5% tolerance): 1 system support + 7 individuals = 8 ingredients
-- 9 capsules (max 5,197mg with 5% tolerance): 1-2 system supports + 6-7 individuals = 8-9 ingredients (most popular)
-- 12 capsules (max 6,930mg with 5% tolerance): 2 system supports + 6-8 individuals = 8-10 ingredients
-- 15 capsules (max 8,662mg with 5% tolerance): 2-3 system supports + 6-10 individuals = 8-13 ingredients
+**Typical safe formula patterns based on capsule count:**
+- 6 capsules (max 3,465mg with 5% tolerance): 1 system support + 7 individuals = comprehensive coverage
+- 9 capsules (max 5,197mg with 5% tolerance): 1-2 system supports + 6-7 individuals (most popular)
+- 12 capsules (max 6,930mg with 5% tolerance): 2 system supports + 6-8 individuals
+- 15 capsules (max 8,662mg with 5% tolerance): 2-3 system supports + 6-10 individuals
 
 **RULE #3: ALWAYS COLLECT CRITICAL HEALTH DATA FIRST**
 
@@ -618,7 +618,7 @@ If you output capsule-recommendation → You should have ZERO questions
 1. Decide on targetCapsules based on user's selection
 2. Note the TARGET budget range (aim for 95-100%)
 3. Add up all ingredient dosages AS YOU GO
-4. Ensure you have at least 8 ingredients
+4. Ensure comprehensive coverage with multiple ingredients
 5. **If under 90% of budget, ADD MORE or INCREASE DOSES**
 6. Double-check your total does NOT exceed the max limit (105%)
 
@@ -634,29 +634,29 @@ Heart Support 2x:     1,378mg (running total: 1,378mg)
 
 ❌ DO NOT exceed 105% of budget - formula WILL BE REJECTED!
 ❌ DO NOT under-fill below 90% - user is not getting full value!
-✅ MUST have at least 8 unique ingredients
+✅ Build comprehensive formulas with good ingredient variety
 ✅ Target 95-100% of budget for maximum value
 
-=== 🎯 MINIMUM 8 INGREDIENTS REQUIREMENT ===
+=== 🎯 COMPREHENSIVE FORMULA DESIGN ===
 
-**EVERY formula MUST contain at least 8 unique ingredients/supplements.**
+**Build formulas that provide comprehensive support by including multiple complementary ingredients.**
 
 This ensures:
 1. Comprehensive coverage of user's health needs
 2. Synergistic combinations for better results
 3. Good value for the user's investment
 
-**REALISTIC formula composition (with 5% tolerance - easier to fit 8 ingredients now!):**
-- 6 capsules (max 3,465mg): 1 system support + 7 individuals = 8 total
-- 9 capsules (max 5,197mg): 1-2 system supports + 6-7 individuals = 8-9 total
-- 12 capsules (max 6,930mg): 2 system supports + 6-8 individuals = 8-10 total
-- 15 capsules (max 8,662mg): 2-3 system supports + 6-10 individuals = 8-13 total
+**REALISTIC formula composition (with 5% tolerance):**
+- 6 capsules (max 3,465mg): 1 system support + 7 individuals for full coverage
+- 9 capsules (max 5,197mg): 1-2 system supports + 6-7 individuals
+- 12 capsules (max 6,930mg): 2 system supports + 6-8 individuals
+- 15 capsules (max 8,662mg): 2-3 system supports + 6-10 individuals
 
 **Remember: System supports are LARGE (400-700mg each, or 800-1400mg at 2x, 1200-2100mg at 3x)!**
 - Heart Support at 2x = 1,378mg (27% of 9-capsule max budget with tolerance)
-- With 5% tolerance, you have more room - use it to fit all 8 ingredients!
+- With 5% tolerance, you have more room - use it for comprehensive coverage!
 
-**If you need more room to fit 8 ingredients:**
+**If you need more room for additional ingredients:**
 - Use 1x system support dosing instead of 2x or 3x
 - Use lower doses within the allowed ranges for individual ingredients
 - The extra 5% gives you ~250mg more on 9 capsules
