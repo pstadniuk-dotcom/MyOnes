@@ -89,10 +89,14 @@ app.use(express.urlencoded({ extended: false }));
 // General API rate limit - prevents abuse and excessive costs
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per 15 minutes
+  max: 200, // Limit each IP to 200 requests per 15 minutes
   message: { error: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
+  skip: (req) => {
+    // Skip rate limiting for admin routes (they're already auth protected)
+    return req.path.startsWith('/api/admin');
+  },
 });
 
 // Stricter limit for authentication endpoints - prevents brute force

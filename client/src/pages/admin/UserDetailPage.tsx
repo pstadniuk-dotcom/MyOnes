@@ -1,12 +1,23 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { 
   ArrowLeft, 
   User, 
@@ -15,16 +26,20 @@ import {
   MapPin, 
   Calendar,
   Shield,
+  ShieldCheck,
+  ShieldOff,
   Activity,
   FlaskConical,
   Package,
   MessageSquare,
   Heart,
   Pill,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { UserAdminNotes } from '@/components/admin/UserAdminNotes';
+import { apiRequest } from '@/lib/queryClient';
 
 // Types
 interface UserDetail {
@@ -108,7 +123,9 @@ export default function UserDetailPage() {
   const [, params] = useRoute('/admin/users/:id');
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const userId = params?.id;
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Fetch user details
   const { data: user, isLoading: userLoading, error: userError } = useQuery<UserDetail>({
@@ -120,6 +137,60 @@ export default function UserDetailPage() {
   const { data: timeline, isLoading: timelineLoading, error: timelineError } = useQuery<UserTimeline>({
     queryKey: ['/api/admin/users', userId, 'timeline'],
     enabled: !!userId,
+  });
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('DELETE', `/api/admin/users/${userId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete user');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User deleted",
+        description: "The user and all associated data have been deleted.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      setLocation('/admin/users');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error deleting user",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Toggle admin status mutation
+  const toggleAdminMutation = useMutation({
+    mutationFn: async (makeAdmin: boolean) => {
+      const response = await apiRequest('PATCH', `/api/admin/users/${userId}/admin-status`, { isAdmin: makeAdmin });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update admin status');
+      }
+      return response.json();
+    },
+    onSuccess: (updatedUser) => {
+      toast({
+        title: updatedUser.isAdmin ? "Admin access granted" : "Admin access revoked",
+        description: `${user?.name} is ${updatedUser.isAdmin ? 'now' : 'no longer'} an admin.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users', userId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error updating admin status",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   });
 
   // Show error toast
@@ -192,6 +263,100 @@ export default function UserDetailPage() {
             <p className="text-muted-foreground">
               User ID: {user.id}
             </p>
+          </div>
+          {/* Admin Actions */}
+          <div className="flex items-center gap-2">
+            {/* Toggle Admin Status */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant={user.isAdmin ? "outline" : "default"}
+                  size="sm"
+                  data-testid="button-toggle-admin"
+                >
+                  {user.isAdmin ? (
+                    <>
+                      <ShieldOff className="h-4 w-4 mr-2" />
+                      Remove Admin
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-4 w-4 mr-2" />
+                      Make Admin
+                    </>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {user.isAdmin ? 'Remove Admin Access' : 'Grant Admin Access'}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {user.isAdmin ? (
+                      <>Are you sure you want to remove admin access from <strong>{user.name}</strong>? They will no longer be able to access the admin dashboard.</>
+                    ) : (
+                      <>Are you sure you want to grant admin access to <strong>{user.name}</strong>? They will have full access to the admin dashboard, user management, and all platform data.</>
+                    )}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-toggle-admin">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => toggleAdminMutation.mutate(!user.isAdmin)}
+                    disabled={toggleAdminMutation.isPending}
+                    data-testid="button-confirm-toggle-admin"
+                  >
+                    {toggleAdminMutation.isPending ? 'Updating...' : (user.isAdmin ? 'Remove Admin' : 'Make Admin')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Delete User Button - only show for non-admin users */}
+            {!user.isAdmin && (
+              <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  data-testid="button-delete-user"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete User
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete User</AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div>
+                      <p>Are you sure you want to delete <strong>{user.name}</strong> ({user.email})?</p>
+                      <p className="mt-2">This action cannot be undone and will permanently delete:</p>
+                      <ul className="list-disc list-inside mt-2 space-y-1">
+                        <li>User account and profile</li>
+                        <li>All health profiles and formulas</li>
+                        <li>All orders and subscriptions</li>
+                        <li>All chat sessions and messages</li>
+                        <li>All uploaded files and lab reports</li>
+                      </ul>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteUserMutation.mutate()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={deleteUserMutation.isPending}
+                    data-testid="button-confirm-delete"
+                  >
+                    {deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           </div>
         </div>
 
@@ -293,7 +458,7 @@ export default function UserDetailPage() {
                       </div>
                     )}
                   </div>
-                  {healthProfile.conditions && healthProfile.conditions.length > 0 && (
+                  {Array.isArray(healthProfile.conditions) && healthProfile.conditions.length > 0 && (
                     <div>
                       <p className="text-sm font-medium mb-1">Conditions</p>
                       <div className="flex flex-wrap gap-1">
@@ -305,7 +470,7 @@ export default function UserDetailPage() {
                       </div>
                     </div>
                   )}
-                  {healthProfile.medications && healthProfile.medications.length > 0 && (
+                  {Array.isArray(healthProfile.medications) && healthProfile.medications.length > 0 && (
                     <div>
                       <p className="text-sm font-medium mb-1">Medications</p>
                       <div className="flex flex-wrap gap-1">
@@ -318,7 +483,7 @@ export default function UserDetailPage() {
                       </div>
                     </div>
                   )}
-                  {healthProfile.allergies && healthProfile.allergies.length > 0 && (
+                  {Array.isArray(healthProfile.allergies) && healthProfile.allergies.length > 0 && (
                     <div>
                       <p className="text-sm font-medium mb-1">Allergies</p>
                       <div className="flex flex-wrap gap-1">

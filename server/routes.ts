@@ -41,8 +41,7 @@ import {
   ingredientsRoutes,
   wearablesRoutes,
   webhooksRoutes,
-  optimizeRoutes,
-  streaksRoutes
+  optimizeRoutes
 } from "./routes/index";
 
 type GroceryListItem = {
@@ -430,13 +429,24 @@ const FORMULA_LIMITS = {
   CAPSULE_CAPACITY_MG: 550,      // Each capsule holds 550mg
   VALID_CAPSULE_COUNTS: [6, 9, 12, 15] as const, // Allowed capsule counts (minimum 6)
   DEFAULT_CAPSULE_COUNT: 9,      // Default if not specified
-  DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance (0.9%) for rounding/calculation differences
-  MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg (lowered to allow clinically valid low-dose ingredients like Lutein 5mg, Resveratrol 20mg)
+  DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance for rounding differences
+  BUDGET_TOLERANCE_PERCENT: 0.05, // Allow 5% over capsule budget
+  MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg
   MIN_INGREDIENT_COUNT: 8,       // Minimum number of unique ingredients per formula
   MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
 
-// Pricing per capsule count (monthly)
+/**
+ * TEMPORARY: Static pricing per capsule count
+ * 
+ * FUTURE: When manufacturer API is connected, pricing will be calculated based on:
+ * 1. Formula is created with specific ingredients
+ * 2. Backend calls manufacturer API for each ingredient's price (based on weight/density)
+ * 3. Total cost is calculated and stored with the formula
+ * 4. Capsule selector shows ACTUAL pricing based on ingredients chosen
+ * 
+ * For now, we use fixed tier pricing until API integration is complete.
+ */
 const CAPSULE_PRICING: Record<number, number> = {
   6: 89,
   9: 119,
@@ -464,19 +474,19 @@ function getMaxDosageForCapsules(targetCapsules: number): number {
 function validateFormulaLimits(formula: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
-  // Determine capsule-based max dosage
+  // Determine capsule-based max dosage with 5% tolerance
   const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
   const maxDosage = getMaxDosageForCapsules(targetCapsules);
-  const maxWithTolerance = maxDosage + FORMULA_LIMITS.DOSAGE_TOLERANCE;
+  const maxWithTolerance = Math.floor(maxDosage * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
   
   // Validate targetCapsules is a valid option
   if (formula.targetCapsules && !FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(formula.targetCapsules)) {
     errors.push(`Invalid capsule count: ${formula.targetCapsules}. Must be one of: ${FORMULA_LIMITS.VALID_CAPSULE_COUNTS.join(', ')}`);
   }
   
-  // Check total dosage limit based on capsule count
+  // Check total dosage limit based on capsule count (with 5% tolerance)
   if (formula.totalMg > maxWithTolerance) {
-    errors.push(`Formula exceeds ${targetCapsules}-capsule budget of ${maxDosage}mg (${maxWithTolerance}mg with tolerance). Attempted: ${formula.totalMg}mg. Reduce ingredients or increase capsule count.`);
+    errors.push(`Formula exceeds ${targetCapsules}-capsule budget of ${maxDosage}mg (max ${maxWithTolerance}mg with 5% tolerance). Attempted: ${formula.totalMg}mg. Reduce ingredients or increase capsule count.`);
   }
   
   // Validate all ingredients (bases + additions)
@@ -847,12 +857,17 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
     errors.push(`Formula exceeds maximum ingredient count of ${FORMULA_LIMITS.MAX_INGREDIENT_COUNT} (attempted: ${ingredientCount})`);
   }
   
-  // Validate daily total based on target capsule count
+  // Check minimum ingredient count
+  if (ingredientCount < FORMULA_LIMITS.MIN_INGREDIENT_COUNT) {
+    errors.push(`Formula must contain at least ${FORMULA_LIMITS.MIN_INGREDIENT_COUNT} ingredients for comprehensive support (has: ${ingredientCount})`);
+  }
+  
+  // Validate daily total based on target capsule count (with 5% tolerance)
   const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
   const maxDosageForCapsules = getMaxDosageForCapsules(targetCapsules);
-  const maxWithTolerance = maxDosageForCapsules + FORMULA_LIMITS.DOSAGE_TOLERANCE;
+  const maxWithTolerance = Math.floor(maxDosageForCapsules * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
   if (calculatedTotal > maxWithTolerance) {
-    errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum ${maxDosageForCapsules}mg (${maxWithTolerance}mg with tolerance) for ${targetCapsules}-capsule protocol.`);
+    errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum ${maxDosageForCapsules}mg (up to ${maxWithTolerance}mg with 5% tolerance) for ${targetCapsules}-capsule protocol.`);
   }
   
   // Validate capsule sizing if provided (00 capsules hold approximately 700-850mg)
@@ -1446,7 +1461,7 @@ STEP 2 - IMMEDIATELY analyze their blood test results
 - Identify what needs addressing that ISN'T already covered
 
 STEP 3 - Suggest ADDITIONS (not a whole new formula)
-- Calculate remaining capacity: Current mg + Additions must be ≤ 5500mg
+- Calculate remaining capacity: Current mg + Additions must be ≤ Capsule Capacity (caps × 550mg)
 - Suggest 2-4 specific ingredients to ADD
 - Show the math: "Current 4860mg + Adding 400mg = 5260mg total"
 - Example: "Based on your elevated CRP, I'd like to ADD Turmeric Extract 500mg for inflammation"
@@ -1480,7 +1495,7 @@ WHEN USER CONFIRMS, immediately output the COMPLETE JSON block (using proper mar
 - ALL existing system supports from their current formula
 - ALL existing individual ingredients from their current formula
 - PLUS all new ingredients you suggested
-- Accurate totalMg calculation (recommend 4500-5500mg for best value, but any amount is acceptable)
+- Accurate totalMg calculation (aim to FILL the user's selected capsule capacity: capsules × 550mg)
 
 🚨 CRITICAL JSON GENERATION RULE FOR EXISTING FORMULAS 🚨
 
@@ -1488,7 +1503,7 @@ When user confirms additions to their EXISTING formula, your JSON MUST include:
 1. ALL system supports from their current formula (carried over unchanged)
 2. ALL individual ingredients from their current formula (carried over unchanged)
 3. PLUS the new ingredients you're adding
-4. Calculate accurate total (recommend 4500-5500mg for optimal value, but honor user preferences)
+4. Calculate accurate total (aim to FILL the capsule capacity: 6 caps=3300mg, 9 caps=4950mg, 12 caps=6600mg, 15 caps=8250mg)
 
 🚨 CRITICAL: INCREASING EXISTING INGREDIENTS 🚨
 
@@ -1513,7 +1528,7 @@ User has "Pete V1" formula containing:
 You suggest adding: Turmeric (500mg), Chlorella (400mg)
 
 WRONG APPROACH: Only including the new ingredients (will fail validation)
-  Result: Only Turmeric + Chlorella = 900mg total (REJECTED - below 4500mg minimum)
+  Result: Only Turmeric + Chlorella = 900mg total (REJECTED - does not include existing formula ingredients)
 
 CORRECT APPROACH: Include ALL existing + ALL new ingredients
   Bases section: Heart Support (450mg), Liver Support (480mg)
@@ -1579,7 +1594,7 @@ Based on your elevated inflammatory marker (CRP 3.5) and low Vitamin D, I'd like
 - Curcumin (500mg) - potent anti-inflammatory to address your CRP elevation
 - Vitamin D3 (150mg equivalent to 6000 IU) - to bring your level from 22 to optimal 40+ ng/mL
 
-New total calculation: Current 4680mg + Curcumin 500mg + Vitamin D3 150mg = 5330mg total (within safe 4500-5500mg range)
+New total calculation: Current 4680mg + Curcumin 500mg + Vitamin D3 150mg = 5330mg total (filling 9-capsule capacity of 4950mg)
 
 Would you like me to add these to your formula?"
 
@@ -1711,22 +1726,27 @@ If user tries to rush you or asks "what should I take?", politely explain:
    - NEVER use ingredients outside our approved catalog
    - If an ingredient isn't listed below, you CANNOT use it
 
-2. CAPSULE SPECIFICATIONS (UPDATED FOR 00 SIZE CAPSULES):
-   - Size 00 capsules: 700-850mg capacity (industry standard)
-   - RECOMMENDED DAILY TOTAL: **4500-5500mg** (optimal value for cost-effectiveness and therapeutic benefit)
-   - system supports total: ~2500-3500mg (select 2-3 system supports)
-   - Individual additions: ~2000-2000mg (select 5-7 individual ingredients at ~300mg each)
-   - Capsule count: 6-8 capsules per day (at ~750mg per capsule = optimal 00 fill)
-   - Always ask user preference for AM/PM split or suggest 4 caps AM, 4 caps PM for convenience
-   - NOTE: While 4500-5500mg is recommended for best value, you can create formulas at any amount the user prefers. Maximum safety limit is 5500mg.
+2. CAPSULE SPECIFICATIONS (CAPACITY-BASED FORMULA SIZING):
+   - Each capsule holds 550mg of active ingredients
+   - FORMULA CAPACITY = User's capsule count × 550mg:
+     • 6 capsules = 3,300mg capacity
+     • 9 capsules = 4,950mg capacity (most common)
+     • 12 capsules = 6,600mg capacity
+     • 15 capsules = 8,250mg capacity
+   - 🎯 GOAL: FILL TO CAPACITY - Aim to use 90-100% of the selected capsule capacity
+   - system supports total: ~1500-3000mg (select 2-4 system supports)
+   - Individual additions: Fill remaining capacity with targeted ingredients
+   - Always ask user preference for AM/PM split (e.g., 4-5 caps AM, 4-5 caps PM for 9-cap protocol)
+   - 5% tolerance allowed above capacity for rounding (e.g., 9 caps can go up to ~5197mg)
 
-3. 🎯 PROACTIVE FORMULA OPTIMIZATION - MAXIMIZE VALUE:
-   **RECOMMENDATION: The 4500-5500mg range tends to maximize health benefits and cost-effectiveness.**
+3. 🎯 PROACTIVE FORMULA OPTIMIZATION - FILL TO CAPACITY:
+   **GOAL: Fill 90-100% of the user's selected capsule capacity to maximize value.**
    
    When creating or updating formulas:
+   - ✅ FILL THE CAPACITY: If user selected 9 capsules (4950mg max), aim for 4500-4950mg total
    - ✅ THINK COMPREHENSIVELY: Don't just address the obvious issues - consider the WHOLE PERSON
    - ✅ ASK PROBING QUESTIONS: "What about your digestion?" "How's your energy throughout the day?" "Any joint stiffness in the mornings?"
-   - ✅ SUGGEST ADDITIONS: If a formula is below 4500mg, mention additional beneficial ingredients they could consider adding to maximize value
+   - ✅ SUGGEST ADDITIONS: If formula is significantly under capacity, suggest additional beneficial ingredients to fill it
    - ✅ LOOK AT BLOOD TESTS HOLISTICALLY: Even "normal" results can reveal optimization opportunities
    
    Common areas people need but don't mention:
@@ -2268,9 +2288,9 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    - Ashwagandha: 600mg
    - CoQ10: 200mg
    - Omega-3: 800mg
-   **Running Total: 450 + 500 + 600 + 200 + 800 = 2550mg** ✅ Under 5500mg limit"
+   **Running Total: 450 + 500 + 600 + 200 + 800 = 2550mg** ✅ Under 9-capsule capacity of 4950mg"
    
-   If your running total exceeds 5500mg, STOP and remove ingredients before creating the JSON!
+   If your running total exceeds the capsule capacity, STOP and remove ingredients before creating the JSON!
    
    RULE 1 - EXACT DOSAGES FOR FIXED-DOSE INGREDIENTS:
    Some ingredients CANNOT be adjusted - they have ONE fixed dosage only:
@@ -2282,7 +2302,7 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    • Add up EVERY ingredient (bases + additions)
    • Use a calculator - do NOT estimate
    • Your totalMg MUST equal the sum of all ingredients
-   • ⚠️ HARD LIMIT: 5500mg MAXIMUM - formulas over this are REJECTED
+   • ⚠️ TARGET: Capsule capacity (capsules × 550mg) - 5% tolerance allowed for rounding
    • Backend will verify - mismatches = REJECTION
    
    Example:
@@ -2292,12 +2312,12 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    + InnoSlim (250)
    = 3050mg ← This is what you put in "totalMg"
    
-   RULE 3 - MAXIMUM LIMIT CHECK:
-   • If your total > 5500mg, you MUST reduce BEFORE creating JSON:
+   RULE 3 - CAPSULE CAPACITY CHECK:
+   • If your total > capacity + 5% tolerance (e.g., 5197mg for 9 caps), you MUST reduce BEFORE creating JSON:
      - Remove some ingredients
      - Use lower dosages (for range-based ingredients)
      - Choose fewer system supports
-   • DO NOT create JSON with total > 5500mg - it will be rejected!
+   • DO NOT create JSON with total exceeding tolerance limit - it will be rejected!
    
    🔴🔴🔴 MANDATORY: You MUST copy this exact format below. Replace the example data with your formula, but keep the JSON structure identical. 🔴🔴🔴
    
@@ -2331,11 +2351,19 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    - Missing ingredients in calculation
    - Using wrong units (ensure all doses are in mg)
    - Rounding errors or typos
+   - **EXCEEDING THE CAPSULE BUDGET** - most common error!
+   
+   🚨 BUDGET LIMITS (5% tolerance allowed for rounding):
+   - 6 capsules = 3,300mg target (up to 3,465mg with tolerance)
+   - 9 capsules = 4,950mg target (up to 5,197mg with tolerance)
+   - 12 capsules = 6,600mg target (up to 6,930mg with tolerance)
+   - 15 capsules = 8,250mg target (up to 8,662mg with tolerance)
    
    ❌ WRONG: If you add 13 ingredients but your totalMg only accounts for 10 = REJECTED!
-   ✅ CORRECT: Double-check your math. Add each dosage one by one:
+   ❌ WRONG: If your formula is 5,628mg for a 9-capsule (5,197mg max with tolerance) = REJECTED!
+   ✅ CORRECT: Add up ingredients AS YOU GO and aim for target capacity (90-100%)
    
-   Example calculation (with actual ingredients from your formula):
+   Example calculation (for a 9-capsule formula with 4950mg capacity):
    Heart Support: 450mg
    + Liver Support: 500mg
    + Ashwagandha: 600mg
@@ -2346,17 +2374,17 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    + Curcumin: 400mg
    + NAD+: 100mg
    + Ginko Biloba Extract 24%: 200mg
-   = 4050mg total ← THIS is the correct totalMg (under 5500mg limit ✅)
+   = 4050mg total ← Under 4950mg capacity but could add ~900mg more to FILL capacity ✅
    
    ⚠️ If your totalMg doesn't match your ingredients, the formula will be REJECTED!
    The backend validates your math and will reject formulas with calculation errors.
    
-   ⚠️ If your total exceeds 5500mg, the formula will be REJECTED! Reduce ingredients first.
+   ⚠️ If your total exceeds the capsule capacity, the formula will be REJECTED! Reduce ingredients first.
    
-   �🔍 QUICK CHECK BEFORE SUBMITTING:
+   🔍 QUICK CHECK BEFORE SUBMITTING:
    - Verify all "bases" items are from the 32 system supports list (scroll up to check)
    - Verify all "additions" items are from the 29 INDIVIDUAL INGREDIENTS list (scroll up to check)
-   - Calculate accurate totalMg (recommend suggesting 4500-5500mg range for optimal value)
+   - Calculate accurate totalMg (aim to FILL the capsule capacity: caps × 550mg, with 5% tolerance allowed)
    
    REQUIRED FIELDS:
    - bases: array of system supports (MUST use exact names from approved 32 system supports)
@@ -2592,9 +2620,6 @@ export async function registerRoutes(
   // Optimize routes: /api/optimize/* - plans, logs, grocery lists
   app.use('/api/optimize', optimizeRoutes);
   
-  // Streaks routes: /api/streaks/* - streak rewards system
-  app.use('/api/streaks', streaksRoutes);
-  
   // ============================================================
   // LEGACY INLINE ROUTES (to be migrated)
   // The following routes are still defined inline and will be
@@ -2714,6 +2739,24 @@ export async function registerRoutes(
 
       const user = await storage.createUser(userData);
       console.log('✅ SIGNUP: User created successfully:', { id: user.id, email: user.email });
+      
+      // 📬 Create welcome notification
+      try {
+        await storage.createNotification({
+          userId: user.id,
+          type: 'system',
+          title: 'Welcome to ONES! 🎉',
+          content: 'Start your personalized supplement journey by chatting with our AI practitioner. Upload your lab results for the most accurate recommendations.',
+          metadata: { 
+            actionUrl: '/dashboard/chat', 
+            icon: 'info', 
+            priority: 'high' 
+          }
+        });
+        console.log('📬 Welcome notification created for user', user.id);
+      } catch (notifError) {
+        console.error('Failed to create welcome notification:', notifError);
+      }
       
       // Generate JWT token
       console.log('📋 SIGNUP: Generating JWT token...');
@@ -3268,6 +3311,12 @@ ${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sorted
           }
         }
         
+        // Calculate capsule-based capacity for this formula
+        const formulaCapsules = activeFormula.targetCapsules || 9;
+        const formulaCapacity = formulaCapsules * 550;
+        const capacityRemaining = formulaCapacity - activeFormula.totalMg;
+        const utilizationPercent = Math.round((activeFormula.totalMg / formulaCapacity) * 100);
+        
         currentFormulaContext = `
 📦 CURRENT ACTIVE FORMULA: "${activeFormula.name || 'Unnamed'}" (Version ${activeFormula.version || 1})
 ${activeFormula.userCreated ? '[CUSTOM BUILT] - User manually created this formula without AI assistance' : '[AI-GENERATED] - AI created and optimized this formula'}
@@ -3278,13 +3327,19 @@ ${basesText}
 Individual Additions${activeFormula.userCreated ? '' : ' (AI-Recommended)'}:
 ${additionsText}${customizationsText}
 
-Total Daily Dose: ${activeFormula.totalMg}mg
-Target Range: 4500-5500mg (00 capsule capacity)
+📊 FORMULA CAPACITY STATUS:
+- Current Total: ${activeFormula.totalMg}mg
+- Capsule Count: ${formulaCapsules} capsules
+- Capsule Capacity: ${formulaCapacity}mg (${formulaCapsules} × 550mg)
+- Capacity Used: ${utilizationPercent}%
+- Capacity Remaining: ${capacityRemaining}mg
+${utilizationPercent < 90 ? `⚠️ UNDER-UTILIZED: Formula is only ${utilizationPercent}% full. Consider adding ${capacityRemaining}mg more ingredients to maximize value.` : `✅ WELL-FILLED: Formula is at ${utilizationPercent}% capacity.`}
 
 ⚠️ IMPORTANT: When analyzing blood tests and making recommendations:
 - Review this COMPLETE formula FIRST (including all system supports, additions, AND user customizations)
 - Identify what's working and what might need adjustment
-- Calculate the gap: Current ${activeFormula.totalMg}mg → Target 4500-5500mg = ${Math.max(0, 4500 - activeFormula.totalMg)}mg minimum addition needed (${5500 - activeFormula.totalMg}mg maximum capacity available)
+- FILL TO CAPACITY: Current ${activeFormula.totalMg}mg → Target ${formulaCapacity}mg (${formulaCapsules} capsules × 550mg)
+- Available space: ${capacityRemaining}mg to add more beneficial ingredients
 - Suggest specific system supports or individual ingredients from the approved catalog to ADD
 - Explain which current ingredients to keep, increase, or remove based on lab results
 - Show your math: "Current XYZ 450mg + Adding ABC 300mg = 750mg total for cardiovascular support"
@@ -3293,11 +3348,10 @@ Target Range: 4500-5500mg (00 capsule capacity)
 - If user says "remove Vitamin C" or "take out X ingredient", ONLY remove that specific ingredient
 - DO NOT remove other ingredients unless explicitly asked
 - MAINTAIN OR INCREASE the total dosage by adding new ingredients to fill the gap
-- Example: If removing Vitamin C (90mg) from a 4110mg formula:
-  - New base = 4020mg (4110mg - 90mg)
-  - Add 480-1480mg of new beneficial ingredients to reach 4500-5500mg target
-  - Result: Formula should be 4500-5500mg, not 2270mg!
-- Always aim for 4500-5500mg total unless user explicitly requests a smaller formula
+- Example: If removing Vitamin C (90mg) from a ${activeFormula.totalMg}mg formula:
+  - New base = ${activeFormula.totalMg - 90}mg
+  - Add new beneficial ingredients to reach ${formulaCapacity}mg target (${formulaCapsules} capsules)
+- Always aim to FILL the capsule capacity (${formulaCapacity}mg for ${formulaCapsules} capsules)
 `;
 
         console.log('📦 DEBUG: Formula context built, length:', currentFormulaContext.length, 'chars');
@@ -3404,7 +3458,7 @@ STEP 2 - CURRENT FORMULA REVIEW
 ${activeFormula ? `Analyze the user's current ${activeFormula.totalMg}mg formula:
 - What's already addressing their issues?
 - What's missing based on lab results?
-- Calculate capacity remaining: ${Math.max(0, 5500 - activeFormula.totalMg)}mg available for additions (max 5500mg total)` : 'User has no current formula - create comprehensive first formula based on labs'}
+- Calculate capacity remaining: User's capsule count × 550mg = max capacity (e.g., 9 caps = 4950mg max)` : 'User has no current formula - create comprehensive first formula based on labs'}
 
 STEP 3 - SPECIFIC RECOMMENDATIONS
 For EACH abnormal biomarker, explain in clean paragraph format:
@@ -3420,7 +3474,7 @@ Current formula: ${activeFormula ? `${activeFormula.totalMg}mg` : '0mg'}
 New ingredients: [list with amounts]
 **New total: [calculated amount]**
 
-Verify: 4500mg ≤ New Total ≤ 5500mg
+Verify: New Total ≤ Capsule Capacity (caps × 550mg)
 
 🚨 CRITICAL FORMATTING RULES:
 - NO markdown tables or bullet lists for biomarkers
@@ -3641,10 +3695,16 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       console.log('📝 Full AI Response Length:', fullResponse.length);
       console.log('📝 Full AI Response Preview (first 500 chars):', fullResponse.substring(0, 500));
       
+      // 🔔 Notify client we're analyzing the response
+      sendSSE({ type: 'processing', message: 'Analyzing AI recommendations...' });
+      
       try {
         // Extract everything between ```json and ``` (greedy match to get complete JSON)
         const jsonMatch = fullResponse.match(/```json\s*([\s\S]*?)\s*```/);
         if (jsonMatch) {
+          // 🔔 IMMEDIATELY notify client that formula processing has started
+          sendSSE({ type: 'processing', message: 'Formula detected! Selecting optimal ingredients...' });
+          
           console.log('✅ FORMULA EXTRACTION: Found ```json block in AI response!');
           console.log('📦 Extracted JSON length:', jsonMatch[1].length, 'chars');
           console.log('📦 Extracted JSON preview (first 300):', jsonMatch[1].substring(0, 300));
@@ -3664,12 +3724,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           }
           
           console.log('🔄 Validating against FormulaExtractionSchema...');
+          sendSSE({ type: 'processing', message: 'Validating ingredient selection...' });
           let validatedFormula = FormulaExtractionSchema.parse(jsonData);
           console.log('✅ Schema validation passed');
           console.log('📊 Validated formula has', validatedFormula.bases?.length || 0, 'bases and', validatedFormula.additions?.length || 0, 'additions');
           
           // 🔍 POST-GENERATION VALIDATOR: Check and auto-correct ingredient names
           console.log('🔍 Running post-generation ingredient validator...');
+          sendSSE({ type: 'processing', message: 'Checking ingredient safety and dosages...' });
           const ingredientValidation = validateAndCorrectIngredientNames(validatedFormula);
           
           if (!ingredientValidation.success) {
@@ -3702,6 +3764,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           
           // 🔧 ALWAYS CALCULATE totalMg ON BACKEND (AI no longer responsible for math)
           console.log('🔄 Calculating formula total (backend calculates - not AI)...');
+          sendSSE({ type: 'processing', message: 'Calculating optimal dosages for your profile...' });
           const validation = validateAndCalculateFormula(validatedFormula);
           
           if (validatedFormula.totalMg) {
@@ -3785,7 +3848,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               
               // Add warning to user about removed ingredients
               validatedFormula.warnings = validatedFormula.warnings || [];
-              validatedFormula.warnings.push(`Note: Removed ${removedIngredients.length} lower-priority ingredients (${removedMg}mg total) to fit within the 5500mg maximum capsule capacity: ${removedIngredients.join(', ')}`);
+              const capsuleCapacity = getMaxDosageForCapsules(validatedFormula.targetCapsules || 9);
+              validatedFormula.warnings.push(`Note: Removed ${removedIngredients.length} lower-priority ingredients (${removedMg}mg total) to fit within the ${capsuleCapacity}mg capsule capacity: ${removedIngredients.join(', ')}`);
             } else {
               console.log(`⚠️ Overage too large (${overagePercent.toFixed(1)}%), cannot auto-correct. Rejecting formula.`);
             }
@@ -3797,7 +3861,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             e.includes('Formula total too high') ||
             e.includes('exceeds maximum dosage limit') ||
             e.includes('exceeds allowed maximum') ||  // Individual ingredient max violations
-            e.includes('below allowed minimum')        // Individual ingredient min violations
+            e.includes('below allowed minimum') ||    // Individual ingredient min violations
+            e.includes('at least') ||                 // Minimum ingredient count
+            e.includes('comprehensive support')       // Minimum ingredient count (alternative phrasing)
           );
           
           if (criticalErrors.length > 0) {
@@ -3808,10 +3874,27 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             const hasIngredientDosageViolation = criticalErrors.some(e => e.includes('exceeds allowed maximum') || e.includes('below allowed minimum'));
             const hasTotalDosageError = criticalErrors.some(e => e.includes('total too high') || e.includes('exceeds maximum dosage limit'));
             const hasUnapprovedIngredient = criticalErrors.some(e => e.includes('UNAUTHORIZED INGREDIENT'));
+            const hasMinIngredientError = criticalErrors.some(e => e.includes('at least') || e.includes('comprehensive support'));
             
             let validationErrorMessage = '\n\n---\n\n⚠️ **VALIDATION ERROR - Formula Rejected**\n\n';
             
-            if (hasIngredientDosageViolation) {
+            if (hasMinIngredientError) {
+              // Minimum ingredient count not met
+              validationErrorMessage += `❌ **Problem:** Your formula doesn't have enough ingredients.\n\n`;
+              validationErrorMessage += `**Error:**\n${criticalErrors.filter(e => e.includes('at least') || e.includes('comprehensive support')).map(e => `- ${e}`).join('\n')}\n\n`;
+              validationErrorMessage += `🚨 **CRITICAL RULE:** Every formula must contain at least ${FORMULA_LIMITS.MIN_INGREDIENT_COUNT} unique ingredients.\n\n`;
+              validationErrorMessage += `**How to Fix:**\n`;
+              validationErrorMessage += `- Add more ingredients to address additional health goals\n`;
+              validationErrorMessage += `- Include complementary ingredients for synergistic effects\n`;
+              validationErrorMessage += `- Consider adding foundational support ingredients\n\n`;
+              validationErrorMessage += `Please create a corrected formula with at least ${FORMULA_LIMITS.MIN_INGREDIENT_COUNT} ingredients.`;
+              
+              sendSSE({
+                type: 'error',
+                error: `⚠️ Formula needs more ingredients:\n\n${criticalErrors.filter(e => e.includes('at least') || e.includes('comprehensive support')).map(e => `❌ ${e}`).join('\n\n')}\n\nPlease add more ingredients to create a comprehensive formula.`,
+                sessionId: chatSession?.id
+              });
+            } else if (hasIngredientDosageViolation) {
               // Specific ingredient violated its allowed dosage range
               validationErrorMessage += `❌ **Problem:** One or more ingredients violate their allowed dosage ranges.\n\n`;
               validationErrorMessage += `**Dosage Violations:**\n${criticalErrors.map(e => `- ${e}`).join('\n')}\n\n`;
@@ -3834,19 +3917,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             } else if (hasTotalDosageError) {
               const formulaTargetCaps = validatedFormula?.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
               const formulaMaxDosage = getMaxDosageForCapsules(formulaTargetCaps);
-              validationErrorMessage += `❌ **Problem:** Your formula totals ${validation.calculatedTotalMg}mg, which exceeds the ${formulaTargetCaps}-capsule budget of ${formulaMaxDosage}mg.\n\n`;
-              validationErrorMessage += `🚨 **CRITICAL REMINDER:** When you create a formula, it REPLACES the entire existing formula. You are creating a COMPLETE formula from scratch (0mg → up to ${formulaMaxDosage}mg), NOT adding to an existing formula.\n\n`;
-              validationErrorMessage += `**Required Fix:** Your new COMPLETE formula must total ≤${formulaMaxDosage}mg. Reduce by ${validation.calculatedTotalMg - formulaMaxDosage}mg by:\n`;
+              const maxWithTolerance = Math.floor(formulaMaxDosage * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
+              validationErrorMessage += `❌ **Problem:** Your formula totals ${validation.calculatedTotalMg}mg, which exceeds the ${formulaTargetCaps}-capsule budget of ${formulaMaxDosage}mg (max ${maxWithTolerance}mg with 5% tolerance).\n\n`;
+              validationErrorMessage += `🚨 **CRITICAL REMINDER:** When you create a formula, it REPLACES the entire existing formula. You are creating a COMPLETE formula from scratch (0mg → up to ${maxWithTolerance}mg), NOT adding to an existing formula.\n\n`;
+              validationErrorMessage += `**Required Fix:** Your new COMPLETE formula must total ≤${maxWithTolerance}mg. Reduce by ${validation.calculatedTotalMg - maxWithTolerance}mg by:\n`;
               validationErrorMessage += `- Removing some system supports (e.g., remove Beta Max saves 650mg)\n`;
               validationErrorMessage += `- Removing some individual ingredients\n`;
               validationErrorMessage += `- Reducing dosages of flexible ingredients (e.g., Curcumin 600mg → 400mg)\n`;
               validationErrorMessage += `- Prioritizing the most critical health goals\n`;
               validationErrorMessage += `- Or increase capsule count if user agrees (e.g., 9 → 12 capsules)\n\n`;
-              validationErrorMessage += `Please create a corrected formula with the COMPLETE ingredient list (bases + additions) that totals ≤${formulaMaxDosage}mg.`;
+              validationErrorMessage += `Please create a corrected formula with the COMPLETE ingredient list (bases + additions) that totals ≤${maxWithTolerance}mg.`;
               
               sendSSE({
                 type: 'error',
-                error: `⚠️ Formula exceeds ${formulaTargetCaps}-capsule budget of ${formulaMaxDosage}mg.\n\nCalculated total: ${validation.calculatedTotalMg}mg\n\nPlease create a smaller formula by:\n- Using fewer system supports\n- Reducing individual ingredient doses\n- Focusing on your top priority health goals\n- Or suggest increasing capsule count`,
+                error: `⚠️ Formula exceeds ${formulaTargetCaps}-capsule budget (max ${maxWithTolerance}mg with 5% tolerance).\n\nCalculated total: ${validation.calculatedTotalMg}mg\n\nPlease create a smaller formula by:\n- Using fewer system supports\n- Reducing individual ingredient doses\n- Focusing on your top priority health goals\n- Or suggest increasing capsule count`,
                 sessionId: chatSession?.id
               });
             } else if (hasUnapprovedIngredient) {
@@ -3920,6 +4004,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           }
           
           // Validate supplement-medication interactions
+          sendSSE({ type: 'processing', message: 'Checking for medication interactions...' });
           const medicalWarnings = await validateSupplementInteractions(validatedFormula, userMedications);
           extractedFormula.warnings.push(...medicalWarnings);
           
@@ -3942,24 +4027,44 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           console.log('🔍 Searching for other patterns...');
           // Check if AI outputted formula without proper formatting
           // Only trigger error if AI explicitly claimed to have created/built a formula
+          const responseLC = fullResponse.toLowerCase();
           const claimsFormulaCreation = 
-              fullResponse.toLowerCase().includes("here's your formula") ||
-              fullResponse.toLowerCase().includes("here is your formula") ||
-              fullResponse.toLowerCase().includes("i've created") ||
-              fullResponse.toLowerCase().includes("i have created") ||
-              fullResponse.toLowerCase().includes("your new formula") ||
-              fullResponse.toLowerCase().includes("your updated formula") ||
-              fullResponse.toLowerCase().includes("here's the formula") ||
-              fullResponse.toLowerCase().includes("presenting your formula");
+              responseLC.includes("here's your formula") ||
+              responseLC.includes("here is your formula") ||
+              responseLC.includes("i've created") ||
+              responseLC.includes("i have created") ||
+              responseLC.includes("i'm creating") ||
+              responseLC.includes("i am creating") ||
+              responseLC.includes("creating your") ||
+              responseLC.includes("your new formula") ||
+              responseLC.includes("your updated formula") ||
+              responseLC.includes("here's the formula") ||
+              responseLC.includes("presenting your formula") ||
+              responseLC.includes("your 9-capsule") ||
+              responseLC.includes("your 6-capsule") ||
+              responseLC.includes("your 12-capsule") ||
+              responseLC.includes("your 15-capsule") ||
+              responseLC.includes("-capsule/day formula") ||
+              responseLC.includes("-capsule formula") ||
+              responseLC.includes("personalized formula") ||
+              responseLC.includes("this formula includes") ||
+              responseLC.includes("this combination");
           
           if (claimsFormulaCreation) {
             console.error('⚠️ CRITICAL: AI claimed to create a formula but NOT in ```json block format!');
             console.error('⚠️ This formula will NOT be saved! AI needs to output JSON block.');
             
+            // 🔔 NOTIFY USER that formula wasn't created properly
+            sendSSE({
+              type: 'error',
+              error: '⚠️ Formula described but not created. Please reply with "create my formula now" to generate it.',
+              code: 'FORMULA_NOT_OUTPUT'
+            });
+            
             // Append error message that AI will see in chat history
             const systemError = '\n\n---\n\n🚨 **SYSTEM ERROR - Formula Not Created**\n\n' +
               '❌ **Problem:** You discussed a formula but did NOT output the ```json code block.\n\n' +
-              '**What happened:** You said "Here\'s your optimized formula" but then only described it in text. ' +
+              '**What happened:** You described ingredients and benefits but did not output the actual JSON formula. ' +
               'The system REQUIRES the JSON code block to actually create the formula.\n\n' +
               '**Required Fix:** Output the complete JSON block immediately:\n\n' +
               '```json\n' +
@@ -4174,6 +4279,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           } else {
             // ✅ Validation passed - save the formula
             console.log('✅ Security validation passed - formula within safe limits');
+            sendSSE({ type: 'processing', message: 'Finalizing your personalized formula...' });
             savedFormula = await storage.createFormula(formulaData);
             console.log(`Formula v${nextVersion} saved successfully for user ${userId}`);
             
@@ -4242,6 +4348,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         // Clean up multiple consecutive newlines left behind
         .replace(/\n{3,}/g, '\n\n')
         .trim();
+      
+      // 🔧 FIX: If response is empty but we have a formula, provide a default message
+      // This prevents showing an empty AI response when AI only output the JSON block
+      if (fullResponse.length < 10 && savedFormula) {
+        console.log('⚠️ Response was empty after cleaning, adding default formula message');
+        fullResponse = `I've created your personalized ${savedFormula.targetCapsules || 9}-capsule daily formula with ${savedFormula.totalMg}mg of targeted support. Your formula has been saved and is ready to review in your dashboard.`;
+      }
       
       // Send health data update notification if applicable
       if (healthDataUpdated) {
@@ -5891,6 +6004,28 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         success: true,
         reason: `Successfully uploaded ${fileType}: ${uploadedFile.name}`
       });
+
+      // 📬 Create notification for lab report upload
+      if (fileType === 'lab_report') {
+        try {
+          await storage.createNotification({
+            userId,
+            type: 'system',
+            title: 'Lab Report Uploaded 📊',
+            content: labDataExtraction 
+              ? `Your lab report has been analyzed. Chat with our AI to discuss your results and optimize your formula.`
+              : `Your lab report "${uploadedFile.name}" has been uploaded. It will be analyzed shortly.`,
+            metadata: { 
+              actionUrl: '/dashboard/chat', 
+              icon: 'beaker', 
+              priority: 'medium' 
+            }
+          });
+          console.log('📬 Lab upload notification created for user', userId);
+        } catch (notifError) {
+          console.error('Failed to create lab upload notification:', notifError);
+        }
+      }
 
       // Return file metadata with lab data if extracted
       const responseData = {
@@ -9824,6 +9959,288 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
     } catch (error) {
       console.error('Error fetching workout analytics:', error);
       res.status(500).json({ error: 'Failed to fetch workout analytics' });
+    }
+  });
+
+  // ============================================
+  // MEMBERSHIP TIER ROUTES
+  // ============================================
+
+  // Get all membership tiers (public - for pricing page)
+  app.get('/api/membership/tiers', async (req, res) => {
+    try {
+      const tiers = await storage.getAllMembershipTiers();
+      res.json(tiers);
+    } catch (error) {
+      console.error('Error fetching membership tiers:', error);
+      res.status(500).json({ error: 'Failed to fetch membership tiers' });
+    }
+  });
+
+  // Get the current available tier (public - for signup flow)
+  app.get('/api/membership/current-tier', async (req, res) => {
+    try {
+      const tier = await storage.getAvailableMembershipTier();
+      if (!tier) {
+        res.status(404).json({ error: 'No membership tier currently available' });
+        return;
+      }
+      res.json(tier);
+    } catch (error) {
+      console.error('Error fetching current membership tier:', error);
+      res.status(500).json({ error: 'Failed to fetch current tier' });
+    }
+  });
+
+  // Get membership stats (admin only)
+  app.get('/api/admin/membership/stats', requireAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getMembershipStats();
+      const tiers = await storage.getAllMembershipTiers();
+      res.json({ stats, tiers });
+    } catch (error) {
+      console.error('Error fetching membership stats:', error);
+      res.status(500).json({ error: 'Failed to fetch membership stats' });
+    }
+  });
+
+  // Create or update membership tier (admin only)
+  app.post('/api/admin/membership/tiers', requireAdmin, async (req, res) => {
+    try {
+      const { tierKey, name, priceCents, maxCapacity, sortOrder, benefits, isActive } = req.body;
+      
+      // Check if tier already exists
+      const existing = await storage.getMembershipTier(tierKey);
+      if (existing) {
+        const updated = await storage.updateMembershipTier(tierKey, {
+          name,
+          priceCents,
+          maxCapacity,
+          sortOrder,
+          benefits,
+          isActive
+        });
+        res.json(updated);
+      } else {
+        const created = await storage.createMembershipTier({
+          tierKey,
+          name,
+          priceCents,
+          maxCapacity,
+          sortOrder: sortOrder || 0,
+          benefits: benefits || [],
+          isActive: isActive !== false
+        });
+        res.status(201).json(created);
+      }
+    } catch (error) {
+      console.error('Error creating/updating membership tier:', error);
+      res.status(500).json({ error: 'Failed to save membership tier' });
+    }
+  });
+
+  // Seed default membership tiers (admin only, one-time setup)
+  app.post('/api/admin/membership/seed', requireAdmin, async (req, res) => {
+    try {
+      const defaultTiers: Array<{
+        tierKey: string;
+        name: string;
+        priceCents: number;
+        maxCapacity: number | null;
+        sortOrder: number;
+        benefits: string[];
+        isActive: boolean;
+      }> = [
+        {
+          tierKey: 'founding',
+          name: 'Founding Member',
+          priceCents: 1900, // $19
+          maxCapacity: 250,
+          sortOrder: 1,
+          benefits: [
+            'Lock in $19/month forever',
+            'Unlimited AI consultations',
+            'Priority formula adjustments',
+            'Founding member badge'
+          ],
+          isActive: true
+        },
+        {
+          tierKey: 'early',
+          name: 'Early Adopter',
+          priceCents: 2900, // $29
+          maxCapacity: 1000,
+          sortOrder: 2,
+          benefits: [
+            'Lock in $29/month forever',
+            'Unlimited AI consultations',
+            'Priority formula adjustments'
+          ],
+          isActive: true
+        },
+        {
+          tierKey: 'beta',
+          name: 'Beta Member',
+          priceCents: 3900, // $39
+          maxCapacity: 5000,
+          sortOrder: 3,
+          benefits: [
+            'Lock in $39/month forever',
+            'Unlimited AI consultations'
+          ],
+          isActive: true
+        },
+        {
+          tierKey: 'standard',
+          name: 'Standard Member',
+          priceCents: 4900, // $49
+          maxCapacity: null, // unlimited
+          sortOrder: 4,
+          benefits: [
+            'Standard pricing at $49/month',
+            'Unlimited AI consultations'
+          ],
+          isActive: true
+        }
+      ];
+
+      const results = [];
+      for (const tier of defaultTiers) {
+        const existing = await storage.getMembershipTier(tier.tierKey);
+        if (!existing) {
+          const created = await storage.createMembershipTier(tier);
+          results.push({ action: 'created', tier: created });
+        } else {
+          results.push({ action: 'exists', tier: existing });
+        }
+      }
+
+      res.json({ message: 'Membership tiers seeded', results });
+    } catch (error) {
+      console.error('Error seeding membership tiers:', error);
+      res.status(500).json({ error: 'Failed to seed membership tiers' });
+    }
+  });
+
+  // Get users by membership tier (admin only)
+  app.get('/api/admin/membership/users/:tierKey', requireAdmin, async (req, res) => {
+    try {
+      const { tierKey } = req.params;
+      const users = await storage.getUsersByMembershipTier(tierKey);
+      res.json(users.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        membershipTier: u.membershipTier,
+        membershipPriceCents: u.membershipPriceCents,
+        membershipLockedAt: u.membershipLockedAt
+      })));
+    } catch (error) {
+      console.error('Error fetching users by tier:', error);
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
+  });
+
+  // Assign membership to current user (during signup/upgrade)
+  app.post('/api/membership/join', requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      
+      // Get the user to check if they already have a membership
+      const user = await storage.getUser(userId);
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      
+      if (user.membershipTier && !user.membershipCancelledAt) {
+        res.status(400).json({ error: 'User already has an active membership' });
+        return;
+      }
+      
+      // Get the current available tier
+      const tier = await storage.getAvailableMembershipTier();
+      if (!tier) {
+        res.status(400).json({ error: 'No membership tier currently available' });
+        return;
+      }
+      
+      // Check capacity
+      if (tier.maxCapacity !== null && tier.currentCount >= tier.maxCapacity) {
+        res.status(400).json({ error: 'This tier is full, please try again' });
+        return;
+      }
+      
+      // Assign the membership
+      const updated = await storage.assignUserMembership(userId, tier.tierKey, tier.priceCents);
+      if (!updated) {
+        res.status(500).json({ error: 'Failed to assign membership' });
+        return;
+      }
+      
+      res.json({
+        message: 'Membership assigned successfully',
+        membership: {
+          tier: tier.tierKey,
+          name: tier.name,
+          priceCents: tier.priceCents,
+          lockedAt: updated.membershipLockedAt
+        }
+      });
+    } catch (error) {
+      console.error('Error joining membership:', error);
+      res.status(500).json({ error: 'Failed to join membership' });
+    }
+  });
+
+  // Get current user's membership info
+  app.get('/api/membership/me', requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      
+      if (!user.membershipTier) {
+        res.json({ hasMembership: false });
+        return;
+      }
+      
+      const tier = await storage.getMembershipTier(user.membershipTier);
+      
+      res.json({
+        hasMembership: true,
+        isCancelled: !!user.membershipCancelledAt,
+        tier: user.membershipTier,
+        tierName: tier?.name || user.membershipTier,
+        priceCents: user.membershipPriceCents,
+        lockedAt: user.membershipLockedAt,
+        cancelledAt: user.membershipCancelledAt
+      });
+    } catch (error) {
+      console.error('Error fetching user membership:', error);
+      res.status(500).json({ error: 'Failed to fetch membership' });
+    }
+  });
+
+  // Cancel membership
+  app.post('/api/membership/cancel', requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const updated = await storage.cancelUserMembership(userId);
+      
+      if (!updated) {
+        res.status(400).json({ error: 'No active membership to cancel' });
+        return;
+      }
+      
+      res.json({ message: 'Membership cancelled', cancelledAt: updated.membershipCancelledAt });
+    } catch (error) {
+      console.error('Error cancelling membership:', error);
+      res.status(500).json({ error: 'Failed to cancel membership' });
     }
   });
 

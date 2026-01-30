@@ -75,13 +75,21 @@ export const users = pgTable("users", {
   // Junction (Vital) wearables integration
   junctionUserId: text("junction_user_id"),
   
-  // Streak Rewards System
+  // Streak Rewards System (DEPRECATED - kept for data migration)
   streakCurrentDays: integer("streak_current_days").default(0).notNull(),
   streakDiscountEarned: integer("streak_discount_earned").default(0).notNull(), // 0-20 percent
   lastOrderDate: timestamp("last_order_date"),
   reorderWindowStart: timestamp("reorder_window_start"),  // Day 75 from last order
   reorderDeadline: timestamp("reorder_deadline"),         // Day 95 from last order (5-day grace)
   streakStatus: text("streak_status").default('building').notNull(), // 'building' | 'ready' | 'warning' | 'grace' | 'lapsed'
+  
+  // Membership System
+  membershipTier: text("membership_tier"), // 'founding' | 'early' | 'beta' | 'standard' | null (not a member)
+  membershipPriceCents: integer("membership_price_cents"), // Price locked at signup (e.g., 1900 = $19)
+  membershipLockedAt: timestamp("membership_locked_at"), // When they locked in their tier
+  membershipCancelledAt: timestamp("membership_cancelled_at"), // If they cancelled
+  stripeCustomerId: text("stripe_customer_id"), // Stripe customer ID for billing
+  stripeSubscriptionId: text("stripe_subscription_id"), // Stripe subscription ID
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -1430,3 +1438,40 @@ export type DailyCompletion = typeof dailyCompletions.$inferSelect;
 
 export type InsertWeeklySummary = z.infer<typeof insertWeeklySummarySchema>;
 export type WeeklySummary = typeof weeklySummaries.$inferSelect;
+
+// ============================================
+// MEMBERSHIP TIERS
+// ============================================
+
+export const membershipTiers = pgTable("membership_tiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tierKey: text("tier_key").notNull().unique(), // 'founding' | 'early' | 'beta' | 'standard'
+  name: text("name").notNull(), // Display name: "Founding Member"
+  priceCents: integer("price_cents").notNull(), // Monthly price in cents (1900 = $19)
+  maxCapacity: integer("max_capacity"), // Max spots (250, 1000, 5000, null for unlimited)
+  currentCount: integer("current_count").default(0).notNull(), // Current members at this tier
+  sortOrder: integer("sort_order").default(0).notNull(), // For display ordering
+  isActive: boolean("is_active").default(true).notNull(), // Whether tier is available
+  benefits: json("benefits").$type<string[]>(), // Array of benefit descriptions
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertMembershipTierSchema = createInsertSchema(membershipTiers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMembershipTier = z.infer<typeof insertMembershipTierSchema>;
+export type MembershipTier = typeof membershipTiers.$inferSelect;
+
+// Membership tier keys for type safety
+export const MEMBERSHIP_TIERS = {
+  FOUNDING: 'founding',
+  EARLY: 'early',
+  BETA: 'beta',
+  STANDARD: 'standard',
+} as const;
+
+export type MembershipTierKey = typeof MEMBERSHIP_TIERS[keyof typeof MEMBERSHIP_TIERS];

@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
 export default function CTASectionV2() {
+  // In production, this would come from the backend
+  const spotsRemaining = 227;
+
   return (
     <section className="py-24 md:py-32 bg-[#1B4332] relative overflow-hidden">
       {/* Decorative elements */}
@@ -11,12 +14,12 @@ export default function CTASectionV2() {
       
       <div className="container mx-auto px-6 max-w-4xl text-center relative z-10">
         <h2 className="text-4xl md:text-5xl lg:text-6xl text-white font-light leading-tight">
-          Ready to stop guessing and{" "}
-<span className="font-medium text-[#D4A574]">start thriving?</span>
+          Stop guessing.{" "}
+          <span className="font-medium text-[#D4A574]">Start optimizing.</span>
         </h2>
         
         <p className="mt-6 text-xl text-white/70 max-w-2xl mx-auto leading-relaxed">
-          Join thousands who've discovered what personalized nutrition can do.
+          Get a supplement formula built from your actual health data.
         </p>
         
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
@@ -31,8 +34,8 @@ export default function CTASectionV2() {
           </Link>
         </div>
         
-        <p className="mt-6 text-white/50 text-sm">
-          No credit card required to start
+        <p className="mt-6 text-[#D4A574] font-medium">
+          {spotsRemaining} founding member spots remaining
         </p>
       </div>
     </section>

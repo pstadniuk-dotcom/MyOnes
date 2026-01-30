@@ -37,13 +37,13 @@ import DashboardHome from "@/pages/DashboardHome";
 import ConsultationPage from "@/pages/ConsultationPage";
 import MyFormulaPage from "@/pages/MyFormulaPage";
 import OptimizePage from "@/pages/OptimizePage";
-import TrackingPage from "@/pages/TrackingPage";
 import WearablesPage from "@/pages/WearablesPage";
 import LabReportsPage from "@/pages/LabReportsPage";
 import OrdersPage from "@/pages/OrdersPage";
 import ProfilePage from "@/pages/ProfilePage";
 import SettingsPage from "@/pages/SettingsPage";
 import SupportPage from "@/pages/SupportPage";
+import NotificationsPage from "@/pages/NotificationsPage";
 
 // Import admin components
 import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
@@ -150,16 +150,8 @@ function MainRouter() {
         </ProtectedRoute>
       </Route>
       <Route path="/dashboard/optimize/tracking">
-        {/* Redirect to dashboard if tracking page is disabled */}
-        {!FEATURES.TRACKING_PAGE ? (
-          <Redirect to="/dashboard" />
-        ) : (
-          <ProtectedRoute>
-            <DashboardLayout>
-              <TrackingPage />
-            </DashboardLayout>
-          </ProtectedRoute>
-        )}
+        {/* TrackingPage removed - redirect to dashboard */}
+        <Redirect to="/dashboard" />
       </Route>
       <Route path="/dashboard/optimize/:tab?">
         {/* Redirect to dashboard if optimize features are disabled */}
@@ -206,6 +198,13 @@ function MainRouter() {
         <ProtectedRoute>
           <DashboardLayout>
             <SettingsPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/notifications">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <NotificationsPage />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

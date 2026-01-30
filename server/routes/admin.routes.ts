@@ -133,6 +133,88 @@ router.get('/users/:id', requireAdmin, async (req, res) => {
 });
 
 /**
+ * DELETE /api/admin/users/:id
+ * Delete a user and all associated data (cascades via foreign keys)
+ */
+router.delete('/users/:id', requireAdmin, async (req, res) => {
+  try {
+    const userToDelete = await storage.getUserById(req.params.id);
+    if (!userToDelete) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Prevent admins from deleting themselves
+    if (userToDelete.id === req.userId) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+    
+    // Prevent deleting other admin accounts (safety measure)
+    if (userToDelete.isAdmin) {
+      return res.status(400).json({ error: 'Cannot delete admin accounts' });
+    }
+    
+    const deleted = await storage.deleteUser(req.params.id);
+    if (!deleted) {
+      return res.status(500).json({ error: 'Failed to delete user' });
+    }
+    
+    logger.info('User deleted by admin', { 
+      deletedUserId: req.params.id, 
+      deletedUserEmail: userToDelete.email,
+      adminId: req.userId 
+    });
+    
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    logger.error('Error deleting user', { error, userId: req.params.id });
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+/**
+ * PATCH /api/admin/users/:id/admin-status
+ * Toggle admin status for a user
+ */
+router.patch('/users/:id/admin-status', requireAdmin, async (req, res) => {
+  try {
+    const { isAdmin } = req.body;
+    
+    if (typeof isAdmin !== 'boolean') {
+      return res.status(400).json({ error: 'isAdmin must be a boolean' });
+    }
+    
+    const userToUpdate = await storage.getUserById(req.params.id);
+    if (!userToUpdate) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Prevent admins from demoting themselves
+    if (userToUpdate.id === req.userId && !isAdmin) {
+      return res.status(400).json({ error: 'Cannot remove your own admin status' });
+    }
+    
+    const updatedUser = await storage.updateUser(req.params.id, { isAdmin });
+    if (!updatedUser) {
+      return res.status(500).json({ error: 'Failed to update user' });
+    }
+    
+    const { password, ...sanitizedUser } = updatedUser;
+    
+    logger.info('User admin status changed', { 
+      userId: req.params.id, 
+      userEmail: userToUpdate.email,
+      isAdmin,
+      changedBy: req.userId 
+    });
+    
+    res.json(sanitizedUser);
+  } catch (error) {
+    logger.error('Error updating admin status', { error, userId: req.params.id });
+    res.status(500).json({ error: 'Failed to update admin status' });
+  }
+});
+
+/**
  * GET /api/admin/orders/today
  * Get today's orders
  */
