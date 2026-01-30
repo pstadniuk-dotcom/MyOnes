@@ -204,10 +204,10 @@ export function NotificationsDropdown() {
           <Bell className="h-4 w-4" />
           {hasUnreadNotifications && (
             <span 
-              className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full text-[10px] flex items-center justify-center text-white"
+              className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full text-[10px] font-medium flex items-center justify-center text-white border-2 border-background"
               data-testid="notification-badge"
             >
-              {unreadCount > 9 ? '9+' : unreadCount}
+              {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
           <span className="sr-only">Notifications</span>

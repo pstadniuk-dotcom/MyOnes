@@ -152,13 +152,13 @@ export default function PersonalizationShowcase() {
           {/* Header */}
           <div className="text-center py-8 px-4">
             <div className="inline-flex items-center gap-2 bg-primary/10 px-4 py-1.5 rounded-full mb-4">
-              <span className="text-sm font-medium text-primary">AI-Powered Personalization</span>
+              <span className="text-sm font-medium text-primary">Personalized for Every Life</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-semibold mb-3">
-              One Formula.<br />Infinite Possibilities.
+              Every member gets a plan<br />designed for their life.
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Our AI analyzes your unique health profile, goals, and lab results to create a supplement formula that's 100% yours.
+              From busy founders to elite athletes to new parents, our AI creates recommendations uniquely suited to your body and goals.
             </p>
           </div>
 

@@ -35,9 +35,9 @@ export const FEATURES = {
   
   /**
    * Streak Rewards System
-   * Enables discount rewards based on supplement compliance streaks
+   * DISABLED: Removed streak/gamification in favor of membership model
    */
-  STREAK_REWARDS: true,
+  STREAK_REWARDS: false,
   
   /**
    * Grocery List

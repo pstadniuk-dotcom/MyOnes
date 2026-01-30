@@ -22,8 +22,15 @@ import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
 import { buildApiUrl } from '@/lib/api';
 import { Link } from 'wouter';
 import ThinkingIndicator from '@/components/ThinkingIndicator';
-import { CapsuleSelectionModal } from '@/components/CapsuleSelectionModal';
+import { InlineCapsuleSelector } from '@/components/InlineCapsuleSelector';
 import { type CapsuleCount } from '@/lib/utils';
+
+interface CapsuleRecommendation {
+  recommendedCapsules: CapsuleCount;
+  reasoning: string;
+  priorities: string[];
+  estimatedAmazonCost: number;
+}
 
 interface Message {
   id: string;
@@ -31,6 +38,8 @@ interface Message {
   sender: 'user' | 'ai' | 'system';
   timestamp: Date;
   sessionId?: string;
+  capsuleRecommendation?: CapsuleRecommendation;
+  selectedCapsules?: CapsuleCount;
   fileAttachment?: {
     name: string;
     url: string;
@@ -66,11 +75,27 @@ interface ChatSession {
 const removeJsonBlocks = (content: string): string => {
   if (!content) return '';
   
-  // Remove ```json blocks (formula data)
+  // Remove complete ```json blocks (formula data)
   let cleaned = content.replace(/```json\s*[\s\S]*?```/g, '');
+  // Also remove incomplete/streaming ```json blocks (no closing backticks yet)
+  cleaned = cleaned.replace(/```json\s*[\s\S]*$/g, '');
   
-  // Remove ```health-data blocks (health profile updates)
+  // Remove complete ```health-data blocks (health profile updates)
   cleaned = cleaned.replace(/```health-data\s*[\s\S]*?```/g, '');
+  // Also remove incomplete/streaming ```health-data blocks
+  cleaned = cleaned.replace(/```health-data\s*[\s\S]*$/g, '');
+  
+  // Remove ```capsule-recommendation blocks (capsule selector data)
+  // Complete blocks with closing backticks
+  cleaned = cleaned.replace(/```capsule-recommendation\s*[\s\S]*?```/g, '');
+  // Incomplete blocks (no closing backticks) - match JSON object
+  cleaned = cleaned.replace(/```capsule-recommendation\s*\{[\s\S]*?\}\s*(?=\n|$)/g, '');
+  // Streaming incomplete blocks
+  cleaned = cleaned.replace(/```capsule-recommendation\s*[\s\S]*$/g, '');
+  
+  // Remove any other code blocks that might be streaming (generic catch-all)
+  // This catches any ``` block that started but hasn't closed
+  cleaned = cleaned.replace(/```[a-z-]*\s*[\s\S]*$/gi, '');
   
   // Remove markdown headers (### Header)
   cleaned = cleaned.replace(/^#{1,6}\s+(.+)$/gm, '$1');
@@ -118,6 +143,7 @@ export default function ConsultationPage() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [thinkingMessage, setThinkingMessage] = useState<string | null>(null);
+  const [activeStreamingMessageId, setActiveStreamingMessageId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -130,18 +156,13 @@ export default function ConsultationPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   
-  // Capsule selection modal state
-  const [showCapsuleModal, setShowCapsuleModal] = useState(false);
-  const [capsuleRecommendation, setCapsuleRecommendation] = useState<{
-    recommendedCapsules: CapsuleCount;
-    reasoning: string;
-    priorities: string[];
-    estimatedAmazonCost: number;
-  } | null>(null);
-  const [pendingCapsuleSelection, setPendingCapsuleSelection] = useState<CapsuleCount | null>(null);
+  // Inline capsule selection state (tracks which message has active selection)
+  const [selectingCapsuleMessageId, setSelectingCapsuleMessageId] = useState<string | null>(null);
   
   // Draft autosave key
   const DRAFT_KEY = 'consultation_draft';
+  // Key for persisting current session across tab navigation
+  const SESSION_KEY = 'consultation_current_session';
   
   // Refs and hooks
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -241,16 +262,40 @@ export default function ConsultationPage() {
     enabled: !!user?.id
   });
   
-  // Load history data and restore most recent session
+  // Persist current session ID to localStorage whenever it changes
+  useEffect(() => {
+    if (currentSessionId) {
+      localStorage.setItem(SESSION_KEY, currentSessionId);
+    }
+  }, [currentSessionId]);
+  
+  // Load history data and restore session (prioritize saved session, fallback to most recent)
   useEffect(() => {
     if (historyData?.sessions) {
       setSessionHistory(historyData.sessions);
       
-      // Auto-restore the most recent active session on initial load
+      // Only restore session on initial load (no messages yet, isNewSession true)
       if (historyData.sessions.length > 0 && messages.length === 0 && isNewSession) {
-        const mostRecentSession = historyData.sessions[0]; // Sessions are sorted by timestamp descending
-        if (mostRecentSession && historyData.messages[mostRecentSession.id]) {
-          const sessionMessages = historyData.messages[mostRecentSession.id].map((msg: any) => {
+        // First, check if there's a saved session from previous navigation
+        const savedSessionId = localStorage.getItem(SESSION_KEY);
+        
+        // Try to find the saved session, otherwise use most recent
+        let sessionToRestore: ChatSession | undefined;
+        if (savedSessionId) {
+          sessionToRestore = historyData.sessions.find(s => s.id === savedSessionId);
+          if (sessionToRestore) {
+            console.log('Restoring saved session from navigation:', savedSessionId);
+          }
+        }
+        
+        // Fallback to most recent session if saved session not found
+        if (!sessionToRestore) {
+          sessionToRestore = historyData.sessions[0]; // Sessions are sorted by timestamp descending
+          console.log('Restoring most recent session:', sessionToRestore?.id);
+        }
+        
+        if (sessionToRestore && historyData.messages[sessionToRestore.id]) {
+          const sessionMessages = historyData.messages[sessionToRestore.id].map((msg: any) => {
             // CRITICAL: Backend sends 'role' but frontend needs 'sender'
             // Backend values: 'user' | 'assistant' | 'system'  
             // Frontend values: 'user' | 'ai' | 'system'
@@ -268,11 +313,11 @@ export default function ConsultationPage() {
           });
           
           setMessages(sessionMessages);
-          setCurrentSessionId(mostRecentSession.id);
+          setCurrentSessionId(sessionToRestore.id);
           setIsNewSession(false);
           setShowSuggestions(false);
           
-          console.log('Auto-restored session:', mostRecentSession.id);
+          console.log('Auto-restored session:', sessionToRestore.id);
         }
       }
     }
@@ -525,7 +570,7 @@ export default function ConsultationPage() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       
-      let aiMessageId = (Date.now() + 1).toString();
+      let aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       let currentAiMessage: Message = {
         id: aiMessageId,
         content: '',
@@ -533,11 +578,15 @@ export default function ConsultationPage() {
         timestamp: new Date()
       };
 
+      setActiveStreamingMessageId(aiMessageId);
       setMessages(prev => [...prev, currentAiMessage]);
       
       let buffer = '';
       let connected = false;
       let completed = false;
+      
+      // Accumulate content in hidden buffer - only show final result
+      let accumulatedContent = '';
 
       try {
         while (true) {
@@ -545,7 +594,17 @@ export default function ConsultationPage() {
           if (done) {
             if (!completed) {
               console.warn('Stream ended without completion signal');
+              // Show accumulated content if stream ended early
+              if (accumulatedContent) {
+                setMessages(prev => prev.map(msg => 
+                  msg.id === aiMessageId 
+                    ? { ...msg, content: accumulatedContent }
+                    : msg
+                ));
+              }
               setIsTyping(false);
+              setThinkingMessage(null);
+              setActiveStreamingMessageId(null);
             }
             break;
           }
@@ -573,15 +632,28 @@ export default function ConsultationPage() {
                   setIsTyping(false);
                   setThinkingMessage(data.message);
                   console.log('🧠 State updated');
+                } else if (data.type === 'processing') {
+                  // Formula is being processed - show status to prevent "timeout" appearance
+                  console.log('⚙️ SSE: Processing status received:', data.message);
+                  setThinkingMessage(data.message || 'Creating your formula...');
                 } else if (data.type === 'chunk') {
-                  // Clear thinking status when content starts arriving
-                  setThinkingMessage(null);
+                  // Accumulate content and show cleaned version in real-time
+                  // This lets user see the "thinking" process without JSON code
+                  accumulatedContent += data.content;
                   
+                  // Display cleaned content (removes JSON blocks) in real-time
+                  const cleanedContent = removeJsonBlocks(accumulatedContent);
                   setMessages(prev => prev.map(msg => 
                     msg.id === aiMessageId 
-                      ? { ...msg, content: msg.content + data.content }
+                      ? { ...msg, content: cleanedContent }
                       : msg
                   ));
+                  
+                  // Clear initial thinking message once we have visible content
+                  // But allow processing messages to override this during formula creation
+                  if (cleanedContent.trim().length > 0 && thinkingMessage === 'Analyzing your health data...') {
+                    setThinkingMessage(null);
+                  }
                   
                   if (data.sessionId && !currentSessionId) {
                     setCurrentSessionId(data.sessionId);
@@ -596,20 +668,26 @@ export default function ConsultationPage() {
                     timestamp: new Date()
                   }]);
                 } else if (data.type === 'capsule_recommendation') {
-                  // AI is recommending a capsule count - show the selection modal
+                  // AI is recommending a capsule count - add inline selector to the current AI message
                   console.log('💊 Capsule recommendation received:', data.data);
-                  setCapsuleRecommendation(data.data);
-                  setShowCapsuleModal(true);
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, capsuleRecommendation: data.data }
+                      : msg
+                  ));
                 } else if (data.type === 'complete') {
                   completed = true;
                   setThinkingMessage(null); // Clear thinking status
+                  setActiveStreamingMessageId(null); // Now clear the streaming indicator
+                  
+                  // Now show the final accumulated content (cleaned by removeJsonBlocks during render)
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, content: accumulatedContent, formula: data.formula || msg.formula }
+                      : msg
+                  ));
+                  
                   if (data.formula) {
-                    setMessages(prev => prev.map(msg => 
-                      msg.id === aiMessageId 
-                        ? { ...msg, formula: data.formula }
-                        : msg
-                    ));
-                    
                     // Invalidate formula queries so the new formula appears in My Formula tab
                     queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/current'] });
                     queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/history'] });
@@ -622,6 +700,7 @@ export default function ConsultationPage() {
                     variant: "destructive"
                   });
                   setIsTyping(false);
+                  setActiveStreamingMessageId(null);
                   completed = true;
                 } else if (data.type === 'info') {
                   toast({
@@ -635,6 +714,7 @@ export default function ConsultationPage() {
                     variant: "destructive"
                   });
                   setIsTyping(false);
+                  setActiveStreamingMessageId(null);
                   completed = true;
                 }
               } catch (parseError) {
@@ -646,6 +726,7 @@ export default function ConsultationPage() {
       } catch (streamError) {
         console.error('Streaming error:', streamError);
         setIsTyping(false);
+        setActiveStreamingMessageId(null);
       } finally {
         try {
           reader.releaseLock();
@@ -680,6 +761,7 @@ export default function ConsultationPage() {
       }
       
       setIsTyping(false);
+      setActiveStreamingMessageId(null);
     } finally {
       clearTimeout(timeoutId);
     }
@@ -817,6 +899,8 @@ export default function ConsultationPage() {
     setUploadedFiles([]);
     setInputValue('');
     setShowSuggestions(false);
+    // Clear saved session when starting a new one
+    localStorage.removeItem(SESSION_KEY);
     
     toast({
       title: "New Consultation Started",
@@ -1127,6 +1211,7 @@ export default function ConsultationPage() {
   }, []);
   
   // Filter messages for search
+  // Filter messages for search
   const filteredMessages = useMemo(() => {
     if (!searchTerm.trim()) return messages;
     return messages.filter(msg => 
@@ -1134,24 +1219,202 @@ export default function ConsultationPage() {
     );
   }, [messages, searchTerm]);
 
-  // Handle capsule selection from modal
-  const handleCapsuleSelection = useCallback(async (capsuleCount: CapsuleCount) => {
-    console.log('💊 User selected', capsuleCount, 'capsules');
-    setPendingCapsuleSelection(capsuleCount);
-    setShowCapsuleModal(false);
+  // Handle inline capsule selection
+  const handleCapsuleSelection = useCallback(async (messageId: string, capsuleCount: CapsuleCount) => {
+    console.log('💊 User selected', capsuleCount, 'capsules for message', messageId);
+    console.log('💊 Current session ID:', currentSessionId);
     
-    // Send a message to the AI to proceed with the selected capsule count
-    const selectionMessage = `I'd like to proceed with ${capsuleCount} capsules per day. Please create my formula.`;
-    setInputValue(selectionMessage);
+    // Mark this message as "selecting" and update selected capsules
+    setSelectingCapsuleMessageId(messageId);
+    setMessages(prev => prev.map(msg => 
+      msg.id === messageId 
+        ? { ...msg, selectedCapsules: capsuleCount }
+        : msg
+    ));
     
-    // Auto-send after a brief delay
-    setTimeout(() => {
-      const sendButton = document.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
-      if (sendButton) {
-        sendButton.click();
+    // Auto-send message to create formula
+    const selectionMessage = `I'll take ${capsuleCount} capsules per day. Please create my formula now.`;
+    
+    // Use the existing send logic
+    setTimeout(async () => {
+      // Directly call the send message API
+      try {
+        const requestBody = {
+          message: selectionMessage,
+          sessionId: currentSessionId || undefined, // Don't send null
+          files: []
+        };
+        
+        console.log('💊 Sending capsule selection request:', requestBody);
+        
+        // Add user message to UI
+        const userMessage: Message = {
+          id: Date.now().toString(),
+          content: selectionMessage,
+          sender: 'user',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, userMessage]);
+        setIsTyping(true);
+        
+        const response = await fetch(buildApiUrl('/api/chat/stream'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders()
+          },
+          body: JSON.stringify(requestBody),
+          credentials: 'include'
+        });
+
+        console.log('💊 Response status:', response.status, response.statusText);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('💊 Error response:', errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        if (!response.body) {
+          throw new Error('No response body');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        let aiMessageId = (Date.now() + 1).toString();
+        let currentAiMessage: Message = {
+          id: aiMessageId,
+          content: '',
+          sender: 'ai',
+          timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, currentAiMessage]);
+        
+        let buffer = '';
+        let completed = false;
+        
+        // Accumulate content - don't show raw JSON during generation
+        let accumulatedContent = '';
+        setThinkingMessage('Creating your personalized formula...');
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            console.log('💊 Stream ended, completed:', completed);
+            // Show accumulated content if stream ended early
+            if (!completed && accumulatedContent) {
+              setMessages(prev => prev.map(msg => 
+                msg.id === aiMessageId 
+                  ? { ...msg, content: accumulatedContent }
+                  : msg
+              ));
+            }
+            setThinkingMessage(null);
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const jsonStr = line.slice(6).trim();
+                if (jsonStr === '') continue;
+                
+                const data = JSON.parse(jsonStr);
+                console.log('💊 SSE event:', data.type);
+                
+                if (data.type === 'connected') {
+                  console.log('💊 Connected to SSE');
+                } else if (data.type === 'thinking') {
+                  console.log('💊 AI thinking:', data.message);
+                  setThinkingMessage(data.message);
+                } else if (data.type === 'chunk') {
+                  // Accumulate and show cleaned content in real-time
+                  accumulatedContent += data.content;
+                  
+                  // Display cleaned content (removes JSON blocks) in real-time
+                  const cleanedContent = removeJsonBlocks(accumulatedContent);
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, content: cleanedContent }
+                      : msg
+                  ));
+                  
+                  // Clear thinking message once we have visible content
+                  if (cleanedContent.trim().length > 0) {
+                    setThinkingMessage(null);
+                  }
+                } else if (data.type === 'complete') {
+                  completed = true;
+                  setThinkingMessage(null);
+                  console.log('💊 Stream complete, formula:', !!data.formula);
+                  
+                  // Now show the final accumulated content
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, content: accumulatedContent, formula: data.formula || msg.formula }
+                      : msg
+                  ));
+                  
+                  if (data.formula) {
+                    queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/current'] });
+                    queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/history'] });
+                    toast({
+                      title: "Formula Created!",
+                      description: "Your personalized supplement formula has been created.",
+                    });
+                  }
+                  setIsTyping(false);
+                  setSelectingCapsuleMessageId(null);
+                } else if (data.type === 'formula_error') {
+                  console.error('💊 Formula error:', data.error);
+                  toast({
+                    title: "Formula Validation Error",
+                    description: data.error,
+                    variant: "destructive"
+                  });
+                  setIsTyping(false);
+                  setSelectingCapsuleMessageId(null);
+                  completed = true;
+                } else if (data.type === 'error') {
+                  console.error('💊 SSE error:', data.error);
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, content: msg.content + '\n\n⚠️ ' + (data.error || 'An error occurred.'), isError: true }
+                      : msg
+                  ));
+                  setIsTyping(false);
+                  setSelectingCapsuleMessageId(null);
+                  completed = true;
+                }
+              } catch (parseError) {
+                console.error('💊 Parse error:', parseError, 'Line:', line);
+              }
+            }
+          }
+        }
+        
+        // Stream ended - ensure typing state is cleared
+        setIsTyping(false);
+        setSelectingCapsuleMessageId(null);
+        reader.releaseLock();
+      } catch (error) {
+        console.error('Error sending capsule selection:', error);
+        setIsTyping(false);
+        setSelectingCapsuleMessageId(null);
+        toast({
+          title: "Error",
+          description: "Failed to create formula. Please try again.",
+          variant: "destructive"
+        });
       }
     }, 100);
-  }, []);
+  }, [currentSessionId, queryClient, toast]);
 
   // Debug: Log render state
   console.log('🔍 RENDER STATE - isTyping:', isTyping, 'thinkingMessage:', thinkingMessage);
@@ -1374,7 +1637,7 @@ export default function ConsultationPage() {
                         <img 
                           src="/ones-logo-icon.svg" 
                           alt="ONES" 
-                          className={`h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0 ${!message.content && (isTyping || thinkingMessage) ? 'animate-spin' : ''}`}
+                          className={`h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0 ${message.id === activeStreamingMessageId ? 'animate-spin' : ''}`}
                         />
                       )}
                       {message.sender === 'user' && (
@@ -1416,13 +1679,24 @@ export default function ConsultationPage() {
                     
                     {/* Message content - left aligned */}
                     <div className="w-full">
-                      {/* Show thinking indicator if AI message is empty/thinking */}
-                      {message.sender === 'ai' && !message.content && (isTyping || thinkingMessage) ? (
-                        <p className="text-sm text-muted-foreground">
-                          {thinkingMessage || 'Analyzing your health data...'}
-                        </p>
+                      {/* Show thinking indicator ONLY when this specific message is streaming and has no content yet */}
+                      {message.sender === 'ai' && message.id === activeStreamingMessageId && !message.content ? (
+                        <ThinkingIndicator message={thinkingMessage || 'Analyzing your health data...'} />
                       ) : (
                         <p className="text-sm whitespace-pre-wrap leading-relaxed">{removeJsonBlocks(message.content)}</p>
+                      )}
+                      
+                      {/* Inline Capsule Selector */}
+                      {message.capsuleRecommendation && (
+                        <InlineCapsuleSelector
+                          recommendedCapsules={message.capsuleRecommendation.recommendedCapsules}
+                          reasoning={message.capsuleRecommendation.reasoning}
+                          priorities={message.capsuleRecommendation.priorities}
+                          estimatedAmazonCost={message.capsuleRecommendation.estimatedAmazonCost}
+                          onSelect={(count) => handleCapsuleSelection(message.id, count)}
+                          isSelecting={selectingCapsuleMessageId === message.id}
+                          selectedCapsules={message.selectedCapsules}
+                        />
                       )}
                       
                       {/* File Attachment Display */}
@@ -1550,6 +1824,20 @@ export default function ConsultationPage() {
           </div>
         </ScrollArea>
         
+        {/* Processing Indicator - Shows thinking/processing status during AI operations */}
+        {thinkingMessage && (
+          <div className="border-t border-border/50 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 px-4 py-3">
+            <div className="flex items-center gap-3 justify-center">
+              <div className="flex space-x-1">
+                <span className="animate-bounce [animation-delay:-0.3s] h-2 w-2 rounded-full bg-primary"></span>
+                <span className="animate-bounce [animation-delay:-0.15s] h-2 w-2 rounded-full bg-primary"></span>
+                <span className="animate-bounce h-2 w-2 rounded-full bg-primary"></span>
+              </div>
+              <span className="text-sm font-medium text-foreground">{thinkingMessage}</span>
+            </div>
+          </div>
+        )}
+        
         {/* Modern Input Area */}
         <div className="border-t bg-background/95 backdrop-blur-sm safe-bottom">
           <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
@@ -1587,6 +1875,9 @@ export default function ConsultationPage() {
             <div className="space-y-3">
               <Textarea
                 ref={textareaRef}
+                id="consultation-message"
+                name="consultation-message"
+                autoComplete="off"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyPress}
@@ -1709,19 +2000,6 @@ export default function ConsultationPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Capsule Selection Modal */}
-      <CapsuleSelectionModal
-        open={showCapsuleModal}
-        onOpenChange={setShowCapsuleModal}
-        recommendedCapsules={capsuleRecommendation?.recommendedCapsules || 9}
-        onSelect={handleCapsuleSelection}
-        reasoning={capsuleRecommendation?.reasoning}
-        amazonComparison={capsuleRecommendation ? {
-          amazonPrice: capsuleRecommendation.estimatedAmazonCost,
-          ingredientCount: capsuleRecommendation.priorities?.length ? capsuleRecommendation.priorities.length * 3 : 10
-        } : undefined}
-      />
     </div>
   );
 }

@@ -21,9 +21,6 @@ import type { Formula } from '@shared/schema';
 import { calculateDosage, CAPSULE_TIER_INFO, type CapsuleCount } from '@/lib/utils';
 import { useState } from 'react';
 import { ProfileCompletionDialog } from '@/components/ProfileCompletionDialog';
-import { SupplementTrackerCard } from '@/components/dashboard/SupplementTrackerCard';
-import { StreakRewardsCard } from '@/components/dashboard/StreakRewardsCard';
-import { FEATURES } from '@/config/features';
 
 // Map next actions to their appropriate routes
 function getNextActionRoute(nextAction: string): string {
@@ -203,14 +200,6 @@ export default function HomePage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Supplement Tracking & Streak Rewards - Only show for users with formula */}
-      {currentFormula && FEATURES.STREAK_REWARDS && (
-        <div className="grid gap-4 md:grid-cols-2 items-stretch">
-          <SupplementTrackerCard />
-          <StreakRewardsCard />
-        </div>
-      )}
 
       {/* New User Onboarding - V2 Styled */}
       {isNewUser && (

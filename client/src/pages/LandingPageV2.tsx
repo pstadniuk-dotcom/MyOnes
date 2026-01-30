@@ -1,12 +1,13 @@
 import HeaderV2 from "@/components/HeaderV2";
 import HeroSectionV2 from "@/components/HeroSectionV2";
+import MembershipValueSection from "@/components/MembershipValueSection";
 import ProblemSectionV2 from "@/components/ProblemSectionV2";
 import HowItWorksSectionV2 from "@/components/HowItWorksSectionV2";
-import LifestyleBannerV2 from "@/components/LifestyleBannerV2";
 import PersonalizationShowcase from "@/components/PersonalizationShowcase";
 import ScienceSectionV2 from "@/components/ScienceSectionV2";
+import MembershipPricingSection from "@/components/MembershipPricingSection";
+import SupplementPricingSection from "@/components/SupplementPricingSection";
 import TestimonialsSectionV2 from "@/components/TestimonialsSectionV2";
-import PricingSectionV2 from "@/components/PricingSectionV2";
 import FAQSectionV2 from "@/components/FAQSectionV2";
 import CTASectionV2 from "@/components/CTASectionV2";
 import FooterV2 from "@/components/FooterV2";
@@ -20,14 +21,17 @@ export default function LandingPageV2() {
         <div className="pt-20">
           <HeroSectionV2 />
         </div>
+        <MembershipValueSection />
         <ProblemSectionV2 />
         <HowItWorksSectionV2 />
         <PersonalizationShowcase />
         <ScienceSectionV2 />
-        <TestimonialsSectionV2 />
-        <LifestyleBannerV2 />
         <div id="pricing">
-          <PricingSectionV2 />
+          <MembershipPricingSection />
+        </div>
+        <SupplementPricingSection />
+        <div id="testimonials">
+          <TestimonialsSectionV2 />
         </div>
         <FAQSectionV2 />
         <CTASectionV2 />

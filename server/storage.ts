@@ -13,6 +13,7 @@ import {
   optimizePlans, optimizeDailyLogs, workoutPlans, workouts, workoutLogs, workoutPreferences,
   mealPlans, recipes, mealLogs, groceryLists, optimizeSmsPreferences, trackingPreferences, userStreaks,
   dailyCompletions, weeklySummaries, exerciseRecords, passwordResetTokens, userAdminNotes,
+  membershipTiers,
   type User, type InsertUser,
   type HealthProfile, type InsertHealthProfile,
   type ChatSession, type InsertChatSession,
@@ -53,7 +54,8 @@ import {
   type UserStreak, type InsertUserStreak,
   type DailyCompletion, type InsertDailyCompletion,
   type WeeklySummary, type InsertWeeklySummary,
-  type ExerciseRecord, type InsertExerciseRecord
+  type ExerciseRecord, type InsertExerciseRecord,
+  type MembershipTier, type InsertMembershipTier
 } from "@shared/schema";
 
 export interface IStorage {
@@ -66,6 +68,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
   updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
+  deleteUser(id: string): Promise<boolean>;
   
   // Password reset operations
   createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
@@ -300,6 +303,21 @@ export interface IStorage {
   applyStreakDiscount(userId: string, orderId: string): Promise<number>; // Returns discount applied
   resetStreakForLapsedUsers(): Promise<number>; // Returns count of users reset
   updateStreakStatuses(): Promise<void>; // Called by cron to update warning/grace statuses
+  
+  // Membership Tier operations
+  getMembershipTier(tierKey: string): Promise<MembershipTier | undefined>;
+  getAllMembershipTiers(): Promise<MembershipTier[]>;
+  getAvailableMembershipTier(): Promise<MembershipTier | undefined>; // Returns the current tier with available capacity
+  createMembershipTier(tier: InsertMembershipTier): Promise<MembershipTier>;
+  updateMembershipTier(tierKey: string, updates: Partial<InsertMembershipTier>): Promise<MembershipTier | undefined>;
+  incrementTierCount(tierKey: string): Promise<MembershipTier | undefined>;
+  decrementTierCount(tierKey: string): Promise<MembershipTier | undefined>;
+  
+  // User membership operations
+  assignUserMembership(userId: string, tierKey: string, priceCents: number): Promise<User | undefined>;
+  cancelUserMembership(userId: string): Promise<User | undefined>;
+  getUsersByMembershipTier(tierKey: string): Promise<User[]>;
+  getMembershipStats(): Promise<{ tier: string; count: number; capacity: number }[]>;
 }
 
 type DbInsertMessage = typeof messages.$inferInsert;
@@ -573,6 +591,16 @@ export class DrizzleStorage implements IStorage {
         .where(eq(users.id, userId));
     } catch (error) {
       console.error('Error updating user password:', error);
+      throw error;
+    }
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    try {
+      const result = await db.delete(users).where(eq(users.id, id)).returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error('Error deleting user:', error);
       throw error;
     }
   }
@@ -5587,6 +5615,206 @@ export class DrizzleStorage implements IStorage {
       return result;
     } catch (error) {
       console.error('Error exporting orders:', error);
+      return [];
+    }
+  }
+
+  // ============================================
+  // MEMBERSHIP TIER OPERATIONS
+  // ============================================
+
+  async getMembershipTier(tierKey: string): Promise<MembershipTier | undefined> {
+    try {
+      const [tier] = await db
+        .select()
+        .from(membershipTiers)
+        .where(eq(membershipTiers.tierKey, tierKey));
+      return tier || undefined;
+    } catch (error) {
+      console.error('Error getting membership tier:', error);
+      return undefined;
+    }
+  }
+
+  async getAllMembershipTiers(): Promise<MembershipTier[]> {
+    try {
+      return await db
+        .select()
+        .from(membershipTiers)
+        .orderBy(membershipTiers.sortOrder);
+    } catch (error) {
+      console.error('Error getting all membership tiers:', error);
+      return [];
+    }
+  }
+
+  async getAvailableMembershipTier(): Promise<MembershipTier | undefined> {
+    try {
+      // Find the first active tier that has available capacity
+      const tiers = await db
+        .select()
+        .from(membershipTiers)
+        .where(eq(membershipTiers.isActive, true))
+        .orderBy(membershipTiers.sortOrder);
+      
+      for (const tier of tiers) {
+        // If maxCapacity is null, it means unlimited
+        if (tier.maxCapacity === null || tier.currentCount < tier.maxCapacity) {
+          return tier;
+        }
+      }
+      return undefined;
+    } catch (error) {
+      console.error('Error getting available membership tier:', error);
+      return undefined;
+    }
+  }
+
+  async createMembershipTier(tier: InsertMembershipTier): Promise<MembershipTier> {
+    const [created] = await db
+      .insert(membershipTiers)
+      .values({
+        ...tier,
+        benefits: tier.benefits ? [...tier.benefits] : null
+      })
+      .returning();
+    return created;
+  }
+
+  async updateMembershipTier(tierKey: string, updates: Partial<InsertMembershipTier>): Promise<MembershipTier | undefined> {
+    try {
+      const [updated] = await db
+        .update(membershipTiers)
+        .set({ 
+          ...updates, 
+          benefits: updates.benefits ? [...updates.benefits] : updates.benefits,
+          updatedAt: new Date() 
+        })
+        .where(eq(membershipTiers.tierKey, tierKey))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error('Error updating membership tier:', error);
+      return undefined;
+    }
+  }
+
+  async incrementTierCount(tierKey: string): Promise<MembershipTier | undefined> {
+    try {
+      const [updated] = await db
+        .update(membershipTiers)
+        .set({ 
+          currentCount: sql`${membershipTiers.currentCount} + 1`,
+          updatedAt: new Date()
+        })
+        .where(eq(membershipTiers.tierKey, tierKey))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error('Error incrementing tier count:', error);
+      return undefined;
+    }
+  }
+
+  async decrementTierCount(tierKey: string): Promise<MembershipTier | undefined> {
+    try {
+      const [updated] = await db
+        .update(membershipTiers)
+        .set({ 
+          currentCount: sql`GREATEST(${membershipTiers.currentCount} - 1, 0)`,
+          updatedAt: new Date()
+        })
+        .where(eq(membershipTiers.tierKey, tierKey))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error('Error decrementing tier count:', error);
+      return undefined;
+    }
+  }
+
+  // ============================================
+  // USER MEMBERSHIP OPERATIONS
+  // ============================================
+
+  async assignUserMembership(userId: string, tierKey: string, priceCents: number): Promise<User | undefined> {
+    try {
+      const [updated] = await db
+        .update(users)
+        .set({
+          membershipTier: tierKey,
+          membershipPriceCents: priceCents,
+          membershipLockedAt: new Date(),
+          membershipCancelledAt: null
+        })
+        .where(eq(users.id, userId))
+        .returning();
+      
+      // Increment the tier count
+      if (updated) {
+        await this.incrementTierCount(tierKey);
+      }
+      
+      return updated || undefined;
+    } catch (error) {
+      console.error('Error assigning user membership:', error);
+      return undefined;
+    }
+  }
+
+  async cancelUserMembership(userId: string): Promise<User | undefined> {
+    try {
+      // Get user's current tier before cancelling
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user || !user.membershipTier) {
+        return undefined;
+      }
+
+      const [updated] = await db
+        .update(users)
+        .set({
+          membershipCancelledAt: new Date()
+        })
+        .where(eq(users.id, userId))
+        .returning();
+      
+      // Decrement the tier count
+      if (updated && user.membershipTier) {
+        await this.decrementTierCount(user.membershipTier);
+      }
+      
+      return updated || undefined;
+    } catch (error) {
+      console.error('Error cancelling user membership:', error);
+      return undefined;
+    }
+  }
+
+  async getUsersByMembershipTier(tierKey: string): Promise<User[]> {
+    try {
+      return await db
+        .select()
+        .from(users)
+        .where(and(
+          eq(users.membershipTier, tierKey),
+          isNull(users.membershipCancelledAt)
+        ));
+    } catch (error) {
+      console.error('Error getting users by membership tier:', error);
+      return [];
+    }
+  }
+
+  async getMembershipStats(): Promise<{ tier: string; count: number; capacity: number }[]> {
+    try {
+      const tiers = await this.getAllMembershipTiers();
+      return tiers.map(tier => ({
+        tier: tier.tierKey,
+        count: tier.currentCount,
+        capacity: tier.maxCapacity || 0 // 0 means unlimited
+      }));
+    } catch (error) {
+      console.error('Error getting membership stats:', error);
       return [];
     }
   }

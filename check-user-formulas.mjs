@@ -6,46 +6,33 @@ const pool = new Pool({
 });
 
 try {
-  // Check the actual columns in formulas table
-  const cols = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'formulas'");
-  console.log('Formula columns:', cols.rows.map(r => r.column_name));
-
-  // Find the user
-  const user = await pool.query(`SELECT id, email, created_at FROM users WHERE email = 'pstadniuk@gmail.com'`);
-  console.log('\nUser:', user.rows[0]);
+  // Replicate the exact query from getCurrentFormulaByUser
+  const userId = '1f7f26d5-bcc7-46f0-a671-c7a793432be1';
   
-  if (user.rows.length > 0) {
-    const userId = user.rows[0].id;
-    
-    // Check all formulas for this user
-    const formulas = await pool.query(`
-      SELECT * 
-      FROM formulas 
-      WHERE user_id = $1 
-      ORDER BY created_at DESC
-    `, [userId]);
-    console.log('\nFormulas count:', formulas.rows.length);
-    formulas.rows.forEach(f => {
-      console.log(f);
-    });
+  console.log('=== Testing getCurrentFormulaByUser query ===');
+  const currentFormula = await pool.query(`
+    SELECT id, version, total_mg, created_at, archived_at 
+    FROM formulas 
+    WHERE user_id = $1 AND archived_at IS NULL
+    ORDER BY created_at DESC
+    LIMIT 1
+  `, [userId]);
+  
+  console.log('Current formula result:', currentFormula.rows);
+  
+  console.log('\n=== All formulas with archived_at status ===');
+  const all = await pool.query(`
+    SELECT id, version, total_mg, created_at, archived_at 
+    FROM formulas 
+    WHERE user_id = $1
+    ORDER BY created_at DESC
+    LIMIT 10
+  `, [userId]);
+  
+  all.rows.forEach(r => {
+    console.log(`v${r.version}: created ${r.created_at}, archived_at: ${r.archived_at}`);
+  });
 
-    // Check for non-archived formulas
-    const activeFormulas = formulas.rows.filter(f => f.archived_at === null);
-    console.log('\nActive (non-archived) formulas:', activeFormulas.length);
-    activeFormulas.forEach(f => {
-      console.log({
-        id: f.id.substring(0, 8),
-        version: f.version,
-        total_mg: f.total_mg,
-        created_at: f.created_at,
-        bases: f.bases?.map(b => b.ingredient),
-        additions: f.additions?.map(a => a.ingredient)
-      });
-    });
-    
-    const archivedFormulas = formulas.rows.filter(f => f.archived_at !== null);
-    console.log('\nArchived formulas:', archivedFormulas.length);
-  }
 } catch (e) {
   console.error('Error:', e.message);
 } finally {

@@ -100,7 +100,7 @@ export default function HeaderV2() {
                 </Link>
                 <Link href="/signup">
                   <Button className="bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-6">
-                    Get Started
+                    Join ONES
                   </Button>
                 </Link>
               </>

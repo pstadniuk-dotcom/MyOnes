@@ -9,7 +9,7 @@ const chatMessages = [
   { role: "user", text: "I want more energy and better focus throughout the day." },
   { role: "assistant", text: "Got it. Do you have any recent blood work I can analyze? And are you taking any medications?" },
   { role: "user", text: "Yes, I uploaded my labs. I take sertraline for anxiety." },
-  { role: "assistant", text: "Perfect. Based on your labs, I see low magnesium and B12. I'm building a formula with Ashwagandha, Magnesium Glycinate, and L-Theanine - all safe with sertraline." },
+  { role: "assistant", text: "Perfect. Based on your labs, I see low magnesium and B12. I'm building a formula with Ashwagandha, Magnesium Glycinate, and L-Theanine, all safe with sertraline." },
 ];
 
 export default function HeroSectionV2() {
@@ -35,19 +35,20 @@ export default function HeroSectionV2() {
             <div className="inline-flex items-center gap-2 bg-[#1B4332]/5 px-4 py-2 rounded-full">
               <span className="w-2 h-2 bg-[#1B4332] rounded-full animate-pulse" />
               <span className="text-sm text-[#1B4332] font-medium tracking-wide">
-                AI-Powered Personalization
+                AI Powered Personalization
               </span>
             </div>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl text-[#1B4332] leading-[1.1] tracking-tight">
-              <span className="font-bold">One Supplement.</span>
+              <span className="font-bold">One supplement.</span>
               <br />
-              <span className="font-light italic">Built for One Person.</span>
+              <span className="font-light italic">Built from your data.</span>
             </h1>
             
             <p className="text-xl text-[#52796F] leading-relaxed">
-              One daily formula, built from your bloodwork, lifestyle, and goals. 
-              No generic multivitamins. No guesswork. Just what your body actually needs.
+              ONES analyzes your labs, wearables, and health goals to create a 
+              personalized supplement formula that evolves with you. 
+              No guesswork. No shelf full of bottles.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 pt-2">
@@ -60,15 +61,16 @@ export default function HeroSectionV2() {
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Link href="/science">
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                  className="border-[#1B4332]/20 text-[#1B4332] hover:bg-[#1B4332]/5 px-8 py-6 text-lg rounded-full"
-                >
-                  See the Science
-                </Button>
-              </Link>
+              <Button 
+                variant="outline" 
+                size="lg"
+                className="border-[#1B4332]/20 text-[#1B4332] hover:bg-[#1B4332]/5 px-8 py-6 text-lg rounded-full"
+                onClick={() => {
+                  document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                See How It Works
+              </Button>
             </div>
             
             {/* Mini Progression */}
@@ -79,10 +81,10 @@ export default function HeroSectionV2() {
               <span className="text-[#1B4332] font-medium">Upload Labs</span>
               <span className="text-[#1B4332]/40 hidden sm:inline">→</span>
               <span className="text-[#1B4332]/40 sm:hidden">•</span>
-              <span className="text-[#1B4332] font-medium">Your Capsule</span>
+              <span className="text-[#1B4332] font-medium">Your Formula</span>
               <span className="text-[#1B4332]/40 hidden sm:inline">→</span>
               <span className="text-[#1B4332]/40 sm:hidden">•</span>
-              <span className="text-[#1B4332] font-medium">Sync Wearables</span>
+              <span className="text-[#1B4332] font-medium">Ongoing Updates</span>
             </div>
           </div>
           

@@ -3,28 +3,36 @@ import { ChevronDown } from "lucide-react";
 
 const faqs = [
   {
-    question: "How is this different from other personalized vitamins?",
-    answer: "ONES uses advanced AI to analyze your complete health profile, including blood tests, lifestyle factors, and health goals. Unlike other services that use simple questionnaires, we create truly personalized formulas that evolve with your health journey. Our AI considers interactions between ingredients and optimizes dosages based on the latest scientific research."
+    question: "What's included in the membership?",
+    answer: "Your membership includes unlimited AI health consultations, lab and wearable data analysis, personalized supplement formula recommendations, formula updates as your health changes, and access to near cost diagnostic testing. You get ongoing optimization, not just a one time recommendation."
+  },
+  {
+    question: "How is supplement pricing determined?",
+    answer: "Your supplement cost depends on your personalized formula: the total daily milligrams, the number of active ingredients, and the sourcing quality of each ingredient. Premium bioavailable forms cost more than basic forms. Typical monthly cost ranges from $100 to $200. You see your exact price before you order, with no hidden fees or markup games."
+  },
+  {
+    question: "What happens if I cancel my membership?",
+    answer: "You can cancel anytime with no penalties. If you rejoin within 3 months, you keep your original membership rate. After 3 months, you'll join at whatever tier is currently available. We believe in earning your membership every month, not locking you into contracts."
+  },
+  {
+    question: "Will my membership rate ever increase?",
+    answer: "No. Your membership rate is locked forever from the day you become a paying member. If you join as a Founding Member at $19 per month, that's your rate for life."
+  },
+  {
+    question: "How is ONES different from other personalized vitamins?",
+    answer: "Most personalized vitamin companies use a simple quiz to recommend from a preset menu of formulas. ONES uses AI to analyze your actual lab results and wearable data, then builds a truly custom formula. And we continuously update your recommendations as your health data changes."
+  },
+  {
+    question: "Do I have to buy supplements as a member?",
+    answer: "No. Your membership gives you access to the AI consultations and analysis. You can upload labs, connect wearables, and get personalized recommendations without purchasing supplements. When you're ready, you can order your personalized formula, but it's never required."
+  },
+  {
+    question: "How do the lab tests work?",
+    answer: "We partner with certified diagnostic labs to offer the same comprehensive tests as premium health platforms, but at near cost pricing. You order through your dashboard, visit a local lab or use an at home kit, and results sync directly to your ONES profile for AI analysis. Lab testing is always optional but helps us give you better recommendations."
   },
   {
     question: "What if I'm taking medications?",
-    answer: "Our AI system is trained to identify potential interactions between supplements and medications. During your consultation, you'll share all medications you're taking, and our system will ensure your formula is safe and complementary. We always recommend consulting with your healthcare provider before starting any new supplement regimen, especially if you have existing medical conditions."
-  },
-  {
-    question: "Can I see what's in my formula before ordering?",
-    answer: "Absolutely! After your AI consultation, you'll receive a detailed breakdown of your personalized formula, including each ingredient, dosage, and the scientific reasoning behind its inclusion. You can review everything before placing your order and even request modifications if needed."
-  },
-  {
-    question: "How do orders work?",
-    answer: "You purchase a 3-month, 6-month, or 12-month supply of your custom formula. When you're ready to reorder, you'll have a consultation to discuss how you're feeling and any changes in your health or lifestyle. Our AI analyzes this data and may adjust your formula for your next order to optimize your results."
-  },
-  {
-    question: "What if I don't see results?",
-    answer: "Health optimization is a journey, and we're committed to finding what works for you. Most people see improvements in energy and sleep within 2-4 weeks. If you're not noticing positive changes, we'll work with you through follow-up consultations to adjust your formula. Since each formula is custom-made specifically for you, we cannot accept returns, but we're dedicated to optimizing your results."
-  },
-  {
-    question: "Are your supplements third-party tested?",
-    answer: "Yes, every batch of supplements is tested by independent laboratories for purity, potency, and contaminants. We manufacture in cGMP-certified facilities following current Good Manufacturing Practices. You can access your batch's certificate of analysis through your account dashboard."
+    answer: "Our AI system is trained to identify potential interactions between supplements and medications. During your consultation, you'll share all medications you're taking, and our system will ensure your formula is safe and complementary. We always recommend consulting with your healthcare provider before starting any new supplement regimen."
   }
 ];
 

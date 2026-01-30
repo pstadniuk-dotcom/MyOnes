@@ -93,8 +93,6 @@ export function SupplementTrackerCard() {
     onSuccess: (_, { taken }) => {
       // Invalidate queries to refresh data from server
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/wellness'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/optimize/streaks/smart'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/streaks/rewards'] });
       
       if (taken) {
         toast({
