@@ -432,7 +432,7 @@ const FORMULA_LIMITS = {
   DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance for rounding differences
   BUDGET_TOLERANCE_PERCENT: 0.05, // Allow 5% over capsule budget
   MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg
-  MIN_INGREDIENT_COUNT: 8,       // Minimum number of unique ingredients per formula
+  MIN_INGREDIENT_COUNT: 6,       // Minimum number of unique ingredients per formula (lowered from 8 to support 6-cap formulas)
   MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
 
