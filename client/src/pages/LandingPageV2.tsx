@@ -1,9 +1,9 @@
 import HeaderV2 from "@/components/HeaderV2";
 import HeroSectionV2 from "@/components/HeroSectionV2";
 import MembershipValueSection from "@/components/MembershipValueSection";
-import ProblemSectionV2 from "@/components/ProblemSectionV2";
+import InterventionSection from "@/components/InterventionSection";
+import CompetitiveComparisonSection from "@/components/CompetitiveComparisonSection";
 import HowItWorksSectionV2 from "@/components/HowItWorksSectionV2";
-import PersonalizationShowcase from "@/components/PersonalizationShowcase";
 import ScienceSectionV2 from "@/components/ScienceSectionV2";
 import MembershipPricingSection from "@/components/MembershipPricingSection";
 import SupplementPricingSection from "@/components/SupplementPricingSection";
@@ -22,9 +22,9 @@ export default function LandingPageV2() {
           <HeroSectionV2 />
         </div>
         <MembershipValueSection />
-        <ProblemSectionV2 />
+        <InterventionSection />
+        <CompetitiveComparisonSection />
         <HowItWorksSectionV2 />
-        <PersonalizationShowcase />
         <ScienceSectionV2 />
         <div id="pricing">
           <MembershipPricingSection />

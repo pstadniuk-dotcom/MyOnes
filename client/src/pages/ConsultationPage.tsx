@@ -1290,6 +1290,8 @@ export default function ConsultationPage() {
           timestamp: new Date()
         };
 
+        // Set streaming indicator BEFORE adding message
+        setActiveStreamingMessageId(aiMessageId);
         setMessages(prev => [...prev, currentAiMessage]);
         
         let buffer = '';
@@ -1312,6 +1314,7 @@ export default function ConsultationPage() {
               ));
             }
             setThinkingMessage(null);
+            setActiveStreamingMessageId(null);
             break;
           }
 
@@ -1370,6 +1373,7 @@ export default function ConsultationPage() {
                     });
                   }
                   setIsTyping(false);
+                  setActiveStreamingMessageId(null);
                   setSelectingCapsuleMessageId(null);
                 } else if (data.type === 'formula_error') {
                   console.error('💊 Formula error:', data.error);
@@ -1379,6 +1383,7 @@ export default function ConsultationPage() {
                     variant: "destructive"
                   });
                   setIsTyping(false);
+                  setActiveStreamingMessageId(null);
                   setSelectingCapsuleMessageId(null);
                   completed = true;
                 } else if (data.type === 'error') {
@@ -1389,6 +1394,7 @@ export default function ConsultationPage() {
                       : msg
                   ));
                   setIsTyping(false);
+                  setActiveStreamingMessageId(null);
                   setSelectingCapsuleMessageId(null);
                   completed = true;
                 }
@@ -1401,11 +1407,13 @@ export default function ConsultationPage() {
         
         // Stream ended - ensure typing state is cleared
         setIsTyping(false);
+        setActiveStreamingMessageId(null);
         setSelectingCapsuleMessageId(null);
         reader.releaseLock();
       } catch (error) {
         console.error('Error sending capsule selection:', error);
         setIsTyping(false);
+        setActiveStreamingMessageId(null);
         setSelectingCapsuleMessageId(null);
         toast({
           title: "Error",
@@ -1692,7 +1700,6 @@ export default function ConsultationPage() {
                           recommendedCapsules={message.capsuleRecommendation.recommendedCapsules}
                           reasoning={message.capsuleRecommendation.reasoning}
                           priorities={message.capsuleRecommendation.priorities}
-                          estimatedAmazonCost={message.capsuleRecommendation.estimatedAmazonCost}
                           onSelect={(count) => handleCapsuleSelection(message.id, count)}
                           isSelecting={selectingCapsuleMessageId === message.id}
                           selectedCapsules={message.selectedCapsules}

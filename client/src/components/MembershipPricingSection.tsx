@@ -17,10 +17,10 @@ interface MembershipTier {
 
 // Fallback tiers if API fails
 const fallbackTiers = [
-  { id: 'founding', name: 'Founding', limit: 250, claimed: 0, priceMonthly: 19, priceYearly: 199, active: true },
-  { id: 'early', name: 'Early', limit: 1000, claimed: 0, priceMonthly: 29, priceYearly: 299, active: false },
-  { id: 'beta', name: 'Beta', limit: 5000, claimed: 0, priceMonthly: 39, priceYearly: 399, active: false },
-  { id: 'standard', name: 'Standard', limit: null as number | null, claimed: 0, priceMonthly: 49, priceYearly: 499, active: false },
+  { id: 'founding', name: 'Founding', limit: 250, claimed: 0, priceMonthly: 9, priceYearly: 99, active: true },
+  { id: 'early', name: 'Early', limit: 1000, claimed: 0, priceMonthly: 15, priceYearly: 149, active: false },
+  { id: 'beta', name: 'Beta', limit: 5000, claimed: 0, priceMonthly: 19, priceYearly: 199, active: false },
+  { id: 'standard', name: 'Standard', limit: null as number | null, claimed: 0, priceMonthly: 29, priceYearly: 299, active: false },
 ];
 
 const membershipIncludes = [

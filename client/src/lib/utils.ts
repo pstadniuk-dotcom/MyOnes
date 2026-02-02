@@ -5,8 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Valid capsule count options (minimum 6, no 3-capsule option)
-export const VALID_CAPSULE_COUNTS = [6, 9, 12, 15] as const;
+// Valid capsule count options (6, 9, or 12 - no 15-capsule option, that's too many daily)
+export const VALID_CAPSULE_COUNTS = [6, 9, 12] as const;
 export type CapsuleCount = typeof VALID_CAPSULE_COUNTS[number];
 
 // Capsule capacity in mg
@@ -17,7 +17,6 @@ export const CAPSULE_PRICING: Record<CapsuleCount, { monthlyPrice: number; perCa
   6: { monthlyPrice: 89, perCapsule: 0.49 },
   9: { monthlyPrice: 119, perCapsule: 0.44 },
   12: { monthlyPrice: 149, perCapsule: 0.41 },
-  15: { monthlyPrice: 179, perCapsule: 0.40 },
 };
 
 // Capsule tier descriptions for UI
@@ -34,13 +33,8 @@ export const CAPSULE_TIER_INFO: Record<CapsuleCount, { label: string; descriptio
   },
   12: { 
     label: 'Therapeutic', 
-    description: 'Enhanced intensity for complex needs',
+    description: 'Maximum intensity for complex needs',
     features: ['15-18 ingredients', '4 per meal', 'Higher doses']
-  },
-  15: { 
-    label: 'Maximum', 
-    description: 'Maximum protocol, all bases covered',
-    features: ['18-22 ingredients', '5 per meal', 'Full optimization']
   },
 };
 

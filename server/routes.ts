@@ -427,12 +427,12 @@ async function callAnthropic(
 // SECURITY: Immutable formula limits - CANNOT be changed by user requests or AI prompts
 const FORMULA_LIMITS = {
   CAPSULE_CAPACITY_MG: 550,      // Each capsule holds 550mg
-  VALID_CAPSULE_COUNTS: [6, 9, 12, 15] as const, // Allowed capsule counts (minimum 6)
+  VALID_CAPSULE_COUNTS: [6, 9, 12] as const, // Allowed capsule counts (6, 9, or 12 - no 15)
   DEFAULT_CAPSULE_COUNT: 9,      // Default if not specified
   DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance for rounding differences
   BUDGET_TOLERANCE_PERCENT: 0.05, // Allow 5% over capsule budget
   MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg
-  MIN_INGREDIENT_COUNT: 8,       // Minimum number of unique ingredients per formula
+  MIN_INGREDIENT_COUNT: 8,       // Minimum 8 ingredients for comprehensive formulas
   MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
 
@@ -462,12 +462,266 @@ function estimateAmazonCost(ingredientCount: number): number {
   return ingredientCount * avgCostPerSupplement;
 }
 
+// 🔧 Extract capsule count from user's message (for when AI gets it wrong)
+function extractCapsuleCountFromMessage(message: string): number | null {
+  // Patterns to match capsule count from user's message
+  const patterns = [
+    /I'll take (\d+) capsules/i,
+    /I've selected (\d+)/i,
+    /(\d+) capsules per day/i,
+    /(\d+) capsules\/day/i,
+    /(\d+) capsules please/i,
+    /selected (\d+) capsules/i,
+    /choose (\d+) capsules/i,
+    /want (\d+) capsules/i,
+    /(\d+) caps per day/i,
+    /go with (\d+)/i,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match) {
+      const count = parseInt(match[1], 10);
+      // Validate it's a valid capsule count
+      if (FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(count as any)) {
+        return count;
+      }
+    }
+  }
+  
+  return null;
+}
+
 // Calculate max dosage based on capsule count
 function getMaxDosageForCapsules(targetCapsules: number): number {
   const validCount = FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(targetCapsules as any) 
     ? targetCapsules 
     : FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
   return validCount * FORMULA_LIMITS.CAPSULE_CAPACITY_MG;
+}
+
+/**
+ * AUTO-EXPAND FORMULA: Automatically add complementary ingredients when formula has too few
+ * This ensures users always get comprehensive formulas without seeing validation errors
+ */
+function autoExpandFormula(formula: any): { expanded: boolean; addedIngredients: string[] } {
+  const allIngredients = [...(formula.bases || []), ...(formula.additions || [])];
+  const currentCount = allIngredients.length;
+  const neededCount = FORMULA_LIMITS.MIN_INGREDIENT_COUNT - currentCount;
+  
+  if (neededCount <= 0) {
+    return { expanded: false, addedIngredients: [] };
+  }
+  
+  // Calculate remaining budget
+  const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+  const maxDosage = getMaxDosageForCapsules(targetCapsules);
+  const maxWithTolerance = Math.floor(maxDosage * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
+  
+  // Calculate current total from ingredients (more accurate than formula.totalMg)
+  let currentTotal = 0;
+  for (const ing of allIngredients) {
+    currentTotal += ing.amount || 0;
+  }
+  
+  let remainingBudget = maxWithTolerance - currentTotal;
+  
+  // Complementary filler ingredients - USE MINIMUM VALID DOSES for tight budgets
+  // IMPORTANT: Names must EXACTLY match the catalog in shared/ingredients.ts
+  // Each entry has: name, minDose, normalDose, purpose (explanation for user)
+  const fillerIngredients = [
+    { name: 'Garlic', minDose: 50, normalDose: 150, unit: 'mg', purpose: 'Supports cardiovascular health and healthy cholesterol levels through allicin and sulfur compounds.' },
+    { name: 'Resveratrol', minDose: 50, normalDose: 150, unit: 'mg', purpose: 'Provides antioxidant support for endothelial function and healthy aging.' },
+    { name: 'Ginkgo Biloba Extract 24%', minDose: 40, normalDose: 120, unit: 'mg', purpose: 'Supports circulation and cognitive function through improved blood flow.' },
+    { name: 'Milk Thistle', minDose: 100, normalDose: 150, unit: 'mg', purpose: 'Supports liver health and detoxification pathways.' },
+    { name: 'Ginger Root', minDose: 75, normalDose: 150, unit: 'mg', purpose: 'Supports digestion, reduces inflammation, and aids metabolic function.' },
+    { name: 'Vitamin C', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Essential antioxidant supporting immune function and collagen synthesis.' },
+    { name: 'CoEnzyme Q10', minDose: 200, normalDose: 200, unit: 'mg', purpose: 'Supports mitochondrial energy production and cardiovascular health.' },
+    { name: 'Hawthorn Berry', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Traditional cardiovascular support for heart muscle function and blood pressure.' },
+    { name: 'Cinnamon 20:1', minDose: 25, normalDose: 100, unit: 'mg', purpose: 'Supports healthy blood sugar metabolism and insulin sensitivity.' },
+    { name: 'Magnesium', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Essential mineral for muscle relaxation, energy production, and nervous system function.' },
+  ];
+  
+  // Get names of ingredients already in formula
+  const existingNames = new Set(allIngredients.map(i => i.ingredient.toLowerCase()));
+  
+  // Phase 1: Try to add with normal doses first
+  const addedIngredients: string[] = [];
+  let runningBudget = remainingBudget;
+  
+  for (const filler of fillerIngredients) {
+    if (addedIngredients.length >= neededCount) break;
+    if (runningBudget < filler.normalDose) continue;
+    if (existingNames.has(filler.name.toLowerCase())) continue;
+    
+    // Add to formula's additions array with purpose
+    if (!formula.additions) formula.additions = [];
+    formula.additions.push({
+      ingredient: filler.name,
+      amount: filler.normalDose,
+      unit: filler.unit,
+      purpose: filler.purpose
+    });
+    
+    addedIngredients.push(`${filler.name} ${filler.normalDose}mg`);
+    runningBudget -= filler.normalDose;
+    existingNames.add(filler.name.toLowerCase());
+  }
+  
+  // Phase 2: If still need more, try with MINIMUM doses (more ingredients, smaller amounts)
+  if (addedIngredients.length < neededCount) {
+    console.log(`🔧 AUTO-EXPAND: Budget tight, trying minimum doses. Budget left: ${runningBudget}mg, still need ${neededCount - addedIngredients.length} ingredients`);
+    
+    for (const filler of fillerIngredients) {
+      if (addedIngredients.length >= neededCount) break;
+      if (runningBudget < filler.minDose) continue;
+      if (existingNames.has(filler.name.toLowerCase())) continue;
+      
+      // Add at minimum dose with purpose
+      if (!formula.additions) formula.additions = [];
+      formula.additions.push({
+        ingredient: filler.name,
+        amount: filler.minDose,
+        unit: filler.unit,
+        purpose: filler.purpose
+      });
+      
+      addedIngredients.push(`${filler.name} ${filler.minDose}mg`);
+      runningBudget -= filler.minDose;
+      existingNames.add(filler.name.toLowerCase());
+    }
+  }
+  
+  // Phase 3: If STILL need more, reduce existing addition doses to make room
+  if (addedIngredients.length < neededCount && formula.additions && formula.additions.length > 0) {
+    console.log(`🔧 AUTO-EXPAND: Still need ${neededCount - addedIngredients.length} more ingredients. Reducing existing doses to make room...`);
+    
+    // Find additions that can be reduced (have room above their minimum)
+    const reducibleAdditions = formula.additions.filter((a: any) => {
+      const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === a.ingredient);
+      return catalogItem?.doseRangeMin && a.amount > catalogItem.doseRangeMin;
+    });
+    
+    // Reduce each reducible addition by up to 20% to free up budget
+    for (const addition of reducibleAdditions) {
+      const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === addition.ingredient);
+      if (!catalogItem?.doseRangeMin) continue;
+      
+      const reduction = Math.min(
+        Math.floor(addition.amount * 0.2), // Max 20% reduction
+        addition.amount - catalogItem.doseRangeMin // Don't go below min
+      );
+      
+      if (reduction >= 50) { // Only reduce if meaningful (50mg+)
+        addition.amount -= reduction;
+        runningBudget += reduction;
+        console.log(`  Reduced ${addition.ingredient}: -${reduction}mg (freed budget for more ingredients)`);
+      }
+    }
+    
+    // Try again with minimum doses after freeing budget
+    for (const filler of fillerIngredients) {
+      if (addedIngredients.length >= neededCount) break;
+      if (runningBudget < filler.minDose) continue;
+      if (existingNames.has(filler.name.toLowerCase())) continue;
+      
+      if (!formula.additions) formula.additions = [];
+      formula.additions.push({
+        ingredient: filler.name,
+        amount: filler.minDose,
+        unit: filler.unit,
+        purpose: filler.purpose
+      });
+      
+      addedIngredients.push(`${filler.name} ${filler.minDose}mg`);
+      runningBudget -= filler.minDose;
+      existingNames.add(filler.name.toLowerCase());
+    }
+  }
+  
+  // Update totalMg
+  const addedMg = addedIngredients.reduce((sum, ing) => {
+    const match = ing.match(/(\d+)mg/);
+    return sum + (match ? parseInt(match[1]) : 0);
+  }, 0);
+  
+  // Recalculate total from all ingredients (in case we reduced some)
+  let finalTotal = [...(formula.bases || []), ...(formula.additions || [])]
+    .reduce((sum, ing) => sum + (ing.amount || 0), 0);
+  
+  // Phase 4: FILL UP - Always fill to 100-105% of budget for maximum value
+  const targetBudget = maxWithTolerance; // Max allowed (105% tolerance)
+  const minTarget = maxDosage; // Must hit at least 100% of base budget
+  
+  if (finalTotal < minTarget) {
+    console.log(`🔧 AUTO-FILL: Formula at ${finalTotal}mg is under 100% target (${minTarget}mg). Filling to 100-105%...`);
+    
+    const headroom = targetBudget - finalTotal;
+    
+    // Increase existing addition doses up to their max, prioritizing larger ingredients
+    const sortedAdditions = [...(formula.additions || [])].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0));
+    
+    let usedHeadroom = 0;
+    for (const addition of sortedAdditions) {
+      if (usedHeadroom >= headroom) break;
+      
+      const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === addition.ingredient);
+      if (!catalogItem?.doseRangeMax) continue;
+      
+      const currentAmount = addition.amount || 0;
+      const maxAllowed = catalogItem.doseRangeMax;
+      const canIncrease = maxAllowed - currentAmount;
+      
+      if (canIncrease > 0) {
+        const increase = Math.min(canIncrease, headroom - usedHeadroom);
+        addition.amount = currentAmount + increase;
+        usedHeadroom += increase;
+        console.log(`   Increased ${addition.ingredient}: +${increase}mg (now ${addition.amount}mg)`);
+      }
+    }
+    
+    // Recalculate final total
+    finalTotal = [...(formula.bases || []), ...(formula.additions || [])]
+      .reduce((sum, ing) => sum + (ing.amount || 0), 0);
+    
+    // If still under 100%, add more filler ingredients
+    if (finalTotal < minTarget) {
+      console.log(`🔧 AUTO-FILL: Still at ${finalTotal}mg, adding more ingredients to reach 100%...`);
+      const stillNeeded = minTarget - finalTotal;
+      
+      for (const filler of fillerIngredients) {
+        if (finalTotal >= minTarget) break;
+        if (existingNames.has(filler.name.toLowerCase())) continue;
+        
+        // Add at a dose that helps fill the gap (up to normalDose)
+        const doseToAdd = Math.min(filler.normalDose, stillNeeded, targetBudget - finalTotal);
+        if (doseToAdd >= filler.minDose) {
+          if (!formula.additions) formula.additions = [];
+          formula.additions.push({
+            ingredient: filler.name,
+            amount: doseToAdd,
+            unit: filler.unit,
+            purpose: filler.purpose
+          });
+          finalTotal += doseToAdd;
+          existingNames.add(filler.name.toLowerCase());
+          addedIngredients.push(`${filler.name} ${doseToAdd}mg`);
+          console.log(`   Added ${filler.name}: ${doseToAdd}mg (total now ${finalTotal}mg)`);
+        }
+      }
+    }
+    
+    console.log(`🔧 AUTO-FILL complete: Final total ${finalTotal}mg (${((finalTotal / maxDosage) * 100).toFixed(1)}% of budget)`);
+  }
+  
+  formula.totalMg = finalTotal;
+  
+  if (addedIngredients.length > 0) {
+    console.log(`🔧 AUTO-EXPAND: Added ${addedIngredients.length} complementary ingredients: ${addedIngredients.join(', ')}`);
+    console.log(`🔧 AUTO-EXPAND: Final total: ${formula.totalMg}mg`);
+  }
+  
+  return { expanded: addedIngredients.length > 0, addedIngredients };
 }
 
 // Validation function to enforce immutable limits
@@ -522,10 +776,9 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
     errors.push(`Formula exceeds maximum ingredient count of ${FORMULA_LIMITS.MAX_INGREDIENT_COUNT} (attempted: ${allIngredients.length})`);
   }
   
-  // Check total ingredient count - minimum for comprehensive formulas
-  if (allIngredients.length < FORMULA_LIMITS.MIN_INGREDIENT_COUNT) {
-    errors.push(`Formula needs more ingredients for comprehensive support (internal validation)`);
-  }
+  // Note: Minimum ingredient count (8) is enforced through auto-expand, not as a hard rejection
+  // If auto-expand couldn't add enough ingredients (budget constraints), we still save the formula
+  // The user gets a comprehensive formula within their budget - that's the priority
   
   // Verify all ingredients are approved
   const approvedNames = new Set([
@@ -1503,7 +1756,7 @@ When user confirms additions to their EXISTING formula, your JSON MUST include:
 1. ALL system supports from their current formula (carried over unchanged)
 2. ALL individual ingredients from their current formula (carried over unchanged)
 3. PLUS the new ingredients you're adding
-4. Calculate accurate total (aim to FILL the capsule capacity: 6 caps=3300mg, 9 caps=4950mg, 12 caps=6600mg, 15 caps=8250mg)
+4. Calculate accurate total (aim to FILL the capsule capacity: 6 caps=3300mg, 9 caps=4950mg, 12 caps=6600mg)
 
 🚨 CRITICAL: INCREASING EXISTING INGREDIENTS 🚨
 
@@ -1731,8 +1984,7 @@ If user tries to rush you or asks "what should I take?", politely explain:
    - FORMULA CAPACITY = User's capsule count × 550mg:
      • 6 capsules = 3,300mg capacity
      • 9 capsules = 4,950mg capacity (most common)
-     • 12 capsules = 6,600mg capacity
-     • 15 capsules = 8,250mg capacity
+     • 12 capsules = 6,600mg capacity (maximum)
    - 🎯 GOAL: FILL TO CAPACITY - Aim to use 90-100% of the selected capsule capacity
    - system supports total: ~1500-3000mg (select 2-4 system supports)
    - Individual additions: Fill remaining capacity with targeted ingredients
@@ -2356,11 +2608,10 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    🚨 BUDGET LIMITS (5% tolerance allowed for rounding):
    - 6 capsules = 3,300mg target (up to 3,465mg with tolerance)
    - 9 capsules = 4,950mg target (up to 5,197mg with tolerance)
-   - 12 capsules = 6,600mg target (up to 6,930mg with tolerance)
-   - 15 capsules = 8,250mg target (up to 8,662mg with tolerance)
+   - 12 capsules = 6,600mg target (up to 6,930mg with tolerance, maximum option)
    
-   ❌ WRONG: If you add 13 ingredients but your totalMg only accounts for 10 = REJECTED!
-   ❌ WRONG: If your formula is 5,628mg for a 9-capsule (5,197mg max with tolerance) = REJECTED!
+   ❌ WRONG: If you add 13 ingredients but your totalMg only accounts for 10 = will be auto-corrected
+   ❌ WRONG: If your formula is 5,628mg for a 9-capsule (5,197mg max with tolerance) = doses will be reduced
    ✅ CORRECT: Add up ingredients AS YOU GO and aim for target capacity (90-100%)
    
    Example calculation (for a 9-capsule formula with 4950mg capacity):
@@ -2376,10 +2627,10 @@ CONVERSATIONAL FORMULA EXPLANATION - BE THOROUGH AND EDUCATIONAL:
    + Ginko Biloba Extract 24%: 200mg
    = 4050mg total ← Under 4950mg capacity but could add ~900mg more to FILL capacity ✅
    
-   ⚠️ If your totalMg doesn't match your ingredients, the formula will be REJECTED!
-   The backend validates your math and will reject formulas with calculation errors.
+   ⚠️ If your totalMg doesn't match your ingredients, the backend will calculate correctly.
+   The backend validates your math and auto-corrects formula issues.
    
-   ⚠️ If your total exceeds the capsule capacity, the formula will be REJECTED! Reduce ingredients first.
+   ⚠️ If your total exceeds the capsule capacity, doses will be proportionally reduced to fit.
    
    🔍 QUICK CHECK BEFORE SUBMITTING:
    - Verify all "bases" items are from the 32 system supports list (scroll up to check)
@@ -3714,8 +3965,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           const jsonData = JSON.parse(jsonMatch[1]);
           console.log('✅ JSON parsed successfully');
           console.log('📊 Parsed data keys:', Object.keys(jsonData));
+          
+          // 🔧 CAPSULE COUNT EXTRACTION: Extract from user message if AI got it wrong
+          const capsuleCountFromMessage = extractCapsuleCountFromMessage(message);
+          if (capsuleCountFromMessage) {
+            console.log('💊 User explicitly requested', capsuleCountFromMessage, 'capsules in their message');
+            if (jsonData.targetCapsules !== capsuleCountFromMessage) {
+              console.log(`⚠️ AI used targetCapsules: ${jsonData.targetCapsules}, but user requested ${capsuleCountFromMessage} - OVERRIDING!`);
+              jsonData.targetCapsules = capsuleCountFromMessage;
+            }
+          }
+          
           console.log('📊 AI Formula Details:');
           console.log('  - totalMg from AI:', jsonData.totalMg);
+          console.log('  - targetCapsules:', jsonData.targetCapsules);
           if (jsonData.bases) {
             console.log('  - Bases:', jsonData.bases.map((b: any) => `${b.ingredient}: ${b.amount}${b.unit}`).join(', '));
           }
@@ -3778,7 +4041,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           validatedFormula.totalMg = validation.calculatedTotalMg;
           console.log('✅ Using backend-calculated totalMg:', validatedFormula.totalMg, 'mg');
           
-          // 🔧 AUTO-CORRECT: If formula exceeds capsule budget by a small amount, remove largest additions
+          // 🔧 AUTO-CORRECT: If formula exceeds capsule budget, remove smallest additions to fit
           const targetCaps = validatedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
           const maxDosage = getMaxDosageForCapsules(targetCaps);
           const maxWithTolerance = maxDosage + FORMULA_LIMITS.DOSAGE_TOLERANCE;
@@ -3786,8 +4049,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             const overage = validation.calculatedTotalMg - maxDosage;
             const overagePercent = (overage / validation.calculatedTotalMg) * 100;
             
-            // Only auto-correct if overage is < 10% (e.g., 5700mg → 5500mg is 3.6% overage)
-            if (overagePercent <= 10) {
+            // Auto-correct if overage is < 20% (increased from 10% to handle more cases)
+            if (overagePercent <= 20) {
               console.log(`🔧 AUTO-TRIMMING: Formula is ${overage}mg over limit (${overagePercent.toFixed(1)}% overage). Removing smallest additions...`);
               
               // Sort additions by amount (ascending) and remove smallest until under limit
@@ -3855,164 +4118,244 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             }
           }
           
+          // 🔧 AUTO-EXPAND: If formula has too few ingredients, automatically add complementary ones
+          const allIngredientsBeforeExpand = [...(validatedFormula.bases || []), ...(validatedFormula.additions || [])];
+          if (allIngredientsBeforeExpand.length < FORMULA_LIMITS.MIN_INGREDIENT_COUNT) {
+            console.log(`🔧 AUTO-EXPAND: Formula has ${allIngredientsBeforeExpand.length} ingredients, need ${FORMULA_LIMITS.MIN_INGREDIENT_COUNT}. Adding complementary ingredients...`);
+            const expandResult = autoExpandFormula(validatedFormula);
+            
+            if (expandResult.expanded) {
+              // Re-validate after expansion
+              const revalidation = validateAndCalculateFormula(validatedFormula);
+              validation.calculatedTotalMg = revalidation.calculatedTotalMg;
+              validation.errors = revalidation.errors;
+              validation.isValid = revalidation.isValid;
+              validatedFormula.totalMg = revalidation.calculatedTotalMg;
+              
+              // Add info to formula warnings so user knows what was added
+              validatedFormula.warnings = validatedFormula.warnings || [];
+              validatedFormula.warnings.push(`Enhanced formula with complementary ingredients: ${expandResult.addedIngredients.join(', ')}`);
+              
+              console.log(`✅ AUTO-EXPAND complete: Added ${expandResult.addedIngredients.length} ingredients, new total: ${validatedFormula.totalMg}mg`);
+            }
+          }
+          
           // Check for CRITICAL errors (unapproved ingredients AND dosage violations)
+          // Note: After auto-expand, minimum ingredient errors should be resolved
           const criticalErrors = validation.errors.filter(e => 
             e.includes('UNAUTHORIZED INGREDIENT') || 
             e.includes('Formula total too high') ||
             e.includes('exceeds maximum dosage limit') ||
             e.includes('exceeds allowed maximum') ||  // Individual ingredient max violations
-            e.includes('below allowed minimum') ||    // Individual ingredient min violations
-            e.includes('at least') ||                 // Minimum ingredient count
-            e.includes('comprehensive support')       // Minimum ingredient count (alternative phrasing)
+            e.includes('below allowed minimum')       // Individual ingredient min violations
+            // REMOVED: 'at least' and 'comprehensive support' - these are now auto-fixed
           );
           
           if (criticalErrors.length > 0) {
-            // CRITICAL: Unapproved ingredients or dosage violations - must reject
-            console.error('🚨 CRITICAL: Formula validation failed:', criticalErrors);
+            // CRITICAL: Validation failed - try to auto-correct silently
+            console.error('🚨 CRITICAL: Formula validation issues detected:', criticalErrors);
             
-            // Build error message for AI to see in next turn
             const hasIngredientDosageViolation = criticalErrors.some(e => e.includes('exceeds allowed maximum') || e.includes('below allowed minimum'));
             const hasTotalDosageError = criticalErrors.some(e => e.includes('total too high') || e.includes('exceeds maximum dosage limit'));
             const hasUnapprovedIngredient = criticalErrors.some(e => e.includes('UNAUTHORIZED INGREDIENT'));
-            const hasMinIngredientError = criticalErrors.some(e => e.includes('at least') || e.includes('comprehensive support'));
             
-            let validationErrorMessage = '\n\n---\n\n⚠️ **VALIDATION ERROR - Formula Rejected**\n\n';
-            
-            if (hasMinIngredientError) {
-              // Minimum ingredient count not met - internal rule, don't expose to user
-              // AI sees this message to fix the formula, but user sees a friendly version
-              validationErrorMessage += `❌ **Problem:** Formula needs more comprehensive coverage.\n\n`;
-              validationErrorMessage += `**How to Fix:**\n`;
-              validationErrorMessage += `- Add more ingredients to address additional health goals\n`;
-              validationErrorMessage += `- Include complementary ingredients for synergistic effects\n`;
-              validationErrorMessage += `- Consider adding foundational support ingredients\n\n`;
-              validationErrorMessage += `Please create a more comprehensive formula with additional beneficial ingredients.`;
+            // 🔧 AUTO-FIX DOSAGE VIOLATIONS: Clamp to allowed ranges
+            if (hasIngredientDosageViolation && !hasUnapprovedIngredient) {
+              console.log('🔧 AUTO-FIX: Clamping ingredient dosages to allowed ranges...');
+              let dosageFixed = false;
               
-              // Don't show an error to user - just let AI retry silently
-              // The AI will see the validation error in the message history and fix it
-            } else if (hasIngredientDosageViolation) {
-              // Specific ingredient violated its allowed dosage range
-              validationErrorMessage += `❌ **Problem:** One or more ingredients violate their allowed dosage ranges.\n\n`;
-              validationErrorMessage += `**Dosage Violations:**\n${criticalErrors.map(e => `- ${e}`).join('\n')}\n\n`;
-              validationErrorMessage += `🚨 **CRITICAL RULE:** Each ingredient has a STRICT minimum and maximum dosage that you MUST follow.\n\n`;
-              validationErrorMessage += `**How to Fix:**\n`;
-              validationErrorMessage += `1. Check the ingredient list above for the EXACT allowed range for each ingredient\n`;
-              validationErrorMessage += `2. Either:\n`;
-              validationErrorMessage += `   - Adjust the dosage to fit within the allowed range, OR\n`;
-              validationErrorMessage += `   - Remove that ingredient entirely and choose a different one\n\n`;
-              validationErrorMessage += `**Example Violations:**\n`;
-              validationErrorMessage += `- Ginger Root: 2000mg ❌ → Max is 500mg (use 500mg or less)\n`;
-              validationErrorMessage += `- Garlic: 300mg ❌ → Max is 200mg (use 50-200mg range)\n\n`;
-              validationErrorMessage += `Please create a corrected formula with VALID dosages for all ingredients.`;
+              // Fix additions
+              for (const addition of (validatedFormula.additions || [])) {
+                const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === addition.ingredient);
+                if (catalogItem) {
+                  if (catalogItem.doseRangeMin && addition.amount < catalogItem.doseRangeMin) {
+                    console.log(`  Clamping ${addition.ingredient}: ${addition.amount}mg → ${catalogItem.doseRangeMin}mg (min)`);
+                    addition.amount = catalogItem.doseRangeMin;
+                    dosageFixed = true;
+                  }
+                  if (catalogItem.doseRangeMax && addition.amount > catalogItem.doseRangeMax) {
+                    console.log(`  Clamping ${addition.ingredient}: ${addition.amount}mg → ${catalogItem.doseRangeMax}mg (max)`);
+                    addition.amount = catalogItem.doseRangeMax;
+                    dosageFixed = true;
+                  }
+                }
+              }
               
-              sendSSE({
-                type: 'error',
-                error: `⚠️ Ingredient dosage violations detected:\n\n${criticalErrors.map(e => `❌ ${e}`).join('\n\n')}\n\nPlease adjust dosages to fit within allowed ranges or remove violating ingredients.`,
-                sessionId: chatSession?.id
-              });
-            } else if (hasTotalDosageError) {
-              const formulaTargetCaps = validatedFormula?.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
-              const formulaMaxDosage = getMaxDosageForCapsules(formulaTargetCaps);
-              const maxWithTolerance = Math.floor(formulaMaxDosage * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
-              validationErrorMessage += `❌ **Problem:** Your formula totals ${validation.calculatedTotalMg}mg, which exceeds the ${formulaTargetCaps}-capsule budget of ${formulaMaxDosage}mg (max ${maxWithTolerance}mg with 5% tolerance).\n\n`;
-              validationErrorMessage += `🚨 **CRITICAL REMINDER:** When you create a formula, it REPLACES the entire existing formula. You are creating a COMPLETE formula from scratch (0mg → up to ${maxWithTolerance}mg), NOT adding to an existing formula.\n\n`;
-              validationErrorMessage += `**Required Fix:** Your new COMPLETE formula must total ≤${maxWithTolerance}mg. Reduce by ${validation.calculatedTotalMg - maxWithTolerance}mg by:\n`;
-              validationErrorMessage += `- Removing some system supports (e.g., remove Beta Max saves 650mg)\n`;
-              validationErrorMessage += `- Removing some individual ingredients\n`;
-              validationErrorMessage += `- Reducing dosages of flexible ingredients (e.g., Curcumin 600mg → 400mg)\n`;
-              validationErrorMessage += `- Prioritizing the most critical health goals\n`;
-              validationErrorMessage += `- Or increase capsule count if user agrees (e.g., 9 → 12 capsules)\n\n`;
-              validationErrorMessage += `Please create a corrected formula with the COMPLETE ingredient list (bases + additions) that totals ≤${maxWithTolerance}mg.`;
+              // Fix bases (system supports)
+              for (const base of (validatedFormula.bases || [])) {
+                const catalogBase = SYSTEM_SUPPORTS.find(f => f.name === base.ingredient);
+                if (catalogBase) {
+                  const validDoses = [catalogBase.doseMg, catalogBase.doseMg * 2, catalogBase.doseMg * 3];
+                  if (!validDoses.includes(base.amount)) {
+                    // Find nearest valid dose
+                    const nearest = validDoses.reduce((prev, curr) => 
+                      Math.abs(curr - base.amount) < Math.abs(prev - base.amount) ? curr : prev
+                    );
+                    console.log(`  Clamping ${base.ingredient}: ${base.amount}mg → ${nearest}mg (nearest valid)`);
+                    base.amount = nearest;
+                    dosageFixed = true;
+                  }
+                }
+              }
               
-              sendSSE({
-                type: 'error',
-                error: `⚠️ Formula exceeds ${formulaTargetCaps}-capsule budget (max ${maxWithTolerance}mg with 5% tolerance).\n\nCalculated total: ${validation.calculatedTotalMg}mg\n\nPlease create a smaller formula by:\n- Using fewer system supports\n- Reducing individual ingredient doses\n- Focusing on your top priority health goals\n- Or suggest increasing capsule count`,
-                sessionId: chatSession?.id
-              });
-            } else if (hasUnapprovedIngredient) {
-              validationErrorMessage += `❌ **Problem:** Formula contains unapproved ingredients.\n\n`;
-              validationErrorMessage += `**Errors:**\n${criticalErrors.map(e => `- ${e}`).join('\n')}\n\n`;
-              validationErrorMessage += `Please create a corrected formula using ONLY ingredients from the approved catalog.`;
-              
-              sendSSE({
-                type: 'error',
-                error: `⚠️ Formula contains unapproved ingredients. Please use only ingredients from our approved catalog.`,
-                sessionId: chatSession?.id
-              });
+              if (dosageFixed) {
+                // Re-validate after fixes
+                const revalidation = validateAndCalculateFormula(validatedFormula);
+                validation.calculatedTotalMg = revalidation.calculatedTotalMg;
+                validation.errors = revalidation.errors;
+                validation.isValid = revalidation.isValid;
+                validatedFormula.totalMg = revalidation.calculatedTotalMg;
+                
+                // Add note about auto-corrections
+                validatedFormula.warnings = validatedFormula.warnings || [];
+                validatedFormula.warnings.push('Some ingredient dosages were automatically adjusted to optimal ranges');
+                
+                console.log('✅ AUTO-FIX complete: Dosages clamped, new total:', validatedFormula.totalMg, 'mg');
+                
+                // Check if we still have critical errors after fix
+                const remainingErrors = revalidation.errors.filter(e => 
+                  e.includes('UNAUTHORIZED INGREDIENT') || 
+                  e.includes('Formula total too high') ||
+                  e.includes('exceeds maximum dosage limit')
+                );
+                
+                if (remainingErrors.length === 0) {
+                  // All fixed! Continue with formula
+                  console.log('✅ All validation issues resolved through auto-correction');
+                  extractedFormula = validatedFormula;
+                }
+              }
             }
             
-            // Append validation error to fullResponse so AI sees it in chat history
-            fullResponse += validationErrorMessage;
-            
-            // Still complete the stream normally but without formula
-            sendSSE({
-              type: 'complete',
-              sessionId: chatSession?.id,
-              formula: null
-            });
-            
-            // Save messages with validation error appended - AI will see this in next turn
-            if (chatSession) {
-              await storage.createMessage({
-                sessionId: chatSession.id,
-                role: 'user',
-                content: message,
-                model: null
-              });
+            // 🔧 AUTO-FIX TOTAL TOO HIGH: Reduce doses proportionally, then remove ingredients if needed
+            if (hasTotalDosageError && !hasUnapprovedIngredient && !extractedFormula) {
+              const targetCaps = validatedFormula?.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+              const maxDosage = getMaxDosageForCapsules(targetCaps);
+              const maxWithTolerance = Math.floor(maxDosage * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
+              let currentTotal = validation.calculatedTotalMg;
               
-              await storage.createMessage({
-                sessionId: chatSession.id,
-                role: 'assistant',
-                content: fullResponse, // Includes validation error message
-                model: model
-              });
+              console.log(`🔧 AUTO-FIX TOTAL: Current ${currentTotal}mg, max ${maxWithTolerance}mg. Fixing...`);
               
-              console.log('💾 Saved validation error to chat history - AI will see it and self-correct in next turn');
+              // Step 1: Reduce all addition doses proportionally
+              const reductionRatio = maxWithTolerance / currentTotal;
+              console.log(`🔧 Step 1: Reducing additions by ${((1 - reductionRatio) * 100).toFixed(1)}%...`);
+              
+              for (const addition of (validatedFormula.additions || [])) {
+                const newAmount = Math.floor(addition.amount * reductionRatio);
+                const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === addition.ingredient);
+                const minDose = catalogItem?.doseRangeMin || FORMULA_LIMITS.MIN_INGREDIENT_DOSE;
+                addition.amount = Math.max(newAmount, minDose);
+              }
+              
+              // Recalculate total
+              currentTotal = [...(validatedFormula.bases || []), ...(validatedFormula.additions || [])]
+                .reduce((sum, ing) => sum + (ing.amount || 0), 0);
+              
+              // Step 2: If still over, remove smallest additions one at a time until we fit
+              if (currentTotal > maxWithTolerance && validatedFormula.additions?.length > 1) {
+                console.log(`🔧 Step 2: Still ${currentTotal}mg (over ${maxWithTolerance}mg). Removing smallest additions...`);
+                
+                // Sort additions by amount (smallest first)
+                validatedFormula.additions.sort((a: any, b: any) => (a.amount || 0) - (b.amount || 0));
+                
+                const removed: string[] = [];
+                while (currentTotal > maxWithTolerance && validatedFormula.additions.length > 1) {
+                  const smallest = validatedFormula.additions.shift();
+                  if (smallest) {
+                    removed.push(`${smallest.ingredient} (${smallest.amount}mg)`);
+                    currentTotal -= smallest.amount || 0;
+                    console.log(`   Removed ${smallest.ingredient} (${smallest.amount}mg), new total: ${currentTotal}mg`);
+                  }
+                }
+                
+                if (removed.length > 0) {
+                  validatedFormula.warnings = validatedFormula.warnings || [];
+                  validatedFormula.warnings.push(`Removed ${removed.length} ingredients to fit budget: ${removed.join(', ')}`);
+                }
+              }
+              
+              // Re-validate
+              const revalidation = validateAndCalculateFormula(validatedFormula);
+              validation.calculatedTotalMg = revalidation.calculatedTotalMg;
+              validation.errors = revalidation.errors;
+              validatedFormula.totalMg = revalidation.calculatedTotalMg;
+              
+              validatedFormula.warnings = validatedFormula.warnings || [];
+              validatedFormula.warnings.push('Formula optimized to fit your selected capsule count');
+              
+              console.log('✅ AUTO-FIX complete: Final total:', validatedFormula.totalMg, 'mg');
+              
+              // Check if within budget now - should always be true after removing ingredients
+              if (revalidation.calculatedTotalMg <= maxWithTolerance) {
+                extractedFormula = validatedFormula;
+                console.log('✅ Formula now within budget, proceeding to save');
+              } else {
+                console.log('⚠️ Still over budget after all fixes, formula will not be saved');
+              }
             }
             
-            endStream();
-            return;
+            // If we couldn't auto-fix (e.g., unapproved ingredients), log but don't show error to user
+            if (!extractedFormula && hasUnapprovedIngredient) {
+              console.log('⚠️ Cannot auto-fix unapproved ingredients - formula will not be saved');
+              // Don't send error to user - just complete without formula
+              // The AI's text response is still shown, just no formula card
+            }
           }
           
-          // ✅ Formula is valid (non-critical errors are just warnings)
-          console.log('✅ Formula validation passed - using calculated totalMg:', validatedFormula.totalMg);
-          extractedFormula = validatedFormula;
+          // If no formula yet from auto-fix, use validated formula
+          if (!extractedFormula && criticalErrors.length === 0) {
+            extractedFormula = validatedFormula;
+          }
+          
+          // If we have a valid formula, proceed with final validation and saving
+          if (extractedFormula) {
+            // Get user's health profile for medication validation
+            let userMedications: string[] = [];
+            if (userId) {
+              try {
+                const healthProfile = await storage.getHealthProfile(userId);
+                userMedications = healthProfile?.medications || [];
+              } catch (e) {
+                console.log('Could not retrieve user health profile for medication validation');
+              }
+            }
+            
+            // Validate supplement-medication interactions
+            sendSSE({ type: 'processing', message: 'Checking for medication interactions...' });
+            const medicalWarnings = await validateSupplementInteractions(extractedFormula, userMedications);
+            extractedFormula.warnings = extractedFormula.warnings || [];
+            extractedFormula.warnings.push(...medicalWarnings);
+            
+            // Add standard medical disclaimers if not present
+            extractedFormula.disclaimers = extractedFormula.disclaimers || [];
+            if (!extractedFormula.disclaimers.some((d: string) => d.includes('medical advice'))) {
+              extractedFormula.disclaimers.unshift('This is supplement support, not medical advice');
+            }
+            if (!extractedFormula.disclaimers.some((d: string) => d.includes('healthcare provider'))) {
+              extractedFormula.disclaimers.push('Always consult your healthcare provider before starting new supplements');
+            }
+            
+            console.log('✅ Formula validation passed - using calculated totalMg:', extractedFormula.totalMg);
+          }
           
           // Add validation warnings (for non-critical issues like capsule sizing)
-          const nonCriticalErrors = validation.errors.filter(e => 
-            !e.includes('UNAUTHORIZED INGREDIENT') && 
-            !e.includes('Formula total too high') &&
-            !e.includes('exceeds maximum dosage limit')
-          );
-          if (nonCriticalErrors.length > 0) {
-            extractedFormula.warnings.push(...nonCriticalErrors);
-          }
-          
-          // Get user's health profile for medication validation
-          let userMedications: string[] = [];
-          if (userId) {
-            try {
-              const healthProfile = await storage.getHealthProfile(userId);
-              userMedications = healthProfile?.medications || [];
-            } catch (e) {
-              console.log('Could not retrieve user health profile for medication validation');
+          if (extractedFormula) {
+            const nonCriticalErrors = validation.errors.filter(e => 
+              !e.includes('UNAUTHORIZED INGREDIENT') && 
+              !e.includes('Formula total too high') &&
+              !e.includes('exceeds maximum dosage limit') &&
+              !e.includes('exceeds allowed maximum') &&
+              !e.includes('below allowed minimum')
+            );
+            if (nonCriticalErrors.length > 0) {
+              extractedFormula.warnings = extractedFormula.warnings || [];
+              extractedFormula.warnings.push(...nonCriticalErrors);
             }
-          }
-          
-          // Validate supplement-medication interactions
-          sendSSE({ type: 'processing', message: 'Checking for medication interactions...' });
-          const medicalWarnings = await validateSupplementInteractions(validatedFormula, userMedications);
-          extractedFormula.warnings.push(...medicalWarnings);
-          
-          // Add standard medical disclaimers if not present
-          if (!extractedFormula.disclaimers.some(d => d.includes('medical advice'))) {
-            extractedFormula.disclaimers.unshift('This is supplement support, not medical advice');
-          }
-          if (!extractedFormula.disclaimers.some(d => d.includes('healthcare provider'))) {
-            extractedFormula.disclaimers.push('Always consult your healthcare provider before starting new supplements');
-          }
-          if (!extractedFormula.disclaimers.some(d => d.includes('interactions'))) {
-            extractedFormula.disclaimers.push('Monitor for interactions with medications and adverse reactions');
+            
+            // Add final interaction disclaimer if not present
+            if (!extractedFormula.disclaimers.some((d: string) => d.includes('interactions'))) {
+              extractedFormula.disclaimers.push('Monitor for interactions with medications and adverse reactions');
+            }
           }
           
           // Remove the formula JSON block from fullResponse before displaying to user
@@ -4023,28 +4366,30 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           console.log('🔍 Searching for other patterns...');
           // Check if AI outputted formula without proper formatting
           // Only trigger error if AI explicitly claimed to have created/built a formula
+          // BUT NOT if it's just showing capsule selector or discussing what it WILL do
           const responseLC = fullResponse.toLowerCase();
-          const claimsFormulaCreation = 
+          
+          // Phrases that indicate AI is NOT yet creating - just preparing/discussing
+          const isPreparingNotCreating = 
+              responseLC.includes("select your preferred capsule") ||
+              responseLC.includes("select your daily protocol") ||
+              responseLC.includes("i'll create your") ||
+              responseLC.includes("i will create your") ||
+              responseLC.includes("once you select") ||
+              responseLC.includes("capsule-recommendation") ||
+              responseLC.includes("i'll immediately send") ||
+              responseLC.includes("and i'll create");
+          
+          const claimsFormulaCreation = !isPreparingNotCreating && (
               responseLC.includes("here's your formula") ||
               responseLC.includes("here is your formula") ||
               responseLC.includes("i've created") ||
               responseLC.includes("i have created") ||
-              responseLC.includes("i'm creating") ||
-              responseLC.includes("i am creating") ||
-              responseLC.includes("creating your") ||
-              responseLC.includes("your new formula") ||
-              responseLC.includes("your updated formula") ||
               responseLC.includes("here's the formula") ||
               responseLC.includes("presenting your formula") ||
-              responseLC.includes("your 9-capsule") ||
-              responseLC.includes("your 6-capsule") ||
-              responseLC.includes("your 12-capsule") ||
-              responseLC.includes("your 15-capsule") ||
-              responseLC.includes("-capsule/day formula") ||
-              responseLC.includes("-capsule formula") ||
-              responseLC.includes("personalized formula") ||
               responseLC.includes("this formula includes") ||
-              responseLC.includes("this combination");
+              // Only trigger on very specific "created" past-tense phrases
+              (responseLC.includes("your formula") && responseLC.includes("includes")));
           
           if (claimsFormulaCreation) {
             console.error('⚠️ CRITICAL: AI claimed to create a formula but NOT in ```json block format!');

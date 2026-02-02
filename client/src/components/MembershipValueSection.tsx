@@ -1,4 +1,4 @@
-import { Brain, Pill, RefreshCw, FlaskConical } from "lucide-react";
+import { Brain, Pill, RefreshCw, FlaskConical, Tag } from "lucide-react";
 
 const membershipFeatures = [
   {
@@ -17,9 +17,9 @@ const membershipFeatures = [
     description: "As your labs and wearable data change, your formula adapts. Your health is dynamic and your supplements should be too.",
   },
   {
-    icon: FlaskConical,
-    title: "Near Cost Lab Testing",
-    description: "Access the same diagnostic tests as premium platforms, offered at a fraction of the markup. Better data means better formulas.",
+    icon: Tag,
+    title: "Member Pricing on Supplements & Labs",
+    description: "Access your custom supplements and diagnostic testing at exclusive member rates. No retail markups—just transparent, honest pricing.",
   },
 ];
 
