@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { FlaskConical, ShieldCheck, Microscope, Leaf, ArrowRight, X, Check } from "lucide-react";
+import { FlaskConical, ShieldCheck, Microscope, Leaf, ArrowRight } from "lucide-react";
 
 const sciencePoints = [
   {
@@ -23,16 +23,6 @@ const sciencePoints = [
     title: "Bioavailable Forms",
     description: "We use the most absorbable forms of each nutrient - like methylated B12 and chelated minerals.",
   },
-];
-
-const comparisonFeatures = [
-  { feature: "Personalized to your blood work", ones: true, others: false },
-  { feature: "AI-powered health analysis", ones: true, others: false },
-  { feature: "Adjusts as your health changes", ones: true, others: false },
-  { feature: "Considers your medications", ones: true, others: false },
-  { feature: "200+ ingredient options", ones: true, others: false },
-  { feature: "One-size-fits-all formula", ones: false, others: true },
-  { feature: "Generic dosing for everyone", ones: false, others: true },
 ];
 
 export default function ScienceSectionV2() {
@@ -77,77 +67,16 @@ export default function ScienceSectionV2() {
           ))}
         </div>
 
-        {/* Comparison Section */}
-        <div className="bg-[#FAF7F2] rounded-3xl p-8 md:p-12">
-          <div className="text-center mb-10">
-            <h3 className="text-2xl md:text-3xl text-[#1B4332] font-light">
-Why <span className="font-medium">personalized</span> beats generic
-            </h3>
-            <p className="mt-3 text-[#52796F]">
-              Most supplements use the same formula for everyone. We believe your body deserves better.
-            </p>
-          </div>
-
-          {/* Comparison Table */}
-          <div className="max-w-2xl mx-auto">
-            {/* Header */}
-            <div className="grid grid-cols-3 gap-4 mb-4 text-center">
-              <div></div>
-              <div className="bg-[#1B4332] text-white py-3 px-4 rounded-t-xl font-medium">
-                ONES
-              </div>
-              <div className="bg-gray-200 text-gray-600 py-3 px-4 rounded-t-xl font-medium text-sm">
-                Generic Brands
-              </div>
-            </div>
-
-            {/* Rows */}
-            <div className="space-y-2">
-              {comparisonFeatures.map((item, index) => (
-                <div 
-                  key={index} 
-                  className="grid grid-cols-3 gap-4 items-center bg-white rounded-xl p-4"
-                >
-                  <div className="text-[#2D3436] text-sm md:text-base">
-                    {item.feature}
-                  </div>
-                  <div className="flex justify-center">
-                    {item.ones ? (
-                      <div className="w-8 h-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center">
-                        <Check className="w-5 h-5 text-[#1B4332]" />
-                      </div>
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                        <X className="w-5 h-5 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex justify-center">
-                    {item.others ? (
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                        <Check className="w-5 h-5 text-gray-400" />
-                      </div>
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
-                        <X className="w-5 h-5 text-red-400" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="text-center mt-10">
-            <Link href="/science">
-              <Button
-                className="bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-8 group"
-              >
-                Learn More About Our Science
-                <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-          </div>
+        {/* CTA */}
+        <div className="text-center">
+          <Link href="/science">
+            <Button
+              className="bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-8 group"
+            >
+              Learn More About Our Science
+              <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </Link>
         </div>
       </div>
     </section>
