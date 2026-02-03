@@ -4,8 +4,8 @@
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { storage } from '../storage';
-import { logger } from '../logger';
+import { userService } from '../domains/users/user.service';
+import { logger } from '../infrastructure/logging/logger';
 
 // Extend Express Request type
 declare global {
@@ -88,11 +88,11 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
   }
 
   try {
-    const user = await storage.getUserById(decoded.userId);
+    const user = await userService.getUser(decoded.userId);
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }
-    
+
     if (!user.isAdmin) {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -123,23 +123,23 @@ export function getClientIP(req: Request): string {
  * Check rate limit for a client
  */
 export function checkRateLimit(
-  clientId: string, 
-  limit: number, 
+  clientId: string,
+  limit: number,
   windowMs: number
 ): { allowed: boolean; remaining: number; resetTime: number } {
   const now = Date.now();
   const entry = rateLimitStore.get(clientId);
-  
+
   if (!entry || now > entry.resetTime) {
     const resetTime = now + windowMs;
     rateLimitStore.set(clientId, { count: 1, resetTime });
     return { allowed: true, remaining: limit - 1, resetTime };
   }
-  
+
   if (entry.count >= limit) {
     return { allowed: false, remaining: 0, resetTime: entry.resetTime };
   }
-  
+
   entry.count++;
   return { allowed: true, remaining: limit - entry.count, resetTime: entry.resetTime };
 }

@@ -10,11 +10,12 @@
  */
 
 import { Router } from 'express';
-import { storage } from '../storage';
+// import { filesService } from '../domains/health/index';
 import { requireAuth } from './middleware';
 import { ObjectStorageService } from '../objectStorage';
 import { analyzeLabReport } from '../fileAnalysis';
-import logger from '../logger';
+import { logger } from '../infrastructure/logging/logger';
+import { filesService } from 'server/domains/files';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get('/:fileId/download', requireAuth, async (req, res) => {
   const userId = req.userId!;
   const { fileId } = req.params;
   try {
-    const fileUpload = await storage.getFileUpload(fileId);
+    const fileUpload = await filesService.getFileUpload(fileId);
     if (!fileUpload) {
       return res.status(404).json({ error: 'File not found' });
     }
@@ -57,7 +58,7 @@ router.get('/user/:userId/:type', requireAuth, async (req, res) => {
 
   try {
     const fileType = type === 'lab-reports' ? 'lab_report' : undefined;
-    const files = await storage.listFileUploadsByUser(userId, fileType, false);
+    const files = await filesService.listFileUploadsByUser(userId, fileType, false);
     res.json(files);
   } catch (error) {
     logger.error('Error fetching files:', error);
@@ -90,19 +91,19 @@ router.post('/upload', requireAuth, async (req, res) => {
     }
 
     const uploadedFile = Array.isArray(req.files.file) ? req.files.file[0] : req.files.file;
-    
+
     // File validation with HIPAA audit logging
     const maxSizeBytes = 10 * 1024 * 1024; // 10MB limit
     const allowedMimeTypes = [
       'application/pdf',
       'image/jpeg',
-      'image/jpg', 
+      'image/jpg',
       'image/png',
       'text/plain',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     ];
-    
+
     const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.txt', '.doc', '.docx'];
 
     if (uploadedFile.size > maxSizeBytes) {
@@ -116,8 +117,8 @@ router.post('/upload', requireAuth, async (req, res) => {
         success: false,
         reason: `File too large: ${uploadedFile.size} bytes (max: ${maxSizeBytes})`
       });
-      return res.status(400).json({ 
-        error: 'File too large. Maximum size is 10MB.' 
+      return res.status(400).json({
+        error: 'File too large. Maximum size is 10MB.'
       });
     }
 
@@ -132,8 +133,8 @@ router.post('/upload', requireAuth, async (req, res) => {
         success: false,
         reason: `Invalid MIME type: ${uploadedFile.mimetype}`
       });
-      return res.status(400).json({ 
-        error: 'Invalid file type. Only PDF, JPG, PNG, TXT, DOC, and DOCX files are allowed.' 
+      return res.status(400).json({
+        error: 'Invalid file type. Only PDF, JPG, PNG, TXT, DOC, and DOCX files are allowed.'
       });
     }
 
@@ -150,8 +151,8 @@ router.post('/upload', requireAuth, async (req, res) => {
         success: false,
         reason: `Invalid file extension for: ${fileName}`
       });
-      return res.status(400).json({ 
-        error: 'Invalid file extension. Only .pdf, .jpg, .jpeg, .png, .txt, .doc, and .docx files are allowed.' 
+      return res.status(400).json({
+        error: 'Invalid file extension. Only .pdf, .jpg, .jpeg, .png, .txt, .doc, and .docx files are allowed.'
       });
     }
 
@@ -159,18 +160,18 @@ router.post('/upload', requireAuth, async (req, res) => {
     let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'other';
     const labKeywords = ['lab', 'blood', 'test', 'cbc', 'panel', 'result', 'report', 'analysis', 'metabolic', 'lipid', 'thyroid', 'vitamin', 'serum', 'urine', 'specimen'];
     const fileNameLower = fileName.toLowerCase();
-    
+
     if (labKeywords.some(keyword => fileNameLower.includes(keyword))) {
       fileType = 'lab_report';
     } else if (fileName.includes('prescription') || fileName.includes('rx')) {
-      fileType = 'prescription';  
+      fileType = 'prescription';
     } else if (allowedMimeTypes.slice(0, 4).includes(uploadedFile.mimetype)) {
       fileType = 'medical_document';
     }
 
     // Use HIPAA-compliant ObjectStorageService for secure upload
     const objectStorageService = new ObjectStorageService();
-    
+
     // Upload directly to Supabase
     const normalizedPath = await objectStorageService.uploadLabReportFile(
       userId,
@@ -180,7 +181,7 @@ router.post('/upload', requireAuth, async (req, res) => {
     );
 
     // Save file metadata to storage with HIPAA compliance fields
-    const fileUpload = await storage.createFileUpload({
+    const fileUpload = await filesService.createFileUpload({
       userId,
       type: fileType,
       objectPath: normalizedPath,
@@ -198,10 +199,10 @@ router.post('/upload', requireAuth, async (req, res) => {
       try {
         logger.info(`✨ Analyzing lab report: ${uploadedFile.name} (${uploadedFile.mimetype})`);
         labDataExtraction = await analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId);
-        
+
         // Update file upload with extracted lab data
         if (labDataExtraction && fileUpload.id) {
-          await storage.updateFileUpload(fileUpload.id, {
+          await filesService.updateFileUpload(fileUpload.id, {
             labReportData: {
               testDate: labDataExtraction.testDate,
               testType: labDataExtraction.testType,
@@ -217,7 +218,7 @@ router.post('/upload', requireAuth, async (req, res) => {
         logger.error('Lab report analysis failed:', error);
         // Update status to error but don't fail the upload
         if (fileUpload.id) {
-          await storage.updateFileUpload(fileUpload.id, {
+          await filesService.updateFileUpload(fileUpload.id, {
             labReportData: {
               analysisStatus: 'error'
             }
@@ -231,7 +232,7 @@ router.post('/upload', requireAuth, async (req, res) => {
       analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId)
         .then(async (extraction) => {
           if (extraction && fileUpload.id) {
-            await storage.updateFileUpload(fileUpload.id, {
+            await filesService.updateFileUpload(fileUpload.id, {
               labReportData: {
                 testDate: extraction.testDate,
                 testType: extraction.testType,
@@ -247,7 +248,7 @@ router.post('/upload', requireAuth, async (req, res) => {
         .catch(async (error) => {
           logger.error('Background lab report analysis failed:', error);
           if (fileUpload.id) {
-            await storage.updateFileUpload(fileUpload.id, {
+            await filesService.updateFileUpload(fileUpload.id, {
               labReportData: {
                 analysisStatus: 'error'
               }
@@ -281,7 +282,7 @@ router.post('/upload', requireAuth, async (req, res) => {
     };
 
     res.json(responseData);
-    
+
   } catch (error) {
     // Log failed upload with full error details
     logger.error("HIPAA AUDIT LOG - Upload Error:", {
@@ -297,14 +298,14 @@ router.post('/upload', requireAuth, async (req, res) => {
     });
 
     if (error instanceof Error && error.name === 'ConsentRequiredError') {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'User consent required for file upload',
         details: error.message
       });
     }
-    
+
     logger.error('File upload error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to upload file',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -316,49 +317,49 @@ router.post('/:fileId/reanalyze', requireAuth, async (req, res) => {
   try {
     const { fileId } = req.params;
     const userId = req.userId!;
-    
+
     // Get the file upload record
-    const fileUpload = await storage.getFileUpload(fileId);
-    
+    const fileUpload = await filesService.getFileUpload(fileId);
+
     if (!fileUpload) {
       return res.status(404).json({ error: 'File not found' });
     }
-    
+
     if (fileUpload.userId !== userId) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
-    
+
     if (fileUpload.type !== 'lab_report') {
       return res.status(400).json({ error: 'Only lab reports can be re-analyzed' });
     }
-    
+
     logger.info('🔄 Re-analyzing lab report:', fileId, fileUpload.originalFileName);
-    
+
     // Trigger analysis
     const labData = await analyzeLabReport(
       fileUpload.objectPath,
       fileUpload.mimeType || 'text/plain',
       userId
     );
-    
+
     // Update the file upload with analyzed data
-    await storage.updateFileUpload(fileId, {
+    await filesService.updateFileUpload(fileId, {
       labReportData: {
         ...labData,
         analysisStatus: 'completed'
       }
     });
-    
+
     logger.info('✅ Re-analysis complete for:', fileId);
-    
-    res.json({ 
+
+    res.json({
       success: true,
       message: 'Lab report re-analyzed successfully',
       data: labData
     });
   } catch (error) {
     logger.error('Re-analysis error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to re-analyze lab report',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -371,7 +372,7 @@ router.delete('/:fileId', requireAuth, async (req, res) => {
   const { fileId } = req.params;
   try {
     // Verify file belongs to user
-    const fileUpload = await storage.getFileUpload(fileId);
+    const fileUpload = await filesService.getFileUpload(fileId);
     if (!fileUpload) {
       return res.status(404).json({ error: 'File not found' });
     }
@@ -382,7 +383,7 @@ router.delete('/:fileId', requireAuth, async (req, res) => {
     const objectPath = fileUpload.objectPath;
     const deletedFromStorage = await ObjectStorageService.prototype.secureDeleteLabReport(objectPath, userId);
     // Soft delete in DB
-    const deleted = await storage.softDeleteFileUpload(fileId, userId);
+    const deleted = await filesService.softDeleteFileUpload(fileId, userId);
     if (!deleted || !deletedFromStorage) {
       throw new Error('Failed to delete file');
     }

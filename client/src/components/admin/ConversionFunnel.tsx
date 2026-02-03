@@ -18,18 +18,18 @@ interface FunnelData {
   };
 }
 
-function FunnelStep({ 
-  label, 
-  count, 
-  rate, 
-  icon: Icon, 
+function FunnelStep({
+  label,
+  count,
+  rate,
+  icon: Icon,
   isLast = false,
   color = 'bg-primary'
-}: { 
-  label: string; 
-  count: number; 
-  rate?: number; 
-  icon: typeof Users; 
+}: {
+  label: string;
+  count: number;
+  rate?: number;
+  icon: typeof Users;
   isLast?: boolean;
   color?: string;
 }) {
@@ -106,37 +106,37 @@ export function ConversionFunnel() {
       </CardHeader>
       <CardContent>
         <div className="flex items-center overflow-x-auto pb-2">
-          <FunnelStep 
-            label="Signups" 
-            count={data.totalSignups} 
+          <FunnelStep
+            label="Signups"
+            count={data.totalSignups}
             icon={Users}
-            rate={data.conversionRates.signupToProfile}
+            rate={data.conversionRates?.signupToProfile}
             color="bg-slate-500"
           />
-          <FunnelStep 
-            label="Profile Done" 
-            count={data.profilesComplete} 
+          <FunnelStep
+            label="Profile Done"
+            count={data.profilesComplete}
             icon={User}
             rate={data.conversionRates.profileToFormula}
             color="bg-blue-500"
           />
-          <FunnelStep 
-            label="Formula Created" 
-            count={data.formulasCreated} 
+          <FunnelStep
+            label="Formula Created"
+            count={data.formulasCreated}
             icon={FlaskConical}
             rate={data.conversionRates.formulaToOrder}
             color="bg-violet-500"
           />
-          <FunnelStep 
-            label="First Order" 
-            count={data.firstOrders} 
+          <FunnelStep
+            label="First Order"
+            count={data.firstOrders}
             icon={Package}
             rate={data.conversionRates.orderToReorder}
             color="bg-emerald-500"
           />
-          <FunnelStep 
-            label="Reorders" 
-            count={data.reorders} 
+          <FunnelStep
+            label="Reorders"
+            count={data.reorders}
             icon={RefreshCw}
             isLast
             color="bg-amber-500"

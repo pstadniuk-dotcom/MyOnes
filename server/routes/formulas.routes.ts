@@ -7,10 +7,12 @@
  */
 
 import { Router } from 'express';
-import { storage } from '../storage';
+import { userService } from '../domains/users/user.service';
+import { formulaService } from '../domains/formulas/formula.service';
+import { notificationService } from '../domains/notifications/notification.service';
 import { requireAuth } from './middleware';
 import { getIngredientDose, isValidIngredient } from '@shared/ingredients';
-import logger from '../logger';
+import { logger } from '../infrastructure/logging/logger';
 
 const router = Router();
 
@@ -28,8 +30,8 @@ const FORMULA_LIMITS = {
 router.get('/current', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const currentFormula = await storage.getCurrentFormulaByUser(userId);
-    
+    const currentFormula = await formulaService.getCurrentFormulaByUser(userId);
+
     if (!currentFormula) {
       return res.status(404).json({ error: 'No formula found for user' });
     }
@@ -37,7 +39,7 @@ router.get('/current', requireAuth, async (req, res) => {
     // Get the latest version changes for context (non-fatal)
     let versionChanges: any[] = [];
     try {
-      versionChanges = await storage.listFormulaVersionChanges(currentFormula.id);
+      versionChanges = await formulaService.listFormulaVersionChanges(currentFormula.id);
     } catch (e) {
       logger.warn('Non-fatal: unable to load version changes for formula', currentFormula.id, e);
     }
@@ -56,19 +58,19 @@ router.get('/current', requireAuth, async (req, res) => {
 router.get('/history', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const formulaHistory = await storage.getFormulaHistory(userId);
-    
+    const formulaHistory = await formulaService.getFormulaHistory(userId);
+
     // Enrich with version change information
     const enrichedHistory = await Promise.all(
       formulaHistory.map(async (formula) => {
-        const changes = await storage.listFormulaVersionChanges(formula.id);
+        const changes = await formulaService.listFormulaVersionChanges(formula.id);
         return {
           ...formula,
           changes: changes[0] || null // Latest change for this version
         };
       })
     );
-    
+
     res.json({ history: enrichedHistory });
   } catch (error) {
     logger.error('Error fetching formula history:', error);
@@ -81,16 +83,16 @@ router.get('/versions/:formulaId', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const formulaId = req.params.formulaId;
-    
-    const formula = await storage.getFormula(formulaId);
-    
+
+    const formula = await formulaService.getFormula(formulaId);
+
     if (!formula || formula.userId !== userId) {
       return res.status(404).json({ error: 'Formula not found or access denied' });
     }
 
     // Get version changes for this formula
-    const versionChanges = await storage.listFormulaVersionChanges(formulaId);
-    
+    const versionChanges = await formulaService.listFormulaVersionChanges(formulaId);
+
     res.json({
       formula,
       versionChanges
@@ -106,10 +108,10 @@ router.get('/compare/:id1/:id2', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const { id1, id2 } = req.params;
-    
+
     const [formula1, formula2] = await Promise.all([
-      storage.getFormula(id1),
-      storage.getFormula(id2)
+      formulaService.getFormula(id1),
+      formulaService.getFormula(id2)
     ]);
 
     if (!formula1 || !formula2) {
@@ -126,20 +128,20 @@ router.get('/compare/:id1/:id2', requireAuth, async (req, res) => {
       formula2,
       differences: {
         totalMgChange: formula2.totalMg - formula1.totalMg,
-        basesAdded: formula2.bases.filter((b2: any) => 
+        basesAdded: formula2.bases.filter((b2: any) =>
           !formula1.bases.some((b1: any) => b1.ingredient === b2.ingredient)
         ),
-        basesRemoved: formula1.bases.filter((b1: any) => 
+        basesRemoved: formula1.bases.filter((b1: any) =>
           !formula2.bases.some((b2: any) => b2.ingredient === b1.ingredient)
         ),
         basesModified: formula2.bases.filter((b2: any) => {
           const b1 = formula1.bases.find((b: any) => b.ingredient === b2.ingredient);
           return b1 && b1.amount !== b2.amount;
         }),
-        additionsAdded: (formula2.additions || []).filter((a2: any) => 
+        additionsAdded: (formula2.additions || []).filter((a2: any) =>
           !(formula1.additions || []).some((a1: any) => a1.ingredient === a2.ingredient)
         ),
-        additionsRemoved: (formula1.additions || []).filter((a1: any) => 
+        additionsRemoved: (formula1.additions || []).filter((a1: any) =>
           !(formula2.additions || []).some((a2: any) => a2.ingredient === a1.ingredient)
         ),
         additionsModified: (formula2.additions || []).filter((a2: any) => {
@@ -161,31 +163,31 @@ router.post('/revert', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const { formulaId, reason } = req.body;
-    
+
     if (!formulaId || !reason) {
       return res.status(400).json({ error: 'Formula ID and revert reason are required' });
     }
 
     // Get the formula to revert to
-    const originalFormula = await storage.getFormula(formulaId);
-    
+    const originalFormula = await formulaService.getFormula(formulaId);
+
     if (!originalFormula || originalFormula.userId !== userId) {
       return res.status(404).json({ error: 'Formula not found or access denied' });
     }
 
     // Validate that reverting to this formula doesn't exceed maximum dosage
     if (originalFormula.totalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
-      return res.status(400).json({ 
-        error: `Cannot revert to this formula as it exceeds the maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (this version has ${originalFormula.totalMg}mg). This formula was created before dosage limits were enforced. Please create a new formula instead.` 
+      return res.status(400).json({
+        error: `Cannot revert to this formula as it exceeds the maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (this version has ${originalFormula.totalMg}mg). This formula was created before dosage limits were enforced. Please create a new formula instead.`
       });
     }
 
     // Get current highest version for user
-    const currentFormula = await storage.getCurrentFormulaByUser(userId);
+    const currentFormula = await formulaService.getCurrentFormulaByUser(userId);
     const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
 
     // Create new formula version with reverted data
-    const revertedFormula = await storage.createFormula({
+    const revertedFormula = await formulaService.createFormula({
       userId,
       version: nextVersion,
       bases: originalFormula.bases as any,
@@ -195,7 +197,7 @@ router.post('/revert', requireAuth, async (req, res) => {
     });
 
     // Create version change record
-    await storage.createFormulaVersionChange({
+    await formulaService.createFormulaVersionChange({
       formulaId: revertedFormula.id,
       summary: `Reverted to version ${originalFormula.version}`,
       rationale: reason
@@ -203,24 +205,24 @@ router.post('/revert', requireAuth, async (req, res) => {
 
     // 📬 Create notification for formula reversion
     try {
-      await storage.createNotification({
+      await notificationService.createNotification({
         userId,
         type: 'formula_update',
         title: `Formula Reverted to V${originalFormula.version}`,
         content: `Your formula has been reverted. Reason: ${reason}`,
         formulaId: revertedFormula.id,
-        metadata: { 
-          actionUrl: '/dashboard/my-formula', 
-          icon: 'beaker', 
-          priority: 'low' 
+        metadata: {
+          actionUrl: '/dashboard/my-formula',
+          icon: 'beaker',
+          priority: 'low'
         }
       });
     } catch (notifError) {
       logger.error('Failed to create reversion notification:', notifError);
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       formula: revertedFormula,
       message: `Successfully reverted to version ${originalFormula.version}`
     });
@@ -241,22 +243,22 @@ router.patch('/:formulaId/customize', requireAuth, async (req, res) => {
     const allAdded = [...(addedBases || []), ...(addedIndividuals || [])];
     for (const item of allAdded) {
       if (!isValidIngredient(item.ingredient)) {
-        return res.status(400).json({ 
-          error: `Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.` 
+        return res.status(400).json({
+          error: `Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.`
         });
       }
     }
 
     // Get the formula
-    const formula = await storage.getFormula(formulaId);
-    
+    const formula = await formulaService.getFormula(formulaId);
+
     if (!formula || formula.userId !== userId) {
       return res.status(404).json({ error: 'Formula not found or access denied' });
     }
 
     // Calculate new total mg with customizations
     let newTotalMg = formula.totalMg;
-    
+
     if (addedBases) {
       for (const base of addedBases) {
         const dose = getIngredientDose(base.ingredient);
@@ -265,7 +267,7 @@ router.patch('/:formulaId/customize', requireAuth, async (req, res) => {
         }
       }
     }
-    
+
     if (addedIndividuals) {
       for (const individual of addedIndividuals) {
         const dose = getIngredientDose(individual.ingredient);
@@ -278,19 +280,19 @@ router.patch('/:formulaId/customize', requireAuth, async (req, res) => {
     // Validate that new total doesn't exceed maximum
     if (newTotalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
       const addedMg = newTotalMg - formula.totalMg;
-      return res.status(400).json({ 
-        error: `Adding these ingredients would exceed the maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg. Current formula: ${formula.totalMg}mg, Adding: ${addedMg}mg, New total would be: ${newTotalMg}mg. Please remove some ingredients first or add fewer ingredients.` 
+      return res.status(400).json({
+        error: `Adding these ingredients would exceed the maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg. Current formula: ${formula.totalMg}mg, Adding: ${addedMg}mg, New total would be: ${newTotalMg}mg. Please remove some ingredients first or add fewer ingredients.`
       });
     }
 
     // Update formula with customizations
-    const updatedFormula = await storage.updateFormulaCustomizations(
+    const updatedFormula = await formulaService.updateFormulaCustomizations(
       formulaId,
       { addedBases, addedIndividuals },
       newTotalMg
     );
 
-    res.json({ 
+    res.json({
       success: true,
       formula: updatedFormula,
       message: 'Formula customized successfully'
@@ -309,8 +311,8 @@ router.post('/custom', requireAuth, async (req, res) => {
 
     // Validate that at least one ingredient is provided
     if ((!bases || bases.length === 0) && (!individuals || individuals.length === 0)) {
-      return res.status(400).json({ 
-        error: 'At least one ingredient is required to create a formula' 
+      return res.status(400).json({
+        error: 'At least one ingredient is required to create a formula'
       });
     }
 
@@ -318,15 +320,15 @@ router.post('/custom', requireAuth, async (req, res) => {
     const allIngredients = [...(bases || []), ...(individuals || [])];
     for (const item of allIngredients) {
       if (!isValidIngredient(item.ingredient)) {
-        return res.status(400).json({ 
-          error: `Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.` 
+        return res.status(400).json({
+          error: `Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.`
         });
       }
     }
 
     // Calculate total mg
     let totalMg = 0;
-    
+
     if (bases) {
       for (const base of bases) {
         const dose = getIngredientDose(base.ingredient);
@@ -335,7 +337,7 @@ router.post('/custom', requireAuth, async (req, res) => {
         }
       }
     }
-    
+
     if (individuals) {
       for (const individual of individuals) {
         const dose = getIngredientDose(individual.ingredient);
@@ -347,23 +349,23 @@ router.post('/custom', requireAuth, async (req, res) => {
 
     // Validate dosage limits
     if (totalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
-      return res.status(400).json({ 
-        error: `Total dosage of ${totalMg}mg exceeds the maximum safe limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg. Please remove some ingredients.` 
+      return res.status(400).json({
+        error: `Total dosage of ${totalMg}mg exceeds the maximum safe limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg. Please remove some ingredients.`
       });
     }
 
     if (totalMg < 100) {
-      return res.status(400).json({ 
-        error: `Total dosage of ${totalMg}mg is too low. Please add more ingredients (minimum 100mg recommended).` 
+      return res.status(400).json({
+        error: `Total dosage of ${totalMg}mg is too low. Please add more ingredients (minimum 100mg recommended).`
       });
     }
 
     // Get user's current formula count to determine version number
-    const history = await storage.getFormulaHistory(userId);
+    const history = await formulaService.getFormulaHistory(userId);
     const nextVersion = (history?.length || 0) + 1;
 
     // Create new formula marked as user-created
-    const newFormula = await storage.createFormula({
+    const newFormula = await formulaService.createFormula({
       userId,
       version: nextVersion,
       name: name?.trim() || undefined,
@@ -384,23 +386,23 @@ router.post('/custom', requireAuth, async (req, res) => {
 
     // 📬 Create notification for user-built formula
     try {
-      await storage.createNotification({
+      await notificationService.createNotification({
         userId,
         type: 'formula_update',
         title: `Custom Formula V${nextVersion} Created`,
         content: `You've built a custom formula with ${totalMg}mg of ingredients. Consider having AI review it for optimization.`,
         formulaId: newFormula.id,
-        metadata: { 
-          actionUrl: '/dashboard/my-formula', 
-          icon: 'beaker', 
-          priority: 'medium' 
+        metadata: {
+          actionUrl: '/dashboard/my-formula',
+          icon: 'beaker',
+          priority: 'medium'
         }
       });
     } catch (notifError) {
       logger.error('Failed to create formula notification:', notifError);
     }
 
-    res.json({ 
+    res.json({
       success: true,
       formula: newFormula,
       message: 'Custom formula created successfully'
@@ -427,16 +429,16 @@ router.patch('/:formulaId/rename', requireAuth, async (req, res) => {
     }
 
     // Get the formula to verify ownership
-    const formula = await storage.getFormula(formulaId);
-    
+    const formula = await formulaService.getFormula(formulaId);
+
     if (!formula || formula.userId !== userId) {
       return res.status(404).json({ error: 'Formula not found or access denied' });
     }
 
     // Update the formula name
-    const updatedFormula = await storage.updateFormulaName(formulaId, name.trim());
+    const updatedFormula = await formulaService.updateFormulaName(formulaId, name.trim());
 
-    res.json({ 
+    res.json({
       success: true,
       formula: updatedFormula,
       message: 'Formula renamed successfully'
@@ -454,8 +456,8 @@ router.post('/:formulaId/archive', requireAuth, async (req, res) => {
     const { formulaId } = req.params;
 
     // Get the formula to verify ownership
-    const formula = await storage.getFormula(formulaId);
-    
+    const formula = await formulaService.getFormula(formulaId);
+
     if (!formula || formula.userId !== userId) {
       return res.status(404).json({ error: 'Formula not found or access denied' });
     }
@@ -465,29 +467,29 @@ router.post('/:formulaId/archive', requireAuth, async (req, res) => {
     }
 
     // Archive the formula
-    const archivedFormula = await storage.archiveFormula(formulaId);
+    const archivedFormula = await formulaService.archiveFormula(formulaId);
 
     // 📬 Create notification for formula archival
     try {
-      await storage.createNotification({
+      await notificationService.createNotification({
         userId,
         type: 'formula_update',
         title: `Formula V${formula.version} Archived`,
-        content: formula.name 
+        content: formula.name
           ? `Your formula "${formula.name}" has been archived. You can restore it anytime from the archived formulas section.`
           : `Your formula (version ${formula.version}) has been archived. You can restore it anytime from the archived formulas section.`,
         formulaId: archivedFormula.id,
-        metadata: { 
-          actionUrl: '/dashboard/my-formula', 
-          icon: 'archive', 
-          priority: 'low' 
+        metadata: {
+          actionUrl: '/dashboard/my-formula',
+          icon: 'archive',
+          priority: 'low'
         }
       });
     } catch (notifError) {
       logger.error('Failed to create archive notification:', notifError);
     }
 
-    res.json({ 
+    res.json({
       success: true,
       formula: archivedFormula,
       message: 'Formula archived successfully'
@@ -505,8 +507,8 @@ router.post('/:formulaId/restore', requireAuth, async (req, res) => {
     const { formulaId } = req.params;
 
     // Get the formula to verify ownership
-    const formula = await storage.getFormula(formulaId);
-    
+    const formula = await formulaService.getFormula(formulaId);
+
     if (!formula || formula.userId !== userId) {
       return res.status(404).json({ error: 'Formula not found or access denied' });
     }
@@ -516,29 +518,29 @@ router.post('/:formulaId/restore', requireAuth, async (req, res) => {
     }
 
     // Restore the formula
-    const restoredFormula = await storage.restoreFormula(formulaId);
+    const restoredFormula = await formulaService.restoreFormula(formulaId);
 
     // 📬 Create notification for formula restoration
     try {
-      await storage.createNotification({
+      await notificationService.createNotification({
         userId,
         type: 'formula_update',
         title: `Formula V${formula.version} Restored`,
-        content: formula.name 
+        content: formula.name
           ? `Your formula "${formula.name}" has been restored and is now active again.`
           : `Your formula (version ${formula.version}) has been restored and is now active again.`,
         formulaId: restoredFormula.id,
-        metadata: { 
-          actionUrl: '/dashboard/my-formula', 
-          icon: 'refresh', 
-          priority: 'low' 
+        metadata: {
+          actionUrl: '/dashboard/my-formula',
+          icon: 'refresh',
+          priority: 'low'
         }
       });
     } catch (notifError) {
       logger.error('Failed to create restore notification:', notifError);
     }
 
-    res.json({ 
+    res.json({
       success: true,
       formula: restoredFormula,
       message: 'Formula restored successfully'
@@ -553,8 +555,8 @@ router.post('/:formulaId/restore', requireAuth, async (req, res) => {
 router.get('/archived', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const archivedFormulas = await storage.getArchivedFormulas(userId);
-    
+    const archivedFormulas = await formulaService.getArchivedFormulas(userId);
+
     res.json({ archived: archivedFormulas });
   } catch (error) {
     logger.error('Error fetching archived formulas:', error);
@@ -569,14 +571,14 @@ router.get('/:formulaId/review-schedule', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const { formulaId } = req.params;
-    
+
     // Verify the formula belongs to the user
-    const formula = await storage.getFormula(formulaId);
+    const formula = await formulaService.getFormula(formulaId);
     if (!formula || formula.userId !== userId) {
       return res.status(404).json({ error: 'Formula not found' });
     }
-    
-    const schedule = await storage.getReviewSchedule(userId, formulaId);
+
+    const schedule = await formulaService.getReviewSchedule(userId, formulaId);
     res.json(schedule || null);
   } catch (error) {
     logger.error('Error fetching review schedule:', error);
@@ -596,48 +598,48 @@ router.put('/:formulaId/review-schedule', requireAuth, async (req, res) => {
       smsReminders,
       calendarIntegration,
     } = req.body;
-    
+
     // Verify the formula belongs to the user
-    const formula = await storage.getFormula(formulaId);
+    const formula = await formulaService.getFormula(formulaId);
     if (!formula || formula.userId !== userId) {
       return res.status(404).json({ error: 'Formula not found' });
     }
-    
+
     // Validate frequency
     if (!['monthly', 'bimonthly', 'quarterly'].includes(frequency)) {
       return res.status(400).json({ error: 'Invalid frequency. Must be monthly, bimonthly, or quarterly' });
     }
-    
+
     // Validate daysBefore
     if (typeof daysBefore !== 'number' || daysBefore < 1 || daysBefore > 14) {
       return res.status(400).json({ error: 'daysBefore must be between 1 and 14' });
     }
-    
+
     // Calculate next review date based on frequency and formula creation date
     const frequencyDays: Record<string, number> = {
       monthly: 30,
       bimonthly: 60,
       quarterly: 90,
     };
-    
+
     const days = frequencyDays[frequency];
-    
+
     const formulaDate = new Date(formula.createdAt);
     const nextReviewDate = new Date(formulaDate);
     nextReviewDate.setDate(nextReviewDate.getDate() + days - daysBefore);
-    
+
     // If the calculated date is in the past, add another cycle
     if (nextReviewDate < new Date()) {
       nextReviewDate.setDate(nextReviewDate.getDate() + days);
     }
-    
+
     // Check if schedule already exists
-    const existingSchedule = await storage.getReviewSchedule(userId, formulaId);
-    
+    const existingSchedule = await formulaService.getReviewSchedule(userId, formulaId);
+
     let schedule;
     if (existingSchedule) {
       // Update existing
-      schedule = await storage.updateReviewSchedule(existingSchedule.id, {
+      schedule = await formulaService.updateReviewSchedule(existingSchedule.id, {
         frequency,
         daysBefore,
         nextReviewDate,
@@ -648,7 +650,7 @@ router.put('/:formulaId/review-schedule', requireAuth, async (req, res) => {
       });
     } else {
       // Create new
-      schedule = await storage.createReviewSchedule({
+      schedule = await formulaService.createReviewSchedule({
         userId,
         formulaId,
         frequency,
@@ -661,7 +663,7 @@ router.put('/:formulaId/review-schedule', requireAuth, async (req, res) => {
         isActive: true,
       });
     }
-    
+
     res.json(schedule);
   } catch (error) {
     logger.error('Error saving review schedule:', error);
@@ -674,19 +676,19 @@ router.delete('/:formulaId/review-schedule', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const { formulaId } = req.params;
-    
+
     // Verify the formula belongs to the user
-    const formula = await storage.getFormula(formulaId);
+    const formula = await formulaService.getFormula(formulaId);
     if (!formula || formula.userId !== userId) {
       return res.status(404).json({ error: 'Formula not found' });
     }
-    
-    const schedule = await storage.getReviewSchedule(userId, formulaId);
+
+    const schedule = await formulaService.getReviewSchedule(userId, formulaId);
     if (!schedule) {
       return res.status(404).json({ error: 'Review schedule not found' });
     }
-    
-    await storage.deleteReviewSchedule(schedule.id);
+
+    await formulaService.deleteReviewSchedule(schedule.id);
     res.json({ success: true });
   } catch (error) {
     logger.error('Error deleting review schedule:', error);
@@ -699,29 +701,29 @@ router.get('/:formulaId/review-schedule/calendar', requireAuth, async (req, res)
   try {
     const userId = req.userId!;
     const { formulaId } = req.params;
-    
+
     // Verify the formula belongs to the user
-    const formula = await storage.getFormula(formulaId);
+    const formula = await formulaService.getFormula(formulaId);
     if (!formula || formula.userId !== userId) {
       return res.status(404).json({ error: 'Formula not found' });
     }
-    
+
     // Get review schedule
-    const schedule = await storage.getReviewSchedule(userId, formulaId);
+    const schedule = await formulaService.getReviewSchedule(userId, formulaId);
     if (!schedule) {
       return res.status(404).json({ error: 'Review schedule not found. Please set up your review schedule first.' });
     }
-    
+
     // Get user for calendar event
-    const user = await storage.getUserById(userId);
+    const user = await userService.getUser(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     // Generate .ics file
     const { generateReviewCalendarEvent } = await import('../calendarGenerator');
     const icsContent = generateReviewCalendarEvent(schedule, user.name);
-    
+
     // Send as downloadable file
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="ones-review.ics"');

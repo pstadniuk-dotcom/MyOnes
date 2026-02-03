@@ -15,13 +15,17 @@ import { Router } from 'express';
 import OpenAI from 'openai';
 import { nanoid } from 'nanoid';
 import { startOfWeek, format, differenceInDays, isSameDay } from 'date-fns';
-import { storage } from '../storage';
+
+import { userService } from '../domains/users/user.service';
+import { formulaService } from '../domains/formulas/formula.service';
+import { healthService } from '../domains/health';
+import { optimizeService } from '../domains/optimize/optimize.service';
 import { requireAuth } from './middleware';
 import { buildNutritionPlanPrompt, buildWorkoutPlanPrompt, buildLifestylePlanPrompt, buildRecipePrompt } from '../optimize-prompts';
 import { parseAiJson } from '../utils/parseAiJson';
 import { normalizePlanContent, DEFAULT_MEAL_TYPES } from '../optimize-normalizer';
 import { getUserLocalMidnight } from '../utils/timezone';
-import logger from '../logger';
+import { logger } from '../infrastructure/logging/logger';
 import type { OptimizeDailyLog } from '@shared/schema';
 
 const router = Router();
@@ -95,7 +99,7 @@ function buildGroceryItemsFromPlanContent(content: any): GroceryListItem[] {
 router.get('/plans', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const plans = await storage.getOptimizePlans(userId);
+    const plans = await optimizeService.getOptimizePlans(userId);
     res.json(plans);
   } catch (error) {
     logger.error('Error fetching optimize plans:', error);
@@ -108,15 +112,15 @@ router.get('/streaks', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const streaks = [];
-    
+
     const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle'] as const;
     for (const type of streakTypes) {
-      const streak = await storage.getUserStreak(userId, type);
+      const streak = await optimizeService.getUserStreak(userId, type);
       if (streak) {
         streaks.push(streak);
       }
     }
-    
+
     res.json(streaks);
   } catch (error) {
     logger.error('Error fetching streaks:', error);
@@ -129,22 +133,22 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const { planTypes, preferences } = req.body;
-    
+
     logger.info('🎯 OPTIMIZE PLAN GENERATION STARTED', { userId, planTypes, preferences });
-    
+
     if (!Array.isArray(planTypes) || planTypes.length === 0) {
       return res.status(400).json({ error: 'planTypes array is required' });
     }
 
     // Get user context
-    const user = await storage.getUser(userId);
+    const user = await userService.getUser(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const healthProfile = await storage.getHealthProfile(userId);
-    const activeFormula = await storage.getCurrentFormulaByUser(userId);
-    const labAnalyses = await storage.listLabAnalysesByUser(userId);
+    const healthProfile = await healthService.getHealthProfile(userId);
+    const activeFormula = await formulaService.getCurrentFormulaByUser(userId);
+    const labAnalyses = await healthService.listLabAnalysesByUser(userId);
 
     logger.info('📊 Context loaded:', { hasProfile: !!healthProfile, hasFormula: !!activeFormula, labCount: labAnalyses.length });
 
@@ -171,11 +175,11 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
     };
 
     const results: Record<string, any> = {};
-    
+
     for (const planType of planTypes) {
       logger.info(`🤖 Generating ${planType} plan...`);
       let prompt: string;
-      
+
       switch (planType) {
         case 'nutrition':
           prompt = buildNutritionPlanPrompt(optimizeContext);
@@ -228,7 +232,7 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
         const content = response.choices[0].message.content || '{}';
         planContent = parseAiJson(content);
         rationale = planContent.weeklyGuidance || planContent.programOverview || planContent.focusAreas || 'Personalized plan generated';
-        
+
         logger.info(`✅ AI response received, length: ${content.length} chars`);
 
         // Log workout exercise counts for debugging
@@ -237,7 +241,7 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
             .filter((day: any) => !day.isRestDay && day.workout?.exercises)
             .map((day: any) => `${day.dayName}: ${day.workout.exercises.length} exercises`);
           logger.info(`📊 Workout exercise counts: ${exerciseCounts.join(', ')}`);
-          
+
           const expLevel = preferences?.experienceLevel || 'intermediate';
           const minExpected = expLevel === 'beginner' ? 6 : expLevel === 'advanced' ? 10 : 8;
           const underCount = planContent.weekPlan
@@ -255,9 +259,9 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
       const normalizedContent = normalizePlanContent(planType as 'nutrition' | 'workout' | 'lifestyle', planContent);
 
       logger.info(`💾 Saving ${planType} plan to database...`);
-      const plan = await storage.createOptimizePlan({
+      const plan = await optimizeService.createOptimizePlan({
         userId,
-        planType,
+        planType: planType as 'nutrition' | 'workout' | 'lifestyle',
         content: normalizedContent,
         aiRationale: rationale,
         preferences: preferences || {},
@@ -265,7 +269,7 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
         basedOnLabs: labAnalyses.length > 0 ? labAnalyses[0] : null,
         isActive: true,
       });
-      
+
       logger.info(`✅ ${planType} plan saved with ID: ${plan.id}`);
       results[planType] = plan;
     }
@@ -277,7 +281,7 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
         const nutritionPlan = results.nutrition;
         const content = nutritionPlan.content as any;
         const weekPlan = content.weekPlan || [];
-        
+
         let mealsText = '';
         weekPlan.forEach((day: any) => {
           mealsText += `\nDay ${day.day} (${day.dayName}):\n`;
@@ -297,7 +301,7 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
 
         const responseContent = completion.choices[0].message.content || '{}';
         const parsed = JSON.parse(responseContent);
-        
+
         const items = (parsed.items || []).map((item: any) => ({
           id: nanoid(8),
           item: item.item,
@@ -308,11 +312,11 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
         }));
 
         if (items.length > 0) {
-          const existingList = await storage.getActiveGroceryList(userId);
+          const existingList = await optimizeService.getActiveGroceryList(userId);
           const groceryList = existingList
-            ? await storage.updateGroceryList(existingList.id, { optimizePlanId: nutritionPlan.id, items, generatedAt: new Date(), isArchived: false })
-            : await storage.createGroceryList({ userId, optimizePlanId: nutritionPlan.id, items, generatedAt: new Date(), isArchived: false });
-          
+            ? await optimizeService.updateGroceryList(existingList.id, { optimizePlanId: nutritionPlan.id, items, generatedAt: new Date(), isArchived: false })
+            : await optimizeService.createGroceryList({ userId, optimizePlanId: nutritionPlan.id, items, generatedAt: new Date(), isArchived: false });
+
           logger.info(`✅ Grocery list auto-generated with ${items.length} items`);
           results.groceryList = groceryList;
         }
@@ -320,7 +324,7 @@ router.post('/plans/generate', requireAuth, async (req, res) => {
         logger.error('⚠️ Failed to auto-generate grocery list (non-fatal):', groceryError);
       }
     }
-    
+
     res.json(results);
   } catch (error) {
     logger.error('❌ Error generating optimize plans:', error);
@@ -382,7 +386,7 @@ router.get('/daily-logs', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'start date must be before end date' });
     }
 
-    const logs = await storage.listDailyLogs(userId, startDate, endDate);
+    const logs = await optimizeService.listDailyLogs(userId, startDate, endDate);
     const normalizedLogs = logs
       .map((log) => ({ ...log, logDate: new Date(log.logDate).toISOString() }))
       .sort((a, b) => new Date(a.logDate).getTime() - new Date(b.logDate).getTime());
@@ -395,7 +399,7 @@ router.get('/daily-logs', requireAuth, async (req, res) => {
     const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle'] as const;
     const streaks = {} as Record<typeof streakTypes[number], any>;
     for (const type of streakTypes) {
-      streaks[type] = (await storage.getUserStreak(userId, type)) ?? null;
+      streaks[type] = (await optimizeService.getUserStreak(userId, type)) ?? null;
     }
 
     res.json({ range: { start: startDate.toISOString(), end: endDate.toISOString() }, logs: normalizedLogs, logsByDate, streaks });
@@ -421,7 +425,7 @@ router.post('/nutrition/log-meal', requireAuth, async (req, res) => {
     }
 
     const normalizedMealType = String(mealType).toLowerCase();
-    const existingLog = await storage.getDailyLog(userId, logDate);
+    const existingLog = await optimizeService.getDailyLog(userId, logDate);
     const mealsLogged = new Set<string>(Array.isArray(existingLog?.mealsLogged) ? existingLog!.mealsLogged : []);
     mealsLogged.add(normalizedMealType);
 
@@ -429,9 +433,9 @@ router.post('/nutrition/log-meal', requireAuth, async (req, res) => {
     let updatedLog = existingLog;
 
     if (existingLog) {
-      updatedLog = await storage.updateDailyLog(existingLog.id, { mealsLogged: Array.from(mealsLogged), nutritionCompleted });
+      updatedLog = await optimizeService.updateDailyLog(existingLog.id, { mealsLogged: Array.from(mealsLogged), nutritionCompleted });
     } else {
-      updatedLog = await storage.createDailyLog({ userId, logDate, mealsLogged: Array.from(mealsLogged), nutritionCompleted, workoutCompleted: false, supplementsTaken: false });
+      updatedLog = await optimizeService.createDailyLog({ userId, logDate, mealsLogged: Array.from(mealsLogged), nutritionCompleted, workoutCompleted: false, supplementsTaken: false });
     }
 
     res.json({ success: true, log: updatedLog, mealsLogged: Array.from(mealsLogged), nutritionCompleted });
@@ -448,7 +452,7 @@ router.get('/workout/logs', requireAuth, async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    const logs = await storage.listWorkoutLogs(userId, limit, offset);
+    const logs = await optimizeService.listWorkoutLogs(userId, limit, offset);
     res.json({ logs, total: logs.length, limit, offset });
   } catch (error) {
     logger.error('❌ Error fetching workout logs:', error);
@@ -468,7 +472,7 @@ router.post('/workout/logs', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'completedAt is required' });
     }
 
-    const log = await storage.createWorkoutLog({
+    const log = await optimizeService.createWorkoutLog({
       userId,
       workoutId: workoutId || null,
       completedAt: new Date(completedAt),
@@ -484,12 +488,12 @@ router.post('/workout/logs', requireAuth, async (req, res) => {
     try {
       const logDate = new Date(completedAt);
       logDate.setHours(0, 0, 0, 0);
-      const existingDailyLog = await storage.getDailyLog(userId, logDate);
-      
+      const existingDailyLog = await optimizeService.getDailyLog(userId, logDate);
+
       if (existingDailyLog) {
-        await storage.updateDailyLog(existingDailyLog.id, { workoutCompleted: true });
+        await optimizeService.updateDailyLog(existingDailyLog.id, { workoutCompleted: true });
       } else {
-        await storage.createDailyLog({ userId, logDate, mealsLogged: [], nutritionCompleted: false, workoutCompleted: true, supplementsTaken: false });
+        await optimizeService.createDailyLog({ userId, logDate, mealsLogged: [], nutritionCompleted: false, workoutCompleted: true, supplementsTaken: false });
       }
     } catch (dailyLogError) {
       logger.warn('⚠️ Could not update daily log (non-fatal):', dailyLogError);
@@ -514,7 +518,7 @@ router.post('/workout/switch', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'dayIndex and exerciseIndex are required' });
     }
 
-    const workoutPlan = await storage.getActiveOptimizePlan(userId, 'workout');
+    const workoutPlan = await optimizeService.getActiveOptimizePlan(userId, 'workout');
     if (!workoutPlan) {
       return res.status(404).json({ error: 'No workout plan found' });
     }
@@ -535,8 +539,8 @@ router.post('/workout/switch', requireAuth, async (req, res) => {
     }
 
     const currentExercise = exercises[exerciseIndex];
-    const healthProfile = await storage.getHealthProfile(userId);
-    const workoutPrefs = await storage.getWorkoutPreferences(userId);
+    const healthProfile = await healthService.getHealthProfile(userId);
+    const workoutPrefs = await optimizeService.getWorkoutPreferences(userId);
 
     const prompt = `Generate a creative and distinct alternative exercise to replace the current one.
 
@@ -582,7 +586,7 @@ Return ONLY valid JSON:
     logger.info('✅ Generated new exercise:', newExercise.name);
 
     exercises[exerciseIndex] = newExercise;
-    const updatedPlan = await storage.updateOptimizePlan(workoutPlan.id, {
+    const updatedPlan = await optimizeService.updateOptimizePlan(workoutPlan.id, {
       content: { ...(workoutPlan.content as any), weekPlan } as any,
     });
 
@@ -608,13 +612,13 @@ router.post('/workout/log', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid date value' });
     }
 
-    const existingLog = await storage.getDailyLog(userId, logDate);
+    const existingLog = await optimizeService.getDailyLog(userId, logDate);
     let updatedLog = existingLog;
 
     if (existingLog) {
-      updatedLog = await storage.updateDailyLog(existingLog.id, { workoutCompleted: Boolean(completed) });
+      updatedLog = await optimizeService.updateDailyLog(existingLog.id, { workoutCompleted: Boolean(completed) });
     } else {
-      updatedLog = await storage.createDailyLog({ userId, logDate, mealsLogged: [], nutritionCompleted: false, workoutCompleted: Boolean(completed), supplementsTaken: false });
+      updatedLog = await optimizeService.createDailyLog({ userId, logDate, mealsLogged: [], nutritionCompleted: false, workoutCompleted: Boolean(completed), supplementsTaken: false });
     }
 
     res.json({ success: true, log: updatedLog, workoutCompleted: Boolean(completed) });
@@ -645,9 +649,9 @@ router.post('/daily-logs', requireAuth, async (req, res) => {
     } = req.body ?? {};
 
     // Get user's timezone for correct day boundary
-    const user = await storage.getUser(userId);
+    const user = await userService.getUser(userId);
     const userTimezone = user?.timezone || 'America/New_York';
-    
+
     // Debug logging for incoming request
     console.log('📝 [optimize.routes] Daily log POST:', {
       supplementMorning,
@@ -663,7 +667,7 @@ router.post('/daily-logs', requireAuth, async (req, res) => {
     if (Number.isNaN(logDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date value' });
     }
-    
+
     console.log('🗓️ [optimize.routes] Calculated logDate:', logDate.toISOString());
 
     const clampRating = (value: unknown) => {
@@ -680,19 +684,19 @@ router.post('/daily-logs', requireAuth, async (req, res) => {
       return Math.max(0, Math.round(parsed));
     };
 
-    const existingLog = await storage.getDailyLog(userId, logDate);
+    const existingLog = await optimizeService.getDailyLog(userId, logDate);
 
     // Handle granular supplement tracking
-    const resolvedMorning = typeof supplementMorning === 'boolean' 
-      ? supplementMorning 
+    const resolvedMorning = typeof supplementMorning === 'boolean'
+      ? supplementMorning
       : existingLog?.supplementMorning ?? false;
-    const resolvedAfternoon = typeof supplementAfternoon === 'boolean' 
-      ? supplementAfternoon 
+    const resolvedAfternoon = typeof supplementAfternoon === 'boolean'
+      ? supplementAfternoon
       : existingLog?.supplementAfternoon ?? false;
-    const resolvedEvening = typeof supplementEvening === 'boolean' 
-      ? supplementEvening 
+    const resolvedEvening = typeof supplementEvening === 'boolean'
+      ? supplementEvening
       : existingLog?.supplementEvening ?? false;
-    
+
     // supplementsTaken is true if any dose was taken (for backwards compatibility)
     const resolvedSupplementsTaken = typeof supplementsTaken === 'boolean'
       ? supplementsTaken
@@ -720,7 +724,7 @@ router.post('/daily-logs', requireAuth, async (req, res) => {
 
     let updatedLog: OptimizeDailyLog | undefined;
     if (existingLog) {
-      updatedLog = await storage.updateDailyLog(existingLog.id, resolvedLog);
+      updatedLog = await optimizeService.updateDailyLog(existingLog.id, resolvedLog);
       console.log('📝 Daily log updated:', {
         logId: existingLog.id,
         supplementMorning: resolvedLog.supplementMorning,
@@ -728,9 +732,9 @@ router.post('/daily-logs', requireAuth, async (req, res) => {
         supplementEvening: resolvedLog.supplementEvening,
       });
       // Update all category streaks including supplements
-      await storage.updateAllStreaks(userId, logDate);
+      await optimizeService.updateAllStreaks(userId, logDate);
     } else {
-      updatedLog = await storage.createDailyLog({
+      updatedLog = await optimizeService.createDailyLog({
         userId,
         logDate,
         mealsLogged: [],
@@ -743,13 +747,13 @@ router.post('/daily-logs', requireAuth, async (req, res) => {
         supplementEvening: resolvedLog.supplementEvening,
       });
       // Update all category streaks including supplements
-      await storage.updateAllStreaks(userId, logDate);
+      await optimizeService.updateAllStreaks(userId, logDate);
     }
 
     const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle', 'supplements'] as const;
     const streaks = {} as Record<typeof streakTypes[number], any>;
     for (const type of streakTypes) {
-      streaks[type] = (await storage.getUserStreak(userId, type)) ?? null;
+      streaks[type] = (await optimizeService.getUserStreak(userId, type)) ?? null;
     }
 
     res.json({ success: true, log: updatedLog, streaks });
@@ -764,8 +768,8 @@ router.post('/nutrition/swap-meal', requireAuth, async (req, res) => {
   try {
     const { planId, dayIndex, mealType, currentMealName, mealIndex } = req.body;
     logger.info('🔄 Meal swap requested:', { userId: req.userId, planId, dayIndex, mealType, currentMealName, mealIndex });
-    
-    const plan = await storage.getOptimizePlan(planId);
+
+    const plan = await optimizeService.getOptimizePlan(planId);
     if (!plan) {
       return res.status(404).json({ error: 'Plan not found' });
     }
@@ -781,7 +785,7 @@ router.post('/nutrition/swap-meal', requireAuth, async (req, res) => {
     }
 
     const dayPlan = weekPlan[dayIndex];
-    
+
     let currentMeal;
     if (typeof mealIndex === 'number' && dayPlan.meals?.[mealIndex]) {
       currentMeal = dayPlan.meals[mealIndex];
@@ -841,7 +845,7 @@ Return ONLY valid JSON:
 
     const updatedWeekPlan = weekPlan.map((day: any, idx: number) => {
       if (idx !== dayIndex) return day;
-      
+
       if (typeof mealIndex === 'number' && day.meals[mealIndex]) {
         const newMeals = [...day.meals];
         newMeals[mealIndex] = newMeal;
@@ -859,7 +863,7 @@ Return ONLY valid JSON:
       };
     });
 
-    await storage.updateOptimizePlan(planId, { content: { ...content, weekPlan: updatedWeekPlan } });
+    await optimizeService.updateOptimizePlan(planId, { content: { ...content, weekPlan: updatedWeekPlan } });
 
     logger.info('✅ Meal swapped successfully:', newMeal.name);
     res.json({ success: true, meal: newMeal, message: 'Meal swapped successfully' });
@@ -873,7 +877,7 @@ Return ONLY valid JSON:
 router.post('/nutrition/recipe', requireAuth, async (req, res) => {
   try {
     const { mealName, ingredients, dietaryRestrictions } = req.body;
-    
+
     if (!mealName) {
       return res.status(400).json({ error: 'Meal name is required' });
     }
@@ -902,7 +906,7 @@ router.post('/nutrition/recipe', requireAuth, async (req, res) => {
 router.get('/grocery-list', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const list = await storage.getActiveGroceryList(userId);
+    const list = await optimizeService.getActiveGroceryList(userId);
     res.json(list || null);
   } catch (error) {
     logger.error('❌ Error fetching grocery list:', error);
@@ -913,14 +917,14 @@ router.get('/grocery-list', requireAuth, async (req, res) => {
 router.post('/grocery-list/generate', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const plan = await storage.getActiveOptimizePlan(userId, 'nutrition');
+    const plan = await optimizeService.getActiveOptimizePlan(userId, 'nutrition');
     if (!plan || !plan.content) {
       return res.status(400).json({ error: 'Generate a nutrition plan before creating a grocery list' });
     }
 
     const content = plan.content as any;
     const weekPlan = content.weekPlan || [];
-    
+
     let mealsText = '';
     weekPlan.forEach((day: any) => {
       mealsText += `\nDay ${day.day} (${day.dayName}):\n`;
@@ -942,7 +946,7 @@ router.post('/grocery-list/generate', requireAuth, async (req, res) => {
 
     const responseContent = completion.choices[0].message.content || '{}';
     const parsed = JSON.parse(responseContent);
-    
+
     const items = (parsed.items || []).map((item: any) => ({
       id: nanoid(8),
       item: item.item,
@@ -962,10 +966,10 @@ router.post('/grocery-list/generate', requireAuth, async (req, res) => {
       }
     }
 
-    const existingList = await storage.getActiveGroceryList(userId);
+    const existingList = await optimizeService.getActiveGroceryList(userId);
     const list = existingList
-      ? await storage.updateGroceryList(existingList.id, { optimizePlanId: plan.id, items, generatedAt: new Date(), isArchived: false })
-      : await storage.createGroceryList({ userId, optimizePlanId: plan.id, items, generatedAt: new Date(), isArchived: false });
+      ? await optimizeService.updateGroceryList(existingList.id, { optimizePlanId: plan.id, items, generatedAt: new Date(), isArchived: false })
+      : await optimizeService.createGroceryList({ userId, optimizePlanId: plan.id, items, generatedAt: new Date(), isArchived: false });
 
     res.json(list);
   } catch (error) {
@@ -978,7 +982,7 @@ router.patch('/grocery-list/:id', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const listId = req.params.id;
-    const list = await storage.getGroceryList(listId);
+    const list = await optimizeService.getGroceryList(listId);
 
     if (!list || list.userId !== userId) {
       return res.status(404).json({ error: 'Grocery list not found' });
@@ -996,7 +1000,7 @@ router.patch('/grocery-list/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'No updates provided' });
     }
 
-    const updated = await storage.updateGroceryList(listId, updates);
+    const updated = await optimizeService.updateGroceryList(listId, updates);
     res.json(updated);
   } catch (error) {
     logger.error('❌ Error updating grocery list:', error);
@@ -1008,10 +1012,10 @@ router.patch('/grocery-list/:id', requireAuth, async (req, res) => {
 router.get('/analytics/workout', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const logs = await storage.getAllWorkoutLogs(userId);
-    
+    const logs = await optimizeService.getAllWorkoutLogs(userId);
+
     // Fetch saved PRs from exercise_records
-    const exerciseRecords = await storage.getExerciseRecords(userId);
+    const exerciseRecords = await optimizeService.getExerciseRecords(userId);
     const savedPRs: Record<string, { weight: number, date: string }> = {};
     exerciseRecords.forEach(record => {
       if (record.isPrTracked && record.prWeight && record.prDate) {
@@ -1026,20 +1030,20 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
     function identifyMuscleGroup(exerciseName: string): string[] {
       const name = exerciseName.toLowerCase();
       const groups: string[] = [];
-      
+
       // Chest
-      if (name.includes('bench') || name.includes('push-up') || name.includes('pushup') || name.includes('push up') || 
-          name.includes('chest') || name.includes('fly') || name.includes('pec') || name.includes('dip')) {
+      if (name.includes('bench') || name.includes('push-up') || name.includes('pushup') || name.includes('push up') ||
+        name.includes('chest') || name.includes('fly') || name.includes('pec') || name.includes('dip')) {
         groups.push('Chest');
       }
       // Shoulders
-      if (name.includes('shoulder') || name.includes('press') || name.includes('lateral') || name.includes('delt') || 
-          name.includes('overhead') || name.includes('raise') || name.includes('military')) {
+      if (name.includes('shoulder') || name.includes('press') || name.includes('lateral') || name.includes('delt') ||
+        name.includes('overhead') || name.includes('raise') || name.includes('military')) {
         groups.push('Shoulders');
       }
       // Back
-      if (name.includes('row') || name.includes('pull') || name.includes('lat') || name.includes('back') || 
-          name.includes('chin') || name.includes('shrug')) {
+      if (name.includes('row') || name.includes('pull') || name.includes('lat') || name.includes('back') ||
+        name.includes('chin') || name.includes('shrug')) {
         groups.push('Back');
       }
       // Biceps
@@ -1051,8 +1055,8 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
         groups.push('Triceps');
       }
       // Quads/Legs
-      if (name.includes('squat') || name.includes('leg') || name.includes('quad') || name.includes('lunge') || 
-          name.includes('jump') || name.includes('step') || name.includes('knee') || name.includes('sled')) {
+      if (name.includes('squat') || name.includes('leg') || name.includes('quad') || name.includes('lunge') ||
+        name.includes('jump') || name.includes('step') || name.includes('knee') || name.includes('sled')) {
         groups.push('Legs');
       }
       // Hamstrings
@@ -1068,23 +1072,23 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
         groups.push('Glutes');
       }
       // Core
-      if (name.includes('ab') || name.includes('core') || name.includes('plank') || name.includes('crunch') || 
-          name.includes('twist') || name.includes('sit-up') || name.includes('situp') || name.includes('hollow')) {
+      if (name.includes('ab') || name.includes('core') || name.includes('plank') || name.includes('crunch') ||
+        name.includes('twist') || name.includes('sit-up') || name.includes('situp') || name.includes('hollow')) {
         groups.push('Core');
       }
       // Olympic/Power lifts - Full Body
       if (name.includes('clean') || name.includes('snatch') || name.includes('jerk') || name.includes('thruster')) {
         groups.push('Full Body');
       }
-      
+
       // Skip warmups/cooldowns - don't count them as "Other"
-      if (name.includes('warmup') || name.includes('warm-up') || name.includes('warm up') || 
-          name.includes('cooldown') || name.includes('cool-down') || name.includes('cool down') ||
-          name.includes('stretch') || name.includes('pose') || name.includes('mobility')) {
+      if (name.includes('warmup') || name.includes('warm-up') || name.includes('warm up') ||
+        name.includes('cooldown') || name.includes('cool-down') || name.includes('cool down') ||
+        name.includes('stretch') || name.includes('pose') || name.includes('mobility')) {
         // Return the groups found, or skip entirely if none
         return groups.length > 0 ? groups : [];
       }
-      
+
       return groups.length > 0 ? groups : ['Other'];
     }
 
@@ -1092,10 +1096,10 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
     const workoutsByWeek: Record<string, number> = {};
     const exerciseCounts: Record<string, number> = {};
     const muscleGroupCounts: Record<string, number> = {};
-    
+
     const currentWeekStart = startOfWeek(new Date());
     let durationThisWeek = 0;
-    
+
     // Completion tracking
     let totalExercisesLogged = 0;
     let totalExercisesSkipped = 0;
@@ -1104,14 +1108,14 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
     logs.forEach(log => {
       const date = new Date(log.completedAt);
       const weekStart = format(startOfWeek(date), 'yyyy-MM-dd');
-      
+
       if (date >= currentWeekStart) {
         durationThisWeek += (log.durationActual || 0);
       }
 
       let logVolume = 0;
       const exercises = log.exercisesCompleted as any;
-      
+
       if (exercises && Array.isArray(exercises)) {
         exercises.forEach((ex: any) => {
           // Track skipped exercises
@@ -1120,10 +1124,10 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
             skippedExerciseCounts[ex.name] = (skippedExerciseCounts[ex.name] || 0) + 1;
             return; // Skip volume calculation for skipped exercises
           }
-          
+
           totalExercisesLogged++;
           exerciseCounts[ex.name] = (exerciseCounts[ex.name] || 0) + 1;
-          
+
           // Track muscle group counts
           const muscleGroups = identifyMuscleGroup(ex.name);
           muscleGroups.forEach(group => {
@@ -1161,25 +1165,25 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
     let currentStreak = 0;
     if (logs.length > 0) {
       const sortedLogs = [...logs].sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
-      
+
       const today = new Date();
       const lastWorkoutDate = new Date(sortedLogs[0].completedAt);
-      
-      const todayStart = new Date(today.setHours(0,0,0,0));
-      const lastWorkoutStart = new Date(new Date(lastWorkoutDate).setHours(0,0,0,0));
-      
+
+      const todayStart = new Date(today.setHours(0, 0, 0, 0));
+      const lastWorkoutStart = new Date(new Date(lastWorkoutDate).setHours(0, 0, 0, 0));
+
       if (differenceInDays(todayStart, lastWorkoutStart) <= 1) {
         currentStreak = 1;
         let currentDate = lastWorkoutStart;
-        
+
         for (let i = 1; i < sortedLogs.length; i++) {
           const logDate = new Date(sortedLogs[i].completedAt);
-          const logDateStart = new Date(new Date(logDate).setHours(0,0,0,0));
-          
+          const logDateStart = new Date(new Date(logDate).setHours(0, 0, 0, 0));
+
           if (isSameDay(currentDate, logDateStart)) {
             continue;
           }
-          
+
           if (differenceInDays(currentDate, logDateStart) === 1) {
             currentStreak++;
             currentDate = logDateStart;
@@ -1202,10 +1206,10 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
 
     // Calculate completion rate
     const totalExercises = totalExercisesLogged + totalExercisesSkipped;
-    const completionRate = totalExercises > 0 
-      ? Math.round((totalExercisesLogged / totalExercises) * 100) 
+    const completionRate = totalExercises > 0
+      ? Math.round((totalExercisesLogged / totalExercises) * 100)
       : 100;
-    
+
     // Top skipped exercises
     const mostSkippedExercises = Object.entries(skippedExerciseCounts)
       .map(([name, count]) => ({ name, count }))
@@ -1241,7 +1245,7 @@ router.get('/analytics/workout', requireAuth, async (req, res) => {
 router.get('/exercise-records/prs', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const prs = await storage.getTrackedPRs(userId);
+    const prs = await optimizeService.getTrackedPRs(userId);
     res.json(prs);
   } catch (error) {
     logger.error('Error fetching PRs:', error);
@@ -1253,7 +1257,7 @@ router.get('/exercise-records/prs', requireAuth, async (req, res) => {
 router.get('/exercise-records', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const records = await storage.getExerciseRecords(userId);
+    const records = await optimizeService.getExerciseRecords(userId);
     res.json(records);
   } catch (error) {
     logger.error('Error fetching exercise records:', error);
@@ -1266,7 +1270,7 @@ router.get('/exercise-records/:exerciseName', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const exerciseName = decodeURIComponent(req.params.exerciseName);
-    const record = await storage.getExerciseRecord(userId, exerciseName);
+    const record = await optimizeService.getExerciseRecord(userId, exerciseName);
     res.json(record || null);
   } catch (error) {
     logger.error('Error fetching exercise record:', error);
@@ -1279,16 +1283,16 @@ router.post('/exercise-records', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const { exerciseName, weight, reps } = req.body;
-    
+
     if (!exerciseName || weight === undefined) {
       return res.status(400).json({ error: 'exerciseName and weight are required' });
     }
-    
-    const record = await storage.upsertExerciseRecord(userId, exerciseName, {
+
+    const record = await optimizeService.upsertExerciseRecord(userId, exerciseName, {
       lastWeight: weight,
       lastReps: reps,
     });
-    
+
     res.json(record);
   } catch (error) {
     logger.error('Error updating exercise record:', error);
@@ -1301,17 +1305,17 @@ router.post('/exercise-records/pr', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const { exerciseName, weight, reps } = req.body;
-    
+
     if (!exerciseName || !weight) {
       return res.status(400).json({ error: 'exerciseName and weight are required' });
     }
-    
-    const record = await storage.upsertExerciseRecord(userId, exerciseName, {
+
+    const record = await optimizeService.upsertExerciseRecord(userId, exerciseName, {
       prWeight: weight,
       prReps: reps,
       isPrTracked: true,
     });
-    
+
     res.json(record);
   } catch (error) {
     logger.error('Error saving PR:', error);
@@ -1324,15 +1328,15 @@ router.post('/exercise-records/log', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const { exercises } = req.body; // Array of { name, weight, reps }
-    
+
     if (!exercises || !Array.isArray(exercises)) {
       return res.status(400).json({ error: 'exercises array is required' });
     }
-    
+
     const results = await Promise.all(
       exercises.map(async (ex: { name: string; weight: number; reps?: number }) => {
         if (ex.weight > 0) {
-          return storage.upsertExerciseRecord(userId, ex.name, {
+          return optimizeService.upsertExerciseRecord(userId, ex.name, {
             lastWeight: ex.weight,
             lastReps: ex.reps,
           });
@@ -1340,7 +1344,7 @@ router.post('/exercise-records/log', requireAuth, async (req, res) => {
         return null;
       })
     );
-    
+
     res.json({ updated: results.filter(Boolean).length });
   } catch (error) {
     logger.error('Error logging exercise weights:', error);
@@ -1353,7 +1357,7 @@ router.delete('/exercise-records/pr/:exerciseName', requireAuth, async (req, res
   try {
     const userId = req.userId!;
     const exerciseName = decodeURIComponent(req.params.exerciseName);
-    const success = await storage.deleteExercisePR(userId, exerciseName);
+    const success = await optimizeService.deleteExercisePR(userId, exerciseName);
     res.json({ success });
   } catch (error) {
     logger.error('Error deleting PR:', error);

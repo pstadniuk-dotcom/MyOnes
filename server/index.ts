@@ -7,7 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startSmsReminderScheduler } from "./smsReminderScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
-import { logger } from "./logger";
+import { logger } from "./infrastructure/logging/logger";
 
 const app = express();
 // Trust reverse proxy (needed for secure cookies and correct protocol detection in production)
@@ -60,7 +60,7 @@ function isAllowedOrigin(origin: string | undefined): boolean {
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  
+
   if (isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin!);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -69,7 +69,7 @@ app.use((req, res, next) => {
   }
   // SECURITY: Do NOT set any CORS headers for unknown origins
   // The browser will block the request if headers are missing
-  
+
   // Handle preflight
   if (req.method === 'OPTIONS') {
     if (isAllowedOrigin(origin)) {
@@ -78,7 +78,7 @@ app.use((req, res, next) => {
     // Don't explicitly reject - just don't set CORS headers
     return res.sendStatus(204);
   }
-  
+
   next();
 });
 
@@ -190,10 +190,10 @@ app.use((req, res, next) => {
     const host = process.env.HOST || '0.0.0.0';
     server.listen(port, host, () => {
       log(`serving on port ${port}`);
-      
+
       // Start SMS reminder scheduler
       startSmsReminderScheduler();
-      
+
       // Note: Wearable data sync is now handled via Junction webhooks
       // No polling schedulers needed - data is pushed to /api/webhooks/junction
     });
@@ -209,15 +209,15 @@ app.use((req, res, next) => {
         logger.error("Server error", { error: e });
       }
     });
-    
+
     server.on('close', () => {
       logger.warn('Server closed');
     });
-    
+
     server.on('listening', () => {
       logger.info('Server listening event fired');
     });
-    
+
   } catch (error) {
     logger.error("FATAL SERVER ERROR", { error });
     process.exit(1);

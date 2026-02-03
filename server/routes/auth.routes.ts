@@ -6,13 +6,13 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import { storage } from '../storage';
-import { logger } from '../logger';
-import { 
-  requireAuth, 
-  generateToken, 
-  getClientIP, 
-  checkRateLimit 
+import { userService } from '../domains/users/user.service';
+import { logger } from '../infrastructure/logging/logger';
+import {
+  requireAuth,
+  generateToken,
+  getClientIP,
+  checkRateLimit
 } from './middleware';
 import { signupSchema, loginSchema, type AuthResponse } from '@shared/schema';
 
@@ -35,17 +35,17 @@ router.post('/signup', async (req, res) => {
     const rateLimit = checkRateLimit(`signup-${clientIP}`, 3, 15 * 60 * 1000);
     if (!rateLimit.allowed) {
       logger.warn('Signup rate limit exceeded', { clientIP });
-      return res.status(429).json({ 
-        error: 'Too many signup attempts. Please try again later.', 
+      return res.status(429).json({
+        error: 'Too many signup attempts. Please try again later.',
         retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
       });
     }
 
     // Validate request body
     const validatedData = signupSchema.parse(req.body);
-    
+
     // Check if user already exists
-    const existingUser = await storage.getUserByEmail(validatedData.email);
+    const existingUser = await userService.getUserByEmail(validatedData.email);
     if (existingUser) {
       logger.info('Signup failed: user exists', { email: validatedData.email });
       return res.status(409).json({ error: 'User with this email already exists' });
@@ -63,9 +63,9 @@ router.post('/signup', async (req, res) => {
       password: hashedPassword
     };
 
-    const user = await storage.createUser(userData);
+    const user = await userService.createUser(userData);
     logger.info('User created successfully', { userId: user.id, email: user.email });
-    
+
     // Generate JWT token
     const token = generateToken(user.id, user.isAdmin || false);
 
@@ -82,26 +82,26 @@ router.post('/signup', async (req, res) => {
       token
     };
 
-    logger.info('Signup success', { 
+    logger.info('Signup success', {
       duration: `${Date.now() - startTime}ms`,
-      userId: user.id 
+      userId: user.id
     });
 
     return res.status(201).json(authResponse);
   } catch (error: any) {
-    logger.error('Signup error', { 
+    logger.error('Signup error', {
       error: error.message,
       duration: `${Date.now() - startTime}ms`,
       type: error.name
     });
-    
+
     if (error.name === 'ZodError') {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: error.errors 
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: error.errors
       });
     }
-    
+
     return res.status(500).json({ error: 'Failed to create account' });
   }
 });
@@ -117,17 +117,17 @@ router.post('/login', async (req, res) => {
     const rateLimit = checkRateLimit(`login-${clientIP}`, 5, 15 * 60 * 1000);
     if (!rateLimit.allowed) {
       logger.warn('Login rate limit exceeded', { clientIP });
-      return res.status(429).json({ 
-        error: 'Too many login attempts. Please try again later.', 
+      return res.status(429).json({
+        error: 'Too many login attempts. Please try again later.',
         retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
       });
     }
 
     // Validate request body
     const validatedData = loginSchema.parse(req.body);
-    
+
     // Find user by email
-    const user = await storage.getUserByEmail(validatedData.email);
+    const user = await userService.getUserByEmail(validatedData.email);
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -158,14 +158,14 @@ router.post('/login', async (req, res) => {
     res.json(authResponse);
   } catch (error: any) {
     logger.error('Login error', { error: error.message });
-    
+
     if (error.name === 'ZodError') {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: error.errors 
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: error.errors
       });
     }
-    
+
     res.status(500).json({ error: 'Login failed' });
   }
 });
@@ -186,7 +186,7 @@ router.post('/logout', (req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const user = await storage.getUser(userId);
+    const user = await userService.getUser(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }

@@ -11,7 +11,7 @@ import { Router } from 'express';
 import { requireAuth } from './middleware';
 import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, SYSTEM_SUPPORT_DETAILS, findIngredientByName } from '@shared/ingredients';
 import { getIngredientResearch } from '@shared/ingredient-research';
-import logger from '../logger';
+import { logger } from '../infrastructure/logging/logger';
 
 const router = Router();
 
@@ -60,14 +60,14 @@ router.get('/:ingredientName', requireAuth, async (req, res) => {
   try {
     const { ingredientName } = req.params;
     const decodedName = safeDecodeURIComponent(ingredientName);
-    
+
     // Search in individual ingredients
     const ingredient = findIngredientByName(decodedName);
-    
+
     if (!ingredient) {
       return res.status(404).json({ error: 'Ingredient not found' });
     }
-    
+
     res.json({ ingredient });
   } catch (error) {
     logger.error('Error fetching ingredient details:', error);
@@ -80,17 +80,17 @@ router.get('/:ingredientName/research', requireAuth, async (req, res) => {
   try {
     const { ingredientName } = req.params;
     const decodedName = safeDecodeURIComponent(ingredientName);
-    
+
     // Search for ingredient
     const ingredient = findIngredientByName(decodedName);
-    
+
     if (!ingredient) {
       return res.status(404).json({ error: 'Ingredient not found' });
     }
-    
+
     // Get pre-built research data from ingredient-research.ts
     const researchData = getIngredientResearch(decodedName);
-    
+
     // Convert research studies to citations format expected by frontend
     const citations = researchData?.studies?.map((study, idx) => ({
       id: `${decodedName}-study-${idx}`,
@@ -104,7 +104,7 @@ router.get('/:ingredientName/research', requireAuth, async (req, res) => {
       evidenceLevel: study.evidenceLevel,
       studyType: study.studyType
     })) || [];
-    
+
     // Return research data with summary, benefits, and citations
     const response = {
       ingredientName: ingredient.name,
@@ -121,7 +121,7 @@ router.get('/:ingredientName/research', requireAuth, async (req, res) => {
       doseRangeMax: ingredient.doseRangeMax,
       description: ingredient.description
     };
-    
+
     res.json(response);
   } catch (error) {
     logger.error('Error fetching ingredient research:', error);

@@ -1,12 +1,12 @@
 import { eq, desc, and, isNull, isNotNull, gte, lte, lt, gt, or, ilike, sql, count, inArray } from "drizzle-orm";
-import { db } from "./db";
-import { encryptToken, decryptToken } from "./tokenEncryption";
-import { encryptField, decryptField, encryptFieldSafe, decryptFieldSafe } from "./fieldEncryption";
-import { logger } from "./logger";
+import { db } from "./infrastructure/database/db";
+import { encryptToken, decryptToken } from "./infrastructure/security/token-encryption";
+import { encryptField, decryptField, encryptFieldSafe, decryptFieldSafe } from "./infrastructure/security/field-encryption";
+import { logger } from "./infrastructure/logging/logger";
 import { getUserLocalMidnight, getUserLocalDateString, toUserLocalDateString } from "./utils/timezone";
 import {
   users, healthProfiles, chatSessions, messages, formulas, formulaVersionChanges,
-  subscriptions, orders, addresses, paymentMethodRefs, fileUploads, 
+  subscriptions, orders, addresses, paymentMethodRefs, fileUploads,
   notifications, notificationPrefs, auditLogs, userConsents, labAnalyses,
   faqItems, supportTickets, supportTicketResponses, helpArticles, newsletterSubscribers,
   researchCitations, wearableConnections, appSettings, reviewSchedules,
@@ -69,29 +69,29 @@ export interface IStorage {
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
   updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
   deleteUser(id: string): Promise<boolean>;
-  
+
   // Password reset operations
   createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
   getPasswordResetToken(token: string): Promise<{ userId: string; expiresAt: Date; used: boolean } | undefined>;
   markPasswordResetTokenUsed(token: string): Promise<void>;
-  
+
   // Health Profile operations
   getHealthProfile(userId: string): Promise<HealthProfile | undefined>;
   createHealthProfile(profile: InsertHealthProfile): Promise<HealthProfile>;
   updateHealthProfile(userId: string, updates: Partial<InsertHealthProfile>): Promise<HealthProfile | undefined>;
-  
+
   // Chat Session operations
   getChatSession(id: string): Promise<ChatSession | undefined>;
   createChatSession(session: InsertChatSession): Promise<ChatSession>;
   listChatSessionsByUser(userId: string): Promise<ChatSession[]>;
   updateChatSessionStatus(id: string, status: 'active' | 'completed' | 'archived'): Promise<ChatSession | undefined>;
   deleteChatSession(id: string): Promise<void>;
-  
+
   // Message operations
   getMessage(id: string): Promise<Message | undefined>;
   createMessage(message: InsertMessage): Promise<Message>;
   listMessagesBySession(sessionId: string): Promise<Message[]>;
-  
+
   // Formula operations
   getFormula(id: string): Promise<Formula | undefined>;
   createFormula(formula: InsertFormula): Promise<Formula>;
@@ -105,77 +105,77 @@ export interface IStorage {
   updateFormulaName(formulaId: string, name: string): Promise<Formula>;
   archiveFormula(formulaId: string): Promise<Formula>;
   restoreFormula(formulaId: string): Promise<Formula>;
-  
+
   // Formula Version Change operations
   createFormulaVersionChange(change: InsertFormulaVersionChange): Promise<FormulaVersionChange>;
   listFormulaVersionChanges(formulaId: string): Promise<FormulaVersionChange[]>;
-  
+
   // Subscription operations
   getSubscription(userId: string): Promise<Subscription | undefined>;
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
   updateSubscription(userId: string, updates: Partial<InsertSubscription>): Promise<Subscription | undefined>;
-  
+
   // Order operations
   getOrder(id: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
   listOrdersByUser(userId: string): Promise<Order[]>;
   updateOrderStatus(id: string, status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled', trackingUrl?: string): Promise<Order | undefined>;
-  getOrderWithFormula(orderId: string): Promise<{order: Order, formula: Formula | undefined} | undefined>;
-  
+  getOrderWithFormula(orderId: string): Promise<{ order: Order, formula: Formula | undefined } | undefined>;
+
   // Address operations
   getAddress(id: string): Promise<Address | undefined>;
   createAddress(address: InsertAddress): Promise<Address>;
   updateAddress(id: string, updates: Partial<InsertAddress>): Promise<Address | undefined>;
   listAddressesByUser(userId: string, type?: 'shipping' | 'billing'): Promise<Address[]>;
-  
+
   // Payment Method operations
   getPaymentMethodRef(id: string): Promise<PaymentMethodRef | undefined>;
   createPaymentMethodRef(paymentMethod: InsertPaymentMethodRef): Promise<PaymentMethodRef>;
   listPaymentMethodsByUser(userId: string): Promise<PaymentMethodRef[]>;
   deletePaymentMethodRef(id: string): Promise<boolean>;
-  
+
   // File Upload operations (enhanced for HIPAA compliance)
   getFileUpload(id: string): Promise<FileUpload | undefined>;
   createFileUpload(fileUpload: InsertFileUpload): Promise<FileUpload>;
   updateFileUpload(id: string, updates: Partial<InsertFileUpload>): Promise<FileUpload | undefined>;
   softDeleteFileUpload(id: string, deletedBy: string): Promise<boolean>;
   listFileUploadsByUser(userId: string, type?: 'lab_report' | 'medical_document' | 'prescription' | 'other', includeDeleted?: boolean): Promise<FileUpload[]>;
-  
+
   // Lab Report specific operations
   getLabReportsByUser(userId: string): Promise<FileUpload[]>;
   getLabReportById(id: string, userId: string): Promise<FileUpload | undefined>;
   updateLabReportData(id: string, labReportData: any, userId: string): Promise<FileUpload | undefined>;
-  
+
   // Audit Log operations (HIPAA compliance)
   createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
   getAuditLogsByFile(fileId: string): Promise<AuditLog[]>;
   getAuditLogsByUser(userId: string, limit?: number): Promise<AuditLog[]>;
   getAuditLogsByDateRange(startDate: Date, endDate: Date): Promise<AuditLog[]>;
-  
+
   // User Consent operations (HIPAA compliance)
   createUserConsent(consent: InsertUserConsent): Promise<UserConsent>;
   getUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing'): Promise<UserConsent | undefined>;
   getUserConsents(userId: string): Promise<UserConsent[]>;
   revokeUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing'): Promise<boolean>;
-  
+
   // Lab Analysis operations (AI-generated insights)
   createLabAnalysis(analysis: InsertLabAnalysis): Promise<LabAnalysis>;
   getLabAnalysis(fileId: string): Promise<LabAnalysis | undefined>;
   updateLabAnalysis(id: string, updates: Partial<InsertLabAnalysis>): Promise<LabAnalysis | undefined>;
   listLabAnalysesByUser(userId: string): Promise<LabAnalysis[]>;
-  
+
   // Notification Preferences operations
   getNotificationPrefs(userId: string): Promise<NotificationPref | undefined>;
   createNotificationPrefs(prefs: InsertNotificationPref): Promise<NotificationPref>;
   updateNotificationPrefs(userId: string, updates: Partial<InsertNotificationPref>): Promise<NotificationPref | undefined>;
-  
+
   // Notification operations
   getNotification(id: string): Promise<Notification | undefined>;
   createNotification(notification: InsertNotification): Promise<Notification>;
   listNotificationsByUser(userId: string, limit?: number): Promise<Notification[]>;
   getUnreadNotificationCount(userId: string): Promise<number>;
   markNotificationAsRead(id: string, userId: string): Promise<Notification | undefined>;
-  
+
   // Support System operations
   // FAQ operations
   getFaqItem(id: string): Promise<FaqItem | undefined>;
@@ -183,19 +183,19 @@ export interface IStorage {
   updateFaqItem(id: string, updates: Partial<InsertFaqItem>): Promise<FaqItem | undefined>;
   listFaqItems(category?: string): Promise<FaqItem[]>;
   deleteFaqItem(id: string): Promise<boolean>;
-  
+
   // Support ticket operations
   getSupportTicket(id: string): Promise<SupportTicket | undefined>;
   createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket>;
   updateSupportTicket(id: string, updates: Partial<InsertSupportTicket>): Promise<SupportTicket | undefined>;
   listSupportTicketsByUser(userId: string): Promise<SupportTicket[]>;
-  listAllSupportTickets(status?: string, limit?: number, offset?: number): Promise<{tickets: Array<SupportTicket & {userName: string, userEmail: string}>, total: number}>;
-  getSupportTicketWithResponses(id: string, userId: string): Promise<{ticket: SupportTicket, responses: SupportTicketResponse[]} | undefined>;
-  
+  listAllSupportTickets(status?: string, limit?: number, offset?: number): Promise<{ tickets: Array<SupportTicket & { userName: string, userEmail: string }>, total: number }>;
+  getSupportTicketWithResponses(id: string, userId: string): Promise<{ ticket: SupportTicket, responses: SupportTicketResponse[] } | undefined>;
+
   // Support ticket response operations
   createSupportTicketResponse(response: InsertSupportTicketResponse): Promise<SupportTicketResponse>;
   listSupportTicketResponses(ticketId: string): Promise<SupportTicketResponse[]>;
-  
+
   // Help article operations
   getHelpArticle(id: string): Promise<HelpArticle | undefined>;
   createHelpArticle(article: InsertHelpArticle): Promise<HelpArticle>;
@@ -205,38 +205,19 @@ export interface IStorage {
   incrementHelpArticleViewCount(id: string): Promise<boolean>;
   markAllNotificationsAsRead(userId: string): Promise<boolean>;
   deleteNotification(id: string, userId: string): Promise<boolean>;
-  
+
   // Newsletter subscriber operations
   getNewsletterSubscriberByEmail(email: string): Promise<NewsletterSubscriber | undefined>;
   createNewsletterSubscriber(subscriber: InsertNewsletterSubscriber): Promise<NewsletterSubscriber>;
   reactivateNewsletterSubscriber(email: string): Promise<boolean>;
-  
+
   // Research citations operations
   getResearchCitationsForIngredient(ingredientName: string): Promise<ResearchCitation[]>;
   createResearchCitation(citation: InsertResearchCitation): Promise<ResearchCitation>;
-  
-  // Admin operations
-  getAdminStats(): Promise<{
-    totalUsers: number;
-    totalPaidUsers: number;
-    totalRevenue: number;
-    activeUsers: number;
-    totalOrders: number;
-    totalFormulas: number;
-  }>;
-  getUserGrowthData(days: number): Promise<Array<{ date: string; users: number; paidUsers: number }>>;
-  getRevenueData(days: number): Promise<Array<{ date: string; revenue: number; orders: number }>>;
-  searchUsers(query: string, limit: number, offset: number, filter?: string): Promise<{ users: User[]; total: number }>;
-  getTodaysOrders(): Promise<Array<Order & { user: { id: string; name: string; email: string }; formula?: Formula }>>;
-  getUserTimeline(userId: string): Promise<{
-    user: User;
-    healthProfile?: HealthProfile;
-    formulas: Formula[];
-    orders: Array<Order & { formula?: Formula }>;
-    chatSessions: ChatSession[];
-    fileUploads: FileUpload[];
-  }>;
-  
+
+  // Admin operations - MOVED TO AdminRepository / AdminService
+
+
   // Wearable device connection operations
   getWearableConnections(userId: string): Promise<WearableConnection[]>;
   getAllWearableConnections(): Promise<WearableConnection[]>;
@@ -244,7 +225,7 @@ export interface IStorage {
   createWearableConnection(connection: InsertWearableConnection): Promise<WearableConnection>;
   updateWearableConnection(id: string, updates: Partial<InsertWearableConnection>): Promise<WearableConnection | undefined>;
   disconnectWearableDevice(id: string, userId: string): Promise<boolean>;
-  
+
   // Biometric data operations
   saveBiometricData(data: {
     userId: string;
@@ -278,7 +259,7 @@ export interface IStorage {
   getAppSetting(key: string): Promise<AppSetting | undefined>;
   upsertAppSetting(key: string, value: Record<string, any>, updatedBy?: string | null): Promise<AppSetting>;
   deleteAppSetting(key: string): Promise<boolean>;
-  
+
   // Review schedule operations
   getReviewSchedule(userId: string, formulaId: string): Promise<ReviewSchedule | undefined>;
   createReviewSchedule(schedule: InsertReviewSchedule): Promise<ReviewSchedule>;
@@ -286,7 +267,7 @@ export interface IStorage {
   deleteReviewSchedule(id: string): Promise<boolean>;
   getActiveReviewSchedules(): Promise<ReviewSchedule[]>;
   getUpcomingReviews(daysAhead: number): Promise<ReviewSchedule[]>;
-  
+
   // Streak Rewards operations
   getStreakRewards(userId: string): Promise<{
     currentStreak: number;
@@ -303,7 +284,7 @@ export interface IStorage {
   applyStreakDiscount(userId: string, orderId: string): Promise<number>; // Returns discount applied
   resetStreakForLapsedUsers(): Promise<number>; // Returns count of users reset
   updateStreakStatuses(): Promise<void>; // Called by cron to update warning/grace statuses
-  
+
   // Membership Tier operations
   getMembershipTier(tierKey: string): Promise<MembershipTier | undefined>;
   getAllMembershipTiers(): Promise<MembershipTier[]>;
@@ -312,7 +293,7 @@ export interface IStorage {
   updateMembershipTier(tierKey: string, updates: Partial<InsertMembershipTier>): Promise<MembershipTier | undefined>;
   incrementTierCount(tierKey: string): Promise<MembershipTier | undefined>;
   decrementTierCount(tierKey: string): Promise<MembershipTier | undefined>;
-  
+
   // User membership operations
   assignUserMembership(userId: string, tierKey: string, priceCents: number): Promise<User | undefined>;
   cancelUserMembership(userId: string): Promise<User | undefined>;
@@ -654,12 +635,12 @@ export class DrizzleStorage implements IStorage {
     try {
       const [profile] = await db.select().from(healthProfiles).where(eq(healthProfiles.userId, userId));
       if (!profile) return undefined;
-      
+
       // Decrypt sensitive medical fields with error handling for each field
       let conditions: string[] = [];
       let medications: string[] = [];
       let allergies: string[] = [];
-      
+
       try {
         if (profile.conditions) {
           // Check if it's already a plain array (not encrypted)
@@ -672,7 +653,7 @@ export class DrizzleStorage implements IStorage {
       } catch (decryptError) {
         console.error('Error decrypting conditions, using empty array:', decryptError);
       }
-      
+
       try {
         if (profile.medications) {
           if (Array.isArray(profile.medications)) {
@@ -684,7 +665,7 @@ export class DrizzleStorage implements IStorage {
       } catch (decryptError) {
         console.error('Error decrypting medications, using empty array:', decryptError);
       }
-      
+
       try {
         if (profile.allergies) {
           if (Array.isArray(profile.allergies)) {
@@ -696,7 +677,7 @@ export class DrizzleStorage implements IStorage {
       } catch (decryptError) {
         console.error('Error decrypting allergies, using empty array:', decryptError);
       }
-      
+
       return {
         ...profile,
         conditions,
@@ -724,9 +705,9 @@ export class DrizzleStorage implements IStorage {
           ? encryptField(JSON.stringify(insertProfile.allergies))
           : null
       };
-      
+
       const [profile] = await db.insert(healthProfiles).values(encryptedProfile as any).returning();
-      
+
       // Decrypt for return
       return {
         ...profile,
@@ -769,25 +750,25 @@ export class DrizzleStorage implements IStorage {
         // Always update the timestamp
         updatedAt: new Date()
       };
-      
+
       // Remove undefined values (but keep null values)
       const cleanUpdates = Object.fromEntries(
         Object.entries(encryptedUpdates).filter(([_, v]) => v !== undefined)
       );
-      
+
       console.log('Updating health profile:', { userId, fieldsToUpdate: Object.keys(cleanUpdates) });
-      
+
       const [profile] = await db
         .update(healthProfiles)
         .set(cleanUpdates as any)
         .where(eq(healthProfiles.userId, userId))
         .returning();
-      
+
       if (!profile) {
         console.error('Health profile update returned no result for userId:', userId);
         return undefined;
       }
-      
+
       // Decrypt for return
       return {
         ...profile,
@@ -954,7 +935,7 @@ export class DrizzleStorage implements IStorage {
 
   async getFormulaHistory(userId: string, includeArchived: boolean = false): Promise<Formula[]> {
     try {
-      const whereClause = includeArchived 
+      const whereClause = includeArchived
         ? eq(formulas.userId, userId)
         : and(eq(formulas.userId, userId), isNull(formulas.archivedAt));
       return await db
@@ -1129,7 +1110,7 @@ export class DrizzleStorage implements IStorage {
       if (status === 'shipped') {
         updateData.shippedAt = new Date();
       }
-      
+
       const [order] = await db
         .update(orders)
         .set(updateData)
@@ -1142,7 +1123,7 @@ export class DrizzleStorage implements IStorage {
     }
   }
 
-  async getOrderWithFormula(orderId: string): Promise<{order: Order, formula: Formula | undefined} | undefined> {
+  async getOrderWithFormula(orderId: string): Promise<{ order: Order, formula: Formula | undefined } | undefined> {
     try {
       const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
       if (!order) return undefined;
@@ -1196,10 +1177,10 @@ export class DrizzleStorage implements IStorage {
 
   async listAddressesByUser(userId: string, type?: 'shipping' | 'billing'): Promise<Address[]> {
     try {
-      const whereClause = type 
+      const whereClause = type
         ? and(eq(addresses.userId, userId), eq(addresses.type, type))
         : eq(addresses.userId, userId);
-      
+
       return await db.select().from(addresses).where(whereClause).orderBy(desc(addresses.createdAt));
     } catch (error) {
       console.error('Error listing addresses by user:', error);
@@ -1311,15 +1292,15 @@ export class DrizzleStorage implements IStorage {
   async listFileUploadsByUser(userId: string, type?: 'lab_report' | 'medical_document' | 'prescription' | 'other', includeDeleted?: boolean): Promise<FileUpload[]> {
     try {
       let whereClause: any = eq(fileUploads.userId, userId);
-      
+
       if (type) {
         whereClause = and(whereClause, eq(fileUploads.type, type));
       }
-      
+
       if (!includeDeleted) {
         whereClause = and(whereClause, isNull(fileUploads.deletedAt));
       }
-      
+
       return await db.select().from(fileUploads).where(whereClause).orderBy(desc(fileUploads.uploadedAt));
     } catch (error) {
       console.error('Error listing file uploads by user:', error);
@@ -1488,20 +1469,20 @@ export class DrizzleStorage implements IStorage {
       // Encrypt sensitive health data before storing
       const encryptedAnalysis = {
         ...insertAnalysis,
-        extractedMarkers: insertAnalysis.extractedMarkers 
+        extractedMarkers: insertAnalysis.extractedMarkers
           ? encryptField(JSON.stringify(insertAnalysis.extractedMarkers))
           : null,
         aiInsights: insertAnalysis.aiInsights
           ? encryptField(JSON.stringify(insertAnalysis.aiInsights))
           : null
       };
-      
+
       const [analysis] = await db.insert(labAnalyses).values(encryptedAnalysis as any).returning();
-      
+
       // Decrypt for return
       return {
         ...analysis,
-        extractedMarkers: analysis.extractedMarkers 
+        extractedMarkers: analysis.extractedMarkers
           ? JSON.parse(decryptField(analysis.extractedMarkers as any))
           : [],
         aiInsights: analysis.aiInsights
@@ -1518,7 +1499,7 @@ export class DrizzleStorage implements IStorage {
     try {
       const [analysis] = await db.select().from(labAnalyses).where(eq(labAnalyses.fileId, fileId));
       if (!analysis) return undefined;
-      
+
       // Decrypt sensitive fields
       return {
         ...analysis,
@@ -1547,20 +1528,20 @@ export class DrizzleStorage implements IStorage {
           ? encryptField(JSON.stringify(updates.aiInsights))
           : undefined
       };
-      
+
       // Remove undefined values
       const cleanUpdates = Object.fromEntries(
         Object.entries(encryptedUpdates).filter(([_, v]) => v !== undefined)
       );
-      
+
       const [analysis] = await db
         .update(labAnalyses)
         .set(cleanUpdates as any)
         .where(eq(labAnalyses.id, id))
         .returning();
-      
+
       if (!analysis) return undefined;
-      
+
       // Decrypt for return
       return {
         ...analysis,
@@ -1580,7 +1561,7 @@ export class DrizzleStorage implements IStorage {
   async listLabAnalysesByUser(userId: string): Promise<LabAnalysis[]> {
     try {
       const analyses = await db.select().from(labAnalyses).where(eq(labAnalyses.userId, userId)).orderBy(desc(labAnalyses.processedAt));
-      
+
       // Decrypt each analysis
       return analyses.map(analysis => ({
         ...analysis,
@@ -1998,7 +1979,7 @@ export class DrizzleStorage implements IStorage {
     }
   }
 
-  async getSupportTicketWithResponses(id: string, userId: string): Promise<{ticket: SupportTicket, responses: SupportTicketResponse[]} | undefined> {
+  async getSupportTicketWithResponses(id: string, userId: string): Promise<{ ticket: SupportTicket, responses: SupportTicketResponse[] } | undefined> {
     try {
       const [ticket] = await db
         .select()
@@ -2007,7 +1988,7 @@ export class DrizzleStorage implements IStorage {
           eq(supportTickets.id, id),
           eq(supportTickets.userId, userId)
         ));
-      
+
       if (!ticket) return undefined;
 
       const responses = await db
@@ -2023,7 +2004,7 @@ export class DrizzleStorage implements IStorage {
     }
   }
 
-  async listAllSupportTickets(status?: string, limit: number = 50, offset: number = 0): Promise<{tickets: Array<SupportTicket & {userName: string, userEmail: string}>, total: number}> {
+  async listAllSupportTickets(status?: string, limit: number = 50, offset: number = 0): Promise<{ tickets: Array<SupportTicket & { userName: string, userEmail: string }>, total: number }> {
     try {
       let query = db
         .select({
@@ -2093,7 +2074,7 @@ export class DrizzleStorage implements IStorage {
       return [];
     }
   }
-  
+
   // Admin operations
   async getAdminStats(): Promise<{
     totalUsers: number;
@@ -2106,29 +2087,29 @@ export class DrizzleStorage implements IStorage {
     try {
       const [userStats] = await db.select({ count: count() }).from(users);
       const totalUsers = Number(userStats?.count || 0);
-      
+
       const [formulaStats] = await db.select({ count: count() }).from(formulas);
       const totalFormulas = Number(formulaStats?.count || 0);
-      
+
       const [orderStats] = await db.select({ count: count() }).from(orders);
       const totalOrders = Number(orderStats?.count || 0);
-      
+
       const paidUsersResult = await db
         .selectDistinct({ userId: orders.userId })
         .from(orders);
       const totalPaidUsers = paidUsersResult.length;
-      
+
       const usersWithFormulas = await db
         .selectDistinct({ userId: formulas.userId })
         .from(formulas);
       const activeUsers = usersWithFormulas.length;
-      
+
       // Calculate total revenue from orders
       const [revenueStats] = await db
         .select({ totalRevenueCents: sql<number>`COALESCE(SUM(amount_cents), 0)` })
         .from(orders);
       const totalRevenue = Number(revenueStats?.totalRevenueCents || 0) / 100;
-      
+
       return {
         totalUsers,
         totalPaidUsers,
@@ -2149,12 +2130,12 @@ export class DrizzleStorage implements IStorage {
       };
     }
   }
-  
+
   async getUserGrowthData(days: number): Promise<Array<{ date: string; users: number; paidUsers: number }>> {
     try {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
-      
+
       // Get daily new user signups
       const dailyUsers = await db
         .select({
@@ -2165,26 +2146,26 @@ export class DrizzleStorage implements IStorage {
         .where(gte(users.createdAt, startDate))
         .groupBy(sql`DATE(created_at)`)
         .orderBy(sql`DATE(created_at)`);
-      
+
       // Get distinct paid users (users who have placed orders)
       const paidUserIds = await db
         .selectDistinct({ userId: orders.userId, orderDate: sql<string>`DATE(placed_at)` })
         .from(orders)
         .where(gte(orders.placedAt, startDate));
-      
+
       // Build cumulative growth data
       let cumulativeUsers = 0;
       let cumulativePaid = 0;
-      
+
       const paidByDate = new Map<string, number>();
       paidUserIds.forEach(({ orderDate }) => {
         paidByDate.set(orderDate, (paidByDate.get(orderDate) || 0) + 1);
       });
-      
+
       return dailyUsers.map(row => {
         cumulativeUsers += Number(row.count);
         cumulativePaid += (paidByDate.get(row.date) || 0);
-        
+
         return {
           date: row.date,
           users: cumulativeUsers,
@@ -2196,12 +2177,12 @@ export class DrizzleStorage implements IStorage {
       return [];
     }
   }
-  
+
   async getRevenueData(days: number): Promise<Array<{ date: string; revenue: number; orders: number }>> {
     try {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
-      
+
       const revenueData = await db
         .select({
           date: sql<string>`DATE(placed_at)`,
@@ -2212,7 +2193,7 @@ export class DrizzleStorage implements IStorage {
         .where(gte(orders.placedAt, startDate))
         .groupBy(sql`DATE(placed_at)`)
         .orderBy(sql`DATE(placed_at)`);
-      
+
       return revenueData.map(row => ({
         date: row.date,
         revenue: Number(row.revenueCents || 0) / 100,
@@ -2223,7 +2204,7 @@ export class DrizzleStorage implements IStorage {
       return [];
     }
   }
-  
+
   async searchUsers(query: string, limit: number, offset: number, filter: string = 'all'): Promise<{ users: User[]; total: number }> {
     try {
       const searchPattern = `%${query}%`;
@@ -2285,18 +2266,18 @@ export class DrizzleStorage implements IStorage {
       return { users: [], total: 0 };
     }
   }
-  
+
   async getTodaysOrders(): Promise<Array<Order & { user: { id: string; name: string; email: string }; formula?: Formula }>> {
     try {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
-      
+
       const todayOrders = await db
         .select()
         .from(orders)
         .where(gte(orders.placedAt, todayStart))
         .orderBy(desc(orders.placedAt));
-      
+
       // Enrich orders with user and formula details
       const enrichedOrders = await Promise.all(
         todayOrders.map(async (order) => {
@@ -2305,7 +2286,7 @@ export class DrizzleStorage implements IStorage {
             name: users.name,
             email: users.email
           }).from(users).where(eq(users.id, order.userId));
-          
+
           const [formula] = await db
             .select()
             .from(formulas)
@@ -2315,18 +2296,18 @@ export class DrizzleStorage implements IStorage {
                 eq(formulas.version, order.formulaVersion)
               )
             );
-          
+
           return { ...order, user, formula };
         })
       );
-      
+
       return enrichedOrders;
     } catch (error) {
       console.error('Error getting today\'s orders:', error);
       return [];
     }
   }
-  
+
   async getUserTimeline(userId: string): Promise<{
     user: User;
     healthProfile?: HealthProfile;
@@ -2341,22 +2322,22 @@ export class DrizzleStorage implements IStorage {
       if (!user) {
         throw new Error('User not found');
       }
-      
+
       console.log('getUserTimeline: Fetching health profile');
       const [healthProfile] = await db.select().from(healthProfiles).where(eq(healthProfiles.userId, userId));
-      
+
       console.log('getUserTimeline: Fetching formulas');
       const userFormulas = await db.select().from(formulas).where(eq(formulas.userId, userId)).orderBy(desc(formulas.createdAt));
-      
+
       console.log('getUserTimeline: Fetching orders');
       const userOrders = await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.placedAt));
-      
+
       console.log('getUserTimeline: Fetching chat sessions');
       const userChatSessions = await db.select().from(chatSessions).where(eq(chatSessions.userId, userId)).orderBy(desc(chatSessions.createdAt));
-      
+
       console.log('getUserTimeline: Fetching file uploads');
       const userFileUploads = await db.select().from(fileUploads).where(eq(fileUploads.userId, userId)).orderBy(desc(fileUploads.uploadedAt));
-      
+
       console.log('getUserTimeline: Enriching orders with formula details');
       // Enrich orders with formula details
       const enrichedOrders = await Promise.all(
@@ -2373,7 +2354,7 @@ export class DrizzleStorage implements IStorage {
           return { ...order, formula };
         })
       );
-      
+
       console.log('getUserTimeline: Success for user', userId);
       return {
         user,
@@ -2397,7 +2378,7 @@ export class DrizzleStorage implements IStorage {
         .from(wearableConnections)
         .where(eq(wearableConnections.userId, userId))
         .orderBy(desc(wearableConnections.connectedAt));
-      
+
       // Decrypt tokens for active connections
       return connections.map(conn => {
         if (conn.status === 'connected' && conn.accessToken) {
@@ -2431,7 +2412,7 @@ export class DrizzleStorage implements IStorage {
             lt(wearableConnections.tokenExpiresAt, expiryThreshold)
           )
         );
-      
+
       // Decrypt tokens for connections
       return connections.map(conn => {
         if (conn.accessToken) {
@@ -2453,7 +2434,7 @@ export class DrizzleStorage implements IStorage {
       return [];
     }
   }
-  
+
   async createWearableConnection(connection: InsertWearableConnection): Promise<WearableConnection> {
     try {
       if (!connection.accessToken) {
@@ -2466,12 +2447,12 @@ export class DrizzleStorage implements IStorage {
         refreshToken: connection.refreshToken ? encryptToken(connection.refreshToken) : null,
         scopes: Array.isArray(connection.scopes) ? [...connection.scopes] : connection.scopes ?? []
       };
-      
+
       const [newConnection] = await db
         .insert(wearableConnections)
         .values(encryptedConnection)
         .returning();
-      
+
       // Return connection with decrypted tokens
       return {
         ...newConnection,
@@ -2483,7 +2464,7 @@ export class DrizzleStorage implements IStorage {
       throw new Error('Failed to create wearable connection');
     }
   }
-  
+
   async updateWearableConnection(id: string, updates: Partial<InsertWearableConnection>): Promise<WearableConnection | undefined> {
     try {
       // Encrypt tokens if present in updates
@@ -2493,15 +2474,15 @@ export class DrizzleStorage implements IStorage {
         refreshToken: updates.refreshToken ? encryptToken(updates.refreshToken) : updates.refreshToken,
         scopes: Array.isArray(updates.scopes) ? [...updates.scopes] : updates.scopes
       };
-      
+
       const [updatedConnection] = await db
         .update(wearableConnections)
         .set(encryptedUpdates)
         .where(eq(wearableConnections.id, id))
         .returning();
-      
+
       if (!updatedConnection) return undefined;
-      
+
       // Decrypt tokens before returning
       if (updatedConnection.accessToken) {
         try {
@@ -2515,21 +2496,21 @@ export class DrizzleStorage implements IStorage {
           return updatedConnection;
         }
       }
-      
+
       return updatedConnection;
     } catch (error) {
       console.error('Error updating wearable connection:', error);
       return undefined;
     }
   }
-  
+
   async disconnectWearableDevice(id: string, userId: string): Promise<boolean> {
     try {
       const revokedToken = encryptToken('revoked');
       // Null out tokens to prevent credential reuse
       const [connection] = await db
         .update(wearableConnections)
-        .set({ 
+        .set({
           status: 'disconnected',
           disconnectedAt: new Date(),
           accessToken: revokedToken,
@@ -2557,7 +2538,7 @@ export class DrizzleStorage implements IStorage {
         .from(wearableConnections)
         .where(eq(wearableConnections.status, 'connected'))
         .orderBy(desc(wearableConnections.connectedAt));
-      
+
       // Decrypt tokens for active connections
       return connections.map(conn => {
         if (conn.accessToken) {
@@ -2650,7 +2631,7 @@ export class DrizzleStorage implements IStorage {
   }): Promise<void> {
     try {
       const { biometricData } = await import('@shared/schema');
-      
+
       // Upsert - update if exists, insert if not
       await db.insert(biometricData).values({
         userId: data.userId,
@@ -2710,7 +2691,7 @@ export class DrizzleStorage implements IStorage {
   async getBiometricData(userId: string, startDate: Date, endDate: Date): Promise<any[]> {
     try {
       const { biometricData } = await import('@shared/schema');
-      
+
       return await db
         .select()
         .from(biometricData)
@@ -2738,7 +2719,7 @@ export class DrizzleStorage implements IStorage {
         ))
         .orderBy(desc(biometricTrends.periodEnd))
         .limit(1);
-      
+
       return trend || null;
     } catch (error) {
       console.error('Error getting biometric trends:', error);
@@ -2926,7 +2907,7 @@ export class DrizzleStorage implements IStorage {
   }
 
   // ===== OPTIMIZE FEATURE OPERATIONS =====
-  
+
   // Optimize Plans
   async deactivateOldPlans(userId: string, planType: 'nutrition' | 'workout' | 'lifestyle'): Promise<void> {
     await db
@@ -2987,10 +2968,10 @@ export class DrizzleStorage implements IStorage {
   // Daily Logs & Streaks
   async createDailyLog(log: InsertOptimizeDailyLog): Promise<OptimizeDailyLog> {
     const [created] = await db.insert(optimizeDailyLogs).values(log).returning();
-    
+
     // Update streak after logging
     await this.updateUserStreak(log.userId, log.logDate);
-    
+
     return created;
   }
 
@@ -3001,7 +2982,7 @@ export class DrizzleStorage implements IStorage {
     const year = date.getUTCFullYear();
     const month = date.getUTCMonth();
     const day = date.getUTCDate();
-    
+
     const startOfDay = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
     const endOfDay = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
 
@@ -3021,13 +3002,13 @@ export class DrizzleStorage implements IStorage {
         lte(optimizeDailyLogs.logDate, endOfDay)
       ))
       .limit(1);
-    
+
     console.log('🔍 getDailyLog - Result:', {
       found: !!log,
       logId: log?.id,
       logDate: log?.logDate?.toISOString?.() || log?.logDate,
     });
-    
+
     return log;
   }
 
@@ -3111,7 +3092,7 @@ export class DrizzleStorage implements IStorage {
   async getTodayNutritionTotals(userId: string): Promise<{ calories: number; protein: number; carbs: number; fat: number; mealsLogged: number; waterOz: number }> {
     const today = new Date();
     const meals = await this.getMealLogsForDay(userId, today);
-    
+
     return {
       calories: meals.reduce((sum, m) => sum + (m.calories || 0), 0),
       protein: meals.reduce((sum, m) => sum + (m.proteinGrams || 0), 0),
@@ -3131,32 +3112,32 @@ export class DrizzleStorage implements IStorage {
         eq(userStreaks.userId, userId),
         eq(userStreaks.streakType, streakType)
       ));
-    
+
     // If no streak exists, return undefined
     if (!streak) return undefined;
-    
+
     // Validate streak against current date - reset if gap is too large
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
-    
+
     // Get last completed date as string
-    const lastCompletedStr = streak.lastCompletedDate 
-      ? (typeof streak.lastCompletedDate === 'string' 
-          ? streak.lastCompletedDate.split('T')[0] 
-          : new Date(streak.lastCompletedDate).toISOString().split('T')[0])
+    const lastCompletedStr = streak.lastCompletedDate
+      ? (typeof streak.lastCompletedDate === 'string'
+        ? streak.lastCompletedDate.split('T')[0]
+        : new Date(streak.lastCompletedDate).toISOString().split('T')[0])
       : null;
-    
+
     if (lastCompletedStr && streak.currentStreak > 0) {
       // Calculate days since last completion
       const lastDate = new Date(lastCompletedStr + 'T12:00:00Z');
       const todayDate = new Date(todayStr + 'T12:00:00Z');
       const daysSinceLast = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       // If more than 2 days have passed (allowing 1 day grace), reset the streak
       // Day 0 = same day, Day 1 = yesterday (still valid), Day 2+ = streak broken
       if (daysSinceLast > 2) {
         console.log(`⚠️ Streak ${streakType} for user ${userId.substring(0, 8)}... is stale (${daysSinceLast} days since last completion). Resetting to 0.`);
-        
+
         // Update the database to reset the streak
         await db
           .update(userStreaks)
@@ -3165,7 +3146,7 @@ export class DrizzleStorage implements IStorage {
             updatedAt: new Date()
           })
           .where(eq(userStreaks.id, streak.id));
-        
+
         // Return the corrected streak
         return {
           ...streak,
@@ -3173,7 +3154,7 @@ export class DrizzleStorage implements IStorage {
         };
       }
     }
-    
+
     return streak;
   }
 
@@ -3182,10 +3163,10 @@ export class DrizzleStorage implements IStorage {
     const yesterday = new Date(logDate);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayLog = await this.getDailyLog(userId, yesterday);
-    
+
     // Get or create overall streak
     let streak = await this.getUserStreak(userId, 'overall');
-    
+
     if (!streak) {
       // Create new streak
       await db.insert(userStreaks).values({
@@ -3202,21 +3183,21 @@ export class DrizzleStorage implements IStorage {
     // This ensures timezone consistency - we compare dates, not exact times
     const logDateNormalized = new Date(logDate);
     logDateNormalized.setHours(0, 0, 0, 0);
-    
+
     const yesterdayFromLogDate = new Date(logDateNormalized);
     yesterdayFromLogDate.setDate(yesterdayFromLogDate.getDate() - 1);
-    
+
     const lastLoggedDate = streak.lastLoggedDate ? new Date(streak.lastLoggedDate) : null;
     lastLoggedDate?.setHours(0, 0, 0, 0);
 
     let newCurrentStreak = streak.currentStreak;
-    
+
     // Check if this is the same day as last log (don't double count)
     if (lastLoggedDate && lastLoggedDate.getTime() === logDateNormalized.getTime()) {
       // Same day - don't change streak
       return;
     }
-    
+
     // Check if logged yesterday (streak continues)
     if (lastLoggedDate && lastLoggedDate.getTime() === yesterdayFromLogDate.getTime()) {
       newCurrentStreak += 1;
@@ -3248,41 +3229,41 @@ export class DrizzleStorage implements IStorage {
   // Category score calculation functions
   calculateNutritionScore(dailyLog: OptimizeDailyLog | null | undefined, meals: MealLog[]): number {
     if (!dailyLog && meals.length === 0) return 0;
-    
+
     let score = 0;
-    
+
     // Count meal types logged
     const mealTypes = new Set(meals.map(m => m.mealType));
     if (mealTypes.has('breakfast')) score += 0.25;
     if (mealTypes.has('lunch')) score += 0.25;
     if (mealTypes.has('dinner')) score += 0.25;
     if (mealTypes.has('snack')) score += 0.10;
-    
+
     // Bonus for hitting calorie goals (we don't have stored targets, so just check if reasonable calories logged)
     const totalCalories = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
     // Give bonus if user logged reasonable calories (between 1500-3000)
     if (totalCalories >= 1500 && totalCalories <= 3000) {
       score += 0.15;
     }
-    
+
     return Math.min(score, 1.0);
   }
 
   calculateWorkoutScore(
-    workoutLog: WorkoutLog | null, 
-    workoutPlan: WorkoutPlan | null | undefined, 
+    workoutLog: WorkoutLog | null,
+    workoutPlan: WorkoutPlan | null | undefined,
     dayOfWeek: string
   ): number | null {
     // Get planned workout for today from workoutSchedule
     const schedule = workoutPlan?.workoutSchedule as Array<{ day: string; isRestDay?: boolean; workoutId?: string }> | null;
     const todayPlan = schedule?.find(d => d.day.toLowerCase() === dayOfWeek.toLowerCase());
-    
+
     // Planned rest day = full credit
     if (todayPlan?.isRestDay) return 1.0;
-    
+
     // No workout planned and none done - N/A (don't count against streak)
     if (!todayPlan && !workoutLog) return null;
-    
+
     // Workout completed
     if (workoutLog?.completedAt) {
       // We don't have direct access to planned exercises here, use exercisesCompleted count
@@ -3292,22 +3273,22 @@ export class DrizzleStorage implements IStorage {
       if (exercisesCompleted >= 4) return 0.75;
       if (exercisesCompleted >= 2) return 0.50;
       const completionRatio = exercisesCompleted > 0 ? 0.25 : 0;
-      
+
       return completionRatio;
     }
-    
+
     // Planned workout not done
     return 0;
   }
 
   calculateSupplementScore(dailyLog: OptimizeDailyLog | null | undefined): number {
     if (!dailyLog) return 0;
-    
+
     let doses = 0;
     if (dailyLog.supplementMorning) doses++;
     if (dailyLog.supplementAfternoon) doses++;
     if (dailyLog.supplementEvening) doses++;
-    
+
     // Return exact proportion (0, 0.33, 0.67, or 1.0)
     return Math.round((doses / 3) * 100) / 100;
   }
@@ -3316,25 +3297,25 @@ export class DrizzleStorage implements IStorage {
     // Simplified: if user logged sleep, energy, and mood, that's the core lifestyle check-in
     // Each core metric (sleep, energy, mood) contributes equally = 0.33 each
     // Bonus points for biometrics and hydration
-    
+
     let score = 0;
-    
+
     // Core lifestyle check-in (0.33 each = 1.0 total for all three)
     if (dailyLog?.sleepQuality) score += 0.33;
     if (dailyLog?.energyLevel) score += 0.33;
     if (dailyLog?.moodLevel) score += 0.34;
-    
+
     // Bonus: biometric data (if connected to wearables)
     const sleepHours = biometricData?.sleepDuration;
     if (sleepHours && sleepHours >= 7) score += 0.10;
-    
+
     const steps = biometricData?.steps;
     if (steps && steps >= 7500) score += 0.10;
-    
+
     // Bonus: hydration (already tracked separately, but contributes to overall wellness)
     const waterOz = dailyLog?.waterIntakeOz || 0;
     if (waterOz >= 64) score += 0.10;
-    
+
     return Math.min(score, 1.0);
   }
 
@@ -3354,7 +3335,7 @@ export class DrizzleStorage implements IStorage {
   async upsertDailyCompletion(userId: string, logDate: Date, updates: Partial<InsertDailyCompletion>): Promise<DailyCompletion> {
     const dateStr = logDate.toISOString().split('T')[0];
     const existing = await this.getDailyCompletion(userId, logDate);
-    
+
     if (existing) {
       const [updated] = await db
         .update(dailyCompletions)
@@ -3363,7 +3344,7 @@ export class DrizzleStorage implements IStorage {
         .returning();
       return updated;
     }
-    
+
     const [created] = await db
       .insert(dailyCompletions)
       .values({
@@ -3379,7 +3360,7 @@ export class DrizzleStorage implements IStorage {
   async calculateAndSaveDailyScores(userId: string, logDate: Date): Promise<DailyCompletion> {
     const dateStr = logDate.toISOString().split('T')[0];
     const dayOfWeek = logDate.toLocaleDateString('en-US', { weekday: 'long' });
-    
+
     // Fetch all required data
     const [dailyLog, meals, workoutPlan, workoutLogs] = await Promise.all([
       this.getDailyLog(userId, logDate),
@@ -3387,15 +3368,15 @@ export class DrizzleStorage implements IStorage {
       this.getActiveWorkoutPlan(userId),
       this.getWorkoutLogsForDate(userId, logDate)
     ]);
-    
+
     const workoutLog = workoutLogs.length > 0 ? workoutLogs[0] : null;
-    
+
     // Calculate individual category scores
     const nutritionScore = this.calculateNutritionScore(dailyLog, meals);
     const workoutScore = this.calculateWorkoutScore(workoutLog, workoutPlan, dayOfWeek);
     const supplementScore = this.calculateSupplementScore(dailyLog);
     const lifestyleScore = this.calculateLifestyleScore(dailyLog);
-    
+
     // Calculate weighted daily score (workouts optional if no plan)
     let dailyScore: number;
     if (workoutScore === null) {
@@ -3405,7 +3386,7 @@ export class DrizzleStorage implements IStorage {
       // Full 4-category weighting
       dailyScore = (nutritionScore * 0.25 + workoutScore * 0.30 + supplementScore * 0.25 + lifestyleScore * 0.20);
     }
-    
+
     // Save to daily_completions
     const completion = await this.upsertDailyCompletion(userId, logDate, {
       nutritionScore: nutritionScore.toFixed(2),
@@ -3418,13 +3399,13 @@ export class DrizzleStorage implements IStorage {
       supplementDetails: { morning: dailyLog?.supplementMorning, afternoon: dailyLog?.supplementAfternoon, evening: dailyLog?.supplementEvening },
       lifestyleDetails: { sleepQuality: dailyLog?.sleepQuality, waterOz: dailyLog?.waterIntakeOz, mood: dailyLog?.moodLevel, energy: dailyLog?.energyLevel }
     });
-    
+
     return completion;
   }
 
   // Enhanced streak update for all categories
   async updateCategoryStreak(
-    userId: string, 
+    userId: string,
     streakType: 'overall' | 'nutrition' | 'workout' | 'supplements' | 'lifestyle',
     todayScore: number,
     logDate: Date,
@@ -3433,10 +3414,10 @@ export class DrizzleStorage implements IStorage {
     // Use date strings (YYYY-MM-DD) for comparison to avoid timezone issues
     // logDate is already in user's local date context (from getUserLocalMidnight)
     const logDateStr = logDate.toISOString().split('T')[0];
-    
+
     // Get or create streak record
     let streak = await this.getUserStreak(userId, streakType as 'overall' | 'nutrition' | 'workout' | 'lifestyle' | 'supplements');
-    
+
     if (!streak) {
       // Create new streak for this category
       const [created] = await db.insert(userStreaks).values({
@@ -3450,22 +3431,22 @@ export class DrizzleStorage implements IStorage {
       console.log(`🔥 Created ${streakType} streak for user ${userId.substring(0, 8)}...: ${created.currentStreak} days`);
       return created;
     }
-    
+
     // Calculate yesterday's date string based on logDate, not server time
     const logDateObj = new Date(logDateStr + 'T12:00:00Z'); // Use noon UTC to avoid edge cases
     const yesterdayObj = new Date(logDateObj);
     yesterdayObj.setUTCDate(yesterdayObj.getUTCDate() - 1);
     const yesterdayStr = yesterdayObj.toISOString().split('T')[0];
-    
+
     // Get last completed date as string (already stored as YYYY-MM-DD or similar)
-    const lastCompletedStr = streak.lastCompletedDate 
-      ? (typeof streak.lastCompletedDate === 'string' 
-          ? streak.lastCompletedDate.split('T')[0] 
-          : new Date(streak.lastCompletedDate).toISOString().split('T')[0])
+    const lastCompletedStr = streak.lastCompletedDate
+      ? (typeof streak.lastCompletedDate === 'string'
+        ? streak.lastCompletedDate.split('T')[0]
+        : new Date(streak.lastCompletedDate).toISOString().split('T')[0])
       : null;
-    
+
     let newCurrentStreak = streak.currentStreak;
-    
+
     console.log(`🔍 ${streakType} streak check:`, {
       logDateStr,
       yesterdayStr,
@@ -3474,7 +3455,7 @@ export class DrizzleStorage implements IStorage {
       threshold,
       currentStreak: streak.currentStreak
     });
-    
+
     // Score meets threshold
     if (todayScore >= threshold) {
       if (!lastCompletedStr) {
@@ -3508,9 +3489,9 @@ export class DrizzleStorage implements IStorage {
         console.log(`🔥 ${streakType}: Score below threshold and streak broken, reset to 0`);
       }
     }
-    
+
     const newLongestStreak = Math.max(newCurrentStreak, streak.longestStreak);
-    
+
     const [updated] = await db
       .update(userStreaks)
       .set({
@@ -3522,9 +3503,9 @@ export class DrizzleStorage implements IStorage {
       })
       .where(eq(userStreaks.id, streak.id))
       .returning();
-    
+
     console.log(`🔥 Updated ${streakType} streak: ${streak.currentStreak} -> ${newCurrentStreak} (longest: ${newLongestStreak})`);
-    
+
     return updated;
   }
 
@@ -3532,7 +3513,7 @@ export class DrizzleStorage implements IStorage {
   async updateAllStreaks(userId: string, logDate: Date): Promise<{ [key: string]: UserStreak }> {
     // First calculate and save daily scores
     const completion = await this.calculateAndSaveDailyScores(userId, logDate);
-    
+
     console.log('📊 updateAllStreaks - Daily scores calculated:', {
       userId: userId.substring(0, 8) + '...',
       logDate: logDate.toISOString(),
@@ -3542,7 +3523,7 @@ export class DrizzleStorage implements IStorage {
       lifestyleScore: completion.lifestyleScore,
       dailyScore: completion.dailyScore,
     });
-    
+
     // Define thresholds for each category
     const thresholds = {
       nutrition: 0.50,    // At least 2 meals
@@ -3551,9 +3532,9 @@ export class DrizzleStorage implements IStorage {
       lifestyle: 0.40,    // Sleep + one other
       overall: 0.50       // Weighted average
     };
-    
+
     const results: { [key: string]: UserStreak } = {};
-    
+
     // Update each category streak - always update if score exists (even if 0)
     if (completion.nutritionScore !== null && completion.nutritionScore !== undefined) {
       results.nutrition = await this.updateCategoryStreak(userId, 'nutrition', parseFloat(completion.nutritionScore), logDate, thresholds.nutrition);
@@ -3570,9 +3551,9 @@ export class DrizzleStorage implements IStorage {
     if (completion.dailyScore !== null && completion.dailyScore !== undefined) {
       results.overall = await this.updateCategoryStreak(userId, 'overall', parseFloat(completion.dailyScore), logDate, thresholds.overall);
     }
-    
+
     console.log('📊 updateAllStreaks - Streaks updated:', Object.keys(results));
-    
+
     return results;
   }
 
@@ -3609,10 +3590,10 @@ export class DrizzleStorage implements IStorage {
     isPaused?: boolean;
   }> {
     const prefs = await this.getTrackingPreferences(userId);
-    
+
     // Check if tracking is paused
     const isPaused = prefs?.pauseUntil ? new Date(prefs.pauseUntil) > new Date() : false;
-    
+
     const enabled = {
       nutrition: prefs?.trackNutrition !== false,
       workout: prefs?.trackWorkouts !== false,
@@ -3696,17 +3677,17 @@ export class DrizzleStorage implements IStorage {
   }> {
     const prefs = await this.getTrackingPreferences(userId);
     const hydrationGoal = prefs?.hydrationGoalOz ?? 64;
-    
+
     // Get active workout plan to determine rest days
     const workoutPlan = await this.getActiveWorkoutPlan(userId);
     let restDays: number[] = []; // 0 = Sunday, 1 = Monday, etc.
-    
+
     if (workoutPlan?.workoutSchedule) {
       try {
-        const schedule = typeof workoutPlan.workoutSchedule === 'string' 
-          ? JSON.parse(workoutPlan.workoutSchedule) 
+        const schedule = typeof workoutPlan.workoutSchedule === 'string'
+          ? JSON.parse(workoutPlan.workoutSchedule)
           : workoutPlan.workoutSchedule;
-        
+
         // Extract rest days from workout plan schedule
         // workoutSchedule format: [{ day: "Monday", workoutId: "uuid" }, ...]
         // Days without workoutId or with workoutId "rest" are rest days
@@ -3715,7 +3696,7 @@ export class DrizzleStorage implements IStorage {
             'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
             'thursday': 4, 'friday': 5, 'saturday': 6
           };
-          
+
           schedule.forEach((item: any) => {
             const dayIndex = dayMap[item.day?.toLowerCase()];
             if (dayIndex !== undefined && (!item.workoutId || item.workoutId === 'rest' || item.isRestDay)) {
@@ -3731,25 +3712,25 @@ export class DrizzleStorage implements IStorage {
     // Get overall streak
     const streaks = await this.getAllUserStreaks(userId);
     const overallStreak = streaks.find(s => s.streakType === 'overall');
-    
+
     // Get month's data (30 days ending today in user's timezone)
     const today = getUserLocalMidnight(userTimezone);
     const startOfMonth = new Date(today);
     startOfMonth.setDate(today.getDate() - 29); // 30 days total including today
     // IMPORTANT: Keep noon UTC (12:00) to avoid timezone edge cases
     // Setting to midnight UTC would make the date appear as "yesterday" in western timezones
-    
+
     // Calculate today's date string in user's timezone
     const todayStr = getUserLocalDateString(userTimezone);
-    
-    console.log('🔍 Smart Streak init:', { 
-      userTimezone, 
-      todayUTC: today.toISOString(), 
+
+    console.log('🔍 Smart Streak init:', {
+      userTimezone,
+      todayUTC: today.toISOString(),
       todayStr,
       startOfMonthUTC: startOfMonth.toISOString(),
       todayGetDate: today.getDate()
     });
-    
+
     const monthlyProgress: Array<{
       date: string;
       percentage: number;
@@ -3770,7 +3751,7 @@ export class DrizzleStorage implements IStorage {
     const endOfMonth = new Date(today);
     endOfMonth.setDate(endOfMonth.getDate() + 1);
     endOfMonth.setHours(23, 59, 59, 999);
-    
+
     // Batch fetch all daily logs for the month
     const allDailyLogs = await this.listDailyLogs(userId, startOfMonth, endOfMonth);
     const dailyLogsByDate = new Map<string, typeof allDailyLogs[0]>();
@@ -3780,7 +3761,7 @@ export class DrizzleStorage implements IStorage {
       const dateStr = toUserLocalDateString(logDate, userTimezone);
       dailyLogsByDate.set(dateStr, log);
     });
-    
+
     // Batch fetch all daily completions for the month
     const allCompletions = await db
       .select()
@@ -3792,7 +3773,7 @@ export class DrizzleStorage implements IStorage {
       ));
     const completionsByDate = new Map<string, typeof allCompletions[0]>();
     allCompletions.forEach(c => completionsByDate.set(c.logDate, c));
-    
+
     // Batch fetch all workout logs for the month
     const allWorkoutLogs = await db
       .select()
@@ -3810,7 +3791,7 @@ export class DrizzleStorage implements IStorage {
       if (!workoutLogsByDate.has(dateStr)) workoutLogsByDate.set(dateStr, []);
       workoutLogsByDate.get(dateStr)!.push(log);
     });
-    
+
     // Batch fetch all meal logs for the month
     const allMealLogs = await db
       .select()
@@ -3834,58 +3815,58 @@ export class DrizzleStorage implements IStorage {
       date.setDate(startOfMonth.getDate() + i);
       // Use user's local date string for the day
       const dateStr = toUserLocalDateString(date, userTimezone);
-      
+
       // Debug: Log first, middle, and last iterations
       if (i === 0 || i === 14 || i === 29) {
         console.log(`🔍 Progress loop i=${i}: startOfMonth.getDate()=${startOfMonth.getDate()}, date=${date.toISOString()}, dateStr=${dateStr}`);
       }
-      
+
       const dayOfWeek = date.getDay();
-      
+
       // Get daily log from batch (no DB call)
       const dailyLog = dailyLogsByDate.get(dateStr);
-      
+
       // Rest day: manual override OR scheduled rest day from workout plan
       const isRestDay = dailyLog?.isRestDay || restDays.includes(dayOfWeek);
-      
+
       // Get daily completion data from batch (no DB call)
       const completion = completionsByDate.get(dateStr);
-      
+
       // Get workout logs for this day from batch (no DB call)
       const dayWorkoutLogs = workoutLogsByDate.get(dateStr) || [];
       const workoutDone = dayWorkoutLogs.length > 0;
-      
+
       // Get meals logged for this day from batch (no DB call)
       const mealsLogged = mealLogsByDate.get(dateStr) || [];
       const uniqueMealTypes = new Set(mealsLogged.map(m => m.mealType));
       // Count main meals (breakfast, lunch, dinner) as goal of 3
       const mainMealsLogged = (['breakfast', 'lunch', 'dinner'] as const).filter(type => uniqueMealTypes.has(type)).length;
-      
+
       // Calculate breakdown
       const breakdown = {
-        workout: { 
-          done: workoutDone, 
-          isRestDay 
+        workout: {
+          done: workoutDone,
+          isRestDay
         },
-        nutrition: { 
+        nutrition: {
           score: completion?.nutritionScore ? Math.round(parseFloat(completion.nutritionScore) * 100) : 0,
           mealsLogged: mealsLogged.length,
           mainMeals: mainMealsLogged,
           goal: 3 // 3 main meals is the standard goal
         },
-        supplements: { 
+        supplements: {
           taken: [
             dailyLog?.supplementMorning,
             dailyLog?.supplementAfternoon,
             dailyLog?.supplementEvening
           ].filter(Boolean).length,
-          total: 3 
+          total: 3
         },
-        water: { 
-          current: dailyLog?.waterIntakeOz || 0, 
-          goal: hydrationGoal 
+        water: {
+          current: dailyLog?.waterIntakeOz || 0,
+          goal: hydrationGoal
         },
-        lifestyle: { 
+        lifestyle: {
           // Check directly if user logged sleep, energy, and mood
           sleepLogged: !!dailyLog?.sleepQuality,
           energyLogged: !!dailyLog?.energyLevel,
@@ -3893,13 +3874,13 @@ export class DrizzleStorage implements IStorage {
           complete: !!(dailyLog?.sleepQuality && dailyLog?.energyLevel && dailyLog?.moodLevel)
         },
       };
-      
+
       // Calculate percentage based on enabled categories
       // KEY INSIGHT: For PAST days, only count categories where user actually logged data
       // This prevents retroactively penalizing users when they add new tracking categories
       // For TODAY, use the current tracking preferences as the goal
       const isToday = dateStr === todayStr;
-      
+
       const enabled = {
         workout: prefs?.trackWorkouts !== false,
         nutrition: prefs?.trackNutrition !== false,
@@ -3907,10 +3888,10 @@ export class DrizzleStorage implements IStorage {
         water: hydrationGoal > 0,
         lifestyle: prefs?.trackLifestyle !== false,
       };
-      
+
       let completed = 0;
       let total = 0;
-      
+
       // For past days: only count a category if user logged something for it
       // For today: count all enabled categories (user should complete them)
       const workoutHasData = isRestDay || workoutDone;
@@ -3918,7 +3899,7 @@ export class DrizzleStorage implements IStorage {
       const supplementsHasData = breakdown.supplements.taken > 0;
       const waterHasData = breakdown.water.current > 0;
       const lifestyleHasData = breakdown.lifestyle.sleepLogged || breakdown.lifestyle.energyLogged || breakdown.lifestyle.moodLogged;
-      
+
       if (enabled.workout && (isToday || workoutHasData)) {
         total++;
         if (workoutHasData) completed++;
@@ -3939,9 +3920,9 @@ export class DrizzleStorage implements IStorage {
         total++;
         if (breakdown.lifestyle.complete) completed++;
       }
-      
+
       const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-      
+
       monthlyProgress.push({
         date: dateStr,
         percentage,
@@ -3949,15 +3930,15 @@ export class DrizzleStorage implements IStorage {
         breakdown,
       });
     }
-    
+
     // Find today's data from monthlyProgress
     const todayData = monthlyProgress.find(d => d.date === todayStr);
-    
+
     // Calculate current streak from monthlyProgress (count consecutive days with >= 50% completion from today backwards)
     // Using 50% threshold to be more encouraging while still requiring meaningful effort
     const STREAK_THRESHOLD = 50;
     let calculatedCurrentStreak = 0;
-    
+
     // Start from the end (today) and work backwards
     // If today is incomplete (< threshold), skip it and start counting from yesterday
     // This way, the streak isn't broken just because you haven't finished today's tasks yet
@@ -3972,7 +3953,7 @@ export class DrizzleStorage implements IStorage {
       // Move to yesterday regardless (either today counted or it's still in progress)
       startIndex--;
     }
-    
+
     // Now count consecutive days from yesterday backwards
     for (let i = startIndex; i >= 0; i--) {
       if (monthlyProgress[i].percentage >= STREAK_THRESHOLD || monthlyProgress[i].isRestDay) {
@@ -3981,7 +3962,7 @@ export class DrizzleStorage implements IStorage {
         break; // Stop at first day below threshold
       }
     }
-    
+
     // Calculate longest streak from monthlyProgress (last 30 days only)
     // We use calculated value only since completion rules may have changed
     let calculatedLongestStreak = 0;
@@ -3994,9 +3975,9 @@ export class DrizzleStorage implements IStorage {
         tempStreak = 0;
       }
     }
-    
+
     console.log('📅 Smart Streak dates:', { todayStr, lastProgressDate: monthlyProgress[monthlyProgress.length - 1]?.date, found: !!todayData });
-    
+
     return {
       currentStreak: calculatedCurrentStreak,
       longestStreak: calculatedLongestStreak, // Only use calculated value from last 30 days
@@ -4011,7 +3992,7 @@ export class DrizzleStorage implements IStorage {
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
-    
+
     return await db
       .select()
       .from(workoutLogs)
@@ -4138,19 +4119,19 @@ export class DrizzleStorage implements IStorage {
     isPrTracked?: boolean;
   }): Promise<ExerciseRecord> {
     const existing = await this.getExerciseRecord(userId, exerciseName);
-    
+
     if (existing) {
       const updates: Partial<ExerciseRecord> = {
         updatedAt: new Date(),
       };
-      
+
       // Update last logged weight/reps
       if (data.lastWeight !== undefined) {
         updates.lastWeight = data.lastWeight;
         updates.lastReps = data.lastReps ?? null;
         updates.lastLoggedAt = new Date();
       }
-      
+
       // Update PR if explicitly setting or if new weight is higher
       if (data.isPrTracked !== undefined) {
         updates.isPrTracked = data.isPrTracked;
@@ -4160,7 +4141,7 @@ export class DrizzleStorage implements IStorage {
         updates.prReps = data.prReps ?? null;
         updates.prDate = new Date();
       }
-      
+
       const [updated] = await db
         .update(exerciseRecords)
         .set(updates)
@@ -4190,7 +4171,7 @@ export class DrizzleStorage implements IStorage {
   async deleteExercisePR(userId: string, exerciseName: string): Promise<boolean> {
     const existing = await this.getExerciseRecord(userId, exerciseName);
     if (!existing) return false;
-    
+
     const [updated] = await db
       .update(exerciseRecords)
       .set({
@@ -4215,7 +4196,7 @@ export class DrizzleStorage implements IStorage {
 
   async upsertWorkoutPreferences(userId: string, prefs: Partial<InsertWorkoutPreferences>): Promise<WorkoutPreferences> {
     const existing = await this.getWorkoutPreferences(userId);
-    
+
     if (existing) {
       const [updated] = await db
         .update(workoutPreferences)
@@ -4289,7 +4270,7 @@ export class DrizzleStorage implements IStorage {
 
   async createOrUpdateOptimizeSmsPreferences(userId: string, prefs: Partial<InsertOptimizeSmsPreferences>): Promise<OptimizeSmsPreferences> {
     const existing = await this.getOptimizeSmsPreferences(userId);
-    
+
     if (existing) {
       const [updated] = await db
         .update(optimizeSmsPreferences)
@@ -4362,7 +4343,7 @@ export class DrizzleStorage implements IStorage {
   }
 
   // ===== STREAK REWARDS OPERATIONS =====
-  
+
   private calculateDiscountTier(streakDays: number): { discount: number; tier: string } {
     if (streakDays >= 90) return { discount: 20, tier: 'Champion' };
     if (streakDays >= 60) return { discount: 15, tier: 'Loyal' };
@@ -4385,24 +4366,24 @@ export class DrizzleStorage implements IStorage {
   }> {
     try {
       // Get streak from user_streaks table (supplements streak)
-      const streak = await this.getUserStreak(userId, 'supplements') 
+      const streak = await this.getUserStreak(userId, 'supplements')
         || await this.getUserStreak(userId, 'overall');
-      
+
       const [user] = await db.select().from(users).where(eq(users.id, userId));
-      
+
       const currentStreak = streak?.currentStreak || 0;
       const { discount, tier } = this.calculateDiscountTier(currentStreak);
       const now = new Date();
-      
+
       // Calculate days until reorder window and deadline
       let daysUntilReorderWindow: number | null = null;
       let daysUntilDeadline: number | null = null;
-      
+
       if (user?.reorderWindowStart) {
         const windowDiff = Math.ceil((user.reorderWindowStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         daysUntilReorderWindow = windowDiff > 0 ? windowDiff : 0;
       }
-      
+
       if (user?.reorderDeadline) {
         const deadlineDiff = Math.ceil((user.reorderDeadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         daysUntilDeadline = deadlineDiff > 0 ? deadlineDiff : 0;
@@ -4438,7 +4419,7 @@ export class DrizzleStorage implements IStorage {
   async updateStreakProgress(userId: string, supplementsComplete: boolean): Promise<void> {
     try {
       if (!supplementsComplete) return; // Only increment on complete days
-      
+
       const [user] = await db.select().from(users).where(eq(users.id, userId));
       if (!user) return;
 
@@ -4465,7 +4446,7 @@ export class DrizzleStorage implements IStorage {
       if (!user) return 0;
 
       const discountToApply = user.streakDiscountEarned || 0;
-      
+
       if (discountToApply > 0) {
         const now = new Date();
         const reorderWindowStart = new Date(now);
@@ -4498,11 +4479,11 @@ export class DrizzleStorage implements IStorage {
   async resetStreakForLapsedUsers(): Promise<number> {
     try {
       const now = new Date();
-      
+
       // Find users whose deadline has passed (Day 100+)
       const gracePeriodEnd = new Date(now);
       gracePeriodEnd.setDate(gracePeriodEnd.getDate() - 5); // 5 day grace period
-      
+
       const result = await db
         .update(users)
         .set({
@@ -4530,7 +4511,7 @@ export class DrizzleStorage implements IStorage {
   async updateStreakStatuses(): Promise<void> {
     try {
       const now = new Date();
-      
+
       // Update to 'ready' - in reorder window (Day 75-85)
       await db
         .update(users)
@@ -4570,1054 +4551,7 @@ export class DrizzleStorage implements IStorage {
     }
   }
 
-  // ========================================
-  // Admin Conversation Intelligence Methods
-  // ========================================
 
-  /**
-   * Get all conversations with messages for admin insight analysis
-   * Returns paginated list of chat sessions with user info and messages
-   */
-  async getAllConversations(limit: number = 50, offset: number = 0, startDate?: Date, endDate?: Date): Promise<{
-    conversations: Array<{
-      session: ChatSession;
-      user: { id: string; name: string; email: string };
-      messages: Message[];
-      messageCount: number;
-    }>;
-    total: number;
-  }> {
-    try {
-      // Build date filter conditions
-      const dateConditions = [];
-      if (startDate) {
-        dateConditions.push(gte(chatSessions.createdAt, startDate));
-      }
-      if (endDate) {
-        dateConditions.push(lte(chatSessions.createdAt, endDate));
-      }
-
-      // Get total count
-      const [{ count: totalCount }] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(chatSessions)
-        .where(dateConditions.length > 0 ? and(...dateConditions) : undefined);
-
-      // Get sessions with user info
-      const sessionsWithUsers = await db
-        .select({
-          session: chatSessions,
-          userId: chatSessions.userId,
-          userName: users.name,
-          userEmail: users.email
-        })
-        .from(chatSessions)
-        .innerJoin(users, eq(chatSessions.userId, users.id))
-        .where(dateConditions.length > 0 ? and(...dateConditions) : undefined)
-        .orderBy(desc(chatSessions.createdAt))
-        .limit(limit)
-        .offset(offset);
-
-      // Get messages for each session
-      const conversations = await Promise.all(
-        sessionsWithUsers.map(async ({ session, userId, userName, userEmail }) => {
-          const sessionMessages = await db
-            .select()
-            .from(messages)
-            .where(eq(messages.sessionId, session.id))
-            .orderBy(messages.createdAt);
-
-          return {
-            session,
-            user: { id: userId, name: userName, email: userEmail },
-            messages: sessionMessages,
-            messageCount: sessionMessages.length
-          };
-        })
-      );
-
-      return {
-        conversations,
-        total: Number(totalCount)
-      };
-    } catch (error) {
-      console.error('Error getting all conversations:', error);
-      throw new Error('Failed to get conversations');
-    }
-  }
-
-  /**
-   * Get a single conversation's full details
-   */
-  async getConversationDetails(sessionId: string): Promise<{
-    session: ChatSession;
-    user: { id: string; name: string; email: string };
-    messages: Message[];
-  } | null> {
-    try {
-      const [sessionWithUser] = await db
-        .select({
-          session: chatSessions,
-          userId: users.id,
-          userName: users.name,
-          userEmail: users.email
-        })
-        .from(chatSessions)
-        .innerJoin(users, eq(chatSessions.userId, users.id))
-        .where(eq(chatSessions.id, sessionId));
-
-      if (!sessionWithUser) {
-        return null;
-      }
-
-      const sessionMessages = await db
-        .select()
-        .from(messages)
-        .where(eq(messages.sessionId, sessionId))
-        .orderBy(messages.createdAt);
-
-      return {
-        session: sessionWithUser.session,
-        user: {
-          id: sessionWithUser.userId,
-          name: sessionWithUser.userName,
-          email: sessionWithUser.userEmail
-        },
-        messages: sessionMessages
-      };
-    } catch (error) {
-      console.error('Error getting conversation details:', error);
-      throw new Error('Failed to get conversation details');
-    }
-  }
-
-  /**
-   * Get all user messages (not AI responses) for insight analysis
-   * This is what we feed to AI for product insights
-   */
-  async getAllUserMessages(limit: number = 1000, startDate?: Date, endDate?: Date): Promise<{
-    messages: Array<{
-      content: string;
-      createdAt: Date;
-      sessionId: string;
-      userId: string;
-    }>;
-    total: number;
-  }> {
-    try {
-      const dateConditions = [eq(messages.role, 'user')];
-      if (startDate) {
-        dateConditions.push(gte(messages.createdAt, startDate));
-      }
-      if (endDate) {
-        dateConditions.push(lte(messages.createdAt, endDate));
-      }
-
-      // Get total count
-      const [{ count: totalCount }] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(messages)
-        .where(and(...dateConditions));
-
-      // Get messages with session info to get userId
-      const userMessages = await db
-        .select({
-          content: messages.content,
-          createdAt: messages.createdAt,
-          sessionId: messages.sessionId,
-          userId: chatSessions.userId
-        })
-        .from(messages)
-        .innerJoin(chatSessions, eq(messages.sessionId, chatSessions.id))
-        .where(and(...dateConditions))
-        .orderBy(desc(messages.createdAt))
-        .limit(limit);
-
-      return {
-        messages: userMessages,
-        total: Number(totalCount)
-      };
-    } catch (error) {
-      console.error('Error getting user messages:', error);
-      throw new Error('Failed to get user messages');
-    }
-  }
-
-  /**
-   * Store conversation insights generated by AI
-   */
-  async saveConversationInsights(insights: {
-    generatedAt: Date;
-    dateRange: { start: Date; end: Date };
-    messageCount: number;
-    summary: string;
-    ingredientRequests: Array<{ name: string; count: number; available: boolean }>;
-    featureRequests: Array<{ feature: string; count: number; category: string }>;
-    commonQuestions: Array<{ question: string; count: number }>;
-    sentimentOverview: { positive: number; neutral: number; negative: number };
-    rawAnalysis: string;
-  }): Promise<void> {
-    try {
-      // Convert dates to ISO strings for JSON storage
-      const insightsData = {
-        ...insights,
-        generatedAt: insights.generatedAt.toISOString(),
-        dateRange: {
-          start: insights.dateRange.start.toISOString(),
-          end: insights.dateRange.end.toISOString()
-        }
-      };
-
-      // Store in app_settings with a unique key per generation
-      const key = `conversation_insights_${insights.generatedAt.toISOString()}`;
-      await db.insert(appSettings).values({
-        key,
-        value: insightsData
-      }).onConflictDoUpdate({
-        target: appSettings.key,
-        set: { value: insightsData, updatedAt: new Date() }
-      });
-
-      // Also update "latest" pointer
-      await db.insert(appSettings).values({
-        key: 'conversation_insights_latest',
-        value: insightsData
-      }).onConflictDoUpdate({
-        target: appSettings.key,
-        set: { value: insightsData, updatedAt: new Date() }
-      });
-    } catch (error) {
-      console.error('Error saving conversation insights:', error);
-      throw new Error('Failed to save conversation insights');
-    }
-  }
-
-  /**
-   * Get the latest conversation insights
-   */
-  async getLatestConversationInsights(): Promise<{
-    generatedAt: Date;
-    dateRange: { start: Date; end: Date };
-    messageCount: number;
-    summary: string;
-    ingredientRequests: Array<{ name: string; count: number; available: boolean }>;
-    featureRequests: Array<{ feature: string; count: number; category: string }>;
-    commonQuestions: Array<{ question: string; count: number }>;
-    sentimentOverview: { positive: number; neutral: number; negative: number };
-    rawAnalysis: string;
-  } | null> {
-    try {
-      const [setting] = await db
-        .select()
-        .from(appSettings)
-        .where(eq(appSettings.key, 'conversation_insights_latest'));
-
-      if (!setting) {
-        return null;
-      }
-
-      const data = setting.value as any;
-      return {
-        ...data,
-        generatedAt: new Date(data.generatedAt),
-        dateRange: {
-          start: new Date(data.dateRange.start),
-          end: new Date(data.dateRange.end)
-        }
-      };
-    } catch (error) {
-      console.error('Error getting conversation insights:', error);
-      return null;
-    }
-  }
-
-  // ========================================
-  // Advanced Analytics Methods
-  // ========================================
-
-  /**
-   * Get conversion funnel data
-   * Tracks: signup -> profile complete -> formula created -> order placed -> reorder (90-day cycle)
-   */
-  async getConversionFunnel(): Promise<{
-    totalSignups: number;
-    profilesComplete: number;
-    formulasCreated: number;
-    firstOrders: number;
-    reorders: number;
-    conversionRates: {
-      signupToProfile: number;
-      profileToFormula: number;
-      formulaToOrder: number;
-      orderToReorder: number;
-    };
-  }> {
-    try {
-      // Total signups
-      const [signupCount] = await db.select({ count: count() }).from(users);
-      const totalSignups = Number(signupCount?.count || 0);
-
-      // Profiles with meaningful data (age, sex, or health goals filled)
-      const profilesComplete = await db
-        .select({ userId: healthProfiles.userId })
-        .from(healthProfiles)
-        .where(
-          or(
-            isNotNull(healthProfiles.age),
-            isNotNull(healthProfiles.sex),
-            sql`jsonb_array_length(${healthProfiles.healthGoals}) > 0`
-          )
-        );
-      const profileCount = profilesComplete.length;
-
-      // Users with at least one formula
-      const usersWithFormula = await db
-        .selectDistinct({ userId: formulas.userId })
-        .from(formulas);
-      const formulaCount = usersWithFormula.length;
-
-      // Users with at least one order
-      const usersWithOrders = await db
-        .selectDistinct({ userId: orders.userId })
-        .from(orders);
-      const firstOrderCount = usersWithOrders.length;
-
-      // Users with more than one order (reorders)
-      const orderCounts = await db
-        .select({
-          userId: orders.userId,
-          orderCount: count()
-        })
-        .from(orders)
-        .groupBy(orders.userId);
-      const reorderCount = orderCounts.filter(oc => Number(oc.orderCount) > 1).length;
-
-      return {
-        totalSignups,
-        profilesComplete: profileCount,
-        formulasCreated: formulaCount,
-        firstOrders: firstOrderCount,
-        reorders: reorderCount,
-        conversionRates: {
-          signupToProfile: totalSignups > 0 ? Math.round((profileCount / totalSignups) * 100) : 0,
-          profileToFormula: profileCount > 0 ? Math.round((formulaCount / profileCount) * 100) : 0,
-          formulaToOrder: formulaCount > 0 ? Math.round((firstOrderCount / formulaCount) * 100) : 0,
-          orderToReorder: firstOrderCount > 0 ? Math.round((reorderCount / firstOrderCount) * 100) : 0,
-        }
-      };
-    } catch (error) {
-      console.error('Error getting conversion funnel:', error);
-      return {
-        totalSignups: 0,
-        profilesComplete: 0,
-        formulasCreated: 0,
-        firstOrders: 0,
-        reorders: 0,
-        conversionRates: { signupToProfile: 0, profileToFormula: 0, formulaToOrder: 0, orderToReorder: 0 }
-      };
-    }
-  }
-
-  /**
-   * Get cohort retention based on 90-day order cycles
-   * Groups users by signup month and tracks reorder behavior
-   */
-  async getCohortRetention(months: number = 6): Promise<Array<{
-    cohort: string;
-    month: number;
-    totalUsers: number;
-    ordered: number;
-    reordered: number;
-    retention: number;
-  }>> {
-    try {
-      const cohorts: Array<{ cohort: string; month: number; totalUsers: number; ordered: number; reordered: number; retention: number }> = [];
-      const now = new Date();
-
-      for (let i = 0; i < months; i++) {
-        const cohortDate = new Date(now);
-        cohortDate.setMonth(cohortDate.getMonth() - i);
-        const cohortStart = new Date(cohortDate.getFullYear(), cohortDate.getMonth(), 1);
-        const cohortEnd = new Date(cohortDate.getFullYear(), cohortDate.getMonth() + 1, 0);
-        const cohortLabel = cohortStart.toISOString().slice(0, 7); // YYYY-MM
-
-        // Users who signed up in this cohort
-        const cohortUsers = await db
-          .select({ id: users.id })
-          .from(users)
-          .where(and(
-            gte(users.createdAt, cohortStart),
-            lte(users.createdAt, cohortEnd)
-          ));
-        const totalUsers = cohortUsers.length;
-        const userIds = cohortUsers.map(u => u.id);
-
-        if (totalUsers === 0 || userIds.length === 0) {
-          cohorts.push({ cohort: cohortLabel, month: i, totalUsers: 0, ordered: 0, reordered: 0, retention: 0 });
-          continue;
-        }
-
-        // Users who placed at least one order
-        const orderedUsers = await db
-          .selectDistinct({ userId: orders.userId })
-          .from(orders)
-          .where(inArray(orders.userId, userIds));
-        const ordered = orderedUsers.length;
-
-        // Users who placed more than one order (reorder within 90-day cycle)
-        const reorderedCounts = await db
-          .select({ userId: orders.userId, cnt: count() })
-          .from(orders)
-          .where(inArray(orders.userId, userIds))
-          .groupBy(orders.userId);
-        const reordered = reorderedCounts.filter(r => Number(r.cnt) > 1).length;
-
-        const retention = ordered > 0 ? Math.round((reordered / ordered) * 100) : 0;
-
-        cohorts.push({ cohort: cohortLabel, month: i, totalUsers, ordered, reordered, retention });
-      }
-
-      return cohorts.reverse(); // Oldest first
-    } catch (error) {
-      console.error('Error getting cohort retention:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get reorder health metrics
-   * Based on 90-day supply cycle:
-   * - Due: 75-90 days since last order
-   * - Overdue: 90-100 days (grace period)
-   * - At Risk: 100+ days, haven't reordered
-   */
-  async getReorderHealth(): Promise<{
-    dueSoon: Array<{ userId: string; name: string; email: string; daysSinceOrder: number; lastOrderDate: string }>;
-    overdue: Array<{ userId: string; name: string; email: string; daysSinceOrder: number; lastOrderDate: string }>;
-    atRisk: Array<{ userId: string; name: string; email: string; daysSinceOrder: number; lastOrderDate: string }>;
-    summary: { dueSoonCount: number; overdueCount: number; atRiskCount: number; healthyCount: number };
-  }> {
-    try {
-      const now = new Date();
-      const day75Ago = new Date(now); day75Ago.setDate(day75Ago.getDate() - 75);
-      const day90Ago = new Date(now); day90Ago.setDate(day90Ago.getDate() - 90);
-      const day100Ago = new Date(now); day100Ago.setDate(day100Ago.getDate() - 100);
-
-      // Get last order date for each user
-      const lastOrders = await db
-        .select({
-          userId: orders.userId,
-          lastOrderDate: sql<Date>`MAX(placed_at)`
-        })
-        .from(orders)
-        .groupBy(orders.userId);
-
-      const dueSoon: Array<{ userId: string; name: string; email: string; daysSinceOrder: number; lastOrderDate: string }> = [];
-      const overdue: Array<{ userId: string; name: string; email: string; daysSinceOrder: number; lastOrderDate: string }> = [];
-      const atRisk: Array<{ userId: string; name: string; email: string; daysSinceOrder: number; lastOrderDate: string }> = [];
-      let healthyCount = 0;
-
-      for (const row of lastOrders) {
-        const lastDate = new Date(row.lastOrderDate);
-        const daysSince = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-
-        // Get user info
-        const [user] = await db
-          .select({ id: users.id, name: users.name, email: users.email })
-          .from(users)
-          .where(eq(users.id, row.userId));
-
-        if (!user) continue;
-
-        const userInfo = {
-          userId: user.id,
-          name: user.name,
-          email: user.email,
-          daysSinceOrder: daysSince,
-          lastOrderDate: lastDate.toISOString().split('T')[0]
-        };
-
-        if (daysSince >= 100) {
-          atRisk.push(userInfo);
-        } else if (daysSince >= 90) {
-          overdue.push(userInfo);
-        } else if (daysSince >= 75) {
-          dueSoon.push(userInfo);
-        } else {
-          healthyCount++;
-        }
-      }
-
-      return {
-        dueSoon: dueSoon.sort((a, b) => b.daysSinceOrder - a.daysSinceOrder),
-        overdue: overdue.sort((a, b) => b.daysSinceOrder - a.daysSinceOrder),
-        atRisk: atRisk.sort((a, b) => b.daysSinceOrder - a.daysSinceOrder),
-        summary: {
-          dueSoonCount: dueSoon.length,
-          overdueCount: overdue.length,
-          atRiskCount: atRisk.length,
-          healthyCount
-        }
-      };
-    } catch (error) {
-      console.error('Error getting reorder health:', error);
-      return {
-        dueSoon: [],
-        overdue: [],
-        atRisk: [],
-        summary: { dueSoonCount: 0, overdueCount: 0, atRiskCount: 0, healthyCount: 0 }
-      };
-    }
-  }
-
-  /**
-   * Get formula insights - popular ingredients, patterns, customization trends
-   */
-  async getFormulaInsights(): Promise<{
-    totalFormulas: number;
-    averageIngredients: number;
-    averageTotalMg: number;
-    popularBases: Array<{ name: string; count: number; percentage: number }>;
-    popularAdditions: Array<{ name: string; count: number; percentage: number }>;
-    customizationRate: number;
-    unusedSystemSupports: string[];
-    unusedIndividuals: string[];
-    totalAvailableSystemSupports: number;
-    totalAvailableIndividuals: number;
-  }> {
-    // Import ingredient catalogs
-    const { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS } = await import('@shared/ingredients');
-    
-    try {
-      const allFormulas = await db.select().from(formulas);
-      const totalFormulas = allFormulas.length;
-
-      // Get all available ingredient names
-      const allSystemSupportNames = SYSTEM_SUPPORTS.map(s => s.name);
-      const allIndividualNames = INDIVIDUAL_INGREDIENTS.map(i => i.name);
-
-      if (totalFormulas === 0) {
-        return {
-          totalFormulas: 0,
-          averageIngredients: 0,
-          averageTotalMg: 0,
-          popularBases: [],
-          popularAdditions: [],
-          customizationRate: 0,
-          unusedSystemSupports: allSystemSupportNames,
-          unusedIndividuals: allIndividualNames,
-          totalAvailableSystemSupports: allSystemSupportNames.length,
-          totalAvailableIndividuals: allIndividualNames.length
-        };
-      }
-
-      // Count ingredient usage
-      const baseCounts: Record<string, number> = {};
-      const additionCounts: Record<string, number> = {};
-      let totalIngredients = 0;
-      let totalMg = 0;
-      let customizedCount = 0;
-
-      for (const formula of allFormulas) {
-        const bases = (formula.bases as Array<{ ingredient: string }>) || [];
-        const additions = (formula.additions as Array<{ ingredient: string }>) || [];
-        const customs = formula.userCustomizations as { addedBases?: Array<any>; addedIndividuals?: Array<any> } | null;
-
-        totalIngredients += bases.length + additions.length;
-        totalMg += formula.totalMg;
-
-        for (const base of bases) {
-          baseCounts[base.ingredient] = (baseCounts[base.ingredient] || 0) + 1;
-        }
-        for (const add of additions) {
-          additionCounts[add.ingredient] = (additionCounts[add.ingredient] || 0) + 1;
-        }
-
-        if (customs && ((customs.addedBases?.length || 0) > 0 || (customs.addedIndividuals?.length || 0) > 0)) {
-          customizedCount++;
-        }
-      }
-
-      // Find unused ingredients
-      const usedSystemSupports = new Set(Object.keys(baseCounts));
-      const usedIndividuals = new Set(Object.keys(additionCounts));
-      
-      const unusedSystemSupports = allSystemSupportNames.filter(name => !usedSystemSupports.has(name));
-      const unusedIndividuals = allIndividualNames.filter(name => !usedIndividuals.has(name));
-
-      // Sort and format popular ingredients
-      const popularBases = Object.entries(baseCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([name, count]) => ({
-          name,
-          count,
-          percentage: Math.round((count / totalFormulas) * 100)
-        }));
-
-      const popularAdditions = Object.entries(additionCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([name, count]) => ({
-          name,
-          count,
-          percentage: Math.round((count / totalFormulas) * 100)
-        }));
-
-      return {
-        totalFormulas,
-        averageIngredients: Math.round(totalIngredients / totalFormulas),
-        averageTotalMg: Math.round(totalMg / totalFormulas),
-        popularBases,
-        popularAdditions,
-        customizationRate: Math.round((customizedCount / totalFormulas) * 100),
-        unusedSystemSupports,
-        unusedIndividuals,
-        totalAvailableSystemSupports: allSystemSupportNames.length,
-        totalAvailableIndividuals: allIndividualNames.length
-      };
-    } catch (error) {
-      console.error('Error getting formula insights:', error);
-      return {
-        totalFormulas: 0,
-        averageIngredients: 0,
-        averageTotalMg: 0,
-        popularBases: [],
-        popularAdditions: [],
-        customizationRate: 0,
-        unusedSystemSupports: [],
-        unusedIndividuals: [],
-        totalAvailableSystemSupports: 0,
-        totalAvailableIndividuals: 0
-      };
-    }
-  }
-
-  /**
-   * Get pending actions that need admin attention
-   */
-  async getPendingActions(): Promise<{
-    openTickets: number;
-    pendingOrders: number;
-    processingOrders: number;
-    reordersdue: number;
-    overdueReorders: number;
-  }> {
-    try {
-      // Open support tickets
-      const [ticketCount] = await db
-        .select({ count: count() })
-        .from(supportTickets)
-        .where(eq(supportTickets.status, 'open'));
-
-      // Pending orders (not yet processing)
-      const [pendingCount] = await db
-        .select({ count: count() })
-        .from(orders)
-        .where(eq(orders.status, 'pending'));
-
-      // Processing orders (need to ship)
-      const [processingCount] = await db
-        .select({ count: count() })
-        .from(orders)
-        .where(eq(orders.status, 'processing'));
-
-      // Reorder health
-      const reorderHealth = await this.getReorderHealth();
-
-      return {
-        openTickets: Number(ticketCount?.count || 0),
-        pendingOrders: Number(pendingCount?.count || 0),
-        processingOrders: Number(processingCount?.count || 0),
-        reordersdue: reorderHealth.summary.dueSoonCount,
-        overdueReorders: reorderHealth.summary.overdueCount + reorderHealth.summary.atRiskCount
-      };
-    } catch (error) {
-      console.error('Error getting pending actions:', error);
-      return { openTickets: 0, pendingOrders: 0, processingOrders: 0, reordersdue: 0, overdueReorders: 0 };
-    }
-  }
-
-  /**
-   * Get activity feed for admin dashboard
-   */
-  async getActivityFeed(limit: number = 20): Promise<Array<{
-    type: 'signup' | 'order' | 'formula' | 'ticket' | 'message';
-    id: string;
-    userId: string;
-    userName: string;
-    description: string;
-    timestamp: Date;
-    metadata?: Record<string, any>;
-  }>> {
-    try {
-      const activities: Array<{
-        type: 'signup' | 'order' | 'formula' | 'ticket' | 'message';
-        id: string;
-        userId: string;
-        userName: string;
-        description: string;
-        timestamp: Date;
-        metadata?: Record<string, any>;
-      }> = [];
-
-      // Recent signups
-      const recentUsers = await db
-        .select()
-        .from(users)
-        .orderBy(desc(users.createdAt))
-        .limit(limit);
-      for (const u of recentUsers) {
-        activities.push({
-          type: 'signup',
-          id: u.id,
-          userId: u.id,
-          userName: u.name,
-          description: `${u.name} signed up`,
-          timestamp: u.createdAt
-        });
-      }
-
-      // Recent orders
-      const recentOrders = await db
-        .select()
-        .from(orders)
-        .orderBy(desc(orders.placedAt))
-        .limit(limit);
-      for (const o of recentOrders) {
-        const [user] = await db.select({ name: users.name }).from(users).where(eq(users.id, o.userId));
-        activities.push({
-          type: 'order',
-          id: o.id,
-          userId: o.userId,
-          userName: user?.name || 'Unknown',
-          description: `${user?.name || 'Unknown'} placed an order`,
-          timestamp: o.placedAt,
-          metadata: { status: o.status, amountCents: o.amountCents }
-        });
-      }
-
-      // Recent formulas
-      const recentFormulas = await db
-        .select()
-        .from(formulas)
-        .orderBy(desc(formulas.createdAt))
-        .limit(limit);
-      for (const f of recentFormulas) {
-        const [user] = await db.select({ name: users.name }).from(users).where(eq(users.id, f.userId));
-        activities.push({
-          type: 'formula',
-          id: f.id,
-          userId: f.userId,
-          userName: user?.name || 'Unknown',
-          description: `${user?.name || 'Unknown'} ${f.version > 1 ? 'updated' : 'created'} their formula`,
-          timestamp: f.createdAt,
-          metadata: { version: f.version, totalMg: f.totalMg }
-        });
-      }
-
-      // Recent support tickets
-      const recentTickets = await db
-        .select()
-        .from(supportTickets)
-        .orderBy(desc(supportTickets.createdAt))
-        .limit(limit);
-      for (const t of recentTickets) {
-        const [user] = await db.select({ name: users.name }).from(users).where(eq(users.id, t.userId));
-        activities.push({
-          type: 'ticket',
-          id: t.id,
-          userId: t.userId,
-          userName: user?.name || 'Unknown',
-          description: `${user?.name || 'Unknown'} opened a support ticket: ${t.subject}`,
-          timestamp: t.createdAt,
-          metadata: { status: t.status, subject: t.subject }
-        });
-      }
-
-      // Sort all activities by timestamp and return top N
-      return activities
-        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-        .slice(0, limit);
-    } catch (error) {
-      console.error('Error getting activity feed:', error);
-      return [];
-    }
-  }
-
-  // ========================================
-  // Order Management Methods
-  // ========================================
-
-  /**
-   * Get all orders with filtering
-   */
-  async getAllOrders(options: {
-    status?: string;
-    limit?: number;
-    offset?: number;
-    startDate?: Date;
-    endDate?: Date;
-  }): Promise<{
-    orders: Array<Order & { user: { id: string; name: string; email: string }; formula?: Formula }>;
-    total: number;
-  }> {
-    try {
-      const { status, limit = 50, offset = 0, startDate, endDate } = options;
-
-      let whereConditions = [];
-      if (status && status !== 'all') {
-        whereConditions.push(eq(orders.status, status as any));
-      }
-      if (startDate) {
-        whereConditions.push(gte(orders.placedAt, startDate));
-      }
-      if (endDate) {
-        whereConditions.push(lte(orders.placedAt, endDate));
-      }
-
-      const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
-
-      const [countResult] = await db
-        .select({ count: count() })
-        .from(orders)
-        .where(whereClause);
-
-      const orderList = await db
-        .select()
-        .from(orders)
-        .where(whereClause)
-        .orderBy(desc(orders.placedAt))
-        .limit(limit)
-        .offset(offset);
-
-      // Enrich with user and formula data
-      const enrichedOrders = await Promise.all(
-        orderList.map(async (order) => {
-          const [user] = await db
-            .select({ id: users.id, name: users.name, email: users.email })
-            .from(users)
-            .where(eq(users.id, order.userId));
-
-          const [formula] = await db
-            .select()
-            .from(formulas)
-            .where(and(
-              eq(formulas.userId, order.userId),
-              eq(formulas.version, order.formulaVersion)
-            ));
-
-          return { ...order, user, formula };
-        })
-      );
-
-      return {
-        orders: enrichedOrders,
-        total: Number(countResult?.count || 0)
-      };
-    } catch (error) {
-      console.error('Error getting all orders:', error);
-      return { orders: [], total: 0 };
-    }
-  }
-
-  // ========================================
-  // User Admin Notes Methods
-  // ========================================
-
-  /**
-   * Get admin notes for a user
-   */
-  async getUserAdminNotes(userId: string): Promise<Array<{
-    id: string;
-    content: string;
-    adminId: string;
-    adminName: string;
-    createdAt: Date;
-  }>> {
-    try {
-      const notes = await db
-        .select()
-        .from(userAdminNotes)
-        .where(eq(userAdminNotes.userId, userId))
-        .orderBy(desc(userAdminNotes.createdAt));
-
-      // Enrich with admin name
-      const enrichedNotes = await Promise.all(
-        notes.map(async (note) => {
-          const [admin] = await db
-            .select({ name: users.name })
-            .from(users)
-            .where(eq(users.id, note.adminId));
-          return {
-            id: note.id,
-            content: note.content,
-            adminId: note.adminId,
-            adminName: admin?.name || 'Unknown',
-            createdAt: note.createdAt
-          };
-        })
-      );
-
-      return enrichedNotes;
-    } catch (error) {
-      console.error('Error getting user admin notes:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Add admin note to a user
-   */
-  async addUserAdminNote(userId: string, adminId: string, content: string): Promise<{
-    id: string;
-    content: string;
-    adminId: string;
-    adminName: string;
-    createdAt: Date;
-  }> {
-    try {
-      const [note] = await db
-        .insert(userAdminNotes)
-        .values({ userId, adminId, content })
-        .returning();
-
-      const [admin] = await db
-        .select({ name: users.name })
-        .from(users)
-        .where(eq(users.id, adminId));
-
-      return {
-        id: note.id,
-        content: note.content,
-        adminId: note.adminId,
-        adminName: admin?.name || 'Unknown',
-        createdAt: note.createdAt
-      };
-    } catch (error) {
-      console.error('Error adding user admin note:', error);
-      throw new Error('Failed to add admin note');
-    }
-  }
-
-  // ========================================
-  // Export Methods
-  // ========================================
-
-  /**
-   * Export users for CSV
-   */
-  async exportUsers(filter: string = 'all'): Promise<Array<{
-    id: string;
-    name: string;
-    email: string;
-    phone: string | null;
-    createdAt: string;
-    hasFormula: boolean;
-    orderCount: number;
-    totalSpent: number;
-  }>> {
-    try {
-      let userList = await db.select().from(users).orderBy(desc(users.createdAt));
-
-      if (filter === 'paid') {
-        const paidUserIds = await db.selectDistinct({ userId: orders.userId }).from(orders);
-        const paidIds = new Set(paidUserIds.map(p => p.userId));
-        userList = userList.filter(u => paidIds.has(u.id));
-      } else if (filter === 'active') {
-        const activeUserIds = await db.selectDistinct({ userId: formulas.userId }).from(formulas);
-        const activeIds = new Set(activeUserIds.map(a => a.userId));
-        userList = userList.filter(u => activeIds.has(u.id));
-      }
-
-      // Get formula and order data for each user
-      const result = await Promise.all(
-        userList.map(async (user) => {
-          const [formulaExists] = await db
-            .select({ id: formulas.id })
-            .from(formulas)
-            .where(eq(formulas.userId, user.id))
-            .limit(1);
-
-          const userOrders = await db
-            .select({ amountCents: orders.amountCents })
-            .from(orders)
-            .where(eq(orders.userId, user.id));
-
-          const totalSpent = userOrders.reduce((sum, o) => sum + (o.amountCents || 0), 0);
-
-          return {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            phone: user.phone,
-            createdAt: user.createdAt.toISOString(),
-            hasFormula: !!formulaExists,
-            orderCount: userOrders.length,
-            totalSpent
-          };
-        })
-      );
-
-      return result;
-    } catch (error) {
-      console.error('Error exporting users:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Export orders for CSV
-   */
-  async exportOrders(startDate?: Date, endDate?: Date): Promise<Array<{
-    id: string;
-    userName: string;
-    userEmail: string;
-    status: string;
-    amountCents: number;
-    supplyMonths: number | null;
-    placedAt: string;
-    shippedAt: string | null;
-  }>> {
-    try {
-      let whereConditions = [];
-      if (startDate) whereConditions.push(gte(orders.placedAt, startDate));
-      if (endDate) whereConditions.push(lte(orders.placedAt, endDate));
-
-      const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
-
-      const orderList = await db
-        .select()
-        .from(orders)
-        .where(whereClause)
-        .orderBy(desc(orders.placedAt));
-
-      const result = await Promise.all(
-        orderList.map(async (order) => {
-          const [user] = await db
-            .select({ name: users.name, email: users.email })
-            .from(users)
-            .where(eq(users.id, order.userId));
-
-          return {
-            id: order.id,
-            userName: user?.name || 'Unknown',
-            userEmail: user?.email || 'Unknown',
-            status: order.status,
-            amountCents: order.amountCents || 0,
-            supplyMonths: order.supplyMonths,
-            placedAt: order.placedAt.toISOString(),
-            shippedAt: order.shippedAt?.toISOString() || null
-          };
-        })
-      );
-
-      return result;
-    } catch (error) {
-      console.error('Error exporting orders:', error);
-      return [];
-    }
-  }
 
   // ============================================
   // MEMBERSHIP TIER OPERATIONS
@@ -5656,7 +4590,7 @@ export class DrizzleStorage implements IStorage {
         .from(membershipTiers)
         .where(eq(membershipTiers.isActive, true))
         .orderBy(membershipTiers.sortOrder);
-      
+
       for (const tier of tiers) {
         // If maxCapacity is null, it means unlimited
         if (tier.maxCapacity === null || tier.currentCount < tier.maxCapacity) {
@@ -5685,10 +4619,10 @@ export class DrizzleStorage implements IStorage {
     try {
       const [updated] = await db
         .update(membershipTiers)
-        .set({ 
-          ...updates, 
+        .set({
+          ...updates,
           benefits: updates.benefits ? [...updates.benefits] : updates.benefits,
-          updatedAt: new Date() 
+          updatedAt: new Date()
         })
         .where(eq(membershipTiers.tierKey, tierKey))
         .returning();
@@ -5703,7 +4637,7 @@ export class DrizzleStorage implements IStorage {
     try {
       const [updated] = await db
         .update(membershipTiers)
-        .set({ 
+        .set({
           currentCount: sql`${membershipTiers.currentCount} + 1`,
           updatedAt: new Date()
         })
@@ -5720,7 +4654,7 @@ export class DrizzleStorage implements IStorage {
     try {
       const [updated] = await db
         .update(membershipTiers)
-        .set({ 
+        .set({
           currentCount: sql`GREATEST(${membershipTiers.currentCount} - 1, 0)`,
           updatedAt: new Date()
         })
@@ -5749,12 +4683,12 @@ export class DrizzleStorage implements IStorage {
         })
         .where(eq(users.id, userId))
         .returning();
-      
+
       // Increment the tier count
       if (updated) {
         await this.incrementTierCount(tierKey);
       }
-      
+
       return updated || undefined;
     } catch (error) {
       console.error('Error assigning user membership:', error);
@@ -5777,12 +4711,12 @@ export class DrizzleStorage implements IStorage {
         })
         .where(eq(users.id, userId))
         .returning();
-      
+
       // Decrement the tier count
       if (updated && user.membershipTier) {
         await this.decrementTierCount(user.membershipTier);
       }
-      
+
       return updated || undefined;
     } catch (error) {
       console.error('Error cancelling user membership:', error);

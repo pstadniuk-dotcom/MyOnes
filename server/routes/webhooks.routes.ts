@@ -12,8 +12,8 @@
 
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import logger from '../logger';
-import { storage } from '../storage';
+import { logger } from '../infrastructure/logging/logger';
+import { userService } from '../domains/users/user.service';
 
 const router = Router();
 
@@ -55,7 +55,7 @@ router.post('/junction', async (req: Request, res: Response) => {
     }
 
     const event = req.body;
-    logger.info('Received Junction webhook', { 
+    logger.info('Received Junction webhook', {
       eventType: event.event_type,
       userId: event.user_id,
     });
@@ -116,7 +116,7 @@ router.post('/junction', async (req: Request, res: Response) => {
  */
 async function handleSleepData(event: any): Promise<void> {
   const { user_id: junctionUserId, data } = event;
-  
+
   // Find ONES user by Junction user ID
   const user = await findUserByJunctionId(junctionUserId);
   if (!user) {
@@ -139,7 +139,7 @@ async function handleSleepData(event: any): Promise<void> {
  */
 async function handleActivityData(event: any): Promise<void> {
   const { user_id: junctionUserId, data } = event;
-  
+
   const user = await findUserByJunctionId(junctionUserId);
   if (!user) {
     logger.warn('No ONES user found for Junction user', { junctionUserId });
@@ -158,7 +158,7 @@ async function handleActivityData(event: any): Promise<void> {
  */
 async function handleBodyData(event: any): Promise<void> {
   const { user_id: junctionUserId, data } = event;
-  
+
   const user = await findUserByJunctionId(junctionUserId);
   if (!user) {
     logger.warn('No ONES user found for Junction user', { junctionUserId });
@@ -177,7 +177,7 @@ async function handleBodyData(event: any): Promise<void> {
  */
 async function handleWorkoutData(event: any): Promise<void> {
   const { user_id: junctionUserId, data } = event;
-  
+
   const user = await findUserByJunctionId(junctionUserId);
   if (!user) {
     logger.warn('No ONES user found for Junction user', { junctionUserId });
@@ -196,7 +196,7 @@ async function handleWorkoutData(event: any): Promise<void> {
  */
 async function handleProviderConnected(event: any): Promise<void> {
   const { user_id: junctionUserId, data } = event;
-  
+
   const user = await findUserByJunctionId(junctionUserId);
   if (!user) {
     logger.warn('No ONES user found for Junction user', { junctionUserId });
@@ -216,7 +216,7 @@ async function handleProviderConnected(event: any): Promise<void> {
  */
 async function handleProviderDisconnected(event: any): Promise<void> {
   const { user_id: junctionUserId, data } = event;
-  
+
   const user = await findUserByJunctionId(junctionUserId);
   if (!user) {
     logger.warn('No ONES user found for Junction user', { junctionUserId });
@@ -237,10 +237,7 @@ async function handleProviderDisconnected(event: any): Promise<void> {
  */
 async function findUserByJunctionId(junctionUserId: string): Promise<any | null> {
   try {
-    // This requires querying all users and filtering by junctionUserId
-    // A more efficient approach would be to add an index/lookup method
-    const users = await storage.listAllUsers();
-    return users.find((u: any) => u.junctionUserId === junctionUserId) || null;
+    return await userService.getUserByJunctionId(junctionUserId) || null;
   } catch (error) {
     logger.error('Error finding user by Junction ID:', error);
     return null;

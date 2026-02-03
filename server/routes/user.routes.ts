@@ -1,12 +1,12 @@
-/**
- * User-related routes
- * Handles: profile management, health profiles, subscriptions, payments
- */
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { storage } from '../storage';
-import { logger } from '../logger';
+import { userService } from '../domains/users/user.service';
+import { formulaService } from '../domains/formulas/formula.service';
+import { healthService } from '../domains/health';
+import { commerceService } from '../domains/commerce';
+import { chatService } from '../domains/chat/chat.service';
+import { logger } from '../infrastructure/logging/logger';
 import { requireAuth } from './middleware';
 import { insertHealthProfileSchema } from '@shared/schema';
 
@@ -19,8 +19,8 @@ const router = Router();
 router.get('/me/formula', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const currentFormula = await storage.getCurrentFormulaByUser(userId);
-    
+    const currentFormula = await formulaService.getCurrentFormulaByUser(userId);
+
     if (!currentFormula) {
       return res.status(404).json({ error: 'No formula found' });
     }
@@ -39,8 +39,8 @@ router.get('/me/formula', requireAuth, async (req, res) => {
 router.get('/me/health-profile', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const healthProfile = await storage.getHealthProfile(userId);
-    
+    const healthProfile = await healthService.getHealthProfile(userId);
+
     if (!healthProfile) {
       return res.status(404).json({ error: 'No health profile found' });
     }
@@ -59,9 +59,9 @@ router.get('/me/health-profile', requireAuth, async (req, res) => {
 router.post('/me/health-profile', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    
+
     logger.info('Health profile save request', { userId, body: req.body });
-    
+
     // Validate request body with proper Zod schema
     const healthProfileUpdate = insertHealthProfileSchema.omit({ userId: true }).parse({
       age: req.body.age,
@@ -84,16 +84,16 @@ router.post('/me/health-profile', requireAuth, async (req, res) => {
     logger.info('Health profile validated', { userId, validatedData: healthProfileUpdate });
 
     // Check if profile exists
-    const existingProfile = await storage.getHealthProfile(userId);
-    
+    const existingProfile = await healthService.getHealthProfile(userId);
+
     logger.info('Existing profile check', { userId, hasExisting: !!existingProfile });
-    
+
     let healthProfile;
     if (existingProfile) {
-      healthProfile = await storage.updateHealthProfile(userId, healthProfileUpdate);
+      healthProfile = await healthService.updateHealthProfile(userId, healthProfileUpdate);
       logger.info('Health profile updated', { userId, result: !!healthProfile });
     } else {
-      healthProfile = await storage.createHealthProfile({
+      healthProfile = await healthService.createHealthProfile({
         userId,
         ...healthProfileUpdate
       });
@@ -104,13 +104,13 @@ router.post('/me/health-profile', requireAuth, async (req, res) => {
   } catch (error) {
     if (error instanceof z.ZodError) {
       logger.error('Health profile validation error', { error: error.errors });
-      return res.status(400).json({ 
-        error: 'Invalid health profile data', 
-        details: error.errors 
+      return res.status(400).json({
+        error: 'Invalid health profile data',
+        details: error.errors
       });
     }
-    logger.error('Save health profile error', { 
-      error: error instanceof Error ? { message: error.message, stack: error.stack } : error 
+    logger.error('Save health profile error', {
+      error: error instanceof Error ? { message: error.message, stack: error.stack } : error
     });
     res.status(500).json({ error: 'Failed to save health profile' });
   }
@@ -123,7 +123,7 @@ router.post('/me/health-profile', requireAuth, async (req, res) => {
 router.patch('/me/profile', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    
+
     // Create validation schema for profile updates
     const updateProfileSchema = z.object({
       name: z.string().min(1).optional(),
@@ -136,33 +136,33 @@ router.patch('/me/profile', requireAuth, async (req, res) => {
       postalCode: z.string().nullable().optional(),
       country: z.string().nullable().optional(),
     });
-    
+
     // Validate request body
     const validatedData = updateProfileSchema.parse(req.body);
-    
+
     // If email is being changed, check if it's already in use
     if (validatedData.email) {
-      const existingUser = await storage.getUserByEmail(validatedData.email);
+      const existingUser = await userService.getUserByEmail(validatedData.email);
       if (existingUser && existingUser.id !== userId) {
         return res.status(409).json({ error: 'Email already in use by another account' });
       }
     }
-    
+
     // Update user profile
-    const updatedUser = await storage.updateUser(userId, validatedData);
-    
+    const updatedUser = await userService.updateUser(userId, validatedData);
+
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     // Return user without password
     const { password, ...userWithoutPassword } = updatedUser;
     res.json({ user: userWithoutPassword });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: 'Invalid profile data', 
-        details: error.errors 
+      return res.status(400).json({
+        error: 'Invalid profile data',
+        details: error.errors
       });
     }
     logger.error('Update profile error', { error });
@@ -177,7 +177,7 @@ router.patch('/me/profile', requireAuth, async (req, res) => {
 router.get('/me/orders', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const orders = await storage.listOrdersByUser(userId);
+    const orders = await commerceService.getOrdersByUser(userId);
     res.json(orders);
   } catch (error) {
     logger.error('Get orders error', { error });
@@ -193,17 +193,17 @@ router.patch('/me/timezone', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
     const { timezone } = req.body;
-    
+
     if (!timezone || typeof timezone !== 'string') {
       return res.status(400).json({ error: 'Valid timezone required' });
     }
-    
-    const updatedUser = await storage.updateUser(userId, { timezone });
-    
+
+    const updatedUser = await userService.updateUser(userId, { timezone });
+
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     res.json({ timezone: updatedUser.timezone });
   } catch (error) {
     logger.error('Update timezone error', { error });
@@ -218,12 +218,12 @@ router.patch('/me/timezone', requireAuth, async (req, res) => {
 router.get('/me/subscription', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const subscription = await storage.getSubscription(userId);
-    
+    const subscription = await commerceService.getSubscription(userId);
+
     if (!subscription) {
       return res.status(404).json({ error: 'No subscription found' });
     }
-    
+
     res.json(subscription);
   } catch (error) {
     logger.error('Get subscription error', { error });
@@ -238,7 +238,7 @@ router.get('/me/subscription', requireAuth, async (req, res) => {
 router.get('/me/sessions', requireAuth, async (req, res) => {
   try {
     const userId = req.userId!;
-    const sessions = await storage.listChatSessionsByUser(userId);
+    const sessions = await chatService.listUserSessions(userId);
     res.json(sessions);
   } catch (error) {
     logger.error('Get sessions error', { error });
@@ -247,3 +247,4 @@ router.get('/me/sessions', requireAuth, async (req, res) => {
 });
 
 export default router;
+

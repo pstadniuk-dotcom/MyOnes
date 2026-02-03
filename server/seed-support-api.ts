@@ -1,5 +1,4 @@
-import './db';
-import { db } from './db';
+import { db } from './infrastructure/database/db';
 import { helpArticles, faqItems } from '../shared/schema';
 
 const helpArticlesData = [
@@ -823,32 +822,32 @@ const faqData = [
 
 async function seedData() {
   console.log('🌱 Starting support data seeding...');
-  
+
   try {
     // Clear existing data
     console.log('🗑️  Clearing existing data...');
     await db.delete(faqItems);
     await db.delete(helpArticles);
     console.log('  ✓ Cleared existing help articles and FAQ items');
-    
+
     // Seed help articles
     console.log('📚 Creating help articles...');
     for (const article of helpArticlesData) {
       await db.insert(helpArticles).values(article);
       console.log(`  ✓ Created: "${article.title}"`);
     }
-    
+
     // Seed FAQ items
     console.log('❓ Creating FAQ items...');
     for (const faq of faqData) {
       await db.insert(faqItems).values(faq);
       console.log(`  ✓ Created: "${faq.question}"`);
     }
-    
+
     console.log('✅ Support data seeding complete!');
     console.log(`   - ${helpArticlesData.length} help articles created`);
     console.log(`   - ${faqData.length} FAQ items created`);
-    
+
   } catch (error) {
     console.error('❌ Error seeding support data:', error);
     throw error;

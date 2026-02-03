@@ -22,6 +22,8 @@
  * - /api/chat/* (AI chat streaming - 1300+ lines, complex SSE handling)
  */
 
+import chatRoutes from "./chat.routes";
+
 // Export all route modules
 export { default as authRoutes } from './auth.routes';
 export { default as userRoutes } from './user.routes';
@@ -36,6 +38,8 @@ export { default as ingredientsRoutes } from './ingredients.routes';
 export { default as wearablesRoutes } from './junction.routes';
 export { default as webhooksRoutes } from './webhooks.routes';
 export { default as optimizeRoutes } from './optimize.routes';
+export { default as chatRoutes } from './chat.routes';
+export { default as dashboardRoutes } from './dashboard.routes';
 
 // Export middleware for use in routes.ts during migration
 export {

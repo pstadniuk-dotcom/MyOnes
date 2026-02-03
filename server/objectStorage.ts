@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
-import { logger } from "./logger";
+import { logger } from "./infrastructure/logging/logger";
 
 // Supabase client - lazy initialization to avoid crashes when env vars missing
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
@@ -9,7 +9,7 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || proce
 const LAB_REPORTS_BUCKET = 'lab-reports';
 
 // Only create client if URL is provided
-export const supabaseClient = SUPABASE_URL 
+export const supabaseClient = SUPABASE_URL
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null as any; // Will throw error on actual use, but won't crash on import
 
@@ -65,8 +65,8 @@ export async function enforceConsentRequirements(
       ipAddress: auditInfo?.ipAddress,
       userAgent: auditInfo?.userAgent,
       success: missingConsents.length === 0,
-      reason: missingConsents.length > 0 
-        ? `Missing required consents: ${missingConsents.join(', ')}` 
+      reason: missingConsents.length > 0
+        ? `Missing required consents: ${missingConsents.join(', ')}`
         : `All required consents verified for ${operation}`
     };
 
@@ -93,7 +93,7 @@ export async function enforceConsentRequirements(
 
 // HIPAA-compliant object storage service for medical lab reports
 export class ObjectStorageService {
-  constructor() {}
+  constructor() { }
 
   // Uploads a lab report file to Supabase Storage
   async uploadLabReportFile(userId: string, fileBuffer: Buffer, originalFileName: string, contentType: string = 'application/pdf'): Promise<string> {
@@ -216,7 +216,7 @@ export class ObjectStorageService {
   }
 
   // List all lab reports for a specific user
-  async listUserLabReports(userId: string): Promise<Array<{path: string, uploadedAt: string}>> {
+  async listUserLabReports(userId: string): Promise<Array<{ path: string, uploadedAt: string }>> {
     if (!supabaseStorageClient) {
       throw new Error('File storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
     }

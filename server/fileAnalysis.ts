@@ -1,7 +1,5 @@
-import OpenAI from 'openai';
+import { aiService } from './domains/ai';
 import { ObjectStorageService } from './objectStorage';
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export interface LabDataExtraction {
   testDate?: string;
@@ -57,47 +55,29 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
     const { pdf } = await import('pdf-to-img');
     const document = await pdf(buffer, { scale: 2.0 });
     const extractedTexts: string[] = [];
-    
+
     let pageNum = 1;
     for await (const page of document) {
       console.log(`📄 Processing PDF page ${pageNum}...`);
-      
+
       // Convert page to base64
       const base64Image = page.toString('base64');
       const dataUrl = `data:image/png;base64,${base64Image}`;
-      
-      // Extract text using OpenAI Vision
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Extract all text from this lab report page. Include test names, values, units, reference ranges, and any other relevant information. Preserve the structure and formatting as much as possible.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: dataUrl,
-                  detail: 'high'
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 2000
-      });
-      
-      const pageText = response.choices[0]?.message?.content || '';
+
+      // Extract text using AI Service Vision
+      const pageText = await aiService.getVisionCompletion(
+        'Extract all text from this lab report page. Include test names, values, units, reference ranges, and any other relevant information. Preserve the structure and formatting as much as possible.',
+        dataUrl,
+        { model: 'gpt-4o', maxTokens: 2000 }
+      );
+
       if (pageText) {
         extractedTexts.push(`--- Page ${pageNum} ---\n${pageText}`);
       }
-      
+
       pageNum++;
     }
-    
+
     console.log(`✅ Successfully extracted text from ${pageNum - 1} PDF page(s)`);
     return extractedTexts.join('\n\n');
   } catch (error) {
@@ -115,30 +95,11 @@ export async function extractTextFromImage(buffer: Buffer, mimeType: string): Pr
     const base64Image = buffer.toString('base64');
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o', // GPT-4 Vision model
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Extract all text from this lab report image. Include test names, values, units, reference ranges, and any other relevant information. Preserve the structure and formatting as much as possible.'
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: dataUrl,
-                detail: 'high'
-              }
-            }
-          ]
-        }
-      ],
-      max_tokens: 2000
-    });
-
-    return response.choices[0]?.message?.content || '';
+    return aiService.getVisionCompletion(
+      'Extract all text from this lab report image. Include test names, values, units, reference ranges, and any other relevant information. Preserve the structure and formatting as much as possible.',
+      dataUrl,
+      { model: 'gpt-4o', maxTokens: 2000 }
+    );
   } catch (error) {
     console.error('Image OCR error:', error);
     throw new Error('Failed to extract text from image');
@@ -150,12 +111,10 @@ export async function extractTextFromImage(buffer: Buffer, mimeType: string): Pr
  */
 export async function structureLabData(rawText: string): Promise<LabDataExtraction> {
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a medical lab report analyzer. Extract structured data from lab reports and return it as JSON.
+    const content = await aiService.getChatCompletion([
+      {
+        role: 'system',
+        content: `You are a medical lab report analyzer. Extract structured data from lab reports and return it as JSON.
 
 Extract the following information:
 - testDate: Date of the test (ISO format if possible)
@@ -170,29 +129,25 @@ Extract the following information:
   - status: "high", "low", or "normal" based on the reference range
 
 Return ONLY valid JSON without any markdown formatting.`
-        },
-        {
-          role: 'user',
-          content: `Extract structured data from this lab report:\n\n${rawText}`
-        }
-      ],
-      temperature: 0.1,
-      response_format: { type: 'json_object' }
-    });
+      },
+      {
+        role: 'user',
+        content: `Extract structured data from this lab report:\n\n${rawText}`
+      }
+    ], { model: 'gpt-4o', temperature: 0.1 });
 
-    const content = response.choices[0]?.message?.content;
     if (!content) {
       throw new Error('No response from AI');
     }
 
     const structured = JSON.parse(content);
-    
+
     // Ensure extractedData is always an array
     if (!Array.isArray(structured.extractedData)) {
       console.warn('AI returned non-array extractedData, normalizing to empty array');
       structured.extractedData = [];
     }
-    
+
     return {
       ...structured,
       rawText
@@ -216,16 +171,16 @@ export async function analyzeLabReport(
     // Get file buffer directly from ObjectStorageService
     const objectStorageService = new ObjectStorageService();
     const fileBuffer = await objectStorageService.getLabReportFile(objectPath, userId);
-    
+
     if (!fileBuffer) {
       throw new Error(`Failed to download file from storage`);
     }
-    
+
     // Detect file type
     const fileType = getFileType(mimeType);
-    
+
     let extractedText = '';
-    
+
     // Extract text based on file type
     if (fileType === 'pdf') {
       extractedText = await extractTextFromPDF(fileBuffer);
@@ -236,10 +191,10 @@ export async function analyzeLabReport(
     } else {
       throw new Error(`Unsupported file type: ${mimeType}`);
     }
-    
+
     // Structure the extracted text into lab data
     const labData = await structureLabData(extractedText);
-    
+
     return labData;
   } catch (error) {
     console.error('Lab report analysis error:', error);

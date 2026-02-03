@@ -1,16 +1,16 @@
-/**
- * Admin routes
- * Handles: dashboard stats, user management, support tickets, AI settings, conversation intelligence
- */
-
-import { Router } from 'express';
-import OpenAI from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
-import { storage } from '../storage';
-import { logger } from '../logger';
+import { formulaService } from '../domains/formulas/formula.service';
+import { commerceService } from '../domains/commerce';
+import { aiService } from '../domains/ai';
+import { logger } from '../infrastructure/logging/logger';
 import { requireAdmin } from './middleware';
 import { sendNotificationEmail } from '../emailService';
 import { INDIVIDUAL_INGREDIENTS, SYSTEM_SUPPORTS } from '@shared/ingredients';
+import { Router } from 'express';
+import { userService } from 'server/domains/users';
+import { supportService } from 'server/domains/support';
+import { chatService } from 'server/domains/chat';
+import OpenAI from 'openai';
+import { adminService } from 'server/domains/admin';
 
 const router = Router();
 
@@ -20,7 +20,7 @@ const router = Router();
  */
 router.get('/stats', requireAdmin, async (req, res) => {
   try {
-    const stats = await storage.getAdminStats();
+    const stats = await userService.getAdminStats();
     res.json(stats);
   } catch (error) {
     logger.error('Error fetching admin stats', { error });
@@ -35,7 +35,7 @@ router.get('/stats', requireAdmin, async (req, res) => {
 router.get('/analytics/growth', requireAdmin, async (req, res) => {
   try {
     const days = parseInt(req.query.days as string) || 30;
-    const growthData = await storage.getUserGrowthData(days);
+    const growthData = await adminService.getUserGrowthData(days);
     res.json(growthData);
   } catch (error) {
     logger.error('Error fetching growth data', { error });
@@ -50,7 +50,7 @@ router.get('/analytics/growth', requireAdmin, async (req, res) => {
 router.get('/analytics/revenue', requireAdmin, async (req, res) => {
   try {
     const days = parseInt(req.query.days as string) || 30;
-    const revenueData = await storage.getRevenueData(days);
+    const revenueData = await adminService.getRevenueData(days);
     res.json(revenueData);
   } catch (error) {
     logger.error('Error fetching revenue data', { error });
@@ -68,12 +68,12 @@ router.get('/users', requireAdmin, async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
     const filter = (req.query.filter as string) || 'all';
-    
-    const result = await storage.searchUsers(query, limit, offset, filter);
-    
+
+    const result = await userService.searchUsers(query, limit, offset, filter);
+
     // Sanitize users to remove sensitive fields
     const sanitizedUsers = result.users.map(({ password, ...user }) => user);
-    
+
     res.json({
       users: sanitizedUsers,
       total: result.total
@@ -92,18 +92,14 @@ router.get('/users', requireAdmin, async (req, res) => {
 router.get('/users/:id/timeline', requireAdmin, async (req, res) => {
   try {
     logger.info('Fetching user timeline', { userId: req.params.id });
-    const timeline = await storage.getUserTimeline(req.params.id);
-    const { password, ...sanitizedUser } = timeline.user;
-    
-    res.json({
-      ...timeline,
-      user: sanitizedUser
-    });
+    const timeline = await adminService.getUserTimeline(req.params.id);
+    // Timeline now returns array format
+    res.json(timeline);
   } catch (error) {
-    logger.error('Error fetching user timeline', { 
+    logger.error('Error fetching user timeline', {
       error: error instanceof Error ? error.message : error,
       stack: error instanceof Error ? error.stack : undefined,
-      userId: req.params.id 
+      userId: req.params.id
     });
     if (error instanceof Error && error.message === 'User not found') {
       return res.status(404).json({ error: 'User not found' });
@@ -119,11 +115,11 @@ router.get('/users/:id/timeline', requireAdmin, async (req, res) => {
  */
 router.get('/users/:id', requireAdmin, async (req, res) => {
   try {
-    const user = await storage.getUserById(req.params.id);
+    const user = await userService.getUser(req.params.id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     const { password, ...sanitizedUser } = user;
     res.json(sanitizedUser);
   } catch (error) {
@@ -138,32 +134,32 @@ router.get('/users/:id', requireAdmin, async (req, res) => {
  */
 router.delete('/users/:id', requireAdmin, async (req, res) => {
   try {
-    const userToDelete = await storage.getUserById(req.params.id);
+    const userToDelete = await userService.getUser(req.params.id);
     if (!userToDelete) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     // Prevent admins from deleting themselves
     if (userToDelete.id === req.userId) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
-    
+
     // Prevent deleting other admin accounts (safety measure)
     if (userToDelete.isAdmin) {
       return res.status(400).json({ error: 'Cannot delete admin accounts' });
     }
-    
-    const deleted = await storage.deleteUser(req.params.id);
+
+    const deleted = await userService.deleteUser(req.params.id);
     if (!deleted) {
       return res.status(500).json({ error: 'Failed to delete user' });
     }
-    
-    logger.info('User deleted by admin', { 
-      deletedUserId: req.params.id, 
+
+    logger.info('User deleted by admin', {
+      deletedUserId: req.params.id,
       deletedUserEmail: userToDelete.email,
-      adminId: req.userId 
+      adminId: req.userId
     });
-    
+
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
     logger.error('Error deleting user', { error, userId: req.params.id });
@@ -178,35 +174,35 @@ router.delete('/users/:id', requireAdmin, async (req, res) => {
 router.patch('/users/:id/admin-status', requireAdmin, async (req, res) => {
   try {
     const { isAdmin } = req.body;
-    
+
     if (typeof isAdmin !== 'boolean') {
       return res.status(400).json({ error: 'isAdmin must be a boolean' });
     }
-    
-    const userToUpdate = await storage.getUserById(req.params.id);
+
+    const userToUpdate = await userService.getUser(req.params.id);
     if (!userToUpdate) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     // Prevent admins from demoting themselves
     if (userToUpdate.id === req.userId && !isAdmin) {
       return res.status(400).json({ error: 'Cannot remove your own admin status' });
     }
-    
-    const updatedUser = await storage.updateUser(req.params.id, { isAdmin });
+
+    const updatedUser = await userService.updateUser(req.params.id, { isAdmin });
     if (!updatedUser) {
       return res.status(500).json({ error: 'Failed to update user' });
     }
-    
+
     const { password, ...sanitizedUser } = updatedUser;
-    
-    logger.info('User admin status changed', { 
-      userId: req.params.id, 
+
+    logger.info('User admin status changed', {
+      userId: req.params.id,
       userEmail: userToUpdate.email,
       isAdmin,
-      changedBy: req.userId 
+      changedBy: req.userId
     });
-    
+
     res.json(sanitizedUser);
   } catch (error) {
     logger.error('Error updating admin status', { error, userId: req.params.id });
@@ -220,7 +216,7 @@ router.patch('/users/:id/admin-status', requireAdmin, async (req, res) => {
  */
 router.get('/orders/today', requireAdmin, async (req, res) => {
   try {
-    const orders = await storage.getTodaysOrders();
+    const orders = await commerceService.getTodaysOrders();
     res.json(orders);
   } catch (error) {
     logger.error('Error fetching today\'s orders', { error });
@@ -237,8 +233,8 @@ router.get('/support-tickets', requireAdmin, async (req, res) => {
     const status = (req.query.status as string) || 'all';
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
-    
-    const result = await storage.listAllSupportTickets(status, limit, offset);
+
+    const result = await supportService.listAllTickets(status, limit, offset);
     res.json(result);
   } catch (error) {
     logger.error('Error fetching support tickets', { error });
@@ -252,13 +248,13 @@ router.get('/support-tickets', requireAdmin, async (req, res) => {
  */
 router.get('/support-tickets/:id', requireAdmin, async (req, res) => {
   try {
-    const ticket = await storage.getSupportTicket(req.params.id);
+    const ticket = await supportService.getTicket(req.params.id);
     if (!ticket) {
       return res.status(404).json({ error: 'Support ticket not found' });
     }
 
-    const responses = await storage.listSupportTicketResponses(req.params.id);
-    const user = await storage.getUserById(ticket.userId);
+    const responses = await supportService.getTicketResponses(req.params.id);
+    const user = await userService.getUser(ticket.userId);
 
     res.json({
       ticket,
@@ -279,14 +275,14 @@ router.patch('/support-tickets/:id', requireAdmin, async (req, res) => {
   try {
     const allowedUpdates = ['status', 'priority', 'adminNotes'];
     const updates: Record<string, any> = {};
-    
+
     for (const key of allowedUpdates) {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
       }
     }
 
-    const ticket = await storage.updateSupportTicket(req.params.id, updates);
+    const ticket = await supportService.updateTicket(req.params.id, updates);
     if (!ticket) {
       return res.status(404).json({ error: 'Support ticket not found' });
     }
@@ -311,12 +307,12 @@ router.post('/support-tickets/:id/reply', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    const ticket = await storage.getSupportTicket(ticketId);
+    const ticket = await supportService.getTicketDetails(ticketId);
     if (!ticket) {
       return res.status(404).json({ error: 'Support ticket not found' });
     }
 
-    const response = await storage.createSupportTicketResponse({
+    const response = await supportService.createTicketResponse({
       ticketId,
       userId: req.userId!,
       message,
@@ -325,7 +321,7 @@ router.post('/support-tickets/:id/reply', requireAdmin, async (req, res) => {
 
     // Send email notification to user
     try {
-      const user = await storage.getUserById(ticket.userId);
+      const user = await userService.getUser(ticket.userId);
       if (user) {
         const ticketUrl = `https://myones.ai/support/tickets/${ticketId}`;
         await sendNotificationEmail({
@@ -369,8 +365,8 @@ router.get('/conversations/stats', requireAdmin, async (req, res) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const { total: totalMessages } = await storage.getAllUserMessages(1, startDate, endDate);
-    const { total: totalConversations } = await storage.getAllConversations(1, 0, startDate, endDate);
+    const { total: totalMessages } = await chatService.getAllUserMessages(1, startDate, endDate);
+    const { total: totalConversations } = await chatService.getAllConversations(1, 0, startDate, endDate);
 
     res.json({
       dateRange: { start: startDate, end: endDate },
@@ -391,7 +387,7 @@ router.get('/conversations/stats', requireAdmin, async (req, res) => {
  */
 router.get('/conversations/insights/latest', requireAdmin, async (req, res) => {
   try {
-    const insights = await storage.getLatestConversationInsights();
+    const insights = await chatService.getLatestConversationInsights();
 
     if (!insights) {
       return res.json({
@@ -425,7 +421,7 @@ router.post('/conversations/insights/generate', requireAdmin, async (req, res) =
     logger.info('Generating conversation insights', { days, startDate, endDate });
 
     // Get all user messages in date range (limit to recent 2000 for context window)
-    const { messages: userMessages, total: totalMessages } = await storage.getAllUserMessages(2000, startDate, endDate);
+    const { messages: userMessages, total: totalMessages } = await chatService.getAllUserMessages(2000, startDate, endDate);
 
     if (userMessages.length === 0) {
       return res.json({
@@ -507,7 +503,7 @@ Be specific and quantify where possible. Return ONLY valid JSON.`;
     });
 
     const rawAnalysis = completion.choices[0]?.message?.content || '';
-    
+
     // Parse the JSON response
     let analysisData;
     try {
@@ -543,10 +539,10 @@ Be specific and quantify where possible. Return ONLY valid JSON.`;
     };
 
     // Save insights to database
-    await storage.saveConversationInsights(insights);
+    await chatService.saveConversationInsights(insights);
 
-    logger.info('Conversation insights generated successfully', { 
-      messageCount: totalMessages, 
+    logger.info('Conversation insights generated successfully', {
+      messageCount: totalMessages,
       ingredientRequests: insights.ingredientRequests.length,
       featureRequests: insights.featureRequests.length
     });
@@ -572,7 +568,7 @@ router.get('/conversations', requireAdmin, async (req, res) => {
     const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
     const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
 
-    const result = await storage.getAllConversations(limit, offset, startDate, endDate);
+    const result = await chatService.getAllConversations(limit, offset, startDate, endDate);
 
     res.json({
       conversations: result.conversations.map(conv => ({
@@ -601,7 +597,7 @@ router.get('/conversations', requireAdmin, async (req, res) => {
  */
 router.get('/conversations/:sessionId', requireAdmin, async (req, res) => {
   try {
-    const result = await storage.getConversationDetails(req.params.sessionId);
+    const result = await chatService.getConversationDetails(req.params.sessionId);
 
     if (!result) {
       return res.status(404).json({ error: 'Conversation not found' });
@@ -636,7 +632,7 @@ router.get('/conversations/:sessionId', requireAdmin, async (req, res) => {
  */
 router.get('/analytics/funnel', requireAdmin, async (req, res) => {
   try {
-    const funnel = await storage.getConversionFunnel();
+    const funnel = await adminService.getConversionFunnel();
     res.json(funnel);
   } catch (error) {
     logger.error('Error fetching funnel data', { error });
@@ -651,7 +647,7 @@ router.get('/analytics/funnel', requireAdmin, async (req, res) => {
 router.get('/analytics/cohorts', requireAdmin, async (req, res) => {
   try {
     const months = parseInt(req.query.months as string) || 6;
-    const cohorts = await storage.getCohortRetention(months);
+    const cohorts = await adminService.getCohortRetention(months);
     res.json(cohorts);
   } catch (error) {
     logger.error('Error fetching cohort data', { error });
@@ -666,7 +662,7 @@ router.get('/analytics/cohorts', requireAdmin, async (req, res) => {
  */
 router.get('/analytics/reorder-health', requireAdmin, async (req, res) => {
   try {
-    const health = await storage.getReorderHealth();
+    const health = await adminService.getReorderHealth();
     res.json(health);
   } catch (error) {
     logger.error('Error fetching reorder health', { error });
@@ -680,7 +676,7 @@ router.get('/analytics/reorder-health', requireAdmin, async (req, res) => {
  */
 router.get('/analytics/formula-insights', requireAdmin, async (req, res) => {
   try {
-    const insights = await storage.getFormulaInsights();
+    const insights = await formulaService.getFormulaInsights();
     res.json(insights);
   } catch (error) {
     logger.error('Error fetching formula insights', { error });
@@ -694,7 +690,7 @@ router.get('/analytics/formula-insights', requireAdmin, async (req, res) => {
  */
 router.get('/analytics/pending-actions', requireAdmin, async (req, res) => {
   try {
-    const pending = await storage.getPendingActions();
+    const pending = await adminService.getPendingActions();
     res.json(pending);
   } catch (error) {
     logger.error('Error fetching pending actions', { error });
@@ -709,7 +705,7 @@ router.get('/analytics/pending-actions', requireAdmin, async (req, res) => {
 router.get('/activity-feed', requireAdmin, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
-    const feed = await storage.getActivityFeed(limit);
+    const feed = await adminService.getActivityFeed(limit);
     res.json(feed);
   } catch (error) {
     logger.error('Error fetching activity feed', { error });
@@ -733,7 +729,7 @@ router.get('/orders', requireAdmin, async (req, res) => {
     const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
     const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
 
-    const result = await storage.getAllOrders({ status, limit, offset, startDate, endDate });
+    const result = await commerceService.getAllOrders({ status, limit, offset, startDate, endDate });
     res.json(result);
   } catch (error) {
     logger.error('Error fetching orders', { error });
@@ -748,7 +744,7 @@ router.get('/orders', requireAdmin, async (req, res) => {
 router.patch('/orders/:id/status', requireAdmin, async (req, res) => {
   try {
     const { status, trackingUrl } = req.body;
-    const order = await storage.updateOrderStatus(req.params.id, status, trackingUrl);
+    const order = await commerceService.updateOrderStatus(req.params.id, status, trackingUrl);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -769,7 +765,7 @@ router.patch('/orders/:id/status', requireAdmin, async (req, res) => {
  */
 router.get('/users/:id/notes', requireAdmin, async (req, res) => {
   try {
-    const notes = await storage.getUserAdminNotes(req.params.id);
+    const notes = await userService.getUserAdminNotes(req.params.id);
     res.json(notes);
   } catch (error) {
     logger.error('Error fetching user notes', { error });
@@ -785,7 +781,7 @@ router.post('/users/:id/notes', requireAdmin, async (req, res) => {
   try {
     const { content } = req.body;
     const adminId = req.userId!;
-    const note = await storage.addUserAdminNote(req.params.id, adminId, content);
+    const note = await userService.addUserAdminNote(req.params.id, adminId, content);
     res.json(note);
   } catch (error) {
     logger.error('Error adding user note', { error });
@@ -804,8 +800,8 @@ router.post('/users/:id/notes', requireAdmin, async (req, res) => {
 router.get('/export/users', requireAdmin, async (req, res) => {
   try {
     const filter = req.query.filter as string || 'all';
-    const users = await storage.exportUsers(filter);
-    
+    const users = await adminService.exportUsers(filter);
+
     // Build CSV
     const headers = ['ID', 'Name', 'Email', 'Phone', 'Created At', 'Has Formula', 'Has Orders', 'Total Spent'];
     const rows = users.map(u => [
@@ -818,9 +814,9 @@ router.get('/export/users', requireAdmin, async (req, res) => {
       u.orderCount > 0 ? 'Yes' : 'No',
       `$${(u.totalSpent / 100).toFixed(2)}`
     ].join(','));
-    
+
     const csv = [headers.join(','), ...rows].join('\n');
-    
+
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="users-export-${new Date().toISOString().split('T')[0]}.csv"`);
     res.send(csv);
@@ -838,8 +834,8 @@ router.get('/export/orders', requireAdmin, async (req, res) => {
   try {
     const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
     const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
-    const orders = await storage.exportOrders(startDate, endDate);
-    
+    const orders = await commerceService.exportOrders(startDate, endDate);
+
     // Build CSV
     const headers = ['Order ID', 'User Name', 'User Email', 'Status', 'Amount', 'Supply (Days)', 'Placed At', 'Shipped At'];
     const rows = orders.map(o => [
@@ -852,9 +848,9 @@ router.get('/export/orders', requireAdmin, async (req, res) => {
       o.placedAt,
       o.shippedAt || ''
     ].join(','));
-    
+
     const csv = [headers.join(','), ...rows].join('\n');
-    
+
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="orders-export-${new Date().toISOString().split('T')[0]}.csv"`);
     res.send(csv);
