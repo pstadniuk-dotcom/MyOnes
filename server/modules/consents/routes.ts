@@ -7,9 +7,9 @@
  */
 
 import { Router } from 'express';
-import { storage } from '../storage';
-import { requireAuth } from './middleware';
-import logger from '../logger';
+import { storage } from '../../storage';
+import { requireAuth } from '../../routes/middleware';
+import logger from '../../logger';
 
 const router = Router();
 

@@ -5,9 +5,9 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { storage } from '../storage';
-import { logger } from '../logger';
-import { requireAuth } from './middleware';
+import { storage } from '../../storage';
+import { logger } from '../../logger';
+import { requireAuth } from '../../routes/middleware';
 import { insertHealthProfileSchema } from '@shared/schema';
 
 const router = Router();

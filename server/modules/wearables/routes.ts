@@ -10,9 +10,9 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { storage } from '../storage';
-import { requireAuth } from './middleware';
-import logger from '../logger';
+import { storage } from '../../storage';
+import { requireAuth } from '../../routes/middleware';
+import logger from '../../logger';
 import {
   getOrCreateJunctionUser,
   generateLinkToken,
@@ -24,7 +24,7 @@ import {
   getWorkoutData,
   PROVIDER_MAP,
   PROVIDER_DISPLAY_NAMES,
-} from '../junction';
+} from '../../junction';
 
 const router = Router();
 

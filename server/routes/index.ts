@@ -23,19 +23,20 @@
  */
 
 // Export all route modules
-export { default as authRoutes } from './auth.routes';
-export { default as userRoutes } from './user.routes';
-export { default as notificationRoutes } from './notifications.routes';
-export { default as adminRoutes } from './admin.routes';
-export { default as supportRoutes } from './support.routes';
-export { default as consentsRoutes } from './consents.routes';
-export { default as filesRoutes } from './files.routes';
-export { default as formulasRoutes } from './formulas.routes';
-export { default as ingredientsRoutes } from './ingredients.routes';
+export { default as authRoutes } from '../modules/auth/routes';
+export { default as userRoutes } from '../modules/users/routes';
+export { default as notificationRoutes } from '../modules/notifications/routes';
+export { default as adminRoutes } from '../modules/admin/routes';
+export { default as supportRoutes } from '../modules/support/routes';
+export { default as consentsRoutes } from '../modules/consents/routes';
+export { default as filesRoutes } from '../modules/files/routes';
+export { default as formulasRoutes } from '../modules/formulas/routes';
+export { default as ingredientsRoutes } from '../modules/ingredients/routes';
 // Junction-based wearables integration (replaces direct OAuth)
-export { default as wearablesRoutes } from './junction.routes';
-export { default as webhooksRoutes } from './webhooks.routes';
-export { default as optimizeRoutes } from './optimize.routes';
+export { default as wearablesRoutes } from '../modules/wearables/routes';
+export { default as webhooksRoutes } from '../modules/webhooks/routes';
+export { default as optimizeRoutes } from '../modules/optimize/routes';
+export { default as membershipRoutes } from '../modules/membership/routes';
 
 // Export middleware for use in routes.ts during migration
 export {

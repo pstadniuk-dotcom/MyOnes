@@ -6,14 +6,14 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import { storage } from '../storage';
-import { logger } from '../logger';
+import { storage } from '../../storage';
+import { logger } from '../../logger';
 import { 
   requireAuth, 
   generateToken, 
   getClientIP, 
   checkRateLimit 
-} from './middleware';
+} from '../../routes/middleware';
 import { signupSchema, loginSchema, type AuthResponse } from '@shared/schema';
 
 const router = Router();

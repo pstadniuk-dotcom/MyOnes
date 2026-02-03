@@ -41,7 +41,8 @@ import {
   ingredientsRoutes,
   wearablesRoutes,
   webhooksRoutes,
-  optimizeRoutes
+  optimizeRoutes,
+  membershipRoutes
 } from "./routes/index";
 
 type GroceryListItem = {
@@ -129,7 +130,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const aiRuntimeSettings: { provider?: 'openai' | 'anthropic'; model?: string; updatedAt?: string; source?: 'override' | 'env' } = {};
 
-const ALLOWED_MODELS: Record<'openai'|'anthropic', string[]> = {
+const ALLOWED_MODELS: Record<'openai' | 'anthropic', string[]> = {
   openai: [
     // GPT-5.2 series (latest)
     'gpt-5.2', 'gpt-5.2-pro',
@@ -158,7 +159,7 @@ const ALLOWED_MODELS: Record<'openai'|'anthropic', string[]> = {
 
 
 
-function normalizeModel(provider: 'openai'|'anthropic', model: string | undefined | null): string | null {
+function normalizeModel(provider: 'openai' | 'anthropic', model: string | undefined | null): string | null {
   if (!model) return null;
   let m = String(model).trim();
   // Normalize separators
@@ -219,7 +220,7 @@ function buildCreateFormulaTool() {
               unit: { type: 'string', enum: ['mg'] },
               purpose: { type: 'string' }
             },
-            required: ['ingredient','amount','unit']
+            required: ['ingredient', 'amount', 'unit']
           }
         },
         additions: {
@@ -232,7 +233,7 @@ function buildCreateFormulaTool() {
               unit: { type: 'string', enum: ['mg'] },
               purpose: { type: 'string' }
             },
-            required: ['ingredient','amount','unit']
+            required: ['ingredient', 'amount', 'unit']
           }
         },
         totalMg: { type: 'number', minimum: 10 },
@@ -314,7 +315,7 @@ async function* streamAnthropic(
 
         try {
           const event = JSON.parse(data);
-          
+
           // Handle different event types
           if (event.type === 'content_block_delta') {
             if (event.delta?.type === 'text_delta' && event.delta?.text) {
@@ -327,7 +328,7 @@ async function* streamAnthropic(
             try {
               const toolInput = JSON.parse(currentToolInput);
               yield { type: 'tool_use', content: '```json\n' + JSON.stringify(toolInput, null, 2) + '\n```', toolInput };
-            } catch {}
+            } catch { }
             currentToolInput = '';
           }
         } catch (parseErr) {
@@ -381,7 +382,7 @@ async function callAnthropic(
       if (!res.ok) {
         const text = await res.text().catch(() => '');
         let parsed: any = text;
-        try { parsed = JSON.parse(text || 'null'); } catch {}
+        try { parsed = JSON.parse(text || 'null'); } catch { }
         console.error(`❌ Anthropic API Error (attempt ${attempt}): HTTP ${res.status}`, parsed);
 
         if (res.status >= 500 || res.status === 429) {
@@ -405,7 +406,7 @@ async function callAnthropic(
           } else if (c?.type === 'tool_use' && c.name === 'create_formula') {
             try {
               toolJsonBlock = '```json\n' + JSON.stringify(c.input ?? c.parameters ?? {}, null, 2) + '\n```';
-            } catch {}
+            } catch { }
           }
         }
       }
@@ -477,7 +478,7 @@ function extractCapsuleCountFromMessage(message: string): number | null {
     /(\d+) caps per day/i,
     /go with (\d+)/i,
   ];
-  
+
   for (const pattern of patterns) {
     const match = message.match(pattern);
     if (match) {
@@ -488,14 +489,14 @@ function extractCapsuleCountFromMessage(message: string): number | null {
       }
     }
   }
-  
+
   return null;
 }
 
 // Calculate max dosage based on capsule count
 function getMaxDosageForCapsules(targetCapsules: number): number {
-  const validCount = FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(targetCapsules as any) 
-    ? targetCapsules 
+  const validCount = FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(targetCapsules as any)
+    ? targetCapsules
     : FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
   return validCount * FORMULA_LIMITS.CAPSULE_CAPACITY_MG;
 }
@@ -508,24 +509,24 @@ function autoExpandFormula(formula: any): { expanded: boolean; addedIngredients:
   const allIngredients = [...(formula.bases || []), ...(formula.additions || [])];
   const currentCount = allIngredients.length;
   const neededCount = FORMULA_LIMITS.MIN_INGREDIENT_COUNT - currentCount;
-  
+
   if (neededCount <= 0) {
     return { expanded: false, addedIngredients: [] };
   }
-  
+
   // Calculate remaining budget
   const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
   const maxDosage = getMaxDosageForCapsules(targetCapsules);
   const maxWithTolerance = Math.floor(maxDosage * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
-  
+
   // Calculate current total from ingredients (more accurate than formula.totalMg)
   let currentTotal = 0;
   for (const ing of allIngredients) {
     currentTotal += ing.amount || 0;
   }
-  
+
   let remainingBudget = maxWithTolerance - currentTotal;
-  
+
   // Complementary filler ingredients - USE MINIMUM VALID DOSES for tight budgets
   // IMPORTANT: Names must EXACTLY match the catalog in shared/ingredients.ts
   // Each entry has: name, minDose, normalDose, purpose (explanation for user)
@@ -541,19 +542,19 @@ function autoExpandFormula(formula: any): { expanded: boolean; addedIngredients:
     { name: 'Cinnamon 20:1', minDose: 25, normalDose: 100, unit: 'mg', purpose: 'Supports healthy blood sugar metabolism and insulin sensitivity.' },
     { name: 'Magnesium', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Essential mineral for muscle relaxation, energy production, and nervous system function.' },
   ];
-  
+
   // Get names of ingredients already in formula
   const existingNames = new Set(allIngredients.map(i => i.ingredient.toLowerCase()));
-  
+
   // Phase 1: Try to add with normal doses first
   const addedIngredients: string[] = [];
   let runningBudget = remainingBudget;
-  
+
   for (const filler of fillerIngredients) {
     if (addedIngredients.length >= neededCount) break;
     if (runningBudget < filler.normalDose) continue;
     if (existingNames.has(filler.name.toLowerCase())) continue;
-    
+
     // Add to formula's additions array with purpose
     if (!formula.additions) formula.additions = [];
     formula.additions.push({
@@ -562,21 +563,21 @@ function autoExpandFormula(formula: any): { expanded: boolean; addedIngredients:
       unit: filler.unit,
       purpose: filler.purpose
     });
-    
+
     addedIngredients.push(`${filler.name} ${filler.normalDose}mg`);
     runningBudget -= filler.normalDose;
     existingNames.add(filler.name.toLowerCase());
   }
-  
+
   // Phase 2: If still need more, try with MINIMUM doses (more ingredients, smaller amounts)
   if (addedIngredients.length < neededCount) {
     console.log(`🔧 AUTO-EXPAND: Budget tight, trying minimum doses. Budget left: ${runningBudget}mg, still need ${neededCount - addedIngredients.length} ingredients`);
-    
+
     for (const filler of fillerIngredients) {
       if (addedIngredients.length >= neededCount) break;
       if (runningBudget < filler.minDose) continue;
       if (existingNames.has(filler.name.toLowerCase())) continue;
-      
+
       // Add at minimum dose with purpose
       if (!formula.additions) formula.additions = [];
       formula.additions.push({
@@ -585,46 +586,46 @@ function autoExpandFormula(formula: any): { expanded: boolean; addedIngredients:
         unit: filler.unit,
         purpose: filler.purpose
       });
-      
+
       addedIngredients.push(`${filler.name} ${filler.minDose}mg`);
       runningBudget -= filler.minDose;
       existingNames.add(filler.name.toLowerCase());
     }
   }
-  
+
   // Phase 3: If STILL need more, reduce existing addition doses to make room
   if (addedIngredients.length < neededCount && formula.additions && formula.additions.length > 0) {
     console.log(`🔧 AUTO-EXPAND: Still need ${neededCount - addedIngredients.length} more ingredients. Reducing existing doses to make room...`);
-    
+
     // Find additions that can be reduced (have room above their minimum)
     const reducibleAdditions = formula.additions.filter((a: any) => {
       const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === a.ingredient);
       return catalogItem?.doseRangeMin && a.amount > catalogItem.doseRangeMin;
     });
-    
+
     // Reduce each reducible addition by up to 20% to free up budget
     for (const addition of reducibleAdditions) {
       const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === addition.ingredient);
       if (!catalogItem?.doseRangeMin) continue;
-      
+
       const reduction = Math.min(
         Math.floor(addition.amount * 0.2), // Max 20% reduction
         addition.amount - catalogItem.doseRangeMin // Don't go below min
       );
-      
+
       if (reduction >= 50) { // Only reduce if meaningful (50mg+)
         addition.amount -= reduction;
         runningBudget += reduction;
         console.log(`  Reduced ${addition.ingredient}: -${reduction}mg (freed budget for more ingredients)`);
       }
     }
-    
+
     // Try again with minimum doses after freeing budget
     for (const filler of fillerIngredients) {
       if (addedIngredients.length >= neededCount) break;
       if (runningBudget < filler.minDose) continue;
       if (existingNames.has(filler.name.toLowerCase())) continue;
-      
+
       if (!formula.additions) formula.additions = [];
       formula.additions.push({
         ingredient: filler.name,
@@ -632,46 +633,46 @@ function autoExpandFormula(formula: any): { expanded: boolean; addedIngredients:
         unit: filler.unit,
         purpose: filler.purpose
       });
-      
+
       addedIngredients.push(`${filler.name} ${filler.minDose}mg`);
       runningBudget -= filler.minDose;
       existingNames.add(filler.name.toLowerCase());
     }
   }
-  
+
   // Update totalMg
   const addedMg = addedIngredients.reduce((sum, ing) => {
     const match = ing.match(/(\d+)mg/);
     return sum + (match ? parseInt(match[1]) : 0);
   }, 0);
-  
+
   // Recalculate total from all ingredients (in case we reduced some)
   let finalTotal = [...(formula.bases || []), ...(formula.additions || [])]
     .reduce((sum, ing) => sum + (ing.amount || 0), 0);
-  
+
   // Phase 4: FILL UP - Always fill to 100-105% of budget for maximum value
   const targetBudget = maxWithTolerance; // Max allowed (105% tolerance)
   const minTarget = maxDosage; // Must hit at least 100% of base budget
-  
+
   if (finalTotal < minTarget) {
     console.log(`🔧 AUTO-FILL: Formula at ${finalTotal}mg is under 100% target (${minTarget}mg). Filling to 100-105%...`);
-    
+
     const headroom = targetBudget - finalTotal;
-    
+
     // Increase existing addition doses up to their max, prioritizing larger ingredients
     const sortedAdditions = [...(formula.additions || [])].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0));
-    
+
     let usedHeadroom = 0;
     for (const addition of sortedAdditions) {
       if (usedHeadroom >= headroom) break;
-      
+
       const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === addition.ingredient);
       if (!catalogItem?.doseRangeMax) continue;
-      
+
       const currentAmount = addition.amount || 0;
       const maxAllowed = catalogItem.doseRangeMax;
       const canIncrease = maxAllowed - currentAmount;
-      
+
       if (canIncrease > 0) {
         const increase = Math.min(canIncrease, headroom - usedHeadroom);
         addition.amount = currentAmount + increase;
@@ -679,20 +680,20 @@ function autoExpandFormula(formula: any): { expanded: boolean; addedIngredients:
         console.log(`   Increased ${addition.ingredient}: +${increase}mg (now ${addition.amount}mg)`);
       }
     }
-    
+
     // Recalculate final total
     finalTotal = [...(formula.bases || []), ...(formula.additions || [])]
       .reduce((sum, ing) => sum + (ing.amount || 0), 0);
-    
+
     // If still under 100%, add more filler ingredients
     if (finalTotal < minTarget) {
       console.log(`🔧 AUTO-FILL: Still at ${finalTotal}mg, adding more ingredients to reach 100%...`);
       const stillNeeded = minTarget - finalTotal;
-      
+
       for (const filler of fillerIngredients) {
         if (finalTotal >= minTarget) break;
         if (existingNames.has(filler.name.toLowerCase())) continue;
-        
+
         // Add at a dose that helps fill the gap (up to normalDose)
         const doseToAdd = Math.min(filler.normalDose, stillNeeded, targetBudget - finalTotal);
         if (doseToAdd >= filler.minDose) {
@@ -710,48 +711,48 @@ function autoExpandFormula(formula: any): { expanded: boolean; addedIngredients:
         }
       }
     }
-    
+
     console.log(`🔧 AUTO-FILL complete: Final total ${finalTotal}mg (${((finalTotal / maxDosage) * 100).toFixed(1)}% of budget)`);
   }
-  
+
   formula.totalMg = finalTotal;
-  
+
   if (addedIngredients.length > 0) {
     console.log(`🔧 AUTO-EXPAND: Added ${addedIngredients.length} complementary ingredients: ${addedIngredients.join(', ')}`);
     console.log(`🔧 AUTO-EXPAND: Final total: ${formula.totalMg}mg`);
   }
-  
+
   return { expanded: addedIngredients.length > 0, addedIngredients };
 }
 
 // Validation function to enforce immutable limits
 function validateFormulaLimits(formula: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  
+
   // Determine capsule-based max dosage with 5% tolerance
   const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
   const maxDosage = getMaxDosageForCapsules(targetCapsules);
   const maxWithTolerance = Math.floor(maxDosage * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
-  
+
   // Validate targetCapsules is a valid option
   if (formula.targetCapsules && !FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(formula.targetCapsules)) {
     errors.push(`Invalid capsule count: ${formula.targetCapsules}. Must be one of: ${FORMULA_LIMITS.VALID_CAPSULE_COUNTS.join(', ')}`);
   }
-  
+
   // Check total dosage limit based on capsule count (with 5% tolerance)
   if (formula.totalMg > maxWithTolerance) {
     errors.push(`Formula exceeds ${targetCapsules}-capsule budget of ${maxDosage}mg (max ${maxWithTolerance}mg with 5% tolerance). Attempted: ${formula.totalMg}mg. Reduce ingredients or increase capsule count.`);
   }
-  
+
   // Validate all ingredients (bases + additions)
   const allIngredients = [...(formula.bases || []), ...(formula.additions || [])];
-  
+
   for (const ingredient of allIngredients) {
     // Check minimum ingredient dose (global minimum)
     if (ingredient.amount < FORMULA_LIMITS.MIN_INGREDIENT_DOSE) {
       errors.push(`Ingredient "${ingredient.ingredient}" below minimum dose of ${FORMULA_LIMITS.MIN_INGREDIENT_DOSE}mg (attempted: ${ingredient.amount}mg)`);
     }
-    
+
     // 🆕 Validate dose ranges for individual ingredients
     const individualIngredient = INDIVIDUAL_INGREDIENTS.find(i => i.name === ingredient.ingredient);
     if (individualIngredient) {
@@ -770,28 +771,28 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
       }
     }
   }
-  
+
   // Check total ingredient count - maximum
   if (allIngredients.length > FORMULA_LIMITS.MAX_INGREDIENT_COUNT) {
     errors.push(`Formula exceeds maximum ingredient count of ${FORMULA_LIMITS.MAX_INGREDIENT_COUNT} (attempted: ${allIngredients.length})`);
   }
-  
+
   // Note: Minimum ingredient count (8) is enforced through auto-expand, not as a hard rejection
   // If auto-expand couldn't add enough ingredients (budget constraints), we still save the formula
   // The user gets a comprehensive formula within their budget - that's the priority
-  
+
   // Verify all ingredients are approved
   const approvedNames = new Set([
     ...SYSTEM_SUPPORTS.map(f => f.name),
     ...INDIVIDUAL_INGREDIENTS.map(i => i.name)
   ]);
-  
+
   for (const ingredient of allIngredients) {
     if (!approvedNames.has(ingredient.ingredient)) {
       errors.push(`Unapproved ingredient: "${ingredient.ingredient}"`);
     }
   }
-  
+
   // 🚨 CRITICAL: Validate system supports use valid dose multiples (1x, 2x, or 3x)
   // system supports can now be dosed at 1x, 2x, or 3x their base amount
   if (formula.bases && formula.bases.length > 0) {
@@ -800,7 +801,7 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
       if (catalogBase) {
         const baseDose = catalogBase.doseMg;
         const validDoses = [baseDose, baseDose * 2, baseDose * 3];
-        
+
         // Check if the amount is a valid multiple (1x, 2x, or 3x)
         if (!validDoses.includes(base.amount)) {
           errors.push(
@@ -812,7 +813,7 @@ function validateFormulaLimits(formula: any): { valid: boolean; errors: string[]
       }
     }
   }
-  
+
   return {
     valid: errors.length === 0,
     errors
@@ -887,7 +888,7 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }
-    
+
     if (!user.isAdmin) {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -905,13 +906,13 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 function isIngredientApproved(ingredientName: string, approvedSet: Set<string>): boolean {
   // Use shared normalizeIngredientName which strips potency qualifiers, extraction ratios, etc.
   const normalized = normalizeIngredientName(ingredientName);
-  
+
   // Check if normalized name exists in approved set
   // The approved set is already normalized, so we can do direct lookups
   if (approvedSet.has(normalized)) {
     return true;
   }
-  
+
   // Defensive fallback: check if any approved ingredient matches (preserves backward compat)
   const normalizedLower = normalized.toLowerCase();
   let foundMatch = false;
@@ -923,7 +924,7 @@ function isIngredientApproved(ingredientName: string, approvedSet: Set<string>):
   if (foundMatch) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -977,26 +978,26 @@ function parseDoseToMg(doseString: string, ingredientName: string): number {
     console.warn('parseDoseToMg received invalid parameters:', { doseString, ingredientName });
     return 0;
   }
-  
+
   // Handle canonical mapping first
-  const canonicalName = Object.keys(CANONICAL_DOSES_MG).find(key => 
+  const canonicalName = Object.keys(CANONICAL_DOSES_MG).find(key =>
     key.toLowerCase() === ingredientName.toLowerCase() ||
     ingredientName.toLowerCase().includes(key.toLowerCase())
   );
-  
+
   if (canonicalName) {
     return CANONICAL_DOSES_MG[canonicalName as keyof typeof CANONICAL_DOSES_MG];
   }
-  
+
   // Parse various dose formats
   const dose = doseString.toLowerCase().replace(/[^0-9.,]/g, '');
   const numericDose = parseFloat(dose);
-  
+
   if (isNaN(numericDose)) {
     console.warn(`Could not parse dose: ${doseString} for ingredient: ${ingredientName}`);
     return 0;
   }
-  
+
   // Convert units to mg
   if (doseString.toLowerCase().includes('g') && !doseString.toLowerCase().includes('mg')) {
     return numericDose * 1000; // grams to mg
@@ -1011,7 +1012,7 @@ function parseDoseToMg(doseString: string, ingredientName: string): number {
     }
     return numericDose / 100; // default IU conversion
   }
-  
+
   // Default assumption is mg
   return numericDose;
 }
@@ -1021,7 +1022,7 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
   const errors: string[] = [];
   let calculatedTotal = 0;
   let ingredientCount = 0;
-  
+
   // Validate bases with CATEGORY-AGNOSTIC flexible matching
   if (!formula.bases || formula.bases.length === 0) {
     errors.push('Formula must include at least one system support');
@@ -1033,7 +1034,7 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
         errors.push(`UNAUTHORIZED INGREDIENT: "${base.ingredient}" is not in the approved catalog. Formula REJECTED.`);
         continue;
       }
-      
+
       // 🔧 FIX: Use amount directly (it's already a number in mg)
       // Don't call parseDoseToMg which looks up catalog dosages
       const mgAmount = typeof base.amount === 'number' ? base.amount : 0;
@@ -1062,7 +1063,7 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
       }
     }
   }
-  
+
   // Validate additions with CATEGORY-AGNOSTIC flexible matching
   if (formula.additions) {
     for (const addition of formula.additions) {
@@ -1072,7 +1073,7 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
         errors.push(`UNAUTHORIZED INGREDIENT: "${addition.ingredient}" is not in the approved catalog. Formula REJECTED.`);
         continue;
       }
-      
+
       // 🔧 FIX: Use amount directly (it's already a number in mg)
       // Don't call parseDoseToMg which looks up catalog dosages  
       const mgAmount = typeof addition.amount === 'number' ? addition.amount : 0;
@@ -1109,12 +1110,12 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
   if (ingredientCount > FORMULA_LIMITS.MAX_INGREDIENT_COUNT) {
     errors.push(`Formula exceeds maximum ingredient count of ${FORMULA_LIMITS.MAX_INGREDIENT_COUNT} (attempted: ${ingredientCount})`);
   }
-  
+
   // Check minimum ingredient count
   if (ingredientCount < FORMULA_LIMITS.MIN_INGREDIENT_COUNT) {
     errors.push(`Formula needs additional ingredients for comprehensive support (internal validation)`);
   }
-  
+
   // Validate daily total based on target capsule count (with 5% tolerance)
   const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
   const maxDosageForCapsules = getMaxDosageForCapsules(targetCapsules);
@@ -1122,11 +1123,11 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
   if (calculatedTotal > maxWithTolerance) {
     errors.push(`Formula total too high: ${calculatedTotal}mg. Maximum ${maxDosageForCapsules}mg (up to ${maxWithTolerance}mg with 5% tolerance) for ${targetCapsules}-capsule protocol.`);
   }
-  
+
   // Validate capsule sizing if provided (00 capsules hold approximately 700-850mg)
   if (formula.capsulesPerDay && formula.capsuleSize) {
     const mgPerCapsule = calculatedTotal / formula.capsulesPerDay;
-    
+
     // Size 00 capacity: 700-850mg (industry standard for 00 capsules)
     if (formula.capsuleSize === '00') {
       if (mgPerCapsule < 600) {
@@ -1136,34 +1137,34 @@ function validateAndCalculateFormula(formula: any): { isValid: boolean, calculat
         errors.push(`Capsule size 00 overfilled: ${mgPerCapsule.toFixed(0)}mg per capsule. Recommend using more capsules per day.`);
       }
     }
-    
+
     // Validate capsule count is valid option
     if (!FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(formula.capsulesPerDay as any)) {
       errors.push(`Invalid capsule count: ${formula.capsulesPerDay}. Must be one of: ${FORMULA_LIMITS.VALID_CAPSULE_COUNTS.join(', ')}`);
     }
   }
-  
+
   const isValid = errors.length === 0;
-  
+
   return { isValid, calculatedTotalMg: calculatedTotal, errors };
 }
 
 // Enhanced medical validation with comprehensive interaction database
 async function validateSupplementInteractions(formula: any, medications: string[] = []): Promise<string[]> {
   const warnings: string[] = [];
-  
+
   // Get all ingredients from formula
   const allIngredients = [
     ...formula.bases.map((b: any) => b.ingredient),
     ...formula.additions.map((a: any) => a.ingredient)
   ];
-  
+
   // Check for general supplement warnings regardless of medications
   for (const ingredient of allIngredients) {
     const generalWarnings = getGeneralSupplementWarnings(ingredient);
     warnings.push(...generalWarnings);
   }
-  
+
   // Check medication interactions if user has medications
   if (medications.length > 0) {
     for (const ingredient of allIngredients) {
@@ -1175,16 +1176,16 @@ async function validateSupplementInteractions(formula: any, medications: string[
       }
     }
   }
-  
+
   // Check for supplement-to-supplement interactions
   const supplementInteractions = checkSupplementToSupplementInteractions(allIngredients);
   warnings.push(...supplementInteractions);
-  
+
   // Add mandatory safety disclaimer
   if (warnings.length > 0) {
     warnings.push('IMPORTANT: These are potential interactions. Always consult your healthcare provider before starting new supplements.');
   }
-  
+
   return Array.from(new Set(warnings)); // Remove duplicates
 }
 
@@ -1192,7 +1193,7 @@ async function validateSupplementInteractions(formula: any, medications: string[
 function getGeneralSupplementWarnings(ingredient: string): string[] {
   const warnings: string[] = [];
   const ingredientLower = ingredient.toLowerCase();
-  
+
   // High-risk supplements that require medical supervision
   const highRiskSupplements = {
     'iron': 'Iron supplements can be toxic in excess. Monitor iron levels and avoid if you have hemochromatosis.',
@@ -1211,13 +1212,13 @@ function getGeneralSupplementWarnings(ingredient: string): string[] {
     'ephedra': 'Ephedra (Ma Huang) can cause heart problems and is banned in many supplements.',
     'comfrey': 'Comfrey can cause liver damage and is not safe for internal use.'
   };
-  
+
   for (const [supplement, warning] of Object.entries(highRiskSupplements)) {
     if (ingredientLower.includes(supplement)) {
       warnings.push(warning);
     }
   }
-  
+
   return warnings;
 }
 
@@ -1225,7 +1226,7 @@ function getGeneralSupplementWarnings(ingredient: string): string[] {
 function checkSupplementToSupplementInteractions(ingredients: string[]): string[] {
   const warnings: string[] = [];
   const ingredientLower = ingredients.map(i => i.toLowerCase());
-  
+
   // Common supplement interactions
   const interactions = [
     {
@@ -1249,17 +1250,17 @@ function checkSupplementToSupplementInteractions(ingredients: string[]): string[
       warning: 'Both 5-HTP and SAMe affect serotonin/neurotransmitters. Avoid combining without medical supervision.'
     }
   ];
-  
+
   for (const interaction of interactions) {
-    const foundSupplements = interaction.supplements.filter(supplement => 
+    const foundSupplements = interaction.supplements.filter(supplement =>
       ingredientLower.some(ingredient => ingredient.includes(supplement))
     );
-    
+
     if (foundSupplements.length >= 2) {
       warnings.push(interaction.warning);
     }
   }
-  
+
   return warnings;
 }
 
@@ -1283,7 +1284,7 @@ async function checkKnownInteractions(supplement: string, medication: string): P
       'aspirin': 'Ginkgo + aspirin increases bleeding risk.',
       'ibuprofen': 'Ginkgo + NSAIDs increases bleeding risk.'
     },
-    
+
     // Mood and psychiatric medications
     'St. John\'s Wort': {
       'ssri': 'St. John\'s Wort may cause serotonin syndrome with SSRIs.',
@@ -1303,7 +1304,7 @@ async function checkKnownInteractions(supplement: string, medication: string): P
       'antidepressants': 'SAMe can interact with antidepressants.',
       'maoi': 'SAMe with MAOIs can cause dangerous interactions.'
     },
-    
+
     // Cardiovascular medications
     'Ginseng': {
       'blood pressure': 'Ginseng may interact with blood pressure medications.',
@@ -1318,7 +1319,7 @@ async function checkKnownInteractions(supplement: string, medication: string): P
       'beta blocker': 'Hawthorn may enhance beta blocker effects.',
       'calcium channel blocker': 'Hawthorn may enhance calcium channel blocker effects.'
     },
-    
+
     // Diabetes medications
     'Chromium': {
       'insulin': 'Chromium may enhance insulin effects - monitor blood sugar.',
@@ -1329,7 +1330,7 @@ async function checkKnownInteractions(supplement: string, medication: string): P
       'diabetes': 'Cinnamon may enhance diabetes medication effects - monitor blood sugar.',
       'insulin': 'Cinnamon may enhance insulin effects.'
     },
-    
+
     // Thyroid medications  
     'Iron': {
       'thyroid': 'Iron can interfere with thyroid medication absorption. Take 4+ hours apart.',
@@ -1341,27 +1342,27 @@ async function checkKnownInteractions(supplement: string, medication: string): P
       'levothyroxine': 'Calcium reduces levothyroxine absorption. Take 4+ hours apart.',
       'antibiotics': 'Calcium can reduce antibiotic absorption.'
     },
-    
+
     // Seizure medications
     'Folate': {
       'phenytoin': 'Folate may reduce phenytoin levels.',
       'carbamazepine': 'Folate may interact with carbamazepine.',
       'valproic acid': 'Folate may interact with valproic acid.'
     },
-    
+
     // Immunosuppressants
     'Echinacea': {
       'immunosuppressant': 'Echinacea may counteract immunosuppressive medications.',
       'cyclosporine': 'Echinacea may reduce cyclosporine effectiveness.',
       'tacrolimus': 'Echinacea may interact with tacrolimus.'
     },
-    
+
     // Antibiotics
     'Zinc': {
       'antibiotic': 'Zinc can reduce antibiotic absorption. Take 2+ hours apart.',
       'quinolone': 'Zinc significantly reduces quinolone antibiotic absorption.'
     },
-    
+
     // Sleep medications
     'Melatonin': {
       'sedative': 'Melatonin may enhance sedative effects.',
@@ -1373,22 +1374,22 @@ async function checkKnownInteractions(supplement: string, medication: string): P
       'sleeping pill': 'Valerian may enhance sleeping medication effects.'
     }
   };
-  
+
   // Check if supplement is in our database
   const supplementLower = supplement.toLowerCase();
   const medicationLower = medication.toLowerCase();
-  
+
   for (const [suppKey, medInteractions] of Object.entries(interactions)) {
     if (supplementLower.includes(suppKey.toLowerCase())) {
       for (const [medKey, warning] of Object.entries(medInteractions)) {
         if (medicationLower.includes(medKey.toLowerCase()) ||
-            medKey.toLowerCase().includes(medicationLower)) {
+          medKey.toLowerCase().includes(medicationLower)) {
           return `INTERACTION: ${warning}`;
         }
       }
     }
   }
-  
+
   return null;
 }
 
@@ -1427,23 +1428,23 @@ function validateAndCorrectIngredientNames(formula: any): {
   const errors: string[] = [];
   const warnings: string[] = [];
   const correctedFormula = JSON.parse(JSON.stringify(formula)); // deep clone
-  
+
   console.log('🔍 POST-GENERATION VALIDATOR: Checking ingredient names...');
-  
+
   // Validate and correct system supports
   for (let i = 0; i < correctedFormula.bases.length; i++) {
     const base = correctedFormula.bases[i];
     const originalName = base.ingredient;
     const normalizedName = normalizeIngredientName(originalName);
     const catalogBase = SYSTEM_SUPPORTS.find(f => f.name.toLowerCase() === normalizedName.toLowerCase());
-    
+
     if (!catalogBase) {
       // Instead of erroring, remove the invalid ingredient and add a warning
       const warningMsg = `Removed unapproved system support: "${originalName}"`;
       warnings.push(warningMsg);
       if (!correctedFormula.warnings) correctedFormula.warnings = [];
       correctedFormula.warnings.push(warningMsg);
-      
+
       console.log(`⚠️ REMOVED invalid system support: "${originalName}"`);
       correctedFormula.bases.splice(i, 1);
       i--; // Adjust index since we removed an element
@@ -1455,21 +1456,21 @@ function validateAndCorrectIngredientNames(formula: any): {
       console.log(`✅ VALID base: "${originalName}"`);
     }
   }
-  
+
   // Validate and correct individual ingredients
   for (let i = 0; i < correctedFormula.additions.length; i++) {
     const addition = correctedFormula.additions[i];
     const originalName = addition.ingredient;
     const normalizedName = normalizeIngredientName(originalName);
     const catalogIngredient = INDIVIDUAL_INGREDIENTS.find(ing => ing.name.toLowerCase() === normalizedName.toLowerCase());
-    
+
     if (!catalogIngredient) {
       // Instead of erroring, remove the invalid ingredient and add a warning
       const warningMsg = `Removed unapproved ingredient: "${originalName}"`;
       warnings.push(warningMsg);
       if (!correctedFormula.warnings) correctedFormula.warnings = [];
       correctedFormula.warnings.push(warningMsg);
-      
+
       console.log(`⚠️ REMOVED invalid individual ingredient: "${originalName}"`);
       correctedFormula.additions.splice(i, 1);
       i--; // Adjust index since we removed an element
@@ -1481,7 +1482,7 @@ function validateAndCorrectIngredientNames(formula: any): {
       console.log(`✅ VALID ingredient: "${originalName}"`);
     }
   }
-  
+
   return {
     success: errors.length === 0,
     correctedFormula,
@@ -2733,27 +2734,27 @@ const rateLimitStore = new Map<string, { count: number, resetTime: number }>();
 
 // Security middleware functions
 function getClientIP(req: any): string {
-  return req.headers['x-forwarded-for']?.split(',')[0] || 
-         req.connection?.remoteAddress || 
-         req.socket?.remoteAddress ||
-         'unknown';
+  return req.headers['x-forwarded-for']?.split(',')[0] ||
+    req.connection?.remoteAddress ||
+    req.socket?.remoteAddress ||
+    'unknown';
 }
 
 function checkRateLimit(clientId: string, limit: number, windowMs: number): { allowed: boolean, remaining: number, resetTime: number } {
   const now = Date.now();
   const entry = rateLimitStore.get(clientId);
-  
+
   if (!entry || now > entry.resetTime) {
     // Reset or create new entry
     const resetTime = now + windowMs;
     rateLimitStore.set(clientId, { count: 1, resetTime });
     return { allowed: true, remaining: limit - 1, resetTime };
   }
-  
+
   if (entry.count >= limit) {
     return { allowed: false, remaining: 0, resetTime: entry.resetTime };
   }
-  
+
   entry.count++;
   return { allowed: true, remaining: limit - entry.count, resetTime: entry.resetTime };
 }
@@ -2787,12 +2788,12 @@ export async function registerRoutes(
   });
 
   // JSON parsing with size limit (using express built-in)
-  app.use('/api', express.json({ 
+  app.use('/api', express.json({
     limit: '10kb',
     strict: true,
     type: 'application/json'
   }));
-  
+
   // Security headers middleware
   app.use('/api', (req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -2830,47 +2831,47 @@ export async function registerRoutes(
   // These routes have been extracted to server/routes/*.routes.ts
   // for better organization and maintainability.
   // ============================================================
-  
+
   // Auth routes: /api/auth/* - signup, login, logout, me
   if (rateLimiters?.authLimiter) {
     app.use('/api/auth/signup', rateLimiters.authLimiter);
     app.use('/api/auth/login', rateLimiters.authLimiter);
   }
   app.use('/api/auth', authRoutes);
-  
+
   // User routes: /api/users/* - profile, health-profile, orders
   app.use('/api/users', userRoutes);
-  
+
   // Notification routes: /api/notifications/*
   app.use('/api/notifications', notificationRoutes);
-  
+
   // Admin routes: /api/admin/* - stats, users, support-tickets
   app.use('/api/admin', adminRoutes);
-  
+
   // Support routes: /api/support/* - FAQ, tickets, help
   app.use('/api/support', supportRoutes);
-  
+
   // Consents routes: /api/consents/*
   app.use('/api/consents', consentsRoutes);
-  
+
   // Files routes: /api/files/* - HIPAA-compliant file uploads
   app.use('/api/files', filesRoutes);
-  
+
   // Formulas routes: /api/formulas/*, /api/users/me/formula/*
   app.use('/api/formulas', formulasRoutes);
-  
+
   // Ingredients routes: /api/ingredients/*
   app.use('/api/ingredients', ingredientsRoutes);
-  
+
   // Wearables routes: /api/wearables/* - Junction (Vital) integration
   app.use('/api/wearables', wearablesRoutes);
-  
+
   // Webhooks routes: /api/webhooks/* - Junction webhooks
   app.use('/api/webhooks', webhooksRoutes);
-  
+
   // Optimize routes: /api/optimize/* - plans, logs, grocery lists
   app.use('/api/optimize', optimizeRoutes);
-  
+
   // ============================================================
   // LEGACY INLINE ROUTES (to be migrated)
   // The following routes are still defined inline and will be
@@ -2910,7 +2911,7 @@ export async function registerRoutes(
     const saved = await storage.getAppSetting('ai_settings');
     const val = saved?.value as any;
     if (val && (val.provider || val.model)) {
-      const provider = String(val.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai'|'anthropic';
+      const provider = String(val.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'anthropic';
       let model = String(val.model || (provider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o'));
       const normalized = normalizeModel(provider, model) || model;
       const allowed = ALLOWED_MODELS[provider] || [];
@@ -2936,7 +2937,7 @@ export async function registerRoutes(
     app.use('/api/auth/signup', rateLimiters.authLimiter);
     app.use('/api/auth/login', rateLimiters.authLimiter);
   }
-  
+
   app.post('/api/auth/signup', async (req, res) => {
     const startTime = Date.now();
     console.log('🔧 SIGNUP REQUEST START:', {
@@ -2952,8 +2953,8 @@ export async function registerRoutes(
       const rateLimit = checkRateLimit(`signup-${clientIP}`, 3, 15 * 60 * 1000);
       if (!rateLimit.allowed) {
         console.log('⚠️ SIGNUP: Rate limit exceeded for IP:', clientIP);
-        return res.status(429).json({ 
-          error: 'Too many signup attempts. Please try again later.', 
+        return res.status(429).json({
+          error: 'Too many signup attempts. Please try again later.',
           retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
         });
       }
@@ -2963,7 +2964,7 @@ export async function registerRoutes(
       console.log('📋 SIGNUP: Validating request body...');
       const validatedData = signupSchema.parse(req.body);
       console.log('✅ SIGNUP: Request validation passed for:', validatedData.email);
-      
+
       // Check if user already exists
       console.log('📋 SIGNUP: Checking if user exists...');
       const existingUser = await storage.getUserByEmail(validatedData.email);
@@ -2990,7 +2991,7 @@ export async function registerRoutes(
 
       const user = await storage.createUser(userData);
       console.log('✅ SIGNUP: User created successfully:', { id: user.id, email: user.email });
-      
+
       // 📬 Create welcome notification
       try {
         await storage.createNotification({
@@ -2998,17 +2999,17 @@ export async function registerRoutes(
           type: 'system',
           title: 'Welcome to ONES! 🎉',
           content: 'Start your personalized supplement journey by chatting with our AI practitioner. Upload your lab results for the most accurate recommendations.',
-          metadata: { 
-            actionUrl: '/dashboard/chat', 
-            icon: 'info', 
-            priority: 'high' 
+          metadata: {
+            actionUrl: '/dashboard/chat',
+            icon: 'info',
+            priority: 'high'
           }
         });
         console.log('📬 Welcome notification created for user', user.id);
       } catch (notifError) {
         console.error('Failed to create welcome notification:', notifError);
       }
-      
+
       // Generate JWT token
       console.log('📋 SIGNUP: Generating JWT token...');
       const token = generateToken(user.id, user.isAdmin || false);
@@ -3045,15 +3046,15 @@ export async function registerRoutes(
         timestamp: new Date().toISOString(),
         type: error.name
       });
-      
+
       if (error.name === 'ZodError') {
         console.log('📋 SIGNUP: Zod validation error details:', error.errors);
-        return res.status(400).json({ 
-          error: 'Validation failed', 
-          details: error.errors 
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: error.errors
         });
       }
-      
+
       return res.status(500).json({ error: 'Failed to create account' });
     }
   });
@@ -3064,15 +3065,15 @@ export async function registerRoutes(
       const clientIP = getClientIP(req);
       const rateLimit = checkRateLimit(`login-${clientIP}`, 5, 15 * 60 * 1000);
       if (!rateLimit.allowed) {
-        return res.status(429).json({ 
-          error: 'Too many login attempts. Please try again later.', 
+        return res.status(429).json({
+          error: 'Too many login attempts. Please try again later.',
           retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
         });
       }
 
       // Validate request body
       const validatedData = loginSchema.parse(req.body);
-      
+
       // Find user by email
       const user = await storage.getUserByEmail(validatedData.email);
       if (!user) {
@@ -3104,14 +3105,14 @@ export async function registerRoutes(
       res.json(authResponse);
     } catch (error: any) {
       console.error('Login error:', error);
-      
+
       if (error.name === 'ZodError') {
-        return res.status(400).json({ 
-          error: 'Validation failed', 
-          details: error.errors 
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: error.errors
         });
       }
-      
+
       res.status(500).json({ error: 'Login failed' });
     }
   });
@@ -3126,7 +3127,7 @@ export async function registerRoutes(
   app.post('/api/auth/forgot-password', async (req, res) => {
     try {
       const { email } = req.body;
-      
+
       if (!email) {
         return res.status(400).json({ error: 'Email is required' });
       }
@@ -3135,7 +3136,7 @@ export async function registerRoutes(
       const clientIP = getClientIP(req);
       const rateLimit = checkRateLimit(`forgot-password-${clientIP}`, 3, 15 * 60 * 1000);
       if (!rateLimit.allowed) {
-        return res.status(429).json({ 
+        return res.status(429).json({
           error: 'Too many password reset requests. Please try again later.',
           retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
         });
@@ -3143,7 +3144,7 @@ export async function registerRoutes(
 
       // Find user by email
       const user = await storage.getUserByEmail(email);
-      
+
       // Always return success to prevent email enumeration
       if (!user) {
         console.log(`Password reset requested for non-existent email: ${email}`);
@@ -3159,7 +3160,7 @@ export async function registerRoutes(
 
       // Send reset email
       const resetUrl = `${process.env.FRONTEND_URL || 'https://my-ones.vercel.app'}/reset-password?token=${resetToken}`;
-      
+
       try {
         await sendNotificationEmail({
           to: user.email,
@@ -3191,7 +3192,7 @@ export async function registerRoutes(
   app.post('/api/auth/reset-password', async (req, res) => {
     try {
       const { token, password } = req.body;
-      
+
       if (!token || !password) {
         return res.status(400).json({ error: 'Token and password are required' });
       }
@@ -3202,7 +3203,7 @@ export async function registerRoutes(
 
       // Find and validate token
       const resetToken = await storage.getPasswordResetToken(token);
-      
+
       if (!resetToken) {
         return res.status(400).json({ error: 'Invalid or expired reset link' });
       }
@@ -3272,7 +3273,7 @@ export async function registerRoutes(
   app.post('/api/chat/stream', requireAuth, async (req, res) => {
     let streamStarted = false;
     const clientIP = getClientIP(req);
-    
+
     // Helper function to send SSE data
     const sendSSE = (data: any) => {
       if (!res.destroyed) {
@@ -3280,7 +3281,7 @@ export async function registerRoutes(
           console.log('📤 Sending thinking status:', data.message);
         }
         res.write(`data: ${JSON.stringify(data)}\n\n`);
-        
+
         // CRITICAL: Flush the response immediately to prevent buffering
         // This ensures thinking indicators appear in real-time
         if (typeof (res as any).flush === 'function') {
@@ -3288,42 +3289,42 @@ export async function registerRoutes(
         }
       }
     };
-    
+
     // Helper function to end stream safely
     const endStream = () => {
       if (!res.destroyed) {
         res.end();
       }
     };
-    
+
     try {
       // Rate limiting check (10 requests per 10 minutes per IP)
       const rateLimit = checkRateLimit(clientIP, 10, 10 * 60 * 1000);
       if (!rateLimit.allowed) {
-        return res.status(429).json({ 
-          error: 'Rate limit exceeded', 
+        return res.status(429).json({
+          error: 'Rate limit exceeded',
           retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
         });
       }
-      
+
       const { message, sessionId, files } = req.body;
       const userId = req.userId; // Use authenticated user ID from middleware
-      
+
       // Enhanced input validation
       if (!message || typeof message !== 'string' || message.trim().length === 0) {
         return res.status(400).json({ error: 'Valid message is required' });
       }
-      
+
       if (message.length > 20000) {
         return res.status(400).json({ error: 'Message too long (max 20,000 characters)' });
       }
-      
+
       // userId is guaranteed to be a valid string from authentication middleware
-      
+
       if (sessionId && typeof sessionId !== 'string') {
         return res.status(400).json({ error: 'Invalid session ID format' });
       }
-      
+
       // Basic content filtering for malicious content
       const suspiciousPatterns = [
         /<script[^>]*>.*?<\/script>/gi,
@@ -3331,7 +3332,7 @@ export async function registerRoutes(
         /data:text\/html/gi,
         /vbscript:/gi
       ];
-      
+
       for (const pattern of suspiciousPatterns) {
         if (pattern.test(message)) {
           console.warn(`Suspicious content detected from IP ${clientIP}: ${message.substring(0, 100)}`);
@@ -3346,9 +3347,9 @@ export async function registerRoutes(
       res.setHeader('Access-Control-Allow-Headers', 'Cache-Control, Content-Type');
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
       res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
-      
+
       streamStarted = true;
-      
+
       // Send initial connection confirmation
       sendSSE({ type: 'connected', message: 'Stream established' });
 
@@ -3357,16 +3358,16 @@ export async function registerRoutes(
       if (sessionId) {
         chatSession = await storage.getChatSession(sessionId);
       }
-      
+
       if (!chatSession) {
         const userId = req.userId!; // TypeScript assertion: userId is guaranteed after requireAuth
         chatSession = await storage.createChatSession({ userId, status: 'active' });
       }
 
       // Get previous messages for context (last 10 messages)
-      const previousMessages = chatSession ? 
+      const previousMessages = chatSession ?
         (await storage.listMessagesBySession(chatSession.id)).slice(-10) : [];
-      
+
       // (Removed - using single thinking message)
 
       // Get user's health profile to check for missing information
@@ -3380,66 +3381,66 @@ export async function registerRoutes(
       // Build health profile context for AI
       const missingFields: string[] = [];
       const completedFields: string[] = [];
-      
+
       // Helper to check if a value is missing (null, undefined, or empty string)
       const isMissing = (value: any): boolean => {
         return value === null || value === undefined || value === '';
       };
-      
+
       if (healthProfile) {
         // Check basic info
         if (!isMissing(healthProfile.age)) completedFields.push('age');
         else missingFields.push('age');
-        
+
         if (!isMissing(healthProfile.sex)) completedFields.push('sex');
         else missingFields.push('sex');
-        
+
         if (!isMissing(healthProfile.heightCm)) completedFields.push('height');
         else missingFields.push('height');
-        
+
         if (!isMissing(healthProfile.weightLbs)) completedFields.push('weight');
         else missingFields.push('weight');
-        
+
         // Check vital signs
         if (!isMissing(healthProfile.bloodPressureSystolic) && !isMissing(healthProfile.bloodPressureDiastolic)) {
           completedFields.push('blood pressure');
         } else {
           missingFields.push('blood pressure');
         }
-        
+
         if (!isMissing(healthProfile.restingHeartRate)) completedFields.push('resting heart rate');
         else missingFields.push('resting heart rate');
-        
+
         // Check lifestyle
         if (!isMissing(healthProfile.sleepHoursPerNight)) completedFields.push('sleep hours');
         else missingFields.push('sleep hours per night');
-        
+
         if (!isMissing(healthProfile.exerciseDaysPerWeek)) completedFields.push('exercise frequency');
         else missingFields.push('exercise frequency');
-        
+
         if (!isMissing(healthProfile.stressLevel)) completedFields.push('stress level');
         else missingFields.push('stress level (1-10)');
-        
+
         // Check risk factors
         if (!isMissing(healthProfile.smokingStatus)) completedFields.push('smoking status');
         else missingFields.push('smoking status');
-        
+
         if (!isMissing(healthProfile.alcoholDrinksPerWeek)) completedFields.push('alcohol consumption');
         else missingFields.push('alcohol consumption per week');
-        
+
         // Check health conditions
         if (healthProfile.conditions && healthProfile.conditions.length > 0) {
           completedFields.push(`health conditions (${healthProfile.conditions.join(', ')})`);
         } else {
           missingFields.push('current health conditions or concerns');
         }
-        
+
         if (healthProfile.medications && healthProfile.medications.length > 0) {
           completedFields.push(`medications (${healthProfile.medications.join(', ')})`);
         } else {
           missingFields.push('current medications');
         }
-        
+
         if (healthProfile.allergies && healthProfile.allergies.length > 0) {
           completedFields.push(`allergies (${healthProfile.allergies.join(', ')})`);
         } else {
@@ -3447,8 +3448,8 @@ export async function registerRoutes(
         }
       } else {
         // No health profile at all
-        missingFields.push('age', 'sex', 'height', 'weight', 'blood pressure', 'resting heart rate', 
-          'sleep hours per night', 'exercise frequency', 'stress level (1-10)', 'smoking status', 
+        missingFields.push('age', 'sex', 'height', 'weight', 'blood pressure', 'resting heart rate',
+          'sleep hours per night', 'exercise frequency', 'stress level (1-10)', 'smoking status',
           'alcohol consumption per week', 'current health conditions or concerns', 'current medications', 'allergies');
       }
 
@@ -3456,12 +3457,12 @@ export async function registerRoutes(
       await new Promise(resolve => setTimeout(resolve, 200));
       const labReports = await storage.getLabReportsByUser(userId!);
       let labDataContext = '';
-      
+
       console.log('🔬 DEBUG: Lab reports found:', labReports.length);
-      
+
       if (labReports.length > 0) {
         console.log('🔬 DEBUG: Lab reports statuses:', labReports.map(r => r.labReportData?.analysisStatus || 'no status'));
-        
+
         // Sort by upload date (newest first) to help AI identify latest reports
         const sortedReports = labReports
           .filter(report => report.labReportData?.analysisStatus === 'completed' && report.labReportData?.extractedData)
@@ -3470,28 +3471,28 @@ export async function registerRoutes(
             const dateB = new Date(b.uploadedAt || 0).getTime();
             return dateB - dateA; // Newest first
           });
-        
+
         const processedReports = sortedReports.map((report, index) => {
           const data = report.labReportData!;
           const values = data.extractedData as any[];
-          
+
           // Format upload date for readability
           const uploadDate = new Date(report.uploadedAt || '');
-          const uploadDateStr = uploadDate.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
+          const uploadDateStr = uploadDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
           });
-          
+
           // Label the most recent report
           const timelineLabel = index === 0 ? '🆕 LATEST REPORT' : `📅 Previous Report #${sortedReports.length - index}`;
-          
+
           const tableRows = values.map(v => {
             const status = v.status || 'normal';
             const statusFlag = status === 'high' ? '⬆️ HIGH' : status === 'low' ? '⬇️ LOW' : '✓ Normal';
             return `  • ${v.testName}: ${v.value} ${v.unit || ''} | Status: ${statusFlag} | Reference: ${v.referenceRange || 'N/A'}`;
           }).join('\n');
-          
+
           return `${timelineLabel}
 📋 Test Date: ${data.testDate || 'unknown date'}
 📤 Uploaded: ${uploadDateStr}
@@ -3501,9 +3502,9 @@ export async function registerRoutes(
 Biomarkers:
 ${tableRows}`;
         });
-        
+
         console.log('🔬 DEBUG: Processed reports count:', processedReports.length);
-        
+
         if (processedReports.length > 0) {
           labDataContext = `
 === 📊 YOUR LAB REPORTS TIMELINE (Sorted: Newest → Oldest) ===
@@ -3518,41 +3519,41 @@ ${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sorted
         } else {
           console.log('⚠️ DEBUG: No lab reports with completed analysis and extracted data');
         }
-        
+
         // (Removed - using single thinking message)
       }
-      
+
       // Fetch user's current active formula
       const activeFormula = await storage.getCurrentFormulaByUser(userId!);
-      
+
       console.log('🔍 DEBUG: Active formula fetched:', activeFormula ? `YES - ${activeFormula.name} (${activeFormula.totalMg}mg)` : 'NO FORMULA FOUND');
-      
+
       // (Removed - using single thinking message)
-      
+
       let currentFormulaContext = '';
       if (activeFormula) {
         // Match actual database schema: ingredient, amount, unit
-        const bases = activeFormula.bases as Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
-        const additions = (activeFormula.additions || []) as Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
+        const bases = activeFormula.bases as Array<{ ingredient: string, amount: number, unit: string, purpose?: string }>;
+        const additions = (activeFormula.additions || []) as Array<{ ingredient: string, amount: number, unit: string, purpose?: string }>;
         const customizations = activeFormula.userCustomizations as {
-          addedBases?: Array<{ingredient: string, amount: number, unit: string}>;
-          addedIndividuals?: Array<{ingredient: string, amount: number, unit: string}>;
+          addedBases?: Array<{ ingredient: string, amount: number, unit: string }>;
+          addedIndividuals?: Array<{ ingredient: string, amount: number, unit: string }>;
         };
-        
+
         console.log('🔍 DEBUG: Bases count:', bases.length, 'Additions count:', additions.length);
         console.log('🔍 DEBUG: User customizations:', customizations ? JSON.stringify(customizations) : 'none');
-        
+
         const basesText = bases.map(b => `  • ${b.ingredient} (${b.amount}${b.unit}) - ${b.purpose || 'No description'}`).join('\n');
-        const additionsText = additions.length > 0 
+        const additionsText = additions.length > 0
           ? additions.map(a => `  • ${a.ingredient} (${a.amount}${a.unit}) - ${a.purpose || 'No description'}`).join('\n')
           : '  (none)';
-        
+
         // Include user customizations if they exist
         let customizationsText = '';
         if (customizations) {
           const customBases = customizations.addedBases || [];
           const customIndividuals = customizations.addedIndividuals || [];
-          
+
           if (customBases.length > 0 || customIndividuals.length > 0) {
             const allCustomizations = [
               ...customBases.map(c => `  • ${c.ingredient} (${c.amount}${c.unit}) - User added system support`),
@@ -3561,13 +3562,13 @@ ${sortedReports.length > 1 ? `- "previous test" / "last month's labs" = ${sorted
             customizationsText = `\n\nUser Manual Customizations:\n${allCustomizations.join('\n')}`;
           }
         }
-        
+
         // Calculate capsule-based capacity for this formula
         const formulaCapsules = activeFormula.targetCapsules || 9;
         const formulaCapacity = formulaCapsules * 550;
         const capacityRemaining = formulaCapacity - activeFormula.totalMg;
         const utilizationPercent = Math.round((activeFormula.totalMg / formulaCapacity) * 100);
-        
+
         currentFormulaContext = `
 📦 CURRENT ACTIVE FORMULA: "${activeFormula.name || 'Unnamed'}" (Version ${activeFormula.version || 1})
 ${activeFormula.userCreated ? '[CUSTOM BUILT] - User manually created this formula without AI assistance' : '[AI-GENERATED] - AI created and optimized this formula'}
@@ -3609,7 +3610,7 @@ ${utilizationPercent < 90 ? `⚠️ UNDER-UTILIZED: Formula is only ${utilizatio
       } else {
         console.log('⚠️ DEBUG: No active formula found for user');
       }
-      
+
       const healthContextMessage = `
 ${labDataContext ? `
 🚨🚨🚨 CRITICAL OVERRIDE INSTRUCTION 🚨🚨🚨
@@ -3752,24 +3753,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         messageWithFileContext = `[User has attached files: ${fileDescriptions}] ${message}`;
       }
 
-  // Choose AI provider and model (admin override > env) with normalization/guardrails
-  const aiProvider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai'|'anthropic';
-  let model = aiRuntimeSettings.model || process.env.AI_MODEL || (aiProvider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o');
-  const normalizedModel = normalizeModel(aiProvider, model) || model;
-  const allowedForProvider = ALLOWED_MODELS[aiProvider] || [];
-  if (!allowedForProvider.includes(normalizedModel)) {
-    const fallback = allowedForProvider[0] || model;
-    console.warn(`⚠️ Unrecognized model '${model}' for provider '${aiProvider}'. Using fallback '${fallback}'.`);
-    model = fallback;
-  } else {
-    model = normalizedModel;
-  }
-  const source = aiRuntimeSettings.provider || aiRuntimeSettings.model ? 'override' : 'env';
-  console.log(`🤖 Using provider: ${aiProvider} | model: ${model} | source: ${source}`);
-      
+      // Choose AI provider and model (admin override > env) with normalization/guardrails
+      const aiProvider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'anthropic';
+      let model = aiRuntimeSettings.model || process.env.AI_MODEL || (aiProvider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o');
+      const normalizedModel = normalizeModel(aiProvider, model) || model;
+      const allowedForProvider = ALLOWED_MODELS[aiProvider] || [];
+      if (!allowedForProvider.includes(normalizedModel)) {
+        const fallback = allowedForProvider[0] || model;
+        console.warn(`⚠️ Unrecognized model '${model}' for provider '${aiProvider}'. Using fallback '${fallback}'.`);
+        model = fallback;
+      } else {
+        model = normalizedModel;
+      }
+      const source = aiRuntimeSettings.provider || aiRuntimeSettings.model ? 'override' : 'env';
+      console.log(`🤖 Using provider: ${aiProvider} | model: ${model} | source: ${source}`);
+
       // Send thinking message
       sendSSE({ type: 'thinking', message: 'Analyzing your health data...' });
-      
+
       // Build comprehensive prompt with all context
       const promptContext: PromptContext = {
         healthProfile: normalizePromptHealthProfile(healthProfile),
@@ -3781,8 +3782,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       console.log('📤 Prompt length:', fullSystemPrompt.length, 'chars');
       console.log('📤 Current formula in prompt?', fullSystemPrompt.includes('CURRENT ACTIVE FORMULA'));
       console.log('📤 Lab data in prompt?', fullSystemPrompt.includes('LABORATORY TEST RESULTS'));
-      
-      const conversationHistory: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
+
+      const conversationHistory: Array<{ role: 'system' | 'user' | 'assistant', content: string }> = [
         { role: 'system', content: fullSystemPrompt },
         ...previousMessages.slice(-10).map(msg => ({
           role: msg.role as 'user' | 'assistant',
@@ -3791,13 +3792,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         { role: 'user', content: messageWithFileContext }
       ];
 
-  // Enhanced AI request with retry logic and circuit breaker
-  let stream: any;
-  // Collect full response text here (used by Anthropic path or after OpenAI streaming)
-  let fullResponse: string = '';
+      // Enhanced AI request with retry logic and circuit breaker
+      let stream: any;
+      // Collect full response text here (used by Anthropic path or after OpenAI streaming)
+      let fullResponse: string = '';
       let retryCount = 0;
       const maxRetries = 2;
-      
+
       while (retryCount <= maxRetries) {
         try {
           if (aiProvider === 'anthropic') {
@@ -3809,7 +3810,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             const msgs = conversationHistory.slice(1)
               .filter(m => m.content && m.content.trim().length > 0)
               .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
-            
+
             // Ensure we have at least the current user message
             if (msgs.length === 0 || msgs[msgs.length - 1]?.role !== 'user') {
               msgs.push({ role: 'user', content: messageWithFileContext });
@@ -3867,19 +3868,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             stream = await Promise.race([streamPromise, timeoutPromise]);
             break; // Success, exit retry loop
           }
-          
+
         } catch (aiError: any) {
           retryCount++;
           console.error(`❌ AI request attempt ${retryCount} failed (${aiProvider}):`, aiError.message || aiError);
           console.error('Full error details:', JSON.stringify(aiError, null, 2));
-          
+
           if (retryCount > maxRetries) {
             // Send specific error based on AI error type
             const errorMessage = aiError.message || String(aiError);
             const statusCode = aiError.status || (errorMessage.match(/HTTP (\d+)/) ? parseInt(errorMessage.match(/HTTP (\d+)/)[1]) : null);
-            
+
             console.error(`🔴 FINAL ERROR after ${retryCount} attempts:`, { provider: aiProvider, model, statusCode, message: errorMessage });
-            
+
             if (statusCode === 429) {
               sendSSE({
                 type: 'error',
@@ -3908,13 +3909,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             endStream();
             return;
           }
-          
+
           // Wait before retry (exponential backoff)
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
         }
       }
 
-  // Note: for Anthropic path above, fullResponse is already set.
+      // Note: for Anthropic path above, fullResponse is already set.
       let extractedFormula = null;
       let chunkCount = 0;
 
@@ -3945,27 +3946,27 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       console.log('🔍 FORMULA EXTRACTION: Checking AI response for ```json block...');
       console.log('📝 Full AI Response Length:', fullResponse.length);
       console.log('📝 Full AI Response Preview (first 500 chars):', fullResponse.substring(0, 500));
-      
+
       // 🔔 Notify client we're analyzing the response
       sendSSE({ type: 'processing', message: 'Analyzing AI recommendations...' });
-      
+
       try {
         // Extract everything between ```json and ``` (greedy match to get complete JSON)
         const jsonMatch = fullResponse.match(/```json\s*([\s\S]*?)\s*```/);
         if (jsonMatch) {
           // 🔔 IMMEDIATELY notify client that formula processing has started
           sendSSE({ type: 'processing', message: 'Formula detected! Selecting optimal ingredients...' });
-          
+
           console.log('✅ FORMULA EXTRACTION: Found ```json block in AI response!');
           console.log('📦 Extracted JSON length:', jsonMatch[1].length, 'chars');
           console.log('📦 Extracted JSON preview (first 300):', jsonMatch[1].substring(0, 300));
           console.log('📦 Extracted JSON preview (last 200):', jsonMatch[1].substring(Math.max(0, jsonMatch[1].length - 200)));
-          
+
           console.log('🔄 Attempting to parse JSON...');
           const jsonData = JSON.parse(jsonMatch[1]);
           console.log('✅ JSON parsed successfully');
           console.log('📊 Parsed data keys:', Object.keys(jsonData));
-          
+
           // 🔧 CAPSULE COUNT EXTRACTION: Extract from user message if AI got it wrong
           const capsuleCountFromMessage = extractCapsuleCountFromMessage(message);
           if (capsuleCountFromMessage) {
@@ -3975,7 +3976,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               jsonData.targetCapsules = capsuleCountFromMessage;
             }
           }
-          
+
           console.log('📊 AI Formula Details:');
           console.log('  - totalMg from AI:', jsonData.totalMg);
           console.log('  - targetCapsules:', jsonData.targetCapsules);
@@ -3985,18 +3986,18 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           if (jsonData.additions) {
             console.log('  - Additions:', jsonData.additions.map((a: any) => `${a.ingredient}: ${a.amount}${a.unit}`).join(', '));
           }
-          
+
           console.log('🔄 Validating against FormulaExtractionSchema...');
           sendSSE({ type: 'processing', message: 'Validating ingredient selection...' });
           let validatedFormula = FormulaExtractionSchema.parse(jsonData);
           console.log('✅ Schema validation passed');
           console.log('📊 Validated formula has', validatedFormula.bases?.length || 0, 'bases and', validatedFormula.additions?.length || 0, 'additions');
-          
+
           // 🔍 POST-GENERATION VALIDATOR: Check and auto-correct ingredient names
           console.log('🔍 Running post-generation ingredient validator...');
           sendSSE({ type: 'processing', message: 'Checking ingredient safety and dosages...' });
           const ingredientValidation = validateAndCorrectIngredientNames(validatedFormula);
-          
+
           if (!ingredientValidation.success) {
             console.error('❌ POST-GENERATION VALIDATION FAILED:', ingredientValidation.errors);
             // Send error with specific ingredient issues
@@ -4004,43 +4005,43 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               type: 'error',
               error: `⚠️ Formula contains unapproved ingredients:\n\n${ingredientValidation.errors.join('\n\n')}\n\nPlease create the formula again using ONLY ingredients from the approved catalog.`
             });
-            
+
             // Skip formula processing by throwing error that will be caught below
             throw new Error('Formula validation failed: ' + ingredientValidation.errors.join(', '));
           }
-          
+
           // Log and send auto-corrections to client
           if (ingredientValidation.warnings.length > 0) {
             console.log('⚠️ AUTO-CORRECTIONS MADE:', ingredientValidation.warnings);
             ingredientValidation.warnings.forEach(warning => console.log(`  ${warning}`));
-            
+
             // Notify user about auto-corrections via SSE
             sendSSE({
               type: 'info',
               message: `✓ Auto-corrected ${ingredientValidation.warnings.length} ingredient name(s) to match catalog`
             });
           }
-          
+
           // Use the corrected formula for validation
           validatedFormula = ingredientValidation.correctedFormula;
           console.log('✅ Post-generation validation passed - using corrected formula');
-          
+
           // 🔧 ALWAYS CALCULATE totalMg ON BACKEND (AI no longer responsible for math)
           console.log('🔄 Calculating formula total (backend calculates - not AI)...');
           sendSSE({ type: 'processing', message: 'Calculating optimal dosages for your profile...' });
           const validation = validateAndCalculateFormula(validatedFormula);
-          
+
           if (validatedFormula.totalMg) {
             console.log('📊 AI provided totalMg:', validatedFormula.totalMg, '(will be ignored)');
           } else {
             console.log('📊 AI did not provide totalMg (as instructed)');
           }
           console.log('📊 Backend calculated total:', validation.calculatedTotalMg);
-          
+
           // Set totalMg to backend calculation (authoritative source)
           validatedFormula.totalMg = validation.calculatedTotalMg;
           console.log('✅ Using backend-calculated totalMg:', validatedFormula.totalMg, 'mg');
-          
+
           // 🔧 AUTO-CORRECT: If formula exceeds capsule budget, remove smallest additions to fit
           const targetCaps = validatedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
           const maxDosage = getMaxDosageForCapsules(targetCaps);
@@ -4048,16 +4049,16 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           if (validation.calculatedTotalMg > maxWithTolerance) {
             const overage = validation.calculatedTotalMg - maxDosage;
             const overagePercent = (overage / validation.calculatedTotalMg) * 100;
-            
+
             // Auto-correct if overage is < 20% (increased from 10% to handle more cases)
             if (overagePercent <= 20) {
               console.log(`🔧 AUTO-TRIMMING: Formula is ${overage}mg over limit (${overagePercent.toFixed(1)}% overage). Removing smallest additions...`);
-              
+
               // Sort additions by amount (ascending) and remove smallest until under limit
               const sortedAdditions = [...validatedFormula.additions].sort((a, b) => a.amount - b.amount);
               let removedMg = 0;
               const removedIngredients: string[] = [];
-              
+
               for (let i = 0; i < sortedAdditions.length && removedMg < overage; i++) {
                 const add = sortedAdditions[i];
                 removedMg += add.amount;
@@ -4065,25 +4066,25 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                 // Remove from validatedFormula.additions
                 validatedFormula.additions = validatedFormula.additions.filter((a: any) => a.ingredient !== add.ingredient);
               }
-              
+
               // Recalculate total
               const newValidation = validateAndCalculateFormula(validatedFormula);
               validatedFormula.totalMg = newValidation.calculatedTotalMg;
-              
+
               console.log(`✅ AUTO-TRIMMED: Removed ${removedIngredients.length} ingredients (${removedMg}mg): ${removedIngredients.join(', ')}`);
               console.log(`✅ New total: ${validation.calculatedTotalMg}mg → ${newValidation.calculatedTotalMg}mg`);
-              
+
               // Update validation object
               validation.calculatedTotalMg = newValidation.calculatedTotalMg;
               validation.errors = newValidation.errors;
               validation.isValid = newValidation.isValid;
-              
+
               // 🔧 ADDITIONAL CHECK: Remove ingredients that violate catalog dosage minimums (e.g., Glutathione at 300mg when min is 600mg)
               const dosageViolations = validation.errors.filter(e => e.includes('below allowed minimum'));
               if (dosageViolations.length > 0) {
                 console.log(`🔧 REMOVING DOSAGE VIOLATIONS: Found ${dosageViolations.length} ingredients with invalid dosages`);
                 const additionalRemovals: string[] = [];
-                
+
                 for (const error of dosageViolations) {
                   // Extract ingredient name from error message: '"Glutathione" below allowed minimum...'
                   const match = error.match(/"([^"]+)"/);
@@ -4097,18 +4098,18 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                     }
                   }
                 }
-                
+
                 // Recalculate again after removing dosage violations
                 const finalValidation = validateAndCalculateFormula(validatedFormula);
                 validatedFormula.totalMg = finalValidation.calculatedTotalMg;
                 validation.calculatedTotalMg = finalValidation.calculatedTotalMg;
                 validation.errors = finalValidation.errors;
                 validation.isValid = finalValidation.isValid;
-                
+
                 removedIngredients.push(...additionalRemovals);
                 console.log(`✅ Final total after removing dosage violations: ${finalValidation.calculatedTotalMg}mg`);
               }
-              
+
               // Add warning to user about removed ingredients
               validatedFormula.warnings = validatedFormula.warnings || [];
               const capsuleCapacity = getMaxDosageForCapsules(validatedFormula.targetCapsules || 9);
@@ -4117,13 +4118,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               console.log(`⚠️ Overage too large (${overagePercent.toFixed(1)}%), cannot auto-correct. Rejecting formula.`);
             }
           }
-          
+
           // 🔧 AUTO-EXPAND: If formula has too few ingredients, automatically add complementary ones
           const allIngredientsBeforeExpand = [...(validatedFormula.bases || []), ...(validatedFormula.additions || [])];
           if (allIngredientsBeforeExpand.length < FORMULA_LIMITS.MIN_INGREDIENT_COUNT) {
             console.log(`🔧 AUTO-EXPAND: Formula has ${allIngredientsBeforeExpand.length} ingredients, need ${FORMULA_LIMITS.MIN_INGREDIENT_COUNT}. Adding complementary ingredients...`);
             const expandResult = autoExpandFormula(validatedFormula);
-            
+
             if (expandResult.expanded) {
               // Re-validate after expansion
               const revalidation = validateAndCalculateFormula(validatedFormula);
@@ -4131,39 +4132,39 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               validation.errors = revalidation.errors;
               validation.isValid = revalidation.isValid;
               validatedFormula.totalMg = revalidation.calculatedTotalMg;
-              
+
               // Add info to formula warnings so user knows what was added
               validatedFormula.warnings = validatedFormula.warnings || [];
               validatedFormula.warnings.push(`Enhanced formula with complementary ingredients: ${expandResult.addedIngredients.join(', ')}`);
-              
+
               console.log(`✅ AUTO-EXPAND complete: Added ${expandResult.addedIngredients.length} ingredients, new total: ${validatedFormula.totalMg}mg`);
             }
           }
-          
+
           // Check for CRITICAL errors (unapproved ingredients AND dosage violations)
           // Note: After auto-expand, minimum ingredient errors should be resolved
-          const criticalErrors = validation.errors.filter(e => 
-            e.includes('UNAUTHORIZED INGREDIENT') || 
+          const criticalErrors = validation.errors.filter(e =>
+            e.includes('UNAUTHORIZED INGREDIENT') ||
             e.includes('Formula total too high') ||
             e.includes('exceeds maximum dosage limit') ||
             e.includes('exceeds allowed maximum') ||  // Individual ingredient max violations
             e.includes('below allowed minimum')       // Individual ingredient min violations
             // REMOVED: 'at least' and 'comprehensive support' - these are now auto-fixed
           );
-          
+
           if (criticalErrors.length > 0) {
             // CRITICAL: Validation failed - try to auto-correct silently
             console.error('🚨 CRITICAL: Formula validation issues detected:', criticalErrors);
-            
+
             const hasIngredientDosageViolation = criticalErrors.some(e => e.includes('exceeds allowed maximum') || e.includes('below allowed minimum'));
             const hasTotalDosageError = criticalErrors.some(e => e.includes('total too high') || e.includes('exceeds maximum dosage limit'));
             const hasUnapprovedIngredient = criticalErrors.some(e => e.includes('UNAUTHORIZED INGREDIENT'));
-            
+
             // 🔧 AUTO-FIX DOSAGE VIOLATIONS: Clamp to allowed ranges
             if (hasIngredientDosageViolation && !hasUnapprovedIngredient) {
               console.log('🔧 AUTO-FIX: Clamping ingredient dosages to allowed ranges...');
               let dosageFixed = false;
-              
+
               // Fix additions
               for (const addition of (validatedFormula.additions || [])) {
                 const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === addition.ingredient);
@@ -4180,7 +4181,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                   }
                 }
               }
-              
+
               // Fix bases (system supports)
               for (const base of (validatedFormula.bases || [])) {
                 const catalogBase = SYSTEM_SUPPORTS.find(f => f.name === base.ingredient);
@@ -4188,7 +4189,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                   const validDoses = [catalogBase.doseMg, catalogBase.doseMg * 2, catalogBase.doseMg * 3];
                   if (!validDoses.includes(base.amount)) {
                     // Find nearest valid dose
-                    const nearest = validDoses.reduce((prev, curr) => 
+                    const nearest = validDoses.reduce((prev, curr) =>
                       Math.abs(curr - base.amount) < Math.abs(prev - base.amount) ? curr : prev
                     );
                     console.log(`  Clamping ${base.ingredient}: ${base.amount}mg → ${nearest}mg (nearest valid)`);
@@ -4197,7 +4198,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                   }
                 }
               }
-              
+
               if (dosageFixed) {
                 // Re-validate after fixes
                 const revalidation = validateAndCalculateFormula(validatedFormula);
@@ -4205,20 +4206,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                 validation.errors = revalidation.errors;
                 validation.isValid = revalidation.isValid;
                 validatedFormula.totalMg = revalidation.calculatedTotalMg;
-                
+
                 // Add note about auto-corrections
                 validatedFormula.warnings = validatedFormula.warnings || [];
                 validatedFormula.warnings.push('Some ingredient dosages were automatically adjusted to optimal ranges');
-                
+
                 console.log('✅ AUTO-FIX complete: Dosages clamped, new total:', validatedFormula.totalMg, 'mg');
-                
+
                 // Check if we still have critical errors after fix
-                const remainingErrors = revalidation.errors.filter(e => 
-                  e.includes('UNAUTHORIZED INGREDIENT') || 
+                const remainingErrors = revalidation.errors.filter(e =>
+                  e.includes('UNAUTHORIZED INGREDIENT') ||
                   e.includes('Formula total too high') ||
                   e.includes('exceeds maximum dosage limit')
                 );
-                
+
                 if (remainingErrors.length === 0) {
                   // All fixed! Continue with formula
                   console.log('✅ All validation issues resolved through auto-correction');
@@ -4226,38 +4227,38 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                 }
               }
             }
-            
+
             // 🔧 AUTO-FIX TOTAL TOO HIGH: Reduce doses proportionally, then remove ingredients if needed
             if (hasTotalDosageError && !hasUnapprovedIngredient && !extractedFormula) {
               const targetCaps = validatedFormula?.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
               const maxDosage = getMaxDosageForCapsules(targetCaps);
               const maxWithTolerance = Math.floor(maxDosage * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
               let currentTotal = validation.calculatedTotalMg;
-              
+
               console.log(`🔧 AUTO-FIX TOTAL: Current ${currentTotal}mg, max ${maxWithTolerance}mg. Fixing...`);
-              
+
               // Step 1: Reduce all addition doses proportionally
               const reductionRatio = maxWithTolerance / currentTotal;
               console.log(`🔧 Step 1: Reducing additions by ${((1 - reductionRatio) * 100).toFixed(1)}%...`);
-              
+
               for (const addition of (validatedFormula.additions || [])) {
                 const newAmount = Math.floor(addition.amount * reductionRatio);
                 const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === addition.ingredient);
                 const minDose = catalogItem?.doseRangeMin || FORMULA_LIMITS.MIN_INGREDIENT_DOSE;
                 addition.amount = Math.max(newAmount, minDose);
               }
-              
+
               // Recalculate total
               currentTotal = [...(validatedFormula.bases || []), ...(validatedFormula.additions || [])]
                 .reduce((sum, ing) => sum + (ing.amount || 0), 0);
-              
+
               // Step 2: If still over, remove smallest additions one at a time until we fit
               if (currentTotal > maxWithTolerance && validatedFormula.additions?.length > 1) {
                 console.log(`🔧 Step 2: Still ${currentTotal}mg (over ${maxWithTolerance}mg). Removing smallest additions...`);
-                
+
                 // Sort additions by amount (smallest first)
                 validatedFormula.additions.sort((a: any, b: any) => (a.amount || 0) - (b.amount || 0));
-                
+
                 const removed: string[] = [];
                 while (currentTotal > maxWithTolerance && validatedFormula.additions.length > 1) {
                   const smallest = validatedFormula.additions.shift();
@@ -4267,24 +4268,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                     console.log(`   Removed ${smallest.ingredient} (${smallest.amount}mg), new total: ${currentTotal}mg`);
                   }
                 }
-                
+
                 if (removed.length > 0) {
                   validatedFormula.warnings = validatedFormula.warnings || [];
                   validatedFormula.warnings.push(`Removed ${removed.length} ingredients to fit budget: ${removed.join(', ')}`);
                 }
               }
-              
+
               // Re-validate
               const revalidation = validateAndCalculateFormula(validatedFormula);
               validation.calculatedTotalMg = revalidation.calculatedTotalMg;
               validation.errors = revalidation.errors;
               validatedFormula.totalMg = revalidation.calculatedTotalMg;
-              
+
               validatedFormula.warnings = validatedFormula.warnings || [];
               validatedFormula.warnings.push('Formula optimized to fit your selected capsule count');
-              
+
               console.log('✅ AUTO-FIX complete: Final total:', validatedFormula.totalMg, 'mg');
-              
+
               // Check if within budget now - should always be true after removing ingredients
               if (revalidation.calculatedTotalMg <= maxWithTolerance) {
                 extractedFormula = validatedFormula;
@@ -4293,7 +4294,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                 console.log('⚠️ Still over budget after all fixes, formula will not be saved');
               }
             }
-            
+
             // If we couldn't auto-fix (e.g., unapproved ingredients), log but don't show error to user
             if (!extractedFormula && hasUnapprovedIngredient) {
               console.log('⚠️ Cannot auto-fix unapproved ingredients - formula will not be saved');
@@ -4301,12 +4302,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               // The AI's text response is still shown, just no formula card
             }
           }
-          
+
           // If no formula yet from auto-fix, use validated formula
           if (!extractedFormula && criticalErrors.length === 0) {
             extractedFormula = validatedFormula;
           }
-          
+
           // If we have a valid formula, proceed with final validation and saving
           if (extractedFormula) {
             // Get user's health profile for medication validation
@@ -4319,13 +4320,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                 console.log('Could not retrieve user health profile for medication validation');
               }
             }
-            
+
             // Validate supplement-medication interactions
             sendSSE({ type: 'processing', message: 'Checking for medication interactions...' });
             const medicalWarnings = await validateSupplementInteractions(extractedFormula, userMedications);
             extractedFormula.warnings = extractedFormula.warnings || [];
             extractedFormula.warnings.push(...medicalWarnings);
-            
+
             // Add standard medical disclaimers if not present
             extractedFormula.disclaimers = extractedFormula.disclaimers || [];
             if (!extractedFormula.disclaimers.some((d: string) => d.includes('medical advice'))) {
@@ -4334,14 +4335,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             if (!extractedFormula.disclaimers.some((d: string) => d.includes('healthcare provider'))) {
               extractedFormula.disclaimers.push('Always consult your healthcare provider before starting new supplements');
             }
-            
+
             console.log('✅ Formula validation passed - using calculated totalMg:', extractedFormula.totalMg);
           }
-          
+
           // Add validation warnings (for non-critical issues like capsule sizing)
           if (extractedFormula) {
-            const nonCriticalErrors = validation.errors.filter(e => 
-              !e.includes('UNAUTHORIZED INGREDIENT') && 
+            const nonCriticalErrors = validation.errors.filter(e =>
+              !e.includes('UNAUTHORIZED INGREDIENT') &&
               !e.includes('Formula total too high') &&
               !e.includes('exceeds maximum dosage limit') &&
               !e.includes('exceeds allowed maximum') &&
@@ -4351,13 +4352,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               extractedFormula.warnings = extractedFormula.warnings || [];
               extractedFormula.warnings.push(...nonCriticalErrors);
             }
-            
+
             // Add final interaction disclaimer if not present
             if (!extractedFormula.disclaimers.some((d: string) => d.includes('interactions'))) {
               extractedFormula.disclaimers.push('Monitor for interactions with medications and adverse reactions');
             }
           }
-          
+
           // Remove the formula JSON block from fullResponse before displaying to user
           // This keeps the conversational response clean while still extracting the data
           fullResponse = fullResponse.replace(/```json\s*{[\s\S]*?}\s*```\s*/g, '').trim();
@@ -4368,40 +4369,40 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           // Only trigger error if AI explicitly claimed to have created/built a formula
           // BUT NOT if it's just showing capsule selector or discussing what it WILL do
           const responseLC = fullResponse.toLowerCase();
-          
+
           // Phrases that indicate AI is NOT yet creating - just preparing/discussing
-          const isPreparingNotCreating = 
-              responseLC.includes("select your preferred capsule") ||
-              responseLC.includes("select your daily protocol") ||
-              responseLC.includes("i'll create your") ||
-              responseLC.includes("i will create your") ||
-              responseLC.includes("once you select") ||
-              responseLC.includes("capsule-recommendation") ||
-              responseLC.includes("i'll immediately send") ||
-              responseLC.includes("and i'll create");
-          
+          const isPreparingNotCreating =
+            responseLC.includes("select your preferred capsule") ||
+            responseLC.includes("select your daily protocol") ||
+            responseLC.includes("i'll create your") ||
+            responseLC.includes("i will create your") ||
+            responseLC.includes("once you select") ||
+            responseLC.includes("capsule-recommendation") ||
+            responseLC.includes("i'll immediately send") ||
+            responseLC.includes("and i'll create");
+
           const claimsFormulaCreation = !isPreparingNotCreating && (
-              responseLC.includes("here's your formula") ||
-              responseLC.includes("here is your formula") ||
-              responseLC.includes("i've created") ||
-              responseLC.includes("i have created") ||
-              responseLC.includes("here's the formula") ||
-              responseLC.includes("presenting your formula") ||
-              responseLC.includes("this formula includes") ||
-              // Only trigger on very specific "created" past-tense phrases
-              (responseLC.includes("your formula") && responseLC.includes("includes")));
-          
+            responseLC.includes("here's your formula") ||
+            responseLC.includes("here is your formula") ||
+            responseLC.includes("i've created") ||
+            responseLC.includes("i have created") ||
+            responseLC.includes("here's the formula") ||
+            responseLC.includes("presenting your formula") ||
+            responseLC.includes("this formula includes") ||
+            // Only trigger on very specific "created" past-tense phrases
+            (responseLC.includes("your formula") && responseLC.includes("includes")));
+
           if (claimsFormulaCreation) {
             console.error('⚠️ CRITICAL: AI claimed to create a formula but NOT in ```json block format!');
             console.error('⚠️ This formula will NOT be saved! AI needs to output JSON block.');
-            
+
             // 🔔 NOTIFY USER that formula wasn't created properly
             sendSSE({
               type: 'error',
               error: '⚠️ Formula described but not created. Please reply with "create my formula now" to generate it.',
               code: 'FORMULA_NOT_OUTPUT'
             });
-            
+
             // Append error message that AI will see in chat history
             const systemError = '\n\n---\n\n🚨 **SYSTEM ERROR - Formula Not Created**\n\n' +
               '❌ **Problem:** You discussed a formula but did NOT output the ```json code block.\n\n' +
@@ -4418,7 +4419,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               '}\n' +
               '```\n\n' +
               '**DO NOT** just describe the formula - you MUST output the actual JSON code block for the formula to be created.';
-            
+
             fullResponse += systemError;
             console.log('💾 Appended JSON missing error to chat history - AI will see it and output JSON next time');
           }
@@ -4435,14 +4436,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         if (capsuleRecMatch) {
           capsuleRecommendation = JSON.parse(capsuleRecMatch[1]);
           console.log('📊 Extracted capsule recommendation:', capsuleRecommendation);
-          
+
           // Send capsule recommendation to client via SSE
           sendSSE({
             type: 'capsule_recommendation',
             data: capsuleRecommendation,
             sessionId: chatSession?.id
           });
-          
+
           // Remove the capsule-recommendation block from fullResponse before displaying
           fullResponse = fullResponse.replace(/```capsule-recommendation\s*{[\s\S]*?}\s*```\s*/g, '').trim();
         }
@@ -4457,10 +4458,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         if (healthDataMatch && userId) {
           const healthData = JSON.parse(healthDataMatch[1]);
           console.log('Extracted health data from AI response:', healthData);
-          
+
           // Get existing health profile to merge with new data
           const existingProfile = await storage.getHealthProfile(userId);
-          
+
           // Merge with existing data (new data takes precedence)
           // For healthGoals, merge arrays to accumulate goals over time
           let mergedHealthGoals = existingProfile?.healthGoals || [];
@@ -4473,7 +4474,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               }
             }
           }
-          
+
           const mergedData = {
             age: healthData.age ?? existingProfile?.age,
             sex: healthData.sex ?? existingProfile?.sex,
@@ -4492,10 +4493,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             allergies: healthData.allergies ?? existingProfile?.allergies,
             healthGoals: mergedHealthGoals.length > 0 ? mergedHealthGoals : undefined,
           };
-          
+
           // Validate merged data against schema before persisting
           const validatedData = insertHealthProfileSchema.omit({ userId: true }).parse(mergedData);
-          
+
           // Update or create health profile
           if (existingProfile) {
             await storage.updateHealthProfile(userId, validatedData);
@@ -4505,10 +4506,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               ...validatedData
             });
           }
-          
+
           console.log('Health profile automatically updated from AI conversation');
           healthDataUpdated = true;
-          
+
           // Remove the health-data block from fullResponse before saving
           fullResponse = fullResponse.replace(/```health-data\s*{[\s\S]*?}\s*```\s*/g, '').trim();
         }
@@ -4522,7 +4523,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       console.log('💾 extractedFormula exists?', !!extractedFormula);
       console.log('💾 chatSession exists?', !!chatSession);
       console.log('💾 userId exists?', !!userId);
-      
+
       if (extractedFormula && chatSession && userId) {
         console.log('✅ All conditions met - proceeding to save formula');
         try {
@@ -4530,7 +4531,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           // This checks ALL ingredients (bases + additions) against the complete catalog
           // to handle cases where AI might miscategorize a base as an addition or vice versa
           console.log('🔍 Validating', extractedFormula.bases.length, 'bases +', extractedFormula.additions.length, 'additions against approved catalog');
-          
+
           // Validate system supports (category-agnostic - checks against ALL approved ingredients)
           for (const base of extractedFormula.bases) {
             const ingredientName = base.ingredient;
@@ -4539,7 +4540,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               throw new Error(`The ingredient "${ingredientName}" is not in our approved catalog. Please use only approved ingredients from our catalog.`);
             }
           }
-          
+
           // Validate additions (category-agnostic - checks against ALL approved ingredients)
           for (const addition of extractedFormula.additions) {
             const ingredientName = addition.ingredient;
@@ -4548,23 +4549,23 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
               throw new Error(`The ingredient "${ingredientName}" is not in our approved catalog. Please use only approved ingredients from our catalog.`);
             }
           }
-          
+
           // Get current formula to determine next version number
           const currentFormula = await storage.getCurrentFormulaByUser(userId);
           const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
-          
+
           // Convert formula to storage format with normalized ingredient names
           const normalizedBases = extractedFormula.bases.map((b: any) => {
             const rawName = b.ingredient || b.name;
-              const normalizedName = normalizeIngredientName(rawName);
-              console.log(`🔄 Normalizing base: "${rawName}" → "${normalizedName}"`);
-              return {
-                ingredient: normalizedName,
-                amount: typeof b.amount === 'number' ? b.amount : parseDoseToMg(b.dose || `${b.amount}mg`, rawName),
-                unit: 'mg',
-                purpose: b.purpose
-              };
-            });
+            const normalizedName = normalizeIngredientName(rawName);
+            console.log(`🔄 Normalizing base: "${rawName}" → "${normalizedName}"`);
+            return {
+              ingredient: normalizedName,
+              amount: typeof b.amount === 'number' ? b.amount : parseDoseToMg(b.dose || `${b.amount}mg`, rawName),
+              unit: 'mg',
+              purpose: b.purpose
+            };
+          });
           const normalizedAdditions = extractedFormula.additions.map((a: any) => {
             const rawName = a.ingredient || a.name;
             const normalizedName = normalizeIngredientName(rawName);
@@ -4588,7 +4589,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             version: nextVersion,
             targetCapsules: extractedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT,
           };
-          
+
           // 🔒 SECURITY: Validate formula against immutable limits
           const limitValidation = validateFormulaLimits(formulaData);
           if (!limitValidation.valid) {
@@ -4597,24 +4598,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             console.error('🚨 Attempted totalMg:', formulaData.totalMg);
             console.error('🚨 Target capsules:', formulaData.targetCapsules);
             console.error('🚨 Max allowed for capsules:', getMaxDosageForCapsules(formulaData.targetCapsules || 9));
-            
+
             // Log potential security issue
             console.warn('⚠️ SECURITY ALERT: Formula validation failed');
             console.warn('Reasons:', limitValidation.errors);
-            
+
             // 🎯 SHOW ERROR TO USER: Display validation errors via SSE
             const errorMessage = `⚠️ **VALIDATION ERROR - Formula Rejected**\n\n${limitValidation.errors.map(e => `❌ ${e}`).join('\n\n')}\n\nPlease create a corrected formula addressing these issues.`;
-            
+
             // Send error via SSE (don't try to write to stream directly)
             sendSSE({
               type: 'error',
               error: errorMessage,
               sessionId: chatSession?.id
             });
-            
+
             console.log('📛 Formula rejected - error shown to user via SSE');
             console.log('📛 User will see validation errors and can ask AI to fix');
-            
+
             // Don't save - formula stays null
             savedFormula = null;
           } else {
@@ -4623,7 +4624,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             sendSSE({ type: 'processing', message: 'Finalizing your personalized formula...' });
             savedFormula = await storage.createFormula(formulaData);
             console.log(`Formula v${nextVersion} saved successfully for user ${userId}`);
-            
+
             // 📬 Create in-app notification for formula update
             try {
               const isFirstFormula = nextVersion === 1;
@@ -4631,14 +4632,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
                 userId,
                 type: 'formula_update',
                 title: isFirstFormula ? 'Your Formula is Ready! 🧪' : `Formula Updated to V${nextVersion}`,
-                content: isFirstFormula 
+                content: isFirstFormula
                   ? `Your personalized supplement formula has been created with ${savedFormula.totalMg}mg of targeted ingredients.`
                   : `Your formula has been updated based on your consultation. Review the changes in My Formula.`,
                 formulaId: savedFormula.id,
-                metadata: { 
-                  actionUrl: '/dashboard/my-formula', 
-                  icon: 'beaker', 
-                  priority: isFirstFormula ? 'high' : 'medium' 
+                metadata: {
+                  actionUrl: '/dashboard/my-formula',
+                  icon: 'beaker',
+                  priority: isFirstFormula ? 'high' : 'medium'
                 }
               });
               console.log(`📬 Formula notification created for user ${userId}`);
@@ -4649,11 +4650,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           }
         } catch (formulaSaveError) {
           console.error('❌ ERROR SAVING FORMULA:', formulaSaveError);
-          
+
           // Check if it's a validation error for unapproved ingredients
           if (formulaSaveError instanceof Error && formulaSaveError.message.includes('not in our approved catalog')) {
             console.error('⚠️ CRITICAL: AI used unapproved ingredient - formula rejected!');
-            
+
             // Notify user via server-sent event
             sendSSE({
               type: 'error',
@@ -4663,15 +4664,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           // Don't throw - just log the error and continue without saving invalid formula
         }
       }
-      
+
       // CRITICAL: Strip ALL remaining code blocks from response before showing to user
       // This ensures customer never sees any technical/code content (```anything```)
       // We've already extracted formula JSON and health-data, so anything left is unwanted
       fullResponse = fullResponse.replace(/```[\s\S]*?```/g, '').trim();
-      
+
       // Also clean up any stray code markers that might remain
       fullResponse = fullResponse.replace(/`{1,3}/g, '').trim();
-      
+
       // 🧹 CLEAN UP FORMULA CALCULATION ITERATIONS
       // Remove patterns like "TOTAL: 6178mg ❌ Over by..." and iteration attempts
       // This strips out the AI "showing work" that users shouldn't see
@@ -4689,14 +4690,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         // Clean up multiple consecutive newlines left behind
         .replace(/\n{3,}/g, '\n\n')
         .trim();
-      
+
       // 🔧 FIX: If response is empty but we have a formula, provide a default message
       // This prevents showing an empty AI response when AI only output the JSON block
       if (fullResponse.length < 10 && savedFormula) {
         console.log('⚠️ Response was empty after cleaning, adding default formula message');
         fullResponse = `I've created your personalized ${savedFormula.targetCapsules || 9}-capsule daily formula with ${savedFormula.totalMg}mg of targeted support. Your formula has been saved and is ready to review in your dashboard.`;
       }
-      
+
       // Send health data update notification if applicable
       if (healthDataUpdated) {
         sendSSE({
@@ -4705,7 +4706,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           sessionId: chatSession?.id
         });
       }
-      
+
       // Transform formula for frontend display (convert ingredient/amount to name/dose format)
       // 🔒 CRITICAL: Only show formula if it was actually saved (passed validation)
       let formulaForDisplay = null;
@@ -4730,7 +4731,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           disclaimers: savedFormula.disclaimers || []
         };
       }
-      
+
       // Send completion event with transformed formula for frontend
       console.log('📤 SSE COMPLETE: formulaForDisplay exists?', !!formulaForDisplay);
       console.log('📤 SSE COMPLETE: savedFormula exists?', !!savedFormula);
@@ -4757,7 +4758,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             model: null,
             formula: undefined
           });
-          
+
           await storage.createMessage({
             sessionId: chatSession.id,
             role: 'assistant',
@@ -4774,7 +4775,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
     } catch (error) {
       console.error(`Chat stream error from IP ${clientIP}:`, error);
-      
+
       // Log detailed error for monitoring
       const errorDetails = {
         timestamp: new Date().toISOString(),
@@ -4785,7 +4786,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         stack: error instanceof Error ? error.stack : undefined
       };
       console.error('Detailed error log:', JSON.stringify(errorDetails, null, 2));
-      
+
       // Only send error if stream was started
       if (streamStarted && !res.destroyed) {
         sendSSE({
@@ -4797,14 +4798,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         endStream();
       } else if (!streamStarted) {
         // If stream never started, send regular HTTP error
-        res.status(500).json({ 
+        res.status(500).json({
           error: 'Failed to generate response. Please try again.',
           code: 'INTERNAL_ERROR',
           timestamp: new Date().toISOString()
         });
       }
     }
-    
+
     // Handle client disconnect
     req.on('close', () => {
       if (!res.destroyed) {
@@ -4812,7 +4813,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         endStream();
       }
     });
-    
+
     req.on('error', (err) => {
       console.error('Request error:', err);
       if (!res.destroyed) {
@@ -4827,7 +4828,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const { sessionId } = req.params;
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const session = await storage.getChatSession(sessionId);
-      
+
       if (!session) {
         return res.status(404).json({ error: 'Session not found' });
       }
@@ -4838,7 +4839,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
 
       const messages = await storage.listMessagesBySession(sessionId);
-      
+
       res.json({
         session,
         messages
@@ -4854,11 +4855,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
 
-      const session = await storage.createChatSession({ 
-        userId, 
-        status: 'active' 
+      const session = await storage.createChatSession({
+        userId,
+        status: 'active'
       });
-      
+
       res.json(session);
     } catch (error) {
       console.error('Create chat session error:', error);
@@ -4871,7 +4872,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const sessions = await storage.listChatSessionsByUser(userId);
-      
+
       res.json(sessions);
     } catch (error) {
       console.error('List chat sessions error:', error);
@@ -4883,20 +4884,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/consultations/history', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
-      
+
       // Fetch user's chat sessions
       const sessions = await storage.listChatSessionsByUser(userId);
-      
+
       // Fetch messages for all sessions and organize them
-      const messagesPromises = sessions.map(session => 
+      const messagesPromises = sessions.map(session =>
         storage.listMessagesBySession(session.id).then(messages => ({
           sessionId: session.id,
           messages
         }))
       );
-      
+
       const sessionMessages = await Promise.all(messagesPromises);
-      
+
       // Organize messages by session ID
       const messagesMap: Record<string, any[]> = {};
       sessionMessages.forEach(({ sessionId, messages }) => {
@@ -4916,7 +4917,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         const sessionMsgs = messagesMap[session.id] || [];
         const lastMessage = sessionMsgs[sessionMsgs.length - 1];
         const hasFormula = sessionMsgs.some(msg => msg.formula);
-        
+
         return {
           id: session.id,
           title: `Consultation ${new Date(session.createdAt).toLocaleDateString()}`,
@@ -4946,23 +4947,23 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       const sessionId = req.params.sessionId;
-      
+
       // Verify session belongs to user
       const session = await storage.getChatSession(sessionId);
       if (!session) {
         return res.status(404).json({ error: 'Session not found' });
       }
-      
+
       if (session.userId !== userId) {
         return res.status(403).json({ error: 'Unauthorized access to session' });
       }
-      
+
       // Fetch messages for this session
       const messages = await storage.listMessagesBySession(sessionId);
       const sessionUpdatedAt = messages.length > 0
         ? messages[messages.length - 1].createdAt
         : session.createdAt;
-      
+
       res.json({
         session: {
           id: session.id,
@@ -4992,20 +4993,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       const sessionId = req.params.sessionId;
-      
+
       // Verify session belongs to user
       const session = await storage.getChatSession(sessionId);
       if (!session) {
         return res.status(404).json({ error: 'Session not found' });
       }
-      
+
       if (session.userId !== userId) {
         return res.status(403).json({ error: 'Access denied' });
       }
-      
+
       // Delete the session (this should cascade delete messages)
       await storage.deleteChatSession(sessionId);
-      
+
       res.json({ success: true, sessionId });
     } catch (error) {
       console.error('Delete consultation error:', error);
@@ -5017,7 +5018,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/dashboard', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
-      
+
       // Fetch all dashboard data in parallel
       const [currentFormula, healthProfile, chatSessions, orders, subscription, labReports] = await Promise.all([
         storage.getCurrentFormulaByUser(userId),
@@ -5032,12 +5033,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const totalConsultations = chatSessions.length;
       const recentSessions = chatSessions.slice(0, 3);
       const recentOrders = orders.slice(0, 5);
-      
+
       // Calculate days since user joined (using oldest chat session or current date)
-      const oldestSession = chatSessions.length > 0 ? 
+      const oldestSession = chatSessions.length > 0 ?
         Math.min(...chatSessions.map(s => s.createdAt.getTime())) : Date.now();
       const daysActive = Math.floor((Date.now() - oldestSession) / (1000 * 60 * 60 * 24));
-      
+
       // Profile Completeness Calculation (0-100%)
       const profileFields = {
         // Demographics (2 fields)
@@ -5074,23 +5075,23 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           labReports && labReports.length > 0 ? true : null
         ]
       };
-      
+
       // Count completed fields
       const completedFields = Object.values(profileFields)
         .flat()
         .filter(field => field !== null && field !== undefined).length;
-      
+
       // Total possible fields
       const totalFields = Object.values(profileFields)
         .flat().length;
-      
+
       // Calculate percentage
       const profileCompleteness = Math.round((completedFields / totalFields) * 100);
-      
+
       // Determine next action message - prioritized by importance
       let nextAction = 'Complete your profile';
       let nextActionDetail = '';
-      
+
       // Priority 1: Critical demographics
       if (!healthProfile || (!healthProfile.age && !healthProfile.sex)) {
         nextAction = 'Add age and gender';
@@ -5167,7 +5168,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         time: string;
         icon: string;
       }> = [];
-      
+
       // Add recent orders
       recentOrders.slice(0, 3).forEach(order => {
         recentActivity.push({
@@ -5327,7 +5328,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/dashboard/wellness', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      
+
       // Get user's timezone for correct day boundary
       const user = await storage.getUser(userId);
       console.log('🔍 GET /api/dashboard/wellness - User lookup:', {
@@ -5347,13 +5348,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // End of day for upper bound comparisons (23:59:59.999)
       const todayEnd = new Date(todayStart);
       todayEnd.setHours(23, 59, 59, 999);
-      
+
       // Calculate week boundaries (Sunday-Saturday)
       const dayOfWeek = today.getDay();
       const weekStart = new Date(today);
       weekStart.setDate(today.getDate() - dayOfWeek);
       weekStart.setHours(0, 0, 0, 0);
-      
+
       // 30 days ago for heatmap
       const thirtyDaysAgo = new Date(today);
       thirtyDaysAgo.setDate(today.getDate() - 30);
@@ -5395,21 +5396,21 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
       // ========== TODAY'S PLAN ==========
       const todayDayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][today.getDay()];
-      
+
       // Find today's workout from the plan
       let todayWorkout = null;
       let hasWorkoutToday = false;
       const workoutContent = workoutPlan?.content as { weekPlan?: any[] } | undefined;
-      
+
       if (workoutContent?.weekPlan) {
         const weekPlan = workoutContent.weekPlan;
-        
+
         todayWorkout = weekPlan.find((day: any) => {
           // Use dayName (the actual day name like "Friday"), not day (which is just the day number)
           const dayName = day.dayName || '';
-          return typeof dayName === 'string' && 
-                 dayName.toLowerCase() === todayDayName.toLowerCase() && 
-                 !day.isRestDay;
+          return typeof dayName === 'string' &&
+            dayName.toLowerCase() === todayDayName.toLowerCase() &&
+            !day.isRestDay;
         });
         hasWorkoutToday = !!todayWorkout;
       }
@@ -5466,22 +5467,22 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         totalCapsules,
         formulaName: currentFormula ? `Formula v${currentFormula.version}` : undefined,
         dosageInfo: currentFormula ? `${currentFormula.totalMg}mg daily` : undefined,
-        
+
         hasWorkoutToday,
         workoutName: todayWorkout?.workout?.name || todayWorkout?.title,
         workoutExerciseCount: todayWorkout?.workout?.exercises?.length || 0,
         workoutDurationMinutes: todayWorkout?.workout?.durationMinutes || 45,
         workoutCompleted: todayWorkoutCompleted,
         isRestDay: todayLog?.isRestDay || false,
-        
+
         hasMealPlan: !!nutritionPlan,
         mealsPlanned: todaysMeals.length,
         mealsLogged: (todayLog?.mealsLogged as string[]) || [],
         todaysMeals,
-        
+
         waterIntakeOz: todayLog?.waterIntakeOz || 0,
         waterGoalOz: 100,
-        
+
         energyLevel: todayLog?.energyLevel,
         moodLevel: todayLog?.moodLevel,
         sleepQuality: todayLog?.sleepQuality
@@ -5493,22 +5494,22 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         const logDate = new Date(log.completedAt);
         return logDate >= weekStart && logDate <= todayEnd;
       });
-      
+
       // Get planned workouts per week from plan
       let plannedWorkoutsPerWeek = 0;
       if (workoutContent?.weekPlan) {
         plannedWorkoutsPerWeek = workoutContent.weekPlan
           .filter((day: any) => !day.isRestDay).length;
       }
-      
+
       // Count days with nutrition logged this week
-      const nutritionDaysLogged = weekLogs.filter(log => 
+      const nutritionDaysLogged = weekLogs.filter(log =>
         log.nutritionCompleted || (log.mealsLogged && (log.mealsLogged as string[]).length > 0)
       ).length;
-      
+
       // Count days supplements taken this week
       const supplementDaysTaken = weekLogs.filter(log => log.supplementsTaken).length;
-      
+
       // Days elapsed this week (1-7)
       const daysElapsedThisWeek = Math.min(dayOfWeek + 1, 7);
 
@@ -5516,7 +5517,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         workouts: {
           completed: weekWorkoutLogs.length,
           total: plannedWorkoutsPerWeek || daysElapsedThisWeek,
-          percentage: plannedWorkoutsPerWeek > 0 
+          percentage: plannedWorkoutsPerWeek > 0
             ? Math.round((weekWorkoutLogs.length / plannedWorkoutsPerWeek) * 100)
             : 0
         },
@@ -5540,35 +5541,35 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // ========== STREAKS & HEATMAP ==========
       // Build 30-day activity map for heatmap
       const activityMap: { date: string; level: 0 | 1 | 2 | 3 | 4; activities: string[] }[] = [];
-      
+
       for (let i = 29; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(today.getDate() - i);
         const dateStr = format(date, 'yyyy-MM-dd');
-        
+
         // Find log for this date
         const dayLog = monthLogs.find(log => {
           const logDate = new Date(log.logDate);
           return format(logDate, 'yyyy-MM-dd') === dateStr;
         });
-        
+
         // Check if workout was done this day
         const hadWorkout = workoutLogs.some(log => {
           const logDate = new Date(log.completedAt);
           return format(logDate, 'yyyy-MM-dd') === dateStr;
         });
-        
+
         const activities: string[] = [];
         if (hadWorkout) activities.push('workout');
         if (dayLog?.nutritionCompleted || (dayLog?.mealsLogged as string[])?.length > 0) activities.push('nutrition');
         if (dayLog?.supplementsTaken) activities.push('supplements');
-        
+
         // Level: 0 = nothing, 1 = 1 activity, 2 = 2 activities, 3 = 3 activities, 4 = all + high ratings
         let level: 0 | 1 | 2 | 3 | 4 = Math.min(activities.length, 3) as 0 | 1 | 2 | 3;
         if (activities.length >= 3 && dayLog?.energyLevel && dayLog.energyLevel >= 4) {
           level = 4;
         }
-        
+
         activityMap.push({ date: dateStr, level, activities });
       }
 
@@ -5603,14 +5604,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       sortedWorkoutLogs.forEach(log => {
         const exercises = log.exercisesCompleted as any[];
         if (!exercises) return;
-        
+
         exercises.forEach((ex: any) => {
           if (!ex.sets || !Array.isArray(ex.sets)) return;
-          
+
           ex.sets.forEach((set: any) => {
             const weight = Number(set.weight) || 0;
             if (weight <= 0) return;
-            
+
             if (!prMap[ex.name] || weight > prMap[ex.name].weight) {
               const previousWeight = prMap[ex.name]?.weight;
               prMap[ex.name] = {
@@ -5644,7 +5645,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
       // ========== INSIGHTS ==========
       const insights: { id: string; type: string; icon: string; message: string; metric?: string; change?: number }[] = [];
-      
+
       // Streak achievements
       if (overallStreak && overallStreak.currentStreak >= 7) {
         insights.push({
@@ -5749,7 +5750,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const currentFormula = await storage.getCurrentFormulaByUser(userId);
-      
+
       if (!currentFormula) {
         return res.status(404).json({ error: 'No formula found' });
       }
@@ -5766,7 +5767,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const healthProfile = await storage.getHealthProfile(userId);
-      
+
       if (!healthProfile) {
         return res.status(404).json({ error: 'No health profile found' });
       }
@@ -5782,7 +5783,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.post('/api/users/me/health-profile', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
-      
+
       // Validate request body with proper Zod schema
       const healthProfileUpdate = insertHealthProfileSchema.omit({ userId: true }).parse({
         age: req.body.age,
@@ -5804,7 +5805,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
       // Check if profile exists
       const existingProfile = await storage.getHealthProfile(userId);
-      
+
       let healthProfile;
       if (existingProfile) {
         healthProfile = await storage.updateHealthProfile(userId, healthProfileUpdate);
@@ -5818,9 +5819,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       res.json(healthProfile);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          error: 'Invalid health profile data', 
-          details: error.errors 
+        return res.status(400).json({
+          error: 'Invalid health profile data',
+          details: error.errors
         });
       }
       console.error('Save health profile error:', error);
@@ -5832,9 +5833,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.patch('/api/users/me/profile', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
-      
+
       console.log('🔧 Profile update request body:', JSON.stringify(req.body, null, 2));
-      
+
       // Create validation schema for profile updates
       const updateProfileSchema = z.object({
         name: z.string().min(1).optional(),
@@ -5847,12 +5848,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         postalCode: z.string().nullable().optional(),
         country: z.string().nullable().optional(),
       });
-      
+
       // Validate request body
       const validatedData = updateProfileSchema.parse(req.body);
-      
+
       console.log('✅ Validated data:', JSON.stringify(validatedData, null, 2));
-      
+
       // If email is being changed, check if it's already in use
       if (validatedData.email) {
         const existingUser = await storage.getUserByEmail(validatedData.email);
@@ -5860,10 +5861,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           return res.status(409).json({ error: 'Email already in use by another account' });
         }
       }
-      
+
       // Update user profile
       const updatedUser = await storage.updateUser(userId, validatedData);
-      
+
       console.log('💾 Updated user address fields:', {
         addressLine1: updatedUser?.addressLine1,
         addressLine2: updatedUser?.addressLine2,
@@ -5872,19 +5873,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         postalCode: updatedUser?.postalCode,
         country: updatedUser?.country
       });
-      
+
       if (!updatedUser) {
         return res.status(404).json({ error: 'User not found' });
       }
-      
+
       // Return user without password
       const { password, ...userWithoutPassword } = updatedUser;
       res.json({ user: userWithoutPassword });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          error: 'Invalid profile data', 
-          details: error.errors 
+        return res.status(400).json({
+          error: 'Invalid profile data',
+          details: error.errors
         });
       }
       console.error('Update profile error:', error);
@@ -5897,7 +5898,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const orders = await storage.listOrdersByUser(userId);
-      
+
       res.json(orders);
     } catch (error) {
       console.error('Get orders error:', error);
@@ -5910,17 +5911,17 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       const { timezone } = req.body;
-      
+
       if (!timezone || typeof timezone !== 'string') {
         return res.status(400).json({ error: 'Valid timezone required' });
       }
-      
+
       const updatedUser = await storage.updateUser(userId, { timezone });
-      
+
       if (!updatedUser) {
         return res.status(404).json({ error: 'User not found' });
       }
-      
+
       res.json({ timezone: updatedUser.timezone });
     } catch (error) {
       console.error('Update timezone error:', error);
@@ -5933,7 +5934,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const subscription = await storage.getSubscription(userId);
-      
+
       if (!subscription) {
         return res.status(404).json({ error: 'No subscription found' });
       }
@@ -5950,7 +5951,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const { status, plan, pausedUntil } = req.body;
-      
+
       // Validate allowed updates
       const allowedUpdates: any = {};
       if (status && ['active', 'paused', 'cancelled'].includes(status)) {
@@ -5962,9 +5963,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       if (pausedUntil) {
         allowedUpdates.pausedUntil = new Date(pausedUntil);
       }
-      
+
       const updatedSubscription = await storage.updateSubscription(userId, allowedUpdates);
-      
+
       if (!updatedSubscription) {
         return res.status(404).json({ error: 'Subscription not found' });
       }
@@ -5981,7 +5982,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const paymentMethods = await storage.listPaymentMethodsByUser(userId);
-      
+
       res.json(paymentMethods);
     } catch (error) {
       console.error('Get payment methods error:', error);
@@ -5994,18 +5995,18 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const { stripePaymentMethodId, brand, last4 } = req.body;
-      
+
       if (!stripePaymentMethodId || !brand || !last4) {
         return res.status(400).json({ error: 'Missing required payment method data' });
       }
-      
+
       const paymentMethod = await storage.createPaymentMethodRef({
         userId,
         stripePaymentMethodId,
         brand,
         last4
       });
-      
+
       res.json(paymentMethod);
     } catch (error) {
       console.error('Add payment method error:', error);
@@ -6018,19 +6019,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const paymentMethodId = req.params.id;
-      
+
       // Verify the payment method belongs to the user
       const paymentMethod = await storage.getPaymentMethodRef(paymentMethodId);
       if (!paymentMethod || paymentMethod.userId !== userId) {
         return res.status(404).json({ error: 'Payment method not found' });
       }
-      
+
       const deleted = await storage.deletePaymentMethodRef(paymentMethodId);
-      
+
       if (!deleted) {
         return res.status(400).json({ error: 'Failed to delete payment method' });
       }
-      
+
       res.json({ success: true });
     } catch (error) {
       console.error('Delete payment method error:', error);
@@ -6042,10 +6043,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/users/me/billing-history', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
-      
+
       // Get orders as billing history for now (can be enhanced with separate billing table later)
       const orders = await storage.listOrdersByUser(userId);
-      
+
       // Transform orders into billing format
       const billingHistory = orders
         .filter(order => order.status === 'delivered') // Only include completed orders
@@ -6057,7 +6058,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           status: 'paid',
           invoiceUrl: `/api/invoices/${order.id}` // Placeholder for future invoice generation
         }));
-      
+
       res.json(billingHistory);
     } catch (error) {
       console.error('Get billing history error:', error);
@@ -6070,17 +6071,17 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       const { consentType, consentVersion, consentText } = req.body;
-      
+
       // Validate consent type
       const validConsentTypes = ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing'];
       if (!validConsentTypes.includes(consentType)) {
         return res.status(400).json({ error: 'Invalid consent type' });
       }
-      
+
       // Get audit information
       const ipAddress = req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress;
       const userAgent = req.headers['user-agent'];
-      
+
       // Create consent record
       const consent = await storage.createUserConsent({
         userId,
@@ -6094,7 +6095,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           source: 'upload_form'
         }
       });
-      
+
       console.log("HIPAA AUDIT LOG - Consent Granted:", {
         timestamp: new Date().toISOString(),
         userId,
@@ -6102,7 +6103,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         ipAddress,
         userAgent
       });
-      
+
       res.json({ success: true, consent });
     } catch (error) {
       console.error('Consent grant error:', error);
@@ -6168,19 +6169,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
 
       const uploadedFile = Array.isArray(req.files.file) ? req.files.file[0] : req.files.file;
-      
+
       // File validation with HIPAA audit logging
       const maxSizeBytes = 10 * 1024 * 1024; // 10MB limit
       const allowedMimeTypes = [
         'application/pdf',
         'image/jpeg',
-        'image/jpg', 
+        'image/jpg',
         'image/png',
         'text/plain',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       ];
-      
+
       const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.txt', '.doc', '.docx'];
 
       if (uploadedFile.size > maxSizeBytes) {
@@ -6194,8 +6195,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           success: false,
           reason: `File too large: ${uploadedFile.size} bytes (max: ${maxSizeBytes})`
         });
-        return res.status(400).json({ 
-          error: 'File too large. Maximum size is 10MB.' 
+        return res.status(400).json({
+          error: 'File too large. Maximum size is 10MB.'
         });
       }
 
@@ -6210,8 +6211,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           success: false,
           reason: `Invalid MIME type: ${uploadedFile.mimetype}`
         });
-        return res.status(400).json({ 
-          error: 'Invalid file type. Only PDF, JPG, PNG, TXT, DOC, and DOCX files are allowed.' 
+        return res.status(400).json({
+          error: 'Invalid file type. Only PDF, JPG, PNG, TXT, DOC, and DOCX files are allowed.'
         });
       }
 
@@ -6228,8 +6229,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           success: false,
           reason: `Invalid file extension for: ${fileName}`
         });
-        return res.status(400).json({ 
-          error: 'Invalid file extension. Only .pdf, .jpg, .jpeg, .png, .txt, .doc, and .docx files are allowed.' 
+        return res.status(400).json({
+          error: 'Invalid file extension. Only .pdf, .jpg, .jpeg, .png, .txt, .doc, and .docx files are allowed.'
         });
       }
 
@@ -6237,18 +6238,18 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'other';
       const labKeywords = ['lab', 'blood', 'test', 'cbc', 'panel', 'result', 'report', 'analysis', 'metabolic', 'lipid', 'thyroid', 'vitamin', 'serum', 'urine', 'specimen'];
       const fileNameLower = fileName.toLowerCase();
-      
+
       if (labKeywords.some(keyword => fileNameLower.includes(keyword))) {
         fileType = 'lab_report';
       } else if (fileName.includes('prescription') || fileName.includes('rx')) {
-        fileType = 'prescription';  
+        fileType = 'prescription';
       } else if (allowedMimeTypes.slice(0, 4).includes(uploadedFile.mimetype)) {
         fileType = 'medical_document';
       }
 
       // Use HIPAA-compliant ObjectStorageService for secure upload
       const objectStorageService = new ObjectStorageService();
-      
+
       // Upload directly to Supabase
       const normalizedPath = await objectStorageService.uploadLabReportFile(
         userId,
@@ -6276,7 +6277,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         try {
           console.log(`✨ Analyzing lab report: ${uploadedFile.name} (${uploadedFile.mimetype})`);
           labDataExtraction = await analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId);
-          
+
           // Update file upload with extracted lab data
           if (labDataExtraction && fileUpload.id) {
             await storage.updateFileUpload(fileUpload.id, {
@@ -6353,13 +6354,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
             userId,
             type: 'system',
             title: 'Lab Report Uploaded 📊',
-            content: labDataExtraction 
+            content: labDataExtraction
               ? `Your lab report has been analyzed. Chat with our AI to discuss your results and optimize your formula.`
               : `Your lab report "${uploadedFile.name}" has been uploaded. It will be analyzed shortly.`,
-            metadata: { 
-              actionUrl: '/dashboard/chat', 
-              icon: 'beaker', 
-              priority: 'medium' 
+            metadata: {
+              actionUrl: '/dashboard/chat',
+              icon: 'beaker',
+              priority: 'medium'
             }
           });
           console.log('📬 Lab upload notification created for user', userId);
@@ -6381,7 +6382,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       };
 
       res.json(responseData);
-      
+
     } catch (error) {
       // Log failed upload with full error details
       console.error("HIPAA AUDIT LOG - Upload Error:", {
@@ -6397,14 +6398,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       });
 
       if (error instanceof Error && error.name === 'ConsentRequiredError') {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'User consent required for file upload',
           details: error.message
         });
       }
-      
+
       console.error('File upload error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to upload file',
         details: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -6416,31 +6417,31 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const { fileId } = req.params;
       const userId = req.userId!;
-      
+
       // Get the file upload record
       const fileUpload = await storage.getFileUpload(fileId);
-      
+
       if (!fileUpload) {
         return res.status(404).json({ error: 'File not found' });
       }
-      
+
       if (fileUpload.userId !== userId) {
         return res.status(403).json({ error: 'Unauthorized' });
       }
-      
+
       if (fileUpload.type !== 'lab_report') {
         return res.status(400).json({ error: 'Only lab reports can be re-analyzed' });
       }
-      
+
       console.log('🔄 Re-analyzing lab report:', fileId, fileUpload.originalFileName);
-      
+
       // Trigger analysis
       const labData = await analyzeLabReport(
         fileUpload.objectPath,
         fileUpload.mimeType || 'text/plain',
         userId
       );
-      
+
       // Update the file upload with analyzed data
       await storage.updateFileUpload(fileId, {
         labReportData: {
@@ -6448,17 +6449,17 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           analysisStatus: 'completed'
         }
       });
-      
+
       console.log('✅ Re-analysis complete for:', fileId);
-      
-      res.json({ 
+
+      res.json({
         success: true,
         message: 'Lab report re-analyzed successfully',
         data: labData
       });
     } catch (error) {
       console.error('Re-analysis error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to re-analyze lab report',
         details: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -6500,7 +6501,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const currentFormula = await storage.getCurrentFormulaByUser(userId);
-      
+
       if (!currentFormula) {
         return res.status(404).json({ error: 'No formula found for user' });
       }
@@ -6528,7 +6529,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       const activeFormulas = await storage.getActiveFormulasByUser(userId);
-      
+
       // Calculate capsule info for each formula
       const formulasWithCapsuleInfo = activeFormulas.map(formula => ({
         ...formula,
@@ -6539,7 +6540,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           utilizationPercent: Math.round((formula.totalMg / ((formula.targetCapsules || 9) * 550)) * 100)
         }
       }));
-      
+
       res.json({ formulas: formulasWithCapsuleInfo });
     } catch (error) {
       console.error('Error fetching active formulas:', error);
@@ -6552,7 +6553,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const formulaHistory = await storage.getFormulaHistory(userId);
-      
+
       // Enrich with version change information
       const enrichedHistory = await Promise.all(
         formulaHistory.map(async (formula) => {
@@ -6563,7 +6564,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           };
         })
       );
-      
+
       res.json({ history: enrichedHistory });
     } catch (error) {
       console.error('Error fetching formula history:', error);
@@ -6576,16 +6577,16 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!; // TypeScript assertion: userId guaranteed after requireAuth
       const formulaId = req.params.formulaId;
-      
+
       const formula = await storage.getFormula(formulaId);
-      
+
       if (!formula || formula.userId !== userId) {
         return res.status(404).json({ error: 'Formula not found or access denied' });
       }
 
       // Get version changes for this formula
       const versionChanges = await storage.listFormulaVersionChanges(formulaId);
-      
+
       res.json({
         formula,
         versionChanges
@@ -6600,16 +6601,16 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/formulas/shared/:formulaId', async (req, res) => {
     try {
       const formulaId = req.params.formulaId;
-      
+
       const formula = await storage.getFormula(formulaId);
-      
+
       if (!formula) {
         return res.status(404).json({ error: 'Formula not found' });
       }
 
       // Get user info (non-sensitive fields only)
       const user = await storage.getUser(formula.userId);
-      
+
       // Return formula with minimal user info
       res.json({
         formula: {
@@ -6640,14 +6641,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId;
       const { formulaId, reason } = req.body;
-      
+
       if (!formulaId || !reason) {
         return res.status(400).json({ error: 'Formula ID and revert reason are required' });
       }
 
       // Get the formula to revert to
       const originalFormula = await storage.getFormula(formulaId);
-      
+
       if (!originalFormula || originalFormula.userId !== userId) {
         return res.status(404).json({ error: 'Formula not found or access denied' });
       }
@@ -6656,8 +6657,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const originalCapsules = originalFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
       const maxForOriginal = getMaxDosageForCapsules(originalCapsules);
       if (originalFormula.totalMg > maxForOriginal) {
-        return res.status(400).json({ 
-          error: `Cannot revert to this formula as it exceeds the ${originalCapsules}-capsule budget of ${maxForOriginal}mg (this version has ${originalFormula.totalMg}mg). This formula may have been created before capsule limits were enforced. Please create a new formula instead.` 
+        return res.status(400).json({
+          error: `Cannot revert to this formula as it exceeds the ${originalCapsules}-capsule budget of ${maxForOriginal}mg (this version has ${originalFormula.totalMg}mg). This formula may have been created before capsule limits were enforced. Please create a new formula instead.`
         });
       }
 
@@ -6690,18 +6691,18 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           title: `Formula Reverted to V${originalFormula.version}`,
           content: `Your formula has been reverted. Reason: ${reason}`,
           formulaId: revertedFormula.id,
-          metadata: { 
-            actionUrl: '/dashboard/my-formula', 
-            icon: 'beaker', 
-            priority: 'low' 
+          metadata: {
+            actionUrl: '/dashboard/my-formula',
+            icon: 'beaker',
+            priority: 'low'
           }
         });
       } catch (notifError) {
         console.error('Failed to create reversion notification:', notifError);
       }
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         formula: revertedFormula,
         message: `Successfully reverted to version ${originalFormula.version}`
       });
@@ -6722,22 +6723,22 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const allAdded = [...(addedBases || []), ...(addedIndividuals || [])];
       for (const item of allAdded) {
         if (!isValidIngredient(item.ingredient)) {
-          return res.status(400).json({ 
-            error: `Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.` 
+          return res.status(400).json({
+            error: `Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.`
           });
         }
       }
 
       // Get the formula
       const formula = await storage.getFormula(formulaId);
-      
+
       if (!formula || formula.userId !== userId) {
         return res.status(404).json({ error: 'Formula not found or access denied' });
       }
 
       // Calculate new total mg with customizations
       let newTotalMg = formula.totalMg;
-      
+
       if (addedBases) {
         for (const base of addedBases) {
           const dose = getIngredientDose(base.ingredient);
@@ -6746,7 +6747,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           }
         }
       }
-      
+
       if (addedIndividuals) {
         for (const individual of addedIndividuals) {
           const dose = getIngredientDose(individual.ingredient);
@@ -6761,8 +6762,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const maxForFormula = getMaxDosageForCapsules(formulaCapsules);
       if (newTotalMg > maxForFormula) {
         const addedMg = newTotalMg - formula.totalMg;
-        return res.status(400).json({ 
-          error: `Adding these ingredients would exceed the ${formulaCapsules}-capsule budget of ${maxForFormula}mg. Current formula: ${formula.totalMg}mg, Adding: ${addedMg}mg, New total would be: ${newTotalMg}mg. Please remove some ingredients first or increase your capsule count.` 
+        return res.status(400).json({
+          error: `Adding these ingredients would exceed the ${formulaCapsules}-capsule budget of ${maxForFormula}mg. Current formula: ${formula.totalMg}mg, Adding: ${addedMg}mg, New total would be: ${newTotalMg}mg. Please remove some ingredients first or increase your capsule count.`
         });
       }
 
@@ -6773,7 +6774,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         newTotalMg
       );
 
-      res.json({ 
+      res.json({
         success: true,
         formula: updatedFormula,
         message: 'Formula customized successfully'
@@ -6792,8 +6793,8 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
       // Validate that at least one ingredient is provided
       if ((!bases || bases.length === 0) && (!individuals || individuals.length === 0)) {
-        return res.status(400).json({ 
-          error: 'At least one ingredient is required to create a formula' 
+        return res.status(400).json({
+          error: 'At least one ingredient is required to create a formula'
         });
       }
 
@@ -6801,15 +6802,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const allIngredients = [...(bases || []), ...(individuals || [])];
       for (const item of allIngredients) {
         if (!isValidIngredient(item.ingredient)) {
-          return res.status(400).json({ 
-            error: `Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.` 
+          return res.status(400).json({
+            error: `Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.`
           });
         }
       }
 
       // Calculate total mg
       let totalMg = 0;
-      
+
       if (bases) {
         for (const base of bases) {
           const dose = getIngredientDose(base.ingredient);
@@ -6818,7 +6819,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           }
         }
       }
-      
+
       if (individuals) {
         for (const individual of individuals) {
           const dose = getIngredientDose(individual.ingredient);
@@ -6832,14 +6833,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const userTargetCapsules = targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
       const maxForUserCapsules = getMaxDosageForCapsules(userTargetCapsules);
       if (totalMg > maxForUserCapsules) {
-        return res.status(400).json({ 
-          error: `Total dosage of ${totalMg}mg exceeds the ${userTargetCapsules}-capsule budget of ${maxForUserCapsules}mg. Please remove some ingredients or increase capsule count.` 
+        return res.status(400).json({
+          error: `Total dosage of ${totalMg}mg exceeds the ${userTargetCapsules}-capsule budget of ${maxForUserCapsules}mg. Please remove some ingredients or increase capsule count.`
         });
       }
 
       if (totalMg < 100) {
-        return res.status(400).json({ 
-          error: `Total dosage of ${totalMg}mg is too low. Please add more ingredients (minimum 100mg recommended).` 
+        return res.status(400).json({
+          error: `Total dosage of ${totalMg}mg is too low. Please add more ingredients (minimum 100mg recommended).`
         });
       }
 
@@ -6875,10 +6876,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           title: `Custom Formula V${nextVersion} Created`,
           content: `You've built a custom formula with ${totalMg}mg of ingredients. Consider having AI review it for optimization.`,
           formulaId: newFormula.id,
-          metadata: { 
-            actionUrl: '/dashboard/my-formula', 
-            icon: 'beaker', 
-            priority: 'medium' 
+          metadata: {
+            actionUrl: '/dashboard/my-formula',
+            icon: 'beaker',
+            priority: 'medium'
           }
         });
       } catch (notifError) {
@@ -6886,7 +6887,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
 
       // Invalidate queries to refresh UI
-      res.json({ 
+      res.json({
         success: true,
         formula: newFormula,
         message: 'Custom formula created successfully'
@@ -6914,7 +6915,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
       // Get the formula to verify ownership
       const formula = await storage.getFormula(formulaId);
-      
+
       if (!formula || formula.userId !== userId) {
         return res.status(404).json({ error: 'Formula not found or access denied' });
       }
@@ -6922,7 +6923,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Update the formula name
       const updatedFormula = await storage.updateFormulaName(formulaId, name.trim());
 
-      res.json({ 
+      res.json({
         success: true,
         formula: updatedFormula,
         message: 'Formula renamed successfully'
@@ -6941,7 +6942,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
       // Get the formula to verify ownership
       const formula = await storage.getFormula(formulaId);
-      
+
       if (!formula || formula.userId !== userId) {
         return res.status(404).json({ error: 'Formula not found or access denied' });
       }
@@ -6953,7 +6954,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Archive the formula
       const archivedFormula = await storage.archiveFormula(formulaId);
 
-      res.json({ 
+      res.json({
         success: true,
         formula: archivedFormula,
         message: 'Formula archived successfully'
@@ -6972,7 +6973,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
 
       // Get the formula to verify ownership
       const formula = await storage.getFormula(formulaId);
-      
+
       if (!formula || formula.userId !== userId) {
         return res.status(404).json({ error: 'Formula not found or access denied' });
       }
@@ -6984,7 +6985,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // Restore the formula
       const restoredFormula = await storage.restoreFormula(formulaId);
 
-      res.json({ 
+      res.json({
         success: true,
         formula: restoredFormula,
         message: 'Formula restored successfully'
@@ -7000,7 +7001,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId;
       const archivedFormulas = await storage.getArchivedFormulas(userId);
-      
+
       res.json({ archived: archivedFormulas });
     } catch (error) {
       console.error('Error fetching archived formulas:', error);
@@ -7038,7 +7039,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId;
       const { id1, id2 } = req.params;
-      
+
       const [formula1, formula2] = await Promise.all([
         storage.getFormula(id1),
         storage.getFormula(id2)
@@ -7058,20 +7059,20 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         formula2,
         differences: {
           totalMgChange: formula2.totalMg - formula1.totalMg,
-          basesAdded: formula2.bases.filter(b2 => 
+          basesAdded: formula2.bases.filter(b2 =>
             !formula1.bases.some(b1 => b1.ingredient === b2.ingredient)
           ),
-          basesRemoved: formula1.bases.filter(b1 => 
+          basesRemoved: formula1.bases.filter(b1 =>
             !formula2.bases.some(b2 => b2.ingredient === b1.ingredient)
           ),
           basesModified: formula2.bases.filter(b2 => {
             const b1 = formula1.bases.find(b => b.ingredient === b2.ingredient);
             return b1 && b1.amount !== b2.amount;
           }),
-          additionsAdded: (formula2.additions || []).filter(a2 => 
+          additionsAdded: (formula2.additions || []).filter(a2 =>
             !(formula1.additions || []).some(a1 => a1.ingredient === a2.ingredient)
           ),
-          additionsRemoved: (formula1.additions || []).filter(a1 => 
+          additionsRemoved: (formula1.additions || []).filter(a1 =>
             !(formula2.additions || []).some(a2 => a2.ingredient === a1.ingredient)
           ),
           additionsModified: (formula2.additions || []).filter(a2 => {
@@ -7092,15 +7093,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/ingredients/:ingredientName', requireAuth, async (req: any, res: any) => {
     try {
       const ingredientName = req.params.ingredientName;
-      
+
       // Add no-cache headers to ensure fresh data
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.set('Pragma', 'no-cache');
       res.set('Expires', '0');
-      
+
       // Use unified lookup function to pull from INDIVIDUAL_INGREDIENTS and SYSTEM_SUPPORT_DETAILS
       const comprehensiveInfo = getComprehensiveIngredientInfo(ingredientName);
-      
+
       const ingredientInfo = {
         name: ingredientName,
         dosage: comprehensiveInfo.standardDose || CANONICAL_DOSES_MG[ingredientName as keyof typeof CANONICAL_DOSES_MG] || 0,
@@ -7129,16 +7130,16 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/ingredients/:ingredientName/research', requireAuth, async (req: any, res: any) => {
     try {
       const ingredientName = req.params.ingredientName;
-      
+
       // Import pre-built research data
       const { getIngredientResearch } = await import('@shared/ingredient-research');
       const research = getIngredientResearch(ingredientName);
-      
+
       // Add no-cache headers to ensure fresh data
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.set('Pragma', 'no-cache');
       res.set('Expires', '0');
-      
+
       if (research) {
         // Convert pre-built research to citation format
         const citations = research.studies.map((study, index) => ({
@@ -7157,7 +7158,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           createdAt: new Date(),
           updatedAt: new Date()
         }));
-        
+
         res.json({
           ingredientName,
           summary: research.summary,
@@ -7204,7 +7205,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   } {
     // IMPORTANT: Normalize name once and use canonical name throughout for consistent metadata lookup
     const canonicalName = normalizeIngredientName(ingredientName);
-    
+
     // 1. First check INDIVIDUAL_INGREDIENTS catalog using shared helper
     const individualIngredient = findIngredientByName(ingredientName);
 
@@ -7233,7 +7234,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const activeIngredient = formula.activeIngredients?.find(
         ai => ai.name.toLowerCase() === canonicalName.toLowerCase()
       );
-      
+
       if (activeIngredient) {
         return {
           benefits: activeIngredient.benefits || ['Supports overall health and wellness'],
@@ -7259,7 +7260,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const formulaDetails = SYSTEM_SUPPORT_DETAILS.find(
         f => f.name.toLowerCase() === canonicalName.toLowerCase()
       );
-      
+
       // Build comprehensive benefits list from description and active ingredients
       const benefits: string[] = [];
       if (formulaDetails?.description) {
@@ -7276,7 +7277,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       if (benefits.length === 0) {
         benefits.push('Comprehensive system support');
       }
-      
+
       return {
         benefits,
         category: 'system support',
@@ -7315,7 +7316,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       'CoEnzyme Q10': ['May interact with blood pressure medications - consult healthcare provider'],
       'Hawthorn Berry': ['May interact with heart medications - consult healthcare provider']
     };
-    
+
     return knownInteractions[ingredient] || [];
   }
 
@@ -7326,7 +7327,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       'Magnesium': 48,
       'Zinc': 136
     };
-    
+
     return dvValues[ingredient] || null;
   }
 
@@ -7337,7 +7338,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       'CoEnzyme Q10': ['Fermented yeast', 'Natural synthesis'],
       'Hawthorn Berry': ['Hawthorn fruit and leaf extract']
     };
-    
+
     return sources[ingredient] || ['Premium natural sources'];
   }
 
@@ -7355,7 +7356,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       'Vitamin D3': ['Vitamin D2', 'Sunlight exposure'],
       'Magnesium': ['Magnesium oxide', 'Magnesium malate']
     };
-    
+
     return alternatives[ingredient] || [];
   }
 
@@ -7375,11 +7376,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       // Get user's notification preferences
       const prefs = await storage.getNotificationPrefs(user.id);
-      
+
       // Determine if we should send email/SMS based on notification type and user preferences
       let shouldSendEmail = false;
       let shouldSendSms = false;
-      
+
       if (prefs) {
         switch (notification.type) {
           case 'order_update':
@@ -7404,7 +7405,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         shouldSendEmail = true;
         shouldSendSms = false;
       }
-      
+
       // Build the full action URL if provided
       let actionUrl = notification.metadata?.actionUrl;
       if (actionUrl) {
@@ -7413,7 +7414,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           actionUrl = `${baseUrl}${actionUrl}`;
         }
       }
-      
+
       // Send email if enabled
       if (shouldSendEmail) {
         await sendNotificationEmail({
@@ -7428,13 +7429,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       } else {
         console.log(`📧 Email skipped for user ${user.email} - notification type ${notification.type} disabled in preferences`);
       }
-      
+
       // Send SMS if enabled and user has a phone number
       if (shouldSendSms && user.phone) {
-        const smsMessage = actionUrl 
+        const smsMessage = actionUrl
           ? `${notification.content} ${actionUrl}`
           : notification.content;
-          
+
         await sendNotificationSms({
           to: user.phone,
           message: smsMessage,
@@ -7479,12 +7480,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       const notificationId = req.params.id;
-      
+
       const notification = await storage.markNotificationAsRead(notificationId, userId);
       if (!notification) {
         return res.status(404).json({ error: 'Notification not found' });
       }
-      
+
       res.json({ notification });
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -7496,11 +7497,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       const success = await storage.markAllNotificationsAsRead(userId);
-      
+
       if (!success) {
         return res.status(500).json({ error: 'Failed to mark all notifications as read' });
       }
-      
+
       res.json({ success: true });
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
@@ -7513,7 +7514,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       let prefs = await storage.getNotificationPrefs(userId);
-      
+
       // Create default preferences if they don't exist
       if (!prefs) {
         prefs = await storage.createNotificationPrefs({
@@ -7526,7 +7527,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           smsBilling: false,
         });
       }
-      
+
       res.json(prefs);
     } catch (error) {
       console.error('Error fetching notification preferences:', error);
@@ -7537,12 +7538,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.put('/api/notification-prefs', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      const { 
-        emailConsultation, 
-        emailShipping, 
-        emailBilling, 
-        smsConsultation, 
-        smsShipping, 
+      const {
+        emailConsultation,
+        emailShipping,
+        emailBilling,
+        smsConsultation,
+        smsShipping,
         smsBilling,
         dailyRemindersEnabled,
         reminderBreakfast,
@@ -7561,24 +7562,24 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         nutritionCustomTime,
         lifestyleCustomTime,
       } = req.body;
-      
+
       // Validate boolean input
       if (
-        typeof emailConsultation !== 'boolean' || 
-        typeof emailShipping !== 'boolean' || 
+        typeof emailConsultation !== 'boolean' ||
+        typeof emailShipping !== 'boolean' ||
         typeof emailBilling !== 'boolean' ||
-        typeof smsConsultation !== 'boolean' || 
-        typeof smsShipping !== 'boolean' || 
+        typeof smsConsultation !== 'boolean' ||
+        typeof smsShipping !== 'boolean' ||
         typeof smsBilling !== 'boolean'
       ) {
         return res.status(400).json({ error: 'Invalid preference values' });
       }
-      
+
       // Validate daily reminder fields if provided
       if (dailyRemindersEnabled !== undefined && typeof dailyRemindersEnabled !== 'boolean') {
         return res.status(400).json({ error: 'Invalid dailyRemindersEnabled value' });
       }
-      
+
       // Validate time slot values
       const validTimeSlots = ['morning', 'afternoon', 'evening', 'custom', 'off', 'all'];
       if (pillsTimeSlot && !validTimeSlots.includes(pillsTimeSlot)) {
@@ -7593,9 +7594,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       if (lifestyleTimeSlot && !validTimeSlots.includes(lifestyleTimeSlot)) {
         return res.status(400).json({ error: 'Invalid lifestyleTimeSlot value' });
       }
-      
+
       let prefs = await storage.getNotificationPrefs(userId);
-      
+
       if (!prefs) {
         // Create if doesn't exist
         prefs = await storage.createNotificationPrefs({
@@ -7642,11 +7643,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           lifestyleCustomTime: lifestyleCustomTime !== undefined ? lifestyleCustomTime : (prefs as any).lifestyleCustomTime,
         });
       }
-      
+
       if (!prefs) {
         return res.status(500).json({ error: 'Failed to update preferences' });
       }
-      
+
       res.json(prefs);
     } catch (error) {
       console.error('Error updating notification preferences:', error);
@@ -7655,19 +7656,19 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   });
 
   // Review Schedule endpoints
-  
+
   // Get review schedule for a formula
   app.get('/api/formulas/:formulaId/review-schedule', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
       const { formulaId } = req.params;
-      
+
       // Verify the formula belongs to the user
       const formula = await storage.getFormula(formulaId);
       if (!formula || formula.userId !== userId) {
         return res.status(404).json({ error: 'Formula not found' });
       }
-      
+
       const schedule = await storage.getReviewSchedule(userId, formulaId);
       res.json(schedule || null);
     } catch (error) {
@@ -7675,7 +7676,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       res.status(500).json({ error: 'Failed to fetch review schedule' });
     }
   });
-  
+
   // Create or update review schedule
   app.put('/api/formulas/:formulaId/review-schedule', requireAuth, async (req, res) => {
     try {
@@ -7688,44 +7689,44 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         smsReminders,
         calendarIntegration,
       } = req.body;
-      
+
       // Verify the formula belongs to the user
       const formula = await storage.getFormula(formulaId);
       if (!formula || formula.userId !== userId) {
         return res.status(404).json({ error: 'Formula not found' });
       }
-      
+
       // Validate frequency
       if (!['monthly', 'bimonthly', 'quarterly'].includes(frequency)) {
         return res.status(400).json({ error: 'Invalid frequency. Must be monthly, bimonthly, or quarterly' });
       }
-      
+
       // Validate daysBefore
       if (typeof daysBefore !== 'number' || daysBefore < 1 || daysBefore > 14) {
         return res.status(400).json({ error: 'daysBefore must be between 1 and 14' });
       }
-      
+
       // Calculate next review date based on frequency and formula creation date
       const frequencyDays: Record<string, number> = {
         monthly: 30,
         bimonthly: 60,
         quarterly: 90,
       };
-      
+
       const days = frequencyDays[frequency];
-      
+
       const formulaDate = new Date(formula.createdAt);
       const nextReviewDate = new Date(formulaDate);
       nextReviewDate.setDate(nextReviewDate.getDate() + days - daysBefore);
-      
+
       // If the calculated date is in the past, add another cycle
       if (nextReviewDate < new Date()) {
         nextReviewDate.setDate(nextReviewDate.getDate() + days);
       }
-      
+
       // Check if schedule already exists
       const existingSchedule = await storage.getReviewSchedule(userId, formulaId);
-      
+
       let schedule;
       if (existingSchedule) {
         // Update existing
@@ -7753,31 +7754,31 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           isActive: true,
         });
       }
-      
+
       res.json(schedule);
     } catch (error) {
       console.error('Error saving review schedule:', error);
       res.status(500).json({ error: 'Failed to save review schedule' });
     }
   });
-  
+
   // Delete review schedule
   app.delete('/api/formulas/:formulaId/review-schedule', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
       const { formulaId } = req.params;
-      
+
       // Verify the formula belongs to the user
       const formula = await storage.getFormula(formulaId);
       if (!formula || formula.userId !== userId) {
         return res.status(404).json({ error: 'Formula not found' });
       }
-      
+
       const schedule = await storage.getReviewSchedule(userId, formulaId);
       if (!schedule) {
         return res.status(404).json({ error: 'Review schedule not found' });
       }
-      
+
       await storage.deleteReviewSchedule(schedule.id);
       res.json({ success: true });
     } catch (error) {
@@ -7785,35 +7786,35 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       res.status(500).json({ error: 'Failed to delete review schedule' });
     }
   });
-  
+
   // Download .ics calendar file for review schedule
   app.get('/api/formulas/:formulaId/review-schedule/calendar', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
       const { formulaId } = req.params;
-      
+
       // Verify the formula belongs to the user
       const formula = await storage.getFormula(formulaId);
       if (!formula || formula.userId !== userId) {
         return res.status(404).json({ error: 'Formula not found' });
       }
-      
+
       // Get review schedule
       const schedule = await storage.getReviewSchedule(userId, formulaId);
       if (!schedule) {
         return res.status(404).json({ error: 'Review schedule not found. Please set up your review schedule first.' });
       }
-      
+
       // Get user for calendar event
       const user = await storage.getUserById(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-      
+
       // Generate .ics file
       const { generateReviewCalendarEvent } = await import('./calendarGenerator');
       const icsContent = generateReviewCalendarEvent(schedule, user.name);
-      
+
       // Send as downloadable file
       res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="ones-review.ics"');
@@ -7829,11 +7830,11 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       const user = await storage.getUserById(userId);
-      
+
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-      
+
       // Create sample notifications
       const sampleNotifications = [
         {
@@ -7856,7 +7857,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       for (const notification of sampleNotifications) {
         const created = await storage.createNotification(notification);
         createdNotifications.push(created);
-        
+
         // Send email notification if user has email preferences enabled
         await sendNotificationsForUser(created, user);
       }
@@ -7873,12 +7874,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       // Only allow users to test notifications for themselves
       const userId = req.userId!;
-      
+
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-      
+
       // Create a test notification
       const testNotification = {
         userId,
@@ -7887,12 +7888,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         content: 'Testing your email and SMS notification system! If you receive this via both email and SMS, everything is working perfectly. 🎉',
         isRead: false,
       };
-      
+
       const created = await storage.createNotification(testNotification);
       await sendNotificationsForUser(created, user);
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         notification: created,
         message: 'Test notification sent! Check your email and phone.'
       });
@@ -7957,22 +7958,22 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.post('/api/support/tickets', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      
+
       // Validate request body with Zod
       const validationResult = insertSupportTicketSchema.safeParse(req.body);
       if (!validationResult.success) {
-        return res.status(400).json({ 
-          error: 'Invalid ticket data', 
-          details: validationResult.error.errors 
+        return res.status(400).json({
+          error: 'Invalid ticket data',
+          details: validationResult.error.errors
         });
       }
-      
+
       const ticketData = {
         ...validationResult.data,
         userId
       };
       const ticket = await storage.createSupportTicket(ticketData);
-      
+
       // Send email notification to support team
       try {
         const user = await storage.getUserById(userId);
@@ -8000,7 +8001,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         // Log but don't fail the ticket creation if email fails
         console.error('Failed to send support notification email:', emailError);
       }
-      
+
       res.json({ ticket });
     } catch (error) {
       console.error('Error creating support ticket:', error);
@@ -8012,25 +8013,25 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       const ticketId = req.params.id;
-      
+
       // Validate request body with Zod
       const messageValidation = z.object({
         message: z.string().min(1, 'Message cannot be empty').max(2000, 'Message too long')
       }).safeParse(req.body);
-      
+
       if (!messageValidation.success) {
-        return res.status(400).json({ 
-          error: 'Invalid message data', 
-          details: messageValidation.error.errors 
+        return res.status(400).json({
+          error: 'Invalid message data',
+          details: messageValidation.error.errors
         });
       }
-      
+
       // Verify user owns the ticket
       const ticket = await storage.getSupportTicket(ticketId);
       if (!ticket || ticket.userId !== userId) {
         return res.status(404).json({ error: 'Support ticket not found' });
       }
-      
+
       const responseData = {
         ticketId,
         userId,
@@ -8038,7 +8039,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         isStaff: false
       };
       const response = await storage.createSupportTicketResponse(responseData);
-      
+
       // Send email notification to support team about new user response
       try {
         const user = await storage.getUserById(userId);
@@ -8064,7 +8065,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         // Log but don't fail if email fails
         console.error('Failed to send response notification email:', emailError);
       }
-      
+
       res.json({ response });
     } catch (error) {
       console.error('Error creating support ticket response:', error);
@@ -8090,10 +8091,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       if (!article) {
         return res.status(404).json({ error: 'Help article not found' });
       }
-      
+
       // Increment view count
       await storage.incrementHelpArticleViewCount(req.params.id);
-      
+
       res.json({ article });
     } catch (error) {
       console.error('Error fetching help article:', error);
@@ -8105,13 +8106,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.post('/api/test/sms-reminder', requireAuth, async (req, res) => {
     try {
       const { checkAndSendReminders } = await import('./smsReminderScheduler');
-      
+
       console.log('🧪 Manual SMS reminder test triggered by user:', req.userId);
       await checkAndSendReminders();
-      
-      res.json({ 
-        success: true, 
-        message: 'SMS reminder check completed. Check server logs for results.' 
+
+      res.json({
+        success: true,
+        message: 'SMS reminder check completed. Check server logs for results.'
       });
     } catch (error) {
       console.error('Test SMS reminder error:', error);
@@ -8123,7 +8124,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.post('/api/newsletter/subscribe', async (req, res) => {
     try {
       const { email } = insertNewsletterSubscriberSchema.parse(req.body);
-      
+
       // Check if email already exists
       const existing = await storage.getNewsletterSubscriberByEmail(email);
       if (existing) {
@@ -8135,26 +8136,26 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           return res.json({ success: true, message: 'Subscription reactivated' });
         }
       }
-      
+
       // Create new subscription
       const subscriber = await storage.createNewsletterSubscriber({ email });
       res.json({ success: true, subscriber });
     } catch (error) {
       // Handle Zod validation errors with 400
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          error: 'Invalid email address', 
-          details: error.errors 
+        return res.status(400).json({
+          error: 'Invalid email address',
+          details: error.errors
         });
       }
-      
+
       console.error('Newsletter subscription error:', error);
       res.status(500).json({ error: 'Failed to subscribe to newsletter' });
     }
   });
 
   // ========== ADMIN ROUTES (Protected with requireAdmin middleware) ==========
-  
+
   // Admin: Test current AI settings by making a tiny provider call
   app.post('/api/admin/ai-settings/test', requireAdmin, async (req, res) => {
     try {
@@ -8192,7 +8193,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       }
     }
   });
-  
+
   // Admin: Get/set AI runtime settings (provider/model override)
   app.get('/api/admin/ai-settings', requireAdmin, async (req, res) => {
     try {
@@ -8218,13 +8219,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         aiRuntimeSettings.updatedAt = new Date().toISOString();
         aiRuntimeSettings.source = 'env';
         // Remove persisted settings to revert to env defaults
-        try { await storage.deleteAppSetting('ai_settings'); } catch {}
+        try { await storage.deleteAppSetting('ai_settings'); } catch { }
         return res.json({ success: true, message: 'AI settings reset to environment defaults', settings: aiRuntimeSettings });
       }
-      if (provider && !['openai','anthropic'].includes(String(provider).toLowerCase())) {
+      if (provider && !['openai', 'anthropic'].includes(String(provider).toLowerCase())) {
         return res.status(400).json({ error: 'Invalid provider. Must be "openai" or "anthropic".' });
       }
-      const effectiveProvider: 'openai'|'anthropic' = (provider ? String(provider).toLowerCase() : (aiRuntimeSettings.provider || (process.env.AI_PROVIDER as any) || 'openai')) as 'openai'|'anthropic';
+      const effectiveProvider: 'openai' | 'anthropic' = (provider ? String(provider).toLowerCase() : (aiRuntimeSettings.provider || (process.env.AI_PROVIDER as any) || 'openai')) as 'openai' | 'anthropic';
       if (provider) aiRuntimeSettings.provider = effectiveProvider;
 
       if (model) {
@@ -8257,7 +8258,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       res.status(500).json({ error: 'Failed to update AI settings' });
     }
   });
-  
+
   // Admin: Get dashboard statistics
   app.get('/api/admin/stats', requireAdmin, async (req, res) => {
     try {
@@ -8268,7 +8269,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       res.status(500).json({ error: 'Failed to fetch admin statistics' });
     }
   });
-  
+
   // Admin: Get user growth data
   app.get('/api/admin/analytics/growth', requireAdmin, async (req, res) => {
     try {
@@ -8280,7 +8281,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       res.status(500).json({ error: 'Failed to fetch growth data' });
     }
   });
-  
+
   // Admin: Get revenue data
   app.get('/api/admin/analytics/revenue', requireAdmin, async (req, res) => {
     try {
@@ -8292,7 +8293,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       res.status(500).json({ error: 'Failed to fetch revenue data' });
     }
   });
-  
+
   // Admin: Search and list users
   app.get('/api/admin/users', requireAdmin, async (req, res) => {
     try {
@@ -8300,12 +8301,12 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const limit = parseInt(req.query.limit as string) || 20;
       const offset = parseInt(req.query.offset as string) || 0;
       const filter = (req.query.filter as string) || 'all'; // 'all', 'paid', 'active'
-      
+
       const result = await storage.searchUsers(query, limit, offset, filter);
-      
+
       // Sanitize users to remove sensitive fields
       const sanitizedUsers = result.users.map(({ password, ...user }) => user);
-      
+
       res.json({
         users: sanitizedUsers,
         total: result.total
@@ -8315,14 +8316,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       res.status(500).json({ error: 'Failed to search users' });
     }
   });
-  
+
   // Admin: Get detailed user information - MIGRATED to admin.routes.ts
   // (Removed duplicate route - see admin.routes.ts /users/:id)
-  
+
   // Admin: Get today's orders
   // NOTE: This route is also in admin.routes.ts - keeping for backward compatibility during migration
   // TODO: Remove once admin.routes.ts migration is verified
-  
+
   // Admin: Get all support tickets - MIGRATED to admin.routes.ts
   // The following admin routes have been migrated to admin.routes.ts:
   // - /api/admin/users/:id/timeline
@@ -8337,7 +8338,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   // All OAuth, data sync, and token refresh is handled by Junction API + webhooks
 
   // ===== OPTIMIZE FEATURE ROUTES =====
-  
+
   // Get user's optimize plans
   app.get('/api/optimize/plans', requireAuth, async (req, res) => {
     try {
@@ -8355,7 +8356,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       const streaks = [];
-      
+
       // Get all streak types
       const streakTypes = ['overall', 'nutrition', 'workout', 'lifestyle'] as const;
       for (const type of streakTypes) {
@@ -8364,7 +8365,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           streaks.push(streak);
         }
       }
-      
+
       res.json(streaks);
     } catch (error) {
       console.error('Error fetching streaks:', error);
@@ -8376,13 +8377,13 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
   app.get('/api/optimize/streaks/smart', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      
+
       // Get user's timezone for correct day boundary
       const user = await storage.getUser(userId);
       const userTimezone = user?.timezone || 'America/New_York';
-      
+
       const smartData = await storage.getSmartStreakData(userId, userTimezone);
-      
+
       // Debug logging for today's breakdown
       const todayStr = getUserLocalDateString(userTimezone);
       console.log('🧮 Smart Streak Data for today:', {
@@ -8390,7 +8391,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         todayBreakdown: smartData.todayBreakdown,
         todayProgress: smartData.monthlyProgress.find((d: { date: string }) => d.date === todayStr),
       });
-      
+
       res.json(smartData);
     } catch (error) {
       console.error('Error fetching smart streak data:', error);
@@ -8460,15 +8461,15 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       const userId = req.userId!;
       const { date } = req.body;
       const logDate = date ? new Date(date) : new Date();
-      
+
       // Calculate and save all scores, then update all streaks
       const streakResults = await storage.updateAllStreaks(userId, logDate);
       const summary = await storage.getStreakSummary(userId);
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         updatedStreaks: streakResults,
-        summary 
+        summary
       });
     } catch (error) {
       console.error('Error recalculating streaks:', error);
@@ -8481,9 +8482,9 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
     try {
       const userId = req.userId!;
       const { planTypes, preferences } = req.body;
-      
+
       console.log('🎯 OPTIMIZE PLAN GENERATION STARTED', { userId, planTypes, preferences });
-      
+
       if (!Array.isArray(planTypes) || planTypes.length === 0) {
         return res.status(400).json({ error: 'planTypes array is required' });
       }
@@ -8534,7 +8535,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       async function generateSinglePlan(planType: string): Promise<{ planType: string; plan: any }> {
         console.log(`🤖 [${planType}] Starting plan generation...`);
         let prompt: string;
-        
+
         // Select prompt builder based on plan type
         switch (planType) {
           case 'nutrition':
@@ -8543,7 +8544,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           case 'workout':
             try {
               const workoutAnalysis = await analyzeWorkoutHistory(userId);
-              const historyContext = workoutAnalysis.allTime.totalWorkouts > 0 
+              const historyContext = workoutAnalysis.allTime.totalWorkouts > 0
                 ? formatAnalysisForPrompt(workoutAnalysis) : undefined;
               prompt = buildWorkoutPlanPrompt(optimizeContext, undefined, historyContext);
             } catch {
@@ -8558,17 +8559,17 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         }
 
         console.log(`📝 [${planType}] Prompt built, length: ${prompt.length} chars`);
-        
+
         let planContent: any;
         let rationale = '';
 
         try {
-          const systemPrompt = planType === 'nutrition' 
+          const systemPrompt = planType === 'nutrition'
             ? "You are a clinical nutrition expert. You MUST generate a complete 7-day meal plan (Monday-Sunday). Do not stop early. The response must be valid JSON containing all 7 days."
             : planType === 'workout'
-            ? "You are an expert fitness coach. Generate a complete weekly workout plan. The response must be valid JSON."
-            : "You are a wellness and lifestyle expert. Generate a comprehensive lifestyle optimization plan. The response must be valid JSON.";
-          
+              ? "You are an expert fitness coach. Generate a complete weekly workout plan. The response must be valid JSON."
+              : "You are a wellness and lifestyle expert. Generate a comprehensive lifestyle optimization plan. The response must be valid JSON.";
+
           const startTime = Date.now();
           const aiResponse = await callAnthropic(systemPrompt, [{ role: 'user', content: prompt }], 'claude-haiku-4-5', 0.7, 8000, false);
           console.log(`⏱️ [${planType}] Haiku response: ${Date.now() - startTime}ms`);
@@ -8582,10 +8583,10 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
         }
 
         const normalizedContent = normalizePlanContent(planType as 'nutrition' | 'workout' | 'lifestyle', planContent);
-        
+
         // IMPORTANT: Deactivate old plans of this type before creating new one
         await storage.deactivateOldPlans(userId, planType as 'nutrition' | 'workout' | 'lifestyle');
-        
+
         const plan = await storage.createOptimizePlan({
           userId,
           planType,
@@ -8596,7 +8597,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           basedOnLabs: labAnalyses.length > 0 ? labAnalyses[0] : null,
           isActive: true,
         });
-        
+
         console.log(`✅ [${planType}] Plan saved: ${plan.id}`);
         return { planType, plan };
       }
@@ -8604,14 +8605,14 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
       // PARALLEL PLAN GENERATION - run all plans simultaneously!
       console.log(`🚀 Generating ${planTypes.length} plans IN PARALLEL: ${planTypes.join(', ')}`);
       const parallelStartTime = Date.now();
-      
+
       const planResults = await Promise.all(planTypes.map((pt: string) => generateSinglePlan(pt)));
-      
+
       const results: Record<string, any> = {};
       for (const { planType, plan } of planResults) {
         results[planType] = plan;
       }
-      
+
       console.log(`🎉 All ${planTypes.length} plans generated in ${Date.now() - parallelStartTime}ms (PARALLEL)`);
 
       // Auto-generate grocery list if nutrition plan was created
@@ -8621,7 +8622,7 @@ INSTRUCTIONS FOR GATHERING MISSING INFORMATION:
           const nutritionPlan = results.nutrition;
           const content = nutritionPlan.content as any;
           const weekPlan = content.weekPlan || [];
-          
+
           let mealsText = '';
           weekPlan.forEach((day: any) => {
             mealsText += `\nDay ${day.day} (${day.dayName}):\n`;
@@ -8676,7 +8677,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
 
           const responseContent = completion.choices[0].message.content || '{}';
           const parsed = JSON.parse(responseContent);
-          
+
           const items = (parsed.items || []).map((item: any) => ({
             id: nanoid(8),
             item: item.item,
@@ -8690,19 +8691,19 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
             const existingList = await storage.getActiveGroceryList(userId);
             const groceryList = existingList
               ? await storage.updateGroceryList(existingList.id, {
-                  optimizePlanId: nutritionPlan.id,
-                  items,
-                  generatedAt: new Date(),
-                  isArchived: false,
-                })
+                optimizePlanId: nutritionPlan.id,
+                items,
+                generatedAt: new Date(),
+                isArchived: false,
+              })
               : await storage.createGroceryList({
-                  userId,
-                  optimizePlanId: nutritionPlan.id,
-                  items,
-                  generatedAt: new Date(),
-                  isArchived: false,
-                });
-            
+                userId,
+                optimizePlanId: nutritionPlan.id,
+                items,
+                generatedAt: new Date(),
+                isArchived: false,
+              });
+
             console.log(`✅ Grocery list auto-generated with ${items.length} items`);
             results.groceryList = groceryList;
           } else {
@@ -8713,7 +8714,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
           // Don't fail the whole request if grocery list generation fails
         }
       }
-      
+
       res.json(results);
     } catch (error) {
       console.error('❌ Error generating optimize plans:', error);
@@ -8921,7 +8922,7 @@ Return ONLY the JSON, no explanation.`
       const user = await storage.getUser(userId);
       const userTimezone = user?.timezone || 'America/New_York';
       const today = getUserLocalMidnight(userTimezone);
-      
+
       const existingLog = await storage.getDailyLog(userId, today);
       const mealsLogged = new Set<string>(
         Array.isArray(existingLog?.mealsLogged) ? existingLog!.mealsLogged : [],
@@ -8959,12 +8960,12 @@ Return ONLY the JSON, no explanation.`
   app.get('/api/optimize/nutrition/today', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      
+
       // Get user's timezone for correct day boundary
       const user = await storage.getUser(userId);
       const userTimezone = user?.timezone || 'America/New_York';
       const today = getUserLocalMidnight(userTimezone);
-      
+
       const meals = await storage.getMealLogsForDay(userId, today);
       const totals = await storage.getTodayNutritionTotals(userId);
       const dailyLog = await storage.getDailyLog(userId, today);
@@ -8986,7 +8987,7 @@ Return ONLY the JSON, no explanation.`
     try {
       const userId = req.userId!;
       const limit = parseInt(req.query.limit as string) || 50;
-      
+
       const meals = await storage.getMealLogsHistory(userId, limit);
 
       res.json({ meals });
@@ -9003,7 +9004,7 @@ Return ONLY the JSON, no explanation.`
       const { mealId } = req.params;
 
       const deleted = await storage.deleteMealLog(userId, mealId);
-      
+
       if (!deleted) {
         return res.status(404).json({ error: 'Meal log not found' });
       }
@@ -9029,7 +9030,7 @@ Return ONLY the JSON, no explanation.`
       const user = await storage.getUser(userId);
       const userTimezone = user?.timezone || 'America/New_York';
       const today = getUserLocalMidnight(userTimezone);
-      
+
       const existingLog = await storage.getDailyLog(userId, today);
 
       let updatedLog;
@@ -9066,12 +9067,12 @@ Return ONLY the JSON, no explanation.`
   app.post('/api/optimize/nutrition/reset-water', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      
+
       // Get user's timezone for correct day boundary
       const user = await storage.getUser(userId);
       const userTimezone = user?.timezone || 'America/New_York';
       const today = getUserLocalMidnight(userTimezone);
-      
+
       const existingLog = await storage.getDailyLog(userId, today);
 
       if (existingLog) {
@@ -9098,8 +9099,8 @@ Return ONLY the JSON, no explanation.`
       const total = logs.length; // TODO: Add count query for pagination
 
       // Debug: Log what we're returning
-      console.log('📊 Returning workout logs:', { 
-        count: logs.length, 
+      console.log('📊 Returning workout logs:', {
+        count: logs.length,
         firstLogExercises: logs[0]?.exercisesCompleted ? JSON.stringify(logs[0].exercisesCompleted).substring(0, 500) : 'NO_DATA'
       });
 
@@ -9114,17 +9115,17 @@ Return ONLY the JSON, no explanation.`
   app.get('/api/optimize/workout/historical-analysis', requireAuth, async (req, res) => {
     try {
       const userId = req.userId!;
-      
+
       console.log('📊 Generating workout historical analysis for user:', userId);
-      
+
       const analysis = await analyzeWorkoutHistory(userId);
-      
-      console.log('📊 Analysis complete:', { 
+
+      console.log('📊 Analysis complete:', {
         totalWorkouts: analysis.allTime.totalWorkouts,
         lastWeekWorkouts: analysis.lastWeek?.workoutsCompleted || 0,
         prCount: analysis.allTime.personalRecords.length
       });
-      
+
       res.json(analysis);
     } catch (error) {
       console.error('❌ Error generating workout analysis:', error);
@@ -9145,7 +9146,7 @@ Return ONLY the JSON, no explanation.`
       // First, get the log to find its date (for daily log update)
       const allLogs = await storage.getAllWorkoutLogs(userId);
       const logToDelete = allLogs.find(log => log.id === logId);
-      
+
       if (!logToDelete) {
         return res.status(404).json({ error: 'Workout log not found or not authorized' });
       }
@@ -9209,7 +9210,7 @@ Return ONLY the JSON, no explanation.`
 
       console.log('📝 Creating workout log:', { userId, workoutId, completedAt, exerciseCount: exercisesCompleted?.length });
       // Log just the first exercise to verify structure without overwhelming output
-      console.log('🏋️ First exercise data:', { 
+      console.log('🏋️ First exercise data:', {
         firstExercise: exercisesCompleted?.[0] ? JSON.stringify(exercisesCompleted[0]) : 'NONE',
         exerciseNames: exercisesCompleted?.map((e: any) => e.name) || []
       });
@@ -9230,7 +9231,7 @@ Return ONLY the JSON, no explanation.`
       });
 
       console.log('✅ Workout log created:', { logId: log.id });
-      console.log('📊 Stored exercises count:', { 
+      console.log('📊 Stored exercises count:', {
         storedCount: (log.exercisesCompleted as any)?.length,
         firstStored: (log.exercisesCompleted as any)?.[0] ? JSON.stringify((log.exercisesCompleted as any)[0]) : 'NONE'
       });
@@ -9240,7 +9241,7 @@ Return ONLY the JSON, no explanation.`
         const logDate = new Date(completedAt);
         logDate.setHours(0, 0, 0, 0); // Normalize to start of day
         const existingDailyLog = await storage.getDailyLog(userId, logDate);
-        
+
         if (existingDailyLog) {
           await storage.updateDailyLog(existingDailyLog.id, {
             workoutCompleted: true,
@@ -9390,7 +9391,7 @@ Return ONLY valid JSON in this exact format:
 
       // Update the exercise in the plan
       exercises[exerciseIndex] = newExercise;
-      
+
       const updatedPlan = await storage.updateOptimizePlan(workoutPlan.id, {
         content: { ...(workoutPlan.content as any), weekPlan } as any,
       });
@@ -9521,16 +9522,16 @@ Return ONLY valid JSON in this exact format:
       const existingLog = await storage.getDailyLog(userId, logDate);
 
       // Handle granular supplement tracking
-      const resolvedMorning = typeof supplementMorning === 'boolean' 
-        ? supplementMorning 
+      const resolvedMorning = typeof supplementMorning === 'boolean'
+        ? supplementMorning
         : existingLog?.supplementMorning ?? false;
-      const resolvedAfternoon = typeof supplementAfternoon === 'boolean' 
-        ? supplementAfternoon 
+      const resolvedAfternoon = typeof supplementAfternoon === 'boolean'
+        ? supplementAfternoon
         : existingLog?.supplementAfternoon ?? false;
-      const resolvedEvening = typeof supplementEvening === 'boolean' 
-        ? supplementEvening 
+      const resolvedEvening = typeof supplementEvening === 'boolean'
+        ? supplementEvening
         : existingLog?.supplementEvening ?? false;
-      
+
       // supplementsTaken is true if any dose was taken (for backwards compatibility)
       const resolvedSupplementsTaken = typeof supplementsTaken === 'boolean'
         ? supplementsTaken
@@ -9612,7 +9613,7 @@ Return ONLY valid JSON in this exact format:
     try {
       const { planId, dayIndex, mealType, currentMealName, mealIndex } = req.body;
       console.log('🔄 Meal swap requested:', { userId: req.userId, planId, dayIndex, mealType, currentMealName, mealIndex });
-      
+
       // Get the current plan
       const plan = await storage.getOptimizePlan(planId);
       if (!plan) {
@@ -9631,7 +9632,7 @@ Return ONLY valid JSON in this exact format:
       }
 
       const dayPlan = weekPlan[dayIndex];
-      
+
       // Find meal by index if provided (most accurate), then name, then type
       let currentMeal;
       if (typeof mealIndex === 'number' && dayPlan.meals?.[mealIndex]) {
@@ -9731,7 +9732,7 @@ Return ONLY a valid JSON object with this EXACT structure (no markdown, no code 
       // Update the plan
       const updatedWeekPlan = weekPlan.map((day: any, idx: number) => {
         if (idx !== dayIndex) return day;
-        
+
         // If we have a specific meal index, use that directly (most accurate)
         if (typeof mealIndex === 'number' && day.meals[mealIndex]) {
           const newMeals = [...day.meals];
@@ -9762,7 +9763,7 @@ Return ONLY a valid JSON object with this EXACT structure (no markdown, no code 
       });
 
       console.log('✅ Meal swapped successfully:', newMeal.name);
-      res.json({ 
+      res.json({
         success: true,
         meal: newMeal,
         message: 'Meal swapped successfully'
@@ -9776,7 +9777,7 @@ Return ONLY a valid JSON object with this EXACT structure (no markdown, no code 
   app.post('/api/optimize/nutrition/recipe', requireAuth, async (req, res) => {
     try {
       const { mealName, ingredients, dietaryRestrictions } = req.body;
-      
+
       if (!mealName) {
         return res.status(400).json({ error: 'Meal name is required' });
       }
@@ -9845,7 +9846,7 @@ Return ONLY a valid JSON object with this EXACT structure (no markdown, no code 
       // Use AI to generate a smart, categorized grocery list
       const content = plan.content as any;
       const weekPlan = content.weekPlan || [];
-      
+
       let mealsText = '';
       weekPlan.forEach((day: any) => {
         mealsText += `\nDay ${day.day} (${day.dayName}):\n`;
@@ -9902,7 +9903,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
 
       const responseContent = completion.choices[0].message.content || '{}';
       const parsed = JSON.parse(responseContent);
-      
+
       const items = (parsed.items || []).map((item: any) => ({
         id: nanoid(8),
         item: item.item,
@@ -9919,25 +9920,25 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
         if (fallbackItems.length > 0) {
           items.push(...fallbackItems);
         } else {
-           return res.status(422).json({ error: 'Could not generate grocery list from this plan.' });
+          return res.status(422).json({ error: 'Could not generate grocery list from this plan.' });
         }
       }
 
       const existingList = await storage.getActiveGroceryList(userId);
       const list = existingList
         ? await storage.updateGroceryList(existingList.id, {
-            optimizePlanId: plan.id,
-            items,
-            generatedAt: new Date(),
-            isArchived: false,
-          })
+          optimizePlanId: plan.id,
+          items,
+          generatedAt: new Date(),
+          isArchived: false,
+        })
         : await storage.createGroceryList({
-            userId,
-            optimizePlanId: plan.id,
-            items,
-            generatedAt: new Date(),
-            isArchived: false,
-          });
+          userId,
+          optimizePlanId: plan.id,
+          items,
+          generatedAt: new Date(),
+          isArchived: false,
+        });
 
       res.json(list);
     } catch (error) {
@@ -9981,19 +9982,19 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
     try {
       const { From: phoneNumber, Body: body } = req.body;
       console.log(`📩 Received SMS from ${phoneNumber}: ${body}`);
-      
+
       const user = await storage.getUserByPhone(phoneNumber);
       if (!user) {
         console.log(`❌ User not found for phone ${phoneNumber}`);
         return res.status(404).send('User not found');
       }
-      
+
       const response = body.trim().toUpperCase();
       const today = new Date();
-      
+
       let nutritionCompleted = false;
       let workoutCompleted = false;
-      
+
       if (response === 'YES' || response === 'DONE') {
         nutritionCompleted = true;
         workoutCompleted = true;
@@ -10007,10 +10008,10 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
         // Unknown command
         return res.sendStatus(200);
       }
-      
+
       if (nutritionCompleted || workoutCompleted) {
         const existingLog = await storage.getDailyLog(user.id, today);
-        
+
         if (existingLog) {
           await storage.updateDailyLog(existingLog.id, {
             nutritionCompleted: nutritionCompleted || existingLog.nutritionCompleted,
@@ -10032,13 +10033,13 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
           });
         }
       }
-      
-      const confirmMessage = response === 'SKIP' 
+
+      const confirmMessage = response === 'SKIP'
         ? `No worries! Tomorrow's a fresh start 💪`
         : `✅ Logged! Keep up the great work 🔥`;
-      
+
       await sendRawSms(phoneNumber, confirmMessage);
-      
+
       res.sendStatus(200);
     } catch (error) {
       console.error('Error handling SMS webhook:', error);
@@ -10057,13 +10058,13 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
       // Search for multiple videos and randomly select one for variety
       // Handle ESM/CommonJS interop issues with youtube-sr
       const searchFn = (YouTube as any).search || (YouTube as any).default?.search;
-      
+
       if (typeof searchFn !== 'function') {
         throw new Error('YouTube.search is not a function');
       }
 
       const videos = await searchFn(query, { limit: 10 });
-      
+
       if (videos && videos.length > 0) {
         // Randomly select a video from results for variety
         const randomIndex = Math.floor(Math.random() * videos.length);
@@ -10094,20 +10095,20 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
       function identifyMuscleGroup(exerciseName: string): string[] {
         const name = exerciseName.toLowerCase();
         const groups: string[] = [];
-        
+
         // Chest
-        if (name.includes('bench') || name.includes('push-up') || name.includes('pushup') || name.includes('push up') || 
-            name.includes('chest') || name.includes('fly') || name.includes('pec') || name.includes('dip')) {
+        if (name.includes('bench') || name.includes('push-up') || name.includes('pushup') || name.includes('push up') ||
+          name.includes('chest') || name.includes('fly') || name.includes('pec') || name.includes('dip')) {
           groups.push('Chest');
         }
         // Shoulders
-        if (name.includes('shoulder') || name.includes('press') || name.includes('lateral') || name.includes('delt') || 
-            name.includes('overhead') || name.includes('raise') || name.includes('military')) {
+        if (name.includes('shoulder') || name.includes('press') || name.includes('lateral') || name.includes('delt') ||
+          name.includes('overhead') || name.includes('raise') || name.includes('military')) {
           groups.push('Shoulders');
         }
         // Back
-        if (name.includes('row') || name.includes('pull') || name.includes('lat') || name.includes('back') || 
-            name.includes('chin') || name.includes('shrug')) {
+        if (name.includes('row') || name.includes('pull') || name.includes('lat') || name.includes('back') ||
+          name.includes('chin') || name.includes('shrug')) {
           groups.push('Back');
         }
         // Biceps
@@ -10119,8 +10120,8 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
           groups.push('Triceps');
         }
         // Quads/Legs
-        if (name.includes('squat') || name.includes('leg') || name.includes('quad') || name.includes('lunge') || 
-            name.includes('jump') || name.includes('step') || name.includes('knee') || name.includes('sled')) {
+        if (name.includes('squat') || name.includes('leg') || name.includes('quad') || name.includes('lunge') ||
+          name.includes('jump') || name.includes('step') || name.includes('knee') || name.includes('sled')) {
           groups.push('Legs');
         }
         // Hamstrings
@@ -10136,23 +10137,23 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
           groups.push('Glutes');
         }
         // Core
-        if (name.includes('ab') || name.includes('core') || name.includes('plank') || name.includes('crunch') || 
-            name.includes('twist') || name.includes('sit-up') || name.includes('situp') || name.includes('hollow')) {
+        if (name.includes('ab') || name.includes('core') || name.includes('plank') || name.includes('crunch') ||
+          name.includes('twist') || name.includes('sit-up') || name.includes('situp') || name.includes('hollow')) {
           groups.push('Core');
         }
         // Olympic/Power lifts - Full Body
         if (name.includes('clean') || name.includes('snatch') || name.includes('jerk') || name.includes('thruster')) {
           groups.push('Full Body');
         }
-        
+
         // Skip warmups/cooldowns - don't count them as "Other"
-        if (name.includes('warmup') || name.includes('warm-up') || name.includes('warm up') || 
-            name.includes('cooldown') || name.includes('cool-down') || name.includes('cool down') ||
-            name.includes('stretch') || name.includes('pose') || name.includes('mobility')) {
+        if (name.includes('warmup') || name.includes('warm-up') || name.includes('warm up') ||
+          name.includes('cooldown') || name.includes('cool-down') || name.includes('cool down') ||
+          name.includes('stretch') || name.includes('pose') || name.includes('mobility')) {
           // Return the groups found, or skip entirely if none
           return groups.length > 0 ? groups : [];
         }
-        
+
         return groups.length > 0 ? groups : ['Other'];
       }
 
@@ -10162,7 +10163,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
       const workoutsByWeek: Record<string, number> = {};
       const exerciseCounts: Record<string, number> = {};
       const muscleGroupCounts: Record<string, number> = {};
-      
+
       // Calculate Duration this week
       const currentWeekStart = startOfWeek(new Date());
       let durationThisWeek = 0;
@@ -10170,7 +10171,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
       logs.forEach(log => {
         const date = new Date(log.completedAt);
         const weekStart = format(startOfWeek(date), 'yyyy-MM-dd');
-        
+
         // Duration this week
         if (date >= currentWeekStart) {
           durationThisWeek += (log.durationActual || 0);
@@ -10179,12 +10180,12 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
         // Volume & PRs
         let logVolume = 0;
         const exercises = log.exercisesCompleted as any;
-        
+
         if (exercises && Array.isArray(exercises)) {
           exercises.forEach((ex: any) => {
             // Track exercise frequency
             exerciseCounts[ex.name] = (exerciseCounts[ex.name] || 0) + 1;
-            
+
             // Track muscle group counts
             const muscleGroups = identifyMuscleGroup(ex.name);
             muscleGroups.forEach(group => {
@@ -10217,7 +10218,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
       const today = new Date();
       const weeksToShow = 8;
       const volumeChartData = [];
-      
+
       for (let i = weeksToShow - 1; i >= 0; i--) {
         const d = subWeeks(today, i);
         const weekStart = format(startOfWeek(d), 'yyyy-MM-dd');
@@ -10243,28 +10244,28 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
       if (logs.length > 0) {
         // Sort logs by date descending
         const sortedLogs = [...logs].sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
-        
+
         const today = new Date();
         const lastWorkoutDate = new Date(sortedLogs[0].completedAt);
-        
+
         // Check if streak is active (workout today or yesterday)
         // Using start of day for comparison to be safe
-        const todayStart = new Date(today.setHours(0,0,0,0));
-        const lastWorkoutStart = new Date(new Date(lastWorkoutDate).setHours(0,0,0,0));
-        
+        const todayStart = new Date(today.setHours(0, 0, 0, 0));
+        const lastWorkoutStart = new Date(new Date(lastWorkoutDate).setHours(0, 0, 0, 0));
+
         if (differenceInDays(todayStart, lastWorkoutStart) <= 1) {
           currentStreak = 1;
           let currentDate = lastWorkoutStart;
-          
+
           // Iterate through logs to find consecutive days
           for (let i = 1; i < sortedLogs.length; i++) {
             const logDate = new Date(sortedLogs[i].completedAt);
-            const logDateStart = new Date(new Date(logDate).setHours(0,0,0,0));
-            
+            const logDateStart = new Date(new Date(logDate).setHours(0, 0, 0, 0));
+
             if (isSameDay(currentDate, logDateStart)) {
               continue; // Multiple workouts on same day
             }
-            
+
             if (differenceInDays(currentDate, logDateStart) === 1) {
               currentStreak++;
               currentDate = logDateStart;
@@ -10303,287 +10304,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown formatting.
     }
   });
 
-  // ============================================
-  // MEMBERSHIP TIER ROUTES
-  // ============================================
-
-  // Get all membership tiers (public - for pricing page)
-  app.get('/api/membership/tiers', async (req, res) => {
-    try {
-      const tiers = await storage.getAllMembershipTiers();
-      res.json(tiers);
-    } catch (error) {
-      console.error('Error fetching membership tiers:', error);
-      res.status(500).json({ error: 'Failed to fetch membership tiers' });
-    }
-  });
-
-  // Get the current available tier (public - for signup flow)
-  app.get('/api/membership/current-tier', async (req, res) => {
-    try {
-      const tier = await storage.getAvailableMembershipTier();
-      if (!tier) {
-        res.status(404).json({ error: 'No membership tier currently available' });
-        return;
-      }
-      res.json(tier);
-    } catch (error) {
-      console.error('Error fetching current membership tier:', error);
-      res.status(500).json({ error: 'Failed to fetch current tier' });
-    }
-  });
-
-  // Get membership stats (admin only)
-  app.get('/api/admin/membership/stats', requireAdmin, async (req, res) => {
-    try {
-      const stats = await storage.getMembershipStats();
-      const tiers = await storage.getAllMembershipTiers();
-      res.json({ stats, tiers });
-    } catch (error) {
-      console.error('Error fetching membership stats:', error);
-      res.status(500).json({ error: 'Failed to fetch membership stats' });
-    }
-  });
-
-  // Create or update membership tier (admin only)
-  app.post('/api/admin/membership/tiers', requireAdmin, async (req, res) => {
-    try {
-      const { tierKey, name, priceCents, maxCapacity, sortOrder, benefits, isActive } = req.body;
-      
-      // Check if tier already exists
-      const existing = await storage.getMembershipTier(tierKey);
-      if (existing) {
-        const updated = await storage.updateMembershipTier(tierKey, {
-          name,
-          priceCents,
-          maxCapacity,
-          sortOrder,
-          benefits,
-          isActive
-        });
-        res.json(updated);
-      } else {
-        const created = await storage.createMembershipTier({
-          tierKey,
-          name,
-          priceCents,
-          maxCapacity,
-          sortOrder: sortOrder || 0,
-          benefits: benefits || [],
-          isActive: isActive !== false
-        });
-        res.status(201).json(created);
-      }
-    } catch (error) {
-      console.error('Error creating/updating membership tier:', error);
-      res.status(500).json({ error: 'Failed to save membership tier' });
-    }
-  });
-
-  // Seed default membership tiers (admin only, one-time setup)
-  app.post('/api/admin/membership/seed', requireAdmin, async (req, res) => {
-    try {
-      const defaultTiers: Array<{
-        tierKey: string;
-        name: string;
-        priceCents: number;
-        maxCapacity: number | null;
-        sortOrder: number;
-        benefits: string[];
-        isActive: boolean;
-      }> = [
-        {
-          tierKey: 'founding',
-          name: 'Founding Member',
-          priceCents: 1900, // $19
-          maxCapacity: 250,
-          sortOrder: 1,
-          benefits: [
-            'Lock in $19/month forever',
-            'Unlimited AI consultations',
-            'Priority formula adjustments',
-            'Founding member badge'
-          ],
-          isActive: true
-        },
-        {
-          tierKey: 'early',
-          name: 'Early Adopter',
-          priceCents: 2900, // $29
-          maxCapacity: 1000,
-          sortOrder: 2,
-          benefits: [
-            'Lock in $29/month forever',
-            'Unlimited AI consultations',
-            'Priority formula adjustments'
-          ],
-          isActive: true
-        },
-        {
-          tierKey: 'beta',
-          name: 'Beta Member',
-          priceCents: 3900, // $39
-          maxCapacity: 5000,
-          sortOrder: 3,
-          benefits: [
-            'Lock in $39/month forever',
-            'Unlimited AI consultations'
-          ],
-          isActive: true
-        },
-        {
-          tierKey: 'standard',
-          name: 'Standard Member',
-          priceCents: 4900, // $49
-          maxCapacity: null, // unlimited
-          sortOrder: 4,
-          benefits: [
-            'Standard pricing at $49/month',
-            'Unlimited AI consultations'
-          ],
-          isActive: true
-        }
-      ];
-
-      const results = [];
-      for (const tier of defaultTiers) {
-        const existing = await storage.getMembershipTier(tier.tierKey);
-        if (!existing) {
-          const created = await storage.createMembershipTier(tier);
-          results.push({ action: 'created', tier: created });
-        } else {
-          results.push({ action: 'exists', tier: existing });
-        }
-      }
-
-      res.json({ message: 'Membership tiers seeded', results });
-    } catch (error) {
-      console.error('Error seeding membership tiers:', error);
-      res.status(500).json({ error: 'Failed to seed membership tiers' });
-    }
-  });
-
-  // Get users by membership tier (admin only)
-  app.get('/api/admin/membership/users/:tierKey', requireAdmin, async (req, res) => {
-    try {
-      const { tierKey } = req.params;
-      const users = await storage.getUsersByMembershipTier(tierKey);
-      res.json(users.map(u => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        membershipTier: u.membershipTier,
-        membershipPriceCents: u.membershipPriceCents,
-        membershipLockedAt: u.membershipLockedAt
-      })));
-    } catch (error) {
-      console.error('Error fetching users by tier:', error);
-      res.status(500).json({ error: 'Failed to fetch users' });
-    }
-  });
-
-  // Assign membership to current user (during signup/upgrade)
-  app.post('/api/membership/join', requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).userId;
-      
-      // Get the user to check if they already have a membership
-      const user = await storage.getUser(userId);
-      if (!user) {
-        res.status(404).json({ error: 'User not found' });
-        return;
-      }
-      
-      if (user.membershipTier && !user.membershipCancelledAt) {
-        res.status(400).json({ error: 'User already has an active membership' });
-        return;
-      }
-      
-      // Get the current available tier
-      const tier = await storage.getAvailableMembershipTier();
-      if (!tier) {
-        res.status(400).json({ error: 'No membership tier currently available' });
-        return;
-      }
-      
-      // Check capacity
-      if (tier.maxCapacity !== null && tier.currentCount >= tier.maxCapacity) {
-        res.status(400).json({ error: 'This tier is full, please try again' });
-        return;
-      }
-      
-      // Assign the membership
-      const updated = await storage.assignUserMembership(userId, tier.tierKey, tier.priceCents);
-      if (!updated) {
-        res.status(500).json({ error: 'Failed to assign membership' });
-        return;
-      }
-      
-      res.json({
-        message: 'Membership assigned successfully',
-        membership: {
-          tier: tier.tierKey,
-          name: tier.name,
-          priceCents: tier.priceCents,
-          lockedAt: updated.membershipLockedAt
-        }
-      });
-    } catch (error) {
-      console.error('Error joining membership:', error);
-      res.status(500).json({ error: 'Failed to join membership' });
-    }
-  });
-
-  // Get current user's membership info
-  app.get('/api/membership/me', requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).userId;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        res.status(404).json({ error: 'User not found' });
-        return;
-      }
-      
-      if (!user.membershipTier) {
-        res.json({ hasMembership: false });
-        return;
-      }
-      
-      const tier = await storage.getMembershipTier(user.membershipTier);
-      
-      res.json({
-        hasMembership: true,
-        isCancelled: !!user.membershipCancelledAt,
-        tier: user.membershipTier,
-        tierName: tier?.name || user.membershipTier,
-        priceCents: user.membershipPriceCents,
-        lockedAt: user.membershipLockedAt,
-        cancelledAt: user.membershipCancelledAt
-      });
-    } catch (error) {
-      console.error('Error fetching user membership:', error);
-      res.status(500).json({ error: 'Failed to fetch membership' });
-    }
-  });
-
-  // Cancel membership
-  app.post('/api/membership/cancel', requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).userId;
-      const updated = await storage.cancelUserMembership(userId);
-      
-      if (!updated) {
-        res.status(400).json({ error: 'No active membership to cancel' });
-        return;
-      }
-      
-      res.json({ message: 'Membership cancelled', cancelledAt: updated.membershipCancelledAt });
-    } catch (error) {
-      console.error('Error cancelling membership:', error);
-      res.status(500).json({ error: 'Failed to cancel membership' });
-    }
-  });
+  app.use(membershipRoutes);
 
   const httpServer = createServer(app);
   return httpServer;
