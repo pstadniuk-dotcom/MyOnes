@@ -8,10 +8,10 @@
  */
 
 import { Router } from 'express';
-import { requireAuth } from './middleware';
+import { requireAuth } from '../../routes/middleware';
 import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, SYSTEM_SUPPORT_DETAILS, findIngredientByName } from '@shared/ingredients';
 import { getIngredientResearch } from '@shared/ingredient-research';
-import logger from '../logger';
+import logger from '../../logger';
 
 const router = Router();
 

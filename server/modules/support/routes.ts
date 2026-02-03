@@ -9,11 +9,11 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { storage } from '../storage';
-import { requireAuth } from './middleware';
+import { storage } from '../../storage';
+import { requireAuth } from '../../routes/middleware';
 import { insertSupportTicketSchema } from '@shared/schema';
 import { sendNotificationEmail } from '../emailService';
-import logger from '../logger';
+import logger from '../../logger';
 
 const router = Router();
 

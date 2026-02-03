@@ -7,10 +7,10 @@
  */
 
 import { Router } from 'express';
-import { storage } from '../storage';
-import { requireAuth } from './middleware';
+import { storage } from '../../storage';
+import { requireAuth } from '../../routes/middleware';
 import { getIngredientDose, isValidIngredient } from '@shared/ingredients';
-import logger from '../logger';
+import logger from '../../logger';
 
 const router = Router();
 
@@ -719,7 +719,7 @@ router.get('/:formulaId/review-schedule/calendar', requireAuth, async (req, res)
     }
     
     // Generate .ics file
-    const { generateReviewCalendarEvent } = await import('../calendarGenerator');
+    const { generateReviewCalendarEvent } = await import('../../calendarGenerator');
     const icsContent = generateReviewCalendarEvent(schedule, user.name);
     
     // Send as downloadable file

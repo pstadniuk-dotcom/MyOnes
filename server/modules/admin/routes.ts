@@ -6,9 +6,9 @@
 import { Router } from 'express';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
-import { storage } from '../storage';
-import { logger } from '../logger';
-import { requireAdmin } from './middleware';
+import { storage } from '../../storage';
+import { logger } from '../../logger';
+import { requireAdmin } from '../../routes/middleware';
 import { sendNotificationEmail } from '../emailService';
 import { INDIVIDUAL_INGREDIENTS, SYSTEM_SUPPORTS } from '@shared/ingredients';
 

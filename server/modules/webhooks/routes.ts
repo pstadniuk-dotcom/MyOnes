@@ -12,8 +12,8 @@
 
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import logger from '../logger';
-import { storage } from '../storage';
+import logger from '../../logger';
+import { storage } from '../../storage';
 
 const router = Router();
 
