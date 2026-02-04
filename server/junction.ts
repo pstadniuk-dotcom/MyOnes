@@ -12,7 +12,7 @@
  */
 
 import { VitalClient, VitalEnvironment, Vital } from '@tryvital/vital-node';
-import logger from './logger';
+import logger from './infra/logging/logger';
 
 // Initialize Junction client
 const getJunctionClient = () => {
@@ -25,7 +25,7 @@ const getJunctionClient = () => {
   }
 
   // Map environment string to VitalEnvironment enum
-  const environment = env === 'production' 
+  const environment = env === 'production'
     ? (region === 'eu' ? VitalEnvironment.ProductionEu : VitalEnvironment.Production)
     : (region === 'eu' ? VitalEnvironment.SandboxEu : VitalEnvironment.Sandbox);
 
@@ -51,7 +51,7 @@ export const junctionClient = () => {
 export async function createJunctionUser(onesUserId: string): Promise<string> {
   try {
     const client = junctionClient();
-    
+
     // Use ONES user ID as the client_user_id (external reference)
     const response = await client.user.create({
       clientUserId: onesUserId,
@@ -91,7 +91,7 @@ export async function getOrCreateJunctionUser(onesUserId: string, existingJuncti
 export async function generateLinkToken(junctionUserId: string): Promise<{ linkToken: string; linkWebUrl: string }> {
   try {
     const client = junctionClient();
-    
+
     const response = await client.link.token({
       userId: junctionUserId,
     });
