@@ -4,6 +4,7 @@ import { systemRepository } from './system.repository';
 import { storage } from '../../storage';
 import { getUserLocalMidnight } from '../../utils/timezone';
 import { type InsertAuditLog } from '@shared/schema';
+import { usersRepository } from "../users/users.repository";
 
 export class SystemService {
     async searchYouTube(query: string) {
@@ -32,7 +33,7 @@ export class SystemService {
 
     async healthCheck() {
         // Basic connectivity check to DB
-        await storage.getUserByEmail('health-check@example.com');
+        await usersRepository.getUserByEmail('health-check@example.com');
         return {
             status: 'healthy',
             timestamp: new Date().toISOString(),

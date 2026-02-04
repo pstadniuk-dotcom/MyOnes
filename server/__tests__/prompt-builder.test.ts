@@ -4,13 +4,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { 
-  buildGPT4Prompt, 
-  buildO1MiniPrompt, 
+import {
+  buildGPT4Prompt,
+  buildO1MiniPrompt,
   type PromptContext,
   type HealthProfile,
-  type Formula 
-} from '../prompt-builder';
+  type Formula
+} from '../utils/prompt-builder';
 
 // Create a minimal valid context for testing (matching actual interface)
 const createTestContext = (overrides: Partial<PromptContext> = {}): PromptContext => ({
@@ -39,7 +39,7 @@ describe('buildGPT4Prompt', () => {
   it('should return a static system prompt', () => {
     const context = createTestContext();
     const prompt = buildGPT4Prompt(context);
-    
+
     expect(typeof prompt).toBe('string');
     expect(prompt.length).toBeGreaterThan(100);
   });
@@ -47,14 +47,14 @@ describe('buildGPT4Prompt', () => {
   it('should mention ONES AI role', () => {
     const context = createTestContext();
     const prompt = buildGPT4Prompt(context);
-    
+
     expect(prompt).toContain('ONES AI');
   });
 
   it('should include guidance to be concise', () => {
     const context = createTestContext();
     const prompt = buildGPT4Prompt(context);
-    
+
     // GPT4 prompt should encourage brief responses
     expect(prompt.toLowerCase()).toMatch(/brief|concise|short|paragraphs/);
   });
@@ -62,18 +62,18 @@ describe('buildGPT4Prompt', () => {
   it('should mention not creating formulas in simple mode', () => {
     const context = createTestContext();
     const prompt = buildGPT4Prompt(context);
-    
+
     expect(prompt.toLowerCase()).toContain('never create');
   });
 
   it('should be consistent across calls', () => {
     const context1 = createTestContext();
     const context2 = createTestContext({ healthProfile: createTestHealthProfile() });
-    
+
     // GPT4 prompt is static, should be same regardless of context
     const prompt1 = buildGPT4Prompt(context1);
     const prompt2 = buildGPT4Prompt(context2);
-    
+
     expect(prompt1).toBe(prompt2);
   });
 });
@@ -82,7 +82,7 @@ describe('buildO1MiniPrompt', () => {
   it('should include formula creation instructions', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // O1 prompt should mention formula structure
     expect(prompt.toLowerCase()).toContain('formula');
   });
@@ -90,7 +90,7 @@ describe('buildO1MiniPrompt', () => {
   it('should include JSON format instructions', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should mention JSON block format
     expect(prompt).toContain('json');
   });
@@ -98,7 +98,7 @@ describe('buildO1MiniPrompt', () => {
   it('should include dosage limits', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should mention the 5500mg limit
     expect(prompt).toContain('5500');
   });
@@ -106,7 +106,7 @@ describe('buildO1MiniPrompt', () => {
   it('should include ingredient catalog reference', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should reference approved ingredients
     expect(prompt.toLowerCase()).toContain('ingredient');
   });
@@ -114,7 +114,7 @@ describe('buildO1MiniPrompt', () => {
   it('should include medical professional language', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should include medical context
     expect(prompt.toLowerCase()).toMatch(/medical|doctor|physician|medicine/);
   });
@@ -122,7 +122,7 @@ describe('buildO1MiniPrompt', () => {
   it('should include system supports list', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should have some system support ingredients
     expect(prompt).toContain('Adrenal Support');
     expect(prompt).toContain('Heart Support');
@@ -131,7 +131,7 @@ describe('buildO1MiniPrompt', () => {
   it('should include individual ingredients list', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should have individual ingredients
     expect(prompt).toContain('Ashwagandha');
     expect(prompt).toContain('CoQ10');
@@ -151,9 +151,9 @@ describe('Prompt Context with Health Profile', () => {
         allergies: ['Shellfish'],
       }),
     });
-    
+
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should include health profile data
     expect(prompt).toContain('45');
     expect(prompt).toContain('female');
@@ -164,9 +164,9 @@ describe('Prompt Context with Health Profile', () => {
 
   it('should handle null health profile', () => {
     const context = createTestContext({ healthProfile: undefined });
-    
+
     expect(() => buildO1MiniPrompt(context)).not.toThrow();
-    
+
     const prompt = buildO1MiniPrompt(context);
     expect(prompt).toContain('NO HEALTH PROFILE');
   });
@@ -178,9 +178,9 @@ describe('Prompt Context with Health Profile', () => {
         age: 50,
       }),
     });
-    
+
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should mention female-specific considerations
     expect(prompt).toContain('Ovary Uterus Support');
     expect(prompt).toContain('DO NOT recommend Prostate Support');
@@ -193,9 +193,9 @@ describe('Prompt Context with Health Profile', () => {
         age: 50,
       }),
     });
-    
+
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should mention male-specific considerations
     expect(prompt).toContain('Prostate Support');
     expect(prompt).toContain('DO NOT recommend Ovary Uterus Support');
@@ -207,9 +207,9 @@ describe('Prompt Context with Health Profile', () => {
         stressLevel: 9,
       }),
     });
-    
+
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should flag high stress
     expect(prompt).toContain('HIGH STRESS');
     expect(prompt).toContain('Ashwagandha');
@@ -221,9 +221,9 @@ describe('Prompt Context with Health Profile', () => {
         sleepHoursPerNight: 4,
       }),
     });
-    
+
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should flag sleep deficiency
     expect(prompt).toContain('SLEEP DEFICIENCY');
   });
@@ -239,9 +239,9 @@ describe('Prompt Context with Active Formula', () => {
         additions: [{ ingredient: 'Ashwagandha', amount: 600, unit: 'mg' }],
       }),
     });
-    
+
     const prompt = buildO1MiniPrompt(context);
-    
+
     expect(prompt).toContain('Adrenal Support');
     expect(prompt).toContain('420');
     expect(prompt).toContain('Ashwagandha');
@@ -255,9 +255,9 @@ describe('Prompt Context with Active Formula', () => {
         totalMg: 3000,
       }),
     });
-    
+
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should explain that new formulas replace old ones
     expect(prompt).toContain('REPLACE');
     expect(prompt).toContain('starting from 0mg');
@@ -270,7 +270,7 @@ describe('Prompt Context with Active Formula', () => {
         additions: [],
       }),
     });
-    
+
     expect(() => buildO1MiniPrompt(context)).not.toThrow();
   });
 });
@@ -287,9 +287,9 @@ Ferritin: 15 ng/mL (Ref: 30-400 ng/mL) - LOW
 Hemoglobin A1c: 5.4% (Ref: <5.7%) - Normal
 Total Cholesterol: 185 mg/dL (Ref: <200 mg/dL) - Normal`,
     });
-    
+
     const prompt = buildO1MiniPrompt(context);
-    
+
     expect(prompt).toContain('LABORATORY TEST RESULTS');
     expect(prompt).toContain('Vitamin D');
     expect(prompt).toContain('TSH');
@@ -300,9 +300,9 @@ Total Cholesterol: 185 mg/dL (Ref: <200 mg/dL) - Normal`,
     const context = createTestContext({
       labDataContext: 'No labs',
     });
-    
+
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Short lab data should be ignored
     expect(prompt).not.toContain('LABORATORY TEST RESULTS');
   });
@@ -315,9 +315,9 @@ describe('Prompt Context with Conversation History', () => {
         { role: 'user', content: 'Hello' },
       ],
     });
-    
+
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should indicate new user workflow
     expect(prompt).toContain('new user');
   });
@@ -329,9 +329,9 @@ describe('Prompt Context with Conversation History', () => {
         { role: 'user', content: 'Can we optimize my formula?' },
       ],
     });
-    
+
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should indicate experienced user
     expect(prompt.toLowerCase()).toContain('experienced');
   });
@@ -341,7 +341,7 @@ describe('Safety Instructions', () => {
   it('should include organ-specific questions', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should have organ-specific guidance
     expect(prompt).toContain('Prostate Support');
     expect(prompt).toContain('Kidney & Bladder Support');
@@ -352,7 +352,7 @@ describe('Safety Instructions', () => {
   it('should include critical safety questions', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should mention critical safety topics
     expect(prompt.toLowerCase()).toContain('medication');
     expect(prompt.toLowerCase()).toContain('pregnant');
@@ -362,7 +362,7 @@ describe('Safety Instructions', () => {
   it('should include dosing strategy guidance', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should explain 1x, 2x, 3x dosing
     expect(prompt).toContain('1x');
     expect(prompt).toContain('2x');
@@ -374,7 +374,7 @@ describe('Formula JSON Structure', () => {
   it('should expect correct formula format', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Prompt should reference the expected JSON structure
     expect(prompt).toContain('"bases"');
     expect(prompt).toContain('"additions"');
@@ -386,7 +386,7 @@ describe('Formula JSON Structure', () => {
   it('should mention NOT to include totalMg', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // AI should not calculate totalMg
     expect(prompt).toContain('Do NOT include "totalMg"');
   });
@@ -396,7 +396,7 @@ describe('Health Data Capture', () => {
   it('should include health-data block instructions', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should explain how to capture health data
     expect(prompt).toContain('health-data');
     expect(prompt).toContain('age');
@@ -407,7 +407,7 @@ describe('Health Data Capture', () => {
   it('should explain height conversion', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
-    
+
     // Should mention height conversion
     expect(prompt).toContain('heightCm');
     expect(prompt).toMatch(/6'6"|6'10"|5'10"/);

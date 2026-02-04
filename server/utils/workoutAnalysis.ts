@@ -5,6 +5,7 @@
  * for AI-powered workout plan generation and progression.
  */
 
+import { optimizeRepository } from "server/modules/optimize/optimize.repository";
 import { storage } from "../storage";
 import type { WorkoutLog } from "@shared/schema";
 
@@ -325,7 +326,7 @@ function identifyMuscleGroup(exerciseName: string): string[] {
  */
 export async function analyzeWorkoutHistory(userId: string): Promise<HistoricalWorkoutAnalysis> {
   // Fetch all workout logs for the user
-  const allLogs = await storage.getAllWorkoutLogs(userId);
+  const allLogs = await optimizeRepository.getAllWorkoutLogs(userId);
 
   if (allLogs.length === 0) {
     return {
