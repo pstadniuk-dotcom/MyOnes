@@ -5,10 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { 
-  FlaskConical, 
-  Pill, 
-  Sparkles, 
+import {
+  FlaskConical,
+  Pill,
+  Sparkles,
   AlertTriangle,
   ChevronDown,
   ChevronUp
@@ -30,7 +30,7 @@ interface FormulaInsightsData {
 export function FormulaInsightsWidget() {
   const [showUnusedBases, setShowUnusedBases] = useState(false);
   const [showUnusedIndividuals, setShowUnusedIndividuals] = useState(false);
-  
+
   const { data, isLoading, error } = useQuery<FormulaInsightsData>({
     queryKey: ['/api/admin/analytics/formula-insights'],
   });
@@ -103,7 +103,7 @@ export function FormulaInsightsWidget() {
               Popular System Supports
             </h4>
             <div className="space-y-2">
-              {data.popularBases.slice(0, 5).map((base, index) => (
+              {data.popularBases?.slice(0, 5).map((base, index) => (
                 <div key={base.name} className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground w-4">{index + 1}.</span>
                   <div className="flex-1 min-w-0">
@@ -130,7 +130,7 @@ export function FormulaInsightsWidget() {
               Popular Individual Ingredients
             </h4>
             <div className="space-y-2">
-              {data.popularAdditions.slice(0, 5).map((addition, index) => (
+              {data.popularAdditions?.slice(0, 5).map((addition, index) => (
                 <div key={addition.name} className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground w-4">{index + 1}.</span>
                   <div className="flex-1 min-w-0">

@@ -1,11 +1,11 @@
 import { sql } from "drizzle-orm";
-import { 
-  pgTable, 
-  text, 
-  varchar, 
-  integer, 
-  boolean, 
-  timestamp, 
+import {
+  pgTable,
+  text,
+  varchar,
+  integer,
+  boolean,
+  timestamp,
   json,
   pgEnum,
   date,
@@ -40,11 +40,11 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   phone: text("phone"),
   password: text("password").notNull(),
-  
+
   // Admin and access tracking
   isAdmin: boolean("is_admin").default(false).notNull(),
   lastLoginAt: timestamp("last_login_at"),
-  
+
   // Address fields
   addressLine1: text("address_line1"),
   addressLine2: text("address_line2"),
@@ -52,29 +52,29 @@ export const users = pgTable("users", {
   state: text("state"),
   postalCode: text("postal_code"),
   country: text("country").default('US'),
-  
+
   // Timezone for scheduling reminders (e.g., 'America/New_York', 'America/Los_Angeles')
   timezone: text("timezone").default('America/New_York'),
-  
+
   // Email notification preferences
   emailConsultation: boolean("email_consultation").default(true).notNull(),
   emailShipping: boolean("email_shipping").default(true).notNull(),
   emailBilling: boolean("email_billing").default(true).notNull(),
-  
+
   // SMS notification preferences
   smsConsultation: boolean("sms_consultation").default(false).notNull(),
   smsShipping: boolean("sms_shipping").default(false).notNull(),
   smsBilling: boolean("sms_billing").default(false).notNull(),
-  
+
   // Daily pill reminder preferences
   dailyRemindersEnabled: boolean("daily_reminders_enabled").default(false).notNull(),
   reminderBreakfast: text("reminder_breakfast").default('08:00').notNull(),
   reminderLunch: text("reminder_lunch").default('12:00').notNull(),
   reminderDinner: text("reminder_dinner").default('18:00').notNull(),
-  
+
   // Junction (Vital) wearables integration
   junctionUserId: text("junction_user_id"),
-  
+
   // Streak Rewards System (DEPRECATED - kept for data migration)
   streakCurrentDays: integer("streak_current_days").default(0).notNull(),
   streakDiscountEarned: integer("streak_discount_earned").default(0).notNull(), // 0-20 percent
@@ -82,7 +82,7 @@ export const users = pgTable("users", {
   reorderWindowStart: timestamp("reorder_window_start"),  // Day 75 from last order
   reorderDeadline: timestamp("reorder_deadline"),         // Day 95 from last order (5-day grace)
   streakStatus: text("streak_status").default('building').notNull(), // 'building' | 'ready' | 'warning' | 'grace' | 'lapsed'
-  
+
   // Membership System
   membershipTier: text("membership_tier"), // 'founding' | 'early' | 'beta' | 'standard' | null (not a member)
   membershipPriceCents: integer("membership_price_cents"), // Price locked at signup (e.g., 1900 = $19)
@@ -90,7 +90,7 @@ export const users = pgTable("users", {
   membershipCancelledAt: timestamp("membership_cancelled_at"), // If they cancelled
   stripeCustomerId: text("stripe_customer_id"), // Stripe customer ID for billing
   stripeSubscriptionId: text("stripe_subscription_id"), // Stripe subscription ID
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -116,35 +116,35 @@ export const newsletterSubscribers = pgTable("newsletter_subscribers", {
 export const healthProfiles = pgTable("health_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  
+
   // Basic demographics
   age: integer("age"),
   sex: sexEnum("sex"),
-  
+
   // Physical measurements
   weightLbs: integer("weight_lbs"),
   heightCm: integer("height_cm"), // For BMI calculation
-  
+
   // Vital signs
   bloodPressureSystolic: integer("blood_pressure_systolic"),
   bloodPressureDiastolic: integer("blood_pressure_diastolic"),
   restingHeartRate: integer("resting_heart_rate"),
-  
+
   // Lifestyle factors
   sleepHoursPerNight: integer("sleep_hours_per_night"),
   exerciseDaysPerWeek: integer("exercise_days_per_week"),
   stressLevel: integer("stress_level"), // 1-10 scale
   smokingStatus: text("smoking_status"), // 'never', 'former', 'current'
   alcoholDrinksPerWeek: integer("alcohol_drinks_per_week"),
-  
+
   // Medical history
   conditions: json("conditions").$type<string[]>().default([]),
   medications: json("medications").$type<string[]>().default([]),
   allergies: json("allergies").$type<string[]>().default([]),
-  
+
   // Health goals (e.g., "gut health", "brain optimization", "energy", "sleep")
   healthGoals: json("health_goals").$type<string[]>().default([]),
-  
+
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -164,8 +164,8 @@ export const messages = pgTable("messages", {
   content: text("content").notNull(),
   model: text("model"), // Track which AI model responded (gpt-4, gpt-5, etc.)
   formula: json("formula").$type<{
-    bases: Array<{name: string, dose: string, purpose?: string}>;
-    additions: Array<{name: string, dose: string, purpose?: string}>;
+    bases: Array<{ name: string, dose: string, purpose?: string }>;
+    additions: Array<{ name: string, dose: string, purpose?: string }>;
     totalMg: number;
     warnings?: string[];
     rationale?: string;
@@ -181,18 +181,18 @@ export const formulas = pgTable("formulas", {
   version: integer("version").default(1).notNull(),
   name: text("name"), // Custom name for the formula
   userCreated: boolean("user_created").default(false).notNull(), // True if user built it manually
-  bases: json("bases").$type<Array<{ingredient: string, amount: number, unit: string, purpose?: string}>>().notNull(),
-  additions: json("additions").$type<Array<{ingredient: string, amount: number, unit: string, purpose?: string}>>().default([]),
+  bases: json("bases").$type<Array<{ ingredient: string, amount: number, unit: string, purpose?: string }>>().notNull(),
+  additions: json("additions").$type<Array<{ ingredient: string, amount: number, unit: string, purpose?: string }>>().default([]),
   userCustomizations: json("user_customizations").$type<{
-    addedBases?: Array<{ingredient: string, amount: number, unit: string}>;
-    addedIndividuals?: Array<{ingredient: string, amount: number, unit: string}>;
+    addedBases?: Array<{ ingredient: string, amount: number, unit: string }>;
+    addedIndividuals?: Array<{ ingredient: string, amount: number, unit: string }>;
   }>().default({}),
   totalMg: integer("total_mg").notNull(),
-  
+
   // Capsule count selection (6, 9, or 12 capsules per day)
   targetCapsules: integer("target_capsules").default(9), // User's selected capsule count
   recommendedCapsules: integer("recommended_capsules"), // AI's recommended capsule count
-  
+
   rationale: text("rationale"),
   warnings: json("warnings").$type<string[]>().default([]),
   disclaimers: json("disclaimers").$type<string[]>().default([]),
@@ -416,25 +416,25 @@ export const reviewSchedules = pgTable("review_schedules", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   formulaId: varchar("formula_id").notNull().references(() => formulas.id, { onDelete: "cascade" }),
-  
+
   // Review frequency settings
   frequency: reviewFrequencyEnum("frequency").notNull(), // monthly, bimonthly, quarterly
   daysBefore: integer("days_before").default(5).notNull(), // Days before shipment to start review
-  
+
   // Calculated dates
   nextReviewDate: timestamp("next_review_date").notNull(), // When the next review should happen
   lastReviewDate: timestamp("last_review_date"), // When the last review was completed
-  
+
   // Notification preferences for this specific review schedule
   emailReminders: boolean("email_reminders").default(true).notNull(),
   smsReminders: boolean("sms_reminders").default(false).notNull(),
-  
+
   // Calendar integration
   calendarIntegration: text("calendar_integration"), // 'google', 'apple', 'outlook', null
-  
+
   // Active status
   isActive: boolean("is_active").default(true).notNull(),
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -661,20 +661,20 @@ export const wearableConnections = pgTable("wearable_connections", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   provider: wearableProviderEnum("provider").notNull(),
   status: wearableConnectionStatusEnum("status").default('connected').notNull(),
-  
+
   // OAuth credentials (encrypted in storage layer)
   accessToken: text("access_token").notNull(),
   refreshToken: text("refresh_token"),
   tokenExpiresAt: timestamp("token_expires_at"),
-  
+
   // Provider-specific user ID
   providerUserId: text("provider_user_id"),
-  
+
   // Connection metadata
   scopes: json("scopes").$type<string[]>().default([]),
   lastSyncAt: timestamp("last_sync_at"),
   lastSyncError: text("last_sync_error"),
-  
+
   connectedAt: timestamp("connected_at").defaultNow().notNull(),
   disconnectedAt: timestamp("disconnected_at"),
 });
@@ -686,38 +686,38 @@ export const biometricData = pgTable("biometric_data", {
   connectionId: varchar("connection_id").notNull().references(() => wearableConnections.id, { onDelete: "cascade" }),
   provider: wearableProviderEnum("provider").notNull(),
   dataDate: timestamp("data_date").notNull(), // The day this data represents
-  
+
   // Sleep metrics
   sleepScore: integer("sleep_score"), // 0-100 (Oura, WHOOP)
   sleepHours: integer("sleep_hours"), // Total sleep in minutes
   deepSleepMinutes: integer("deep_sleep_minutes"),
   remSleepMinutes: integer("rem_sleep_minutes"),
   lightSleepMinutes: integer("light_sleep_minutes"),
-  
+
   // Heart metrics
   hrvMs: integer("hrv_ms"), // Heart rate variability in milliseconds
   restingHeartRate: integer("resting_heart_rate"), // BPM
   averageHeartRate: integer("average_heart_rate"),
   maxHeartRate: integer("max_heart_rate"),
-  
+
   // Recovery and readiness
   recoveryScore: integer("recovery_score"), // 0-100 (WHOOP, Oura)
   readinessScore: integer("readiness_score"), // 0-100 (Oura)
   strainScore: integer("strain_score"), // 0-21 (WHOOP)
-  
+
   // Activity metrics
   steps: integer("steps"),
   caloriesBurned: integer("calories_burned"),
   activeMinutes: integer("active_minutes"),
-  
+
   // Additional metrics
   spo2Percentage: integer("spo2_percentage"), // Blood oxygen 0-100
   skinTempCelsius: integer("skin_temp_celsius"), // Multiplied by 10 for decimal precision
   respiratoryRate: integer("respiratory_rate"), // Breaths per minute
-  
+
   // Raw data from provider (for reference)
   rawData: json("raw_data").$type<Record<string, any>>(),
-  
+
   syncedAt: timestamp("synced_at").defaultNow().notNull(),
 });
 
@@ -728,7 +728,7 @@ export const biometricTrends = pgTable("biometric_trends", {
   periodType: text("period_type").notNull(), // 'week' or 'month'
   periodStart: timestamp("period_start").notNull(),
   periodEnd: timestamp("period_end").notNull(),
-  
+
   // Averaged metrics over the period
   avgSleepScore: integer("avg_sleep_score"),
   avgSleepHours: integer("avg_sleep_hours"),
@@ -737,16 +737,16 @@ export const biometricTrends = pgTable("biometric_trends", {
   avgRecoveryScore: integer("avg_recovery_score"),
   avgStrainScore: integer("avg_strain_score"),
   avgSteps: integer("avg_steps"),
-  
+
   // Trend indicators (positive/negative/stable)
   sleepTrend: text("sleep_trend"), // 'improving', 'declining', 'stable'
   hrvTrend: text("hrv_trend"),
   recoveryTrend: text("recovery_trend"),
-  
+
   // Data quality metrics
   daysWithData: integer("days_with_data").notNull(),
   totalDaysInPeriod: integer("total_days_in_period").notNull(),
-  
+
   calculatedAt: timestamp("calculated_at").defaultNow().notNull(),
 });
 
@@ -756,7 +756,7 @@ export const reorderRecommendations = pgTable("reorder_recommendations", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   orderId: varchar("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
   currentFormulaId: varchar("current_formula_id").notNull().references(() => formulas.id),
-  
+
   // AI analysis results
   analysisStatus: text("analysis_status").default('pending').notNull(), // pending, analyzing, completed, error
   biometricSummary: json("biometric_summary").$type<{
@@ -766,24 +766,24 @@ export const reorderRecommendations = pgTable("reorder_recommendations", {
     activityChange?: string;
     dataQuality?: string;
   }>(),
-  
+
   // Recommended formula changes
   recommendedFormula: json("recommended_formula").$type<{
-    bases: Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
-    additions: Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
+    bases: Array<{ ingredient: string, amount: number, unit: string, purpose?: string }>;
+    additions: Array<{ ingredient: string, amount: number, unit: string, purpose?: string }>;
     totalMg: number;
   }>(),
-  
+
   changeRationale: text("change_rationale"), // AI explanation of why changes were made
   confidence: integer("confidence"), // 0-100 how confident AI is in recommendations
-  
+
   // User action tracking
   userApproved: boolean("user_approved"),
   userReviewedAt: timestamp("user_reviewed_at"),
   adminReviewRequired: boolean("admin_review_required").default(false).notNull(),
   adminReviewedBy: varchar("admin_reviewed_by").references(() => users.id),
   adminReviewedAt: timestamp("admin_reviewed_at"),
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -972,16 +972,16 @@ export const optimizePlans = pgTable("optimize_plans", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   planType: planTypeEnum("plan_type").notNull(),
-  
+
   // Plan content (flexible JSON structure)
   content: json("content").notNull(), // Nutrition: meals, macros; Workout: exercises, schedule; Lifestyle: protocols
   aiRationale: text("ai_rationale"), // Why this plan was created
-  
+
   // Context used to generate plan (for regeneration)
   basedOnFormulaId: varchar("based_on_formula_id").references(() => formulas.id),
   basedOnLabs: json("based_on_labs"), // Snapshot of lab data used
   preferences: json("preferences"), // User preferences (workout days, dietary restrictions, etc.)
-  
+
   // Metadata
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -993,32 +993,32 @@ export const optimizeDailyLogs = pgTable("optimize_daily_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   logDate: timestamp("log_date").notNull(), // Date of tracking
-  
+
   // Daily completion tracking
   nutritionCompleted: boolean("nutrition_completed").default(false).notNull(),
   mealsLogged: json("meals_logged"), // Array of meal types logged: ['breakfast', 'lunch']
   workoutCompleted: boolean("workout_completed").default(false).notNull(),
-  
+
   // Granular supplement tracking (morning/afternoon/evening doses)
   supplementsTaken: boolean("supplements_taken").default(false).notNull(), // Legacy: true if ANY dose taken
   supplementMorning: boolean("supplement_morning").default(false).notNull(),
   supplementAfternoon: boolean("supplement_afternoon").default(false).notNull(),
   supplementEvening: boolean("supplement_evening").default(false).notNull(),
-  
+
   // Manual rest day override (user can mark any day as rest day)
   isRestDay: boolean("is_rest_day").default(false).notNull(),
-  
+
   // Hydration tracking
   waterIntakeOz: integer("water_intake_oz"),
-  
+
   // Subjective ratings (1-5 scale)
   energyLevel: integer("energy_level"), // 1 = very low, 5 = excellent
   moodLevel: integer("mood_level"), // 1 = poor, 5 = excellent
   sleepQuality: integer("sleep_quality"), // 1 = poor, 5 = excellent
-  
+
   // Notes
   notes: text("notes"),
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1026,14 +1026,14 @@ export const optimizeDailyLogs = pgTable("optimize_daily_logs", {
 export const workoutPlans = pgTable("workout_plans", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  
+
   name: varchar("name", { length: 255 }).notNull(), // e.g., "3-Day Strength Program"
   daysPerWeek: integer("days_per_week").notNull(), // 1-7
   experienceLevel: workoutExperienceLevelEnum("experience_level").notNull(),
-  
+
   // Schedule: [{ day: "Monday", workoutId: "uuid" }, ...]
   workoutSchedule: json("workout_schedule").notNull(),
-  
+
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1043,14 +1043,14 @@ export const workoutPlans = pgTable("workout_plans", {
 export const workouts = pgTable("workouts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   planId: varchar("plan_id").references(() => workoutPlans.id, { onDelete: "cascade" }),
-  
+
   name: varchar("name", { length: 255 }).notNull(), // e.g., "Upper Body Push"
   description: text("description"),
   durationMinutes: integer("duration_minutes"),
-  
+
   // Exercises: [{ name, sets, reps, rest, notes, videoUrl }]
   exercises: json("exercises").notNull(),
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1059,12 +1059,12 @@ export const workoutLogs = pgTable("workout_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   workoutId: varchar("workout_id").references(() => workouts.id),
-  
+
   completedAt: timestamp("completed_at").defaultNow().notNull(),
-  
+
   // Actual performance: [{ exerciseName, sets: [{ weight, reps }] }]
   exercisesCompleted: json("exercises_completed"),
-  
+
   durationActual: integer("duration_actual"), // Actual minutes spent
   difficultyRating: integer("difficulty_rating"), // 1-5 scale
   notes: text("notes"),
@@ -1074,20 +1074,20 @@ export const workoutLogs = pgTable("workout_logs", {
 export const exerciseRecords = pgTable("exercise_records", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  
+
   exerciseName: varchar("exercise_name", { length: 255 }).notNull(),
-  
+
   // Last logged weight/reps (for suggestions)
   lastWeight: integer("last_weight"),
   lastReps: integer("last_reps"),
   lastLoggedAt: timestamp("last_logged_at"),
-  
+
   // Manual PR tracking (only when user explicitly saves)
   prWeight: integer("pr_weight"),
   prReps: integer("pr_reps"),
   prDate: timestamp("pr_date"),
   isPrTracked: boolean("is_pr_tracked").default(false).notNull(), // User explicitly marked this as a tracked PR
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -1098,16 +1098,16 @@ export const exerciseRecords = pgTable("exercise_records", {
 export const mealPlans = pgTable("meal_plans", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  
+
   name: varchar("name", { length: 255 }).notNull(), // e.g., "High Protein Anti-Inflammatory"
   dailyCalories: integer("daily_calories").notNull(),
-  
+
   // Macros: { protein: 200, carbs: 220, fat: 80 }
   macros: json("macros").notNull(),
-  
+
   // Meals: [{ mealType: "breakfast", recipes: [...], timing: "7-8 AM" }]
   meals: json("meals").notNull(),
-  
+
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1116,29 +1116,29 @@ export const mealPlans = pgTable("meal_plans", {
 // Recipe Library - Reusable recipes
 export const recipes = pgTable("recipes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  
+
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   category: recipeCategoryEnum("category").notNull(),
-  
+
   prepTimeMinutes: integer("prep_time_minutes"),
   cookTimeMinutes: integer("cook_time_minutes"),
   servings: integer("servings").notNull(),
-  
+
   // Ingredients: [{ item, amount, unit }]
   ingredients: json("ingredients").notNull(),
-  
+
   // Instructions as array of steps
   instructions: json("instructions").notNull(), // Array of strings
-  
+
   // Macros per serving: { calories, protein, carbs, fat, fiber }
   macros: json("macros").notNull(),
-  
+
   // Tags: ["high-protein", "anti-inflammatory", "quick", etc.]
   tags: json("tags"), // Array of strings
-  
+
   imageUrl: text("image_url"),
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1146,16 +1146,16 @@ export const recipes = pgTable("recipes", {
 export const mealLogs = pgTable("meal_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  
+
   recipeId: varchar("recipe_id").references(() => recipes.id), // NULL if custom meal
   mealType: mealTypeEnum("meal_type").notNull(),
   customMealName: varchar("custom_meal_name", { length: 255 }),
   customMealDescription: text("custom_meal_description"), // What the user ate (for AI analysis)
-  
+
   loggedAt: timestamp("logged_at").defaultNow().notNull(),
   servings: integer("servings").default(1),
   notes: text("notes"),
-  
+
   // AI-analyzed nutritional data
   calories: integer("calories"),
   proteinGrams: integer("protein_grams"),
@@ -1164,10 +1164,10 @@ export const mealLogs = pgTable("meal_logs", {
   fiberGrams: integer("fiber_grams"),
   sugarGrams: integer("sugar_grams"),
   sodiumMg: integer("sodium_mg"),
-  
+
   // Hydration tracking
   waterOz: integer("water_oz"), // Water intake in ounces
-  
+
   // Source tracking
   isFromPlan: boolean("is_from_plan").default(false), // Was this from the meal plan?
   planMealName: varchar("plan_meal_name", { length: 255 }), // Name of the meal from plan
@@ -1178,10 +1178,10 @@ export const groceryLists = pgTable("grocery_lists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   optimizePlanId: varchar("optimize_plan_id").references(() => optimizePlans.id),
-  
+
   // Items: [{ item, amount, unit, category, checked }]
   items: json("items").notNull(),
-  
+
   generatedAt: timestamp("generated_at").defaultNow().notNull(),
   isArchived: boolean("is_archived").default(false).notNull(),
 });
@@ -1190,19 +1190,19 @@ export const groceryLists = pgTable("grocery_lists", {
 export const optimizeSmsPreferences = pgTable("optimize_sms_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
-  
+
   // Morning reminder (nutrition + workout + supplements)
   morningReminderEnabled: boolean("morning_reminder_enabled").default(true).notNull(),
   morningReminderTime: text("morning_reminder_time").default('07:00').notNull(), // HH:MM format
-  
+
   // Pre-workout reminder
   workoutReminderEnabled: boolean("workout_reminder_enabled").default(true).notNull(),
   workoutReminderTime: text("workout_reminder_time").default('17:00').notNull(),
-  
+
   // Evening check-in
   eveningCheckinEnabled: boolean("evening_checkin_enabled").default(true).notNull(),
   eveningCheckinTime: text("evening_checkin_time").default('21:00').notNull(),
-  
+
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -1229,23 +1229,23 @@ export const trackingPreferences = pgTable("tracking_preferences", {
 export const userStreaks = pgTable("user_streaks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  
+
   streakType: varchar("streak_type", { length: 50 }).notNull(), // 'overall', 'nutrition', 'workout', 'supplements', 'lifestyle'
   currentStreak: integer("current_streak").default(0).notNull(),
   longestStreak: integer("longest_streak").default(0).notNull(),
   lastLoggedDate: timestamp("last_logged_date"), // Keep for backward compat
   lastCompletedDate: date("last_completed_date"), // New DATE type for better date handling
-  
+
   // Weekly & Monthly aggregates
   currentWeekScore: decimal("current_week_score", { precision: 3, scale: 2 }),
   currentMonthScore: decimal("current_month_score", { precision: 3, scale: 2 }),
   lastWeekScore: decimal("last_week_score", { precision: 3, scale: 2 }),
   lastMonthScore: decimal("last_month_score", { precision: 3, scale: 2 }),
-  
+
   // Streak preservation (grace period tracking)
   streakFreezeUsed: boolean("streak_freeze_used").default(false),
   streakFreezeDate: date("streak_freeze_date"),
-  
+
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -1254,22 +1254,22 @@ export const dailyCompletions = pgTable("daily_completions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   logDate: date("log_date").notNull(), // DATE only, no time
-  
+
   // Category completion scores (0.00 - 1.00)
   nutritionScore: decimal("nutrition_score", { precision: 3, scale: 2 }),
   workoutScore: decimal("workout_score", { precision: 3, scale: 2 }),
   supplementScore: decimal("supplement_score", { precision: 3, scale: 2 }),
   lifestyleScore: decimal("lifestyle_score", { precision: 3, scale: 2 }),
-  
+
   // Detailed completion data (JSON for flexibility)
   nutritionDetails: json("nutrition_details"), // { mealsLogged: 3, mealsPlanned: 3, calories: 2100 }
   workoutDetails: json("workout_details"), // { completed: true, exerciseCount: 8, duration: 45 }
   supplementDetails: json("supplement_details"), // { morning: true, afternoon: true, evening: false }
   lifestyleDetails: json("lifestyle_details"), // { sleepHours: 7.5, stepsCount: 8000 }
-  
+
   // Overall daily score (weighted average)
   dailyScore: decimal("daily_score", { precision: 3, scale: 2 }),
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -1281,26 +1281,26 @@ export const weeklySummaries = pgTable("weekly_summaries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   weekStart: date("week_start").notNull(), // Monday of the week
-  
+
   // Days completed per category (0-7)
   nutritionDays: integer("nutrition_days").default(0),
   workoutDays: integer("workout_days").default(0),
   supplementDays: integer("supplement_days").default(0),
   lifestyleDays: integer("lifestyle_days").default(0),
-  
+
   // Average scores for the week (0.00 - 1.00)
   avgNutritionScore: decimal("avg_nutrition_score", { precision: 3, scale: 2 }),
   avgWorkoutScore: decimal("avg_workout_score", { precision: 3, scale: 2 }),
   avgSupplementScore: decimal("avg_supplement_score", { precision: 3, scale: 2 }),
   avgLifestyleScore: decimal("avg_lifestyle_score", { precision: 3, scale: 2 }),
-  
+
   // Overall consistency score for the week (0-100)
   consistencyScore: decimal("consistency_score", { precision: 5, scale: 2 }),
-  
+
   // Perfect and partial day counts
   perfectDays: integer("perfect_days").default(0),
   partialDays: integer("partial_days").default(0),
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   userWeekIdx: uniqueIndex("weekly_summaries_user_week_idx").on(table.userId, table.weekStart),
@@ -1475,3 +1475,19 @@ export const MEMBERSHIP_TIERS = {
 } as const;
 
 export type MembershipTierKey = typeof MEMBERSHIP_TIERS[keyof typeof MEMBERSHIP_TIERS];
+
+export type MessageFormulaIngredientPayload = {
+  name: string;
+  dose: string;
+  purpose?: string;
+};
+
+export type MessageFormulaPayload = {
+  bases: MessageFormulaIngredientPayload[];
+  additions: MessageFormulaIngredientPayload[];
+  totalMg: number;
+  warnings?: string[];
+  rationale?: string;
+  disclaimers?: string[];
+  targetCapsules?: number;
+};
