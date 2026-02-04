@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from "crypto";
 import { storage } from "../storage";
 import { logger } from "../infra/logging/logger";
+import { consentsRepository } from 'server/modules/consents/consents.repository';
 
 // Supabase client - lazy initialization to avoid crashes when env vars missing
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
@@ -45,7 +46,7 @@ export async function enforceConsentRequirements(
     // Check each required consent
     for (const consentType of consentsNeeded) {
       try {
-        const consent = await storage.getUserConsent(userId, consentType as any);
+        const consent = await consentsRepository.getUserConsent(userId, consentType as any);
         if (!consent) {
           missingConsents.push(consentType);
         }
