@@ -61,9 +61,64 @@ export class UsersRepository {
 
     // Health Profile operations
     async getHealthProfile(userId: string): Promise<HealthProfile | undefined> {
-        const [profile] = await db.select().from(healthProfiles).where(eq(healthProfiles.userId, userId));
-        return profile || undefined;
+        try {
+            const [profile] = await db.select().from(healthProfiles).where(eq(healthProfiles.userId, userId));
+            if (!profile) return undefined;
+
+            // Decrypt sensitive medical fields with error handling for each field
+            let conditions: string[] = [];
+            let medications: string[] = [];
+            let allergies: string[] = [];
+
+            try {
+                if (profile.conditions) {
+                    // Check if it's already a plain array (not encrypted)
+                    if (Array.isArray(profile.conditions)) {
+                        conditions = profile.conditions;
+                    } else if (typeof profile.conditions === 'string') {
+                        conditions = JSON.parse(decryptField(profile.conditions));
+                    }
+                }
+            } catch (decryptError) {
+                console.error('Error decrypting conditions, using empty array:', decryptError);
+            }
+
+            try {
+                if (profile.medications) {
+                    if (Array.isArray(profile.medications)) {
+                        medications = profile.medications;
+                    } else if (typeof profile.medications === 'string') {
+                        medications = JSON.parse(decryptField(profile.medications));
+                    }
+                }
+            } catch (decryptError) {
+                console.error('Error decrypting medications, using empty array:', decryptError);
+            }
+
+            try {
+                if (profile.allergies) {
+                    if (Array.isArray(profile.allergies)) {
+                        allergies = profile.allergies;
+                    } else if (typeof profile.allergies === 'string') {
+                        allergies = JSON.parse(decryptField(profile.allergies));
+                    }
+                }
+            } catch (decryptError) {
+                console.error('Error decrypting allergies, using empty array:', decryptError);
+            }
+
+            return {
+                ...profile,
+                conditions,
+                medications,
+                allergies
+            };
+        } catch (error) {
+            console.error('Error getting health profile:', error);
+            return undefined;
+        }
     }
+
 
     async createHealthProfile(insertProfile: InsertHealthProfile): Promise<HealthProfile> {
         const encryptedProfile = {

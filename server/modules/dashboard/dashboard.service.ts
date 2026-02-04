@@ -8,6 +8,7 @@ import { optimizeRepository } from '../optimize/optimize.repository';
 import { optimizeService } from '../optimize/optimize.service';
 import { formulasRepository } from '../formulas/formulas.repository';
 import logger from '../../infra/logging/logger';
+import { usersRepository } from '../users/users.repository';
 
 
 export class DashboardService {
@@ -15,10 +16,10 @@ export class DashboardService {
         // Fetch all dashboard data in parallel
         const [currentFormula, healthProfile, chatSessions, orders, subscription, labReports] = await Promise.all([
             formulasRepository.getCurrentFormulaByUser(userId),
-            storage.getHealthProfile(userId),
+            usersRepository.getHealthProfile(userId),
             chatRepository.listChatSessionsByUser(userId),
             storage.listOrdersByUser(userId),
-            storage.getSubscription(userId),
+            usersRepository.getSubscription(userId),
             filesRepository.listFileUploadsByUser(userId, 'lab_report')
         ]);
 

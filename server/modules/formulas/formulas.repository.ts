@@ -32,6 +32,8 @@ type FormulaCustomizationPayload = {
     addedIndividuals?: FormulaCustomizationItemPayload[];
 };
 
+type DbInsertFormula = typeof formulas.$inferInsert;
+
 function normalizeFormulaCustomizations(customizations?: { addedBases?: any[]; addedIndividuals?: any[] }): FormulaCustomizationPayload | undefined {
     const normalizeItem = (item: any): FormulaCustomizationItemPayload => ({
         ingredient: typeof item?.ingredient === 'string' ? item.ingredient : 'unknown',
@@ -113,7 +115,7 @@ export class FormulasRepository {
     async createFormula(insertFormula: InsertFormula): Promise<Formula> {
         try {
             const normalizedFormula = normalizeFormulaInsertPayload(insertFormula);
-            const [formula] = await db.insert(formulas).values(normalizedFormula as any).returning();
+            const [formula] = await db.insert(formulas).values(normalizedFormula as DbInsertFormula).returning();
             return formula;
         } catch (error) {
             console.error('Error creating formula:', error);
