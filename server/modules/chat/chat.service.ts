@@ -17,6 +17,7 @@ import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builde
 import { logger } from '../../infra/logging/logger';
 import { type MessageFormulaPayload, type MessageFormulaIngredientPayload } from '@shared/schema';
 import { filesRepository } from '../files/files.repository';
+import { usersRepository } from '../users/users.repository';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -185,7 +186,7 @@ export class ChatService {
 
     async getContext(userId: string) {
         const [healthProfile, labReports, activeFormula] = await Promise.all([
-            storage.getHealthProfile(userId).catch(() => null),
+            usersRepository.getHealthProfile(userId).catch(() => null),
             filesRepository.getLabReportsByUser(userId),
             formulasRepository.getCurrentFormulaByUser(userId)
         ]);
