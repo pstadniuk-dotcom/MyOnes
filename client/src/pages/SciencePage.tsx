@@ -1,6 +1,6 @@
-import HeaderV2 from "@/components/HeaderV2";
-import ScienceSection from "@/components/ScienceSection";
-import FooterV2 from "@/components/FooterV2";
+import HeaderV2 from "@/features/marketing/components/HeaderV2";
+import ScienceSection from "@/features/marketing/components/ScienceSection";
+import FooterV2 from "@/features/marketing/components/FooterV2";
 
 export default function SciencePage() {
   return (

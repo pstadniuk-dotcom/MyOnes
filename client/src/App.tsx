@@ -1,15 +1,15 @@
 import { Switch, Route, Redirect } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { queryClient } from "@/shared/lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/shared/components/ui/toaster";
+import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ApiConfigError } from "@/components/ApiConfigError";
-import { isApiConfigurationValid } from "@/lib/api";
-import { FEATURES, isOptimizeEnabled } from "@/config/features";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import ProtectedAdminRoute from "@/components/ProtectedAdminRoute";
+import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
+import { ApiConfigError } from "@/shared/components/ApiConfigError";
+import { isApiConfigurationValid } from "@/shared/lib/api";
+import { FEATURES, isOptimizeEnabled } from "@/shared/config/features";
+import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
+import ProtectedAdminRoute from "@/features/admin/components/ProtectedAdminRoute";
 import NotFound from "@/pages/not-found";
 import SignupPage from "@/pages/SignupPage";
 import LoginPage from "@/pages/LoginPage";
@@ -32,7 +32,7 @@ import ReturnsPage from "@/pages/ReturnsPage";
 import ShippingPage from "@/pages/ShippingPage";
 
 // Import dashboard components
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { DashboardLayout } from "@/shared/components/DashboardLayout";
 import DashboardHome from "@/pages/DashboardHome";
 import ConsultationPage from "@/pages/ConsultationPage";
 import MyFormulaPage from "@/pages/MyFormulaPage";
@@ -57,17 +57,17 @@ import OrdersManagementPage from "@/pages/admin/OrdersManagementPage";
 import SharedFormulaPage from "@/pages/SharedFormulaPage";
 
 // Import all landing page components
-import Header from "@/components/Header";
-import HeroSection from "@/components/HeroSection";
-import ProblemSection from "@/components/ProblemSection";
-import HowItWorksSection from "@/components/HowItWorksSection";
-import ScienceSection from "@/components/ScienceSection";
-import PersonalizationShowcase from "@/components/PersonalizationShowcase";
-import TestimonialsSection from "@/components/TestimonialsSection";
-import PricingSection from "@/components/PricingSection";
-import FAQSection from "@/components/FAQSection";
-import CTASection from "@/components/CTASection";
-import Footer from "@/components/Footer";
+import Header from "@/features/marketing/components/Header";
+import HeroSection from "@/features/marketing/components/HeroSection";
+import ProblemSection from "@/features/marketing/components/ProblemSection";
+import HowItWorksSection from "@/features/marketing/components/HowItWorksSection";
+import ScienceSection from "@/features/marketing/components/ScienceSection";
+import PersonalizationShowcase from "@/features/marketing/components/PersonalizationShowcase";
+import TestimonialsSection from "@/features/marketing/components/TestimonialsSection";
+import PricingSection from "@/features/marketing/components/PricingSection";
+import FAQSection from "@/features/marketing/components/FAQSection";
+import CTASection from "@/features/marketing/components/CTASection";
+import Footer from "@/features/marketing/components/Footer";
 
 // Import V2 landing page (premium design)
 import LandingPageV2 from "@/pages/LandingPageV2";
@@ -104,7 +104,7 @@ function MainRouter() {
       <Route path="/login" component={LoginPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
-      
+
       {/* Static Pages */}
       <Route path="/about" component={AboutPage} />
       <Route path="/blog" component={BlogPage} />
@@ -119,7 +119,7 @@ function MainRouter() {
       <Route path="/returns" component={ReturnsPage} />
       <Route path="/shipping" component={ShippingPage} />
       <Route path="/help" component={SupportPage} />
-      
+
       {/* Protected Dashboard Routes - explicit paths */}
       <Route path="/dashboard">
         <ProtectedRoute>
@@ -165,7 +165,7 @@ function MainRouter() {
           </ProtectedRoute>
         )}
       </Route>
-      
+
       <Route path="/dashboard/wearables">
         <ProtectedRoute>
           <DashboardLayout>
@@ -215,7 +215,7 @@ function MainRouter() {
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
-      
+
       {/* Legacy /chat redirect to dashboard consultation */}
       <Route path="/chat">
         <ProtectedRoute>
@@ -224,7 +224,7 @@ function MainRouter() {
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
-      
+
       {/* Admin Routes */}
       <Route path="/admin">
         <ProtectedAdminRoute>
@@ -263,10 +263,10 @@ function MainRouter() {
           </ProtectedAdminRoute>
         )}
       </Route>
-      
+
       {/* Public Shared Formula View */}
       <Route path="/shared/formula/:id" component={SharedFormulaPage} />
-      
+
       <Route component={NotFound} />
     </Switch>
   );

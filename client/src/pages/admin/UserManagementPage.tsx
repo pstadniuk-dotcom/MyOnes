@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -11,9 +11,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/shared/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/shared/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { Search as SearchIcon, ChevronLeft, ChevronRight, Users, Shield, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
@@ -162,7 +162,7 @@ export default function UserManagementPage() {
                   {filter === 'paid' ? 'Paid Users' : filter === 'active' ? 'Active Users' : 'All Users'}
                 </CardTitle>
                 <CardDescription>
-                  {total} total user{total !== 1 ? 's' : ''} 
+                  {total} total user{total !== 1 ? 's' : ''}
                   {filter === 'paid' && ' with orders'}
                   {filter === 'active' && ' with formulas'}
                 </CardDescription>

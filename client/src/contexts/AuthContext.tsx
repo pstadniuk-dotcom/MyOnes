@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/api';
-import { SESSION_EXPIRED_EVENT } from '@/lib/queryClient';
+import { useToast } from '@/shared/hooks/use-toast';
+import { apiRequest } from '@/shared/lib/api';
+import { SESSION_EXPIRED_EVENT } from '@/shared/lib/queryClient';
 import type { AuthResponse, SignupData, LoginData } from '@shared/schema';
 
 interface User {
@@ -46,13 +46,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(null);
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
-    
+
     toast({
       title: "Session Expired",
       description: "Your session has expired. Please log in again.",
       variant: "destructive"
     });
-    
+
     setLocation('/login');
   }, [toast, setLocation]);
 
@@ -70,12 +70,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         const storedToken = localStorage.getItem('authToken');
         const storedUser = localStorage.getItem('user');
-        
+
         if (storedToken && storedUser) {
           const parsedUser = JSON.parse(storedUser);
           setToken(storedToken);
           setUser(parsedUser);
-          
+
           // Validate token with server
           await validateToken(storedToken);
         }
@@ -110,8 +110,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
         return; // Don't throw - this is expected behavior
-      } 
-      
+      }
+
       if (response.status === 404) {
         // User not found - clear auth
         console.error('User account no longer exists - clearing authentication');
@@ -121,7 +121,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.removeItem('user');
         throw new Error('User account not found');
       }
-      
+
       if (!response.ok) {
         // Other server errors
         throw new Error(`Token validation failed: ${response.status} ${response.statusText}`);
@@ -129,19 +129,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const data = await response.json();
       setUser(data.user);
-      
+
     } catch (error: any) {
       console.error('Token validation error:', error);
-      
+
       // Only clear auth data for auth-related errors, not network errors
-      if (error.message?.includes('Token validation failed') || 
-          error.message?.includes('User account not found')) {
+      if (error.message?.includes('Token validation failed') ||
+        error.message?.includes('User account not found')) {
         setToken(null);
         setUser(null);
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
       }
-      
+
       throw error;
     }
   };
@@ -251,7 +251,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Clear auth state
       setToken(null);
       setUser(null);
-      
+
       // Clear localStorage
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');

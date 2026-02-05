@@ -1,15 +1,15 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { 
-  Watch, 
-  Activity, 
-  Heart, 
-  CheckCircle2, 
-  XCircle, 
+import { queryClient, apiRequest } from '@/shared/lib/queryClient';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+import { useToast } from '@/shared/hooks/use-toast';
+import {
+  Watch,
+  Activity,
+  Heart,
+  CheckCircle2,
+  XCircle,
   Loader2,
   Link as LinkIcon,
   ExternalLink,
@@ -61,14 +61,14 @@ function ProviderLogo({ provider, logo, size = 'md' }: { provider: string; logo?
     md: 'h-8 w-8',
     lg: 'h-12 w-12',
   };
-  
+
   // Try provider logo from Junction API
   const logoUrl = logo || `https://storage.googleapis.com/vital-assets/${provider}.png`;
-  
+
   if (imgError) {
     return <Watch className={`${sizeClasses[size]} text-muted-foreground`} />;
   }
-  
+
   return (
     <img
       src={logoUrl}
@@ -137,7 +137,7 @@ export default function WearablesPage() {
     setIsConnecting(true);
     try {
       const res = await apiRequest('GET', '/api/wearables/connect');
-      
+
       if (res.status === 401) {
         toast({
           title: 'Authentication required',
@@ -193,7 +193,7 @@ export default function WearablesPage() {
             Connect your fitness trackers to personalize your supplement formula based on your activity, sleep, and recovery data.
           </p>
         </div>
-        
+
         {/* Buttons - Full width on mobile */}
         <div className="flex flex-col sm:flex-row gap-2">
           {connections.length > 0 && (
@@ -211,8 +211,8 @@ export default function WearablesPage() {
               Sync Data
             </Button>
           )}
-          <Button 
-            onClick={handleConnect} 
+          <Button
+            onClick={handleConnect}
             disabled={isConnecting}
             className="w-full sm:w-auto bg-[#1B4332] hover:bg-[#1B4332]/90"
           >
@@ -231,17 +231,17 @@ export default function WearablesPage() {
         <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {connections.map((connection) => {
             const colors = PROVIDER_COLORS[connection.provider] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
-            
+
             return (
               <Card key={connection.id} className="relative overflow-hidden bg-[#FAF7F2] border-[#52796F]/20">
                 <div className={`absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 ${colors.bgColor} rounded-full -mr-12 sm:-mr-16 -mt-12 sm:-mt-16 opacity-20`} />
-                
+
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className={`p-2 sm:p-3 rounded-lg ${colors.bgColor}`}>
                       <ProviderLogo provider={connection.provider} logo={connection.logo} size="md" />
                     </div>
-                    <Badge 
+                    <Badge
                       variant={connection.status === 'connected' ? 'default' : connection.status === 'error' ? 'destructive' : 'secondary'}
                       className="gap-1 text-xs whitespace-nowrap bg-[#1B4332]"
                     >
@@ -277,7 +277,7 @@ export default function WearablesPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   <Button
                     variant="outline"
                     className="w-full border-red-300 text-red-600 hover:bg-red-50"
@@ -312,8 +312,8 @@ export default function WearablesPage() {
             <p className="text-[#52796F] text-center text-sm sm:text-base max-w-md mb-4">
               Connect your wearable device to get personalized supplement recommendations based on your activity, sleep, and recovery data.
             </p>
-            <Button 
-              onClick={handleConnect} 
+            <Button
+              onClick={handleConnect}
               disabled={isConnecting}
               className="w-full sm:w-auto bg-[#1B4332] hover:bg-[#1B4332]/90"
             >
@@ -344,15 +344,14 @@ export default function WearablesPage() {
             {PRIORITY_PROVIDERS.map((provider) => {
               const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
               const isConnected = connections.some(c => c.provider === provider.slug || c.provider === provider.slug.replace('_v2', ''));
-              
+
               return (
-                <div 
-                  key={provider.slug} 
-                  className={`flex items-center gap-3 p-3 sm:p-4 rounded-xl border-2 transition-all ${
-                    isConnected 
-                      ? 'border-green-500 bg-green-50/50' 
-                      : 'border-transparent bg-white/50 hover:bg-white hover:border-[#1B4332]/20'
-                  }`}
+                <div
+                  key={provider.slug}
+                  className={`flex items-center gap-3 p-3 sm:p-4 rounded-xl border-2 transition-all ${isConnected
+                    ? 'border-green-500 bg-green-50/50'
+                    : 'border-transparent bg-white/50 hover:bg-white hover:border-[#1B4332]/20'
+                    }`}
                 >
                   <div className={`p-2 rounded-lg ${colors.bgColor} flex-shrink-0`}>
                     <ProviderLogo provider={provider.slug} logo={provider.logo} size="md" />

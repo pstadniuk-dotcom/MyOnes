@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Salad, 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import {
+  Salad,
   Dumbbell,
   Heart,
   Sparkles,
@@ -15,17 +15,17 @@ import {
   Clock
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { getQueryFn } from '@/lib/queryClient';
+import { getQueryFn } from '@/shared/lib/queryClient';
 import { Link, useLocation, useParams } from 'wouter';
-import { NutritionPlanTab } from '@/components/optimize/NutritionPlanTab';
-import { WorkoutPlanTab } from '@/components/optimize/WorkoutPlanTab';
-import { LifestylePlanTab } from '@/components/optimize/LifestylePlanTab';
+import { NutritionPlanTab } from '@/features/optimize/components/NutritionPlanTab';
+import { WorkoutPlanTab } from '@/features/optimize/components/WorkoutPlanTab';
+import { LifestylePlanTab } from '@/features/optimize/components/LifestylePlanTab';
 import type { OptimizeLogsByDate } from '@/types/optimize';
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
-} from "@/components/ui/hover-card";
+} from "@/shared/components/ui/hover-card";
 
 interface OptimizePlan {
   id: string;
@@ -46,7 +46,7 @@ interface HealthProfile {
 export default function OptimizePage() {
   const [location, navigate] = useLocation();
   const params = useParams<{ tab?: string }>();
-  
+
   // Get tab from URL param (e.g., /dashboard/optimize/workout)
   const urlTab = params.tab as 'nutrition' | 'workout' | 'lifestyle' | undefined;
 
@@ -121,9 +121,9 @@ export default function OptimizePage() {
     if (plansLoading) return 'nutrition' as const; // Default while loading
     return (planSections.find((section) => section.isActive)?.key ?? planSections[0].key) as typeof planSections[number]['key'];
   }, [urlTab, nutritionPlan, workoutPlan, lifestylePlan, plansLoading]);
-  
+
   const [activePlanTab, setActivePlanTab] = useState<typeof defaultTab>(defaultTab);
-  
+
   // Update active tab when URL param changes or plans finish loading
   useEffect(() => {
     if (urlTab && ['nutrition', 'workout', 'lifestyle'].includes(urlTab)) {
@@ -171,7 +171,7 @@ export default function OptimizePage() {
             </div>
             <h3 className="text-2xl font-semibold mb-2">Complete Your Health Profile</h3>
             <p className="text-muted-foreground text-center mb-6 max-w-lg">
-              To unlock AI-powered optimization plans, we need to understand your health goals, 
+              To unlock AI-powered optimization plans, we need to understand your health goals,
               current status, and preferences. This takes just 2 minutes.
             </p>
             <Link href="/dashboard/profile">
@@ -217,9 +217,8 @@ export default function OptimizePage() {
                 className="w-full justify-center rounded-lg border border-transparent px-3 py-3 md:py-2.5 text-center transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
               >
                 <div className="flex flex-col items-center gap-1.5">
-                  <div className={`h-9 w-9 md:h-8 md:w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    activePlanTab === section.key ? section.badgeClass : 'bg-muted text-muted-foreground'
-                  }`}>
+                  <div className={`h-9 w-9 md:h-8 md:w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${activePlanTab === section.key ? section.badgeClass : 'bg-muted text-muted-foreground'
+                    }`}>
                     <Icon className="h-4.5 w-4.5 md:h-4 md:w-4" />
                   </div>
                   <p className="text-sm md:text-sm font-semibold text-foreground">{section.title}</p>
@@ -254,7 +253,7 @@ export default function OptimizePage() {
                           <div>
                             <p className="font-semibold text-purple-900 mb-1 text-sm">Pro Tip</p>
                             <p className="text-xs text-purple-800">
-                              Set up personalized reminders for supplements, workouts, meals, and check-ins. 
+                              Set up personalized reminders for supplements, workouts, meals, and check-ins.
                               Daily reminders help you stay consistent and achieve your health goals faster.
                             </p>
                           </div>
@@ -267,9 +266,9 @@ export default function OptimizePage() {
               </div>
               <div className="flex gap-2">
                 <Link href="/dashboard/settings#notifications">
-                  <Button 
-                    variant="default" 
-                    size="sm" 
+                  <Button
+                    variant="default"
+                    size="sm"
                     className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                   >
                     <Clock className="mr-2 h-4 w-4" />

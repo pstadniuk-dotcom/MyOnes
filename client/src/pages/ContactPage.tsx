@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/shared/components/ui/card';
+import { Label } from '@/shared/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/shared/components/ui/select";
 import { MessageSquare, Clock, Shield } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import HeaderV2 from '@/components/HeaderV2';
-import FooterV2 from '@/components/FooterV2';
+import { useToast } from '@/shared/hooks/use-toast';
+import HeaderV2 from '@/features/marketing/components/HeaderV2';
+import FooterV2 from '@/features/marketing/components/FooterV2';
 
 const inquiryTypes = [
   { value: "support", label: "General Support", description: "Questions about your account or supplements" },
@@ -31,7 +31,7 @@ export default function ContactPage() {
   const [location] = useLocation();
   const searchParams = new URLSearchParams(location.split('?')[1] || '');
   const typeFromUrl = searchParams.get('type');
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -109,7 +109,7 @@ export default function ContactPage() {
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="inquiryType" className="text-[#1B4332]">What can we help you with?</Label>
                 <Select
@@ -147,11 +147,11 @@ export default function ContactPage() {
                   data-testid="textarea-contact-message"
                 />
               </div>
-              
-              <Button 
-                type="submit" 
-                size="lg" 
-                className="w-full bg-[#1B4332] hover:bg-[#1B4332]/90" 
+
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full bg-[#1B4332] hover:bg-[#1B4332]/90"
                 data-testid="button-contact-submit"
                 disabled={!formData.inquiryType}
               >

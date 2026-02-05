@@ -1,24 +1,24 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
-import { 
-  Bell, 
-  Check, 
-  CheckCheck, 
-  Package, 
-  Beaker, 
-  Calendar, 
+import {
+  Bell,
+  Check,
+  CheckCheck,
+  Package,
+  Beaker,
+  Calendar,
   Info,
   Filter,
   Trash2,
   ArrowLeft
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { apiRequest } from '@/lib/queryClient';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { Separator } from '@/shared/components/ui/separator';
+import { apiRequest } from '@/shared/lib/queryClient';
 import { useLocation } from 'wouter';
 import type { Notification } from '@shared/schema';
 
@@ -34,7 +34,7 @@ type FilterType = 'all' | 'unread' | 'formula_update' | 'order_update' | 'system
 
 const NotificationIcon = ({ type, metadata }: { type: string; metadata?: any }) => {
   const iconProps = { className: "h-5 w-5" };
-  
+
   if (metadata?.icon) {
     switch (metadata.icon) {
       case 'package':
@@ -47,7 +47,7 @@ const NotificationIcon = ({ type, metadata }: { type: string; metadata?: any }) 
         return <Info {...iconProps} className="h-5 w-5 text-gray-500" />;
     }
   }
-  
+
   switch (type) {
     case 'order_update':
       return <Package {...iconProps} className="h-5 w-5 text-blue-500" />;
@@ -65,7 +65,7 @@ const formatNotificationTime = (createdAt: string | Date) => {
   const date = new Date(createdAt);
   const now = new Date();
   const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-  
+
   if (diffInHours < 24) {
     return formatDistanceToNow(date, { addSuffix: true });
   } else if (diffInHours < 24 * 7) {
@@ -75,28 +75,27 @@ const formatNotificationTime = (createdAt: string | Date) => {
   }
 };
 
-const NotificationCard = ({ 
-  notification, 
-  onMarkAsRead 
-}: { 
-  notification: Notification; 
+const NotificationCard = ({
+  notification,
+  onMarkAsRead
+}: {
+  notification: Notification;
   onMarkAsRead: (id: string) => void;
 }) => {
   const handleClick = () => {
     if (!notification.isRead) {
       onMarkAsRead(notification.id);
     }
-    
+
     if (notification.metadata?.actionUrl) {
       window.location.href = notification.metadata.actionUrl;
     }
   };
 
   return (
-    <Card 
-      className={`cursor-pointer transition-all hover:shadow-md ${
-        !notification.isRead ? 'border-l-4 border-l-primary bg-primary/5' : 'opacity-75'
-      }`}
+    <Card
+      className={`cursor-pointer transition-all hover:shadow-md ${!notification.isRead ? 'border-l-4 border-l-primary bg-primary/5' : 'opacity-75'
+        }`}
       onClick={handleClick}
     >
       <CardContent className="p-4">
@@ -104,7 +103,7 @@ const NotificationCard = ({
           <div className="flex-shrink-0 p-2 rounded-full bg-muted">
             <NotificationIcon type={notification.type} metadata={notification.metadata} />
           </div>
-          
+
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className={`font-medium ${notification.isRead ? 'text-muted-foreground' : 'text-foreground'}`}>
@@ -117,20 +116,20 @@ const NotificationCard = ({
                 <Badge variant="destructive" className="text-xs">Priority</Badge>
               )}
             </div>
-            
+
             <p className="text-sm text-muted-foreground mb-2">
               {notification.content}
             </p>
-            
+
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
                 {formatNotificationTime(notification.createdAt)}
               </span>
-              
+
               {!notification.isRead && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="h-7 px-2 text-xs"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -216,8 +215,8 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
             onClick={() => setLocation('/dashboard')}
             className="h-9 w-9"
@@ -234,7 +233,7 @@ export default function NotificationsPage() {
             </p>
           </div>
         </div>
-        
+
         {unreadCount > 0 && (
           <Button
             variant="outline"
@@ -305,13 +304,13 @@ export default function NotificationsPage() {
               {filter === 'all' ? 'No notifications yet' : `No ${filter.replace('_', ' ')} notifications`}
             </h3>
             <p className="text-sm text-muted-foreground max-w-sm">
-              {filter === 'all' 
+              {filter === 'all'
                 ? "When you receive notifications about your formula, orders, or account, they'll appear here."
                 : `You don't have any ${filter.replace('_', ' ')} notifications at the moment.`}
             </p>
             {filter !== 'all' && (
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 className="mt-2 text-primary"
                 onClick={() => setFilter('all')}
               >
@@ -326,8 +325,8 @@ export default function NotificationsPage() {
       {notifications.length > 0 && (
         <p className="text-xs text-muted-foreground text-center mt-6">
           Notifications are kept for 30 days. Manage notification preferences in{' '}
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             className="h-auto p-0 text-xs text-primary hover:underline"
             onClick={() => setLocation('/dashboard/settings#notifications')}
           >

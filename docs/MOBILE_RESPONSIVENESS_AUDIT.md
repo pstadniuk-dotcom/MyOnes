@@ -459,7 +459,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 // client/src/components/mobile/MobileBottomNav.tsx
 import { Home, Sparkles, ClipboardList, User } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { cn } from '@/lib/utils';
+import { cn } from '@/shared/lib/utils';
 
 const navItems = [
   { href: '/dashboard', icon: Home, label: 'Home' },
