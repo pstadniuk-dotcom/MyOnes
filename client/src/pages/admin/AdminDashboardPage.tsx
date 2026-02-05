@@ -1,13 +1,13 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Badge } from '@/shared/components/ui/badge';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/shared/hooks/use-toast';
 import { useLocation } from 'wouter';
-import { 
-  Users, 
-  DollarSign, 
-  Activity, 
+import {
+  Users,
+  DollarSign,
+  Activity,
   Package,
   TrendingUp,
   UserCheck,
@@ -18,26 +18,26 @@ import {
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { 
+import { Button } from '@/shared/components/ui/button';
+import { Label } from '@/shared/components/ui/label';
+import { Input } from '@/shared/components/ui/input';
+import {
   Select,
   SelectTrigger,
   SelectContent,
   SelectItem,
   SelectValue
-} from '@/components/ui/select';
+} from '@/shared/components/ui/select';
 import { Settings2, ArrowRight } from 'lucide-react';
 
 // Import new admin components
-import { ConversionFunnel } from '@/components/admin/ConversionFunnel';
-import { CohortRetentionChart } from '@/components/admin/CohortRetentionChart';
-import { ReorderHealthWidget } from '@/components/admin/ReorderHealthWidget';
-import { PendingActionsWidget } from '@/components/admin/PendingActionsWidget';
-import { ActivityFeed } from '@/components/admin/ActivityFeed';
-import { FormulaInsightsWidget } from '@/components/admin/FormulaInsightsWidget';
-import { apiRequest } from '@/lib/queryClient';
+import { ConversionFunnel } from '@/features/admin/components/ConversionFunnel';
+import { CohortRetentionChart } from '@/features/admin/components/CohortRetentionChart';
+import { ReorderHealthWidget } from '@/features/admin/components/ReorderHealthWidget';
+import { PendingActionsWidget } from '@/features/admin/components/PendingActionsWidget';
+import { ActivityFeed } from '@/features/admin/components/ActivityFeed';
+import { FormulaInsightsWidget } from '@/features/admin/components/FormulaInsightsWidget';
+import { apiRequest } from '@/shared/lib/queryClient';
 
 // Types for API responses
 interface DashboardStats {
@@ -72,21 +72,21 @@ interface TodaysOrder {
 }
 
 // Stat Card Component
-function StatCard({ 
-  title, 
-  value, 
-  description, 
-  icon: Icon, 
+function StatCard({
+  title,
+  value,
+  description,
+  icon: Icon,
   trend
-}: { 
-  title: string; 
-  value: string | number; 
-  description: string; 
+}: {
+  title: string;
+  value: string | number;
+  description: string;
   icon: typeof Users;
   trend?: string;
 }) {
   return (
-    <Card 
+    <Card
       data-testid={`stat-card-${title.toLowerCase().replace(/\s/g, '-')}`}
       className="hover-elevate"
     >
@@ -122,7 +122,7 @@ function DashboardSkeleton() {
         <Skeleton className="h-8 w-64 mb-2" />
         <Skeleton className="h-4 w-96" />
       </div>
-      
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <Card key={i}>
@@ -146,7 +146,7 @@ function DashboardSkeleton() {
             <Skeleton className="h-80 w-full" />
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <Skeleton className="h-6 w-32" />
@@ -251,7 +251,7 @@ export default function AdminDashboardPage() {
 
         {/* Quick Links */}
         <div className="grid gap-4 md:grid-cols-5">
-          <Card 
+          <Card
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => setLocation('/admin/users')}
           >
@@ -265,8 +265,8 @@ export default function AdminDashboardPage() {
               </CardDescription>
             </CardHeader>
           </Card>
-          
-          <Card 
+
+          <Card
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => setLocation('/admin/orders')}
           >
@@ -280,8 +280,8 @@ export default function AdminDashboardPage() {
               </CardDescription>
             </CardHeader>
           </Card>
-          
-          <Card 
+
+          <Card
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => setLocation('/admin/conversations')}
           >
@@ -295,8 +295,8 @@ export default function AdminDashboardPage() {
               </CardDescription>
             </CardHeader>
           </Card>
-          
-          <Card 
+
+          <Card
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => setLocation('/admin/support-tickets')}
           >
@@ -310,8 +310,8 @@ export default function AdminDashboardPage() {
               </CardDescription>
             </CardHeader>
           </Card>
-          
-          <Card 
+
+          <Card
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => setLocation('/admin')}
           >
@@ -332,7 +332,7 @@ export default function AdminDashboardPage() {
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="section-stats-cards">
-          <div 
+          <div
             className="cursor-pointer transition-all"
             onClick={() => setLocation('/admin/users?filter=all')}
           >
@@ -343,7 +343,7 @@ export default function AdminDashboardPage() {
               icon={Users}
             />
           </div>
-          <div 
+          <div
             className="cursor-pointer transition-all"
             onClick={() => setLocation('/admin/users?filter=paid')}
           >
@@ -354,7 +354,7 @@ export default function AdminDashboardPage() {
               icon={UserCheck}
             />
           </div>
-          <div 
+          <div
             className="cursor-pointer transition-all"
             onClick={() => setLocation('/admin/users?filter=active')}
           >
@@ -445,33 +445,33 @@ export default function AdminDashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={growthData || []}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="date" 
+                    <XAxis
+                      dataKey="date"
                       className="text-xs"
                       tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     />
                     <YAxis className="text-xs" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px'
                       }}
                       labelFormatter={(value) => new Date(value).toLocaleDateString()}
                     />
                     <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="users" 
-                      stroke="hsl(var(--primary))" 
+                    <Line
+                      type="monotone"
+                      dataKey="users"
+                      stroke="hsl(var(--primary))"
                       strokeWidth={2}
                       name="Total Users"
                       dot={{ fill: 'hsl(var(--primary))' }}
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="paidUsers" 
-                      stroke="hsl(var(--chart-2))" 
+                    <Line
+                      type="monotone"
+                      dataKey="paidUsers"
+                      stroke="hsl(var(--chart-2))"
                       strokeWidth={2}
                       name="Paid Users"
                       dot={{ fill: 'hsl(var(--chart-2))' }}
@@ -495,24 +495,24 @@ export default function AdminDashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={revenueData || []}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="date" 
+                    <XAxis
+                      dataKey="date"
                       className="text-xs"
                       tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     />
                     <YAxis className="text-xs" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px'
                       }}
                       labelFormatter={(value) => new Date(value).toLocaleDateString()}
                     />
                     <Legend />
-                    <Bar 
-                      dataKey="orders" 
-                      fill="hsl(var(--primary))" 
+                    <Bar
+                      dataKey="orders"
+                      fill="hsl(var(--primary))"
                       radius={[4, 4, 0, 0]}
                       name="Orders"
                     />

@@ -1,7 +1,7 @@
 import { Link } from 'wouter';
 import { Mail, Users, Sparkles, TrendingUp, Heart } from 'lucide-react';
-import HeaderV2 from '@/components/HeaderV2';
-import FooterV2 from '@/components/FooterV2';
+import HeaderV2 from '@/features/marketing/components/HeaderV2';
+import FooterV2 from '@/features/marketing/components/FooterV2';
 
 export default function PartnershipsPage() {
   return (

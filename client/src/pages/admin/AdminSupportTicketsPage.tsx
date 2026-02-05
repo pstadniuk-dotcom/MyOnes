@@ -1,25 +1,25 @@
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { Label } from '@/shared/components/ui/label';
+import { Input } from '@/shared/components/ui/input';
 import {
   Select,
   SelectTrigger,
   SelectContent,
   SelectItem,
   SelectValue
-} from '@/components/ui/select';
+} from '@/shared/components/ui/select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/shared/hooks/use-toast';
 import { useLocation } from 'wouter';
-import { 
-  MessageSquare, 
-  Clock, 
-  CheckCircle2, 
+import {
+  MessageSquare,
+  Clock,
+  CheckCircle2,
   AlertCircle,
   ArrowLeft,
   Send,
@@ -31,7 +31,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest } from '@/shared/lib/queryClient';
 
 interface SupportTicket {
   id: string;
@@ -64,29 +64,29 @@ interface SupportTicketDetails {
 }
 
 const statusConfig = {
-  open: { 
-    icon: AlertCircle, 
-    color: 'bg-red-100 text-red-700 border-red-200', 
+  open: {
+    icon: AlertCircle,
+    color: 'bg-red-100 text-red-700 border-red-200',
     dotColor: 'bg-red-500',
-    label: 'Open' 
+    label: 'Open'
   },
-  in_progress: { 
-    icon: Clock, 
-    color: 'bg-amber-100 text-amber-700 border-amber-200', 
+  in_progress: {
+    icon: Clock,
+    color: 'bg-amber-100 text-amber-700 border-amber-200',
     dotColor: 'bg-amber-500',
-    label: 'In Progress' 
+    label: 'In Progress'
   },
-  resolved: { 
-    icon: CheckCircle2, 
-    color: 'bg-emerald-100 text-emerald-700 border-emerald-200', 
+  resolved: {
+    icon: CheckCircle2,
+    color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     dotColor: 'bg-emerald-500',
-    label: 'Resolved' 
+    label: 'Resolved'
   },
-  closed: { 
-    icon: CheckCircle2, 
-    color: 'bg-slate-100 text-slate-700 border-slate-200', 
+  closed: {
+    icon: CheckCircle2,
+    color: 'bg-slate-100 text-slate-700 border-slate-200',
     dotColor: 'bg-slate-400',
-    label: 'Closed' 
+    label: 'Closed'
   }
 };
 
@@ -102,7 +102,7 @@ function SupportTicketList() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const queryKey = statusFilter === 'all' 
+  const queryKey = statusFilter === 'all'
     ? '/api/admin/support-tickets'
     : `/api/admin/support-tickets?status=${statusFilter}`;
 
@@ -111,10 +111,10 @@ function SupportTicketList() {
   });
 
   const tickets = data?.tickets || [];
-  
+
   // Filter by search
-  const filteredTickets = tickets.filter(ticket => 
-    searchQuery === '' || 
+  const filteredTickets = tickets.filter(ticket =>
+    searchQuery === '' ||
     ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
     ticket.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     ticket.userEmail.toLowerCase().includes(searchQuery.toLowerCase())
@@ -182,7 +182,7 @@ function SupportTicketList() {
                   className="pl-10"
                 />
               </div>
-              
+
               {/* Status Filter */}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full sm:w-[180px]">
@@ -218,9 +218,9 @@ function SupportTicketList() {
               const status = statusConfig[ticket.status];
               const priority = priorityConfig[ticket.priority];
               const StatusIcon = status.icon;
-              
+
               return (
-                <Card 
+                <Card
                   key={ticket.id}
                   className="group cursor-pointer hover:shadow-md hover:border-slate-300 transition-all duration-200"
                   onClick={() => setLocation(`/admin/support-tickets/${ticket.id}`)}
@@ -241,17 +241,17 @@ function SupportTicketList() {
                           {ticket.category}
                         </Badge>
                       </div>
-                      
+
                       {/* Subject */}
                       <h3 className="font-semibold text-slate-900 line-clamp-2">
                         {ticket.subject}
                       </h3>
-                      
+
                       {/* Message Preview */}
                       <p className="text-sm text-slate-500 line-clamp-2">
                         {ticket.message}
                       </p>
-                      
+
                       {/* Meta Info */}
                       <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t">
                         <div className="flex items-center gap-1">
@@ -266,7 +266,7 @@ function SupportTicketList() {
                     <div className="hidden md:flex items-start gap-4">
                       {/* Status Indicator */}
                       <div className={`w-3 h-3 rounded-full mt-1.5 ${status.dotColor}`} />
-                      
+
                       {/* Main Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-4">
@@ -283,12 +283,12 @@ function SupportTicketList() {
                                 {ticket.category}
                               </Badge>
                             </div>
-                            
+
                             {/* Message Preview */}
                             <p className="text-sm text-slate-500 line-clamp-1 mb-3">
                               {ticket.message}
                             </p>
-                            
+
                             {/* Meta Info */}
                             <div className="flex items-center gap-4 text-xs text-slate-400">
                               <span className="flex items-center gap-1">
@@ -302,7 +302,7 @@ function SupportTicketList() {
                               <span>{ticket.userEmail}</span>
                             </div>
                           </div>
-                          
+
                           {/* Right side */}
                           <div className="flex flex-col items-end gap-2 shrink-0">
                             <Badge className={`${status.color} border`}>
@@ -398,8 +398,8 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 md:px-6 py-4">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => setLocation('/admin/support-tickets')}
             className="mb-3 -ml-2"
@@ -407,7 +407,7 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Tickets
           </Button>
-          
+
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
             <div className="flex-1 min-w-0">
               <h1 className="text-xl md:text-2xl font-bold text-slate-900 mb-2">
@@ -427,7 +427,7 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
                 </span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2 shrink-0">
               <Badge className={`${status.color} border`}>
                 {status.label}
@@ -478,13 +478,12 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
                 ) : (
                   <div className="space-y-4">
                     {responses.map((response) => (
-                      <div 
+                      <div
                         key={response.id}
-                        className={`p-4 rounded-lg ${
-                          response.isStaff 
-                            ? 'bg-blue-50 border-l-4 border-blue-400' 
-                            : 'bg-slate-50 border-l-4 border-slate-300'
-                        }`}
+                        className={`p-4 rounded-lg ${response.isStaff
+                          ? 'bg-blue-50 border-l-4 border-blue-400'
+                          : 'bg-slate-50 border-l-4 border-slate-300'
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                           <Badge variant={response.isStaff ? 'default' : 'secondary'}>
@@ -515,7 +514,7 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
                     rows={4}
                     className="resize-none"
                   />
-                  <Button 
+                  <Button
                     onClick={() => sendReply.mutate(replyMessage)}
                     disabled={!replyMessage.trim() || sendReply.isPending}
                     className="w-full sm:w-auto"
@@ -538,8 +537,8 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
               <CardContent className="space-y-4">
                 <div>
                   <Label className="text-xs text-slate-500 mb-1.5 block">Status</Label>
-                  <Select 
-                    value={ticket.status} 
+                  <Select
+                    value={ticket.status}
                     onValueChange={(value) => updateTicket.mutate({ status: value })}
                   >
                     <SelectTrigger className="w-full">
@@ -576,8 +575,8 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
 
                 <div>
                   <Label className="text-xs text-slate-500 mb-1.5 block">Priority</Label>
-                  <Select 
-                    value={ticket.priority} 
+                  <Select
+                    value={ticket.priority}
                     onValueChange={(value) => updateTicket.mutate({ priority: value })}
                   >
                     <SelectTrigger className="w-full">
@@ -618,8 +617,8 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
                   rows={4}
                   className="resize-none text-sm"
                 />
-                <Button 
-                  variant="secondary" 
+                <Button
+                  variant="secondary"
                   onClick={() => updateTicket.mutate({ adminNotes })}
                   disabled={updateTicket.isPending}
                   size="sm"
@@ -644,9 +643,9 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
                   <div className="text-slate-500 pl-6">
                     {user.email}
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="w-full mt-3"
                     onClick={() => setLocation(`/admin/users/${user.id}`)}
                   >

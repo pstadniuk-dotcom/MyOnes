@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/shared/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,13 +17,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { 
-  ArrowLeft, 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
+} from '@/shared/components/ui/alert-dialog';
+import {
+  ArrowLeft,
+  User,
+  Mail,
+  Phone,
+  MapPin,
   Calendar,
   Shield,
   ShieldCheck,
@@ -38,8 +38,8 @@ import {
   Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { UserAdminNotes } from '@/components/admin/UserAdminNotes';
-import { apiRequest } from '@/lib/queryClient';
+import { UserAdminNotes } from '@/features/admin/components/UserAdminNotes';
+import { apiRequest } from '@/shared/lib/queryClient';
 
 // Types
 interface UserDetail {
@@ -316,47 +316,47 @@ export default function UserDetailPage() {
             {/* Delete User Button - only show for non-admin users */}
             {!user.isAdmin && (
               <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  data-testid="button-delete-user"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete User
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete User</AlertDialogTitle>
-                  <AlertDialogDescription asChild>
-                    <div>
-                      <p>Are you sure you want to delete <strong>{user.name}</strong> ({user.email})?</p>
-                      <p className="mt-2">This action cannot be undone and will permanently delete:</p>
-                      <ul className="list-disc list-inside mt-2 space-y-1">
-                        <li>User account and profile</li>
-                        <li>All health profiles and formulas</li>
-                        <li>All orders and subscriptions</li>
-                        <li>All chat sessions and messages</li>
-                        <li>All uploaded files and lab reports</li>
-                      </ul>
-                    </div>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => deleteUserMutation.mutate()}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    disabled={deleteUserMutation.isPending}
-                    data-testid="button-confirm-delete"
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    data-testid="button-delete-user"
                   >
-                    {deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete User
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete User</AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div>
+                        <p>Are you sure you want to delete <strong>{user.name}</strong> ({user.email})?</p>
+                        <p className="mt-2">This action cannot be undone and will permanently delete:</p>
+                        <ul className="list-disc list-inside mt-2 space-y-1">
+                          <li>User account and profile</li>
+                          <li>All health profiles and formulas</li>
+                          <li>All orders and subscriptions</li>
+                          <li>All chat sessions and messages</li>
+                          <li>All uploaded files and lab reports</li>
+                        </ul>
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteUserMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={deleteUserMutation.isPending}
+                      data-testid="button-confirm-delete"
+                    >
+                      {deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
 
@@ -593,12 +593,12 @@ export default function UserDetailPage() {
                                 ${(order.amountCents / 100).toFixed(2)}
                               </Badge>
                             )}
-                            <Badge 
+                            <Badge
                               variant={
                                 order.status === 'delivered' ? 'default' :
-                                order.status === 'shipped' ? 'default' :
-                                order.status === 'cancelled' ? 'destructive' :
-                                'secondary'
+                                  order.status === 'shipped' ? 'default' :
+                                    order.status === 'cancelled' ? 'destructive' :
+                                      'secondary'
                               }
                             >
                               {order.status}
@@ -630,14 +630,14 @@ export default function UserDetailPage() {
                               <p className="text-xs text-muted-foreground mb-2">Formula Composition</p>
                               <div className="space-y-1">
                                 <p className="text-sm">
-                                  <span className="font-medium">{order.formula.bases.length}</span> ingredients • 
+                                  <span className="font-medium">{order.formula.bases.length}</span> ingredients •
                                   <span className="font-medium ml-1">{order.formula.totalMg}mg</span> total
                                 </p>
                                 <div className="flex flex-wrap gap-1 mt-2">
                                   {order.formula.bases.slice(0, 5).map((base, i) => (
-                                    <Badge 
-                                      key={i} 
-                                      variant="secondary" 
+                                    <Badge
+                                      key={i}
+                                      variant="secondary"
                                       className="text-xs"
                                       data-testid={`badge-ingredient-${order.id}-${i}`}
                                     >
@@ -663,9 +663,9 @@ export default function UserDetailPage() {
                                 </p>
                               )}
                               {order.trackingUrl && (
-                                <a 
-                                  href={order.trackingUrl} 
-                                  target="_blank" 
+                                <a
+                                  href={order.trackingUrl}
+                                  target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-sm text-primary hover:underline inline-block mt-1"
                                   data-testid={`link-tracking-${order.id}`}
@@ -693,7 +693,7 @@ export default function UserDetailPage() {
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-base">Session #{session.id.slice(0, 8)}</CardTitle>
-                          <Badge 
+                          <Badge
                             variant={session.status === 'active' ? 'default' : 'secondary'}
                           >
                             {session.status}

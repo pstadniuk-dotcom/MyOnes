@@ -1,25 +1,25 @@
 import { useState, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { Label } from '@/shared/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { FileText, Plus, Trash2, Download, Loader2, Upload, ClipboardPaste } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
-import { queryClient, apiRequest, getAuthHeaders } from '@/lib/queryClient';
-import { buildApiUrl } from '@/lib/api';
+import { useToast } from '@/shared/hooks/use-toast';
+import { queryClient, apiRequest, getAuthHeaders } from '@/shared/lib/queryClient';
+import { buildApiUrl } from '@/shared/lib/api';
 import type { FileUpload, UserConsent } from '@shared/schema';
 
 function LabReportsSkeleton() {
   return (
     <div className="space-y-4">
-      {Array.from({length: 3}).map((_, i) => (
+      {Array.from({ length: 3 }).map((_, i) => (
         <Card key={i}>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
@@ -40,7 +40,7 @@ export default function LabReportsPage() {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [showConsentDialog, setShowConsentDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -149,7 +149,7 @@ export default function LabReportsPage() {
       if (!response.ok) {
         const error = await response.json();
         console.log('Upload error response:', response.status, error);
-        
+
         // Check for consent error specifically
         if (response.status === 403) {
           console.log('403 error detected, showing consent dialog');
@@ -162,12 +162,12 @@ export default function LabReportsPage() {
           });
           return;
         }
-        
+
         throw new Error(error.error || 'Upload failed');
       }
 
       await queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
-      
+
       toast({
         title: "File uploaded successfully",
         description: `${file.name} has been securely uploaded.`,
@@ -282,7 +282,7 @@ export default function LabReportsPage() {
       if (!response.ok) {
         const error = await response.json();
         console.log('Manual entry upload error:', response.status, error);
-        
+
         // Check for consent error
         if (response.status === 403) {
           console.log('403 error on manual entry, showing consent dialog');
@@ -295,12 +295,12 @@ export default function LabReportsPage() {
           });
           return;
         }
-        
+
         throw new Error(error.error || 'Upload failed');
       }
 
       await queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
-      
+
       toast({
         title: "Lab results saved",
         description: "Your manually entered results have been saved successfully.",
@@ -352,7 +352,7 @@ export default function LabReportsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button 
+            <Button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
               data-testid="button-upload-report"
@@ -370,7 +370,7 @@ export default function LabReportsPage() {
                 </>
               )}
             </Button>
-            <Button 
+            <Button
               onClick={() => setShowManualEntryDialog(true)}
               disabled={isUploading}
               variant="outline"
@@ -417,8 +417,8 @@ export default function LabReportsPage() {
                         <Badge variant="default" className="bg-[#1B4332] text-xs whitespace-nowrap">
                           Encrypted
                         </Badge>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           className="h-8 w-8 flex-shrink-0"
                           onClick={() => setFileToDelete(report.id)}
@@ -438,7 +438,7 @@ export default function LabReportsPage() {
                 <p className="text-sm text-[#52796F] mb-4">
                   Upload your blood work, urine tests, or other medical documents to help optimize your formula.
                 </p>
-                <Button 
+                <Button
                   onClick={() => fileInputRef.current?.click()}
                   variant="outline"
                   data-testid="button-upload-first"
@@ -477,8 +477,8 @@ export default function LabReportsPage() {
             </p>
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setShowConsentDialog(false);
                 setPendingFile(null);
@@ -490,7 +490,7 @@ export default function LabReportsPage() {
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => grantConsentMutation.mutate()}
               disabled={grantConsentMutation.isPending}
               data-testid="button-consent-agree"
@@ -528,7 +528,7 @@ export default function LabReportsPage() {
                 More test types (urine analysis, iris scan) coming soon.
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="lab-results">Lab Results</Label>
               <Textarea
@@ -545,8 +545,8 @@ export default function LabReportsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setShowManualEntryDialog(false);
                 setManualEntryText('');
@@ -555,7 +555,7 @@ export default function LabReportsPage() {
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleManualEntry}
               disabled={isUploading || !manualEntryText.trim()}
               data-testid="button-manual-entry-save"
@@ -582,7 +582,7 @@ export default function LabReportsPage() {
             <AlertDialogCancel data-testid="button-delete-cancel">
               No, Keep It
             </AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => fileToDelete && deleteFileMutation.mutate(fileToDelete)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-delete-confirm"

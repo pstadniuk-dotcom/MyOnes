@@ -1,36 +1,36 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
-import { 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { Separator } from '@/shared/components/ui/separator';
+import { Input } from '@/shared/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/shared/components/ui/alert-dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
+import { ScrollArea } from '@/shared/components/ui/scroll-area';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import {
   FlaskConical, Calendar, TrendingUp, AlertTriangle, CheckCircle, Download,
-  MessageSquare, RefreshCw, Info, Pill, Beaker, Search, Filter, Eye, 
+  MessageSquare, RefreshCw, Info, Pill, Beaker, Search, Filter, Eye,
   Share2, Archive, FileText, ShoppingCart, ChevronDown, ChevronUp,
   Clock, ArrowRight, ArrowLeft, GitBranch, Star, Zap,
-  Heart, Brain, Activity, Target, Plus, Minus, RotateCcw, 
+  Heart, Brain, Activity, Target, Plus, Minus, RotateCcw,
   ExternalLink, Copy, Users, Lightbulb, BookOpen, Award,
   Package, AlertCircle, Pencil, Sparkles
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
-import { FormulaCustomizationDialog } from '@/components/FormulaCustomizationDialog';
-import { CustomFormulaBuilderDialog } from '@/components/CustomFormulaBuilderDialog';
-import { ResearchCitationCard, ResearchSummaryDialog } from '@/components/ResearchCitationCard';
-import { ReviewScheduleCard } from '@/components/ReviewScheduleCard';
-import { calculateDosage } from '@/lib/utils';
+import { useToast } from '@/shared/hooks/use-toast';
+import { apiRequest } from '@/shared/lib/queryClient';
+import { FormulaCustomizationDialog } from '@/features/formulas/components/FormulaCustomizationDialog';
+import { CustomFormulaBuilderDialog } from '@/features/formulas/components/CustomFormulaBuilderDialog';
+import { ResearchCitationCard, ResearchSummaryDialog } from '@/features/marketing/components/ResearchCitationCard';
+import { ReviewScheduleCard } from '@/features/dashboard/components/ReviewScheduleCard';
+import { calculateDosage } from '@/shared/lib/utils';
 import type { ResearchCitation } from '@shared/schema';
 import { generateFormulaPDF, type FormulaForPDF } from '@shared/pdf-generator';
 
@@ -132,7 +132,7 @@ export default function MyFormulaPage() {
   const [renamingFormulaId, setRenamingFormulaId] = useState<string | null>(null);
   const [newFormulaName, setNewFormulaName] = useState('');
   const [expandedIndividualIngredients, setExpandedIndividualIngredients] = useState<Record<string, boolean>>({});
-  
+
   // Hooks
   const { user } = useAuth();
   const { toast } = useToast();
@@ -264,29 +264,29 @@ export default function MyFormulaPage() {
   // Derived data
   const currentFormula = currentFormulaData?.formula;
   const formulaHistory = historyData?.history;
-  
+
   // Combine current formula with history to ensure all formulas are shown
   // History API may or may not include the current formula
   const allFormulas = useMemo(() => {
     if (!formulaHistory) return currentFormula ? [currentFormula] : [];
-    
+
     // Check if currentFormula is already in history
     const hasCurrentInHistory = currentFormula && formulaHistory.some(f => f.id === currentFormula.id);
-    
+
     // If current formula exists and isn't in history, prepend it
     if (currentFormula && !hasCurrentInHistory) {
       return [currentFormula, ...formulaHistory];
     }
-    
+
     return formulaHistory;
   }, [currentFormula, formulaHistory]);
-  
+
   // Get selected formula (either from history or current)
   const selectedFormula = useMemo(() => {
     if (!selectedFormulaId) return currentFormula;
     return allFormulas.find(f => f.id === selectedFormulaId) || currentFormula;
   }, [selectedFormulaId, currentFormula, allFormulas]);
-  
+
   // Auto-select newest formula on load
   useEffect(() => {
     if (currentFormula && !selectedFormulaId) {
@@ -297,7 +297,7 @@ export default function MyFormulaPage() {
   // Ingredient filtering and searching
   const filteredIngredients = useMemo(() => {
     if (!selectedFormula) return [];
-    
+
     const allIngredients = [
       ...selectedFormula.bases.map(ing => ({ ...ing, type: 'base' as const, source: 'ai' as const })),
       ...selectedFormula.additions.map(ing => ({ ...ing, type: 'addition' as const, source: 'ai' as const })),
@@ -308,9 +308,9 @@ export default function MyFormulaPage() {
 
     return allIngredients.filter(ingredient => {
       const matchesSearch = ingredient.ingredient.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = categoryFilter === 'all' || 
-                            (categoryFilter === 'bases' && ingredient.type === 'base') ||
-                            (categoryFilter === 'additions' && ingredient.type === 'addition');
+      const matchesCategory = categoryFilter === 'all' ||
+        (categoryFilter === 'bases' && ingredient.type === 'base') ||
+        (categoryFilter === 'additions' && ingredient.type === 'addition');
       return matchesSearch && matchesCategory;
     });
   }, [selectedFormula, searchTerm, categoryFilter]);
@@ -349,7 +349,7 @@ export default function MyFormulaPage() {
       });
       return;
     }
-    
+
     revertFormulaMutation.mutate({ formulaId, reason: revertReason });
   }, [revertReason, revertFormulaMutation, toast]);
 
@@ -359,9 +359,9 @@ export default function MyFormulaPage() {
   }
 
   // Check if it's a "no formula found" (404) vs a real error
-  const isNoFormulaError = currentError && 
-    (currentError.message?.includes('No formula found') || 
-     currentError.message?.includes('404'));
+  const isNoFormulaError = currentError &&
+    (currentError.message?.includes('No formula found') ||
+      currentError.message?.includes('404'));
 
   // No formula yet (empty state) - either no data or 404 error
   if (!currentFormula && (isNoFormulaError || !currentError)) {
@@ -399,9 +399,9 @@ export default function MyFormulaPage() {
               {selectedFormula.id === currentFormula?.id && ' (New)'}
             </Badge>
           )}
-          <Button 
-            variant="default" 
-            className="gap-1.5 sm:gap-2 bg-primary hover:bg-primary/90 text-xs sm:text-sm" 
+          <Button
+            variant="default"
+            className="gap-1.5 sm:gap-2 bg-primary hover:bg-primary/90 text-xs sm:text-sm"
             size="sm"
             data-testid="button-order-formula"
             disabled={!selectedFormula}
@@ -464,7 +464,7 @@ export default function MyFormulaPage() {
                   />
                 ))}
               </div>
-              
+
               {/* Archived Formulas Section */}
               {(archivedData?.archived?.length || 0) > 0 && (
                 <Collapsible open={showArchived} onOpenChange={setShowArchived}>
@@ -478,9 +478,9 @@ export default function MyFormulaPage() {
                   <CollapsibleContent className="mt-4">
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {archivedData?.archived?.map((formula) => (
-                        <ArchivedFormulaCard 
-                          key={formula.id} 
-                          formula={formula} 
+                        <ArchivedFormulaCard
+                          key={formula.id}
+                          formula={formula}
                           onRestore={(id) => restoreFormulaMutation.mutate(id)}
                           isRestoring={restoreFormulaMutation.isPending}
                         />
@@ -501,7 +501,7 @@ export default function MyFormulaPage() {
 
         {/* Ingredients Tab */}
         <TabsContent value="ingredients" className="space-y-6">
-          <IngredientsSection 
+          <IngredientsSection
             ingredients={filteredIngredients}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
@@ -514,7 +514,7 @@ export default function MyFormulaPage() {
 
         {/* History Tab */}
         <TabsContent value="history" className="space-y-6">
-          <HistorySection 
+          <HistorySection
             history={formulaHistory}
             isLoading={isLoadingHistory}
             selectedVersions={selectedVersions}
@@ -545,9 +545,9 @@ export default function MyFormulaPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Button 
+                    <Button
                       variant="outline"
-                      className="w-full gap-2 border-purple-600 text-purple-600 hover:bg-purple-50" 
+                      className="w-full gap-2 border-purple-600 text-purple-600 hover:bg-purple-50"
                       data-testid="button-custom-formula"
                       onClick={() => setShowCustomBuilderDialog(true)}
                     >
@@ -569,10 +569,10 @@ export default function MyFormulaPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Button 
-                      asChild 
-                      variant="outline" 
-                      className="w-full gap-2" 
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full gap-2"
                       data-testid="button-discuss-formula"
                     >
                       <Link href="/dashboard/consultation">
@@ -596,7 +596,7 @@ export default function MyFormulaPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button 
+                  <Button
                     onClick={() => setShowCustomizationDialog(true)}
                     className="w-full"
                     data-testid="button-open-customization"
@@ -606,13 +606,13 @@ export default function MyFormulaPage() {
                   </Button>
                 </CardContent>
               </Card>
-              
+
               <ActionsSection formula={selectedFormula} onOrderClick={() => setShowOrderConfirmation(true)} />
             </>
           )}
         </TabsContent>
       </Tabs>
-      
+
       {/* Order Confirmation Dialog */}
       <Dialog open={showOrderConfirmation} onOpenChange={setShowOrderConfirmation}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -625,7 +625,7 @@ export default function MyFormulaPage() {
               Review your selected formula before proceeding to checkout
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedFormula && (
             <div className="space-y-4 py-4">
               {/* Formula Summary */}
@@ -643,8 +643,8 @@ export default function MyFormulaPage() {
                   </CardTitle>
                   <CardDescription>
                     {selectedFormula.name && `Version ${selectedFormula.version} • `}
-                    Created {new Date(selectedFormula.createdAt).toLocaleDateString()} • 
-                    {selectedFormula.bases.length + selectedFormula.additions.length + (selectedFormula.userCustomizations?.addedBases?.length || 0) + (selectedFormula.userCustomizations?.addedIndividuals?.length || 0)} ingredients • 
+                    Created {new Date(selectedFormula.createdAt).toLocaleDateString()} •
+                    {selectedFormula.bases.length + selectedFormula.additions.length + (selectedFormula.userCustomizations?.addedBases?.length || 0) + (selectedFormula.userCustomizations?.addedIndividuals?.length || 0)} ingredients •
                     {selectedFormula.totalMg}mg total
                   </CardDescription>
                 </CardHeader>
@@ -661,11 +661,11 @@ export default function MyFormulaPage() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Take {calculateDosage(selectedFormula.totalMg, selectedFormula.targetCapsules || undefined).perMeal} capsules with each meal (morning, lunch, dinner) • 
+                      Take {calculateDosage(selectedFormula.totalMg, selectedFormula.targetCapsules || undefined).perMeal} capsules with each meal (morning, lunch, dinner) •
                       {selectedFormula.targetCapsules || calculateDosage(selectedFormula.totalMg).total} capsules per day
                     </p>
                   </div>
-                  
+
                   <Separator />
                   {/* System Supports */}
                   {selectedFormula.bases.length > 0 && (
@@ -684,7 +684,7 @@ export default function MyFormulaPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Custom Additions */}
                   {selectedFormula.additions.length > 0 && (
                     <div>
@@ -702,7 +702,7 @@ export default function MyFormulaPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* User Customizations */}
                   {((selectedFormula.userCustomizations?.addedBases?.length || 0) > 0 || (selectedFormula.userCustomizations?.addedIndividuals?.length || 0) > 0) && (
                     <div>
@@ -758,7 +758,7 @@ export default function MyFormulaPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Warnings */}
                   {selectedFormula.warnings && selectedFormula.warnings.length > 0 && (
                     <div className="p-3 bg-orange-50 border border-orange-200 rounded">
@@ -777,7 +777,7 @@ export default function MyFormulaPage() {
               </Card>
             </div>
           )}
-          
+
           {/* Medical Disclaimer */}
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <div className="flex items-start gap-2">
@@ -785,25 +785,25 @@ export default function MyFormulaPage() {
               <div className="text-xs text-amber-800">
                 <p className="font-semibold mb-1">Medical Disclaimer</p>
                 <p>
-                  This personalized formula is a supplement recommendation, not medical advice. 
-                  Consult your healthcare provider before starting any new supplement regimen, 
+                  This personalized formula is a supplement recommendation, not medical advice.
+                  Consult your healthcare provider before starting any new supplement regimen,
                   especially if you have medical conditions or take medications. See our{' '}
                   <Link href="/disclaimer" className="underline">Medical Disclaimer</Link> for full details.
                 </p>
               </div>
             </div>
           </div>
-          
+
           {/* Action Buttons */}
           <div className="flex gap-3 justify-end pt-4 border-t">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowOrderConfirmation(false)}
               data-testid="button-cancel-order"
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               variant="default"
               className="bg-primary hover:bg-primary/90"
               onClick={() => {
@@ -821,7 +821,7 @@ export default function MyFormulaPage() {
           </div>
         </DialogContent>
       </Dialog>
-      
+
       {/* Customization Dialog */}
       {selectedFormula && (
         <FormulaCustomizationDialog
@@ -923,12 +923,11 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
   const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
   const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
   const createdDate = new Date(formula.createdAt).toLocaleDateString();
-  
+
   return (
-    <Card 
-      className={`relative transition-all flex flex-col ${
-        isSelected ? 'ring-2 ring-primary shadow-lg' : 'hover-elevate'
-      }`}
+    <Card
+      className={`relative transition-all flex flex-col ${isSelected ? 'ring-2 ring-primary shadow-lg' : 'hover-elevate'
+        }`}
       data-testid={`card-formula-${formula.version}`}
     >
       {/* Badges */}
@@ -952,7 +951,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
           </Badge>
         )}
       </div>
-      
+
       <CardHeader className="pb-4">
         <div className="pr-24 min-h-[56px] flex flex-col justify-start">
           <CardTitle className="text-lg flex items-center gap-1.5 flex-wrap">
@@ -981,7 +980,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
           {createdDate} • {totalIngredients} ingredients
         </CardDescription>
       </CardHeader>
-      
+
       <CardContent className="flex-1 flex flex-col space-y-4">
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-3">
@@ -998,7 +997,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
             <div className="text-xs text-muted-foreground text-center leading-tight">Additions</div>
           </div>
         </div>
-        
+
         {/* Daily Dosage */}
         <div className="space-y-2 p-3 bg-muted/20 rounded-lg">
           <div className="flex items-center justify-between gap-2">
@@ -1011,10 +1010,10 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
             {formula.targetCapsules || calculateDosage(formula.totalMg).total} capsules/day • {formula.totalMg}mg total
           </div>
         </div>
-        
+
         {/* Spacer to push buttons to bottom */}
         <div className="flex-1" />
-        
+
         {/* Expandable Details */}
         <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
           <CollapsibleTrigger asChild>
@@ -1041,7 +1040,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
                 </div>
               </div>
             )}
-            
+
             {/* Additions */}
             {formula.additions.length > 0 && (
               <div>
@@ -1059,7 +1058,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
                 </div>
               </div>
             )}
-            
+
             {/* User Customizations */}
             {((formula.userCustomizations?.addedBases?.length || 0) > 0 || (formula.userCustomizations?.addedIndividuals?.length || 0) > 0) && (
               <div>
@@ -1115,7 +1114,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
                 </div>
               </div>
             )}
-            
+
             {/* Rationale */}
             {formula.rationale && (
               <div>
@@ -1126,7 +1125,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
                 <p className="text-xs text-muted-foreground">{formula.rationale}</p>
               </div>
             )}
-            
+
             {/* Warnings */}
             {formula.warnings && formula.warnings.length > 0 && (
               <div>
@@ -1143,11 +1142,11 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
             )}
           </CollapsibleContent>
         </Collapsible>
-        
+
         {/* Action Buttons */}
         <div className="flex gap-2">
           {/* Select Button */}
-          <Button 
+          <Button
             variant={isSelected ? "secondary" : "default"}
             size="sm"
             className="flex-1"
@@ -1166,11 +1165,11 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
               </>
             )}
           </Button>
-          
+
           {/* Archive Button */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button 
+              <Button
                 variant="outline"
                 size="sm"
                 className="text-muted-foreground hover:text-orange-600 hover:border-orange-300"
@@ -1184,13 +1183,13 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
               <AlertDialogHeader>
                 <AlertDialogTitle>Archive this formula?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will hide "{formula.name || `Version ${formula.version}`}" from your active formulas. 
+                  This will hide "{formula.name || `Version ${formula.version}`}" from your active formulas.
                   You can restore it anytime from the archived section.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
+                <AlertDialogAction
                   onClick={() => onArchive(formula.id)}
                   className="bg-orange-600 hover:bg-orange-700"
                 >
@@ -1217,7 +1216,7 @@ function ArchivedFormulaCard({ formula, onRestore, isRestoring }: ArchivedFormul
   const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
   const createdDate = new Date(formula.createdAt).toLocaleDateString();
   const archivedDate = formula.archivedAt ? new Date(formula.archivedAt).toLocaleDateString() : '';
-  
+
   return (
     <Card className="relative opacity-75 hover:opacity-100 transition-opacity border-dashed">
       {/* Archived Badge */}
@@ -1227,7 +1226,7 @@ function ArchivedFormulaCard({ formula, onRestore, isRestoring }: ArchivedFormul
           Archived
         </Badge>
       </div>
-      
+
       <CardHeader className="pb-4">
         <div className="pr-20">
           <CardTitle className="text-lg flex items-center gap-1.5">
@@ -1239,7 +1238,7 @@ function ArchivedFormulaCard({ formula, onRestore, isRestoring }: ArchivedFormul
           </CardDescription>
         </div>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-3">
@@ -1252,9 +1251,9 @@ function ArchivedFormulaCard({ formula, onRestore, isRestoring }: ArchivedFormul
             <div className="text-xs text-muted-foreground">Total</div>
           </div>
         </div>
-        
+
         {/* Restore Button */}
-        <Button 
+        <Button
           variant="outline"
           size="sm"
           className="w-full"
@@ -1274,7 +1273,7 @@ function ArchivedFormulaCard({ formula, onRestore, isRestoring }: ArchivedFormul
 function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
   const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
   const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
-  
+
   return (
     <div className="space-y-6">
       {/* Formula Overview */}
@@ -1453,11 +1452,11 @@ function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
 }
 
 // Ingredients Section Component
-function IngredientsSection({ 
-  ingredients, 
-  searchTerm, 
-  setSearchTerm, 
-  categoryFilter, 
+function IngredientsSection({
+  ingredients,
+  searchTerm,
+  setSearchTerm,
+  categoryFilter,
   setCategoryFilter,
   expandedIngredients,
   toggleIngredientExpansion
@@ -1511,7 +1510,7 @@ function IngredientsSection({
           </Card>
         ) : (
           ingredients.map((ingredient, idx) => (
-            <IngredientCard 
+            <IngredientCard
               key={`${ingredient.ingredient}-${idx}`}
               ingredient={ingredient}
               isExpanded={expandedIngredients.has(ingredient.ingredient)}
@@ -1525,10 +1524,10 @@ function IngredientsSection({
 }
 
 // Individual Ingredient Card Component
-function IngredientCard({ 
-  ingredient, 
-  isExpanded, 
-  onToggleExpansion 
+function IngredientCard({
+  ingredient,
+  isExpanded,
+  onToggleExpansion
 }: {
   ingredient: FormulaIngredient & { type: 'base' | 'addition'; source: 'ai' | 'user' };
   isExpanded: boolean;
@@ -1543,21 +1542,23 @@ function IngredientCard({
   });
 
   // Fetch system support details if this is a system support type
-  const { data: systemSupportData } = useQuery<{ systemSupportDetails: Array<{
-    name: string;
-    doseMg: number;
-    systemSupported: string;
-    activeIngredients: Array<{ name: string; amount: string; description?: string; benefits?: string[] }>;
-    suggestedDosage: string;
-    description: string;
-  }> }>({
+  const { data: systemSupportData } = useQuery<{
+    systemSupportDetails: Array<{
+      name: string;
+      doseMg: number;
+      systemSupported: string;
+      activeIngredients: Array<{ name: string; amount: string; description?: string; benefits?: string[] }>;
+      suggestedDosage: string;
+      description: string;
+    }>
+  }>({
     queryKey: ['/api/ingredients/base-details'],
     enabled: ingredient.type === 'base' && isExpanded
   });
 
   // Fetch research citations for this ingredient - includes summary, benefits, and safety data
   // Only fetch for individual ingredients, NOT system supports (which are proprietary blends)
-  const { data: researchData, isLoading: isLoadingResearch } = useQuery<{ 
+  const { data: researchData, isLoading: isLoadingResearch } = useQuery<{
     ingredientName: string;
     summary: string | null;
     keyBenefits: string[];
@@ -1574,7 +1575,7 @@ function IngredientCard({
       pubmedUrl?: string | null;
       evidenceLevel: 'strong' | 'moderate' | 'preliminary' | 'limited';
       studyType: 'rct' | 'meta_analysis' | 'systematic_review' | 'observational' | 'case_study' | 'review';
-    }>; 
+    }>;
     totalCitations: number;
   }>({
     queryKey: ['/api/ingredients', ingredient.ingredient, 'research'],
@@ -1589,8 +1590,8 @@ function IngredientCard({
   );
 
   return (
-    <Card className={`border-l-4 ${ingredient.type === 'base' ? 'border-l-primary' : 'border-l-blue-500'}`} 
-          data-testid={`card-ingredient-${ingredient.ingredient}`}>
+    <Card className={`border-l-4 ${ingredient.type === 'base' ? 'border-l-primary' : 'border-l-blue-500'}`}
+      data-testid={`card-ingredient-${ingredient.ingredient}`}>
       <Collapsible open={isExpanded} onOpenChange={onToggleExpansion}>
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover-elevate" data-testid={`button-expand-${ingredient.ingredient}`}>
@@ -1619,11 +1620,11 @@ function IngredientCard({
             </div>
           </CardHeader>
         </CollapsibleTrigger>
-        
+
         <CollapsibleContent>
           <CardContent className="pt-0">
             <Separator className="mb-4" />
-            
+
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(4)].map((_, i) => (
@@ -1656,7 +1657,7 @@ function IngredientCard({
                           {formulaBreakdown.activeIngredients.map((subIng, idx) => {
                             const hasExpanded = expandedIngredients[`${ingredient.ingredient}-${idx}`] || false;
                             const hasBenefits = subIng.benefits && subIng.benefits.length > 0;
-                            
+
                             return (
                               <div key={idx} className="bg-background rounded overflow-hidden">
                                 <button
@@ -1681,7 +1682,7 @@ function IngredientCard({
                                   </div>
                                   {/* Amounts hidden - proprietary formulation */}
                                 </button>
-                                
+
                                 {hasBenefits && hasExpanded && subIng.benefits && (
                                   <div className="px-3 pb-3 pt-1 bg-primary/5">
                                     <p className="text-xs font-medium mb-1.5 text-primary">Health Benefits:</p>
@@ -1761,27 +1762,27 @@ function IngredientCard({
 
                     {/* Sources */}
                     {ingredientDetail.sources && ingredientDetail.sources.length > 0 && (
-                    <div>
-                      <h4 className="font-medium mb-2 flex items-center gap-2">
-                        <Package className="w-4 h-4 text-green-500" />
-                        Sources & Quality
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {ingredientDetail.sources.map((source: string, idx: number) => (
-                          <Badge key={idx} variant="outline" className="text-xs">{source}</Badge>
-                        ))}
+                      <div>
+                        <h4 className="font-medium mb-2 flex items-center gap-2">
+                          <Package className="w-4 h-4 text-green-500" />
+                          Sources & Quality
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {ingredientDetail.sources.map((source: string, idx: number) => (
+                            <Badge key={idx} variant="outline" className="text-xs">{source}</Badge>
+                          ))}
+                        </div>
+                        {ingredientDetail.qualityIndicators && ingredientDetail.qualityIndicators.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {ingredientDetail.qualityIndicators.map((indicator: string, idx: number) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                <Award className="w-3 h-3 mr-1" />
+                                {indicator}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      {ingredientDetail.qualityIndicators && ingredientDetail.qualityIndicators.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {ingredientDetail.qualityIndicators.map((indicator: string, idx: number) => (
-                          <Badge key={idx} variant="secondary" className="text-xs">
-                            <Award className="w-3 h-3 mr-1" />
-                            {indicator}
-                          </Badge>
-                        ))}
-                      </div>
-                      )}
-                    </div>
                     )}
 
                     {/* Interactions */}
@@ -1829,7 +1830,7 @@ function IngredientCard({
                           Research Overview
                         </h4>
                         <p className="text-sm text-blue-900 leading-relaxed line-clamp-3">{researchData.summary}</p>
-                        
+
                         {/* Key benefits from research */}
                         {researchData.keyBenefits && researchData.keyBenefits.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-blue-200">
@@ -1844,7 +1845,7 @@ function IngredientCard({
                             </ul>
                           </div>
                         )}
-                        
+
                         {/* View Full Research Button */}
                         <div className="mt-3 pt-3 border-t border-blue-200">
                           <ResearchSummaryDialog
@@ -1907,8 +1908,8 @@ function IngredientCard({
 }
 
 // History Section Component  
-function HistorySection({ 
-  history, 
+function HistorySection({
+  history,
   isLoading,
   selectedVersions,
   onVersionSelection,
@@ -1960,8 +1961,8 @@ function HistorySection({
               Version Comparison
             </CardTitle>
             <CardDescription>
-              {selectedVersions.length === 1 
-                ? 'Select another version to compare' 
+              {selectedVersions.length === 1
+                ? 'Select another version to compare'
                 : 'Comparing 2 selected versions'}
             </CardDescription>
           </CardHeader>
@@ -1995,11 +1996,10 @@ function HistorySection({
                 <div className="flex flex-col items-center">
                   <button
                     onClick={() => onVersionSelection(formula.id)}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium hover-elevate ${
-                      idx === 0 ? 'bg-primary text-primary-foreground' :
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium hover-elevate ${idx === 0 ? 'bg-primary text-primary-foreground' :
                       selectedVersions.includes(formula.id) ? 'bg-blue-500 text-white' :
-                      'bg-muted text-muted-foreground'
-                    }`}
+                        'bg-muted text-muted-foreground'
+                      }`}
                     data-testid={`button-select-version-${formula.version}`}
                   >
                     v{formula.version}
@@ -2041,7 +2041,7 @@ function HistorySection({
                             <AlertDialogHeader>
                               <AlertDialogTitle>Revert to {formula.name || `Version ${formula.version}`}?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This will create a new version based on the selected formula. 
+                                This will create a new version based on the selected formula.
                                 Please provide a reason for this change.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
@@ -2054,7 +2054,7 @@ function HistorySection({
                             />
                             <AlertDialogFooter>
                               <AlertDialogCancel data-testid={`button-cancel-revert-${formula.id}`}>Cancel</AlertDialogCancel>
-                              <AlertDialogAction 
+                              <AlertDialogAction
                                 onClick={() => onRevert(formula.id)}
                                 disabled={!revertReason.trim() || isReverting}
                                 data-testid={`button-confirm-revert-${formula.id}`}
@@ -2134,60 +2134,60 @@ function FormulaComparison({ comparison }: { comparison: FormulaComparison }) {
       </div>
 
       {/* Detailed Changes */}
-      {(differences.basesAdded.length > 0 || differences.basesRemoved.length > 0 || 
+      {(differences.basesAdded.length > 0 || differences.basesRemoved.length > 0 ||
         differences.additionsAdded.length > 0 || differences.additionsRemoved.length > 0) && (
-        <div className="space-y-4">
-          <h4 className="font-medium">Detailed Changes</h4>
-          
-          {differences.basesAdded.length > 0 && (
-            <div>
-              <h5 className="text-sm font-medium text-green-600 mb-2">Added Bases</h5>
-              {differences.basesAdded.map((base, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm">
-                  <Plus className="w-3 h-3 text-green-600" />
-                  {base.ingredient} ({base.amount}{base.unit})
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="space-y-4">
+            <h4 className="font-medium">Detailed Changes</h4>
 
-          {differences.basesRemoved.length > 0 && (
-            <div>
-              <h5 className="text-sm font-medium text-red-600 mb-2">Removed Bases</h5>
-              {differences.basesRemoved.map((base, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm">
-                  <Minus className="w-3 h-3 text-red-600" />
-                  {base.ingredient} ({base.amount}{base.unit})
-                </div>
-              ))}
-            </div>
-          )}
+            {differences.basesAdded.length > 0 && (
+              <div>
+                <h5 className="text-sm font-medium text-green-600 mb-2">Added Bases</h5>
+                {differences.basesAdded.map((base, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-sm">
+                    <Plus className="w-3 h-3 text-green-600" />
+                    {base.ingredient} ({base.amount}{base.unit})
+                  </div>
+                ))}
+              </div>
+            )}
 
-          {differences.additionsAdded.length > 0 && (
-            <div>
-              <h5 className="text-sm font-medium text-green-600 mb-2">Added Additions</h5>
-              {differences.additionsAdded.map((addition, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm">
-                  <Plus className="w-3 h-3 text-green-600" />
-                  {addition.ingredient} ({addition.amount}{addition.unit})
-                </div>
-              ))}
-            </div>
-          )}
+            {differences.basesRemoved.length > 0 && (
+              <div>
+                <h5 className="text-sm font-medium text-red-600 mb-2">Removed Bases</h5>
+                {differences.basesRemoved.map((base, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-sm">
+                    <Minus className="w-3 h-3 text-red-600" />
+                    {base.ingredient} ({base.amount}{base.unit})
+                  </div>
+                ))}
+              </div>
+            )}
 
-          {differences.additionsRemoved.length > 0 && (
-            <div>
-              <h5 className="text-sm font-medium text-red-600 mb-2">Removed Additions</h5>
-              {differences.additionsRemoved.map((addition, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm">
-                  <Minus className="w-3 h-3 text-red-600" />
-                  {addition.ingredient} ({addition.amount}{addition.unit})
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+            {differences.additionsAdded.length > 0 && (
+              <div>
+                <h5 className="text-sm font-medium text-green-600 mb-2">Added Additions</h5>
+                {differences.additionsAdded.map((addition, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-sm">
+                    <Plus className="w-3 h-3 text-green-600" />
+                    {addition.ingredient} ({addition.amount}{addition.unit})
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {differences.additionsRemoved.length > 0 && (
+              <div>
+                <h5 className="text-sm font-medium text-red-600 mb-2">Removed Additions</h5>
+                {differences.additionsRemoved.map((addition, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-sm">
+                    <Minus className="w-3 h-3 text-red-600" />
+                    {addition.ingredient} ({addition.amount}{addition.unit})
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
     </div>
   );
 }
@@ -2204,7 +2204,7 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
       console.log('Starting PDF download...');
       const pdfMake = (await import('pdfmake/build/pdfmake')).default;
       const pdfFonts = (await import('pdfmake/build/vfs_fonts')).default as any;
-      
+
       if (pdfMake && pdfFonts && pdfFonts.pdfMake && pdfFonts.pdfMake.vfs) {
         pdfMake.vfs = pdfFonts.pdfMake.vfs;
       }
@@ -2307,13 +2307,13 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
                 <span className="font-medium">Order Now</span>
                 <span className="text-xs opacity-80">Monthly supply</span>
               </Button>
-              
+
               <Button variant="outline" onClick={handleDownload} className="gap-2 h-auto p-4 flex-col" data-testid="button-action-download">
                 <Download className="w-6 h-6 mb-2" />
                 <span className="font-medium">Download</span>
                 <span className="text-xs opacity-80">PDF Report</span>
               </Button>
-              
+
               <Button variant="outline" onClick={handleShare} className="gap-2 h-auto p-4 flex-col" data-testid="button-action-share">
                 <Share2 className="w-6 h-6 mb-2" />
                 <span className="font-medium">Share</span>
@@ -2323,8 +2323,8 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
           </CardContent>
         </Card>
 
-      {/* Review Schedule */}
-      <ReviewScheduleCard formulaId={formula.id} />
+        {/* Review Schedule */}
+        <ReviewScheduleCard formulaId={formula.id} />
 
         {/* Support Information */}
         <Card data-testid="section-support-info">
@@ -2349,7 +2349,7 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
                 <span className="text-sm">Need help? Contact our support team</span>
               </div>
             </div>
-            
+
             <Button asChild variant="ghost" className="mt-4 p-0 h-auto justify-start" data-testid="button-contact-support">
               <Link href="/dashboard/support">
                 Questions about your formula? Get help →
@@ -2371,14 +2371,14 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
               Share your formula with your healthcare provider or family
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Share via Link</label>
               <div className="flex gap-2">
-                <Input 
+                <Input
                   value={`${window.location.origin}/shared/formula/${formula.id}`}
-                  readOnly 
+                  readOnly
                   className="flex-1"
                 />
                 <Button variant="outline" onClick={handleCopyLink} data-testid="button-copy-share-link">
@@ -2395,15 +2395,15 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Share via Email (Coming Soon)</label>
-              <Input 
+              <Input
                 type="email"
                 placeholder="doctor@example.com"
                 value={shareEmail}
                 onChange={(e) => setShareEmail(e.target.value)}
                 data-testid="input-share-email"
               />
-              <Button 
-                onClick={handleEmailShare} 
+              <Button
+                onClick={handleEmailShare}
                 className="w-full"
                 disabled
                 data-testid="button-send-email-share"
@@ -2432,9 +2432,9 @@ function FormulaSkeleton() {
           <Skeleton className="h-10 w-32" />
         </div>
       </div>
-      
+
       <Skeleton className="h-24 w-full" />
-      
+
       <div className="space-y-4">
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-64 w-full" />

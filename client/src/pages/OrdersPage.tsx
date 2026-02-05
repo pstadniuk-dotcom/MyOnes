@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { Separator } from '@/shared/components/ui/separator';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,16 +14,16 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from '@/shared/components/ui/alert-dialog';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/shared/hooks/use-toast';
+import { apiRequest, queryClient } from '@/shared/lib/queryClient';
 import type { Order, Subscription, PaymentMethodRef } from '@shared/schema';
-import { 
-  Package, 
-  CreditCard, 
-  Truck, 
+import {
+  Package,
+  CreditCard,
+  Truck,
   Calendar,
   DollarSign,
   CheckCircle,
@@ -145,19 +145,19 @@ export default function OrdersPage() {
       if (!error) return false;
       const msg = error.message || '';
       // Check for 404s, "not found" errors, or JSON parsing errors
-      return msg.includes('404') || 
-             msg.includes('not found') || 
-             msg.includes('No subscription') ||
-             msg.includes('Unexpected token') ||
-             msg.includes('is not valid JSON');
+      return msg.includes('404') ||
+        msg.includes('not found') ||
+        msg.includes('No subscription') ||
+        msg.includes('Unexpected token') ||
+        msg.includes('is not valid JSON');
     };
-    
+
     // Only show toast for real errors (not 404 "not found" or parsing errors)
     const hasSubscriptionError = subscriptionError && !isNonCriticalError(subscriptionError);
     const hasOrdersError = ordersError && !isNonCriticalError(ordersError);
     const hasPaymentsError = paymentsError && !isNonCriticalError(paymentsError);
     const hasBillingError = billingError && !isNonCriticalError(billingError);
-    
+
     if (hasSubscriptionError || hasOrdersError || hasPaymentsError || hasBillingError) {
       const errorMessage = subscriptionError?.message || ordersError?.message || paymentsError?.message || billingError?.message;
       toast({
@@ -238,7 +238,7 @@ export default function OrdersPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={confirmCancelSubscription}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
@@ -326,8 +326,8 @@ export default function OrdersPage() {
               <Separator className="bg-[#52796F]/20" />
 
               <div className="flex gap-3">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   data-testid="button-pause-subscription"
                   onClick={handlePauseSubscription}
                   disabled={updateSubscriptionMutation.isPending || subscription?.status !== 'active'}
@@ -339,8 +339,8 @@ export default function OrdersPage() {
                 <Button variant="outline" data-testid="button-change-plan" className="border-[#52796F] text-[#52796F] hover:bg-[#52796F] hover:text-white">
                   Change Plan
                 </Button>
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   data-testid="button-cancel-subscription"
                   onClick={handleCancelSubscription}
                   disabled={updateSubscriptionMutation.isPending}
@@ -398,51 +398,51 @@ export default function OrdersPage() {
                   </div>
                 ) : (
                   orders.map((order) => (
-                  <Card key={order.id} className="border-l-4 border-l-[#1B4332] bg-white" data-testid={`order-${order.id}`}>
-                    <CardContent className="pt-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(order.status)}
-                            <span className="font-medium text-[#1B4332]">{order.id}</span>
+                    <Card key={order.id} className="border-l-4 border-l-[#1B4332] bg-white" data-testid={`order-${order.id}`}>
+                      <CardContent className="pt-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(order.status)}
+                              <span className="font-medium text-[#1B4332]">{order.id}</span>
+                            </div>
+                            <Badge className={getStatusColor(order.status)}>
+                              {order.status}
+                            </Badge>
                           </div>
-                          <Badge className={getStatusColor(order.status)}>
-                            {order.status}
-                          </Badge>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-medium text-[#1B4332]">$89.99</div>
-                          <div className="text-sm text-[#52796F]">
-                            Formula v{order.formulaVersion}
+                          <div className="text-right">
+                            <div className="font-medium text-[#1B4332]">$89.99</div>
+                            <div className="text-sm text-[#52796F]">
+                              Formula v{order.formulaVersion}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="grid gap-4 md:grid-cols-3 text-sm">
-                        <div>
-                          <span className="text-[#52796F]">Placed:</span>
-                          <div className="text-[#1B4332]">{new Date(order.placedAt).toLocaleDateString()}</div>
-                        </div>
-                        {order.shippedAt && (
+                        <div className="grid gap-4 md:grid-cols-3 text-sm">
                           <div>
-                            <span className="text-[#52796F]">Shipped:</span>
-                            <div className="text-[#1B4332]">{new Date(order.shippedAt).toLocaleDateString()}</div>
+                            <span className="text-[#52796F]">Placed:</span>
+                            <div className="text-[#1B4332]">{new Date(order.placedAt).toLocaleDateString()}</div>
+                          </div>
+                          {order.shippedAt && (
+                            <div>
+                              <span className="text-[#52796F]">Shipped:</span>
+                              <div className="text-[#1B4332]">{new Date(order.shippedAt).toLocaleDateString()}</div>
+                            </div>
+                          )}
+                        </div>
+
+                        {order.status === 'shipped' && order.trackingUrl && (
+                          <div className="mt-4 pt-4 border-t border-[#52796F]/20">
+                            <Button variant="outline" size="sm" asChild data-testid={`button-track-${order.id}`} className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white">
+                              <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                Track Package
+                              </a>
+                            </Button>
                           </div>
                         )}
-                      </div>
-
-                      {order.status === 'shipped' && order.trackingUrl && (
-                        <div className="mt-4 pt-4 border-t border-[#52796F]/20">
-                          <Button variant="outline" size="sm" asChild data-testid={`button-track-${order.id}`} className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white">
-                            <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="w-4 h-4 mr-2" />
-                              Track Package
-                            </a>
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
                   ))
                 )}
               </div>
@@ -481,28 +481,28 @@ export default function OrdersPage() {
                 ) : (
                   paymentMethods.map((method) => (
                     <div key={method.id} className="flex items-center justify-between p-4 border border-[#52796F]/20 rounded-lg bg-white" data-testid={`payment-method-${method.id}`}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-6 bg-[#1B4332]/10 rounded flex items-center justify-center">
-                        <CreditCard className="w-4 h-4 text-[#1B4332]" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-[#1B4332]">
-                          {method.brand?.toUpperCase()} ****{method.last4}
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-6 bg-[#1B4332]/10 rounded flex items-center justify-center">
+                          <CreditCard className="w-4 h-4 text-[#1B4332]" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-[#1B4332]">
+                            {method.brand?.toUpperCase()} ****{method.last4}
+                          </div>
                         </div>
                       </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="border-[#52796F] text-[#52796F]">Edit</Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleRemovePaymentMethod(method.id)}
+                          disabled={deletePaymentMethodMutation.isPending}
+                        >
+                          Remove
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="border-[#52796F] text-[#52796F]">Edit</Button>
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={() => handleRemovePaymentMethod(method.id)}
-                        disabled={deletePaymentMethodMutation.isPending}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
                   ))
                 )}
               </div>

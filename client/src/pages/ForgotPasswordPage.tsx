@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/components/ui/form';
+import { Input } from '@/shared/components/ui/input';
 import { Loader2, ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 import { Link } from 'wouter';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/api';
+import { useToast } from '@/shared/hooks/use-toast';
+import { apiRequest } from '@/shared/lib/api';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (data: ForgotPasswordData) => {
     try {
       setIsLoading(true);
-      
+
       const response = await apiRequest('/api/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify(data),

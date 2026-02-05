@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/components/ui/form';
+import { Input } from '@/shared/components/ui/input';
 import { Loader2, ArrowLeft, Lock, CheckCircle, XCircle } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/api';
+import { useToast } from '@/shared/hooks/use-toast';
+import { apiRequest } from '@/shared/lib/api';
 
 const resetPasswordSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -27,7 +27,7 @@ export default function ResetPasswordPage() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  
+
   // Get token from URL
   const searchParams = new URLSearchParams(window.location.search);
   const token = searchParams.get('token');
@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
 
     try {
       setIsLoading(true);
-      
+
       const response = await apiRequest('/api/auth/reset-password', {
         method: 'POST',
         body: JSON.stringify({
@@ -80,7 +80,7 @@ export default function ResetPasswordPage() {
         description: error.message || 'Failed to reset password. Please try again.',
         variant: 'destructive',
       });
-      
+
       if (error.message?.includes('expired') || error.message?.includes('Invalid')) {
         setTokenError(error.message);
       }

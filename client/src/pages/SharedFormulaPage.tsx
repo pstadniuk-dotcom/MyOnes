@@ -1,20 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRoute } from 'wouter';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { 
-  Package, 
-  AlertCircle, 
-  CheckCircle2, 
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/shared/components/ui/card';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Separator } from '@/shared/components/ui/separator';
+import {
+  Package,
+  AlertCircle,
+  CheckCircle2,
   ExternalLink,
   Download
 } from 'lucide-react';
-import { calculateDosage } from '@/lib/utils';
-import { buildApiUrl } from '@/lib/api';
+import { calculateDosage } from '@/shared/lib/utils';
+import { buildApiUrl } from '@/shared/lib/api';
 import { SYSTEM_SUPPORT_DETAILS, findIngredientByName } from '@shared/ingredients';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 
 export default function SharedFormulaPage() {
   const [, params] = useRoute('/shared/formula/:id');
@@ -263,8 +263,8 @@ export default function SharedFormulaPage() {
               <div className="text-xs text-muted-foreground space-y-2">
                 <p className="font-medium">Medical Disclaimer</p>
                 <p>
-                  This formula is personalized for the individual user and shared for informational purposes only. 
-                  It is not intended to diagnose, treat, cure, or prevent any disease. Always consult with a qualified 
+                  This formula is personalized for the individual user and shared for informational purposes only.
+                  It is not intended to diagnose, treat, cure, or prevent any disease. Always consult with a qualified
                   healthcare professional before making any changes to your supplement regimen or health routine.
                 </p>
                 <p className="pt-2 text-center">

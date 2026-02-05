@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { useLocation } from 'wouter';
-import { 
-  Package, 
-  Search, 
+import {
+  Package,
+  Search,
   Download,
   ArrowLeft,
   Truck,
@@ -13,18 +13,18 @@ import {
   XCircle,
   ExternalLink
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+import { Input } from '@/shared/components/ui/input';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/shared/components/ui/select';
 import {
   Table,
   TableBody,
@@ -32,7 +32,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/shared/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -40,9 +40,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+} from '@/shared/components/ui/dialog';
+import { useToast } from '@/shared/hooks/use-toast';
+import { apiRequest } from '@/shared/lib/queryClient';
 
 interface Order {
   id: string;
@@ -128,9 +128,9 @@ export default function OrdersManagementPage() {
   };
 
   const handleStatusChange = (order: Order, newStatus: string) => {
-    setUpdateDialog({ 
-      open: true, 
-      order, 
+    setUpdateDialog({
+      open: true,
+      order,
       newStatus,
       trackingUrl: order.trackingUrl || ''
     });
@@ -250,7 +250,7 @@ export default function OrdersManagementPage() {
                             {order.id.slice(0, 8)}...
                           </TableCell>
                           <TableCell>
-                            <button 
+                            <button
                               className="text-left hover:underline"
                               onClick={() => setLocation(`/admin/users/${order.userId}`)}
                             >
@@ -259,8 +259,8 @@ export default function OrdersManagementPage() {
                             </button>
                           </TableCell>
                           <TableCell>
-                            <Select 
-                              value={order.status} 
+                            <Select
+                              value={order.status}
                               onValueChange={(value) => handleStatusChange(order, value)}
                             >
                               <SelectTrigger className={`w-[130px] ${config.color}`}>
@@ -345,7 +345,7 @@ export default function OrdersManagementPage() {
                 Change status from {updateDialog.order?.status} to {updateDialog.newStatus}
               </DialogDescription>
             </DialogHeader>
-            
+
             {updateDialog.newStatus === 'shipped' && (
               <div className="py-4">
                 <label className="text-sm font-medium">Tracking URL (optional)</label>

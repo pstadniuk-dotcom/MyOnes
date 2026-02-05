@@ -1,38 +1,38 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  MessageSquare, 
-  FlaskConical, 
-  Package, 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+import { Progress } from '@/shared/components/ui/progress';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import {
+  MessageSquare,
+  FlaskConical,
+  Package,
   Upload,
   Shield,
   Sparkles,
   PlayCircle,
   TrendingUp,
-  
+
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import type { Formula } from '@shared/schema';
-import { calculateDosage, CAPSULE_TIER_INFO, type CapsuleCount } from '@/lib/utils';
+import { calculateDosage, CAPSULE_TIER_INFO, type CapsuleCount } from '@/shared/lib/utils';
 import { useState } from 'react';
-import { ProfileCompletionDialog } from '@/components/ProfileCompletionDialog';
+import { ProfileCompletionDialog } from '@/features/auth/components/ProfileCompletionDialog';
 
 // Map next actions to their appropriate routes
 function getNextActionRoute(nextAction: string): string {
   const actionRoutes: Record<string, string> = {
     // Lab reports
     'Upload lab results': '/dashboard/lab-reports',
-    
+
     // Profile tab - demographics & physical
     'Add age and gender': '/dashboard/profile?tab=profile',
     'Add demographics': '/dashboard/profile?tab=profile',
     'Add weight and height': '/dashboard/profile?tab=profile',
-    
+
     // Health tab - medical & lifestyle
     'Add medications': '/dashboard/profile?tab=health',
     'Add health conditions': '/dashboard/profile?tab=health',
@@ -45,12 +45,12 @@ function getNextActionRoute(nextAction: string): string {
     'Add smoking status': '/dashboard/profile?tab=health',
     'Add alcohol intake': '/dashboard/profile?tab=health',
     'Add lifestyle data': '/dashboard/profile?tab=health',
-    
+
     // Complete states
     'Profile complete': '/dashboard/formula',
     'Complete your profile': '/dashboard/chat'
   };
-  
+
   return actionRoutes[nextAction] || '/dashboard/chat';
 }
 
@@ -87,7 +87,7 @@ function HomeSkeleton() {
     <div className="space-y-6">
       <Skeleton className="h-16 w-full" />
       <div className="grid gap-4 md:grid-cols-3">
-        {Array.from({length: 3}).map((_, i) => (
+        {Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} className="h-32" />
         ))}
       </div>
@@ -120,8 +120,8 @@ export default function HomePage() {
             Long live {userName}.
           </h1>
           <p className="text-sm md:text-base text-[#52796F]">
-            {isNewUser 
-              ? "Start your personalized supplement journey" 
+            {isNewUser
+              ? "Start your personalized supplement journey"
               : "Your health journey overview"
             }
           </p>
@@ -131,8 +131,8 @@ export default function HomePage() {
       {/* Quick Stats - V2 Styled Cards */}
       <div className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-3">
         {/* Profile Completeness */}
-        <Card 
-          data-testid="card-profile-completeness" 
+        <Card
+          data-testid="card-profile-completeness"
           className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer"
           onClick={() => setShowProfileDialog(true)}
         >
@@ -214,22 +214,21 @@ export default function HomePage() {
                   Let's create your personalized supplement formula. First, tell us about yourself so our AI can make the best recommendations.
                 </p>
               </div>
-              
+
               {/* Step 1: Health Profile */}
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
-                    (metrics?.profileCompleteness || 0) >= 50 
-                      ? 'bg-green-600 text-white' 
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${(metrics?.profileCompleteness || 0) >= 50
+                      ? 'bg-green-600 text-white'
                       : 'bg-[#1B4332] text-white'
-                  }`}>
+                    }`}>
                     {(metrics?.profileCompleteness || 0) >= 50 ? '✓' : '1'}
                   </div>
                   <div className="flex-1">
                     <span className="text-sm text-[#1B4332] font-medium">Complete your health profile</span>
                     <p className="text-xs text-[#52796F]">
-                      {(metrics?.profileCompleteness || 0) >= 50 
-                        ? `${metrics?.profileCompleteness}% complete` 
+                      {(metrics?.profileCompleteness || 0) >= 50
+                        ? `${metrics?.profileCompleteness}% complete`
                         : 'Age, medications, health goals & more'}
                     </p>
                   </div>
@@ -352,8 +351,8 @@ export default function HomePage() {
                   </span>
                   <span className="font-medium text-[#1B4332]">{currentFormula.totalMg}mg</span>
                 </div>
-                <Progress 
-                  value={Math.min((currentFormula.totalMg / ((currentFormula.targetCapsules || 9) * 550)) * 100, 100)} 
+                <Progress
+                  value={Math.min((currentFormula.totalMg / ((currentFormula.targetCapsules || 9) * 550)) * 100, 100)}
                   className="h-2 bg-[#1B4332]/10"
                 />
               </div>

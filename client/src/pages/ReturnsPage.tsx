@@ -1,5 +1,5 @@
-import HeaderV2 from '@/components/HeaderV2';
-import FooterV2 from '@/components/FooterV2';
+import HeaderV2 from '@/features/marketing/components/HeaderV2';
+import FooterV2 from '@/features/marketing/components/FooterV2';
 
 export default function ReturnsPage() {
   return (

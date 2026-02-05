@@ -1,8 +1,8 @@
 import { Link } from 'wouter';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/components/ui/button';
 import { ArrowRight, Heart, Users, Award, Target } from 'lucide-react';
-import HeaderV2 from '@/components/HeaderV2';
-import FooterV2 from '@/components/FooterV2';
+import HeaderV2 from '@/features/marketing/components/HeaderV2';
+import FooterV2 from '@/features/marketing/components/FooterV2';
 
 export default function AboutPage() {
   return (

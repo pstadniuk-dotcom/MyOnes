@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { Badge } from '@/shared/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { Switch } from '@/shared/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Separator } from '@/shared/components/ui/separator';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from '@/shared/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,9 +27,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { 
-  User, 
+} from '@/shared/components/ui/alert-dialog';
+import {
+  User,
   Activity,
   AlertCircle,
   Loader2
@@ -37,9 +37,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient, getAuthHeaders } from '@/lib/queryClient';
-import { buildApiUrl } from '@/lib/api';
+import { useToast } from '@/shared/hooks/use-toast';
+import { apiRequest, queryClient, getAuthHeaders } from '@/shared/lib/queryClient';
+import { buildApiUrl } from '@/shared/lib/api';
 import type { User as UserType, HealthProfile } from '@shared/schema';
 
 // Loading skeleton components
@@ -47,7 +47,7 @@ function ProfileSkeleton() {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
-        {Array.from({length: 4}).map((_, i) => (
+        {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="space-y-2">
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-10 w-full" />
@@ -62,7 +62,7 @@ function HealthProfileSkeleton() {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-3">
-        {Array.from({length: 6}).map((_, i) => (
+        {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="space-y-2">
             <Skeleton className="h-4 w-20" />
             <Skeleton className="h-10 w-full" />
@@ -84,9 +84,9 @@ export default function ProfilePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [showConsentDialog, setShowConsentDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  
+
   // React Query for user data
-  const { data: userData, isLoading: userLoading, error: userError } = useQuery<{user: UserType}>({
+  const { data: userData, isLoading: userLoading, error: userError } = useQuery<{ user: UserType }>({
     queryKey: ['/api/auth/me'],
     enabled: isAuthenticated,
   });
@@ -157,7 +157,7 @@ export default function ProfilePage() {
         feet = Math.floor(totalInches / 12).toString();
         inches = Math.round(totalInches % 12).toString();
       }
-      
+
       setHealthData({
         age: healthProfile.age?.toString() || '',
         sex: healthProfile.sex || '',
@@ -204,9 +204,9 @@ export default function ProfilePage() {
   });
 
   const updateUserProfileMutation = useMutation({
-    mutationFn: async (data: { 
-      name?: string; 
-      email?: string; 
+    mutationFn: async (data: {
+      name?: string;
+      email?: string;
       phone?: string | null;
       addressLine1?: string | null;
       addressLine2?: string | null;
@@ -325,7 +325,7 @@ export default function ProfilePage() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
-      
+
       toast({
         title: "File uploaded successfully",
         description: `${file.name} has been securely uploaded.`,
@@ -386,17 +386,17 @@ export default function ProfilePage() {
       if (!error) return false;
       const msg = error.message || '';
       // Check for 404s, "not found" errors, or JSON parsing errors (which happen when endpoint returns HTML)
-      return msg.includes('404') || 
-             msg.includes('not found') || 
-             msg.includes('No health profile') ||
-             msg.includes('Unexpected token') ||
-             msg.includes('is not valid JSON');
+      return msg.includes('404') ||
+        msg.includes('not found') ||
+        msg.includes('No health profile') ||
+        msg.includes('Unexpected token') ||
+        msg.includes('is not valid JSON');
     };
-    
+
     // Only show toast for real errors (not 404 "not found" or parsing errors)
     const hasRealError = userError && !isNonCriticalError(userError);
     const hasHealthError = healthError && !isNonCriticalError(healthError);
-    
+
     if (hasRealError || hasHealthError) {
       toast({
         title: "Error loading profile data",
@@ -490,7 +490,7 @@ export default function ProfilePage() {
                   <Input
                     id="name"
                     value={profile.name}
-                    onChange={(e) => setProfile({...profile, name: e.target.value})}
+                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                     data-testid="input-name"
                   />
                 </div>
@@ -500,7 +500,7 @@ export default function ProfilePage() {
                     id="email"
                     type="email"
                     value={profile.email}
-                    onChange={(e) => setProfile({...profile, email: e.target.value})}
+                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                     data-testid="input-email"
                   />
                 </div>
@@ -511,14 +511,14 @@ export default function ProfilePage() {
                   id="phone"
                   type="tel"
                   value={profile.phone}
-                  onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                   placeholder="+1 (555) 123-4567"
                   data-testid="input-phone"
                 />
               </div>
-              
+
               <Separator />
-              
+
               <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-medium mb-3">Address</h3>
@@ -528,7 +528,7 @@ export default function ProfilePage() {
                   <Input
                     id="addressLine1"
                     value={profile.addressLine1}
-                    onChange={(e) => setProfile({...profile, addressLine1: e.target.value})}
+                    onChange={(e) => setProfile({ ...profile, addressLine1: e.target.value })}
                     placeholder="123 Main Street"
                     data-testid="input-address-line1"
                   />
@@ -538,7 +538,7 @@ export default function ProfilePage() {
                   <Input
                     id="addressLine2"
                     value={profile.addressLine2}
-                    onChange={(e) => setProfile({...profile, addressLine2: e.target.value})}
+                    onChange={(e) => setProfile({ ...profile, addressLine2: e.target.value })}
                     placeholder="Apt 4B"
                     data-testid="input-address-line2"
                   />
@@ -549,7 +549,7 @@ export default function ProfilePage() {
                     <Input
                       id="city"
                       value={profile.city}
-                      onChange={(e) => setProfile({...profile, city: e.target.value})}
+                      onChange={(e) => setProfile({ ...profile, city: e.target.value })}
                       placeholder="New York"
                       data-testid="input-city"
                     />
@@ -559,7 +559,7 @@ export default function ProfilePage() {
                     <Input
                       id="state"
                       value={profile.state}
-                      onChange={(e) => setProfile({...profile, state: e.target.value})}
+                      onChange={(e) => setProfile({ ...profile, state: e.target.value })}
                       placeholder="NY"
                       data-testid="input-state"
                     />
@@ -571,7 +571,7 @@ export default function ProfilePage() {
                     <Input
                       id="postalCode"
                       value={profile.postalCode}
-                      onChange={(e) => setProfile({...profile, postalCode: e.target.value})}
+                      onChange={(e) => setProfile({ ...profile, postalCode: e.target.value })}
                       placeholder="10001"
                       data-testid="input-postal-code"
                     />
@@ -581,16 +581,16 @@ export default function ProfilePage() {
                     <Input
                       id="country"
                       value={profile.country}
-                      onChange={(e) => setProfile({...profile, country: e.target.value})}
+                      onChange={(e) => setProfile({ ...profile, country: e.target.value })}
                       placeholder="US"
                       data-testid="input-country"
                     />
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex justify-end">
-                <Button 
+                <Button
                   onClick={async () => {
                     try {
                       await updateUserProfileMutation.mutateAsync({
@@ -650,7 +650,7 @@ export default function ProfilePage() {
                       id="age"
                       type="number"
                       value={healthData.age}
-                      onChange={(e) => setHealthData({...healthData, age: e.target.value})}
+                      onChange={(e) => setHealthData({ ...healthData, age: e.target.value })}
                       placeholder="Enter your age"
                       data-testid="input-age"
                     />
@@ -661,7 +661,7 @@ export default function ProfilePage() {
                   {healthLoading ? (
                     <Skeleton className="h-10 w-full" />
                   ) : (
-                    <Select value={healthData.sex} onValueChange={(value) => setHealthData({...healthData, sex: value})}>
+                    <Select value={healthData.sex} onValueChange={(value) => setHealthData({ ...healthData, sex: value })}>
                       <SelectTrigger data-testid="select-sex">
                         <SelectValue placeholder="Select sex" />
                       </SelectTrigger>
@@ -684,7 +684,7 @@ export default function ProfilePage() {
                           id="height-feet"
                           type="number"
                           value={healthData.heightFeet}
-                          onChange={(e) => setHealthData({...healthData, heightFeet: e.target.value})}
+                          onChange={(e) => setHealthData({ ...healthData, heightFeet: e.target.value })}
                           placeholder="Feet"
                           min="3"
                           max="8"
@@ -696,7 +696,7 @@ export default function ProfilePage() {
                           id="height-inches"
                           type="number"
                           value={healthData.heightInches}
-                          onChange={(e) => setHealthData({...healthData, heightInches: e.target.value})}
+                          onChange={(e) => setHealthData({ ...healthData, heightInches: e.target.value })}
                           placeholder="Inches"
                           min="0"
                           max="11"
@@ -707,7 +707,7 @@ export default function ProfilePage() {
                   )}
                 </div>
               </div>
-              
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="weight">Weight (lbs)</Label>
@@ -718,7 +718,7 @@ export default function ProfilePage() {
                       id="weight"
                       type="number"
                       value={healthData.weightLbs}
-                      onChange={(e) => setHealthData({...healthData, weightLbs: e.target.value})}
+                      onChange={(e) => setHealthData({ ...healthData, weightLbs: e.target.value })}
                       placeholder="Enter weight in lbs"
                       data-testid="input-weight"
                     />
@@ -740,7 +740,7 @@ export default function ProfilePage() {
                     id="bpSystolic"
                     type="number"
                     value={healthData.bloodPressureSystolic}
-                    onChange={(e) => setHealthData({...healthData, bloodPressureSystolic: e.target.value})}
+                    onChange={(e) => setHealthData({ ...healthData, bloodPressureSystolic: e.target.value })}
                     placeholder="e.g. 120"
                     data-testid="input-bp-systolic"
                   />
@@ -751,7 +751,7 @@ export default function ProfilePage() {
                     id="bpDiastolic"
                     type="number"
                     value={healthData.bloodPressureDiastolic}
-                    onChange={(e) => setHealthData({...healthData, bloodPressureDiastolic: e.target.value})}
+                    onChange={(e) => setHealthData({ ...healthData, bloodPressureDiastolic: e.target.value })}
                     placeholder="e.g. 80"
                     data-testid="input-bp-diastolic"
                   />
@@ -762,7 +762,7 @@ export default function ProfilePage() {
                     id="heartRate"
                     type="number"
                     value={healthData.restingHeartRate}
-                    onChange={(e) => setHealthData({...healthData, restingHeartRate: e.target.value})}
+                    onChange={(e) => setHealthData({ ...healthData, restingHeartRate: e.target.value })}
                     placeholder="e.g. 70"
                     data-testid="input-heart-rate"
                   />
@@ -783,7 +783,7 @@ export default function ProfilePage() {
                     id="sleep"
                     type="number"
                     value={healthData.sleepHoursPerNight}
-                    onChange={(e) => setHealthData({...healthData, sleepHoursPerNight: e.target.value})}
+                    onChange={(e) => setHealthData({ ...healthData, sleepHoursPerNight: e.target.value })}
                     placeholder="e.g. 7"
                     data-testid="input-sleep"
                   />
@@ -794,7 +794,7 @@ export default function ProfilePage() {
                     id="exercise"
                     type="number"
                     value={healthData.exerciseDaysPerWeek}
-                    onChange={(e) => setHealthData({...healthData, exerciseDaysPerWeek: e.target.value})}
+                    onChange={(e) => setHealthData({ ...healthData, exerciseDaysPerWeek: e.target.value })}
                     placeholder="e.g. 3"
                     min="0"
                     max="7"
@@ -807,7 +807,7 @@ export default function ProfilePage() {
                     id="stress"
                     type="number"
                     value={healthData.stressLevel}
-                    onChange={(e) => setHealthData({...healthData, stressLevel: e.target.value})}
+                    onChange={(e) => setHealthData({ ...healthData, stressLevel: e.target.value })}
                     placeholder="e.g. 5"
                     min="1"
                     max="10"
@@ -826,7 +826,7 @@ export default function ProfilePage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="smoking">Smoking Status</Label>
-                  <Select value={healthData.smokingStatus} onValueChange={(value) => setHealthData({...healthData, smokingStatus: value})}>
+                  <Select value={healthData.smokingStatus} onValueChange={(value) => setHealthData({ ...healthData, smokingStatus: value })}>
                     <SelectTrigger data-testid="select-smoking">
                       <SelectValue placeholder="Select smoking status" />
                     </SelectTrigger>
@@ -843,7 +843,7 @@ export default function ProfilePage() {
                     id="alcohol"
                     type="number"
                     value={healthData.alcoholDrinksPerWeek}
-                    onChange={(e) => setHealthData({...healthData, alcoholDrinksPerWeek: e.target.value})}
+                    onChange={(e) => setHealthData({ ...healthData, alcoholDrinksPerWeek: e.target.value })}
                     placeholder="e.g. 2"
                     min="0"
                     data-testid="input-alcohol"
@@ -864,11 +864,11 @@ export default function ProfilePage() {
                         {healthData.conditions.map((condition, idx) => (
                           <Badge key={idx} variant="secondary" className="text-sm">
                             {condition}
-                            <button 
+                            <button
                               className="ml-2 text-muted-foreground hover:text-destructive"
                               onClick={() => {
                                 const newConditions = healthData.conditions.filter((_, i) => i !== idx);
-                                setHealthData({...healthData, conditions: newConditions});
+                                setHealthData({ ...healthData, conditions: newConditions });
                               }}
                             >
                               ×
@@ -884,7 +884,7 @@ export default function ProfilePage() {
                             e.preventDefault();
                             const value = e.currentTarget.value.trim();
                             if (value && !healthData.conditions.includes(value)) {
-                              setHealthData({...healthData, conditions: [...healthData.conditions, value]});
+                              setHealthData({ ...healthData, conditions: [...healthData.conditions, value] });
                               e.currentTarget.value = '';
                             }
                           }
@@ -905,11 +905,11 @@ export default function ProfilePage() {
                         {healthData.medications.map((medication, idx) => (
                           <Badge key={idx} variant="outline" className="text-sm">
                             {medication}
-                            <button 
+                            <button
                               className="ml-2 text-muted-foreground hover:text-destructive"
                               onClick={() => {
                                 const newMedications = healthData.medications.filter((_, i) => i !== idx);
-                                setHealthData({...healthData, medications: newMedications});
+                                setHealthData({ ...healthData, medications: newMedications });
                               }}
                             >
                               ×
@@ -925,7 +925,7 @@ export default function ProfilePage() {
                             e.preventDefault();
                             const value = e.currentTarget.value.trim();
                             if (value && !healthData.medications.includes(value)) {
-                              setHealthData({...healthData, medications: [...healthData.medications, value]});
+                              setHealthData({ ...healthData, medications: [...healthData.medications, value] });
                               e.currentTarget.value = '';
                             }
                           }
@@ -946,11 +946,11 @@ export default function ProfilePage() {
                         {healthData.allergies.map((allergy, idx) => (
                           <Badge key={idx} variant="destructive" className="text-sm">
                             {allergy}
-                            <button 
+                            <button
                               className="ml-2 text-white hover:text-gray-300"
                               onClick={() => {
                                 const newAllergies = healthData.allergies.filter((_, i) => i !== idx);
-                                setHealthData({...healthData, allergies: newAllergies});
+                                setHealthData({ ...healthData, allergies: newAllergies });
                               }}
                             >
                               ×
@@ -966,7 +966,7 @@ export default function ProfilePage() {
                             e.preventDefault();
                             const value = e.currentTarget.value.trim();
                             if (value && !healthData.allergies.includes(value)) {
-                              setHealthData({...healthData, allergies: [...healthData.allergies, value]});
+                              setHealthData({ ...healthData, allergies: [...healthData.allergies, value] });
                               e.currentTarget.value = '';
                             }
                           }
@@ -979,7 +979,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="flex justify-end">
-                <Button 
+                <Button
                   onClick={async () => {
                     try {
                       // Convert feet and inches to cm
@@ -990,7 +990,7 @@ export default function ProfilePage() {
                         const totalInches = (feet * 12) + inches;
                         heightCm = Math.round(totalInches * 2.54);
                       }
-                      
+
                       const healthProfileData = {
                         age: healthData.age ? parseInt(healthData.age) : null,
                         sex: healthData.sex || null,
@@ -1052,8 +1052,8 @@ export default function ProfilePage() {
             </p>
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setShowConsentDialog(false);
                 setPendingFile(null);
@@ -1065,7 +1065,7 @@ export default function ProfilePage() {
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => grantConsentMutation.mutate()}
               disabled={grantConsentMutation.isPending}
               data-testid="button-consent-agree"
@@ -1092,7 +1092,7 @@ export default function ProfilePage() {
             <AlertDialogCancel data-testid="button-delete-cancel">
               No, Keep It
             </AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => {
                 if (fileToDelete) {
                   deleteFileMutation.mutate(fileToDelete);

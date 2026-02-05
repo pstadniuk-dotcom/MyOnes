@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
-import { 
-  MessageSquare, 
-  Search, 
-  RefreshCw, 
-  ChevronRight, 
-  User, 
+import {
+  MessageSquare,
+  Search,
+  RefreshCw,
+  ChevronRight,
+  User,
   Bot,
   Lightbulb,
   TrendingUp,
@@ -17,17 +17,17 @@ import {
   Calendar,
   ArrowLeft
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
-import { cn } from '@/lib/utils';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+import { Input } from '@/shared/components/ui/input';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { ScrollArea } from '@/shared/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { useToast } from '@/shared/hooks/use-toast';
+import { apiRequest } from '@/shared/lib/queryClient';
+import { cn } from '@/shared/lib/utils';
 
 // Types
 interface ConversationPreview {
@@ -146,7 +146,7 @@ export default function ConversationsPage() {
   });
 
   // Filter conversations by search
-  const filteredConversations = conversationsData?.conversations.filter(conv => 
+  const filteredConversations = conversationsData?.conversations.filter(conv =>
     conv.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     conv.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     conv.preview.toLowerCase().includes(searchQuery.toLowerCase())
@@ -181,7 +181,7 @@ export default function ConversationsPage() {
                   <SelectItem value="90">Last 90 days</SelectItem>
                 </SelectContent>
               </Select>
-              <Button 
+              <Button
                 onClick={() => generateInsights.mutate()}
                 disabled={generateInsights.isPending}
               >
@@ -286,7 +286,7 @@ export default function ConversationsPage() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-lg">{insightsData.insights!.summary}</p>
-                    
+
                     {/* Sentiment Overview */}
                     <div className="mt-4 flex items-center gap-6">
                       <div className="flex items-center gap-2">

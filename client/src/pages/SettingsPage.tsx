@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { Switch } from '@/shared/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { useToast } from '@/shared/hooks/use-toast';
 import { Lock, Bell, Shield, Clock, Pill, Globe, Dumbbell, Salad, Heart } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import { getCurrentTimezone } from '@/hooks/use-timezone';
+import { apiRequest, queryClient } from '@/shared/lib/queryClient';
+import { getCurrentTimezone } from '@/shared/hooks/use-timezone';
 
 // Time slot options for each notification type
 const TIME_SLOT_OPTIONS = [
@@ -29,7 +29,7 @@ const PILLS_TIME_SLOT_OPTIONS = [
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  
+
   // Check URL hash on mount to determine initial tab
   const initialTab = window.location.hash === '#notifications' ? 'notifications' : 'account';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -118,7 +118,7 @@ export default function SettingsPage() {
 
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (newPassword !== confirmPassword) {
       toast({
         variant: 'destructive',
@@ -268,8 +268,8 @@ export default function SettingsPage() {
             <CardContent>
               <div className="p-4 bg-[#1B4332]/5 rounded-lg border border-[#1B4332]/10">
                 <p className="text-sm text-[#52796F]">
-                  Your health data is encrypted and stored securely. We never sell or share your personal 
-                  information with third parties. You can request to download or delete your data at 
+                  Your health data is encrypted and stored securely. We never sell or share your personal
+                  information with third parties. You can request to download or delete your data at
                   any time by contacting support.
                 </p>
               </div>
@@ -420,7 +420,7 @@ export default function SettingsPage() {
                               <strong>Your timezone:</strong> {getCurrentTimezone()} - Reminders will be sent at your local time
                             </p>
                           </div>
-                          
+
                           {/* Reminder Times */}
                           <div className="space-y-3">
                             <Label className="text-sm font-semibold">Reminder Times</Label>
@@ -440,7 +440,7 @@ export default function SettingsPage() {
                                   data-testid="input-morning-time"
                                 />
                               </div>
-                              
+
                               <div className="space-y-2">
                                 <Label htmlFor="afternoon-time" className="flex items-center gap-2 text-sm">
                                   <Clock className="w-3 h-3" />
@@ -456,7 +456,7 @@ export default function SettingsPage() {
                                   data-testid="input-afternoon-time"
                                 />
                               </div>
-                              
+
                               <div className="space-y-2">
                                 <Label htmlFor="evening-time" className="flex items-center gap-2 text-sm">
                                   <Clock className="w-3 h-3" />
@@ -638,7 +638,7 @@ export default function SettingsPage() {
                               */}
                             </div>
                           </div>
-                          
+
                           {/* Example Messages */}
                           <div className="space-y-3">
                             <Label className="text-sm font-semibold">Example Messages</Label>
@@ -646,21 +646,21 @@ export default function SettingsPage() {
                               <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                                 <p className="text-xs font-medium text-green-800 mb-1">☀️ Morning ({notifications.reminderMorning})</p>
                                 <p className="text-sm text-green-900">
-                                  "⚗️ ONES: Good morning! 
+                                  "⚗️ ONES: Good morning!
                                   {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'morning') && "💊 Take 3 capsules with breakfast."}"
                                 </p>
                               </div>
                               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                 <p className="text-xs font-medium text-blue-800 mb-1">🌤️ Afternoon ({notifications.reminderAfternoon})</p>
                                 <p className="text-sm text-blue-900">
-                                  "⚗️ ONES: Afternoon check-in! 
+                                  "⚗️ ONES: Afternoon check-in!
                                   {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'afternoon') && "💊 Take 2 capsules with lunch."}"
                                 </p>
                               </div>
                               <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
                                 <p className="text-xs font-medium text-purple-800 mb-1">🌙 Evening ({notifications.reminderEvening})</p>
                                 <p className="text-sm text-purple-900">
-                                  "⚗️ ONES: Evening reminder! 
+                                  "⚗️ ONES: Evening reminder!
                                   {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'evening') && "💊 Take 2 capsules with dinner."}"
                                 </p>
                               </div>
@@ -671,8 +671,8 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <Button 
-                    onClick={saveNotificationSettings} 
+                  <Button
+                    onClick={saveNotificationSettings}
                     disabled={saveNotificationsMutation.isPending}
                     data-testid="button-save-notifications"
                     className="bg-[#1B4332] hover:bg-[#1B4332]/90 text-white"

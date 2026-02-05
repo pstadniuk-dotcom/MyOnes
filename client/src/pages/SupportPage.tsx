@@ -1,19 +1,19 @@
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  HelpCircle, 
-  MessageCircle, 
-  Mail, 
-  Book, 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { Badge } from '@/shared/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/shared/components/ui/accordion';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import {
+  HelpCircle,
+  MessageCircle,
+  Mail,
+  Book,
   Search,
   ChevronRight,
   Clock,
@@ -23,8 +23,8 @@ import {
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/shared/hooks/use-toast';
+import { apiRequest, queryClient } from '@/shared/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
 import type { FaqItem, SupportTicket, HelpArticle } from '@shared/schema';
 
@@ -40,7 +40,7 @@ function ArticleContent({ content }: { content: string }) {
 
     const flushSection = () => {
       if (currentSection.length === 0) return;
-      
+
       const content = currentSection.join('\n').trim();
       if (!content) return;
 
@@ -75,7 +75,7 @@ function ArticleContent({ content }: { content: string }) {
           </p>
         );
       }
-      
+
       currentSection = [];
     };
 
@@ -92,7 +92,7 @@ function ArticleContent({ content }: { content: string }) {
 
     lines.forEach((line, idx) => {
       const trimmed = line.trim();
-      
+
       // Empty line - flush current section
       if (!trimmed) {
         flushSection();
@@ -203,7 +203,7 @@ export default function SupportPage() {
   const [selectedArticle, setSelectedArticle] = useState<HelpArticle | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   // Form state for new ticket
   const [newTicket, setNewTicket] = useState({
     subject: '',
@@ -213,21 +213,21 @@ export default function SupportPage() {
   });
 
   // Fetch FAQ items
-  const { data: faqData, isLoading: faqLoading, error: faqError } = useQuery<{faqItems: FaqItem[]}>({
+  const { data: faqData, isLoading: faqLoading, error: faqError } = useQuery<{ faqItems: FaqItem[] }>({
     queryKey: ['/api/support/faq'],
   });
-  
+
   // Fetch help articles
-  const { data: helpData, isLoading: helpLoading } = useQuery<{articles: HelpArticle[]}>({
+  const { data: helpData, isLoading: helpLoading } = useQuery<{ articles: HelpArticle[] }>({
     queryKey: ['/api/support/help'],
   });
-  
+
   // Fetch user support tickets
-  const { data: ticketsData, isLoading: ticketsLoading } = useQuery<{tickets: SupportTicket[]}>({
+  const { data: ticketsData, isLoading: ticketsLoading } = useQuery<{ tickets: SupportTicket[] }>({
     queryKey: ['/api/support/tickets'],
     enabled: !!user,
   });
-  
+
   // Create support ticket mutation
   const createTicketMutation = useMutation({
     mutationFn: async (ticketData: typeof newTicket) => {
@@ -257,27 +257,27 @@ export default function SupportPage() {
       });
     },
   });
-  
+
   const faqItems = faqData?.faqItems || [];
   const helpArticles = helpData?.articles || [];
   const supportTickets = ticketsData?.tickets || [];
-  
+
   // Filter FAQs based on search query
   const filteredFAQs = faqItems.filter(item =>
     item.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.answer.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
+
   // Filter help articles based on search query
   const filteredArticles = helpArticles.filter(article =>
     article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     article.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
     article.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
+
   // Generate help categories with article counts
   const helpCategories = helpCategoryConfigs.map(config => {
-    const articlesInCategory = helpArticles.filter(article => 
+    const articlesInCategory = helpArticles.filter(article =>
       article.category === config.category
     ).length;
     return {
@@ -285,7 +285,7 @@ export default function SupportPage() {
       articles: articlesInCategory
     };
   });
-  
+
   const handleCreateTicket = () => {
     if (!newTicket.subject || !newTicket.description || !newTicket.category) {
       toast({
@@ -295,7 +295,7 @@ export default function SupportPage() {
       });
       return;
     }
-    
+
     createTicketMutation.mutate(newTicket);
   };
 
@@ -627,13 +627,13 @@ export default function SupportPage() {
                       id="ticket-subject"
                       placeholder="Brief description of your issue"
                       value={newTicket.subject}
-                      onChange={(e) => setNewTicket({...newTicket, subject: e.target.value})}
+                      onChange={(e) => setNewTicket({ ...newTicket, subject: e.target.value })}
                       data-testid="input-ticket-subject"
                     />
                   </div>
                   <div>
                     <Label htmlFor="ticket-category">Category</Label>
-                    <Select value={newTicket.category} onValueChange={(value) => setNewTicket({...newTicket, category: value})}>
+                    <Select value={newTicket.category} onValueChange={(value) => setNewTicket({ ...newTicket, category: value })}>
                       <SelectTrigger data-testid="select-ticket-category">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
@@ -647,10 +647,10 @@ export default function SupportPage() {
                     </Select>
                   </div>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="ticket-priority">Priority</Label>
-                  <Select value={newTicket.priority} onValueChange={(value) => setNewTicket({...newTicket, priority: value})}>
+                  <Select value={newTicket.priority} onValueChange={(value) => setNewTicket({ ...newTicket, priority: value })}>
                     <SelectTrigger data-testid="select-ticket-priority">
                       <SelectValue />
                     </SelectTrigger>
@@ -670,13 +670,13 @@ export default function SupportPage() {
                     placeholder="Please provide as much detail as possible about your issue..."
                     className="min-h-[120px]"
                     value={newTicket.description}
-                    onChange={(e) => setNewTicket({...newTicket, description: e.target.value})}
+                    onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
                     data-testid="textarea-ticket-message"
                   />
                 </div>
 
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   disabled={!newTicket.subject || !newTicket.description || !newTicket.category || createTicketMutation.isPending}
                   onClick={handleCreateTicket}
                   data-testid="button-submit-ticket"
@@ -720,7 +720,7 @@ export default function SupportPage() {
                 <CardContent>
                   <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200">
                     <p className="text-sm text-red-800 dark:text-red-300 mb-3">
-                      <strong>Important:</strong> Ones AI provides supplement recommendations, not medical advice. 
+                      <strong>Important:</strong> Ones AI provides supplement recommendations, not medical advice.
                       For medical emergencies, please contact emergency services immediately.
                     </p>
                     <div className="space-y-1 text-sm text-red-700 dark:text-red-400">
