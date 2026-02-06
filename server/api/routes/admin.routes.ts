@@ -48,4 +48,7 @@ router.patch('/orders/:id/status', requireAdmin, adminController.updateOrderStat
 router.get('/export/users', requireAdmin, adminController.exportUsers);
 router.get('/export/orders', requireAdmin, adminController.exportOrders);
 
+router.get('/ai-settings', requireAdmin, adminController.getAiSettings);
+router.post('/ai-settings', requireAdmin, adminController.updateAiSettings);
+
 export default router;

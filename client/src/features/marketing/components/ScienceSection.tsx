@@ -1,11 +1,11 @@
 import { Link } from "wouter";
 import { Button } from "@/shared/components/ui/button";
-import { 
-  Users, 
-  Brain, 
-  X, 
-  Check, 
-  AlertTriangle, 
+import {
+  Users,
+  Brain,
+  X,
+  Check,
+  AlertTriangle,
   ArrowRight,
   FlaskConical,
   ShieldCheck,
@@ -121,8 +121,8 @@ export default function ScienceSection() {
           {/* Competitor Cards with Images */}
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
             {competitors.map((competitor, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
               >
                 <div className="aspect-square bg-gray-50 p-6 flex items-center justify-center">
@@ -152,8 +152,8 @@ export default function ScienceSection() {
 
           <div className="grid md:grid-cols-2 gap-4 max-w-3xl mx-auto mb-12">
             {audienceTypes.map((audience, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className="flex items-center gap-3 p-4 bg-white rounded-xl"
               >
                 <Users className="w-5 h-5 text-[#52796F] flex-shrink-0" />
@@ -289,7 +289,7 @@ export default function ScienceSection() {
           <p className="text-xl text-[#95D5B2] mb-10">
             Take a 3-minute consultation and discover what personalized nutrition can do for you.
           </p>
-          <Link href="/auth">
+          <Link href="/signup">
             <Button
               size="lg"
               className="bg-[#D4A574] hover:bg-[#c4956a] text-white rounded-full px-10 py-6 text-lg shadow-lg group"

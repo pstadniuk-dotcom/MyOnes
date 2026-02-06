@@ -14,6 +14,8 @@ router.patch('/mark-all-read', requireAuth, notificationsController.markAllRead)
 
 // Preferences (Added for future use/consistency)
 router.get('/preferences', requireAuth, notificationsController.getPreferences);
-router.patch('/preferences', requireAuth, notificationsController.updatePreferences);
+router.put('/preferences', requireAuth, notificationsController.updatePreferences);
+
+
 
 export default router;

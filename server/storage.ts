@@ -376,15 +376,15 @@ export class DrizzleStorage implements IStorage {
   }
 
   // Order operations
-  async getOrder(id: string): Promise<Order | undefined> {
-    try {
-      const [order] = await db.select().from(orders).where(eq(orders.id, id));
-      return order || undefined;
-    } catch (error) {
-      console.error('Error getting order:', error);
-      return undefined;
-    }
-  }
+  // async getOrder(id: string): Promise<Order | undefined> {
+  //   try {
+  //     const [order] = await db.select().from(orders).where(eq(orders.id, id));
+  //     return order || undefined;
+  //   } catch (error) {
+  //     console.error('Error getting order:', error);
+  //     return undefined;
+  //   }
+  // }
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     try {
@@ -396,14 +396,14 @@ export class DrizzleStorage implements IStorage {
     }
   }
 
-  async listOrdersByUser(userId: string): Promise<Order[]> {
-    try {
-      return await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.placedAt));
-    } catch (error) {
-      console.error('Error listing orders by user:', error);
-      return [];
-    }
-  }
+  // async listOrdersByUser(userId: string): Promise<Order[]> {
+  //   try {
+  //     return await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.placedAt));
+  //   } catch (error) {
+  //     console.error('Error listing orders by user:', error);
+  //     return [];
+  //   }
+  // }
 
 
   async getOrderWithFormula(orderId: string): Promise<{ order: Order, formula: Formula | undefined } | undefined> {

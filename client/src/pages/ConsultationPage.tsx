@@ -253,9 +253,9 @@ export default function ConsultationPage() {
 
   // Query to fetch consultation history
   const { data: historyData, isLoading: isLoadingHistory, error: historyError } = useQuery({
-    queryKey: ['/api/consultations/history', user?.id],
+    queryKey: ['/api/chat/consultations/history', user?.id],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/consultations/history');
+      const response = await apiRequest('GET', '/api/chat/consultations/history');
       const data = await response.json();
       return data as { sessions: ChatSession[], messages: Record<string, Message[]> };
     },
@@ -941,13 +941,13 @@ export default function ConsultationPage() {
   // Delete session mutation
   const deleteSessionMutation = useMutation({
     mutationFn: async (sessionId: string) => {
-      const response = await apiRequest('DELETE', `/api/consultations/${sessionId}`);
+      const response = await apiRequest('DELETE', `/api/chat/consultations/${sessionId}`);
       if (!response.ok) throw new Error('Failed to delete session');
       return sessionId;
     },
     onSuccess: (deletedSessionId) => {
       // Invalidate history query to refresh the list
-      queryClient.invalidateQueries({ queryKey: ['/api/consultations/history', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/chat/consultations/history', user?.id] });
 
       // If we deleted the current session, start a new one
       if (deletedSessionId === currentSessionId) {

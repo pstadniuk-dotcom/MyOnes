@@ -62,7 +62,7 @@ export default function SettingsPage() {
     nutritionCustomTime?: string | null;
     lifestyleCustomTime?: string | null;
   }>({
-    queryKey: ['/api/notification-prefs'],
+    queryKey: ['/api/notifications/preferences'],
   });
 
   // Notification settings state - initialized from database
@@ -150,9 +150,9 @@ export default function SettingsPage() {
   // Mutation to save notification preferences
   const saveNotificationsMutation = useMutation({
     mutationFn: (prefs: typeof notifications) =>
-      apiRequest('PUT', '/api/notification-prefs', prefs),
+      apiRequest('PUT', '/api/notifications/preferences', prefs),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/notification-prefs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/preferences'] });
       toast({
         title: 'Settings saved',
         description: 'Your notification preferences have been updated.',

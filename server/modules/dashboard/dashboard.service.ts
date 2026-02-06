@@ -18,7 +18,7 @@ export class DashboardService {
             formulasRepository.getCurrentFormulaByUser(userId),
             usersRepository.getHealthProfile(userId),
             chatRepository.listChatSessionsByUser(userId),
-            storage.listOrdersByUser(userId),
+            usersRepository.listOrdersByUser(userId),
             usersRepository.getSubscription(userId),
             filesRepository.listFileUploadsByUser(userId, 'lab_report')
         ]);
