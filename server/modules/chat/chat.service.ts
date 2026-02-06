@@ -15,12 +15,13 @@ import {
 import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
 import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builder';
 import { logger } from '../../infra/logging/logger';
-import { type MessageFormulaPayload, type MessageFormulaIngredientPayload } from '@shared/schema';
+import { type MessageFormulaPayload, type MessageFormulaIngredientPayload, InsertMessage, messages } from '@shared/schema';
 import { filesRepository } from '../files/files.repository';
 import { usersRepository } from '../users/users.repository';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+type DbInsertMessage = typeof messages.$inferInsert;
 
 function normalizeMessageFormula(formula?: unknown): MessageFormulaPayload | null {
     if (!formula || typeof formula !== 'object') {
@@ -46,7 +47,10 @@ function normalizeMessageFormula(formula?: unknown): MessageFormulaPayload | nul
             ? payload.additions.map<MessageFormulaIngredientPayload>(normalizeIngredient)
             : [],
         totalMg: typeof payload.totalMg === 'number' ? payload.totalMg : Number(payload.totalMg) || 0,
-        targetCapsules: typeof payload.targetCapsules === 'number' ? payload.targetCapsules : undefined
+        targetCapsules: typeof payload.targetCapsules === 'number' ? payload.targetCapsules : undefined,
+        warnings: Array.isArray(payload.warnings) ? payload.warnings.map(String) : undefined,
+        rationale: typeof payload.rationale === 'string' ? payload.rationale : undefined,
+        disclaimers: Array.isArray(payload.disclaimers) ? payload.disclaimers.map(String) : undefined
     };
 }
 
@@ -174,14 +178,15 @@ export class ChatService {
         await chatRepository.deleteChatSession(sessionId);
     }
 
-    async createMessage(userId: string, sessionId: string, role: string, content: string, formula?: any) {
-        const normalizedFormula = normalizeMessageFormula(formula);
-        return await chatRepository.createMessage({
-            sessionId,
-            role,
-            content,
-            formula: normalizedFormula
-        });
+    async createMessage(insertMessage: InsertMessage) {
+        const rawFormula = normalizeMessageFormula(insertMessage.formula);
+        const normalizedMessage: InsertMessage = {
+            ...insertMessage,
+            formula: (rawFormula ?? null) as InsertMessage['formula']
+        };
+        const dbPayload = normalizedMessage as DbInsertMessage;
+        return await chatRepository.createMessage(dbPayload);
+
     }
 
     async getContext(userId: string) {

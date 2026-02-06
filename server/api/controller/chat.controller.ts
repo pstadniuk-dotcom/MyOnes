@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { chatService } from '../../modules/chat/chat.service';
 import { chatRepository } from '../../modules/chat/chat.repository';
 import { usersRepository } from '../../modules/users/users.repository';
+import { formulasRepository } from '../../modules/formulas/formulas.repository';
 import { storage } from '../../storage';
 import { getClientIP, checkRateLimit } from '../middleware/middleware';
 import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
@@ -121,6 +122,9 @@ export class ChatController {
             }
 
             // Extraction logic...
+            let validatedFormula: any = null;
+            let savedFormula: any = null;
+
             const jsonMatch = fullResponse.match(/```json\s*([\s\S]*?)\s*```/);
             if (jsonMatch) {
                 sendSSE({ type: 'processing', message: 'Formula detected! Validating recommendations...' });
@@ -130,7 +134,7 @@ export class ChatController {
                     if (capsuleCountFromMessage) jsonData.targetCapsules = capsuleCountFromMessage;
 
                     const validation = validateAndCorrectIngredientNames(jsonData);
-                    let validatedFormula = validation.correctedFormula;
+                    validatedFormula = validation.correctedFormula;
                     if (validation.warnings.length > 0) {
                         sendSSE({ type: 'info', message: `✓ Auto-corrected ${validation.warnings.length} ingredient name(s)` });
                     }
@@ -146,7 +150,27 @@ export class ChatController {
 
                     const finalChecks = validateFormulaLimits(validatedFormula);
                     if (finalChecks.valid) {
-                        sendSSE({ type: 'formula_extracted', formula: validatedFormula });
+                        // Save the formula to database
+                        sendSSE({ type: 'processing', message: 'Finalizing your personalized formula...' });
+
+                        // Get current formula to determine next version number
+                        const currentFormula = await formulasRepository.getCurrentFormulaByUser(userId);
+                        const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
+
+                        const formulaData = {
+                            userId,
+                            bases: validatedFormula.bases,
+                            additions: validatedFormula.additions,
+                            totalMg: validatedFormula.totalMg,
+                            rationale: validatedFormula.rationale,
+                            warnings: validatedFormula.warnings || [],
+                            disclaimers: validatedFormula.disclaimers || [],
+                            version: nextVersion,
+                            targetCapsules: validatedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT,
+                        };
+
+                        savedFormula = await formulasRepository.createFormula(formulaData);
+                        logger.info(`Formula v${nextVersion} saved successfully for user ${userId}`);
                     } else {
                         sendSSE({ type: 'error', error: `Formula validation failed: ${finalChecks.errors.join(', ')}` });
                     }
@@ -155,29 +179,116 @@ export class ChatController {
                 }
             }
 
+            // Extract capsule recommendation from response if present
+            let capsuleRecommendation = null;
+            try {
+                const capsuleRecMatch = fullResponse.match(/```capsule-recommendation\s*({[\s\S]*?})\s*```/);
+                if (capsuleRecMatch) {
+                    capsuleRecommendation = JSON.parse(capsuleRecMatch[1]);
+                    logger.info('📊 Extracted capsule recommendation:', capsuleRecommendation);
+
+                    // Send capsule recommendation to client via SSE
+                    sendSSE({
+                        type: 'capsule_recommendation',
+                        data: capsuleRecommendation,
+                        sessionId: chatSession.id
+                    });
+
+                    // Remove the capsule-recommendation block from fullResponse before displaying
+                    fullResponse = fullResponse.replace(/```capsule-recommendation\s*{[\s\S]*?}\s*```\s*/g, '').trim();
+                }
+            } catch (e) {
+                logger.info('No valid capsule recommendation found in response:', e);
+            }
+
             // Health Data Update logic...
-            const healthDataMatch = fullResponse.match(/```health-data\s*([\s\S]*?)\s*```/);
+            let healthDataUpdated = false;
+            const healthDataMatch = fullResponse.match(/```health-data\s*({[\s\S]*?})\s*```/);
             if (healthDataMatch) {
                 try {
                     const healthData = JSON.parse(healthDataMatch[1]);
                     await storage.updateHealthProfile(userId, healthData);
-                    sendSSE({ type: 'health_data_updated', data: healthData });
+                    healthDataUpdated = true;
+                    logger.info('Health profile automatically updated from AI conversation');
+
+                    // Remove the health-data block from fullResponse before saving
+                    fullResponse = fullResponse.replace(/```health-data\s*{[\s\S]*?}\s*```\s*/g, '').trim();
                 } catch (err) {
                     logger.error('Health data update error', err);
                 }
             }
 
-            // Save messages
-            await chatService.createMessage(userId, chatSession.id, 'user', message);
+            // CRITICAL: Strip ALL remaining code blocks from response before showing to user
+            fullResponse = fullResponse.replace(/```[\s\S]*?```/g, '').trim();
+            fullResponse = fullResponse.replace(/`{1,3}/g, '').trim();
 
-            let cleanResponse = fullResponse.replace(/```json[\s\S]*?```/g, '');
-            cleanResponse = cleanResponse.replace(/```health-data[\s\S]*?```/g, '');
-            cleanResponse = cleanResponse.replace(/```capsule-recommendation[\s\S]*?```/g, '');
+            // Send health data update notification if applicable
+            if (healthDataUpdated) {
+                sendSSE({
+                    type: 'health_data_updated',
+                    message: "✓ We've updated your health profile based on the information you provided.",
+                    sessionId: chatSession.id
+                });
+            }
+
+            // Transform formula for frontend display (convert ingredient/amount to name/dose format)
+            let formulaForDisplay = null;
+            let savedFormulaId = null;
+
+            // Check if a formula was saved
+            if (savedFormula) {
+                savedFormulaId = savedFormula.id;
+                const savedBases = savedFormula.bases ?? [];
+                const savedAdditions = savedFormula.additions ?? [];
+
+                formulaForDisplay = {
+                    bases: savedBases.map((b: any) => ({
+                        name: b.ingredient || b.name,
+                        dose: typeof b.amount === 'number' ? `${b.amount}mg` : (b.dose || `${b.amount}mg`),
+                        purpose: b.purpose
+                    })),
+                    additions: savedAdditions.map((a: any) => ({
+                        name: a.ingredient || a.name,
+                        dose: typeof a.amount === 'number' ? `${a.amount}mg` : (a.dose || `${a.amount}mg`),
+                        purpose: a.purpose
+                    })),
+                    totalMg: savedFormula.totalMg,
+                    warnings: savedFormula.warnings || [],
+                    rationale: savedFormula.rationale,
+                    disclaimers: savedFormula.disclaimers || []
+                };
+            }
+
+            // Send completion event with transformed formula for frontend
+            sendSSE({
+                type: 'complete',
+                formula: formulaForDisplay,
+                sessionId: chatSession.id,
+                formulaId: savedFormulaId,
+                responseLength: fullResponse.length,
+                chunkCount
+            });
+
+            // Save messages
+            await chatService.createMessage({
+                sessionId: chatSession.id,
+                role: 'user',
+                content: message,
+                model: null,
+                formula: undefined
+            });
+
+            let cleanResponse = fullResponse;
             cleanResponse = cleanResponse.trim();
 
-            await chatService.createMessage(userId, chatSession.id, 'assistant', cleanResponse);
+            await chatService.createMessage({
+                sessionId: chatSession.id,
+                role: 'assistant',
+                content: cleanResponse,
+                model: model,
+                formula: formulaForDisplay || undefined
+            });
 
-            sendSSE({ type: 'done', sessionId: chatSession.id });
             endStream();
 
         } catch (error) {
