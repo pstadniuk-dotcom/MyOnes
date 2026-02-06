@@ -377,6 +377,27 @@ export class AdminController {
             res.status(500).json({ error: 'Failed to export orders' });
         }
     }
+
+    async getAiSettings(req: Request, res: Response) {
+        try {
+            const settings = await adminService.getAiSettings();
+            res.json(settings);
+        } catch (error) {
+            logger.error('Error fetching AI settings', { error });
+            res.status(500).json({ error: 'Failed to fetch AI settings' });
+        }
+    }
+
+    async updateAiSettings(req: Request, res: Response) {
+        try {
+            const { provider, model, reset } = req.body;
+            const settings = await adminService.updateAiSettings(req.userId!, provider, model, reset);
+            res.json(settings);
+        } catch (error) {
+            logger.error('Error updating AI settings', { error });
+            res.status(500).json({ error: 'Failed to update AI settings' });
+        }
+    }
 }
 
 export const adminController = new AdminController();

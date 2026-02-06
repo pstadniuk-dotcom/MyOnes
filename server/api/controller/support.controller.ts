@@ -54,7 +54,7 @@ export class SupportController {
 
     async createTicket(req: Request, res: Response) {
         try {
-            const validationResult = insertSupportTicketSchema.safeParse(req.body);
+            const validationResult = insertSupportTicketSchema.safeParse({ ...req.body, userId: req.userId! });
             if (!validationResult.success) {
                 return res.status(400).json({
                     error: 'Invalid ticket data',

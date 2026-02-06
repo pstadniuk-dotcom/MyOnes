@@ -3,6 +3,8 @@ import OpenAI from 'openai';
 import { logger } from '../../infra/logging/logger';
 import { sendNotificationEmail } from '../../utils/emailService';
 import { INDIVIDUAL_INGREDIENTS, SYSTEM_SUPPORTS } from '@shared/ingredients';
+import { aiRuntimeSettings, ALLOWED_MODELS, normalizeModel } from 'server/infra/ai/ai-config';
+import { systemRepository } from '../system/system.repository';
 
 export class AdminService {
     async getStats() {
@@ -356,6 +358,58 @@ Return ONLY valid JSON.`;
             o.shippedAt || ''
         ].join(','));
         return [headers.join(','), ...rows].join('\n');
+    }
+
+    async getAiSettings() {
+        return {
+            provider: aiRuntimeSettings.provider || (process.env.AI_PROVIDER || 'openai'),
+            model: aiRuntimeSettings.model || process.env.AI_MODEL || ((process.env.AI_PROVIDER || 'openai').toLowerCase() === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o'),
+            source: aiRuntimeSettings.provider || aiRuntimeSettings.model ? 'override' : 'env',
+            updatedAt: aiRuntimeSettings.updatedAt || null
+        };
+    }
+
+    async updateAiSettings(userId: string | null, provider: string, model: string, reset: boolean) {
+        if (reset) {
+            aiRuntimeSettings.provider = undefined;
+            aiRuntimeSettings.model = undefined;
+            aiRuntimeSettings.updatedAt = new Date().toISOString();
+            aiRuntimeSettings.source = 'env';
+            // Remove persisted settings to revert to env defaults
+            try { await systemRepository.deleteAppSetting('ai_settings') } catch { };
+            return { success: true, message: 'AI settings reset to environment defaults', settings: aiRuntimeSettings };
+        }
+        if (provider && !['openai', 'anthropic'].includes(String(provider).toLowerCase())) {
+            return { error: 'Invalid provider. Must be "openai" or "anthropic".' };
+        }
+        const effectiveProvider: 'openai' | 'anthropic' = (provider ? String(provider).toLowerCase() : (aiRuntimeSettings.provider || (process.env.AI_PROVIDER as any) || 'openai')) as 'openai' | 'anthropic';
+        if (provider) aiRuntimeSettings.provider = effectiveProvider;
+
+        if (model) {
+            const normalized = normalizeModel(effectiveProvider, String(model));
+            const allowed = ALLOWED_MODELS[effectiveProvider];
+            if (!normalized || !allowed.includes(normalized)) {
+                return {
+                    error: `Invalid model for provider '${effectiveProvider}'. Allowed: ${allowed.join(', ')}`,
+                    suggestion: allowed[0]
+                };
+            }
+            aiRuntimeSettings.model = normalized;
+        }
+        aiRuntimeSettings.updatedAt = new Date().toISOString();
+        aiRuntimeSettings.source = 'override';
+        // Persist settings to DB
+        try {
+            await systemRepository.upsertAppSetting('ai_settings', {
+                provider: aiRuntimeSettings.provider,
+                model: aiRuntimeSettings.model,
+                updatedAt: aiRuntimeSettings.updatedAt
+            }, userId || null);
+        } catch (e) {
+            console.error('Error persisting AI settings:', e);
+            // Non-fatal; continue with in-memory override
+        }
+        return { success: true, settings: aiRuntimeSettings }
     }
 }
 

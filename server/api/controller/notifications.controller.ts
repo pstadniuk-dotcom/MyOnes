@@ -73,8 +73,88 @@ export class NotificationsController {
     async updatePreferences(req: Request, res: Response) {
         try {
             const userId = req.userId!;
-            const updates = req.body;
-            const prefs = await notificationsService.updatePreferences(userId, updates);
+            // const updates = req.body;
+
+            const {
+                emailConsultation,
+                emailShipping,
+                emailBilling,
+                smsConsultation,
+                smsShipping,
+                smsBilling,
+                dailyRemindersEnabled,
+                reminderBreakfast,
+                reminderLunch,
+                reminderDinner,
+                // Time slot preferences
+                reminderMorning,
+                reminderAfternoon,
+                reminderEvening,
+                pillsTimeSlot,
+                workoutTimeSlot,
+                nutritionTimeSlot,
+                lifestyleTimeSlot,
+                pillsCustomTime,
+                workoutCustomTime,
+                nutritionCustomTime,
+                lifestyleCustomTime,
+            } = req.body;
+
+            // Validate boolean input
+            if (
+                typeof emailConsultation !== 'boolean' ||
+                typeof emailShipping !== 'boolean' ||
+                typeof emailBilling !== 'boolean' ||
+                typeof smsConsultation !== 'boolean' ||
+                typeof smsShipping !== 'boolean' ||
+                typeof smsBilling !== 'boolean'
+            ) {
+                return res.status(400).json({ error: 'Invalid preference values' });
+            }
+
+            // Validate daily reminder fields if provided
+            if (dailyRemindersEnabled !== undefined && typeof dailyRemindersEnabled !== 'boolean') {
+                return res.status(400).json({ error: 'Invalid dailyRemindersEnabled value' });
+            }
+
+            // Validate time slot values
+            const validTimeSlots = ['morning', 'afternoon', 'evening', 'custom', 'off', 'all'];
+            if (pillsTimeSlot && !validTimeSlots.includes(pillsTimeSlot)) {
+                return res.status(400).json({ error: 'Invalid pillsTimeSlot value' });
+            }
+            if (workoutTimeSlot && !validTimeSlots.includes(workoutTimeSlot)) {
+                return res.status(400).json({ error: 'Invalid workoutTimeSlot value' });
+            }
+            if (nutritionTimeSlot && !validTimeSlots.includes(nutritionTimeSlot)) {
+                return res.status(400).json({ error: 'Invalid nutritionTimeSlot value' });
+            }
+            if (lifestyleTimeSlot && !validTimeSlots.includes(lifestyleTimeSlot)) {
+                return res.status(400).json({ error: 'Invalid lifestyleTimeSlot value' });
+            }
+
+            const prefs = await notificationsService.updatePreferences(userId, {
+                emailConsultation,
+                emailShipping,
+                emailBilling,
+                smsConsultation,
+                smsShipping,
+                smsBilling,
+                dailyRemindersEnabled,
+                reminderBreakfast,
+                reminderLunch,
+                reminderDinner,
+                reminderMorning,
+                reminderAfternoon,
+                reminderEvening,
+                pillsTimeSlot,
+                workoutTimeSlot,
+                nutritionTimeSlot,
+                lifestyleTimeSlot,
+                pillsCustomTime,
+                workoutCustomTime,
+                nutritionCustomTime,
+                lifestyleCustomTime,
+            });
             res.json(prefs);
         } catch (error) {
             logger.error('Error updating notification preferences controller', { error });
