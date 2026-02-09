@@ -4,15 +4,16 @@
 
 /* LIGHT MODE - Premium Earthy Green Theme */
 :root {
-  --button-outline: rgba(0,0,0, .08);
-  --badge-outline: rgba(0,0,0, .04);
+  --button-outline: rgba(0, 0, 0, .08);
+  --badge-outline: rgba(0, 0, 0, .04);
 
   /* Automatic computation of border around primary / danger buttons */
-  --opaque-button-border-intensity: -8; /* In terms of percentages */
+  --opaque-button-border-intensity: -8;
+  /* In terms of percentages */
 
   /* Backgrounds applied on top of other backgrounds when hovered/active */
-  --elevate-1: rgba(0,0,0, .02);
-  --elevate-2: rgba(0,0,0, .05);
+  --elevate-1: rgba(0, 0, 0, .02);
+  --elevate-2: rgba(0, 0, 0, .05);
 
   --background: 0 0% 100%;
 
@@ -79,7 +80,8 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   --font-serif: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Monaco, 'Cascadia Code', monospace;
-  --radius: .5rem; /* 8px */
+  --radius: .5rem;
+  /* 8px */
   --shadow-2xs: 0px 1px 2px 0px hsl(120 20% 15% / 0.03);
   --shadow-xs: 0px 1px 3px 0px hsl(120 20% 15% / 0.04);
   --shadow-sm: 0px 1px 3px 0px hsl(120 20% 15% / 0.05), 0px 1px 2px -1px hsl(120 20% 15% / 0.04);
@@ -123,14 +125,15 @@
 }
 
 .dark {
-  --button-outline: rgba(255,255,255, .08);
-  --badge-outline: rgba(255,255,255, .04);
+  --button-outline: rgba(255, 255, 255, .08);
+  --badge-outline: rgba(255, 255, 255, .04);
 
-  --opaque-button-border-intensity: 9;  /* In terms of percentages */
+  --opaque-button-border-intensity: 9;
+  /* In terms of percentages */
 
   /* Backgrounds applied on top of other backgrounds when hovered/active */
-  --elevate-1: rgba(255,255,255, .03);
-  --elevate-2: rgba(255,255,255, .06);
+  --elevate-1: rgba(255, 255, 255, .03);
+  --elevate-2: rgba(255, 255, 255, .06);
 
   --background: 64 15% 10%;
 
@@ -205,6 +208,7 @@
 }
 
 @layer base {
+
   *,
   *::before,
   *::after {
@@ -212,7 +216,8 @@
   }
 
   /* Mobile-first: Prevent horizontal overflow globally */
-  html, body {
+  html,
+  body {
     overflow-x: hidden;
     max-width: 100vw;
   }
@@ -222,7 +227,12 @@
   }
 
   /* Premium typography - Suisse Int'l for clean, modern feel */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-sans;
     letter-spacing: -0.02em;
   }
@@ -298,13 +308,13 @@
 
   /* Premium subtle shadows */
   .shadow-premium {
-    box-shadow: 
+    box-shadow:
       0 1px 3px 0 rgba(0, 0, 0, 0.04),
       0 1px 2px -1px rgba(0, 0, 0, 0.03);
   }
 
   .shadow-premium-lg {
-    box-shadow: 
+    box-shadow:
       0 10px 15px -3px rgba(0, 0, 0, 0.04),
       0 4px 6px -2px rgba(0, 0, 0, 0.02),
       0 1px 3px 0 rgba(0, 0, 0, 0.03);
@@ -322,7 +332,7 @@
   }
 
   .micro-glow:hover {
-    box-shadow: 
+    box-shadow:
       0 0 20px rgba(145, 95, 65, 0.06),
       0 10px 15px -3px rgba(0, 0, 0, 0.04);
     transition: box-shadow 0.2s ease;
@@ -330,16 +340,16 @@
 
   /* Gradient backgrounds */
   .bg-premium-gradient {
-    background: linear-gradient(135deg, 
-      hsl(var(--background)) 0%, 
-      hsl(var(--card)) 50%, 
-      hsl(var(--background)) 100%);
+    background: linear-gradient(135deg,
+        hsl(var(--background)) 0%,
+        hsl(var(--card)) 50%,
+        hsl(var(--background)) 100%);
   }
 
   .bg-premium-gradient-subtle {
-    background: linear-gradient(to bottom, 
-      hsl(var(--background)) 0%, 
-      hsl(var(--card)) 100%);
+    background: linear-gradient(to bottom,
+        hsl(var(--background)) 0%,
+        hsl(var(--card)) 100%);
   }
 
   /* Smooth transitions for premium feel */
@@ -357,6 +367,7 @@
       opacity: 0;
       transform: translateY(10px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -372,50 +383,48 @@
     0% {
       background-position: -200% center;
     }
+
     100% {
       background-position: 200% center;
     }
   }
 
   .animate-shimmer {
-    background: linear-gradient(
-      90deg,
-      hsl(64 44% 60%) 0%,
-      hsl(64 44% 75%) 20%,
-      hsl(0 0% 95%) 40%,
-      hsl(64 44% 85%) 60%,
-      hsl(64 44% 75%) 80%,
-      hsl(64 44% 60%) 100%
-    );
+    background: linear-gradient(90deg,
+        hsl(64 44% 60%) 0%,
+        hsl(64 44% 75%) 20%,
+        hsl(0 0% 95%) 40%,
+        hsl(64 44% 85%) 60%,
+        hsl(64 44% 75%) 80%,
+        hsl(64 44% 60%) 100%);
     background-size: 200% auto;
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     animation: shimmer 3s ease-in-out infinite;
   }
-  
+
   /* Fade-in animation that works with shimmer */
   @keyframes fade-in-shimmer {
     from {
       opacity: 0;
       transform: translateY(10px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
-  
+
   .animate-fade-in-shimmer {
     animation: fade-in-shimmer 0.8s ease-out forwards, shimmer 12s ease-in-out infinite 0.8s;
-    background: linear-gradient(
-      90deg,
-      hsl(64 44% 70%) 0%,
-      hsl(64 44% 78%) 30%,
-      hsl(0 0% 90%) 50%,
-      hsl(64 44% 78%) 70%,
-      hsl(64 44% 70%) 100%
-    );
+    background: linear-gradient(90deg,
+        hsl(64 44% 70%) 0%,
+        hsl(64 44% 78%) 30%,
+        hsl(0 0% 90%) 50%,
+        hsl(64 44% 78%) 70%,
+        hsl(64 44% 70%) 100%);
     background-size: 200% auto;
     background-clip: text;
     -webkit-background-clip: text;
@@ -514,6 +523,7 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
@@ -522,23 +532,29 @@
   .safe-top {
     padding-top: env(safe-area-inset-top);
   }
+
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
   .safe-left {
     padding-left: env(safe-area-inset-left);
   }
+
   .safe-right {
     padding-right: env(safe-area-inset-right);
   }
+
   .safe-x {
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
+
   .safe-y {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
+
   .safe-all {
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
@@ -547,6 +563,7 @@
   .mt-safe {
     margin-top: env(safe-area-inset-top);
   }
+
   .mb-safe {
     margin-bottom: env(safe-area-inset-bottom);
   }
@@ -555,13 +572,16 @@
   .touch-feedback {
     transition: transform 100ms ease-out, opacity 100ms ease-out;
   }
+
   .touch-feedback:active {
     transform: scale(0.98);
     opacity: 0.9;
   }
+
   .touch-feedback-strong {
     transition: transform 100ms ease-out, opacity 100ms ease-out;
   }
+
   .touch-feedback-strong:active {
     transform: scale(0.95);
     opacity: 0.8;
@@ -571,9 +591,11 @@
   .h-dvh {
     height: 100dvh;
   }
+
   .min-h-dvh {
     min-height: 100dvh;
   }
+
   .max-h-dvh {
     max-height: 100dvh;
   }
@@ -590,9 +612,11 @@
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
   }
+
   .snap-start {
     scroll-snap-align: start;
   }
+
   .snap-center {
     scroll-snap-align: center;
   }
@@ -601,11 +625,13 @@
   .mobile-card-padding {
     padding: 0.75rem;
   }
+
   @media (min-width: 640px) {
     .mobile-card-padding {
       padding: 1rem;
     }
   }
+
   @media (min-width: 768px) {
     .mobile-card-padding {
       padding: 1.5rem;
@@ -638,6 +664,7 @@
 
   /* Reduce motion for users who prefer it */
   @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {
@@ -646,7 +673,7 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
-    
+
     .touch-feedback:active,
     .touch-feedback-strong:active {
       transform: none;
@@ -666,6 +693,7 @@
 
   /* Mobile text size adjustments to prevent zoom on input focus */
   @media (max-width: 768px) {
+
     input[type="text"],
     input[type="email"],
     input[type="password"],

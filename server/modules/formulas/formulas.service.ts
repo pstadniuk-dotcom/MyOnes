@@ -154,7 +154,7 @@ export class FormulasService {
                 content: `Your formula has been reverted. Reason: ${reason}`,
                 formulaId: revertedFormula.id,
                 metadata: {
-                    actionUrl: '/dashboard/my-formula',
+                    actionUrl: '/dashboard/formula',
                     icon: 'beaker',
                     priority: 'low'
                 }
@@ -299,7 +299,7 @@ export class FormulasService {
                 content: `You've built a custom formula with ${totalMg}mg of ingredients. Consider having AI review it for optimization.`,
                 formulaId: newFormula.id,
                 metadata: {
-                    actionUrl: '/dashboard/my-formula',
+                    actionUrl: '/dashboard/formula',
                     icon: 'beaker',
                     priority: 'medium'
                 }
@@ -357,7 +357,7 @@ export class FormulasService {
                     : `Your formula (version ${formula.version}) has been archived. You can restore it anytime from the archived formulas section.`,
                 formulaId: archivedFormula.id,
                 metadata: {
-                    actionUrl: '/dashboard/my-formula',
+                    actionUrl: '/dashboard/formula',
                     icon: 'archive',
                     priority: 'low'
                 }
@@ -395,7 +395,7 @@ export class FormulasService {
                     : `Your formula (version ${formula.version}) has been restored and is now active again.`,
                 formulaId: restoredFormula.id,
                 metadata: {
-                    actionUrl: '/dashboard/my-formula',
+                    actionUrl: '/dashboard/formula',
                     icon: 'refresh',
                     priority: 'low'
                 }

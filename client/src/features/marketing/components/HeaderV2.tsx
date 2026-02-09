@@ -11,7 +11,7 @@ export default function HeaderV2() {
 
   const handleNavClick = (sectionId: string) => {
     setMobileMenuOpen(false);
-    
+
     // If we're on the home page, scroll to section
     if (location === "/" || location === "") {
       const element = document.getElementById(sectionId);
@@ -29,6 +29,7 @@ export default function HeaderV2() {
           {/* Logo */}
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
+              <img src="/ones-logo-icon.svg" alt="Logo" width={32} height={32} />
               <span className="text-2xl font-semibold text-[#1B4332] tracking-tight">
                 ONES
               </span>

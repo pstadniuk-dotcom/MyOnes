@@ -71,6 +71,7 @@ import Footer from "@/features/marketing/components/Footer";
 
 // Import V2 landing page (premium design)
 import LandingPageV2 from "@/pages/LandingPageV2";
+import ScrollToTop from "./shared/components/ScrollToTop";
 
 function LandingPage() {
   return (
@@ -285,6 +286,7 @@ function App() {
         <AuthProvider>
           <TooltipProvider>
             <Toaster />
+            <ScrollToTop />
             <MainRouter />
           </TooltipProvider>
         </AuthProvider>

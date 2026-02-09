@@ -154,6 +154,17 @@ function ContactDialog() {
 }
 
 export default function FooterV2() {
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith("/#")) {
+      const id = href.replace("/#", "");
+      const element = document.getElementById(id);
+      if (element) {
+        e.preventDefault();
+        element.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  };
+
   return (
     <footer className="bg-[#FAF7F2] border-t border-[#1B4332]/10">
       <div className="container mx-auto px-6 max-w-7xl py-16">
@@ -176,7 +187,7 @@ export default function FooterV2() {
             <ul className="space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href}>
+                  <Link href={link.href} onClick={(e) => handleLinkClick(e, link.href)}>
                     <span className="text-[#52796F] hover:text-[#1B4332] text-sm cursor-pointer transition-colors">
                       {link.label}
                     </span>
@@ -191,7 +202,7 @@ export default function FooterV2() {
             <ul className="space-y-3">
               {footerLinks.company.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href}>
+                  <Link href={link.href} onClick={(e) => handleLinkClick(e, link.href)}>
                     <span className="text-[#52796F] hover:text-[#1B4332] text-sm cursor-pointer transition-colors">
                       {link.label}
                     </span>
@@ -209,7 +220,7 @@ export default function FooterV2() {
             <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href}>
+                  <Link href={link.href} onClick={(e) => handleLinkClick(e, link.href)}>
                     <span className="text-[#52796F] hover:text-[#1B4332] text-sm cursor-pointer transition-colors">
                       {link.label}
                     </span>

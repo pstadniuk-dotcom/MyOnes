@@ -219,8 +219,8 @@ export default function HomePage() {
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${(metrics?.profileCompleteness || 0) >= 50
-                      ? 'bg-green-600 text-white'
-                      : 'bg-[#1B4332] text-white'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-[#1B4332] text-white'
                     }`}>
                     {(metrics?.profileCompleteness || 0) >= 50 ? '✓' : '1'}
                   </div>
@@ -295,7 +295,7 @@ export default function HomePage() {
                 </div>
               ) : (
                 <Button asChild className="gap-2 bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-6" data-testid="button-start-consultation">
-                  <Link href="/dashboard/chat">
+                  <Link href="/dashboard/chat?new=true">
                     <PlayCircle className="w-4 h-4" />
                     Start AI Consultation
                   </Link>
@@ -444,7 +444,7 @@ export default function HomePage() {
                   Chat with our AI to refine your supplement blend based on your latest health goals and lab results.
                 </p>
                 <Button asChild size="sm" className="bg-[#1B4332] hover:bg-[#143728] text-white rounded-full">
-                  <Link href="/dashboard/chat">
+                  <Link href="/dashboard/chat?new=true">
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Start Chat
                   </Link>

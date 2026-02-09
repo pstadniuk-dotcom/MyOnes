@@ -20,7 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getAuthHeaders } from '@/shared/lib/queryClient';
 import { buildApiUrl } from '@/shared/lib/api';
-import { Link } from 'wouter';
+import { Link, useSearch } from 'wouter';
 import ThinkingIndicator from '@/features/chat/components/ThinkingIndicator';
 import { InlineCapsuleSelector } from '@/features/formulas/components/InlineCapsuleSelector';
 import { type CapsuleCount } from '@/shared/lib/utils';
@@ -179,6 +179,31 @@ export default function ConsultationPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Start new consultation session - defined early for use in effects
+  const handleNewSession = useCallback(() => {
+    const welcomeMessage: Message = {
+      id: 'welcome-' + Date.now(),
+      content: `Hello ${user?.name?.split(' ')[0] || 'there'}! I'm here to help you optimize your health. Let's get started with creating the perfect supplement formula for you.\n\nTo give you the best recommendations, I need to understand your complete health picture. Please share as much information as you can about yourself:\n\n• Your age, gender, height, and weight\n• Any medications you're currently taking\n• Health goals or concerns you have\n• Any specific symptoms or issues you're experiencing\n• Lifestyle factors (exercise, diet, sleep patterns)\n\nFeel free to click the microphone icon to speak with me, or simply type in the chat. This is just like a doctor's visit - the more you share, the better I can help you.`,
+      sender: 'ai',
+      timestamp: new Date()
+    };
+
+    setMessages([welcomeMessage]);
+    setCurrentSessionId(null);
+    setIsNewSession(true);
+    setUploadedFiles([]);
+    setInputValue('');
+    setShowSuggestions(false);
+    // Clear saved session when starting a new one
+    localStorage.removeItem(SESSION_KEY);
+
+    toast({
+      title: "New Consultation Started",
+      description: "Ready to discuss your health goals with Ones AI.",
+      variant: "default"
+    });
+  }, [toast, user?.name]);
+
   // Restore draft on mount
   useEffect(() => {
     const savedDraft = localStorage.getItem(DRAFT_KEY);
@@ -269,10 +294,23 @@ export default function ConsultationPage() {
     }
   }, [currentSessionId]);
 
+  const search = useSearch();
+
   // Load history data and restore session (prioritize saved session, fallback to most recent)
   useEffect(() => {
     if (historyData?.sessions) {
       setSessionHistory(historyData.sessions);
+
+      const params = new URLSearchParams(search);
+      const startNew = params.get('new') === 'true';
+
+      if (startNew && messages.length === 0) {
+        // If query param requests new session, force it
+        handleNewSession();
+        // Clear the query param to avoid sticking (optional but good UI)
+        window.history.replaceState({}, '', window.location.pathname);
+        return;
+      }
 
       // Only restore session on initial load (no messages yet, isNewSession true)
       if (historyData.sessions.length > 0 && messages.length === 0 && isNewSession) {
@@ -884,30 +922,7 @@ export default function ConsultationPage() {
     }, 100);
   }, [handleSendMessage]);
 
-  // Start new consultation session
-  const handleNewSession = useCallback(() => {
-    const welcomeMessage: Message = {
-      id: 'welcome-' + Date.now(),
-      content: `Hello ${user?.name?.split(' ')[0] || 'there'}! I'm here to help you optimize your health. Let's get started with creating the perfect supplement formula for you.\n\nTo give you the best recommendations, I need to understand your complete health picture. Please share as much information as you can about yourself:\n\n• Your age, gender, height, and weight\n• Any medications you're currently taking\n• Health goals or concerns you have\n• Any specific symptoms or issues you're experiencing\n• Lifestyle factors (exercise, diet, sleep patterns)\n\nFeel free to click the microphone icon to speak with me, or simply type in the chat. This is just like a doctor's visit - the more you share, the better I can help you.`,
-      sender: 'ai',
-      timestamp: new Date()
-    };
 
-    setMessages([welcomeMessage]);
-    setCurrentSessionId(null);
-    setIsNewSession(true);
-    setUploadedFiles([]);
-    setInputValue('');
-    setShowSuggestions(false);
-    // Clear saved session when starting a new one
-    localStorage.removeItem(SESSION_KEY);
-
-    toast({
-      title: "New Consultation Started",
-      description: "Ready to discuss your health goals with Ones AI.",
-      variant: "default"
-    });
-  }, [toast, user?.name]);
 
   // Load previous session
   const handleLoadSession = useCallback((session: ChatSession) => {

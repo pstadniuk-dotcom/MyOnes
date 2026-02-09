@@ -130,6 +130,11 @@ export default function ProfilePage() {
     allergies: [] as string[],
   });
 
+  // State for pending inputs
+  const [conditionInput, setConditionInput] = useState('');
+  const [medicationInput, setMedicationInput] = useState('');
+  const [allergyInput, setAllergyInput] = useState('');
+
   // Update form states when data is loaded
   useEffect(() => {
     if (userData?.user) {
@@ -673,7 +678,7 @@ export default function ProfilePage() {
                     </Select>
                   )}
                 </div>
-                <div className="space-y-2">
+                <div className="">
                   <Label>Height</Label>
                   {healthLoading ? (
                     <Skeleton className="h-10 w-full" />
@@ -741,6 +746,7 @@ export default function ProfilePage() {
                     type="number"
                     value={healthData.bloodPressureSystolic}
                     onChange={(e) => setHealthData({ ...healthData, bloodPressureSystolic: e.target.value })}
+                    min="0"
                     placeholder="e.g. 120"
                     data-testid="input-bp-systolic"
                   />
@@ -752,6 +758,7 @@ export default function ProfilePage() {
                     type="number"
                     value={healthData.bloodPressureDiastolic}
                     onChange={(e) => setHealthData({ ...healthData, bloodPressureDiastolic: e.target.value })}
+                    min="0"
                     placeholder="e.g. 80"
                     data-testid="input-bp-diastolic"
                   />
@@ -763,6 +770,7 @@ export default function ProfilePage() {
                     type="number"
                     value={healthData.restingHeartRate}
                     onChange={(e) => setHealthData({ ...healthData, restingHeartRate: e.target.value })}
+                    min="0"
                     placeholder="e.g. 70"
                     data-testid="input-heart-rate"
                   />
@@ -784,6 +792,7 @@ export default function ProfilePage() {
                     type="number"
                     value={healthData.sleepHoursPerNight}
                     onChange={(e) => setHealthData({ ...healthData, sleepHoursPerNight: e.target.value })}
+                    min="0"
                     placeholder="e.g. 7"
                     data-testid="input-sleep"
                   />
@@ -878,14 +887,16 @@ export default function ProfilePage() {
                       </div>
                       <Input
                         id="conditions"
+                        value={conditionInput}
+                        onChange={(e) => setConditionInput(e.target.value)}
                         placeholder="Add a health condition..."
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            const value = e.currentTarget.value.trim();
+                            const value = conditionInput.trim();
                             if (value && !healthData.conditions.includes(value)) {
                               setHealthData({ ...healthData, conditions: [...healthData.conditions, value] });
-                              e.currentTarget.value = '';
+                              setConditionInput('');
                             }
                           }
                         }}
@@ -919,14 +930,16 @@ export default function ProfilePage() {
                       </div>
                       <Input
                         id="medications"
+                        value={medicationInput}
+                        onChange={(e) => setMedicationInput(e.target.value)}
                         placeholder="Add a medication..."
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            const value = e.currentTarget.value.trim();
+                            const value = medicationInput.trim();
                             if (value && !healthData.medications.includes(value)) {
                               setHealthData({ ...healthData, medications: [...healthData.medications, value] });
-                              e.currentTarget.value = '';
+                              setMedicationInput('');
                             }
                           }
                         }}
@@ -960,14 +973,16 @@ export default function ProfilePage() {
                       </div>
                       <Input
                         id="allergies"
+                        value={allergyInput}
+                        onChange={(e) => setAllergyInput(e.target.value)}
                         placeholder="Add an allergy..."
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            const value = e.currentTarget.value.trim();
+                            const value = allergyInput.trim();
                             if (value && !healthData.allergies.includes(value)) {
                               setHealthData({ ...healthData, allergies: [...healthData.allergies, value] });
-                              e.currentTarget.value = '';
+                              setAllergyInput('');
                             }
                           }
                         }}
@@ -982,6 +997,25 @@ export default function ProfilePage() {
                 <Button
                   onClick={async () => {
                     try {
+                      // Handle pending inputs
+                      const currentConditions = [...healthData.conditions];
+                      if (conditionInput.trim() && !currentConditions.includes(conditionInput.trim())) {
+                        currentConditions.push(conditionInput.trim());
+                        setConditionInput('');
+                      }
+
+                      const currentMedications = [...healthData.medications];
+                      if (medicationInput.trim() && !currentMedications.includes(medicationInput.trim())) {
+                        currentMedications.push(medicationInput.trim());
+                        setMedicationInput('');
+                      }
+
+                      const currentAllergies = [...healthData.allergies];
+                      if (allergyInput.trim() && !currentAllergies.includes(allergyInput.trim())) {
+                        currentAllergies.push(allergyInput.trim());
+                        setAllergyInput('');
+                      }
+
                       // Convert feet and inches to cm
                       let heightCm = null;
                       if (healthData.heightFeet || healthData.heightInches) {
@@ -1004,9 +1038,9 @@ export default function ProfilePage() {
                         stressLevel: healthData.stressLevel ? parseInt(healthData.stressLevel) : null,
                         smokingStatus: healthData.smokingStatus || null,
                         alcoholDrinksPerWeek: healthData.alcoholDrinksPerWeek ? parseInt(healthData.alcoholDrinksPerWeek) : null,
-                        conditions: healthData.conditions,
-                        medications: healthData.medications,
-                        allergies: healthData.allergies,
+                        conditions: currentConditions,
+                        medications: currentMedications,
+                        allergies: currentAllergies,
                       };
                       await updateHealthProfileMutation.mutateAsync(healthProfileData);
                     } catch (error) {
