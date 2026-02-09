@@ -26,9 +26,7 @@ export default function LandingPageV2() {
         <CompetitiveComparisonSection />
         <HowItWorksSectionV2 />
         <ScienceSectionV2 />
-        <div id="pricing">
-          <MembershipPricingSection />
-        </div>
+        <MembershipPricingSection />
         <SupplementPricingSection />
         <div id="testimonials">
           <TestimonialsSectionV2 />

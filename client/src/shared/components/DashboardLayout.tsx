@@ -17,7 +17,8 @@ import {
   LogOut,
   Bell,
   Shield,
-  Settings
+  Settings,
+  User
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'wouter';
@@ -78,15 +79,8 @@ function UserDropdown() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-[#1B4332]/10" />
         <DropdownMenuGroup>
-          {user.isAdmin && (
-            <DropdownMenuItem asChild className="hover:bg-[#1B4332]/5 focus:bg-[#1B4332]/5 cursor-pointer">
-              <Link href="/admin" data-testid="link-admin-panel">
-                <Settings className="mr-2 h-4 w-4 text-[#52796F]" />
-                <span className="text-[#1B4332]">Admin Panel</span>
-              </Link>
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem asChild className="hover:bg-[#1B4332]/5 focus:bg-[#1B4332]/5 cursor-pointer">
+
+          {/* <DropdownMenuItem asChild className="hover:bg-[#1B4332]/5 focus:bg-[#1B4332]/5 cursor-pointer">
             <Link href="/dashboard/settings?tab=notifications" data-testid="link-notifications">
               <Bell className="mr-2 h-4 w-4 text-[#52796F]" />
               <span className="text-[#1B4332]">Notifications</span>
@@ -97,7 +91,28 @@ function UserDropdown() {
               <Shield className="mr-2 h-4 w-4 text-[#52796F]" />
               <span className="text-[#1B4332]">Privacy</span>
             </Link>
+          </DropdownMenuItem> */}
+          <DropdownMenuItem asChild className="hover:bg-[#1B4332]/5 focus:bg-[#1B4332]/5 cursor-pointer">
+            <Link href="/dashboard/profile" data-testid="link-profile">
+              <User className="mr-2 h-4 w-4 text-[#52796F]" />
+              <span className="text-[#1B4332]">Profile</span>
+            </Link>
           </DropdownMenuItem>
+          <DropdownMenuItem asChild className="hover:bg-[#1B4332]/5 focus:bg-[#1B4332]/5 cursor-pointer">
+            <Link href="/dashboard/settings" data-testid="link-settings">
+              <Settings className="mr-2 h-4 w-4 text-[#52796F]" />
+              <span className="text-[#1B4332]">Settings</span>
+            </Link>
+          </DropdownMenuItem>
+          {user.isAdmin && (
+            <DropdownMenuItem asChild className="hover:bg-[#1B4332]/5 focus:bg-[#1B4332]/5 cursor-pointer">
+              <Link href="/admin" data-testid="link-admin-panel">
+                {/* <Settings className="mr-2 h-4 w-4 text-[#52796F]" /> */}
+                <Shield className="mr-2 h-4 w-4 text-[#52796F]" />
+                <span className="text-[#1B4332]">Admin Panel</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuGroup>
         <DropdownMenuSeparator className="bg-[#1B4332]/10" />
         <DropdownMenuItem

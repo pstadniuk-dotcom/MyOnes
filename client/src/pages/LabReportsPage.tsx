@@ -409,8 +409,11 @@ export default function LabReportsPage() {
                         <p className="text-sm text-[#52796F]">
                           Uploaded on {new Date(report.uploadedAt).toLocaleDateString()}
                         </p>
-                        <p className="text-sm text-[#52796F]">
+                        {/* <p className="text-sm text-[#52796F]">
                           {report.fileSize ? `${(report.fileSize / 1024 / 1024).toFixed(2)} MB` : ''} • {report.type}
+                        </p> */}
+                        <p className="text-sm text-[#52796F]">
+                          {report.type}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">

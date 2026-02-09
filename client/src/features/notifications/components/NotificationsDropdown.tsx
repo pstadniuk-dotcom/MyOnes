@@ -239,7 +239,7 @@ export function NotificationsDropdown() {
 
         <Separator />
 
-        <ScrollArea className="max-h-96">
+        <ScrollArea className="h-96">
           {isLoading ? (
             <div className="flex items-center justify-center py-6">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>

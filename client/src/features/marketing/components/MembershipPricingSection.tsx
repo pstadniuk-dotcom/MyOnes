@@ -70,7 +70,7 @@ export default function MembershipPricingSection() {
   // Transform and prepare tiers for display
   const rawTiers = apiTiers && apiTiers.length > 0 ? transformTiers(apiTiers) : fallbackTiers;
   const activeTierData = findActiveTier(rawTiers);
-  
+
   // Mark the active tier in the tiers array
   const tiers = rawTiers.map(t => ({
     ...t,
@@ -93,7 +93,7 @@ export default function MembershipPricingSection() {
   }
 
   return (
-    <section id="pricing" className="py-24 md:py-32 bg-[#FAF7F2]">
+    <section id="pricing" className="py-24 md:py-32 bg-[#FAF7F2] scroll-mt-24">
       <div className="container mx-auto px-6 max-w-5xl">
         {/* Header */}
         <div className="max-w-2xl mx-auto text-center mb-12">
@@ -116,9 +116,8 @@ export default function MembershipPricingSection() {
             <div className="flex justify-between items-end mb-4 px-2">
               {tiers.map((tier, index) => (
                 <div key={tier.id} className="text-center flex-1">
-                  <div className={`text-2xl md:text-3xl font-light ${
-                    tier.active ? "text-[#1B4332]" : "text-[#1B4332]/40"
-                  }`}>
+                  <div className={`text-2xl md:text-3xl font-light ${tier.active ? "text-[#1B4332]" : "text-[#1B4332]/40"
+                    }`}>
                     ${tier.priceMonthly}
                     <span className="text-sm font-normal">/mo</span>
                   </div>
@@ -128,7 +127,7 @@ export default function MembershipPricingSection() {
 
             {/* Progress bar */}
             <div className="relative h-2 bg-[#1B4332]/10 rounded-full mb-4">
-              <div 
+              <div
                 className="absolute left-0 top-0 h-full bg-[#1B4332] rounded-full transition-all duration-500"
                 style={{ width: `${((activeTier.claimed || 0) / (activeTier.limit || 100)) * 25}%` }}
               />
@@ -136,13 +135,12 @@ export default function MembershipPricingSection() {
               {tiers.map((tier, index) => (
                 <div
                   key={tier.id}
-                  className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 ${
-                    tier.active 
-                      ? "bg-[#1B4332] border-[#1B4332]" 
-                      : index < tiers.findIndex(t => t.active)
-                        ? "bg-[#1B4332] border-[#1B4332]"
-                        : "bg-white border-[#1B4332]/30"
-                  }`}
+                  className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 ${tier.active
+                    ? "bg-[#1B4332] border-[#1B4332]"
+                    : index < tiers.findIndex(t => t.active)
+                      ? "bg-[#1B4332] border-[#1B4332]"
+                      : "bg-white border-[#1B4332]/30"
+                    }`}
                   style={{ left: `${index * 33.33}%`, transform: 'translate(-50%, -50%)' }}
                 />
               ))}
@@ -152,14 +150,12 @@ export default function MembershipPricingSection() {
             <div className="flex justify-between items-start px-2">
               {tiers.map((tier) => (
                 <div key={tier.id} className="text-center flex-1">
-                  <div className={`text-sm font-medium ${
-                    tier.active ? "text-[#1B4332]" : "text-[#1B4332]/40"
-                  }`}>
+                  <div className={`text-sm font-medium ${tier.active ? "text-[#1B4332]" : "text-[#1B4332]/40"
+                    }`}>
                     {tier.name}
                   </div>
-                  <div className={`text-xs mt-1 ${
-                    tier.active ? "text-[#52796F]" : "text-[#52796F]/40"
-                  }`}>
+                  <div className={`text-xs mt-1 ${tier.active ? "text-[#52796F]" : "text-[#52796F]/40"
+                    }`}>
                     {tier.limit ? `First ${tier.limit.toLocaleString()}` : "After launch"}
                   </div>
                   {tier.active && spotsRemaining && (
@@ -209,7 +205,7 @@ export default function MembershipPricingSection() {
               </ul>
 
               <Link href="/signup">
-                <Button 
+                <Button
                   className="w-full bg-[#1B4332] hover:bg-[#143728] text-white py-6 text-lg rounded-full group"
                 >
                   Claim Your {activeTier.name} Spot

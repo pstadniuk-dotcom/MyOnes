@@ -220,7 +220,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-4 border-t border-[#1B4332]/10">
         <p className="text-[#52796F] text-xs text-center">
-          © 2025 ONES AI
+          © 2026 ONES AI
         </p>
       </SidebarFooter>
     </Sidebar>

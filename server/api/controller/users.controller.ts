@@ -45,7 +45,11 @@ export class UsersController {
             logger.info('Health profile save request', { userId, body: req.body });
 
             // Validate request body with proper Zod schema
-            const healthProfileUpdate = insertHealthProfileSchema.omit({ userId: true }).parse({
+            const healthProfileUpdate = insertHealthProfileSchema.omit({ userId: true }).extend({
+                conditions: z.array(z.string()).optional(),
+                medications: z.array(z.string()).optional(),
+                allergies: z.array(z.string()).optional(),
+            }).parse({
                 age: req.body.age,
                 sex: req.body.sex,
                 weightLbs: req.body.weightLbs,
