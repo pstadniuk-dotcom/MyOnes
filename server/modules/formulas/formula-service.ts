@@ -207,17 +207,6 @@ export function validateFormulaLimits(formula: any): { valid: boolean; errors: s
         errors.push(`Formula exceeds maximum ingredient count of ${FORMULA_LIMITS.MAX_INGREDIENT_COUNT}`);
     }
 
-    const approvedNames = new Set([
-        ...SYSTEM_SUPPORTS.map(f => f.name),
-        ...INDIVIDUAL_INGREDIENTS.map(i => i.name)
-    ]);
-
-    for (const ingredient of allIngredients) {
-        if (!approvedNames.has(ingredient.ingredient)) {
-            errors.push(`Unapproved ingredient: "${ingredient.ingredient}"`);
-        }
-    }
-
     return { valid: errors.length === 0, errors };
 }
 
@@ -269,11 +258,15 @@ export function validateAndCalculateFormula(formula: any) {
 
 export function validateAndCorrectIngredientNames(formula: any) {
     const correctedFormula = { ...formula };
-    const warnings: string[] = [];
-    const errors: string[] = [];
+    correctedFormula.bases = [...(formula.bases || [])];
+    correctedFormula.additions = [...(formula.additions || [])];
 
-    const correctNames = (list: any[]) => {
-        return list.map(item => {
+    const warnings: string[] = [];
+    const errors: string[] = []; // We won't use this for "unrecognized" anymore, only logic errors if any
+
+    const processList = (list: any[], type: 'base' | 'addition') => {
+        for (let i = 0; i < list.length; i++) {
+            const item = list[i];
             const rawName = item.ingredient || item.name;
             const normalized = normalizeIngredientName(rawName);
 
@@ -282,21 +275,25 @@ export function validateAndCorrectIngredientNames(formula: any) {
 
             if (found) {
                 if (found.name !== rawName) {
-                    warnings.push(`Corrected "${rawName}" to "${found.name}"`);
+                    warnings.push(`Auto-corrected "${rawName}" to "${found.name}"`);
                 }
-                return { ...item, ingredient: found.name };
+                list[i] = { ...item, ingredient: found.name };
             } else {
-                errors.push(`Unrecognized ingredient: "${rawName}"`);
-                return item;
+                // SILENT REMOVAL logic from old_routes:
+                // Remove the unapproved item and add a warning instead of erroring
+                const warningMsg = `Removed unapproved ${type}: "${rawName}"`;
+                warnings.push(warningMsg);
+                list.splice(i, 1);
+                i--; // Adjust index
             }
-        });
+        }
     };
 
-    correctedFormula.bases = correctNames(formula.bases || []);
-    correctedFormula.additions = correctNames(formula.additions || []);
+    processList(correctedFormula.bases, 'base');
+    processList(correctedFormula.additions, 'addition');
 
     return {
-        success: errors.length === 0,
+        success: true, // Always true if it reaches here, since we remove instead of erroring
         correctedFormula,
         warnings,
         errors

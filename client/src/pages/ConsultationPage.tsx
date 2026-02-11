@@ -314,19 +314,30 @@ export default function ConsultationPage() {
 
       // Only restore session on initial load (no messages yet, isNewSession true)
       if (historyData.sessions.length > 0 && messages.length === 0 && isNewSession) {
-        // First, check if there's a saved session from previous navigation
+        const params = new URLSearchParams(search);
+        const urlSessionId = params.get('session_id');
         const savedSessionId = localStorage.getItem(SESSION_KEY);
 
-        // Try to find the saved session, otherwise use most recent
+        // Priority 1: session_id from URL (e.g., from Dashboard 'Refine' button)
+        // Priority 2: saved session from localStorage (previous navigation)
+        // Priority 3: most recent session from history
         let sessionToRestore: ChatSession | undefined;
-        if (savedSessionId) {
+
+        if (urlSessionId) {
+          sessionToRestore = historyData.sessions.find(s => s.id === urlSessionId);
+          if (sessionToRestore) {
+            console.log('Restoring session from URL parameter:', urlSessionId);
+          }
+        }
+
+        if (!sessionToRestore && savedSessionId) {
           sessionToRestore = historyData.sessions.find(s => s.id === savedSessionId);
           if (sessionToRestore) {
             console.log('Restoring saved session from navigation:', savedSessionId);
           }
         }
 
-        // Fallback to most recent session if saved session not found
+        // Fallback to most recent session if no specific session requested or found
         if (!sessionToRestore) {
           sessionToRestore = historyData.sessions[0]; // Sessions are sorted by timestamp descending
           console.log('Restoring most recent session:', sessionToRestore?.id);
@@ -354,6 +365,11 @@ export default function ConsultationPage() {
           setCurrentSessionId(sessionToRestore.id);
           setIsNewSession(false);
           setShowSuggestions(false);
+
+          // Clear query parameters to avoid re-triggering restoration on refresh
+          if (urlSessionId) {
+            window.history.replaceState({}, '', window.location.pathname);
+          }
 
           console.log('Auto-restored session:', sessionToRestore.id);
         }
@@ -732,8 +748,14 @@ export default function ConsultationPage() {
                   }
                   setIsTyping(false);
                 } else if (data.type === 'formula_error') {
+                  console.error('Formula validation error:', data.error);
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === aiMessageId
+                      ? { ...msg, content: removeJsonBlocks(accumulatedContent) + '\n\n⚠️ **Formula Error**: ' + (data.error || 'Validation failed.'), isError: true }
+                      : msg
+                  ));
                   toast({
-                    title: "Formula Validation Error",
+                    title: "Formula Error",
                     description: data.error,
                     variant: "destructive"
                   });
@@ -746,6 +768,12 @@ export default function ConsultationPage() {
                     variant: "default"
                   });
                 } else if (data.type === 'error') {
+                  console.error('AI Stream error:', data.error);
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === aiMessageId
+                      ? { ...msg, content: removeJsonBlocks(accumulatedContent) + '\n\n⚠️ **Error**: ' + (data.error || 'An error occurred.'), isError: true }
+                      : msg
+                  ));
                   toast({
                     title: "AI Response Error",
                     description: data.error,
@@ -1116,6 +1144,7 @@ export default function ConsultationPage() {
   // Remove uploaded file
   const handleRemoveFile = useCallback((fileId: string) => {
     setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+    setInputValue('');
   }, []);
 
   // Voice input handling with continuous recording
@@ -1392,6 +1421,11 @@ export default function ConsultationPage() {
                   setSelectingCapsuleMessageId(null);
                 } else if (data.type === 'formula_error') {
                   console.error('💊 Formula error:', data.error);
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === aiMessageId
+                      ? { ...msg, content: removeJsonBlocks(accumulatedContent) + '\n\n⚠️ **Formula Error**: ' + (data.error || 'Validation failed.'), isError: true }
+                      : msg
+                  ));
                   toast({
                     title: "Formula Validation Error",
                     description: data.error,
@@ -1405,7 +1439,7 @@ export default function ConsultationPage() {
                   console.error('💊 SSE error:', data.error);
                   setMessages(prev => prev.map(msg =>
                     msg.id === aiMessageId
-                      ? { ...msg, content: msg.content + '\n\n⚠️ ' + (data.error || 'An error occurred.'), isError: true }
+                      ? { ...msg, content: removeJsonBlocks(accumulatedContent) + '\n\n⚠️ **Error**: ' + (data.error || 'An error occurred.'), isError: true }
                       : msg
                   ));
                   setIsTyping(false);
@@ -1647,7 +1681,7 @@ export default function ConsultationPage() {
                   data-testid={`message-${message.sender}-${message.id}`}
                 >
                   <div
-                    className={`max-w-[95%] sm:max-w-[85%] rounded-2xl p-3 sm:p-5 space-y-3 overflow-hidden ${message.sender === 'user'
+                    className={`group max-w-[95%] sm:max-w-[85%] rounded-2xl p-3 sm:p-5 space-y-3 overflow-hidden ${message.sender === 'user'
                       ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-lg'
                       : 'bg-background/80 backdrop-blur-sm text-foreground border shadow-md'
                       } ${message.sender === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
@@ -1680,22 +1714,22 @@ export default function ConsultationPage() {
                           </span>
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={() => handleCopyMessage(message.content)}
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="!size-4 p-0 min-w-0 opacity-0 group-hover:opacity-100 transition-all"
                             data-testid={`button-copy-message-${message.id}`}
                           >
-                            <Copy className="w-3 h-3" />
+                            <Copy className="!size-3" />
                           </Button>
-                          <Button
+                          {/* <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleShareMessage(message.content, message.formula)}
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="h-6 w-0 p-0 group-hover:w-6 opacity-0 group-hover:opacity-100 transition-all"
                             data-testid={`button-share-message-${message.id}`}
                           >
                             <Share2 className="w-3 h-3" />
-                          </Button>
+                          </Button> */}
                         </div>
                       </div>
 

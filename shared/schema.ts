@@ -193,6 +193,9 @@ export const formulas = pgTable("formulas", {
   targetCapsules: integer("target_capsules").default(9), // User's selected capsule count
   recommendedCapsules: integer("recommended_capsules"), // AI's recommended capsule count
 
+  // Link to the chat session that generated this formula
+  chatSessionId: varchar("chat_session_id").references(() => chatSessions.id, { onDelete: "set null" }),
+
   rationale: text("rationale"),
   warnings: json("warnings").$type<string[]>().default([]),
   disclaimers: json("disclaimers").$type<string[]>().default([]),

@@ -1,4 +1,5 @@
 import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, SYSTEM_SUPPORT_DETAILS } from "@shared/ingredients";
+import { QueryIntent, generateScopingInstructions } from "./query-intent-analyzer";
 
 // Define types directly to avoid circular dependencies
 export interface HealthProfile {
@@ -28,14 +29,14 @@ export interface Formula {
   userId: string;
   version?: number;
   name?: string | null;
-  bases: Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
-  additions?: Array<{ingredient: string, amount: number, unit: string, purpose?: string}>;
+  bases: Array<{ ingredient: string, amount: number, unit: string, purpose?: string }>;
+  additions?: Array<{ ingredient: string, amount: number, unit: string, purpose?: string }>;
   totalMg: number;
   targetCapsules?: number | null;
   recommendedCapsules?: number | null;
   userCustomizations?: {
-    addedBases?: Array<{ingredient: string, amount: number, unit: string}>;
-    addedIndividuals?: Array<{ingredient: string, amount: number, unit: string}>;
+    addedBases?: Array<{ ingredient: string, amount: number, unit: string }>;
+    addedIndividuals?: Array<{ ingredient: string, amount: number, unit: string }>;
   };
   createdAt: Date;
 }
@@ -44,7 +45,9 @@ export interface PromptContext {
   healthProfile?: HealthProfile;
   activeFormula?: Formula;
   labDataContext?: string;
-  recentMessages?: Array<{role: string, content: string}>;
+  recentMessages?: Array<{ role: string, content: string }>;
+  queryIntent?: QueryIntent;
+  currentUserMessage?: string;
 }
 
 /**
@@ -76,7 +79,7 @@ Answer the user's question directly and helpfully.`;
  * Acts like a doctor with clinical reasoning, not a script-follower
  */
 export function buildO1MiniPrompt(context: PromptContext): string {
-  
+
   // Generate dynamic ingredient lists for the prompt
   // System supports now show 1x dose with option to use 2x or 3x
   const systemSupportsList = SYSTEM_SUPPORTS.map(f => {
@@ -85,7 +88,7 @@ export function buildO1MiniPrompt(context: PromptContext): string {
     const dose3x = f.doseMg * 3;
     return `• ${f.name} (1x=${dose1x}mg, 2x=${dose2x}mg, 3x=${dose3x}mg) - ${f.description}`;
   }).join('\n');
-  
+
   const individualIngredientsList = INDIVIDUAL_INGREDIENTS.map(ing => {
     let doseInfo = `${ing.doseMg}mg`;
     if (ing.doseRangeMin && ing.doseRangeMax) {
@@ -105,9 +108,15 @@ export function buildO1MiniPrompt(context: PromptContext): string {
   // This prevents skipping consultation for new users who uploaded blood tests
   const activeFormulaVersion = context.activeFormula?.version ?? 0;
   const isAdvancedUser = hasActiveFormula && activeFormulaVersion > 2;
-  
-  let prompt = `You are ONES AI, a functional medicine practitioner specializing in personalized supplement formulation, with expertise in holistic health optimization including nutrition, exercise, and lifestyle guidance.
 
+  // Add query scoping instructions if this is a specific request
+  let scopingInstructions = '';
+  if (context.queryIntent && context.currentUserMessage) {
+    scopingInstructions = generateScopingInstructions(context.queryIntent, context.currentUserMessage);
+  }
+
+  let prompt = `You are ONES AI, a functional medicine practitioner specializing in personalized supplement formulation, with expertise in holistic health optimization including nutrition, exercise, and lifestyle guidance.
+${scopingInstructions}
 === 🚨🚨🚨 ABSOLUTE RULES - READ FIRST 🚨🚨🚨 ===
 
 **RULE A: NEVER ASK ABOUT CAPSULE COUNT**
@@ -241,6 +250,13 @@ When the user says "I'll take X capsules" or "I've selected X capsules":
 - Nutrition advice that complements their supplement formula
 - Lifestyle modifications (sleep, stress, hydration) for optimal results
 - Always consider their specific health markers when giving lifestyle advice
+
+=== 🚨 ingredient validation rules 🚨 ===
+1. **ONLY use the approved catalog** listed below.
+2. **NEVER** include ingredients not in our approved list.
+3. **If you include an unapproved ingredient**, it will be auto-removed and the user will be notified of the error.
+4. **Always use exact names** from the catalog (e.g., "Red Ginseng" not just "Ginseng").
+5. **DO NOT** make up names like "Brain Support Blend". Use individual ingredients for specific goals.
 
 === 🏋️ MANDATORY: YOU MUST PROVIDE WORKOUT AND NUTRITION PLANS ===
 
@@ -904,7 +920,7 @@ If you need specific ingredient info, reference the quick guide above.
 - If user wants to change capsule count, include the new targetCapsules in your JSON
 
 `;
-    
+
     if (formula.bases && formula.bases.length > 0) {
       prompt += `**Current System Supports (HISTORICAL - see warning below):**\n`;
       formula.bases.forEach((base) => {
@@ -912,7 +928,7 @@ If you need specific ingredient info, reference the quick guide above.
         const catalogBase = SYSTEM_SUPPORTS.find(f => f.name === base.ingredient);
         const catalogDose = catalogBase?.doseMg;
         const doseChanged = catalogDose && catalogDose !== base.amount;
-        
+
         prompt += `- ${base.ingredient}: ${base.amount}mg`;
         if (doseChanged) {
           prompt += ` ⚠️ CATALOG NOW: ${catalogDose}mg - USE ${catalogDose}mg!`;
@@ -920,14 +936,14 @@ If you need specific ingredient info, reference the quick guide above.
         if (base.purpose) prompt += ` (${base.purpose})`;
         prompt += `\n`;
       });
-      
+
       prompt += `\n🚨 **CRITICAL: SYSTEM SUPPORT DOSAGES ARE FIXED**
 - The amounts shown above are HISTORICAL (what user received before)
 - You MUST use the CATALOG dosages from the ingredient list above
 - System supports have FIXED dosages that CANNOT be changed
 - If you include a system support, use its CATALOG dosage, NOT the historical amount\n`;
     }
-    
+
     if (formula.additions && formula.additions.length > 0) {
       prompt += `\n**Current Individual Ingredients:**\n`;
       formula.additions.forEach((add) => {
@@ -956,7 +972,7 @@ WRONG: Keep all 4000mg + add more ingredients = exceeds budget ❌
   if (context.healthProfile) {
     const profile = context.healthProfile;
     prompt += `\n=== 📊 USER HEALTH PROFILE ===\n\n`;
-    
+
     // Health goals are the MOST IMPORTANT context - show first
     if (profile.healthGoals && profile.healthGoals.length > 0) {
       prompt += `🎯 **PRIMARY HEALTH GOALS:** ${profile.healthGoals.join(', ')}\n`;
@@ -965,12 +981,12 @@ WRONG: Keep all 4000mg + add more ingredients = exceeds budget ❌
       prompt += `🎯 **PRIMARY HEALTH GOALS:** Not yet captured\n`;
       prompt += `⚠️ If the user mentions ANY health goals (e.g., "gut health", "brain optimization", "energy", "sleep", "stress relief", "longevity"), capture them in your health-data JSON response.\n\n`;
     }
-    
+
     if (profile.age) prompt += `Age: ${profile.age}\n`;
     if (profile.sex) prompt += `Sex: ${profile.sex}\n`;
     if (profile.weightLbs) prompt += `Weight: ${profile.weightLbs} lbs\n`;
     if (profile.heightCm) prompt += `Height: ${profile.heightCm} cm\n`;
-    
+
     if (profile.conditions && profile.conditions.length > 0) {
       prompt += `Medical Conditions: ${profile.conditions.join(', ')}\n`;
     }
@@ -980,13 +996,13 @@ WRONG: Keep all 4000mg + add more ingredients = exceeds budget ❌
     if (profile.allergies && profile.allergies.length > 0) {
       prompt += `Allergies: ${profile.allergies.join(', ')}\n`;
     }
-    
+
     if (profile.sleepHoursPerNight) prompt += `Sleep: ${profile.sleepHoursPerNight} hours/night\n`;
     if (profile.exerciseDaysPerWeek) prompt += `Exercise: ${profile.exerciseDaysPerWeek} days/week\n`;
     if (profile.stressLevel) prompt += `Stress Level: ${profile.stressLevel}/10\n`;
     if (profile.smokingStatus) prompt += `Smoking: ${profile.smokingStatus}\n`;
     if (profile.alcoholDrinksPerWeek) prompt += `Alcohol: ${profile.alcoholDrinksPerWeek} drinks/week\n`;
-    
+
     // Gender-specific guidance
     if (profile.sex) {
       prompt += `\n**GENDER-SPECIFIC CONSIDERATIONS:**\n`;
@@ -1010,7 +1026,7 @@ WRONG: Keep all 4000mg + add more ingredients = exceeds budget ❌
         }
       }
     }
-    
+
     // Age-specific guidance
     if (profile.age) {
       prompt += `\n**AGE-SPECIFIC CONSIDERATIONS (${profile.age} years old):**\n`;
@@ -1030,7 +1046,7 @@ WRONG: Keep all 4000mg + add more ingredients = exceeds budget ❌
         prompt += `- Be extra cautious with interactions - ask about ALL medications\n`;
       }
     }
-    
+
     // Weight-specific guidance
     if (profile.weightLbs) {
       prompt += `\n**WEIGHT CONSIDERATIONS (${profile.weightLbs} lbs):**\n`;
@@ -1043,7 +1059,7 @@ WRONG: Keep all 4000mg + add more ingredients = exceeds budget ❌
         prompt += `- Monitor for sensitivity to ingredients\n`;
       }
     }
-    
+
     // Lifestyle-specific guidance
     if (profile.stressLevel && profile.stressLevel >= 7) {
       prompt += `\n**HIGH STRESS ALERT (${profile.stressLevel}/10):** Strongly consider Adrenal Support, Ashwagandha, L-Theanine, GABA\n`;
@@ -1057,13 +1073,13 @@ WRONG: Keep all 4000mg + add more ingredients = exceeds budget ❌
     if (profile.smokingStatus && profile.smokingStatus !== 'never') {
       prompt += `\n**SMOKING HISTORY:** Lung Support recommended, antioxidants (C Boost, Glutathione) important\n`;
     }
-    
+
     // Show missing critical fields
     const missingCritical = [];
     if (!profile.medications || profile.medications.length === 0) missingCritical.push('medications');
     if (!profile.conditions || profile.conditions.length === 0) missingCritical.push('health conditions');
     if (!profile.allergies || profile.allergies.length === 0) missingCritical.push('allergies');
-    
+
     if (missingCritical.length > 0) {
       prompt += `\n🚨 **MISSING CRITICAL DATA:** ${missingCritical.join(', ')}\n`;
       prompt += `**You MUST ask about these before creating a formula!**\n`;
