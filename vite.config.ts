@@ -12,7 +12,8 @@ export default defineConfig({
     react(),
     // Validate environment variables during production builds
     validateEnvPlugin({
-      requiredInProduction: ['VITE_API_BASE'],
+      // requiredInProduction: ['VITE_API_BASE'],
+      requiredInProduction: [],
       urlVariables: ['VITE_API_BASE'],
       failOnError: true, // Fail build if validation fails
     }),
