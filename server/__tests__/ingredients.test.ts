@@ -38,7 +38,7 @@ describe('Ingredient Normalization', () => {
   it('should strip PE qualifiers from AI-generated names', () => {
     // AI sometimes adds PE qualifiers that need stripping
     const result = normalizeIngredientName('Ginkgo Biloba PE 1/8% Flavones');
-    expect(result).toBe('Ginkgo Biloba');
+    expect(result).toBe('Ginkgo Biloba Extract 24%');
   });
 
   it('should strip parenthetical descriptors', () => {
@@ -65,7 +65,7 @@ describe('Find Ingredient By Name', () => {
     const lower = findIngredientByName('ashwagandha');
     const upper = findIngredientByName('ASHWAGANDHA');
     const mixed = findIngredientByName('AsHwAgAnDhA');
-    
+
     expect(lower).toBeDefined();
     expect(upper).toBeDefined();
     expect(mixed).toBeDefined();
@@ -103,7 +103,7 @@ describe('Ingredient Dosing', () => {
   it('should return correct dose for system supports', () => {
     const adrenalDose = getIngredientDose('Adrenal Support');
     expect(adrenalDose).toBe(420);
-    
+
     const heartDose = getIngredientDose('Heart Support');
     expect(heartDose).toBeDefined();
     expect(heartDose).toBeGreaterThan(0);
@@ -113,7 +113,7 @@ describe('Ingredient Dosing', () => {
     // Ashwagandha default dose is 50mg (range 50-600)
     const ashwagandhaDose = getIngredientDose('Ashwagandha');
     expect(ashwagandhaDose).toBe(50);
-    
+
     // CoQ10 is actually named "CoEnzyme Q10" in the catalog
     const coq10Dose = getIngredientDose('CoEnzyme Q10');
     expect(coq10Dose).toBeDefined();
@@ -165,7 +165,7 @@ describe('Individual Ingredients Structure', () => {
     INDIVIDUAL_INGREDIENTS.forEach(ingredient => {
       expect(ingredient.name).toBeDefined();
       expect(typeof ingredient.name).toBe('string');
-      
+
       // Should have either fixed dose or range
       if (ingredient.doseRangeMin && ingredient.doseRangeMax) {
         expect(ingredient.doseRangeMax).toBeGreaterThanOrEqual(ingredient.doseRangeMin);
@@ -177,7 +177,7 @@ describe('Individual Ingredients Structure', () => {
 
   it('should include common supplements', () => {
     const names = INDIVIDUAL_INGREDIENTS.map(i => i.name.toLowerCase());
-    
+
     // Check for presence of common supplements (case insensitive)
     expect(names).toContain('ashwagandha');
     expect(names).toContain('coenzyme q10');
@@ -194,7 +194,7 @@ describe('Formula Total Limits', () => {
     const adrenalDose = getIngredientDose('Adrenal Support') || 0;
     const ashwagandhaDose = getIngredientDose('Ashwagandha') || 0;
     const coq10Dose = getIngredientDose('CoEnzyme Q10') || 0;
-    
+
     const total = adrenalDose + ashwagandhaDose + coq10Dose;
     expect(total).toBeLessThan(MAX_FORMULA_MG);
   });

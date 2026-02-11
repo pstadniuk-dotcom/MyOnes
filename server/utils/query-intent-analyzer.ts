@@ -1,7 +1,13 @@
 import OpenAI from 'openai';
 import { aiRuntimeSettings } from '../infra/ai/ai-config';
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import "dotenv/config";
+let _openai: OpenAI | null = null;
+function getOpenAI() {
+    if (!_openai) {
+        _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-tests' });
+    }
+    return _openai;
+}
 
 /**
  * Query Intent Analyzer
@@ -50,7 +56,7 @@ const SPECIFIC_REQUEST_PATTERNS = [
  */
 async function analyzeWithAI(userMessage: string): Promise<QueryIntent> {
     try {
-        const response = await openai.chat.completions.create({
+        const response = await getOpenAI().chat.completions.create({
             model: "gpt-4o-mini",
             messages: [
                 {
