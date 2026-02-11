@@ -7,6 +7,7 @@ import { storage } from '../../storage';
 import { getClientIP, checkRateLimit } from '../middleware/middleware';
 import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
 import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builder';
+import { analyzeQueryIntent } from '../../utils/query-intent-analyzer';
 import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits } from '../../modules/formulas/formula-service';
 import OpenAI from 'openai';
 import logger from '../../infra/logging/logger';
@@ -74,12 +75,17 @@ export class ChatController {
 
             sendSSE({ type: 'thinking', message: 'Analyzing your health data...' });
 
+            // Analyze query intent to determine scope
+            const queryIntent = await analyzeQueryIntent(message);
+
             const previousMessages = await chatRepository.listMessagesBySession(chatSession.id);
             const promptContext: PromptContext = {
                 healthProfile: healthProfile as any,
                 activeFormula: activeFormula as any,
                 labDataContext: labDataContext || undefined,
-                recentMessages: previousMessages.slice(-10).map(m => ({ role: m.role, content: m.content }))
+                recentMessages: previousMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+                queryIntent,
+                currentUserMessage: message
             };
 
             const fullSystemPrompt = buildO1MiniPrompt(promptContext);
@@ -136,7 +142,9 @@ export class ChatController {
                     const validation = validateAndCorrectIngredientNames(jsonData);
                     validatedFormula = validation.correctedFormula;
                     if (validation.warnings.length > 0) {
-                        sendSSE({ type: 'info', message: `✓ Auto-corrected ${validation.warnings.length} ingredient name(s)` });
+                        validation.warnings.forEach(warning => {
+                            sendSSE({ type: 'info', message: warning });
+                        });
                     }
 
                     const calcResult = validateAndCalculateFormula(validatedFormula);
@@ -167,15 +175,38 @@ export class ChatController {
                             disclaimers: validatedFormula.disclaimers || [],
                             version: nextVersion,
                             targetCapsules: validatedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT,
+                            chatSessionId: chatSession.id,
                         };
 
                         savedFormula = await formulasRepository.createFormula(formulaData);
                         logger.info(`Formula v${nextVersion} saved successfully for user ${userId}`);
                     } else {
-                        sendSSE({ type: 'error', error: `Formula validation failed: ${finalChecks.errors.join(', ')}` });
+                        const errorMessage = finalChecks.errors.join(', ');
+                        sendSSE({ type: 'formula_error', error: `Formula validation failed: ${errorMessage}` });
+                        fullResponse += `\n\n⚠️ **Formula Error**: Validation failed - ${errorMessage}`;
                     }
-                } catch (err) {
+                } catch (err: any) {
                     logger.error('Formula extraction error', err);
+                    const errorMessage = err.message || 'An error occurred during formula extraction.';
+                    sendSSE({ type: 'formula_error', error: errorMessage });
+                    fullResponse += `\n\n⚠️ **Formula Error**: ${errorMessage}`;
+                }
+            } else {
+                // If no JSON match, check if AI claimed to create a formula
+                const responseLC = fullResponse.toLowerCase();
+                const claimsFormulaCreation = (
+                    responseLC.includes("here's your formula") ||
+                    responseLC.includes("here is your formula") ||
+                    responseLC.includes("i've created") ||
+                    responseLC.includes("i have created") ||
+                    responseLC.includes("this formula includes")
+                ) && !responseLC.includes("i'll create") && !responseLC.includes("i will create");
+
+                if (claimsFormulaCreation) {
+                    const errorMessage = '⚠️ Formula described but not created. Please reply with "create my formula now" to generate it.';
+                    sendSSE({ type: 'formula_error', error: errorMessage });
+                    fullResponse += `\n\n⚠️ **Formula Error**: ${errorMessage}`;
+                    logger.warn('AI claimed formula creation but no JSON block found');
                 }
             }
 

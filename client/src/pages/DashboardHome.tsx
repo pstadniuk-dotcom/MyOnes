@@ -384,7 +384,7 @@ export default function HomePage() {
                   </Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild className="flex-1 border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white rounded-full" data-testid="button-refine-formula">
-                  <Link href="/dashboard/chat">
+                  <Link href={currentFormula.chatSessionId ? `/dashboard/chat?session_id=${currentFormula.chatSessionId}` : "/dashboard/chat"}>
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Refine
                   </Link>
