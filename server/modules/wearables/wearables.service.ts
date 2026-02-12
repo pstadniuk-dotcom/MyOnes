@@ -52,20 +52,21 @@ export class WearablesService {
     }
 
     async disconnectDevice(userId: string, connectionId: string) {
-        const parts = connectionId.split('_');
-        if (parts.length < 2) {
-            throw new Error('Invalid connection ID');
-        }
-
-        const junctionUserId = parts.slice(0, -1).join('_');
-        const providerSlug = parts[parts.length - 1];
-
         const actualJunctionUserId = await wearablesRepository.getJunctionUserId(userId);
-        if (actualJunctionUserId !== junctionUserId) {
+        if (!actualJunctionUserId) {
             throw new Error('Not authorized to disconnect this device');
         }
 
-        await disconnectProvider(junctionUserId, providerSlug);
+        if (!connectionId.startsWith(actualJunctionUserId + '_')) {
+            throw new Error('Not authorized to disconnect this device');
+        }
+
+        const providerSlug = connectionId.substring(actualJunctionUserId.length + 1);
+        if (!providerSlug) {
+            throw new Error('Invalid connection ID');
+        }
+
+        await disconnectProvider(actualJunctionUserId, providerSlug);
     }
 
     async getBiometricData(userId: string, startDate: string, endDate: string, provider?: string) {

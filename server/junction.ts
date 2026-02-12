@@ -112,13 +112,32 @@ export async function generateLinkToken(junctionUserId: string): Promise<{ linkT
 export async function getConnectedProviders(junctionUserId: string): Promise<any[]> {
   try {
     const client = junctionClient();
-    const response = await client.user.getConnectedProviders(junctionUserId);
-    // The response is a record of provider slug -> array of provider info
-    // Flatten it into an array
+    const response = await client.user.getConnectedProviders(junctionUserId) as any;
+
+    // The response can be an array of connections, or an object containing a 'providers' array,
+    // or a legacy record mapping provider slug -> array of provider info.
+
+    // 1. Handle array response
+    if (Array.isArray(response)) {
+      return response;
+    }
+
+    // 2. Handle wrapped response { providers: [...] }
+    if (response && response.providers && Array.isArray(response.providers)) {
+      return response.providers;
+    }
+
+    // 3. Fallback: handle as record slug -> connection[] (Legacy)
     const providers: any[] = [];
     for (const [slug, providerArray] of Object.entries(response)) {
-      for (const provider of providerArray) {
-        providers.push({ ...provider, slug });
+      if (Array.isArray(providerArray)) {
+        for (const provider of providerArray) {
+          // Use the provider's own slug if available, otherwise fallback to the key
+          providers.push({
+            ...provider,
+            slug: (provider as any).slug || slug
+          });
+        }
       }
     }
     return providers;
