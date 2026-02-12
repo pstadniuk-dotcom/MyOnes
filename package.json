@@ -17,9 +17,9 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate",
-    "test:db": "node test-supabase.mjs",
-    "verify": "tsx verify-server.ts",
-    "migrate:supabase": "./migrate-to-supabase.sh",
+    "test:db": "node scripts/dev/test-supabase.mjs",
+    "verify": "tsx scripts/dev/verify-server.ts",
+    "migrate:supabase": "./scripts/migrate-to-supabase.sh",
     "prepare": "husky"
   },
   "dependencies": {
