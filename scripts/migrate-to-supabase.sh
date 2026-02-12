@@ -17,7 +17,7 @@ command -v psql >/dev/null 2>&1 || { echo "❌ psql is required but not installe
 SOURCE_DB="postgresql://neondb_owner:npg_QAi9ZGyEvIs6@ep-curly-frog-a6aeyl2v.us-west-2.aws.neon.tech/neondb"
 
 # Target database (Supabase - get from .env)
-source ./server/.env
+source ../server/.env
 TARGET_DB="$DATABASE_URL"
 
 if [ -z "$TARGET_DB" ]; then

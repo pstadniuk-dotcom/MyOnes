@@ -1,4 +1,4 @@
-import { insertHealthProfileSchema } from './shared/schema.js';
+import { insertHealthProfileSchema } from '../../shared/schema.js';
 
 // Test with typical data from the client
 const testData = {

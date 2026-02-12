@@ -1,10 +1,10 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
-dotenv.config({path: './server/.env'});
+dotenv.config({ path: '../../server/.env' });
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {rejectUnauthorized: false}
+  ssl: { rejectUnauthorized: false }
 });
 
 async function addStandardTier() {
@@ -15,7 +15,7 @@ async function addStandardTier() {
       VALUES ('standard', 'Standard Member', 4900, 999999, 0, 4, '["Standard pricing at $49/month","Unlimited AI consultations"]', true, NOW(), NOW())
     `);
     console.log('✅ Created standard tier with 999999 capacity (effectively unlimited)');
-    
+
     // Show all tiers
     const result = await pool.query('SELECT tier_key, name, price_cents, max_capacity FROM membership_tiers ORDER BY sort_order');
     console.table(result.rows);
