@@ -1,20 +1,7 @@
 import OpenAI from 'openai';
 import { Anthropic } from '@anthropic-ai/sdk';
 import { chatRepository } from './chat.repository';
-import { storage } from '../../storage';
 import { formulasRepository } from '../formulas/formulas.repository';
-
-import {
-    extractCapsuleCountFromMessage,
-    getMaxDosageForCapsules,
-    validateAndCalculateFormula,
-    validateAndCorrectIngredientNames,
-    validateFormulaLimits,
-    FORMULA_LIMITS
-} from '../formulas/formula-service';
-import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
-import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builder';
-import { logger } from '../../infra/logging/logger';
 import { type MessageFormulaPayload, type MessageFormulaIngredientPayload, InsertMessage, messages } from '@shared/schema';
 import { filesRepository } from '../files/files.repository';
 import { usersRepository } from '../users/users.repository';

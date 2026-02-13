@@ -127,6 +127,21 @@ ${scopingInstructions}
 ❌ DO NOT ASK about age, sex, medications, allergies if they're in the USER HEALTH PROFILE below
 ✅ INSTEAD: Reference what you already know: "I see you're 40 years old and taking Sertraline..."
 
+**RULE B-2: 🚨 NEVER HALLUCINATE OR FABRICATE MEDICAL DATA 🚨**
+🚨🚨🚨 **THIS IS ABSOLUTELY CRITICAL - VIOLATION IS UNACCEPTABLE** 🚨🚨🚨
+
+❌ NEVER invent lab results, biomarker values, or test data that wasn't provided
+❌ NEVER claim you "reviewed their blood work" if no lab data is in the context below
+❌ NEVER reference specific numbers (ApoB: 147, LDL-P: 1776, etc.) unless they appear in the LAB RESULTS section
+❌ NEVER analyze fabricated test results - this is medical misinformation and extremely dangerous
+
+✅ ONLY reference lab data that appears in the "LABORATORY TEST RESULTS" section below
+✅ If no lab data exists, be honest: "I don't see any lab results uploaded yet"
+✅ Base recommendations on their stated symptoms, health goals, and profile information
+✅ Encourage lab test uploads for better personalization
+
+**If you violate this rule, you are providing false medical information that could harm the user.**
+
 **RULE C: QUESTIONS AND CAPSULE SELECTION ARE MUTUALLY EXCLUSIVE**
 🚨🚨🚨 THIS IS THE MOST IMPORTANT RULE 🚨🚨🚨
 
@@ -1101,6 +1116,24 @@ WRONG: Keep all 4000mg + add more ingredients = exceeds budget ❌
   if (context.labDataContext && context.labDataContext.length > 100) {
     prompt += `\n=== 🔬 LABORATORY TEST RESULTS ===\n\n${context.labDataContext}\n`;
     prompt += `\n**Use this data to make evidence-based ingredient selections.**\n`;
+  } else {
+    // CRITICAL: Explicitly tell AI that NO lab data exists
+    prompt += `\n=== 🔬 LABORATORY TEST RESULTS ===\n\n`;
+    prompt += `🚨🚨🚨 **CRITICAL: NO LAB DATA UPLOADED** 🚨🚨🚨\n\n`;
+    prompt += `**The user has NOT uploaded any blood test results or lab reports.**\n\n`;
+    prompt += `**YOU MUST NOT:**\n`;
+    prompt += `❌ Invent, fabricate, or hallucinate lab values (ApoB, LDL-P, omega-3 index, etc.)\n`;
+    prompt += `❌ Reference specific biomarker numbers that don't exist\n`;
+    prompt += `❌ Analyze non-existent test results\n`;
+    prompt += `❌ Claim you "reviewed their lab results" when none were uploaded\n`;
+    prompt += `❌ Provide detailed analysis of fabricated blood work\n\n`;
+    prompt += `**YOU MUST:**\n`;
+    prompt += `✅ Base recommendations ONLY on their health profile, symptoms, and goals\n`;
+    prompt += `✅ Encourage them to upload blood tests for better optimization\n`;
+    prompt += `✅ Be honest that you don't have lab data to work with\n`;
+    prompt += `✅ Create formulas based on their stated health concerns and goals\n\n`;
+    prompt += `**If the user claims they uploaded lab results but you don't see them here, tell them:**\n`;
+    prompt += `"I don't see any lab results in your profile yet. Please make sure to upload your blood test PDF through the upload feature, and I'll analyze it for you."\n\n`;
   }
 
   prompt += `

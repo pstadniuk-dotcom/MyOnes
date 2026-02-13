@@ -136,6 +136,16 @@ describe('buildO1MiniPrompt', () => {
     expect(prompt).toContain('Ashwagandha');
     expect(prompt).toContain('CoQ10');
   });
+
+  it('should include anti-hallucination rules in absolute rules section', () => {
+    const context = createTestContext();
+    const prompt = buildO1MiniPrompt(context);
+
+    // Should have critical anti-hallucination rule
+    expect(prompt).toContain('NEVER HALLUCINATE OR FABRICATE MEDICAL DATA');
+    expect(prompt).toContain('NEVER invent lab results');
+    expect(prompt).toContain('medical misinformation');
+  });
 });
 
 describe('Prompt Context with Health Profile', () => {
@@ -296,15 +306,30 @@ Total Cholesterol: 185 mg/dL (Ref: <200 mg/dL) - Normal`,
     expect(prompt).toContain('Ferritin');
   });
 
-  it('should not include lab section if data too short', () => {
+  it('should warn against hallucinating lab data when none provided', () => {
+    const context = createTestContext({
+      labDataContext: undefined, // No lab data
+    });
+
+    const prompt = buildO1MiniPrompt(context);
+
+    // Should include explicit warning against hallucination
+    expect(prompt).toContain('NO LAB DATA UPLOADED');
+    expect(prompt).toContain('Invent, fabricate, or hallucinate lab values');
+    expect(prompt).toContain('Claim you "reviewed their lab results"');
+    expect(prompt).toContain('Reference specific biomarker numbers');
+  });
+
+  it('should warn against hallucinating when lab data is too short', () => {
     const context = createTestContext({
       labDataContext: 'No labs',
     });
 
     const prompt = buildO1MiniPrompt(context);
 
-    // Short lab data should be ignored
-    expect(prompt).not.toContain('LABORATORY TEST RESULTS');
+    // Short lab data should trigger anti-hallucination warning
+    expect(prompt).toContain('NO LAB DATA UPLOADED');
+    expect(prompt).toContain('Invent, fabricate, or hallucinate lab values');
   });
 });
 
