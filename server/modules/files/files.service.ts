@@ -67,16 +67,17 @@ export class FilesService {
         }
 
         // Determine category
-        let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'other';
+        // let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'other';
+        let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'lab_report';
         const labKeywords = ['lab', 'blood', 'test', 'cbc', 'panel', 'result', 'report', 'analysis', 'metabolic', 'lipid', 'thyroid', 'vitamin', 'serum', 'urine', 'specimen'];
 
-        if (labKeywords.some(keyword => fileName.includes(keyword))) {
-            fileType = 'lab_report';
-        } else if (fileName.includes('prescription') || fileName.includes('rx')) {
-            fileType = 'prescription';
-        } else if (allowedMimeTypes.slice(0, 4).includes(uploadedFile.mimetype)) {
-            fileType = 'medical_document';
-        }
+        // if (labKeywords.some(keyword => fileName.includes(keyword))) {
+        //     fileType = 'lab_report';
+        // } else if (fileName.includes('prescription') || fileName.includes('rx')) {
+        //     fileType = 'prescription';
+        // } else if (allowedMimeTypes.slice(0, 4).includes(uploadedFile.mimetype)) {
+        //     fileType = 'medical_document';
+        // }
 
         // Upload to storage
         const normalizedPath = await this.objectStorageService.uploadLabReportFile(
