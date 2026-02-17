@@ -10,6 +10,8 @@ import { Link } from 'wouter';
 import { loginSchema, type LoginData } from '@shared/schema';
 import { useAuth } from '@/contexts/AuthContext';
 
+import { SocialAuthButtons } from '@/shared/components/auth/SocialAuthButtons';
+
 export default function LoginPage() {
   const { login, isLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
@@ -144,6 +146,10 @@ export default function LoginPage() {
                 </Button>
               </form>
             </Form>
+
+            <div className="mt-6">
+              <SocialAuthButtons />
+            </div>
           </CardContent>
         </Card>
 

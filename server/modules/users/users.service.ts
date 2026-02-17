@@ -1,4 +1,5 @@
 import { usersRepository } from './users.repository';
+import bcrypt from 'bcrypt';
 import logger from '../../infra/logging/logger';
 import { type InsertHealthProfile, type InsertSubscription, type InsertPaymentMethodRef } from '@shared/schema';
 
@@ -138,6 +139,27 @@ export class UsersService {
         }
 
         return await usersRepository.deletePaymentMethodRef(paymentMethodId);
+    }
+
+    async changePassword(userId: string, currentPassword: string, newPassword: string) {
+        const user = await usersRepository.getUser(userId);
+        if (!user || !user.password) {
+            throw new Error('User not found');
+        }
+
+        const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!isValidPassword) {
+            throw new Error('Invalid current password');
+        }
+
+        if (currentPassword === newPassword) {
+            throw new Error('New password cannot be the same as current password');
+        }
+
+        const saltRounds = 12;
+        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+        await usersRepository.updateUserPassword(userId, hashedPassword);
     }
 }
 

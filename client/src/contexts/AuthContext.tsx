@@ -21,6 +21,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   signup: (data: SignupData) => Promise<void>;
   login: (data: LoginData) => Promise<void>;
+  googleLogin: (token: string) => Promise<void>;
+  facebookLogin: (token: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -235,6 +237,98 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  const googleLogin = async (googleToken: string) => {
+    try {
+      setIsLoading(true);
+
+      const response = await apiRequest('/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: googleToken }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Google login failed');
+      }
+
+      // Store auth data
+      setToken(data.token);
+      setUser(data.user);
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      toast({
+        title: "Welcome back!",
+        description: `Logged in with Google as ${data.user.name}`,
+        variant: "default"
+      });
+
+      // Redirect to dashboard
+      setLocation('/dashboard');
+
+    } catch (error: any) {
+      console.error('Google login error:', error);
+      toast({
+        title: "Google Login Failed",
+        description: error.message || "Unable to log in with Google. Please try again.",
+        variant: "destructive"
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const facebookLogin = async (fbToken: string) => {
+    try {
+      setIsLoading(true);
+
+      const response = await apiRequest('/api/auth/facebook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: fbToken }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Facebook login failed');
+      }
+
+      // Store auth data
+      setToken(data.token);
+      setUser(data.user);
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      toast({
+        title: "Welcome back!",
+        description: `Logged in with Facebook as ${data.user.name}`,
+        variant: "default"
+      });
+
+      // Redirect to dashboard
+      setLocation('/dashboard');
+
+    } catch (error: any) {
+      console.error('Facebook login error:', error);
+      toast({
+        title: "Facebook Login Failed",
+        description: error.message || "Unable to log in with Facebook. Please try again.",
+        variant: "destructive"
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     try {
       // Make API call to logout endpoint
@@ -303,6 +397,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated,
     signup,
     login,
+    googleLogin,
+    facebookLogin,
     logout,
     refreshUser,
   };

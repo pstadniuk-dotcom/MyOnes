@@ -39,7 +39,9 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   phone: text("phone"),
-  password: text("password").notNull(),
+  password: text("password"),
+  googleId: text("google_id").unique(),
+  facebookId: text("facebook_id").unique(),
 
   // Admin and access tracking
   isAdmin: boolean("is_admin").default(false).notNull(),

@@ -13,6 +13,7 @@ router.post('/me/health-profile', requireAuth, usersController.saveHealthProfile
 
 // User Profile endpoints
 router.patch('/me/profile', requireAuth, usersController.updateProfile);
+router.patch('/me/password', requireAuth, usersController.changePassword);
 router.patch('/me/timezone', requireAuth, usersController.updateTimezone);
 
 // Order endpoints

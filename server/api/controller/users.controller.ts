@@ -278,6 +278,38 @@ export class UsersController {
             res.status(500).json({ error: 'Failed to fetch billing history' });
         }
     }
+
+    async changePassword(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const { currentPassword, newPassword } = req.body;
+
+            if (!currentPassword || !newPassword) {
+                return res.status(400).json({ error: 'Current and new password are required' });
+            }
+
+            if (newPassword.length < 8) {
+                return res.status(400).json({ error: 'New password must be at least 8 characters long' });
+            }
+
+            if (currentPassword === newPassword) {
+                return res.status(400).json({ error: 'New password cannot be the same as the current password' });
+            }
+
+            await usersService.changePassword(userId, currentPassword, newPassword);
+
+            res.json({ message: 'Password updated successfully' });
+        } catch (error: any) {
+            if (error.message === 'Invalid current password') {
+                return res.status(400).json({ error: error.message });
+            }
+            if (error.message === 'New password cannot be the same as current password') {
+                return res.status(400).json({ error: error.message });
+            }
+            logger.error('Change password error', { error });
+            res.status(500).json({ error: 'Failed to update password' });
+        }
+    }
 }
 
 export const usersController = new UsersController();

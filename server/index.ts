@@ -19,12 +19,12 @@ app.set('trust proxy', 1);
 const isDevMode = process.env.NODE_ENV !== 'production';
 const cspDirectives = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDevMode ? " 'unsafe-eval'" : ''} https://cdn.jsdelivr.net`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  `script-src 'self' 'unsafe-inline'${isDevMode ? " 'unsafe-eval'" : ''} https://cdn.jsdelivr.net https://accounts.google.com/gsi/client https://connect.facebook.net`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: https: blob:",
-  "connect-src 'self' https://api.openai.com https://api.anthropic.com wss: ws:",
-  "frame-src 'self' https://www.youtube.com https://youtube.com",
+  "connect-src 'self' https://api.openai.com https://api.anthropic.com https://accounts.google.com/gsi/ wss: ws:",
+  "frame-src 'self' https://www.youtube.com https://youtube.com https://accounts.google.com/ https://www.facebook.com https://web.facebook.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'"

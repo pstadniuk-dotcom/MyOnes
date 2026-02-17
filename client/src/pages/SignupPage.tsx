@@ -10,6 +10,7 @@ import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { signupSchema } from '@shared/schema';
+import { SocialAuthButtons } from '@/shared/components/auth/SocialAuthButtons';
 
 // Extended form validation schema to include password confirmation
 const extendedSignupSchema = signupSchema.extend({
@@ -208,6 +209,10 @@ export default function SignupPage() {
                 </Button>
               </form>
             </Form>
+
+            <div className="mt-6">
+              <SocialAuthButtons />
+            </div>
           </CardContent>
         </Card>
 
