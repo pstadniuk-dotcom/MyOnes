@@ -6,6 +6,10 @@ import { signupSchema, loginSchema, type InsertUser, type User } from '@shared/s
 import { generateToken } from '../../api/middleware/middleware';
 import { sendNotificationEmail } from '../../utils/emailService';
 import { logger } from '../../infra/logging/logger';
+import { OAuth2Client } from 'google-auth-library';
+import axios from 'axios';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export class AuthService {
     async signup(data: any) {
@@ -39,7 +43,7 @@ export class AuthService {
         const validatedData = loginSchema.parse(data);
 
         const user = await usersRepository.getUserByEmail(validatedData.email);
-        if (!user) {
+        if (!user || !user.password) {
             throw new Error('Invalid email or password');
         }
 
@@ -51,6 +55,108 @@ export class AuthService {
         const token = generateToken(user.id, user.isAdmin || false);
 
         return { user, token };
+    }
+
+    async googleLogin(googleToken: string) {
+        try {
+            let email: string | undefined;
+            let name: string | undefined;
+            let googleId: string | undefined;
+
+            try {
+                // Try as ID Token first (standard for Google-provided button)
+                const ticket = await googleClient.verifyIdToken({
+                    idToken: googleToken,
+                    audience: process.env.GOOGLE_CLIENT_ID,
+                });
+                const payload = ticket.getPayload();
+                if (payload && payload.email) {
+                    email = payload.email;
+                    name = payload.name;
+                    googleId = payload.sub;
+                }
+            } catch (error) {
+                // If ID Token verification fails, try as Access Token (standard for custom buttons)
+                logger.debug('ID Token verification failed, trying as Access Token', { error: error instanceof Error ? error.message : 'Unknown error' });
+                const { data } = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo`, {
+                    headers: { 'Authorization': `Bearer ${googleToken}` }
+                });
+                if (data && data.email) {
+                    email = data.email;
+                    name = data.name;
+                    googleId = data.sub;
+                }
+            }
+
+            if (!email || !googleId) {
+                throw new Error('Invalid Google token');
+            }
+
+            // 1. Try to find user by googleId
+            let user = await usersRepository.getUserByGoogleId(googleId);
+
+            if (!user) {
+                // 2. Try to find user by email (to link account)
+                user = await usersRepository.getUserByEmail(email);
+
+                if (user) {
+                    // Update user with googleId
+                    await usersRepository.updateUser(user.id, { googleId });
+                } else {
+                    // 3. Create new user
+                    user = await usersRepository.createUser({
+                        name: name || 'Google User',
+                        email,
+                        googleId,
+                    });
+                }
+            }
+
+            const token = generateToken(user.id, user.isAdmin || false);
+            return { user, token };
+        } catch (error: any) {
+            logger.error('Google login error', { error: error.message });
+            throw new Error('Google authentication failed');
+        }
+    }
+
+    async facebookLogin(accessToken: string) {
+        try {
+            // Verify Facebook token and get user info
+            const { data } = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`);
+
+            if (!data || !data.email) {
+                throw new Error('Invalid Facebook token or missing email permission');
+            }
+
+            const { id: facebookId, email, name } = data;
+
+            // 1. Try to find user by facebookId
+            let user = await usersRepository.getUserByFacebookId(facebookId);
+
+            if (!user) {
+                // 2. Try to find user by email (to link account)
+                user = await usersRepository.getUserByEmail(email);
+
+                if (user) {
+                    // Update user with facebookId
+                    await usersRepository.updateUser(user.id, { facebookId });
+                } else {
+                    // 3. Create new user
+                    user = await usersRepository.createUser({
+                        name: name || 'Facebook User',
+                        email,
+                        facebookId,
+                    });
+                }
+            }
+
+            const token = generateToken(user.id, user.isAdmin || false);
+            return { user, token };
+        } catch (error: any) {
+            logger.error('Facebook login error', { error: error.message });
+            throw new Error('Facebook authentication failed');
+        }
     }
 
     async getMe(userId: string) {

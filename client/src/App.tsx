@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/shared/components/ui/toaster";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { ApiConfigError } from "@/shared/components/ApiConfigError";
 import { isApiConfigurationValid } from "@/shared/lib/api";
@@ -150,6 +151,9 @@ function MainRouter() {
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/dashboard/my-formula">
+        <Redirect to="/dashboard/formula" />
+      </Route>
       <Route path="/dashboard/optimize/tracking">
         {/* TrackingPage removed - redirect to dashboard */}
         <Redirect to="/dashboard" />
@@ -279,17 +283,18 @@ function App() {
   if (!isApiConfigurationValid()) {
     return <ApiConfigError />;
   }
-
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <ScrollToTop />
-            <MainRouter />
-          </TooltipProvider>
-        </AuthProvider>
+        <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ""}>
+          <AuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <ScrollToTop />
+              <MainRouter />
+            </TooltipProvider>
+          </AuthProvider>
+        </GoogleOAuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

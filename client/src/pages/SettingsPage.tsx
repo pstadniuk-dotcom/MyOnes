@@ -121,6 +121,28 @@ export default function SettingsPage() {
   }, [notificationPrefs]);
 
 
+  // Mutation to change password
+  const changePasswordMutation = useMutation({
+    mutationFn: (data: any) =>
+      apiRequest('PATCH', '/api/users/me/password', data),
+    onSuccess: () => {
+      toast({
+        title: 'Password updated',
+        description: 'Your password has been successfully changed.',
+      });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to update password. Please try again.',
+      });
+    },
+  });
+
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -142,14 +164,10 @@ export default function SettingsPage() {
       return;
     }
 
-    toast({
-      title: 'Password updated',
-      description: 'Your password has been successfully changed.',
+    changePasswordMutation.mutate({
+      currentPassword,
+      newPassword
     });
-
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
   };
 
   // Mutation to save notification preferences
@@ -304,8 +322,13 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                 </div>
-                <Button type="submit" data-testid="button-update-password" className="bg-[#1B4332] hover:bg-[#1B4332]/90 text-white">
-                  Update Password
+                <Button
+                  type="submit"
+                  disabled={changePasswordMutation.isPending}
+                  data-testid="button-update-password"
+                  className="bg-[#1B4332] hover:bg-[#1B4332]/90 text-white"
+                >
+                  {changePasswordMutation.isPending ? 'Updating...' : 'Update Password'}
                 </Button>
               </form>
             </CardContent>

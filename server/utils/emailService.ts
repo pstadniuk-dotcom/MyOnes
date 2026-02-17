@@ -20,7 +20,7 @@ interface EmailNotification {
 
 function getEmailTemplate(notification: EmailNotification): string {
   const { title, content, actionUrl, actionText, type } = notification;
-  
+
   const typeColors: Record<typeof type, { primary: string; secondary: string; icon: string }> = {
     order_update: { primary: '168 76% 42%', secondary: '168 76% 95%', icon: '📦' },
     formula_update: { primary: '262 83% 58%', secondary: '262 83% 95%', icon: '⚗️' },
@@ -149,10 +149,13 @@ function getEmailTemplate(notification: EmailNotification): string {
 export async function sendNotificationEmail(notification: EmailNotification): Promise<boolean> {
   try {
     if (!SENDGRID_API_KEY || !SENDGRID_FROM_EMAIL) {
+      console.log('sendgrid api key ', SENDGRID_API_KEY)
+      console.log('sendgrid from email ', SENDGRID_FROM_EMAIL)
       console.error('❌ SendGrid not configured: Missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL environment variables');
       return false;
     }
-    
+    console.log('sendgrid api key ', process.env.SENDGRID_API_KEY, SENDGRID_API_KEY)
+
     const msg = {
       to: notification.to,
       from: SENDGRID_FROM_EMAIL,

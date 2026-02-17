@@ -81,6 +81,58 @@ export class AuthController {
         }
     }
 
+    async googleLogin(req: Request, res: Response) {
+        try {
+            const { token: idToken } = req.body;
+            if (!idToken) return res.status(400).json({ error: 'Google ID token is required' });
+
+            const { user, token } = await authService.googleLogin(idToken);
+
+            logger.info('Google login success', { userId: user.id });
+
+            res.json({
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    phone: user.phone,
+                    createdAt: user.createdAt.toISOString(),
+                    isAdmin: user.isAdmin || false
+                },
+                token
+            });
+        } catch (error: any) {
+            logger.error('Google login error', { error: error.message });
+            res.status(401).json({ error: error.message });
+        }
+    }
+
+    async facebookLogin(req: Request, res: Response) {
+        try {
+            const { token: accessToken } = req.body;
+            if (!accessToken) return res.status(400).json({ error: 'Facebook access token is required' });
+
+            const { user, token } = await authService.facebookLogin(accessToken);
+
+            logger.info('Facebook login success', { userId: user.id });
+
+            res.json({
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    phone: user.phone,
+                    createdAt: user.createdAt.toISOString(),
+                    isAdmin: user.isAdmin || false
+                },
+                token
+            });
+        } catch (error: any) {
+            logger.error('Facebook login error', { error: error.message });
+            res.status(401).json({ error: error.message });
+        }
+    }
+
     async logout(req: Request, res: Response) {
         res.json({ message: 'Logged out successfully' });
     }

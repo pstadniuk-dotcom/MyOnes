@@ -29,6 +29,16 @@ export class UsersRepository {
         return user || undefined;
     }
 
+    async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+        const [user] = await db.select().from(users).where(eq(users.googleId, googleId));
+        return user || undefined;
+    }
+
+    async getUserByFacebookId(facebookId: string): Promise<User | undefined> {
+        const [user] = await db.select().from(users).where(eq(users.facebookId, facebookId));
+        return user || undefined;
+    }
+
     async listAllUsers(): Promise<User[]> {
         return await db.select().from(users);
     }

@@ -17,7 +17,13 @@ async function throwIfResNotOk(res: Response) {
       throw new Error('Session expired. Please log in again.');
     }
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let errorMessage = text;
+    try {
+      errorMessage = JSON.parse(text).error;
+    } catch (error) {
+      // Ignore JSON parse errors, fall back to default error
+    }
+    throw new Error(`${res.status}: ${errorMessage}`);
   }
 }
 
