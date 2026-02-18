@@ -115,7 +115,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar data-testid="sidebar-main" className="border-r border-[#1B4332]/10 bg-[#FAF7F2]">
-      <SidebarHeader className="p-6 border-b border-[#1B4332]/10">
+      <SidebarHeader className="p-[13.5px] border-b border-[#1B4332]/10">
         <Link href="/" className="flex items-center -space-x-3">
           <img src="/ones-logo-icon.svg" alt="" className="h-9 w-9" />
           <img src="/ones-logo-green.svg" alt="ONES" className="h-7" />

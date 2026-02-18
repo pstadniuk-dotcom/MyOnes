@@ -132,6 +132,7 @@ export default function MyFormulaPage() {
   const [renamingFormulaId, setRenamingFormulaId] = useState<string | null>(null);
   const [newFormulaName, setNewFormulaName] = useState('');
   const [expandedIndividualIngredients, setExpandedIndividualIngredients] = useState<Record<string, boolean>>({});
+  const [columnCount, setColumnCount] = useState<number>(3);
 
   // Hooks
   const { user } = useAuth();
@@ -294,6 +295,37 @@ export default function MyFormulaPage() {
     }
   }, [currentFormula, selectedFormulaId]);
 
+  // Update column count based on window width for masonry layout
+  useEffect(() => {
+    const updateColumns = () => {
+      if (window.innerWidth >= 1024) setColumnCount(3);
+      else if (window.innerWidth >= 768) setColumnCount(2);
+      else setColumnCount(1);
+    };
+    updateColumns();
+    window.addEventListener('resize', updateColumns);
+    return () => window.removeEventListener('resize', updateColumns);
+  }, []);
+
+  // Distribute formulas into columns for masonry layout
+  const formulaColumns = useMemo<Formula[][]>(() => {
+    const columns: Formula[][] = Array.from({ length: columnCount }, () => []);
+    allFormulas.forEach((formula, i) => {
+      columns[i % columnCount].push(formula);
+    });
+    return columns;
+  }, [allFormulas, columnCount]);
+
+  // Distribute archived formulas into columns
+  const archivedColumns = useMemo<Formula[][]>(() => {
+    const archived = archivedData?.archived || [];
+    const columns: Formula[][] = Array.from({ length: columnCount }, () => []);
+    archived.forEach((formula, i) => {
+      columns[i % columnCount].push(formula);
+    });
+    return columns;
+  }, [archivedData?.archived, columnCount]);
+
   // Ingredient filtering and searching
   const filteredIngredients = useMemo(() => {
     if (!selectedFormula) return [];
@@ -440,28 +472,32 @@ export default function MyFormulaPage() {
             </div>
           ) : allFormulas && allFormulas.length > 0 ? (
             <>
-              <div className={`grid md:grid-cols-2 lg:grid-cols-3 gap-4 ${expandedFormulaId ? 'items-start' : ''}`}>
-                {allFormulas.map((formula) => (
-                  <FormulaCard
-                    key={formula.id}
-                    formula={formula}
-                    isSelected={selectedFormulaId === formula.id}
-                    isExpanded={expandedFormulaId === formula.id}
-                    isNewest={formula.id === currentFormula?.id}
-                    onSelect={() => setSelectedFormulaId(formula.id)}
-                    onToggleExpand={() => setExpandedFormulaId(
-                      expandedFormulaId === formula.id ? null : formula.id
-                    )}
-                    onRename={(id, currentName) => {
-                      setRenamingFormulaId(id);
-                      setNewFormulaName(currentName || '');
-                    }}
-                    onArchive={(id) => archiveFormulaMutation.mutate(id)}
-                    isArchiving={archiveFormulaMutation.isPending}
-                    getIndividualIngredientDetails={getIndividualIngredientDetails}
-                    expandedIndividualIngredients={expandedIndividualIngredients}
-                    setExpandedIndividualIngredients={setExpandedIndividualIngredients}
-                  />
+              <div className="flex flex-row gap-4 items-start">
+                {formulaColumns.map((col, colIdx) => (
+                  <div key={colIdx} className="flex-1 flex flex-col gap-4">
+                    {col.map((formula) => (
+                      <FormulaCard
+                        key={formula.id}
+                        formula={formula}
+                        isSelected={selectedFormulaId === formula.id}
+                        isExpanded={expandedFormulaId === formula.id}
+                        isNewest={formula.id === currentFormula?.id}
+                        onSelect={() => setSelectedFormulaId(formula.id)}
+                        onToggleExpand={() => setExpandedFormulaId(
+                          expandedFormulaId === formula.id ? null : formula.id
+                        )}
+                        onRename={(id, currentName) => {
+                          setRenamingFormulaId(id);
+                          setNewFormulaName(currentName || '');
+                        }}
+                        onArchive={(id) => archiveFormulaMutation.mutate(id)}
+                        isArchiving={archiveFormulaMutation.isPending}
+                        getIndividualIngredientDetails={getIndividualIngredientDetails}
+                        expandedIndividualIngredients={expandedIndividualIngredients}
+                        setExpandedIndividualIngredients={setExpandedIndividualIngredients}
+                      />
+                    ))}
+                  </div>
                 ))}
               </div>
 
@@ -476,14 +512,18 @@ export default function MyFormulaPage() {
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-4">
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {archivedData?.archived?.map((formula) => (
-                        <ArchivedFormulaCard
-                          key={formula.id}
-                          formula={formula}
-                          onRestore={(id) => restoreFormulaMutation.mutate(id)}
-                          isRestoring={restoreFormulaMutation.isPending}
-                        />
+                    <div className="flex flex-row gap-4 items-start">
+                      {archivedColumns.map((col, colIdx) => (
+                        <div key={colIdx} className="flex-1 flex flex-col gap-4">
+                          {col.map((formula) => (
+                            <ArchivedFormulaCard
+                              key={formula.id}
+                              formula={formula}
+                              onRestore={(id) => restoreFormulaMutation.mutate(id)}
+                              isRestoring={restoreFormulaMutation.isPending}
+                            />
+                          ))}
+                        </div>
                       ))}
                     </div>
                   </CollapsibleContent>
