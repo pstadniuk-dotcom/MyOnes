@@ -3,6 +3,7 @@ import sgMail from '@sendgrid/mail';
 // Initialize SendGrid with API key from environment variables
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL;
+const SENDGRID_FROM_NAME = process.env.SENDGRID_FROM_NAME || 'ONES';
 
 if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);
@@ -21,14 +22,14 @@ interface EmailNotification {
 function getEmailTemplate(notification: EmailNotification): string {
   const { title, content, actionUrl, actionText, type } = notification;
 
-  const typeColors: Record<typeof type, { primary: string; secondary: string; icon: string }> = {
-    order_update: { primary: '168 76% 42%', secondary: '168 76% 95%', icon: '📦' },
-    formula_update: { primary: '262 83% 58%', secondary: '262 83% 95%', icon: '⚗️' },
-    consultation_reminder: { primary: '221 83% 53%', secondary: '221 83% 95%', icon: '💬' },
-    system: { primary: '221 83% 53%', secondary: '221 83% 95%', icon: '🔔' }
+  const typeConfig: Record<typeof type, { accent: string; icon: string }> = {
+    order_update:          { accent: '#2D9E6B', icon: '📦' },
+    formula_update:        { accent: '#7C3AED', icon: '⚗️' },
+    consultation_reminder: { accent: '#2563EB', icon: '💬' },
+    system:                { accent: '#111827', icon: '🔔' },
   };
 
-  const colors = typeColors[type];
+  const { accent, icon } = typeConfig[type];
 
   return `
 <!DOCTYPE html>
@@ -37,110 +38,71 @@ function getEmailTemplate(notification: EmailNotification): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title}</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-      line-height: 1.6;
-      background-color: #f5f5f5;
-    }
-    .email-container {
-      max-width: 600px;
-      margin: 40px auto;
-      background-color: #ffffff;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .header {
-      background: linear-gradient(135deg, hsl(${colors.primary}) 0%, hsl(${colors.primary.replace('42%', '35%')}) 100%);
-      color: #ffffff;
-      padding: 40px 30px;
-      text-align: center;
-    }
-    .header .icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-    }
-    .header h1 {
-      margin: 0;
-      font-size: 28px;
-      font-weight: 600;
-    }
-    .content {
-      padding: 40px 30px;
-    }
-    .content p {
-      color: #374151;
-      font-size: 16px;
-      margin: 0 0 20px 0;
-    }
-    .cta-button {
-      display: inline-block;
-      background-color: hsl(${colors.primary});
-      color: #ffffff;
-      text-decoration: none;
-      padding: 14px 32px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 16px;
-      margin: 20px 0;
-      transition: background-color 0.2s;
-    }
-    .cta-button:hover {
-      background-color: hsl(${colors.primary.replace('42%', '38%')});
-    }
-    .footer {
-      background-color: hsl(${colors.secondary});
-      padding: 30px;
-      text-align: center;
-      border-top: 1px solid #e5e7eb;
-    }
-    .footer p {
-      margin: 5px 0;
-      color: #6b7280;
-      font-size: 14px;
-    }
-    .footer a {
-      color: hsl(${colors.primary});
-      text-decoration: none;
-    }
-    .brand {
-      font-weight: 700;
-      font-size: 24px;
-      letter-spacing: 0.05em;
-      color: #ffffff;
-      margin-top: 8px;
-    }
-  </style>
 </head>
-<body>
-  <div class="email-container">
-    <div class="header">
-      <div class="icon">${colors.icon}</div>
-      <h1>${title}</h1>
-      <div class="brand">ONES</div>
-    </div>
-    <div class="content">
-      <p>${content}</p>
-      ${actionUrl && actionText ? `
-        <div style="text-align: center;">
-          <a href="${actionUrl}" class="cta-button">${actionText}</a>
-        </div>
-      ` : ''}
-    </div>
-    <div class="footer">
-      <p><strong>ONES - Personalized AI Supplements</strong></p>
-      <p>Your custom formula, delivered to your door.</p>
-      <p style="margin-top: 20px;">
-        <a href="${process.env.APP_URL || 'https://my-ones.vercel.app'}/dashboard/settings">Manage Notification Preferences</a>
-      </p>
-      <p style="font-size: 12px; color: #9ca3af; margin-top: 20px;">
-        This is a transactional email related to your ONES account.
-      </p>
-    </div>
-  </div>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:${accent};padding:36px 40px;text-align:center;">
+              <p style="margin:0 0 4px 0;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:600;">ONES AI</p>
+              <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.01em;">${title}</h1>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px 40px 32px;">
+              <div style="color:#374151;font-size:15px;line-height:1.7;">
+                ${content}
+              </div>
+              ${actionUrl && actionText ? `
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:32px;">
+                <tr>
+                  <td align="center">
+                    <a href="${actionUrl}"
+                       style="display:inline-block;background-color:${accent};color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:600;font-size:15px;letter-spacing:0.01em;">
+                      ${actionText}
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top:16px;">
+                    <p style="margin:0;font-size:12px;color:#9ca3af;">Or copy this link into your browser:<br>
+                      <a href="${actionUrl}" style="color:#6b7280;word-break:break-all;">${actionUrl}</a>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              ` : ''}
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"></td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:24px 40px;text-align:center;">
+              <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#111827;">ONES — Personalized AI Supplements</p>
+              <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">Your custom formula, delivered to your door.</p>
+              <p style="margin:0;font-size:12px;color:#9ca3af;">
+                <a href="${process.env.APP_URL || 'https://myones.ai'}/dashboard/settings" style="color:#9ca3af;">Manage preferences</a>
+                &nbsp;·&nbsp;
+                <a href="${process.env.APP_URL || 'https://myones.ai'}" style="color:#9ca3af;">myones.ai</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
   `;
@@ -157,7 +119,7 @@ export async function sendNotificationEmail(notification: EmailNotification): Pr
 
     const msg = {
       to: notification.to,
-      from: SENDGRID_FROM_EMAIL,
+      from: { email: SENDGRID_FROM_EMAIL!, name: SENDGRID_FROM_NAME },
       subject: notification.subject,
       html: getEmailTemplate(notification),
     };
