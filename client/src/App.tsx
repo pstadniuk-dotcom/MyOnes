@@ -285,18 +285,28 @@ function App() {
   if (!isApiConfigurationValid()) {
     return <ApiConfigError />;
   }
+
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const appContent = (
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <ScrollToTop />
+        <MainRouter />
+      </TooltipProvider>
+    </AuthProvider>
+  );
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ""}>
-          <AuthProvider>
-            <TooltipProvider>
-              <Toaster />
-              <ScrollToTop />
-              <MainRouter />
-            </TooltipProvider>
-          </AuthProvider>
-        </GoogleOAuthProvider>
+        {googleClientId ? (
+          <GoogleOAuthProvider clientId={googleClientId}>
+            {appContent}
+          </GoogleOAuthProvider>
+        ) : (
+          appContent
+        )}
       </QueryClientProvider>
     </ErrorBoundary>
   );

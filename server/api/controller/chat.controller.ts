@@ -253,6 +253,12 @@ export class ChatController {
             fullResponse = fullResponse.replace(/```[\s\S]*?```/g, '').trim();
             fullResponse = fullResponse.replace(/`{1,3}/g, '').trim();
 
+            // Normalize dosing schedule emojis — the AI inconsistently drops 🌅 🌙 ☀️
+            // Strip any existing emoji at start of line first, then re-apply consistently
+            fullResponse = fullResponse.replace(/^[🌅☀️🌙\s]*\*{0,2}(Morning)\*{0,2}(.+)$/gm, '🌅 **$1**$2');
+            fullResponse = fullResponse.replace(/^[🌅☀️🌙\s]*\*{0,2}(Midday)\*{0,2}(.+)$/gm, '☀️ **$1**$2');
+            fullResponse = fullResponse.replace(/^[🌅☀️🌙\s]*\*{0,2}(Evening)\*{0,2}(.+)$/gm, '🌙 **$1**$2');
+
             // Send health data update notification if applicable
             if (healthDataUpdated) {
                 sendSSE({

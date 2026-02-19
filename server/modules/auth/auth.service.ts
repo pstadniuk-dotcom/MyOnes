@@ -54,16 +54,16 @@ export class AuthService {
         try {
             await sendNotificationEmail({
                 to: user.email,
-                subject: 'Verify Your ONES Account',
+                subject: 'Verify your ONES account',
                 type: 'system',
-                title: 'Welcome to ONES!',
+                title: 'Confirm your email',
                 content: `
-                    <p>Hi ${user.name},</p>
-                    <p>Welcome to ONES! We're excited to have you on board.</p>
-                    <p>Please verify your email address to get started with your personalized supplement journey.</p>
+                    <p style="margin:0 0 12px;">Hi ${user.name},</p>
+                    <p style="margin:0 0 12px;">Thanks for signing up. Click the button below to verify your email address and activate your account.</p>
+                    <p style="margin:0;font-size:13px;color:#6b7280;">This link expires in 24 hours. If you didn't create an account, you can safely ignore this email.</p>
                 `,
                 actionUrl: verificationUrl,
-                actionText: 'Verify Email Address',
+                actionText: 'Verify my email',
             });
         } catch (emailError) {
             logger.error('Failed to send verification email', { email: user.email, error: emailError });

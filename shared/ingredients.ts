@@ -1759,6 +1759,9 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
 
   // Hawthorn variations
   'hawthorn': 'Hawthorn Berry',
+  'hawthorne': 'Hawthorn Berry',
+  'hawthorne berry': 'Hawthorn Berry',
+  'hawthorn berries': 'Hawthorn Berry',
 
   // Phosphatidylcholine variations
   'pc': 'Phosphatidylcholine',
