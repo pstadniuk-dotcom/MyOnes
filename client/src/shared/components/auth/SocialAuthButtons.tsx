@@ -17,8 +17,11 @@ export function SocialAuthButtons() {
     });
 
     const handleFacebookResponse = async (response: any) => {
+        console.log('Facebook SDK response:', response);
         if (response.accessToken) {
             await facebookLogin(response.accessToken);
+        } else {
+            console.warn('Facebook login failed: No access token in response', response);
         }
     };
 
@@ -66,6 +69,7 @@ export function SocialAuthButtons() {
 
                 <FacebookLogin
                     appId={import.meta.env.VITE_FACEBOOK_APP_ID || ''}
+                    fields="name,email,picture"
                     callback={handleFacebookResponse}
                     render={(renderProps: any) => (
                         <Button

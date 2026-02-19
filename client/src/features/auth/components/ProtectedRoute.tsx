@@ -8,22 +8,29 @@ interface ProtectedRouteProps {
   fallback?: string; // Route to redirect to if not authenticated
 }
 
-export default function ProtectedRoute({ 
-  children, 
-  fallback = '/login' 
+export default function ProtectedRoute({
+  children,
+  fallback = '/login'
 }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
     // Don't redirect while still loading authentication state
     if (isLoading) return;
-    
+
     // Redirect if not authenticated
     if (!isAuthenticated) {
       setLocation(fallback);
+      return;
     }
-  }, [isAuthenticated, isLoading, setLocation, fallback]);
+
+    // Redirect to verify-email if authenticated but not verified
+    // Skip this check for the verify-email page itself to avoid loops
+    if (isAuthenticated && !user?.emailVerified && window.location.pathname !== '/verify-email') {
+      setLocation('/verify-email');
+    }
+  }, [isAuthenticated, user?.emailVerified, isLoading, setLocation, fallback]);
 
   // Show loading spinner while checking authentication
   if (isLoading) {
@@ -37,9 +44,9 @@ export default function ProtectedRoute({
     );
   }
 
-  // Don't render children if not authenticated
+  // Don't render children if not authenticated or not verified
   // The redirect will happen via useEffect
-  if (!isAuthenticated) {
+  if (!isAuthenticated || (!user?.emailVerified && window.location.pathname !== '/verify-email')) {
     return null;
   }
 

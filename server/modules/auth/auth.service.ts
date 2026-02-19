@@ -34,9 +34,71 @@ export class AuthService {
         };
 
         const user = await usersRepository.createUser(userData);
+
+        // Generate and send verification email
+        await this.sendVerificationEmail(user);
+
         const token = generateToken(user.id, user.isAdmin || false);
 
         return { user, token };
+    }
+
+    private async sendVerificationEmail(user: User) {
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+        await authRepository.createEmailVerificationToken(user.id, verificationToken, expiresAt);
+
+        const verificationUrl = `${process.env.FRONTEND_URL || 'https://my-ones.vercel.app'}/verify-email?token=${verificationToken}`;
+
+        try {
+            await sendNotificationEmail({
+                to: user.email,
+                subject: 'Verify Your ONES Account',
+                type: 'system',
+                title: 'Welcome to ONES!',
+                content: `
+                    <p>Hi ${user.name},</p>
+                    <p>Welcome to ONES! We're excited to have you on board.</p>
+                    <p>Please verify your email address to get started with your personalized supplement journey.</p>
+                `,
+                actionUrl: verificationUrl,
+                actionText: 'Verify Email Address',
+            });
+        } catch (emailError) {
+            logger.error('Failed to send verification email', { email: user.email, error: emailError });
+        }
+    }
+
+    async verifyEmail(token: string) {
+        const verificationToken = await authRepository.getEmailVerificationToken(token);
+
+        if (!verificationToken || new Date() > verificationToken.expiresAt) {
+            throw new Error('Invalid or expired verification link');
+        }
+
+        await usersRepository.updateUser(verificationToken.userId, { emailVerified: true });
+        await authRepository.deleteEmailVerificationToken(token);
+
+        const user = await usersRepository.getUser(verificationToken.userId);
+        return user;
+    }
+
+    async resendVerification(userId: string) {
+        const user = await usersRepository.getUser(userId);
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        if (user.emailVerified) {
+            throw new Error('Email already verified');
+        }
+
+        // Delete old tokens
+        await authRepository.deleteEmailVerificationTokensByUser(userId);
+
+        // Send new email
+        await this.sendVerificationEmail(user);
     }
 
     async login(data: any) {
@@ -101,13 +163,14 @@ export class AuthService {
 
                 if (user) {
                     // Update user with googleId
-                    await usersRepository.updateUser(user.id, { googleId });
+                    await usersRepository.updateUser(user.id, { googleId, emailVerified: true });
                 } else {
                     // 3. Create new user
                     user = await usersRepository.createUser({
                         name: name || 'Google User',
                         email,
                         googleId,
+                        emailVerified: true,
                     });
                 }
             }
@@ -122,10 +185,14 @@ export class AuthService {
 
     async facebookLogin(accessToken: string) {
         try {
+            logger.debug('Attempting Facebook login with token...');
             // Verify Facebook token and get user info
             const { data } = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`);
 
+            logger.debug('Facebook response data', { data });
+
             if (!data || !data.email) {
+                logger.warn('Facebook login failed: Missing email permission', { data });
                 throw new Error('Invalid Facebook token or missing email permission');
             }
 
@@ -140,13 +207,16 @@ export class AuthService {
 
                 if (user) {
                     // Update user with facebookId
-                    await usersRepository.updateUser(user.id, { facebookId });
+                    logger.info('Linking existing user to Facebook account', { userId: user.id, email });
+                    await usersRepository.updateUser(user.id, { facebookId, emailVerified: true });
                 } else {
                     // 3. Create new user
+                    logger.info('Creating new user via Facebook', { email });
                     user = await usersRepository.createUser({
                         name: name || 'Facebook User',
                         email,
                         facebookId,
+                        emailVerified: true,
                     });
                 }
             }
@@ -154,8 +224,13 @@ export class AuthService {
             const token = generateToken(user.id, user.isAdmin || false);
             return { user, token };
         } catch (error: any) {
-            logger.error('Facebook login error', { error: error.message });
-            throw new Error('Facebook authentication failed');
+            const fbError = error.response?.data?.error?.message || error.message;
+            logger.error('Facebook login error details', {
+                error: error.message,
+                fbError: fbError,
+                response: error.response?.data
+            });
+            throw new Error(`Facebook authentication failed: ${fbError}`);
         }
     }
 
