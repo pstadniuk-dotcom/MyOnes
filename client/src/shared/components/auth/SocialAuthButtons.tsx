@@ -1,50 +1,11 @@
-import { useEffect, useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
+import FacebookLogin from '@greatsumini/react-facebook-login';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/shared/components/ui/button';
 import { Separator } from '@/shared/components/ui/separator';
 
-declare global {
-    interface Window {
-        FB: any;
-        fbAsyncInit: () => void;
-    }
-}
-
 export function SocialAuthButtons() {
     const { googleLogin: authGoogleLogin, facebookLogin, isLoading } = useAuth();
-    const [isSdkLoading, setIsSdkLoading] = useState(true);
-
-    useEffect(() => {
-        // 1. Define the initialization function that the SDK will call (or we call manually)
-        window.fbAsyncInit = function () {
-            if (window.FB) {
-                window.FB.init({
-                    appId: import.meta.env.VITE_FACEBOOK_APP_ID || '',
-                    cookie: true,
-                    xfbml: true,
-                    version: 'v18.0'
-                });
-                setIsSdkLoading(false);
-            }
-        };
-
-        // 2. If SDK is already loaded, initialize it immediately
-        if (window.FB) {
-            window.fbAsyncInit();
-        }
-        // 3. If SDK script isn't even in the document yet, load it
-        else if (!document.getElementById('facebook-jssdk')) {
-            const script = document.createElement('script');
-            script.id = 'facebook-jssdk';
-            script.src = "https://connect.facebook.net/en_US/sdk.js";
-            script.async = true;
-            script.defer = true;
-            document.body.appendChild(script);
-        }
-        // 4. If script is in document but window.FB isn't set, it's still loading
-        // and it will call fbAsyncInit when ready.
-    }, []);
 
     const loginWithGoogle = useGoogleLogin({
         onSuccess: (tokenResponse) => {
@@ -54,21 +15,6 @@ export function SocialAuthButtons() {
         },
         onError: () => console.error('Google Login Failed'),
     });
-
-    const handleFacebookLogin = () => {
-        if (!window.FB) {
-            console.error('Facebook SDK not loaded');
-            return;
-        }
-
-        window.FB.login((response: any) => {
-            if (response.authResponse) {
-                facebookLogin(response.authResponse.accessToken);
-            } else {
-                console.log('User cancelled login or did not fully authorize.');
-            }
-        }, { scope: 'public_profile,email' });
-    };
 
     return (
         <div className="space-y-4 w-full">
@@ -112,17 +58,30 @@ export function SocialAuthButtons() {
                     Google
                 </Button>
 
-                <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleFacebookLogin}
-                    disabled={isLoading || isSdkLoading}
-                >
-                    <svg className="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                    </svg>
-                    Facebook
-                </Button>
+                <FacebookLogin
+                    appId={import.meta.env.VITE_FACEBOOK_APP_ID || ''}
+                    onSuccess={(response) => {
+                        if (response.accessToken) {
+                            facebookLogin(response.accessToken);
+                        }
+                    }}
+                    onFail={(error) => {
+                        console.error('Facebook Login Failed:', error);
+                    }}
+                    render={({ onClick }) => (
+                        <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={onClick}
+                            disabled={isLoading}
+                        >
+                            <svg className="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                            </svg>
+                            Facebook
+                        </Button>
+                    )}
+                />
             </div>
         </div>
     );
