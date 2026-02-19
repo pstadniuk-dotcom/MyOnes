@@ -1,5 +1,5 @@
 import { db } from '../../infra/db/db';
-import { passwordResetTokens } from '@shared/schema';
+import { passwordResetTokens, emailVerificationTokens } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
 export class AuthRepository {
@@ -29,6 +29,35 @@ export class AuthRepository {
             .update(passwordResetTokens)
             .set({ used: true })
             .where(eq(passwordResetTokens.token, token));
+    }
+
+    // Email Verification tokens
+    async createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void> {
+        await db.insert(emailVerificationTokens).values({
+            userId,
+            token,
+            expiresAt,
+        });
+    }
+
+    async getEmailVerificationToken(token: string): Promise<{ userId: string; expiresAt: Date } | undefined> {
+        const [result] = await db
+            .select()
+            .from(emailVerificationTokens)
+            .where(eq(emailVerificationTokens.token, token));
+        if (!result) return undefined;
+        return {
+            userId: result.userId,
+            expiresAt: result.expiresAt,
+        };
+    }
+
+    async deleteEmailVerificationToken(token: string): Promise<void> {
+        await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.token, token));
+    }
+
+    async deleteEmailVerificationTokensByUser(userId: string): Promise<void> {
+        await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.userId, userId));
     }
 }
 

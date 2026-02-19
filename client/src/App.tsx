@@ -16,6 +16,7 @@ import SignupPage from "@/pages/SignupPage";
 import LoginPage from "@/pages/LoginPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import SciencePage from "@/pages/SciencePage";
 // ThemeProvider removed: app is light-only
 
@@ -106,6 +107,7 @@ function MainRouter() {
       <Route path="/login" component={LoginPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
+      <Route path="/verify-email" component={VerifyEmailPage} />
 
       {/* Static Pages */}
       <Route path="/about" component={AboutPage} />

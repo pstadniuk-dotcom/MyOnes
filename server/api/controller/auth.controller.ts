@@ -27,7 +27,8 @@ export class AuthController {
                     email: user.email,
                     phone: user.phone,
                     createdAt: user.createdAt.toISOString(),
-                    isAdmin: user.isAdmin || false
+                    isAdmin: user.isAdmin || false,
+                    emailVerified: user.emailVerified
                 },
                 token
             });
@@ -65,7 +66,8 @@ export class AuthController {
                     email: user.email,
                     phone: user.phone,
                     createdAt: user.createdAt.toISOString(),
-                    isAdmin: user.isAdmin || false
+                    isAdmin: user.isAdmin || false,
+                    emailVerified: user.emailVerified
                 },
                 token
             });
@@ -97,7 +99,8 @@ export class AuthController {
                     email: user.email,
                     phone: user.phone,
                     createdAt: user.createdAt.toISOString(),
-                    isAdmin: user.isAdmin || false
+                    isAdmin: user.isAdmin || false,
+                    emailVerified: user.emailVerified
                 },
                 token
             });
@@ -123,7 +126,8 @@ export class AuthController {
                     email: user.email,
                     phone: user.phone,
                     createdAt: user.createdAt.toISOString(),
-                    isAdmin: user.isAdmin || false
+                    isAdmin: user.isAdmin || false,
+                    emailVerified: user.emailVerified
                 },
                 token
             });
@@ -155,7 +159,8 @@ export class AuthController {
                     postalCode: user.postalCode,
                     country: user.country,
                     createdAt: user.createdAt.toISOString(),
-                    isAdmin: user.isAdmin || false
+                    isAdmin: user.isAdmin || false,
+                    emailVerified: user.emailVerified
                 }
             });
         } catch (error) {
@@ -197,6 +202,53 @@ export class AuthController {
             res.json({ message: 'Password reset successful. You can now log in with your new password.' });
         } catch (error: any) {
             logger.error('Reset password error', { error: error.message });
+            res.status(400).json({ error: error.message });
+        }
+    }
+
+    async verifyEmail(req: Request, res: Response) {
+        try {
+            const { token } = req.body;
+            if (!token) return res.status(400).json({ error: 'Token is required' });
+
+            const user = await authService.verifyEmail(token);
+            if (!user) return res.status(400).json({ error: 'Verification failed' });
+
+            res.json({
+                message: 'Email verified successfully',
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    emailVerified: user.emailVerified,
+                    createdAt: user.createdAt.toISOString()
+                }
+            });
+        } catch (error: any) {
+            logger.error('Verify email error', { error: error.message });
+            res.status(400).json({ error: error.message });
+        }
+    }
+
+    async resendVerification(req: Request, res: Response) {
+        try {
+            const userId = req.userId;
+            if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+            const clientIP = getClientIP(req);
+            const rateLimit = checkRateLimit(`resend-verification-${clientIP}`, 3, 15 * 60 * 1000);
+            if (!rateLimit.allowed) {
+                return res.status(429).json({
+                    error: 'Too many verification requests. Please try again later.',
+                    retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
+                });
+            }
+
+            await authService.resendVerification(userId);
+
+            res.json({ message: 'Verification email resent successfully' });
+        } catch (error: any) {
+            logger.error('Resend verification error', { error: error.message });
             res.status(400).json({ error: error.message });
         }
     }

@@ -93,6 +93,8 @@ export const users = pgTable("users", {
   stripeCustomerId: text("stripe_customer_id"), // Stripe customer ID for billing
   stripeSubscriptionId: text("stripe_subscription_id"), // Stripe subscription ID
 
+  emailVerified: boolean("email_verified").default(false).notNull(),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -103,6 +105,15 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   token: text("token").notNull().unique(),
   expiresAt: timestamp("expires_at").notNull(),
   used: boolean("used").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Email verification tokens
+export const emailVerificationTokens = pgTable("email_verification_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -623,6 +634,7 @@ export const authResponseSchema = z.object({
     phone: z.string().nullable(),
     createdAt: z.string(),
     isAdmin: z.boolean().optional(),
+    emailVerified: z.boolean(),
   }),
   token: z.string(),
 });

@@ -154,7 +154,6 @@ export async function sendNotificationEmail(notification: EmailNotification): Pr
       console.error('❌ SendGrid not configured: Missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL environment variables');
       return false;
     }
-    console.log('sendgrid api key ', process.env.SENDGRID_API_KEY, SENDGRID_API_KEY)
 
     const msg = {
       to: notification.to,

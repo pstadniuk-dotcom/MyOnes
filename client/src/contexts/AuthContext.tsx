@@ -12,6 +12,7 @@ interface User {
   phone: string | null;
   createdAt: string;
   isAdmin: boolean;
+  emailVerified: boolean;
 }
 
 interface AuthContextType {
@@ -23,6 +24,8 @@ interface AuthContextType {
   login: (data: LoginData) => Promise<void>;
   googleLogin: (token: string) => Promise<void>;
   facebookLogin: (token: string) => Promise<void>;
+  verifyEmail: (token: string) => Promise<void>;
+  resendVerification: () => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -171,12 +174,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       toast({
         title: "Welcome to ONES!",
-        description: "Your account has been created successfully.",
+        description: "Your account has been created. Please check your email to verify your account.",
         variant: "default"
       });
 
-      // Redirect to dashboard
-      setLocation('/dashboard');
+      // Redirect to email verification notice page
+      setLocation('/verify-email');
 
     } catch (error: any) {
       console.error('Signup error:', error);
@@ -221,8 +224,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         variant: "default"
       });
 
-      // Redirect to dashboard
-      setLocation('/dashboard');
+      // Redirect to appropriate page
+      if (!data.user.emailVerified) {
+        setLocation('/verify-email');
+      } else {
+        setLocation('/dashboard');
+      }
 
     } catch (error: any) {
       console.error('Login error:', error);
@@ -267,8 +274,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         variant: "default"
       });
 
-      // Redirect to dashboard
-      setLocation('/dashboard');
+      // Redirect to appropriate page
+      if (!data.user.emailVerified) {
+        setLocation('/verify-email');
+      } else {
+        setLocation('/dashboard');
+      }
 
     } catch (error: any) {
       console.error('Google login error:', error);
@@ -326,6 +337,80 @@ export function AuthProvider({ children }: AuthProviderProps) {
       throw error;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const verifyEmail = async (verificationToken: string) => {
+    try {
+      setIsLoading(true);
+      const response = await apiRequest('/api/auth/verify-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: verificationToken }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Email verification failed');
+      }
+
+      // Update local user state
+      setUser(data.user);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      toast({
+        title: "Email Verified",
+        description: "Your email has been verified successfully.",
+        variant: "default"
+      });
+
+    } catch (error: any) {
+      console.error('Email verification error:', error);
+      toast({
+        title: "Verification Failed",
+        description: error.message || "Invalid or expired verification link.",
+        variant: "destructive"
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    try {
+      if (!token) throw new Error('You must be logged in to resend verification');
+
+      const response = await apiRequest('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to resend verification email');
+      }
+
+      toast({
+        title: "Email Sent",
+        description: "A new verification link has been sent to your email address.",
+        variant: "default"
+      });
+
+    } catch (error: any) {
+      console.error('Resend verification error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Could not resend verification email.",
+        variant: "destructive"
+      });
+      throw error;
     }
   };
 
@@ -399,6 +484,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     googleLogin,
     facebookLogin,
+    verifyEmail,
+    resendVerification,
     logout,
     refreshUser,
   };
