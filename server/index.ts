@@ -6,6 +6,7 @@ import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startSmsReminderScheduler } from "./utils/smsReminderScheduler";
+import { startAutoOptimizeScheduler } from "./utils/autoOptimizeScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
 
@@ -194,6 +195,9 @@ app.use((req, res, next) => {
 
       // Start SMS reminder scheduler
       startSmsReminderScheduler();
+
+      // Start auto-optimize formula drift scheduler (daily at 9am UTC)
+      startAutoOptimizeScheduler();
 
       // Note: Wearable data sync is now handled via Junction webhooks
       // No polling schedulers needed - data is pushed to /api/webhooks/junction

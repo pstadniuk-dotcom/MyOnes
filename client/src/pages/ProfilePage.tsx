@@ -42,6 +42,57 @@ import { apiRequest, queryClient, getAuthHeaders } from '@/shared/lib/queryClien
 import { buildApiUrl } from '@/shared/lib/api';
 import type { User as UserType, HealthProfile } from '@shared/schema';
 
+// ── Formula Preferences card (auto-optimize toggle) ─────────────────────────
+function FormulaPreferencesCard() {
+  const { data, isLoading } = useQuery<{ autoOptimizeFormula: boolean }>({
+    queryKey: ['/api/users/me/auto-optimize'],
+    queryFn: () => apiRequest('GET', '/api/users/me/auto-optimize').then((r: Response) => r.json()),
+    staleTime: 60_000,
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiRequest('PATCH', '/api/users/me/auto-optimize', { enabled }).then((r: Response) => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/auto-optimize'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/formulas/review-status'] });
+    },
+  });
+
+  return (
+    <Card data-testid="section-formula-preferences" className="bg-[#FAF7F2] border-[#52796F]/20">
+      <CardHeader>
+        <CardTitle className="text-[#1B4332]">Formula Preferences</CardTitle>
+        <CardDescription className="text-[#52796F]">
+          Control how your formula is updated when new health data is detected
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <p className="text-sm font-medium text-[#1B4332]">Auto-optimize formula</p>
+            <p className="text-xs text-[#52796F] mt-0.5">
+              {data?.autoOptimizeFormula
+                ? 'Formula updates automatically when new data is detected — you\'ll be notified by email and SMS'
+                : 'You\'ll be notified when a review is recommended, but your formula won\'t change until you approve'}
+            </p>
+          </div>
+          {isLoading ? (
+            <Skeleton className="h-6 w-11 rounded-full" />
+          ) : (
+            <Switch
+              checked={data?.autoOptimizeFormula ?? false}
+              onCheckedChange={(enabled) => toggleMutation.mutate(enabled)}
+              disabled={toggleMutation.isPending}
+              data-testid="toggle-auto-optimize"
+            />
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // Loading skeleton components
 function ProfileSkeleton() {
   return (
@@ -625,6 +676,10 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Formula Preferences */}
+          <FormulaPreferencesCard />
+
         </TabsContent>
 
         <TabsContent value="health" className="space-y-6">

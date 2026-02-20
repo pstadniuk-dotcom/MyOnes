@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/shared/components/ui/alert-dialog';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest, queryClient } from '@/shared/lib/queryClient';
@@ -71,6 +71,54 @@ const getStatusColor = (status: string) => {
       return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
   }
 };
+
+// ── Pre-reorder review gate ────────────────────────────────────────────────
+interface ReviewStatus {
+  needsReview: boolean;
+  reasons: string[];
+  driftScore: number;
+  autoOptimizeEnabled: boolean;
+}
+
+function PreReorderReviewGate() {
+  const qc = useQueryClient();
+  const { data: status } = useQuery<ReviewStatus>({
+    queryKey: ['/api/formulas/review-status'],
+    queryFn: () => apiRequest('GET', '/api/formulas/review-status').then((r: Response) => r.json()),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (!status?.needsReview) return null;
+
+  return (
+    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 mb-2">
+      <div className="flex items-start gap-2">
+        <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-amber-800">
+            Formula review recommended before this shipment
+          </p>
+          {status.reasons.length > 0 && (
+            <ul className="mt-1 space-y-0.5">
+              {status.reasons.map((r, i) => (
+                <li key={i} className="text-xs text-amber-700 flex items-start gap-1">
+                  <span className="mt-1 h-1 w-1 rounded-full bg-amber-500 shrink-0" />
+                  {r}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <a
+          href="/dashboard/chat?context=formula-review"
+          className="shrink-0 text-xs font-medium text-amber-700 underline underline-offset-2 hover:text-amber-900"
+        >
+          Review now
+        </a>
+      </div>
+    </div>
+  );
+}
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState('subscription');
@@ -359,7 +407,8 @@ export default function OrdersPage() {
                 Upcoming Delivery
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <PreReorderReviewGate />
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium text-[#1B4332]">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
