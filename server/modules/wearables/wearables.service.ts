@@ -1,4 +1,5 @@
 import { wearablesRepository } from './wearables.repository';
+import { storage } from '../../storage';
 import logger from '../../infra/logging/logger';
 import {
     getOrCreateJunctionUser,
@@ -452,6 +453,103 @@ export class WearablesService {
             success: true,
             data: historicalData,
             statistics: stats,
+        };
+    }
+
+    async getHealthPulseSummary(userId: string) {
+        const junctionUserId = await wearablesRepository.getJunctionUserId(userId);
+
+        // Get 7 days of wearable data + latest lab analyses in parallel
+        const endDate = new Date().toISOString().split('T')[0];
+        const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        const [sleepData, activityData, bodyData, labAnalyses] = await Promise.all([
+            junctionUserId ? getSleepData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
+            junctionUserId ? getActivityData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
+            junctionUserId ? getBodyData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
+            storage.listLabAnalysesByUser(userId).catch(() => []),
+        ]);
+
+        // Check connected providers
+        let providers: string[] = [];
+        if (junctionUserId) {
+            try {
+                const connected = await getConnectedProviders(junctionUserId);
+                providers = connected.filter((p: any) => p.status === 'connected').map((p: any) => PROVIDER_DISPLAY_NAMES[PROVIDER_MAP[p.slug]] || p.name);
+            } catch {
+                providers = [];
+            }
+        }
+
+        // Build date-keyed map of the last 7 days
+        const dateMap = new Map<string, { sleepMinutes: number | null; deepSleepMinutes: number | null; hrv: number | null; sleepScore: number | null; steps: number | null; activeMinutes: number | null }>();
+
+        // Initialise each of the 7 days with nulls so we have full arrays even without data
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            dateMap.set(d, { sleepMinutes: null, deepSleepMinutes: null, hrv: null, sleepScore: null, steps: null, activeMinutes: null });
+        }
+
+        // Fill sleep data (uses Junction normalized format: duration_total_seconds, average_hrv, sleep_efficiency)
+        for (const s of sleepData as any[]) {
+            const date = s.calendar_date || s.calendarDate || s.date?.split('T')[0];
+            if (!date || !dateMap.has(date)) continue;
+            const entry = dateMap.get(date)!;
+            if (s.duration_total_seconds) entry.sleepMinutes = Math.round(s.duration_total_seconds / 60);
+            if (s.duration_deep_sleep_seconds) entry.deepSleepMinutes = Math.round(s.duration_deep_sleep_seconds / 60);
+            if (s.average_hrv) entry.hrv = Math.round(s.average_hrv);
+            if (s.sleep_efficiency) entry.sleepScore = Math.round(s.sleep_efficiency * 100);
+            // Fallback for older format
+            if (!entry.sleepMinutes && s.duration) entry.sleepMinutes = Math.round(s.duration / 60);
+            if (!entry.hrv && (s.hrv?.avgHrv || s.hrvAvg)) entry.hrv = Math.round(s.hrv?.avgHrv || s.hrvAvg);
+        }
+
+        // Fill activity data
+        for (const a of activityData as any[]) {
+            const date = a.calendar_date || a.calendarDate || a.date?.split('T')[0];
+            if (!date || !dateMap.has(date)) continue;
+            const entry = dateMap.get(date)!;
+            if (a.steps) entry.steps = a.steps;
+            if (a.active_duration_seconds) entry.activeMinutes = Math.round(a.active_duration_seconds / 60);
+            else if (a.activeMinutes) entry.activeMinutes = a.activeMinutes;
+        }
+
+        const sortedDates = Array.from(dateMap.keys()).sort();
+        const today = sortedDates[sortedDates.length - 1];
+        const todayEntry = dateMap.get(today)!;
+
+        // Lab markers from most recent analysis
+        const latestLab = labAnalyses[0] || null;
+        const labMarkers = latestLab?.extractedMarkers
+            ? (latestLab.extractedMarkers as any[]).slice(0, 8).map((m: any) => ({
+                name: m.name,
+                value: m.value,
+                unit: m.unit || '',
+                status: m.status || 'normal',
+                referenceRange: m.referenceRange || '',
+            }))
+            : [];
+
+        return {
+            connected: providers.length > 0,
+            providers,
+            today: {
+                sleepMinutes: todayEntry.sleepMinutes,
+                deepSleepMinutes: todayEntry.deepSleepMinutes,
+                sleepScore: todayEntry.sleepScore,
+                hrvMs: todayEntry.hrv,
+                steps: todayEntry.steps,
+                activeMinutes: todayEntry.activeMinutes,
+            },
+            trends: {
+                dates: sortedDates,
+                sleepMinutes: sortedDates.map(d => dateMap.get(d)!.sleepMinutes),
+                hrv: sortedDates.map(d => dateMap.get(d)!.hrv),
+                steps: sortedDates.map(d => dateMap.get(d)!.steps),
+            },
+            labMarkers,
+            labReportDate: latestLab?.processedAt ? new Date(latestLab.processedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null,
+            lastUpdated: new Date().toISOString(),
         };
     }
 

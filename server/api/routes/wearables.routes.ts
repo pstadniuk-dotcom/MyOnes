@@ -54,4 +54,9 @@ router.get('/available-providers', requireAuth, wearablesController.getAvailable
  */
 router.get('/historical-data', requireAuth, wearablesController.getHistoricalData);
 
+/**
+ * Get health pulse summary: today's snapshot + 7-day trends + latest lab markers
+ */
+router.get('/health-pulse', requireAuth, wearablesController.getHealthPulseSummary);
+
 export default router;

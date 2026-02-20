@@ -53,6 +53,9 @@ router.delete('/:formulaId/review-schedule', requireAuth, formulasController.del
 // Download .ics calendar file for review schedule
 router.get('/:formulaId/review-schedule/calendar', requireAuth, formulasController.downloadCalendar);
 
+// Get formula drift / review status
+router.get('/review-status', requireAuth, formulasController.getReviewStatus);
+
 // Public endpoint - Get shared formula by ID (no auth required)
 router.get('/shared/:formulaId', formulasController.getSharedFormula);
 

@@ -21,6 +21,8 @@ import type { Formula } from '@shared/schema';
 import { calculateDosage, CAPSULE_TIER_INFO, type CapsuleCount } from '@/shared/lib/utils';
 import { useState } from 'react';
 import { ProfileCompletionDialog } from '@/features/auth/components/ProfileCompletionDialog';
+import { HealthPulseCard } from '@/features/dashboard/components/HealthPulseCard';
+import FormulaReviewBanner from '@/features/dashboard/components/FormulaReviewBanner';
 
 // Map next actions to their appropriate routes
 function getNextActionRoute(nextAction: string): string {
@@ -395,41 +397,47 @@ export default function HomePage() {
         </Card>
       )}
 
+      {/* Formula drift / review banner — only shown when review is recommended */}
+      {currentFormula && <FormulaReviewBanner />}
+
+      {/* Health Pulse: wearable snapshot + lab markers — always visible */}
+      <HealthPulseCard />
+
       {/* Quick Actions for Users with Formula - V2 Styled */}
       {!isNewUser && currentFormula && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-upload-labs">
-            <Link href="/dashboard/lab-reports">
-              <CardHeader className="space-y-0 pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
-                  <Upload className="w-4 h-4 text-[#1B4332]" />
-                  Upload Lab Results
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-[#52796F]">
-                  Add blood tests for better formula optimization
-                </p>
-              </CardContent>
-            </Link>
-          </Card>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-upload-labs">
+              <Link href="/dashboard/lab-reports">
+                <CardHeader className="space-y-0 pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
+                    <Upload className="w-4 h-4 text-[#1B4332]" />
+                    Upload Lab Results
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-[#52796F]">
+                    Add blood tests for better formula optimization
+                  </p>
+                </CardContent>
+              </Link>
+            </Card>
 
-          <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-view-orders">
-            <Link href="/dashboard/orders">
-              <CardHeader className="space-y-0 pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
-                  <Package className="w-4 h-4 text-[#1B4332]" />
-                  View Orders
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-[#52796F]">
-                  Track your supplement orders and shipping status
-                </p>
-              </CardContent>
-            </Link>
-          </Card>
-        </div>
+            <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-view-orders">
+              <Link href="/dashboard/orders">
+                <CardHeader className="space-y-0 pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
+                    <Package className="w-4 h-4 text-[#1B4332]" />
+                    View Orders
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-[#52796F]">
+                    Track your supplement orders and shipping status
+                  </p>
+                </CardContent>
+              </Link>
+            </Card>
+          </div>
       )}
 
       {/* Promotional/Info Section - V2 Styled */}
