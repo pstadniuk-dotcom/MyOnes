@@ -166,6 +166,63 @@ export class FilesService {
         };
     }
 
+    async updateFile(fileId: string, userId: string, uploadedFile: any, auditInfo: any) {
+        const fileUpload = await this.getFile(fileId, userId);
+
+        // Validate file constraints
+        const maxSizeBytes = 10 * 1024 * 1024;
+        if (uploadedFile.size > maxSizeBytes) {
+            throw new Error(`File too large. Maximum size is 10MB.`);
+        }
+
+        // Upload new content to storage
+        const normalizedPath = await this.objectStorageService.uploadLabReportFile(
+            userId,
+            uploadedFile.data,
+            uploadedFile.name,
+            uploadedFile.mimetype,
+            fileUpload.objectPath
+        );
+
+        // Update metadata
+        await filesRepository.updateFileUpload(fileId, {
+            objectPath: normalizedPath,
+            fileSize: uploadedFile.size,
+            mimeType: uploadedFile.mimetype
+        });
+
+        // Trigger Re-analysis
+        let labDataExtraction = null;
+        if (fileUpload.type === 'lab_report') {
+            try {
+                labDataExtraction = await analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId);
+                if (labDataExtraction) {
+                    await filesRepository.updateFileUpload(fileId, {
+                        labReportData: {
+                            ...labDataExtraction,
+                            analysisStatus: 'completed'
+                        }
+                    });
+                }
+            } catch (error) {
+                logger.error('Lab report analysis failed during update:', error);
+                await filesRepository.updateFileUpload(fileId, {
+                    labReportData: { analysisStatus: 'error' }
+                });
+            }
+        }
+
+        return {
+            id: fileId,
+            name: uploadedFile.name,
+            url: normalizedPath,
+            type: fileUpload.type,
+            size: uploadedFile.size,
+            uploadedAt: new Date(),
+            labData: labDataExtraction
+        };
+    }
+
     async reanalyzeFile(fileId: string, userId: string) {
         const fileUpload = await filesRepository.getFileUpload(fileId);
 

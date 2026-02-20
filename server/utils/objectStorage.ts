@@ -97,21 +97,26 @@ export class ObjectStorageService {
   constructor() { }
 
   // Uploads a lab report file to Supabase Storage
-  async uploadLabReportFile(userId: string, fileBuffer: Buffer, originalFileName: string, contentType: string = 'application/pdf'): Promise<string> {
+  async uploadLabReportFile(userId: string, fileBuffer: Buffer, originalFileName: string, contentType: string = 'application/pdf', existingPath?: string): Promise<string> {
     if (!supabaseStorageClient) {
       throw new Error('File storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
     }
     await enforceConsentRequirements(userId, 'upload');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const objectId = randomUUID();
-    const fileExtension = originalFileName.split('.').pop() || 'pdf';
-    const fileName = `${timestamp}_${objectId}.${fileExtension}`;
-    const filePath = `${userId}/${fileName}`;
+
+    let filePath = existingPath;
+    if (!filePath) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const objectId = randomUUID();
+      const fileExtension = originalFileName.split('.').pop() || 'pdf';
+      const fileName = `${timestamp}_${objectId}.${fileExtension}`;
+      filePath = `${userId}/${fileName}`;
+    }
+
     const { data, error } = await supabaseStorageClient
       .from(LAB_REPORTS_BUCKET)
       .upload(filePath, fileBuffer, {
         contentType,
-        upsert: false
+        upsert: true
       });
     if (error) throw new Error(`Supabase upload error: ${error.message}`);
     return filePath;
