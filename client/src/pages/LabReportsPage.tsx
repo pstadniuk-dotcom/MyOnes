@@ -8,7 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
-import { FileText, Plus, Trash2, Download, Loader2, Upload, ClipboardPaste } from 'lucide-react';
+import { FileText, Plus, Trash2, Download, Loader2, Upload, ClipboardPaste, Eye, Edit2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/shared/hooks/use-toast';
@@ -48,6 +48,9 @@ export default function LabReportsPage() {
   const [showManualEntryDialog, setShowManualEntryDialog] = useState(false);
   const [manualEntryText, setManualEntryText] = useState('');
   const [selectedTestType, setSelectedTestType] = useState<'blood_test'>('blood_test');
+  const [editingFileId, setEditingFileId] = useState<string | null>(null);
+  const [loadingFiles, setLoadingFiles] = useState<Set<string>>(new Set());
+  const [editingFiles, setEditingFiles] = useState<Set<string>>(new Set());
 
   // Fetch user consents
   const { data: consents, isLoading: consentsLoading, error: consentsError } = useQuery<UserConsent[]>({
@@ -239,8 +242,8 @@ export default function LabReportsPage() {
       return;
     }
 
-    // Check if user has consent before uploading
-    if (!hasLabDataConsent) {
+    // Check if user has consent before uploading (only for new entries)
+    if (!hasLabDataConsent && !editingFileId) {
       console.log('Manual entry needs consent, showing dialog');
       setShowManualEntryDialog(false);
       // Create the file and store it as pending
@@ -263,17 +266,24 @@ export default function LabReportsPage() {
 
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('type', 'lab_report');
-      formData.append('testType', selectedTestType);
-      formData.append('metadata', JSON.stringify({
-        uploadSource: 'manual-entry',
-        testType: selectedTestType,
-        originalName: fileName,
-        manualEntry: true
-      }));
 
-      const response = await fetch(buildApiUrl('/api/files/upload'), {
-        method: 'POST',
+      if (!editingFileId) {
+        formData.append('type', 'lab_report');
+        formData.append('testType', selectedTestType);
+        formData.append('metadata', JSON.stringify({
+          uploadSource: 'manual-entry',
+          testType: selectedTestType,
+          originalName: fileName,
+          manualEntry: true
+        }));
+      }
+
+      const url = editingFileId
+        ? buildApiUrl(`/api/files/${editingFileId}`)
+        : buildApiUrl('/api/files/upload');
+
+      const response = await fetch(url, {
+        method: editingFileId ? 'PUT' : 'POST',
         headers: getAuthHeaders(),
         body: formData,
         credentials: 'include'
@@ -281,10 +291,10 @@ export default function LabReportsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        console.log('Manual entry upload error:', response.status, error);
+        console.log('Manual entry save error:', response.status, error);
 
         // Check for consent error
-        if (response.status === 403) {
+        if (response.status === 403 && !editingFileId) {
           console.log('403 error on manual entry, showing consent dialog');
           setIsUploading(false);
           setPendingFile(file);
@@ -296,18 +306,21 @@ export default function LabReportsPage() {
           return;
         }
 
-        throw new Error(error.error || 'Upload failed');
+        throw new Error(error.error || 'Save failed');
       }
 
       await queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
 
       toast({
-        title: "Lab results saved",
-        description: "Your manually entered results have been saved successfully.",
+        title: editingFileId ? "Lab results updated" : "Lab results saved",
+        description: editingFileId
+          ? "Your changes have been saved successfully."
+          : "Your manually entered results have been saved successfully.",
       });
 
-      // Reset manual entry
+      // Reset manual entry and editing state
       setManualEntryText('');
+      setEditingFileId(null);
     } catch (error: any) {
       toast({
         title: "Save failed",
@@ -316,6 +329,68 @@ export default function LabReportsPage() {
       });
     } finally {
       setIsUploading(false);
+    }
+  };
+  const handleEditReport = async (report: FileUpload) => {
+    if (report.mimeType === 'text/plain') {
+      setEditingFiles(prev => new Set(prev).add(report.id));
+      try {
+        const response = await fetch(buildApiUrl(`/api/files/${report.id}/download`), {
+          headers: getAuthHeaders(),
+          credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Failed to fetch file content');
+        const text = await response.text();
+        setManualEntryText(text);
+        setEditingFileId(report.id);
+        setShowManualEntryDialog(true);
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: "Could not load report content for editing.",
+          variant: "destructive",
+        });
+      } finally {
+        setEditingFiles(prev => {
+          const next = new Set(prev);
+          next.delete(report.id);
+          return next;
+        });
+      }
+    }
+  };
+
+  const handleViewFile = async (fileId: string) => {
+    setLoadingFiles(prev => new Set(prev).add(fileId));
+    try {
+      const response = await fetch(buildApiUrl(`/api/files/${fileId}/download`), {
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch file');
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      window.open(objectUrl, '_blank');
+
+      // We can't automatically revoke it since it's used in a new window, 
+      // but it will be cleaned up when the page is unloaded.
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Could not open the report. Please try again.",
+        variant: "destructive",
+      });
+      console.error('View file error:', error);
+    } finally {
+      setLoadingFiles(prev => {
+        const next = new Set(prev);
+        next.delete(fileId);
+        return next;
+      });
     }
   };
 
@@ -371,7 +446,11 @@ export default function LabReportsPage() {
               )}
             </Button>
             <Button
-              onClick={() => setShowManualEntryDialog(true)}
+              onClick={() => {
+                setEditingFileId(null);
+                setManualEntryText('');
+                setShowManualEntryDialog(true);
+              }}
               disabled={isUploading}
               variant="outline"
               data-testid="button-manual-entry"
@@ -405,7 +484,7 @@ export default function LabReportsPage() {
                   <CardContent className="pt-4 px-3 sm:px-6">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
                       <div className="min-w-0 flex-1">
-                        <h4 className="font-medium text-[#1B4332] truncate">{report.originalFileName}</h4>
+                        <h4 className="font-medium text-[#1B4332] truncate text-lg">{report.originalFileName}</h4>
                         <p className="text-sm text-[#52796F]">
                           Uploaded on {new Date(report.uploadedAt).toLocaleDateString()}
                         </p>
@@ -424,8 +503,39 @@ export default function LabReportsPage() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 flex-shrink-0"
+                          onClick={() => handleViewFile(report.id)}
+                          disabled={loadingFiles.has(report.id)}
+                          title="View Report"
+                        >
+                          {loadingFiles.has(report.id) ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-[#1B4332]" />
+                          ) : (
+                            <Eye className="w-4 h-4 text-[#1B4332]" />
+                          )}
+                        </Button>
+                        {report.mimeType === 'text/plain' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 flex-shrink-0"
+                            onClick={() => handleEditReport(report)}
+                            disabled={editingFiles.has(report.id)}
+                            title="Edit Report"
+                          >
+                            {editingFiles.has(report.id) ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-[#1B4332]" />
+                            ) : (
+                              <Edit2 className="w-4 h-4 text-[#1B4332]" />
+                            )}
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 flex-shrink-0"
                           onClick={() => setFileToDelete(report.id)}
                           data-testid={`button-delete-${report.id}`}
+                          title="Delete Report"
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
@@ -511,9 +621,11 @@ export default function LabReportsPage() {
       <Dialog open={showManualEntryDialog} onOpenChange={setShowManualEntryDialog}>
         <DialogContent className="max-w-2xl" data-testid="dialog-manual-entry">
           <DialogHeader>
-            <DialogTitle>Paste Lab Results</DialogTitle>
+            <DialogTitle>{editingFileId ? 'Edit Lab Results' : 'Paste Lab Results'}</DialogTitle>
             <DialogDescription>
-              Copy and paste your lab results directly from your test report or doctor's portal.
+              {editingFileId
+                ? 'Update your lab results. Our AI will re-analyze the data to optimize your formula.'
+                : 'Copy and paste your lab results directly from your test report or doctor\'s portal.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -553,6 +665,7 @@ export default function LabReportsPage() {
               onClick={() => {
                 setShowManualEntryDialog(false);
                 setManualEntryText('');
+                setEditingFileId(null);
               }}
               data-testid="button-manual-entry-cancel"
             >

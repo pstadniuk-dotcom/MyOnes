@@ -63,6 +63,38 @@ export class FilesController {
         }
     }
 
+    async updateFile(req: Request, res: Response) {
+        const userId = req.userId!;
+        const fileId = req.params.fileId;
+        const auditInfo = {
+            ipAddress: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+            userAgent: req.headers['user-agent']
+        };
+
+        try {
+            if (!req.files || !req.files.file) {
+                return res.status(400).json({ error: 'No file provided for update' });
+            }
+
+            const uploadedFile = Array.isArray(req.files.file) ? req.files.file[0] : req.files.file;
+            const result = await filesService.updateFile(fileId, userId, uploadedFile, auditInfo);
+            res.json(result);
+
+        } catch (error) {
+            logger.error('File update error:', error);
+            const message = error instanceof Error ? error.message : 'Failed to update file';
+            if (message === 'File not found') {
+                res.status(404).json({ error: message });
+            } else if (message === 'Access denied') {
+                res.status(403).json({ error: message });
+            } else if (message.includes('File too large')) {
+                res.status(400).json({ error: message });
+            } else {
+                res.status(500).json({ error: 'Failed to update file', details: message });
+            }
+        }
+    }
+
     async reanalyzeFile(req: Request, res: Response) {
         try {
             const result = await filesService.reanalyzeFile(req.params.fileId, req.userId!);
