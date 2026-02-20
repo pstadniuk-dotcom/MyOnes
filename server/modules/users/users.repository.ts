@@ -9,8 +9,9 @@ import {
     type PaymentMethodRef, type InsertPaymentMethodRef,
     type Formula
 } from '@shared/schema';
-import { eq, and, desc, isNull } from 'drizzle-orm';
+import { eq, and, desc, isNull, inArray, sql, lt, lte, gt } from 'drizzle-orm';
 import { decryptField, encryptField } from 'server/infra/security/fieldEncryption';
+import { newsletterSubscribers, userStreaks, type NewsletterSubscriber, type InsertNewsletterSubscriber } from '@shared/schema';
 
 export class UsersRepository {
     // User operations
@@ -312,15 +313,262 @@ export class UsersRepository {
         return result.length > 0;
     }
 
-    // Formula operations (user-specific)
-    async getCurrentFormulaByUser(userId: string): Promise<Formula | undefined> {
-        const [formula] = await db
-            .select()
-            .from(formulas)
-            .where(and(eq(formulas.userId, userId), isNull(formulas.archivedAt)))
-            .orderBy(desc(formulas.createdAt))
-            .limit(1);
-        return formula || undefined;
+    // Newsletter subscriber operations
+    async getNewsletterSubscriberByEmail(email: string): Promise<NewsletterSubscriber | undefined> {
+        try {
+            const normalizedEmail = email.trim().toLowerCase();
+            const [subscriber] = await db
+                .select()
+                .from(newsletterSubscribers)
+                .where(eq(newsletterSubscribers.email, normalizedEmail));
+            return subscriber || undefined;
+        } catch (error) {
+            console.error('Error getting newsletter subscriber:', error);
+            return undefined;
+        }
+    }
+
+    async createNewsletterSubscriber(insertSubscriber: InsertNewsletterSubscriber): Promise<NewsletterSubscriber> {
+        try {
+            const normalizedEmail = insertSubscriber.email.trim().toLowerCase();
+            const [subscriber] = await db
+                .insert(newsletterSubscribers)
+                .values({ email: normalizedEmail })
+                .returning();
+            return subscriber;
+        } catch (error) {
+            console.error('Error creating newsletter subscriber:', error);
+            throw error;
+        }
+    }
+
+    async reactivateNewsletterSubscriber(email: string): Promise<boolean> {
+        try {
+            const normalizedEmail = email.trim().toLowerCase();
+            await db
+                .update(newsletterSubscribers)
+                .set({ isActive: true })
+                .where(eq(newsletterSubscribers.email, normalizedEmail));
+            return true;
+        } catch (error) {
+            console.error('Error reactivating newsletter subscriber:', error);
+            return false;
+        }
+    }
+
+    // Streak Rewards operations
+    private calculateDiscountTier(streakDays: number): { discount: number; tier: string } {
+        if (streakDays >= 90) return { discount: 20, tier: 'Champion' };
+        if (streakDays >= 60) return { discount: 15, tier: 'Loyal' };
+        if (streakDays >= 30) return { discount: 10, tier: 'Dedicated' };
+        if (streakDays >= 14) return { discount: 8, tier: 'Committed' };
+        if (streakDays >= 7) return { discount: 5, tier: 'Consistent' };
+        return { discount: 0, tier: 'Building' };
+    }
+
+    async getStreakRewards(userId: string): Promise<{
+        currentStreak: number;
+        discountEarned: number;
+        discountTier: string;
+        lastOrderDate: Date | null;
+        reorderWindowStart: Date | null;
+        reorderDeadline: Date | null;
+        streakStatus: 'building' | 'ready' | 'warning' | 'grace' | 'lapsed';
+        daysUntilReorderWindow: number | null;
+        daysUntilDeadline: number | null;
+    }> {
+        try {
+            // Get streak from user_streaks table (supplements streak)
+            const [streak] = await db
+                .select()
+                .from(userStreaks)
+                .where(and(
+                    eq(userStreaks.userId, userId),
+                    inArray(userStreaks.streakType, ['supplements', 'overall'])
+                ))
+                .orderBy(desc(userStreaks.streakType))
+                .limit(1);
+
+            const [user] = await db.select().from(users).where(eq(users.id, userId));
+
+            const currentStreak = streak?.currentStreak || 0;
+            const { discount, tier } = this.calculateDiscountTier(currentStreak);
+            const now = new Date();
+
+            // Calculate days until reorder window and deadline
+            let daysUntilReorderWindow: number | null = null;
+            let daysUntilDeadline: number | null = null;
+
+            if (user?.reorderWindowStart) {
+                const windowDiff = Math.ceil((user.reorderWindowStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                daysUntilReorderWindow = windowDiff > 0 ? windowDiff : 0;
+            }
+
+            if (user?.reorderDeadline) {
+                const deadlineDiff = Math.ceil((user.reorderDeadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                daysUntilDeadline = deadlineDiff > 0 ? deadlineDiff : 0;
+            }
+
+            return {
+                currentStreak,
+                discountEarned: discount,
+                discountTier: tier,
+                lastOrderDate: user?.lastOrderDate || null,
+                reorderWindowStart: user?.reorderWindowStart || null,
+                reorderDeadline: user?.reorderDeadline || null,
+                streakStatus: (user?.streakStatus as any) || 'building',
+                daysUntilReorderWindow,
+                daysUntilDeadline,
+            };
+        } catch (error) {
+            console.error('Error getting streak rewards:', error);
+            return {
+                currentStreak: 0,
+                discountEarned: 0,
+                discountTier: 'Building',
+                lastOrderDate: null,
+                reorderWindowStart: null,
+                reorderDeadline: null,
+                streakStatus: 'building',
+                daysUntilReorderWindow: null,
+                daysUntilDeadline: null,
+            };
+        }
+    }
+
+    async updateStreakProgress(userId: string, supplementsComplete: boolean): Promise<void> {
+        try {
+            if (!supplementsComplete) return; // Only increment on complete days
+
+            const [user] = await db.select().from(users).where(eq(users.id, userId));
+            if (!user) return;
+
+            const newStreak = (user.streakCurrentDays || 0) + 1;
+            const { discount } = this.calculateDiscountTier(newStreak);
+
+            await db
+                .update(users)
+                .set({
+                    streakCurrentDays: newStreak,
+                    streakDiscountEarned: discount,
+                })
+                .where(eq(users.id, userId));
+
+            console.log(`🔥 Streak updated for user ${userId}: ${newStreak} days, ${discount}% discount`);
+        } catch (error) {
+            console.error('Error updating streak progress:', error);
+        }
+    }
+
+    async applyStreakDiscount(userId: string, orderId: string): Promise<number> {
+        try {
+            const [user] = await db.select().from(users).where(eq(users.id, userId));
+            if (!user) return 0;
+
+            const discountToApply = user.streakDiscountEarned || 0;
+
+            if (discountToApply > 0) {
+                const now = new Date();
+                const reorderWindowStart = new Date(now);
+                reorderWindowStart.setDate(reorderWindowStart.getDate() + 75);
+                const reorderDeadline = new Date(now);
+                reorderDeadline.setDate(reorderDeadline.getDate() + 95);
+
+                // Update user with new order date and calculated reorder windows
+                // Keep the streak going - don't reset it
+                await db
+                    .update(users)
+                    .set({
+                        lastOrderDate: now,
+                        reorderWindowStart,
+                        reorderDeadline,
+                        streakStatus: 'building',
+                    })
+                    .where(eq(users.id, userId));
+
+                console.log(`💰 Applied ${discountToApply}% streak discount to order ${orderId}`);
+            }
+
+            return discountToApply;
+        } catch (error) {
+            console.error('Error applying streak discount:', error);
+            return 0;
+        }
+    }
+
+    async resetStreakForLapsedUsers(): Promise<number> {
+        try {
+            const now = new Date();
+
+            // Find users whose deadline has passed (Day 100+)
+            const gracePeriodEnd = new Date(now);
+            gracePeriodEnd.setDate(gracePeriodEnd.getDate() - 5); // 5 day grace period
+
+            const result = await db
+                .update(users)
+                .set({
+                    streakCurrentDays: 0,
+                    streakDiscountEarned: 0,
+                    streakStatus: 'lapsed',
+                })
+                .where(and(
+                    lt(users.reorderDeadline, gracePeriodEnd),
+                    sql`${users.streakStatus} != 'lapsed'`
+                ))
+                .returning();
+
+            if (result.length > 0) {
+                console.log(`⚠️ Reset streaks for ${result.length} lapsed users`);
+            }
+
+            return result.length;
+        } catch (error) {
+            console.error('Error resetting lapsed streaks:', error);
+            return 0;
+        }
+    }
+
+    async updateStreakStatuses(): Promise<void> {
+        try {
+            const now = new Date();
+
+            // Update to 'ready' - in reorder window (Day 75-85)
+            await db
+                .update(users)
+                .set({ streakStatus: 'ready' })
+                .where(and(
+                    lte(users.reorderWindowStart, now),
+                    gt(users.reorderDeadline, new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000)), // More than 10 days to deadline
+                    sql`${users.streakStatus} = 'building'`
+                ));
+
+            // Update to 'warning' - approaching deadline (Day 86-90)
+            const warningThreshold = new Date(now);
+            warningThreshold.setDate(warningThreshold.getDate() + 10);
+            await db
+                .update(users)
+                .set({ streakStatus: 'warning' })
+                .where(and(
+                    lte(users.reorderWindowStart, now),
+                    lte(users.reorderDeadline, warningThreshold),
+                    gt(users.reorderDeadline, now),
+                    sql`${users.streakStatus} IN ('building', 'ready')`
+                ));
+
+            // Update to 'grace' - past deadline but in grace period (Day 91-95)
+            await db
+                .update(users)
+                .set({ streakStatus: 'grace' })
+                .where(and(
+                    lte(users.reorderDeadline, now),
+                    gt(users.reorderDeadline, new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000)), // Within 5 day grace
+                    sql`${users.streakStatus} IN ('building', 'ready', 'warning')`
+                ));
+
+            console.log('✅ Streak statuses updated');
+        } catch (error) {
+            console.error('Error updating streak statuses:', error);
+        }
     }
 }
 

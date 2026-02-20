@@ -6,7 +6,7 @@
  */
 
 import { optimizeRepository } from "server/modules/optimize/optimize.repository";
-import { storage } from "../storage";
+
 import type { WorkoutLog } from "@shared/schema";
 
 // Types for exercise performance tracking

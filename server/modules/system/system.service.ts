@@ -1,7 +1,7 @@
 import YouTube from "youtube-sr";
 import logger from '../../infra/logging/logger';
 import { systemRepository } from './system.repository';
-import { storage } from '../../storage';
+
 import { getUserLocalMidnight } from '../../utils/timezone';
 import { type InsertAuditLog } from '@shared/schema';
 import { usersRepository } from "../users/users.repository";
@@ -52,7 +52,7 @@ export class SystemService {
     }
 
     async getDebugUserInfo(userId: string) {
-        const user = await storage.getUser(userId);
+        const user = await usersRepository.getUser(userId);
         return {
             serverTime: new Date().toISOString(),
             userFound: !!user,

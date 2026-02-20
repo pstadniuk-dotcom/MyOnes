@@ -4,7 +4,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { storage } from '../../storage';
+import { usersRepository } from '../../modules/users/users.repository';
 import { logger } from '../../infra/logging/logger';
 
 // Extend Express Request type
@@ -88,7 +88,7 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
   }
 
   try {
-    const user = await storage.getUserById(decoded.userId);
+    const user = await usersRepository.getUser(decoded.userId);
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }

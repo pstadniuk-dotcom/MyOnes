@@ -3,7 +3,7 @@ import { chatService } from '../../modules/chat/chat.service';
 import { chatRepository } from '../../modules/chat/chat.repository';
 import { usersRepository } from '../../modules/users/users.repository';
 import { formulasRepository } from '../../modules/formulas/formulas.repository';
-import { storage } from '../../storage';
+
 import { getClientIP, checkRateLimit } from '../middleware/middleware';
 import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
 import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builder';
@@ -238,7 +238,7 @@ export class ChatController {
             if (healthDataMatch) {
                 try {
                     const healthData = JSON.parse(healthDataMatch[1]);
-                    await storage.updateHealthProfile(userId, healthData);
+                    await usersRepository.updateHealthProfile(userId, healthData);
                     healthDataUpdated = true;
                     logger.info('Health profile automatically updated from AI conversation');
 

@@ -65,9 +65,11 @@ export function normalizeModel(provider: 'openai' | 'anthropic', model: string |
     return m;
 }
 
-export async function initializeAiSettings(storage: any) {
+import { systemRepository } from '../../modules/system/system.repository';
+
+export async function initializeAiSettings() {
     try {
-        const saved = await storage.getAppSetting('ai_settings');
+        const saved = await systemRepository.getAppSetting('ai_settings');
         const val = saved?.value as any;
         if (val && (val.provider || val.model)) {
             const provider = String(val.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'anthropic';

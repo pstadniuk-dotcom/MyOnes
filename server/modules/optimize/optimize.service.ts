@@ -3,7 +3,8 @@ import { nanoid } from 'nanoid';
 import { startOfWeek, format, differenceInDays, isSameDay } from 'date-fns';
 import { optimizeRepository } from './optimize.repository';
 import { usersRepository } from '../users/users.repository';
-import { storage } from '../../storage';
+import { filesRepository } from '../files/files.repository';
+import { formulasRepository } from '../formulas/formulas.repository';
 import {
     buildNutritionPlanPrompt,
     buildWorkoutPlanPrompt,
@@ -96,8 +97,8 @@ Meal Plan: ${mealsText}`;
         if (!user) throw new Error('User not found');
 
         const healthProfile = await usersRepository.getHealthProfile(userId);
-        const activeFormula = await usersRepository.getCurrentFormulaByUser(userId);
-        const labAnalyses = await storage.listLabAnalysesByUser(userId);
+        const activeFormula = await formulasRepository.getCurrentFormulaByUser(userId);
+        const labAnalyses = await filesRepository.listLabAnalysesByUser(userId);
 
         const labSummary = labAnalyses.map(analysis => analysis.aiInsights?.summary || '').filter(Boolean).join('\n\n');
 
