@@ -23,10 +23,10 @@ function getEmailTemplate(notification: EmailNotification): string {
   const { title, content, actionUrl, actionText, type } = notification;
 
   const typeConfig: Record<typeof type, { accent: string; icon: string }> = {
-    order_update:          { accent: '#2D9E6B', icon: '📦' },
-    formula_update:        { accent: '#7C3AED', icon: '⚗️' },
-    consultation_reminder: { accent: '#2563EB', icon: '💬' },
-    system:                { accent: '#111827', icon: '🔔' },
+    order_update:          { accent: '#004700', icon: '📦' },
+    formula_update:        { accent: '#004700', icon: '⚗️' },
+    consultation_reminder: { accent: '#004700', icon: '💬' },
+    system:                { accent: '#004700', icon: '🔔' },
   };
 
   const { accent, icon } = typeConfig[type];
@@ -47,8 +47,7 @@ function getEmailTemplate(notification: EmailNotification): string {
 
           <!-- Header -->
           <tr>
-            <td style="background-color:${accent};padding:36px 40px;text-align:center;">
-              <p style="margin:0 0 4px 0;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:600;">ONES AI</p>
+            <td style="background-color:${accent};padding:32px 40px 28px;text-align:center;">
               <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.01em;">${title}</h1>
             </td>
           </tr>
@@ -89,12 +88,17 @@ function getEmailTemplate(notification: EmailNotification): string {
           <!-- Footer -->
           <tr>
             <td style="padding:24px 40px;text-align:center;">
-              <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#111827;">ONES — Personalized AI Supplements</p>
+              <img src="${process.env.FRONTEND_URL || 'https://myones.ai'}/ones-logo-light.svg"
+                   alt="ONES"
+                   width="140"
+                   style="display:block;margin:0 auto 10px;height:auto;"
+              />
+              <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#111827;">Personalized AI Supplements</p>
               <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">Your custom formula, delivered to your door.</p>
               <p style="margin:0;font-size:12px;color:#9ca3af;">
-                <a href="${process.env.APP_URL || 'https://myones.ai'}/dashboard/settings" style="color:#9ca3af;">Manage preferences</a>
+                <a href="${process.env.FRONTEND_URL || 'https://myones.ai'}/dashboard/settings?tab=notifications" style="color:#9ca3af;">Manage preferences</a>
                 &nbsp;·&nbsp;
-                <a href="${process.env.APP_URL || 'https://myones.ai'}" style="color:#9ca3af;">myones.ai</a>
+                <a href="${process.env.FRONTEND_URL || 'https://myones.ai'}" style="color:#9ca3af;">myones.ai</a>
               </p>
             </td>
           </tr>
