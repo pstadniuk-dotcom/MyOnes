@@ -95,6 +95,10 @@ export const users = pgTable("users", {
 
   emailVerified: boolean("email_verified").default(false).notNull(),
 
+  // Formula auto-optimization: when true, system auto-applies AI-suggested changes before reorder
+  // and sends email + SMS notification. Default false = manual review required.
+  autoOptimizeFormula: boolean("auto_optimize_formula").default(false).notNull(),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

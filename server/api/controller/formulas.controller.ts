@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { formulasService } from '../../modules/formulas/formulas.service';
+import { formulaReviewService } from '../../modules/formulas/formula-review.service';
 import logger from '../../infra/logging/logger';
 
 export class FormulasController {
@@ -303,6 +304,16 @@ export class FormulasController {
         } catch (error) {
             logger.error('Error fetching shared formula:', error);
             res.status(500).json({ error: 'Failed to fetch formula' });
+        }
+    }
+    async getReviewStatus(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const status = await formulaReviewService.getReviewStatus(userId);
+            res.json(status);
+        } catch (error) {
+            logger.error('Error fetching formula review status:', error);
+            res.status(500).json({ error: 'Failed to fetch formula review status' });
         }
     }
 }

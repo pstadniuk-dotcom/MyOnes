@@ -161,6 +161,18 @@ export class UsersService {
 
         await usersRepository.updateUserPassword(userId, hashedPassword);
     }
+
+    async updateAutoOptimize(userId: string, enabled: boolean) {
+        const updated = await usersRepository.updateUser(userId, { autoOptimizeFormula: enabled });
+        if (!updated) return undefined;
+        return { autoOptimizeFormula: updated.autoOptimizeFormula };
+    }
+
+    async getAutoOptimize(userId: string) {
+        const user = await usersRepository.getUser(userId);
+        if (!user) return undefined;
+        return { autoOptimizeFormula: user.autoOptimizeFormula ?? false };
+    }
 }
 
 export const usersService = new UsersService();

@@ -24,6 +24,10 @@ router.get('/me/billing-history', requireAuth, usersController.getBillingHistory
 router.get('/me/subscription', requireAuth, usersController.getSubscription);
 router.patch('/me/subscription', requireAuth, usersController.updateSubscription);
 
+// Auto-optimize formula toggle
+router.get('/me/auto-optimize', requireAuth, usersController.getAutoOptimize);
+router.patch('/me/auto-optimize', requireAuth, usersController.updateAutoOptimize);
+
 // Chat Session endpoints
 router.get('/me/sessions', requireAuth, usersController.getChatSessions);
 

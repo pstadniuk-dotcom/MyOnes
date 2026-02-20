@@ -144,6 +144,17 @@ export class WearablesController {
             });
         }
     }
+
+    async getHealthPulseSummary(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const summary = await wearablesService.getHealthPulseSummary(userId);
+            res.json(summary);
+        } catch (error) {
+            logger.error('Error fetching health pulse summary:', error);
+            res.status(500).json({ error: 'Failed to fetch health pulse summary' });
+        }
+    }
 }
 
 export const wearablesController = new WearablesController();

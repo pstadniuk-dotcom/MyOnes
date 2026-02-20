@@ -310,6 +310,34 @@ export class UsersController {
             res.status(500).json({ error: 'Failed to update password' });
         }
     }
+
+    async getAutoOptimize(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const result = await usersService.getAutoOptimize(userId);
+            if (!result) return res.status(404).json({ error: 'User not found' });
+            res.json(result);
+        } catch (error) {
+            logger.error('Get auto-optimize error', { error });
+            res.status(500).json({ error: 'Failed to get auto-optimize setting' });
+        }
+    }
+
+    async updateAutoOptimize(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const { enabled } = req.body;
+            if (typeof enabled !== 'boolean') {
+                return res.status(400).json({ error: '"enabled" must be a boolean' });
+            }
+            const result = await usersService.updateAutoOptimize(userId, enabled);
+            if (!result) return res.status(404).json({ error: 'User not found' });
+            res.json(result);
+        } catch (error) {
+            logger.error('Update auto-optimize error', { error });
+            res.status(500).json({ error: 'Failed to update auto-optimize setting' });
+        }
+    }
 }
 
 export const usersController = new UsersController();
