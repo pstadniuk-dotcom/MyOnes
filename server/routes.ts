@@ -1,7 +1,7 @@
 import express, { type Express } from "express";
 import type { RateLimitRequestHandler } from "express-rate-limit";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+
 import {
   authRoutes,
   userRoutes,
@@ -30,7 +30,7 @@ import logger from "./infra/logging/logger";
 export async function registerRoutes(app: Express, rateLimiters?: { authLimiter?: RateLimitRequestHandler, aiLimiter?: RateLimitRequestHandler }): Promise<Server> {
   // Initialize AI settings from database (loads provider/model overrides)
   try {
-    await initializeAiSettings(storage);
+    await initializeAiSettings();
   } catch (err) {
     logger.error('Failed to initialize AI settings at startup', { error: err });
   }

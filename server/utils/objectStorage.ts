@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from "crypto";
-import { storage } from "../storage";
+
 import { logger } from "../infra/logging/logger";
 import { consentsRepository } from 'server/modules/consents/consents.repository';
 

@@ -1,5 +1,5 @@
 import { membershipRepository } from './membership.repository';
-import { storage } from '../../storage';
+import { usersRepository } from '../users/users.repository';
 
 export class MembershipService {
     async getAllTiers() {
@@ -127,7 +127,7 @@ export class MembershipService {
     }
 
     async joinMembership(userId: string) {
-        const user = await storage.getUser(userId);
+        const user = await usersRepository.getUser(userId);
         if (!user) {
             throw new Error('User not found');
         }
@@ -159,7 +159,7 @@ export class MembershipService {
     }
 
     async getUserMembership(userId: string) {
-        const user = await storage.getUser(userId);
+        const user = await usersRepository.getUser(userId);
         if (!user) {
             throw new Error('User not found');
         }

@@ -1,0 +1,59 @@
+./api/controller/chat.controller.ts:241:                    await usersRepository.updateHealthProfile(userId, healthData);
+./api/middleware/middleware.ts:91:    const user = await usersRepository.getUser(decoded.userId);
+./modules/auth/auth.service.ts:19:        const existingUser = await usersRepository.getUserByEmail(validatedData.email);
+./modules/auth/auth.service.ts:36:        const user = await usersRepository.createUser(userData);
+./modules/auth/auth.service.ts:80:        await usersRepository.updateUser(verificationToken.userId, { emailVerified: true });
+./modules/auth/auth.service.ts:83:        const user = await usersRepository.getUser(verificationToken.userId);
+./modules/auth/auth.service.ts:88:        const user = await usersRepository.getUser(userId);
+./modules/auth/auth.service.ts:107:        const user = await usersRepository.getUserByEmail(validatedData.email);
+./modules/auth/auth.service.ts:158:            let user = await usersRepository.getUserByGoogleId(googleId);
+./modules/auth/auth.service.ts:162:                user = await usersRepository.getUserByEmail(email);
+./modules/auth/auth.service.ts:166:                    await usersRepository.updateUser(user.id, { googleId, emailVerified: true });
+./modules/auth/auth.service.ts:169:                    user = await usersRepository.createUser({
+./modules/auth/auth.service.ts:202:            let user = await usersRepository.getUserByFacebookId(facebookId);
+./modules/auth/auth.service.ts:206:                user = await usersRepository.getUserByEmail(email);
+./modules/auth/auth.service.ts:211:                    await usersRepository.updateUser(user.id, { facebookId, emailVerified: true });
+./modules/auth/auth.service.ts:215:                    user = await usersRepository.createUser({
+./modules/auth/auth.service.ts:238:        const user = await usersRepository.getUser(userId);
+./modules/auth/auth.service.ts:246:        const user = await usersRepository.getUserByEmail(email);
+./modules/auth/auth.service.ts:291:        await usersRepository.updateUserPassword(resetToken.userId, hashedPassword);
+./modules/chat/chat.service.ts:181:            usersRepository.getHealthProfile(userId).catch(() => null),
+./modules/dashboard/dashboard.service.ts:19:            usersRepository.getHealthProfile(userId),
+./modules/dashboard/dashboard.service.ts:21:            usersRepository.listOrdersByUser(userId),
+./modules/dashboard/dashboard.service.ts:22:            usersRepository.getSubscription(userId),
+./modules/dashboard/dashboard.service.ts:315:        const user = await usersRepository.getUser(userId);
+./modules/formulas/formula-review.service.ts:67:            usersRepository.getUser(userId),
+./modules/formulas/formula-review.service.ts:181:        const user = await usersRepository.getUser(userId);
+./modules/membership/membership.service.ts:130:        const user = await usersRepository.getUser(userId);
+./modules/membership/membership.service.ts:162:        const user = await usersRepository.getUser(userId);
+./modules/optimize/optimize.service.ts:96:        const user = await usersRepository.getUser(userId);
+./modules/optimize/optimize.service.ts:99:        const healthProfile = await usersRepository.getHealthProfile(userId);
+./modules/support/support.service.ts:32:            const user = await usersRepository.getUser(userId);
+./modules/support/support.service.ts:74:            const user = await usersRepository.getUser(userId);
+./modules/system/system.service.ts:36:        await usersRepository.getUserByEmail('health-check@example.com');
+./modules/system/system.service.ts:55:        const user = await usersRepository.getUser(userId);
+./modules/users/users.service.ts:10:        const user = await usersRepository.getUser(userId);
+./modules/users/users.service.ts:31:            const existingUser = await usersRepository.getUserByEmail(updates.email);
+./modules/users/users.service.ts:37:        const updatedUser = await usersRepository.updateUser(userId, updates);
+./modules/users/users.service.ts:45:        const updatedUser = await usersRepository.updateUser(userId, { timezone });
+./modules/users/users.service.ts:53:        return await usersRepository.getHealthProfile(userId);
+./modules/users/users.service.ts:57:        const existingProfile = await usersRepository.getHealthProfile(userId);
+./modules/users/users.service.ts:60:            return await usersRepository.updateHealthProfile(userId, healthProfileData);
+./modules/users/users.service.ts:62:            return await usersRepository.createHealthProfile({
+./modules/users/users.service.ts:76:        return await usersRepository.getSubscription(userId);
+./modules/users/users.service.ts:96:        return await usersRepository.updateSubscription(userId, allowedUpdates);
+./modules/users/users.service.ts:101:        return await usersRepository.listOrdersByUser(userId);
+./modules/users/users.service.ts:105:        const orders = await usersRepository.listOrdersByUser(userId);
+./modules/users/users.service.ts:121:        return await usersRepository.listPaymentMethodsByUser(userId);
+./modules/users/users.service.ts:129:        return await usersRepository.createPaymentMethodRef({
+./modules/users/users.service.ts:136:        const paymentMethod = await usersRepository.getPaymentMethodRef(paymentMethodId);
+./modules/users/users.service.ts:142:        return await usersRepository.deletePaymentMethodRef(paymentMethodId);
+./modules/users/users.service.ts:146:        const user = await usersRepository.getUser(userId);
+./modules/users/users.service.ts:163:        await usersRepository.updateUserPassword(userId, hashedPassword);
+./modules/users/users.service.ts:167:        const updated = await usersRepository.updateUser(userId, { autoOptimizeFormula: enabled });
+./modules/users/users.service.ts:173:        const user = await usersRepository.getUser(userId);
+./modules/webhooks/webhooks.service.ts:14:        const user = await usersRepository.getUserByPhone(phoneNumber);
+./modules/webhooks/webhooks.service.ts:226:            const users = await usersRepository.listAllUsers();
+./utils/autoOptimizeScheduler.ts:29:    const allUsers = await usersRepository.listAllUsers();
+./utils/smsReminderScheduler.ts:72:    const allUsers = await usersRepository.listAllUsers();
+./utils/smsReminderScheduler.ts:175:    const allUsers = await usersRepository.listAllUsers();

@@ -1,5 +1,5 @@
 import { wearablesRepository } from './wearables.repository';
-import { storage } from '../../storage';
+import { filesRepository } from '../files/files.repository';
 import logger from '../../infra/logging/logger';
 import {
     getOrCreateJunctionUser,
@@ -467,7 +467,7 @@ export class WearablesService {
             junctionUserId ? getSleepData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
             junctionUserId ? getActivityData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
             junctionUserId ? getBodyData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
-            storage.listLabAnalysesByUser(userId).catch(() => []),
+            filesRepository.listLabAnalysesByUser(userId).catch(() => []),
         ]);
 
         // Check connected providers

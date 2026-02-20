@@ -10,7 +10,8 @@
  * the scheduler can call this and trigger AI re-optimization + notification.
  */
 
-import { storage } from '../../storage';
+import { usersRepository } from '../users/users.repository';
+import { filesRepository } from '../files/files.repository';
 import { formulasRepository } from './formulas.repository';
 import { type LabAnalysis } from '@shared/schema';
 import { wearablesRepository } from '../wearables/wearables.repository';
@@ -63,9 +64,9 @@ export class FormulaReviewService {
 
         // 1. Get user + formula + lab data in parallel
         const [user, formula, labAnalyses] = await Promise.all([
-            storage.getUser(userId),
+            usersRepository.getUser(userId),
             formulasRepository.getCurrentFormulaByUser(userId).catch(() => undefined),
-            storage.listLabAnalysesByUser(userId).catch((): LabAnalysis[] => []),
+            filesRepository.listLabAnalysesByUser(userId).catch((): LabAnalysis[] => []),
         ]);
 
         const autoOptimizeEnabled = user?.autoOptimizeFormula ?? false;
@@ -177,7 +178,7 @@ export class FormulaReviewService {
         reasons: string[],
         formulaName?: string,
     ): Promise<void> {
-        const user = await storage.getUser(userId);
+        const user = await usersRepository.getUser(userId);
         if (!user) return;
 
         const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';

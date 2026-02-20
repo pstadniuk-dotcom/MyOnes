@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { storage } from '../storage';
+import { usersRepository } from '../modules/users/users.repository';
 import { notificationsService } from '../modules/notifications/notifications.service';
 import { optimizeRepository } from '../modules/optimize/optimize.repository';
 import { formulasRepository } from '../modules/formulas/formulas.repository';
@@ -69,7 +69,7 @@ function getCurrentTimeInTimezone(timezone: string): { hours: number; minutes: n
 async function checkAndSendOptimizeReminders() {
   try {
     console.log('⏰ Checking for OPTIMIZE reminders...');
-    const allUsers = await storage.listAllUsers?.() || [];
+    const allUsers = await usersRepository.listAllUsers();
     console.log(`📋 Found ${allUsers.length} users for optimize reminders`);
 
     for (const user of allUsers) {
@@ -172,7 +172,7 @@ async function checkAndSendReminders() {
     console.log('⏰ Checking for reminders to send...');
 
     // Get all users with daily reminders enabled
-    const allUsers = await storage.listAllUsers?.() || [];
+    const allUsers = await usersRepository.listAllUsers();
     console.log(`📋 Found ${allUsers.length} total users`);
 
     for (const user of allUsers) {

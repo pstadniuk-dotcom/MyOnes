@@ -11,7 +11,7 @@
  */
 
 import cron from 'node-cron';
-import { storage } from '../storage';
+import { usersRepository } from '../modules/users/users.repository';
 import { formulaReviewService } from '../modules/formulas/formula-review.service';
 import logger from '../infra/logging/logger';
 
@@ -26,7 +26,7 @@ function resetWeeklyTracking() {
 async function runAutoOptimizeCheck() {
     logger.info('Auto-optimize scheduler: starting daily check');
 
-    const allUsers = await storage.listAllUsers?.() || [];
+    const allUsers = await usersRepository.listAllUsers();
     let checked = 0;
     let notified = 0;
     let errors = 0;

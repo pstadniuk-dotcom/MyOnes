@@ -1,4 +1,4 @@
-import { storage } from '../../storage';
+
 import { dashboardRepository } from './dashboard.repository';
 import { chatRepository } from '../chat/chat.repository';
 import { filesRepository } from '../files/files.repository';
@@ -312,7 +312,7 @@ export class DashboardService {
     }
 
     async getWellnessDashboardData(userId: string) {
-        const user = await storage.getUser(userId);
+        const user = await usersRepository.getUser(userId);
         const userTimezone = user?.timezone || 'America/New_York';
         const today = getUserLocalMidnight(userTimezone);
 

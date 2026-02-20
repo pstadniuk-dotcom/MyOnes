@@ -1,4 +1,5 @@
 import { usersRepository } from './users.repository';
+import { formulasRepository } from '../formulas/formulas.repository';
 import bcrypt from 'bcrypt';
 import logger from '../../infra/logging/logger';
 import { type InsertHealthProfile, type InsertSubscription, type InsertPaymentMethodRef } from '@shared/schema';
@@ -67,7 +68,7 @@ export class UsersService {
 
     // Formula operations
     async getCurrentFormula(userId: string) {
-        return await usersRepository.getCurrentFormulaByUser(userId);
+        return await formulasRepository.getCurrentFormulaByUser(userId);
     }
 
     // Subscription operations
