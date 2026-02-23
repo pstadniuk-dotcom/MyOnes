@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import twilio from 'twilio';
 import { webhooksService } from '../../modules/webhooks/webhooks.service';
 import logger from '../../infra/logging/logger';
 
@@ -9,6 +10,25 @@ export class WebhooksController {
      */
     async handleTwilioSms(req: Request, res: Response) {
         try {
+            const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+            const twilioSignature = req.headers['x-twilio-signature'] as string | undefined;
+
+            if (twilioAuthToken && twilioSignature) {
+                const configuredWebhookUrl = process.env.TWILIO_WEBHOOK_URL;
+                const requestUrl = configuredWebhookUrl || `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+                const isValidTwilioRequest = twilio.validateRequest(
+                    twilioAuthToken,
+                    twilioSignature,
+                    requestUrl,
+                    req.body
+                );
+
+                if (!isValidTwilioRequest) {
+                    logger.warn('Invalid Twilio webhook signature');
+                    return res.status(403).send('Invalid signature');
+                }
+            }
+
             const { From: phoneNumber, Body: body } = req.body;
 
             if (!phoneNumber || !body) {

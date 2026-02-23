@@ -45,11 +45,6 @@ router.post('/sync', requireAuth, wearablesController.syncData);
 router.get('/insights', requireAuth, wearablesController.getInsights);
 
 /**
- * Get available providers
- */
-router.get('/available-providers', requireAuth, wearablesController.getAvailableProviders);
-
-/**
  * Get comprehensive historical data for AI analysis
  */
 router.get('/historical-data', requireAuth, wearablesController.getHistoricalData);
@@ -58,5 +53,10 @@ router.get('/historical-data', requireAuth, wearablesController.getHistoricalDat
  * Get health pulse summary: today's snapshot + 7-day trends + latest lab markers
  */
 router.get('/health-pulse', requireAuth, wearablesController.getHealthPulseSummary);
+
+/**
+ * Get active data pillars + unlockable pillars based on connected devices
+ */
+router.get('/pillars', requireAuth, wearablesController.getPillars);
 
 export default router;

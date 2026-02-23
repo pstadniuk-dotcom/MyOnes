@@ -14,6 +14,29 @@ import {
     PROVIDER_DISPLAY_NAMES,
 } from '../../junction';
 
+const PILLAR_META: Record<string, { label: string; description: string }> = {
+    sleep: { label: 'Sleep', description: 'Sleep duration, stages & quality' },
+    activity: { label: 'Activity', description: 'Steps, calories & active minutes' },
+    recovery: { label: 'Recovery', description: 'HRV, heart rate & stress' },
+    workouts: { label: 'Workouts', description: 'Exercise sessions & performance' },
+    body: { label: 'Body', description: 'Weight, BMI & body composition' },
+    glucose: { label: 'Glucose', description: 'Continuous blood sugar monitoring' },
+    heart: { label: 'Heart', description: 'Blood pressure & ECG readings' },
+    nutrition: { label: 'Nutrition', description: 'Calories, hydration & macros' },
+};
+
+// Static map of suggested providers per unlockable pillar
+const PILLAR_SUGGESTED: Record<string, { slug: string; name: string; logo?: string }[]> = {
+    sleep:    [{ slug: 'oura', name: 'Oura Ring' }, { slug: 'eight_sleep', name: 'Eight Sleep' }, { slug: 'fitbit', name: 'Fitbit' }, { slug: 'whoop_v2', name: 'WHOOP' }, { slug: 'garmin', name: 'Garmin' }, { slug: 'polar', name: 'Polar' }, { slug: 'withings', name: 'Withings' }],
+    activity: [{ slug: 'garmin', name: 'Garmin' }, { slug: 'fitbit', name: 'Fitbit' }, { slug: 'google_fit', name: 'Google Fit' }, { slug: 'apple_health_kit', name: 'Apple Health' }, { slug: 'polar', name: 'Polar' }, { slug: 'strava', name: 'Strava' }, { slug: 'whoop_v2', name: 'WHOOP' }, { slug: 'withings', name: 'Withings' }, { slug: 'ultrahuman', name: 'Ultrahuman' }, { slug: 'peloton', name: 'Peloton' }, { slug: 'wahoo', name: 'Wahoo' }, { slug: 'zwift', name: 'Zwift' }, { slug: 'hammerhead', name: 'Hammerhead' }],
+    recovery: [{ slug: 'oura', name: 'Oura Ring' }, { slug: 'whoop_v2', name: 'WHOOP' }, { slug: 'garmin', name: 'Garmin' }, { slug: 'fitbit', name: 'Fitbit' }, { slug: 'polar', name: 'Polar' }, { slug: 'apple_health_kit', name: 'Apple Health' }, { slug: 'ultrahuman', name: 'Ultrahuman' }],
+    workouts: [{ slug: 'garmin', name: 'Garmin' }, { slug: 'fitbit', name: 'Fitbit' }, { slug: 'strava', name: 'Strava' }, { slug: 'peloton', name: 'Peloton' }, { slug: 'apple_health_kit', name: 'Apple Health' }, { slug: 'polar', name: 'Polar' }, { slug: 'whoop_v2', name: 'WHOOP' }, { slug: 'zwift', name: 'Zwift' }, { slug: 'wahoo', name: 'Wahoo' }, { slug: 'hammerhead', name: 'Hammerhead' }, { slug: 'ultrahuman', name: 'Ultrahuman' }],
+    body:     [{ slug: 'withings', name: 'Withings' }, { slug: 'fitbit', name: 'Fitbit' }, { slug: 'oura', name: 'Oura Ring' }, { slug: 'apple_health_kit', name: 'Apple Health' }, { slug: 'garmin', name: 'Garmin' }, { slug: 'polar', name: 'Polar' }, { slug: 'ultrahuman', name: 'Ultrahuman' }],
+    glucose:  [{ slug: 'freestyle_libre', name: 'Freestyle Libre' }, { slug: 'dexcom', name: 'Dexcom' }, { slug: 'beurer', name: 'Beurer' }],
+    heart:    [{ slug: 'withings', name: 'Withings' }, { slug: 'omron', name: 'Omron' }, { slug: 'kardia', name: 'Kardia' }, { slug: 'beurer', name: 'Beurer' }, { slug: 'garmin', name: 'Garmin' }, { slug: 'apple_health_kit', name: 'Apple Health' }, { slug: 'polar', name: 'Polar' }],
+    nutrition:[{ slug: 'cronometer', name: 'Cronometer' }],
+};
+
 export class WearablesService {
     async getConnections(userId: string) {
         const junctionUserId = await wearablesRepository.getJunctionUserId(userId);
@@ -35,7 +58,7 @@ export class WearablesService {
         }));
     }
 
-    async getConnectLink(userId: string) {
+    async getConnectLink(userId: string, provider?: string) {
         let junctionUserId = await wearablesRepository.getJunctionUserId(userId);
 
         if (!junctionUserId) {
@@ -44,7 +67,7 @@ export class WearablesService {
             logger.info('Created and saved Junction user ID', { userId, junctionUserId });
         }
 
-        const { linkToken, linkWebUrl } = await generateLinkToken(junctionUserId);
+        const { linkToken, linkWebUrl } = await generateLinkToken(junctionUserId, provider as any);
 
         return {
             linkUrl: linkWebUrl,
@@ -350,11 +373,22 @@ export class WearablesService {
             },
             sleep: sleepData.map((s: any) => ({
                 date: s.calendar_date || s.calendarDate,
-                totalMinutes: s.duration_total_seconds ? Math.round(s.duration_total_seconds / 60) : s.duration,
-                deepSleepMinutes: s.duration_deep_sleep_seconds ? Math.round(s.duration_deep_sleep_seconds / 60) : s.deepSleep,
-                remSleepMinutes: s.duration_rem_sleep_seconds ? Math.round(s.duration_rem_sleep_seconds / 60) : s.remSleep,
-                lightSleepMinutes: s.duration_light_sleep_seconds ? Math.round(s.duration_light_sleep_seconds / 60) : s.lightSleep,
-                awakeMinutes: s.duration_awake_seconds ? Math.round(s.duration_awake_seconds / 60) : s.awakeTime,
+                // SDK returns duration fields in seconds; duration_total_seconds is legacy snake_case, s.total/s.duration are camelCase SDK fields
+                totalMinutes: s.duration_total_seconds
+                    ? Math.round(s.duration_total_seconds / 60)
+                    : (s.total != null ? Math.round(s.total / 60) : s.duration != null ? Math.round(s.duration / 60) : null),
+                deepSleepMinutes: s.duration_deep_sleep_seconds
+                    ? Math.round(s.duration_deep_sleep_seconds / 60)
+                    : (s.deep != null ? Math.round(s.deep / 60) : null),
+                remSleepMinutes: s.duration_rem_sleep_seconds
+                    ? Math.round(s.duration_rem_sleep_seconds / 60)
+                    : (s.rem != null ? Math.round(s.rem / 60) : null),
+                lightSleepMinutes: s.duration_light_sleep_seconds
+                    ? Math.round(s.duration_light_sleep_seconds / 60)
+                    : (s.light != null ? Math.round(s.light / 60) : null),
+                awakeMinutes: s.duration_awake_seconds
+                    ? Math.round(s.duration_awake_seconds / 60)
+                    : (s.awake != null ? Math.round(s.awake / 60) : null),
                 efficiency: s.sleep_efficiency || s.efficiency,
                 score: s.sleep_score || s.score,
                 hrv: s.average_hrv || s.hrv?.average,
@@ -365,17 +399,19 @@ export class WearablesService {
             activity: activityData.map((a: any) => ({
                 date: a.calendar_date || a.calendarDate || a.date?.split('T')[0],
                 steps: a.steps,
-                caloriesActive: a.calories_active || a.caloriesActive,
+                // caloriesActive can be negative in Fitbit demo data — clamp to 0
+                caloriesActive: Math.max(0, a.calories_active ?? a.caloriesActive ?? 0) || null,
                 caloriesTotal: a.calories_total || a.caloriesTotal,
                 distanceMeters: a.distance_meters || a.distance,
                 floorsClimbed: a.floors_climbed || a.floorsClimbed,
-                activeMinutes: a.active_duration_seconds ? Math.round(a.active_duration_seconds / 60) : a.activeMinutes,
-                sedentaryMinutes: a.sedentary_duration_seconds ? Math.round(a.sedentary_duration_seconds / 60) : a.sedentaryMinutes,
-                lowIntensityMinutes: a.low_intensity_duration_seconds ? Math.round(a.low_intensity_duration_seconds / 60) : a.lowIntensity,
-                moderateIntensityMinutes: a.moderate_intensity_duration_seconds ? Math.round(a.moderate_intensity_duration_seconds / 60) : a.moderateIntensity,
-                highIntensityMinutes: a.high_intensity_duration_seconds ? Math.round(a.high_intensity_duration_seconds / 60) : a.highIntensity,
-                avgHeartRate: a.heart_rate?.avg_bpm || a.heartRate?.average,
-                maxHeartRate: a.heart_rate?.max_bpm || a.heartRate?.max,
+                // SDK exposes intensity buckets as low/medium/high (in minutes); active = medium + high
+                activeMinutes: ((a.medium || 0) + (a.high || 0)) || null,
+                lowIntensityMinutes: a.low_intensity_duration_seconds ? Math.round(a.low_intensity_duration_seconds / 60) : (a.low ?? null),
+                moderateIntensityMinutes: a.moderate_intensity_duration_seconds ? Math.round(a.moderate_intensity_duration_seconds / 60) : (a.medium ?? null),
+                highIntensityMinutes: a.high_intensity_duration_seconds ? Math.round(a.high_intensity_duration_seconds / 60) : (a.high ?? null),
+                // SDK uses camelCase heartRate.avgBpm / maxBpm
+                avgHeartRate: a.heart_rate?.avg_bpm || a.heartRate?.avgBpm,
+                maxHeartRate: a.heart_rate?.max_bpm || a.heartRate?.maxBpm,
                 source: a.source?.slug || 'unknown',
             })),
             body: bodyData.map((b: any) => ({
@@ -391,14 +427,20 @@ export class WearablesService {
                 source: b.source?.slug || 'unknown',
             })),
             workouts: workoutData.map((w: any) => ({
-                date: w.calendar_date || w.time_start?.split('T')[0],
+                date: w.calendar_date || w.calendarDate || w.time_start?.split('T')[0] || w.timeStart?.split('T')[0],
                 type: w.sport?.name || w.title || w.sport_name,
-                durationMinutes: w.duration_seconds ? Math.round(w.duration_seconds / 60) : w.duration,
+                // SDK has timeStart/timeEnd (camelCase); compute duration from those when duration_seconds is absent
+                durationMinutes: w.duration_seconds
+                    ? Math.round(w.duration_seconds / 60)
+                    : (w.timeStart && w.timeEnd
+                        ? Math.round((new Date(w.timeEnd).getTime() - new Date(w.timeStart).getTime()) / 60000)
+                        : null),
                 calories: w.calories,
                 distanceMeters: w.distance_meters || w.distance,
-                avgHeartRate: w.average_hr || w.heartRate?.average,
-                maxHeartRate: w.max_hr || w.heartRate?.max,
-                avgSpeed: w.average_speed,
+                // SDK uses camelCase averageHr/maxHr
+                avgHeartRate: w.average_hr || w.averageHr || w.heartRate?.average,
+                maxHeartRate: w.max_hr || w.maxHr || w.heartRate?.max,
+                avgSpeed: w.average_speed || w.averageSpeed,
                 source: w.source?.slug || 'unknown',
             })),
         };
@@ -422,9 +464,14 @@ export class WearablesService {
                 avgActiveMinutes: historicalData.activity.filter(a => a.activeMinutes).length > 0
                     ? Math.round(historicalData.activity.filter(a => a.activeMinutes).reduce((sum, a) => sum + a.activeMinutes, 0) / historicalData.activity.filter(a => a.activeMinutes).length)
                     : null,
-                avgCaloriesActive: historicalData.activity.filter(a => a.caloriesActive).length > 0
-                    ? Math.round(historicalData.activity.filter(a => a.caloriesActive).reduce((sum, a) => sum + a.caloriesActive, 0) / historicalData.activity.filter(a => a.caloriesActive).length)
-                    : null,
+                avgCaloriesActive: (() => {
+                    const calories = historicalData.activity
+                        .map(a => a.caloriesActive)
+                        .filter((value): value is number => value != null);
+                    return calories.length > 0
+                        ? Math.round(calories.reduce((sum, value) => sum + value, 0) / calories.length)
+                        : null;
+                })(),
             },
             body: {
                 latestWeight: historicalData.body.filter(b => b.weight).slice(-1)[0]?.weight || null,
@@ -440,9 +487,12 @@ export class WearablesService {
                 avgPerWeek: historicalData.workouts.length > 0
                     ? Math.round((historicalData.workouts.length / days) * 7 * 10) / 10
                     : 0,
-                avgDuration: historicalData.workouts.length > 0
-                    ? Math.round(historicalData.workouts.reduce((sum, w) => sum + (w.durationMinutes || 0), 0) / historicalData.workouts.length)
-                    : null,
+                avgDuration: (() => {
+                    const withDuration = historicalData.workouts.filter(w => w.durationMinutes != null && w.durationMinutes > 0);
+                    return withDuration.length > 0
+                        ? Math.round(withDuration.reduce((sum, w) => sum + w.durationMinutes!, 0) / withDuration.length)
+                        : null;
+                })(),
                 mostCommonType: historicalData.workouts.length > 0
                     ? this.getMostCommonWorkoutType(historicalData.workouts)
                     : null,
@@ -454,6 +504,74 @@ export class WearablesService {
             data: historicalData,
             statistics: stats,
         };
+    }
+
+    async getPillars(userId: string) {
+        const junctionUserId = await wearablesRepository.getJunctionUserId(userId);
+        if (!junctionUserId) {
+            return { activePillars: [], unlockablePillars: Object.keys(PILLAR_META).map(p => ({ pillar: p, label: PILLAR_META[p].label, description: PILLAR_META[p].description, suggestedProviders: PILLAR_SUGGESTED[p] ?? [] })) };
+        }
+
+        // Derive active pillars from real data, not unreliable provider catalog
+        const endDate = new Date().toISOString().split('T')[0];
+        const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        const [sleepData, activityData, bodyData, workoutData, connectedProviders] = await Promise.all([
+            getSleepData(junctionUserId, startDate, endDate).catch(() => []),
+            getActivityData(junctionUserId, startDate, endDate).catch(() => []),
+            getBodyData(junctionUserId, startDate, endDate).catch(() => []),
+            getWorkoutData(junctionUserId, startDate, endDate).catch(() => []),
+            getConnectedProviders(junctionUserId).catch(() => []),
+        ]);
+
+        const connectedProviderSlugs = new Set<string>(
+            (connectedProviders as any[])
+                .filter((provider: any) => provider?.status === 'connected')
+                .flatMap((provider: any) => {
+                    const raw = provider?.slug;
+                    if (!raw) return [];
+                    const mapped = PROVIDER_MAP[raw] || raw;
+                    return [raw, mapped];
+                })
+        );
+
+        const hasConnectedProviderForPillar = (pillar: string) =>
+            (PILLAR_SUGGESTED[pillar] ?? []).some((provider) => {
+                const mapped = PROVIDER_MAP[provider.slug] || provider.slug;
+                return connectedProviderSlugs.has(provider.slug) || connectedProviderSlugs.has(mapped);
+            });
+
+        const hasHRV = sleepData.some((s: any) => s.average_hrv != null || s.hrv?.average != null || s.hrv != null)
+            || bodyData.some((b: any) => b.hrv?.rmssd?.avg != null || b.hrv_avg != null);
+
+        const dataPresence: Record<string, boolean> = {
+            sleep:    sleepData.length > 0 || hasConnectedProviderForPillar('sleep'),
+            activity: activityData.length > 0 || hasConnectedProviderForPillar('activity'),
+            workouts: workoutData.length > 0 || hasConnectedProviderForPillar('workouts'),
+            body:     bodyData.length > 0 || hasConnectedProviderForPillar('body'),
+            recovery: hasHRV || hasConnectedProviderForPillar('recovery'),
+            glucose:  hasConnectedProviderForPillar('glucose'),
+            heart:    hasConnectedProviderForPillar('heart'),
+            nutrition: hasConnectedProviderForPillar('nutrition'),
+        };
+
+        const activePillars: string[] = [];
+        const unlockablePillars: { pillar: string; label: string; description: string; suggestedProviders: { slug: string; name: string; logo?: string }[] }[] = [];
+
+        for (const [pillar, active] of Object.entries(dataPresence)) {
+            if (active) {
+                activePillars.push(pillar);
+            } else {
+                unlockablePillars.push({
+                    pillar,
+                    label: PILLAR_META[pillar].label,
+                    description: PILLAR_META[pillar].description,
+                    suggestedProviders: PILLAR_SUGGESTED[pillar] ?? [],
+                });
+            }
+        }
+
+        return { activePillars, unlockablePillars };
     }
 
     async getHealthPulseSummary(userId: string) {

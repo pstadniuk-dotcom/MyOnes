@@ -1,8 +1,10 @@
 import cron from 'node-cron';
+import logger from '../infra/logging/logger';
 import { usersRepository } from '../modules/users/users.repository';
 import { notificationsService } from '../modules/notifications/notifications.service';
 import { optimizeRepository } from '../modules/optimize/optimize.repository';
 import { formulasRepository } from '../modules/formulas/formulas.repository';
+import { consentsRepository } from '../modules/consents/consents.repository';
 import { sendNotificationSms, sendRawSms } from '../utils/smsService';
 import { generatePersonalizedTip, type FormulaIngredient } from './healthTips';
 
@@ -22,7 +24,7 @@ const sentOptimizeRemindersToday = new Map<string, Set<string>>(); // userId -> 
 function resetDailyTracking() {
   sentRemindersToday.clear();
   sentOptimizeRemindersToday.clear();
-  console.log('📅 Daily reminder tracking reset');
+  logger.info('Daily reminder tracking reset');
 }
 
 function hasReminderBeenSent(userId: string, mealType: string): boolean {
@@ -59,21 +61,28 @@ function getCurrentTimeInTimezone(timezone: string): { hours: number; minutes: n
     const [hours, minutes] = timeString.split(':').map(Number);
     return { hours, minutes };
   } catch (error) {
-    console.error(`Error getting time for timezone ${timezone}:`, error);
-    // Fallback to UTC
+    logger.error(`Error getting time for timezone ${timezone}`, { error });
     const now = new Date();
     return { hours: now.getUTCHours(), minutes: now.getUTCMinutes() };
   }
 }
 
+async function hasSmsAccountabilityConsent(userId: string): Promise<boolean> {
+  const consent = await consentsRepository.getUserConsent(userId, 'sms_accountability');
+  return !!consent;
+}
+
 async function checkAndSendOptimizeReminders() {
   try {
-    console.log('⏰ Checking for OPTIMIZE reminders...');
     const allUsers = await usersRepository.listAllUsers();
-    console.log(`📋 Found ${allUsers.length} users for optimize reminders`);
 
     for (const user of allUsers) {
       if (!user.phone) continue;
+
+      const hasConsent = await hasSmsAccountabilityConsent(user.id);
+      if (!hasConsent) {
+        continue;
+      }
 
       const prefs = await optimizeRepository.getOptimizeSmsPreferences(user.id);
       if (!prefs) continue; // Skip if no optimize prefs
@@ -82,11 +91,9 @@ async function checkAndSendOptimizeReminders() {
       const { hours, minutes } = getCurrentTimeInTimezone(timezone);
       const currentTime = `${hours}:${minutes.toString().padStart(2, '0')}`;
 
-      // console.log(`👤 Checking optimize reminders for ${user.id} at ${currentTime}`);
-
       // 1. Morning Reminder
       if (prefs.morningReminderEnabled && prefs.morningReminderTime === currentTime && !hasOptimizeReminderBeenSent(user.id, 'morning')) {
-        console.log(`🔔 Sending Morning Optimize Reminder to ${user.id}`);
+        logger.info('Sending morning optimize reminder', { userId: user.id });
         const mealPlan = await optimizeRepository.getActiveOptimizePlan(user.id, 'nutrition');
         const streak = await optimizeRepository.getUserStreak(user.id, 'overall');
 
@@ -120,7 +127,7 @@ async function checkAndSendOptimizeReminders() {
 
       // 2. Workout Reminder
       if (prefs.workoutReminderEnabled && prefs.workoutReminderTime === currentTime && !hasOptimizeReminderBeenSent(user.id, 'workout')) {
-        console.log(`🔔 Sending Workout Optimize Reminder to ${user.id}`);
+        logger.info('Sending workout optimize reminder', { userId: user.id });
         const workoutPlan = await optimizeRepository.getActiveOptimizePlan(user.id, 'workout');
 
         if (workoutPlan && workoutPlan.content) {
@@ -149,7 +156,7 @@ async function checkAndSendOptimizeReminders() {
 
       // 3. Evening Check-in
       if (prefs.eveningCheckinEnabled && prefs.eveningCheckinTime === currentTime && !hasOptimizeReminderBeenSent(user.id, 'evening')) {
-        console.log(`🔔 Sending Evening Optimize Reminder to ${user.id}`);
+        logger.info('Sending evening optimize reminder', { userId: user.id });
         const message = `🌙 End-of-day check-in, ${user.name}!\n\n` +
           `Did you complete today?\n` +
           `Reply with:\n` +
@@ -163,46 +170,34 @@ async function checkAndSendOptimizeReminders() {
       }
     }
   } catch (error) {
-    console.error('Error in checkAndSendOptimizeReminders:', error);
+    logger.error('Error in checkAndSendOptimizeReminders', { error });
   }
 }
 
 async function checkAndSendReminders() {
   try {
-    console.log('⏰ Checking for reminders to send...');
-
     // Get all users with daily reminders enabled
     const allUsers = await usersRepository.listAllUsers();
-    console.log(`📋 Found ${allUsers.length} total users`);
 
     for (const user of allUsers) {
       // Get notification preferences to check if daily reminders are enabled
       const prefs = await notificationsService.getPreferences(user.id);
 
-      if (!prefs?.dailyRemindersEnabled) {
-        console.log(`⏭️  Skipping user ${user.id} - reminders disabled`);
-        continue;
-      }
+      if (!prefs?.dailyRemindersEnabled) continue;
+      if (!user.phone) continue;
 
-      if (!user.phone) {
-        console.log(`⏭️  Skipping user ${user.id} - no phone number`);
-        continue;
-      }
+      const hasConsent = await hasSmsAccountabilityConsent(user.id);
+      if (!hasConsent) continue;
 
       const timezone = user.timezone || 'America/New_York';
       const currentTime = getCurrentTimeInTimezone(timezone);
       const currentTimeStr = `${currentTime.hours.toString().padStart(2, '0')}:${currentTime.minutes.toString().padStart(2, '0')}`;
 
-      console.log(`👤 Checking user ${user.id} - Local time: ${currentTimeStr} (${timezone})`);
-
       // Get user's active formula to determine capsule count and ingredients
       const formulas = await formulasRepository.getFormulaHistory(user.id);
       const activeFormula = formulas[0]; // Most recent formula
 
-      if (!activeFormula) {
-        console.log(`⏭️  Skipping user ${user.id} - no formula`);
-        continue;
-      }
+      if (!activeFormula) continue;
 
       // Calculate total capsule count from formula
       const totalDosage = Math.max(activeFormula.totalMg || 0, 0);
@@ -229,12 +224,8 @@ async function checkAndSendReminders() {
         const timeMatches = currentTime.hours === targetHours && currentTime.minutes === targetMinutes;
         const alreadySent = hasReminderBeenSent(user.id, mealType);
 
-        console.log(`  ${mealType}: ${targetHours}:${targetMinutes.toString().padStart(2, '0')} - Match: ${timeMatches}, Sent: ${alreadySent}`);
-
-        // Check if current time matches reminder time (within 1 minute window)
         if (timeMatches && !alreadySent) {
-          // Time to send reminder!
-          console.log(`🔔 SENDING ${mealType} reminder to user ${user.id}!`);
+          logger.info('Sending meal reminder', { userId: user.id, mealType });
           await sendReminderSms({
             userId: user.id,
             phone: user.phone,
@@ -262,7 +253,7 @@ async function checkAndSendReminders() {
           const alreadySent = hasReminderBeenSent(user.id, customKey);
 
           if (customTime === currentTimeStr && !alreadySent) {
-            console.log(`🔔 SENDING custom ${type} reminder to user ${user.id} at ${customTime}!`);
+            logger.info('Sending custom reminder', { userId: user.id, type, time: customTime });
             await sendCustomNotificationSms(user.id, user.phone, type, capsuleCount, ingredients);
             markReminderAsSent(user.id, customKey);
           }
@@ -270,7 +261,7 @@ async function checkAndSendReminders() {
       }
     }
   } catch (error) {
-    console.error('❌ Error in checkAndSendReminders:', error);
+    logger.error('Error in checkAndSendReminders', { error });
   }
 }
 
@@ -322,12 +313,12 @@ async function sendCustomNotificationSms(
     });
 
     if (success) {
-      console.log(`✅ Sent custom ${notificationType} reminder to user ${userId}`);
+      logger.info('Sent custom reminder', { userId, notificationType });
     } else {
-      console.error(`❌ Failed to send custom ${notificationType} reminder to user ${userId}`);
+      logger.warn('Failed to send custom reminder', { userId, notificationType });
     }
   } catch (error) {
-    console.error(`❌ Error sending custom ${notificationType} SMS:`, error);
+    logger.error('Error sending custom notification SMS', { error, notificationType });
   }
 }
 
@@ -352,11 +343,7 @@ async function sendReminderSms(reminder: ReminderCheck) {
     };
     const currentSlot = mealToSlot[mealType];
 
-    // Build message based on user preferences and time slots
     const parts: string[] = [];
-
-    // Greeting emoji
-    const emoji = mealType === 'breakfast' ? '☀️' : mealType === 'lunch' ? '🌤️' : '🌙';
 
     // Pills/Supplements section - check if this time slot matches
     const pillsSlot = prefs?.pillsTimeSlot ?? 'all';
@@ -396,7 +383,6 @@ async function sendReminderSms(reminder: ReminderCheck) {
 
     // If nothing is enabled for this time slot, skip sending
     if (parts.length === 0) {
-      console.log(`⏭️  No notifications configured for ${mealType} slot for user ${userId}`);
       return;
     }
 
@@ -410,35 +396,54 @@ async function sendReminderSms(reminder: ReminderCheck) {
     });
 
     if (success) {
-      console.log(`✅ Sent ${mealType} reminder to user ${reminder.userId}`);
+      logger.info('Sent meal reminder', { userId: reminder.userId, mealType });
     } else {
-      console.error(`❌ Failed to send ${mealType} reminder to user ${reminder.userId}`);
+      logger.warn('Failed to send meal reminder', { userId: reminder.userId, mealType });
     }
   } catch (error) {
-    console.error('❌ Error sending reminder SMS:', error);
+    logger.error('Error sending reminder SMS', { error });
+  }
+}
+
+async function checkAndSendRenewalReminders() {
+  try {
+    const renewals = await usersRepository.getUpcomingRenewals(5);
+    for (const sub of renewals) {
+      const user = await usersRepository.getUser(sub.userId);
+      if (!user?.phone || !(await hasSmsAccountabilityConsent(user.id))) continue;
+
+      await sendRawSms(
+        user.phone,
+        `Hi ${user.name}, your ONES AI supplement subscription renews in 5 days! 🔄\n\nIf you've had any changes in your health, diet, or goals, now is the perfect time to chat with your AI practitioner to update your formula before your next batch ships.\n\nReply to this message or log in to update your profile.`
+      );
+    }
+  } catch (error) {
+    logger.error('Error in checkAndSendRenewalReminders', { error });
   }
 }
 
 // Start the scheduler
 export function startSmsReminderScheduler() {
-  console.log('🚀 Starting SMS reminder scheduler...');
+  logger.info('SMS reminder scheduler starting');
 
-  // Check every minute for reminders
   cron.schedule('* * * * *', async () => {
     await checkAndSendReminders();
     await checkAndSendOptimizeReminders();
   });
 
-  // Reset daily tracking at midnight UTC
+  cron.schedule('0 12 * * *', async () => {
+    await checkAndSendRenewalReminders();
+  });
+
   cron.schedule('0 0 * * *', () => {
     resetDailyTracking();
   });
 
-  console.log('✅ SMS reminder scheduler started - checking every minute');
+  logger.info('SMS reminder scheduler started');
 }
 
 // Export for manual testing
-export { checkAndSendReminders, sendReminderSms };
+export { checkAndSendReminders, checkAndSendRenewalReminders, sendReminderSms };
 
 function mapMealTypeToTipContext(mealType: 'breakfast' | 'lunch' | 'dinner'): 'morning' | 'evening' {
   if (mealType === 'dinner') {

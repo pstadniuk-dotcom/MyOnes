@@ -9,7 +9,7 @@ export class ConsentsController {
             const { consentType, consentVersion, consentText } = req.body;
 
             // Validate consent type
-            const validConsentTypes = ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing'];
+            const validConsentTypes = ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing', 'sms_accountability'];
             if (!validConsentTypes.includes(consentType)) {
                 return res.status(400).json({ error: 'Invalid consent type' });
             }
@@ -54,7 +54,7 @@ export class ConsentsController {
             const userId = req.userId!;
             const { consentType } = req.params;
 
-            const validConsentTypes = ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing'];
+            const validConsentTypes = ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing', 'sms_accountability'];
             if (!validConsentTypes.includes(consentType)) {
                 return res.status(400).json({ error: 'Invalid consent type' });
             }

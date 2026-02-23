@@ -88,12 +88,17 @@ export async function getOrCreateJunctionUser(onesUserId: string, existingJuncti
  * Generate a Link token for the Junction Link widget
  * This is used to initiate the connection flow
  */
-export async function generateLinkToken(junctionUserId: string): Promise<{ linkToken: string; linkWebUrl: string }> {
+export async function generateLinkToken(
+  junctionUserId: string,
+  provider?: Vital.Providers
+): Promise<{ linkToken: string; linkWebUrl: string }> {
   try {
     const client = junctionClient();
 
     const response = await client.link.token({
       userId: junctionUserId,
+      provider,
+      filterOnProviders: provider ? [provider] : undefined,
     });
 
     return {
@@ -237,6 +242,7 @@ export const PROVIDER_MAP: Record<string, string> = {
   'fitbit': 'fitbit',
   'oura': 'oura',
   'whoop': 'whoop',
+  'whoop_v2': 'whoop',
   'garmin': 'garmin',
   'apple_health_kit': 'apple',
   'google_fit': 'google',
@@ -246,7 +252,16 @@ export const PROVIDER_MAP: Record<string, string> = {
   'eight_sleep': 'eight_sleep',
   'cronometer': 'cronometer',
   'libre': 'libre',
+  'freestyle_libre': 'libre',
   'dexcom': 'dexcom',
+  'peloton': 'peloton',
+  'ultrahuman': 'ultrahuman',
+  'zwift': 'zwift',
+  'wahoo': 'wahoo',
+  'omron': 'omron',
+  'kardia': 'kardia',
+  'beurer': 'beurer',
+  'hammerhead': 'hammerhead',
 };
 
 /**
@@ -266,4 +281,12 @@ export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   'cronometer': 'Cronometer',
   'libre': 'Freestyle Libre',
   'dexcom': 'Dexcom',
+  'peloton': 'Peloton',
+  'ultrahuman': 'Ultrahuman',
+  'zwift': 'Zwift',
+  'wahoo': 'Wahoo',
+  'omron': 'Omron',
+  'kardia': 'Kardia',
+  'beurer': 'Beurer',
+  'hammerhead': 'Hammerhead',
 };

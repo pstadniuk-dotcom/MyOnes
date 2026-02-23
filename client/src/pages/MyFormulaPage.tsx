@@ -5,6 +5,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Separator } from '@/shared/components/ui/separator';
 import { Input } from '@/shared/components/ui/input';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/shared/components/ui/alert-dialog';
@@ -127,6 +128,7 @@ export default function MyFormulaPage() {
   const [selectedFormulaId, setSelectedFormulaId] = useState<string | null>(null);
   const [expandedFormulaId, setExpandedFormulaId] = useState<string | null>(null);
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
+  const [smsOptInAtFirstPurchase, setSmsOptInAtFirstPurchase] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [showCustomBuilderDialog, setShowCustomBuilderDialog] = useState(false);
   const [renamingFormulaId, setRenamingFormulaId] = useState<string | null>(null);
@@ -153,6 +155,16 @@ export default function MyFormulaPage() {
   const { data: archivedData, isLoading: isLoadingArchived } = useQuery<{ archived: Formula[] }>({
     queryKey: ['/api/users/me/formula/archived'],
     enabled: !!user?.id
+  });
+
+  const { data: ordersData } = useQuery<Array<{ id: string }>>({
+    queryKey: ['/api/users/me/orders'],
+    enabled: !!user?.id,
+  });
+
+  const { data: consentsData } = useQuery<Array<{ consentType: string; revokedAt?: string | null }>>({
+    queryKey: ['/api/consents'],
+    enabled: !!user?.id,
   });
 
   const [showArchived, setShowArchived] = useState(false);
@@ -262,9 +274,84 @@ export default function MyFormulaPage() {
     }
   });
 
+  const purchaseSmsOptInMutation = useMutation({
+    mutationFn: async () => {
+      if (!smsOptInAtFirstPurchase) {
+        return;
+      }
+
+      if (!user?.phone) {
+        throw new Error('Please add a phone number in your profile before enabling SMS accountability reminders.');
+      }
+
+      const alreadyConsented = consentsData?.some(
+        (consent) => consent.consentType === 'sms_accountability' && !consent.revokedAt
+      );
+
+      if (!alreadyConsented) {
+        await apiRequest('POST', '/api/consents/grant', {
+          consentType: 'sms_accountability',
+          consentVersion: '1.0',
+          consentText: 'I agree to receive recurring SMS accountability and supplement reminders from ONES. Msg frequency varies. Msg and data rates may apply. Reply STOP to opt out, HELP for help.',
+        });
+      }
+
+      let existingPrefs: any = null;
+      try {
+        const prefsRes = await apiRequest('GET', '/api/notifications/preferences');
+        existingPrefs = await prefsRes.json();
+      } catch {
+        existingPrefs = null;
+      }
+
+      await apiRequest('PUT', '/api/notifications/preferences', {
+        emailConsultation: existingPrefs?.emailConsultation ?? true,
+        emailShipping: existingPrefs?.emailShipping ?? true,
+        emailBilling: existingPrefs?.emailBilling ?? true,
+        smsConsultation: existingPrefs?.smsConsultation ?? false,
+        smsShipping: existingPrefs?.smsShipping ?? false,
+        smsBilling: existingPrefs?.smsBilling ?? false,
+        dailyRemindersEnabled: true,
+        reminderBreakfast: existingPrefs?.reminderBreakfast ?? '08:00',
+        reminderLunch: existingPrefs?.reminderLunch ?? '12:00',
+        reminderDinner: existingPrefs?.reminderDinner ?? '18:00',
+        pillsTimeSlot: existingPrefs?.pillsTimeSlot ?? 'all',
+        workoutTimeSlot: existingPrefs?.workoutTimeSlot ?? 'morning',
+        nutritionTimeSlot: existingPrefs?.nutritionTimeSlot ?? 'morning',
+        lifestyleTimeSlot: existingPrefs?.lifestyleTimeSlot ?? 'evening',
+        pillsCustomTime: existingPrefs?.pillsCustomTime ?? null,
+        workoutCustomTime: existingPrefs?.workoutCustomTime ?? null,
+        nutritionCustomTime: existingPrefs?.nutritionCustomTime ?? null,
+        lifestyleCustomTime: existingPrefs?.lifestyleCustomTime ?? null,
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/consents'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/notifications/preferences'] });
+
+      if (smsOptInAtFirstPurchase) {
+        toast({
+          title: 'SMS accountability reminders enabled',
+          description: 'We\'ll text supplement reminders and check-ins. Reply STOP anytime to opt out.',
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not enable SMS reminders',
+        description: error?.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Derived data
   const currentFormula = currentFormulaData?.formula;
   const formulaHistory = historyData?.history;
+  const isFirstFormulaOrder = (ordersData?.length ?? 0) === 0;
+  const hasSmsAccountabilityConsent = !!consentsData?.some(
+    (consent) => consent.consentType === 'sms_accountability' && !consent.revokedAt
+  );
 
   // Combine current formula with history to ensure all formulas are shown
   // History API may or may not include the current formula
@@ -294,6 +381,12 @@ export default function MyFormulaPage() {
       setSelectedFormulaId(currentFormula.id);
     }
   }, [currentFormula, selectedFormulaId]);
+
+  useEffect(() => {
+    if (!showOrderConfirmation) {
+      setSmsOptInAtFirstPurchase(false);
+    }
+  }, [showOrderConfirmation]);
 
   // Update column count based on window width for masonry layout
   useEffect(() => {
@@ -813,6 +906,27 @@ export default function MyFormulaPage() {
                       </ul>
                     </div>
                   )}
+
+                  {isFirstFormulaOrder && !hasSmsAccountabilityConsent && (
+                    <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          id="sms-opt-in-first-purchase"
+                          checked={smsOptInAtFirstPurchase}
+                          onCheckedChange={(checked) => setSmsOptInAtFirstPurchase(checked === true)}
+                          className="mt-0.5"
+                        />
+                        <label htmlFor="sms-opt-in-first-purchase" className="text-sm leading-relaxed cursor-pointer">
+                          Yes, I want ONES accountability texts for supplement reminders and check-ins. Msg frequency varies. Msg & data rates may apply. Reply STOP to opt out and HELP for help.
+                        </label>
+                      </div>
+                      {!user?.phone && smsOptInAtFirstPurchase && (
+                        <p className="text-xs text-muted-foreground">
+                          Add a phone number in your profile to enable SMS reminders.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -846,17 +960,23 @@ export default function MyFormulaPage() {
             <Button
               variant="default"
               className="bg-primary hover:bg-primary/90"
-              onClick={() => {
-                setShowOrderConfirmation(false);
-                toast({
-                  title: "Redirecting to checkout...",
-                  description: "Checkout page coming soon!",
-                });
+              onClick={async () => {
+                try {
+                  await purchaseSmsOptInMutation.mutateAsync();
+                  setShowOrderConfirmation(false);
+                  toast({
+                    title: 'Redirecting to checkout...',
+                    description: 'Checkout page coming soon!',
+                  });
+                } catch {
+                  // Errors are handled in mutation onError
+                }
               }}
+              disabled={purchaseSmsOptInMutation.isPending}
               data-testid="button-proceed-checkout"
             >
               <ArrowRight className="w-4 h-4 mr-2" />
-              Proceed to Checkout
+              {purchaseSmsOptInMutation.isPending ? 'Saving...' : 'Proceed to Checkout'}
             </Button>
           </div>
         </DialogContent>

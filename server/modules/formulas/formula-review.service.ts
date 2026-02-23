@@ -23,6 +23,7 @@ import {
 import logger from '../../infra/logging/logger';
 import { sendNotificationEmail } from '../../utils/emailService';
 import { sendNotificationSms } from '../../utils/smsService';
+import { consentsRepository } from '../consents/consents.repository';
 
 const FORMULA_REVIEW_DAYS = 30;          // Review if formula is older than 30 days
 const HRV_DECLINE_THRESHOLD = 0.12;     // 12% decline triggers review
@@ -207,11 +208,13 @@ export class FormulaReviewService {
 
             // SMS
             if (user.phone) {
-                await sendNotificationSms({
-                    to: user.phone,
-                    message: `Your formula has been updated based on your latest health data. Review before your next shipment: ${reviewUrl}`,
-                    type: 'formula_update',
-                });
+                if (await consentsRepository.getUserConsent(user.id, 'sms_accountability')) {
+                    await sendNotificationSms({
+                        to: user.phone,
+                        message: `Your formula has been updated based on your latest health data. Review before your next shipment: ${reviewUrl}`,
+                        type: 'formula_update',
+                    });
+                }
             }
         } else {
             // Manual review needed
@@ -232,11 +235,13 @@ export class FormulaReviewService {
             });
 
             if (user.phone) {
-                await sendNotificationSms({
-                    to: user.phone,
-                    message: `Your health data suggests your formula may need updating. Log in to review: ${reviewUrl}`,
-                    type: 'formula_update',
-                });
+                if (await consentsRepository.getUserConsent(user.id, 'sms_accountability')) {
+                    await sendNotificationSms({
+                        to: user.phone,
+                        message: `Your health data suggests your formula may need updating. Log in to review: ${reviewUrl}`,
+                        type: 'formula_update',
+                    });
+                }
             }
         }
 
