@@ -391,7 +391,8 @@ export default function OrdersPage() {
                   variant="destructive"
                   data-testid="button-cancel-subscription"
                   onClick={handleCancelSubscription}
-                  disabled={updateSubscriptionMutation.isPending}
+                  // disabled={updateSubscriptionMutation.isPending}
+                  disabled={true}
                 >
                   Cancel Subscription
                 </Button>

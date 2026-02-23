@@ -113,6 +113,12 @@ export default function HomePage() {
 
   const { metrics, profileChecklist, currentFormula, isNewUser } = dashboardData || {};
 
+  // Step completion logic
+  const isStep1Complete = (metrics?.profileCompleteness || 0) >= 50;
+  const isStep2Complete = profileChecklist?.find(c => c.category === 'Lab Reports')?.items.every(i => i.complete) || false;
+  const isStep3Complete = (metrics?.consultationsSessions || 0) > 0;
+  const isStep4Complete = !!currentFormula;
+
   return (
     <div className="w-full px-4 py-4 md:max-w-6xl md:mx-auto space-y-4 md:space-y-6" data-testid="page-home">
       {/* Personal Greeting - V2 Branding */}
@@ -220,21 +226,21 @@ export default function HomePage() {
               {/* Step 1: Health Profile */}
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${(metrics?.profileCompleteness || 0) >= 50
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${isStep1Complete
                     ? 'bg-green-600 text-white'
                     : 'bg-[#1B4332] text-white'
                     }`}>
-                    {(metrics?.profileCompleteness || 0) >= 50 ? '✓' : '1'}
+                    {isStep1Complete ? '✓' : '1'}
                   </div>
                   <div className="flex-1">
                     <span className="text-sm text-[#1B4332] font-medium">Complete your health profile</span>
                     <p className="text-xs text-[#52796F]">
-                      {(metrics?.profileCompleteness || 0) >= 50
+                      {isStep1Complete
                         ? `${metrics?.profileCompleteness}% complete`
                         : 'Age, medications, health goals & more'}
                     </p>
                   </div>
-                  {(metrics?.profileCompleteness || 0) < 50 && (
+                  {!isStep1Complete && (
                     <Button asChild variant="outline" size="sm" className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white rounded-full">
                       <Link href="/dashboard/profile?tab=profile">
                         Start
@@ -245,12 +251,19 @@ export default function HomePage() {
 
                 {/* Step 2: Upload Blood Tests (Optional) */}
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1B4332]/10 text-[#52796F] text-sm font-medium">
-                    2
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${isStep2Complete
+                    ? 'bg-green-600 text-white'
+                    : (isStep1Complete ? 'bg-[#1B4332] text-white' : 'bg-[#1B4332]/10 text-[#52796F]')
+                    }`}>
+                    {isStep2Complete ? '✓' : '2'}
                   </div>
                   <div className="flex-1">
-                    <span className="text-sm text-[#52796F]">Upload blood tests</span>
-                    <p className="text-xs text-[#52796F]/70">Optional but recommended for precision</p>
+                    <span className={`text-sm font-medium ${isStep2Complete || isStep1Complete ? 'text-[#1B4332]' : 'text-[#52796F]'}`}>
+                      Upload blood tests
+                    </span>
+                    <p className="text-xs text-[#52796F]/70">
+                      {isStep2Complete ? 'Tests uploaded' : 'Optional but recommended for precision'}
+                    </p>
                   </div>
                   <Button asChild variant="ghost" size="sm" className="text-[#52796F] hover:text-[#1B4332] hover:bg-[#1B4332]/5 rounded-full">
                     <Link href="/dashboard/lab-reports">
@@ -261,26 +274,36 @@ export default function HomePage() {
 
                 {/* Step 3: AI Consultation */}
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1B4332]/10 text-[#52796F] text-sm font-medium">
-                    3
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${isStep3Complete
+                    ? 'bg-green-600 text-white'
+                    : (isStep1Complete ? 'bg-[#1B4332] text-white' : 'bg-[#1B4332]/10 text-[#52796F]')
+                    }`}>
+                    {isStep3Complete ? '✓' : '3'}
                   </div>
                   <div className="flex-1">
-                    <span className="text-sm text-[#52796F]">Start AI consultation</span>
+                    <span className={`text-sm font-medium ${isStep3Complete || isStep1Complete ? 'text-[#1B4332]' : 'text-[#52796F]'}`}>
+                      Start AI consultation
+                    </span>
                     <p className="text-xs text-[#52796F]/70">Get your personalized formula</p>
                   </div>
                 </div>
 
                 {/* Step 4: Receive Formula */}
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1B4332]/10 text-[#52796F] text-sm font-medium">
-                    4
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${isStep4Complete
+                    ? 'bg-green-600 text-white'
+                    : (isStep3Complete ? 'bg-[#1B4332] text-white' : 'bg-[#1B4332]/10 text-[#52796F]')
+                    }`}>
+                    {isStep4Complete ? '✓' : '4'}
                   </div>
-                  <span className="text-sm text-[#52796F]">Receive supplements monthly</span>
+                  <span className={`text-sm font-medium ${isStep4Complete || isStep3Complete ? 'text-[#1B4332]' : 'text-[#52796F]'}`}>
+                    Receive supplements monthly
+                  </span>
                 </div>
               </div>
 
               {/* Conditional CTA based on profile completeness */}
-              {(metrics?.profileCompleteness || 0) < 50 ? (
+              {!isStep1Complete ? (
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button asChild className="gap-2 bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-6" data-testid="button-complete-profile">
                     <Link href="/dashboard/profile?tab=profile">
@@ -405,39 +428,39 @@ export default function HomePage() {
 
       {/* Quick Actions for Users with Formula - V2 Styled */}
       {!isNewUser && currentFormula && (
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-upload-labs">
-              <Link href="/dashboard/lab-reports">
-                <CardHeader className="space-y-0 pb-3">
-                  <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
-                    <Upload className="w-4 h-4 text-[#1B4332]" />
-                    Upload Lab Results
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-[#52796F]">
-                    Add blood tests for better formula optimization
-                  </p>
-                </CardContent>
-              </Link>
-            </Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-upload-labs">
+            <Link href="/dashboard/lab-reports">
+              <CardHeader className="space-y-0 pb-3">
+                <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
+                  <Upload className="w-4 h-4 text-[#1B4332]" />
+                  Upload Lab Results
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-[#52796F]">
+                  Add blood tests for better formula optimization
+                </p>
+              </CardContent>
+            </Link>
+          </Card>
 
-            <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-view-orders">
-              <Link href="/dashboard/orders">
-                <CardHeader className="space-y-0 pb-3">
-                  <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
-                    <Package className="w-4 h-4 text-[#1B4332]" />
-                    View Orders
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-[#52796F]">
-                    Track your supplement orders and shipping status
-                  </p>
-                </CardContent>
-              </Link>
-            </Card>
-          </div>
+          <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-view-orders">
+            <Link href="/dashboard/orders">
+              <CardHeader className="space-y-0 pb-3">
+                <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
+                  <Package className="w-4 h-4 text-[#1B4332]" />
+                  View Orders
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-[#52796F]">
+                  Track your supplement orders and shipping status
+                </p>
+              </CardContent>
+            </Link>
+          </Card>
+        </div>
       )}
 
       {/* Promotional/Info Section - V2 Styled */}
