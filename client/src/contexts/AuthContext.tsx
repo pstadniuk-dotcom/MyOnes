@@ -434,6 +434,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Clear localStorage
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
+      localStorage.removeItem('consultation_draft');
 
       toast({
         title: "Logged Out",
