@@ -1,16 +1,63 @@
 import twilio from 'twilio';
+import { logger } from '../infra/logging/logger';
 
-// Initialize Twilio with credentials from environment variables
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-// Support both TWILIO_PHONE_NUMBER and TWILIO_FROM for flexibility
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_FROM;
+type TwilioConfig = {
+  accountSid: string | undefined;
+  authToken: string | undefined;
+  fromNumber: string | undefined;
+  apiKeySid: string | undefined;
+  apiKeySecret: string | undefined;
+};
 
 let twilioClient: ReturnType<typeof twilio> | null = null;
+let twilioClientKey: string | null = null;
 
-if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
-  twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+function getTwilioConfig(): TwilioConfig {
+  return {
+    accountSid: process.env.TWILIO_ACCOUNT_SID,
+    authToken: process.env.TWILIO_AUTH_TOKEN,
+    fromNumber: process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_FROM,
+    apiKeySid: process.env.TWILIO_API_KEY_SID,
+    apiKeySecret: process.env.TWILIO_API_KEY_SECRET,
+  };
 }
+
+function getTwilioClient(): ReturnType<typeof twilio> | null {
+  const { accountSid, authToken, apiKeySid, apiKeySecret } = getTwilioConfig();
+  if (!accountSid) {
+    return null;
+  }
+
+  const useApiKeyAuth = Boolean(apiKeySid && apiKeySecret);
+  const useTokenAuth = Boolean(authToken);
+
+  if (!useApiKeyAuth && !useTokenAuth) {
+    return null;
+  }
+
+  const key = useApiKeyAuth
+    ? `${accountSid}:${apiKeySid}:${apiKeySecret}`
+    : `${accountSid}:${authToken}`;
+
+  if (!twilioClient || twilioClientKey !== key) {
+    twilioClient = useApiKeyAuth
+      ? twilio(apiKeySid!, apiKeySecret!, { accountSid })
+      : twilio(accountSid, authToken!);
+    twilioClientKey = key;
+  }
+
+  return twilioClient;
+}
+
+function normalizePhoneNumber(phone: string): string {
+  const trimmed = phone.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.startsWith('+')) {
+    return `+${trimmed.slice(1).replace(/\D/g, '')}`;
+  }
+  return `+${trimmed.replace(/\D/g, '')}`;
+}
+
 
 interface SmsNotification {
   to: string;
@@ -37,54 +84,48 @@ function formatSmsMessage(notification: SmsNotification): string {
 
 export async function sendNotificationSms(notification: SmsNotification): Promise<boolean> {
   try {
-    if (!twilioClient || !TWILIO_PHONE_NUMBER) {
-      console.error('❌ Twilio not configured: Missing TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, or TWILIO_PHONE_NUMBER environment variables');
+    const { fromNumber } = getTwilioConfig();
+    const client = getTwilioClient();
+
+    if (!client || !fromNumber) {
+      logger.warn('Twilio not configured: missing TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, or TWILIO_PHONE_NUMBER/TWILIO_FROM');
       return false;
     }
     
     const formattedMessage = formatSmsMessage(notification);
+    const to = normalizePhoneNumber(notification.to);
     
-    const result = await twilioClient.messages.create({
+    const result = await client.messages.create({
       body: formattedMessage,
-      from: TWILIO_PHONE_NUMBER,
-      to: notification.to
+      from: fromNumber,
+      to,
     });
 
-    console.log(`✅ SMS sent successfully to ${notification.to} - SID: ${result.sid}`);
+    logger.info('SMS sent successfully', { to, sid: result.sid, type: notification.type });
     return true;
   } catch (error) {
-    console.error('❌ Error sending SMS via Twilio:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', error.message);
-    }
+    logger.error('Error sending SMS via Twilio', { error });
     return false;
   }
 }
 
 export async function sendRawSms(to: string, body: string): Promise<boolean> {
   try {
-    if (!twilioClient || !TWILIO_PHONE_NUMBER) {
-      // console.log('❌ Twilio not configured'); // Reduce noise in dev
+    const { fromNumber } = getTwilioConfig();
+    const client = getTwilioClient();
+
+    if (!client || !fromNumber) {
       return false;
     }
-    await twilioClient.messages.create({
+    await client.messages.create({
       body,
-      from: TWILIO_PHONE_NUMBER,
-      to
+      from: fromNumber,
+      to: normalizePhoneNumber(to),
     });
     return true;
   } catch (error) {
-    console.error('Error sending raw SMS:', error);
+    logger.error('Error sending raw SMS', { error });
     return false;
   }
 }
 
-export function getNotificationSmsContent(
-  type: 'order_update' | 'formula_update' | 'consultation_reminder' | 'system',
-  message: string
-): Omit<SmsNotification, 'to'> {
-  return {
-    message,
-    type
-  };
-}

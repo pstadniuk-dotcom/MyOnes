@@ -25,7 +25,7 @@ export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant', 'sys
 export const addressTypeEnum = pgEnum('address_type', ['shipping', 'billing']);
 export const fileTypeEnum = pgEnum('file_type', ['lab_report', 'medical_document', 'prescription', 'other']);
 export const auditActionEnum = pgEnum('audit_action', ['upload', 'view', 'download', 'delete', 'share', 'access_denied']);
-export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing']);
+export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing', 'sms_accountability']);
 export const notificationTypeEnum = pgEnum('notification_type', ['order_update', 'formula_update', 'consultation_reminder', 'system']);
 export const evidenceLevelEnum = pgEnum('evidence_level', ['strong', 'moderate', 'preliminary', 'limited']);
 export const studyTypeEnum = pgEnum('study_type', ['rct', 'meta_analysis', 'systematic_review', 'observational', 'case_study', 'review']);
@@ -663,7 +663,7 @@ export const labReportUploadSchema = z.object({
 
 // User consent validation schema
 export const userConsentSchema = z.object({
-  consentType: z.enum(['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing']),
+  consentType: z.enum(['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing', 'sms_accountability']),
   granted: z.boolean(),
   consentVersion: z.string().default('1.0'),
   metadata: z.record(z.any()).optional(),

@@ -9,7 +9,7 @@ import {
     type PaymentMethodRef, type InsertPaymentMethodRef,
     type Formula
 } from '@shared/schema';
-import { eq, and, desc, isNull, inArray, sql, lt, lte, gt } from 'drizzle-orm';
+import { eq, and, desc, isNull, inArray, sql, lt, lte, gt, gte } from 'drizzle-orm';
 import { decryptField, encryptField } from 'server/infra/security/fieldEncryption';
 import { newsletterSubscribers, userStreaks, type NewsletterSubscriber, type InsertNewsletterSubscriber } from '@shared/schema';
 
@@ -235,6 +235,24 @@ export class UsersRepository {
             .where(eq(subscriptions.userId, userId))
             .returning();
         return subscription || undefined;
+    }
+
+    async getUpcomingRenewals(daysAhead: number): Promise<Subscription[]> {
+        const targetDateStart = new Date();
+        targetDateStart.setDate(targetDateStart.getDate() + daysAhead);
+        targetDateStart.setHours(0, 0, 0, 0);
+
+        const targetDateEnd = new Date(targetDateStart);
+        targetDateEnd.setHours(23, 59, 59, 999);
+
+        return await db
+            .select()
+            .from(subscriptions)
+            .where(and(
+                eq(subscriptions.status, 'active'),
+                gte(subscriptions.renewsAt, targetDateStart),
+                lte(subscriptions.renewsAt, targetDateEnd)
+            ));
     }
 
     // Order operations

@@ -2,22 +2,36 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/shared/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
-import { Badge } from '@/shared/components/ui/badge';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { useToast } from '@/shared/hooks/use-toast';
 import {
   Watch,
   Activity,
   Heart,
+  Moon,
+  Footprints,
+  Flame,
+  Dumbbell,
+  Scale,
+  Droplets,
+  HeartPulse,
+  Salad,
   CheckCircle2,
   XCircle,
   Loader2,
   Link as LinkIcon,
-  ExternalLink,
   RefreshCw,
   Plus,
-  Sparkles
+  Sparkles,
+  Lock,
+  Zap,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  LucideIcon,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface WearableConnection {
   id: string;
@@ -28,19 +42,32 @@ interface WearableConnection {
   connectedAt: string;
   lastSyncedAt: string | null;
   source: 'junction';
-  logo?: string;
 }
 
 // Priority providers for ONES - Activity focused
-// Junction API provides logos at: https://storage.googleapis.com/vital-assets/{slug}.png
+// Logos are handled by ProviderLogo component with special overrides for non-standard names
 const PRIORITY_PROVIDERS = [
-  { slug: 'garmin', name: 'Garmin', priority: 1, description: 'Fitness watches & GPS', logo: 'https://storage.googleapis.com/vital-assets/garmin.png' },
-  { slug: 'google_fit', name: 'Google Fit', priority: 2, description: 'Android health platform', logo: 'https://storage.googleapis.com/vital-assets/googlefit.png' },
-  { slug: 'fitbit', name: 'Fitbit', priority: 3, description: 'Activity trackers', logo: 'https://storage.googleapis.com/vital-assets/fitbit.png' },
-  { slug: 'oura', name: 'Oura Ring', priority: 4, description: 'Sleep & recovery tracking', logo: 'https://storage.googleapis.com/vital-assets/oura.png' },
-  { slug: 'whoop_v2', name: 'WHOOP', priority: 5, description: 'Strain & recovery coach', logo: 'https://storage.googleapis.com/vital-assets/whoop.png' },
-  { slug: 'peloton', name: 'Peloton', priority: 6, description: 'Connected fitness', logo: 'https://storage.googleapis.com/vital-assets/peloton.png' },
-  { slug: 'freestyle_libre', name: 'Freestyle Libre', priority: 7, description: 'Continuous glucose monitoring', logo: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iNDAiIGZpbGw9IiMwMDQ4OGEiIHJ4PSI0Ii8+PHRleHQgeD0iNTAiIHk9IjI2IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QWJib3R0PC90ZXh0Pjwvc3ZnPg==' },
+  { slug: 'garmin', name: 'Garmin', priority: 1, description: 'Fitness watches & GPS' },
+  { slug: 'fitbit', name: 'Fitbit', priority: 2, description: 'Activity trackers' },
+  { slug: 'oura', name: 'Oura Ring', priority: 3, description: 'Sleep & recovery tracking' },
+  { slug: 'whoop_v2', name: 'WHOOP', priority: 4, description: 'Strain & recovery coach' },
+  { slug: 'google_fit', name: 'Google Fit', priority: 5, description: 'Android health platform' },
+  { slug: 'apple_health_kit', name: 'Apple Health', priority: 6, description: 'iOS health platform' },
+  { slug: 'withings', name: 'Withings', priority: 7, description: 'Smart scales & health monitors' },
+  { slug: 'strava', name: 'Strava', priority: 8, description: 'Activity social network' },
+  { slug: 'polar', name: 'Polar', priority: 9, description: 'Sports tech pioneer' },
+  { slug: 'peloton', name: 'Peloton', priority: 10, description: 'Connected fitness' },
+  { slug: 'eight_sleep', name: 'Eight Sleep', priority: 11, description: 'Smart mattress' },
+  { slug: 'ultrahuman', name: 'Ultrahuman', priority: 12, description: 'Metabolic fitness' },
+  { slug: 'zwift', name: 'Zwift', priority: 13, description: 'Virtual cycling app' },
+  { slug: 'wahoo', name: 'Wahoo', priority: 14, description: 'Indoor bike trainers' },
+  { slug: 'freestyle_libre', name: 'Freestyle Libre', priority: 15, description: 'Continuous glucose monitor' },
+  { slug: 'dexcom', name: 'Dexcom', priority: 16, description: 'Continuous glucose monitor' },
+  { slug: 'cronometer', name: 'Cronometer', priority: 17, description: 'Nutrition tracking app' },
+  { slug: 'omron', name: 'Omron', priority: 18, description: 'Blood pressure monitors' },
+  { slug: 'kardia', name: 'Kardia', priority: 19, description: 'Portable ECG sensors' },
+  { slug: 'beurer', name: 'Beurer', priority: 20, description: 'Blood pressure & glucose' },
+  { slug: 'hammerhead', name: 'Hammerhead', priority: 21, description: 'Cycling computers' },
 ];
 
 const PROVIDER_COLORS: Record<string, { color: string; bgColor: string }> = {
@@ -52,9 +79,23 @@ const PROVIDER_COLORS: Record<string, { color: string; bgColor: string }> = {
   whoop: { color: 'text-black', bgColor: 'bg-yellow-50' },
   peloton: { color: 'text-red-600', bgColor: 'bg-red-50' },
   freestyle_libre: { color: 'text-blue-500', bgColor: 'bg-blue-50' },
+  apple_health_kit: { color: 'text-pink-600', bgColor: 'bg-pink-50' },
+  withings: { color: 'text-slate-700', bgColor: 'bg-slate-50' },
+  strava: { color: 'text-orange-600', bgColor: 'bg-orange-50' },
+  polar: { color: 'text-red-700', bgColor: 'bg-red-50' },
+  eight_sleep: { color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
+  ultrahuman: { color: 'text-purple-600', bgColor: 'bg-purple-50' },
+  zwift: { color: 'text-orange-500', bgColor: 'bg-orange-50' },
+  wahoo: { color: 'text-blue-700', bgColor: 'bg-blue-50' },
+  dexcom: { color: 'text-teal-600', bgColor: 'bg-teal-50' },
+  cronometer: { color: 'text-green-700', bgColor: 'bg-green-50' },
+  omron: { color: 'text-blue-600', bgColor: 'bg-blue-50' },
+  kardia: { color: 'text-red-500', bgColor: 'bg-red-50' },
+  beurer: { color: 'text-cyan-600', bgColor: 'bg-cyan-50' },
+  hammerhead: { color: 'text-slate-800', bgColor: 'bg-slate-100' },
 };
 
-function ProviderLogo({ provider, logo, size = 'md' }: { provider: string; logo?: string; size?: 'sm' | 'md' | 'lg' }) {
+function ProviderLogo({ provider, size = 'md' }: { provider: string; size?: 'sm' | 'md' | 'lg' }) {
   const [imgError, setImgError] = useState(false);
   const sizeClasses = {
     sm: 'h-5 w-5',
@@ -62,8 +103,32 @@ function ProviderLogo({ provider, logo, size = 'md' }: { provider: string; logo?
     lg: 'h-12 w-12',
   };
 
-  // Try provider logo from Junction API
-  const logoUrl = logo || `https://storage.googleapis.com/vital-assets/${provider}.png`;
+  const domainByProvider: Record<string, string> = {
+    garmin: 'garmin.com',
+    fitbit: 'fitbit.com',
+    oura: 'ouraring.com',
+    whoop_v2: 'whoop.com',
+    google_fit: 'google.com',
+    apple_health_kit: 'apple.com',
+    withings: 'withings.com',
+    strava: 'strava.com',
+    polar: 'polar.com',
+    peloton: 'onepeloton.com',
+    eight_sleep: 'eightsleep.com',
+    ultrahuman: 'ultrahuman.com',
+    zwift: 'zwift.com',
+    wahoo: 'wahoofitness.com',
+    freestyle_libre: 'freestyle.abbott',
+    dexcom: 'dexcom.com',
+    cronometer: 'cronometer.com',
+    omron: 'omronhealthcare.com',
+    kardia: 'kardia.com',
+    beurer: 'beurer.com',
+    hammerhead: 'hammerhead.io',
+  };
+
+  const domain = domainByProvider[provider] || `${provider}.com`;
+  const logoUrl = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
 
   if (imgError) {
     return <Watch className={`${sizeClasses[size]} text-muted-foreground`} />;
@@ -79,13 +144,193 @@ function ProviderLogo({ provider, logo, size = 'md' }: { provider: string; logo?
   );
 }
 
+// --- Interfaces ---
+interface PillarsData {
+  activePillars: string[];
+  unlockablePillars: { pillar: string; label: string; description: string; suggestedProviders: { slug: string; name: string; logo?: string }[] }[];
+}
+
+interface HistoricalData {
+  success: boolean;
+  data: {
+    sleep: { date: string; totalMinutes: number | null; hrv: number | null; score: number | null; source: string }[];
+    activity: { date: string; steps: number | null; caloriesActive: number | null; activeMinutes: number | null; source: string }[];
+    body: any[];
+    workouts: any[];
+  };
+  statistics: {
+    sleep: { avgDuration: number | null; avgScore: number | null; avgHRV: number | null };
+    activity: { avgSteps: number | null; avgActiveMinutes: number | null; avgCaloriesActive: number | null };
+    body: { latestWeight: number | null; avgRestingHR: number | null; avgHRV: number | null };
+    workouts: { totalCount: number; avgPerWeek: number; avgDuration: number | null; mostCommonType: string | null };
+  };
+}
+
+// --- Pillar definitions ---
+const PILLAR_DEFS: { id: string; label: string; icon: LucideIcon }[] = [
+  { id: 'sleep',    label: 'Sleep',    icon: Moon },
+  { id: 'activity', label: 'Activity', icon: Footprints },
+  { id: 'recovery', label: 'Recovery', icon: Heart },
+  { id: 'workouts', label: 'Workouts', icon: Dumbbell },
+  { id: 'body',     label: 'Body',     icon: Scale },
+  { id: 'glucose',  label: 'Glucose',  icon: Droplets },
+  { id: 'heart',    label: 'Heart',    icon: HeartPulse },
+  { id: 'nutrition',label: 'Nutrition',icon: Salad },
+];
+
+// Map of suggested devices per pillar (matches backend PILLAR_SUGGESTED)
+const PILLAR_DEVICE_MAP: Record<string, { slug: string; name: string }[]> = {
+  sleep:    [{ slug: 'oura', name: 'Oura Ring' }, { slug: 'eight_sleep', name: 'Eight Sleep' }, { slug: 'fitbit', name: 'Fitbit' }, { slug: 'whoop_v2', name: 'WHOOP' }, { slug: 'garmin', name: 'Garmin' }, { slug: 'polar', name: 'Polar' }, { slug: 'withings', name: 'Withings' }],
+  activity: [{ slug: 'garmin', name: 'Garmin' }, { slug: 'fitbit', name: 'Fitbit' }, { slug: 'google_fit', name: 'Google Fit' }, { slug: 'apple_health_kit', name: 'Apple Health' }, { slug: 'polar', name: 'Polar' }, { slug: 'strava', name: 'Strava' }, { slug: 'whoop_v2', name: 'WHOOP' }, { slug: 'withings', name: 'Withings' }, { slug: 'ultrahuman', name: 'Ultrahuman' }, { slug: 'peloton', name: 'Peloton' }, { slug: 'wahoo', name: 'Wahoo' }, { slug: 'zwift', name: 'Zwift' }, { slug: 'hammerhead', name: 'Hammerhead' }],
+  recovery: [{ slug: 'oura', name: 'Oura Ring' }, { slug: 'whoop_v2', name: 'WHOOP' }, { slug: 'garmin', name: 'Garmin' }, { slug: 'fitbit', name: 'Fitbit' }, { slug: 'polar', name: 'Polar' }, { slug: 'apple_health_kit', name: 'Apple Health' }, { slug: 'ultrahuman', name: 'Ultrahuman' }],
+  workouts: [{ slug: 'garmin', name: 'Garmin' }, { slug: 'fitbit', name: 'Fitbit' }, { slug: 'strava', name: 'Strava' }, { slug: 'peloton', name: 'Peloton' }, { slug: 'apple_health_kit', name: 'Apple Health' }, { slug: 'polar', name: 'Polar' }, { slug: 'whoop_v2', name: 'WHOOP' }, { slug: 'zwift', name: 'Zwift' }, { slug: 'wahoo', name: 'Wahoo' }, { slug: 'hammerhead', name: 'Hammerhead' }, { slug: 'ultrahuman', name: 'Ultrahuman' }],
+  body:     [{ slug: 'withings', name: 'Withings' }, { slug: 'fitbit', name: 'Fitbit' }, { slug: 'oura', name: 'Oura Ring' }, { slug: 'apple_health_kit', name: 'Apple Health' }, { slug: 'garmin', name: 'Garmin' }, { slug: 'polar', name: 'Polar' }, { slug: 'ultrahuman', name: 'Ultrahuman' }],
+  glucose:  [{ slug: 'freestyle_libre', name: 'Freestyle Libre' }, { slug: 'dexcom', name: 'Dexcom' }, { slug: 'beurer', name: 'Beurer' }],
+  heart:    [{ slug: 'withings', name: 'Withings' }, { slug: 'omron', name: 'Omron' }, { slug: 'kardia', name: 'Kardia' }, { slug: 'beurer', name: 'Beurer' }, { slug: 'garmin', name: 'Garmin' }, { slug: 'apple_health_kit', name: 'Apple Health' }, { slug: 'polar', name: 'Polar' }],
+  nutrition:[{ slug: 'cronometer', name: 'Cronometer' }],
+};
+
+// --- Helper functions ---
+const fmtSleep = (mins: number | null) =>
+  mins ? `${Math.floor(mins / 60)}h ${mins % 60}m` : '—';
+const fmtNum = (n: number | null) =>
+  n != null ? n.toLocaleString() : '—';
+
+function fmtDate(d: string) {
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// --- SparkBars mini chart ---
+function SparkBars({ values, color }: { values: (number | null)[]; color: string }) {
+  const valid = values.filter((v): v is number => v !== null);
+  const max = valid.length > 0 ? Math.max(...valid) : 1;
+  return (
+    <div className="flex items-end gap-[2px] h-10">
+      {values.map((v, i) => {
+        const h = v !== null && max > 0 ? Math.max(4, Math.round((v / max) * 40)) : 3;
+        return (
+          <div
+            key={i}
+            className="flex-1 rounded-t-sm transition-all"
+            style={{
+              height: `${h}px`,
+              backgroundColor: v !== null ? color : '#E8F0EC',
+              opacity: 0.3 + (i / Math.max(values.length - 1, 1)) * 0.7,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// --- Stat tile ---
+type DetailRow = { date: string; value: string; sub?: string };
+
+function StatTile({
+  icon: Icon,
+  iconBg,
+  iconColor,
+  accentColor,
+  label,
+  value,
+  unit,
+  sub,
+  sparkValues,
+  onClick,
+  expanded,
+  detailRows,
+}: {
+  icon: LucideIcon;
+  iconBg: string;
+  iconColor: string;
+  accentColor: string;
+  label: string;
+  value: string | null;
+  unit: string;
+  sub: string;
+  sparkValues: (number | null)[];
+  onClick?: () => void;
+  expanded?: boolean;
+  detailRows?: DetailRow[];
+}) {
+  const Chevron = expanded ? ChevronUp : ChevronDown;
+  return (
+    <div
+      onClick={onClick}
+      className={`bg-white rounded-2xl border p-4 sm:p-5 flex flex-col gap-3 shadow-sm transition-all ${
+        onClick ? 'cursor-pointer hover:shadow-md hover:border-[#52796F]/25' : ''
+      } ${
+        expanded ? 'border-[#52796F]/30 ring-1 ring-[#1B4332]/10' : 'border-[#52796F]/10'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <div className={`h-9 w-9 rounded-full ${iconBg} flex items-center justify-center`}>
+          <Icon className={`h-4 w-4 ${iconColor}`} />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-[#52796F]">{label}</span>
+          {onClick && <Chevron className="h-3.5 w-3.5 text-[#52796F]/50" />}
+        </div>
+      </div>
+      <div>
+        {value !== null ? (
+          <p className="text-2xl sm:text-3xl font-bold text-[#1B4332] leading-tight">
+            {value}
+            {unit && <span className="text-sm font-normal text-[#52796F] ml-1">{unit}</span>}
+          </p>
+        ) : (
+          <p className="text-base text-[#52796F] italic">No data yet</p>
+        )}
+        <p className="text-xs text-[#52796F] mt-0.5">{sub}</p>
+      </div>
+      <SparkBars values={sparkValues} color={accentColor} />
+      {expanded && detailRows && detailRows.length > 0 && (
+        <div className="border-t border-[#52796F]/10 pt-3 space-y-2" onClick={e => e.stopPropagation()}>
+          {detailRows.map((row, i) => (
+            <div key={i} className="flex items-center justify-between">
+              <span className="text-xs text-[#52796F]">{row.date}</span>
+              <div className="text-right">
+                <span className="text-xs font-semibold text-[#1B4332]">{row.value}</span>
+                {row.sub && <span className="text-xs text-[#52796F] ml-1">{row.sub}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {expanded && (!detailRows || detailRows.length === 0) && (
+        <p className="text-xs text-[#52796F] border-t border-[#52796F]/10 pt-3 text-center italic">No detail data available</p>
+      )}
+    </div>
+  );
+}
+
 export default function WearablesPage() {
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
+  const [dayRange, setDayRange] = useState<7 | 30 | 90>(30);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [showPillarDevices, setShowPillarDevices] = useState(false);
+  const toggleCard = (id: string) => setExpandedCard(prev => prev === id ? null : id);
 
   // Fetch connected devices
   const { data: connections = [], isLoading } = useQuery<WearableConnection[]>({
     queryKey: ['/api/wearables/connections'],
+  });
+
+  // Fetch active/unlockable pillars based on connected devices
+  const { data: pillarsData } = useQuery<PillarsData>({
+    queryKey: ['/api/wearables/pillars'],
+    enabled: connections.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch historical biometric data for the selected day range
+  const { data: histData, isLoading: histLoading } = useQuery<HistoricalData>({
+    queryKey: ['/api/wearables/historical-data', dayRange],
+    queryFn: () => apiRequest('GET', `/api/wearables/historical-data?days=${dayRange}`).then(r => r.json()),
+    enabled: connections.length > 0,
+    staleTime: 3 * 60 * 1000,
   });
 
   // Disconnect mutation
@@ -133,10 +378,19 @@ export default function WearablesPage() {
   });
 
   // Handle connect - opens Junction Link widget
-  const handleConnect = async () => {
+  const handleConnect = async (provider?: string) => {
+    if (provider === 'apple_health_kit') {
+      toast({
+        title: 'Apple Health requires mobile SDK',
+        description: 'Apple HealthKit connects through the iOS app (Vital Core + Vital Health SDK), not web Link flow.',
+      });
+      return;
+    }
+
     setIsConnecting(true);
     try {
-      const res = await apiRequest('GET', '/api/wearables/connect');
+      const query = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+      const res = await apiRequest('GET', `/api/wearables/connect${query}`);
 
       if (res.status === 401) {
         toast({
@@ -150,7 +404,6 @@ export default function WearablesPage() {
 
       const data = await res.json();
       if (data?.linkUrl) {
-        // Redirect to Junction Link widget
         window.location.href = data.linkUrl;
       } else {
         toast({
@@ -183,246 +436,508 @@ export default function WearablesPage() {
     );
   }
 
+  // Derived dashboard values
+  const stats = histData?.statistics;
+  const sleepSparkline = (histData?.data?.sleep  ?? []).map(s => s.totalMinutes ?? null);
+  const stepsSparkline = (histData?.data?.activity ?? []).map(a => a.steps ?? null);
+  const hrvSparkline   = (histData?.data?.sleep  ?? []).map(s => s.hrv ?? null);
+  const calSparkline   = (histData?.data?.activity ?? []).map(a => a.caloriesActive ?? null);
+  // Detail rows for expandable tiles
+  const sleepRows: DetailRow[] = (histData?.data?.sleep ?? []).slice(0, 7).map(s => ({
+    date: fmtDate(s.date),
+    value: fmtSleep(s.totalMinutes),
+    sub: s.totalMinutes ? undefined : undefined,
+  }));
+  const stepsRows: DetailRow[] = (histData?.data?.activity ?? []).slice(0, 7).map(a => ({
+    date: fmtDate(a.date),
+    value: a.steps != null ? fmtNum(a.steps) + ' steps' : '—',
+    sub: a.activeMinutes ? `${a.activeMinutes}m active` : undefined,
+  }));
+  const hrvRows: DetailRow[] = (histData?.data?.sleep ?? []).filter(s => s.hrv != null).slice(0, 7).map(s => ({
+    date: fmtDate(s.date),
+    value: `${s.hrv}ms`,
+  }));
+  const calRows: DetailRow[] = (histData?.data?.activity ?? []).filter(a => a.caloriesActive != null).slice(0, 7).map(a => ({
+    date: fmtDate(a.date),
+    value: a.caloriesActive != null ? fmtNum(a.caloriesActive) + ' kcal' : '—',
+  }));
+  const workoutRows: DetailRow[] = (histData?.data?.workouts ?? []).slice(0, 7).map(w => ({
+    date: fmtDate(w.date),
+    value: w.type ? `${w.type}` : 'Workout',
+    sub: w.durationMinutes ? `${w.durationMinutes}m` : undefined,
+  }));
+  // Workout sparklines from individual records
+  const workoutDurationSparkline = (histData?.data?.workouts ?? []).map((w: any) => w.durationMinutes ?? null);
+  const activePillars    = pillarsData?.activePillars    ?? [];
+  const unlockablePillars = pillarsData?.unlockablePillars ?? [];
+
   return (
     <div className="space-y-6 px-1 sm:px-0">
-      {/* Header - Stack on mobile */}
-      <div className="flex flex-col gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1B4332]">Wearable Devices</h1>
-          <p className="text-sm sm:text-base text-[#52796F] mt-2">
-            Connect your fitness trackers to personalize your supplement formula based on your activity, sleep, and recovery data.
-          </p>
-        </div>
 
-        {/* Buttons - Full width on mobile */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          {connections.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
-              className="w-full sm:w-auto border-[#1B4332] text-[#1B4332]"
-            >
-              {syncMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              Sync Data
-            </Button>
-          )}
-          <Button
-            onClick={handleConnect}
-            disabled={isConnecting}
-            className="w-full sm:w-auto bg-[#1B4332] hover:bg-[#1B4332]/90"
-          >
-            {isConnecting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="mr-2 h-4 w-4" />
-            )}
-            Connect Device
-          </Button>
-        </div>
+      {/* ── Page Header ── */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1B4332]">Wearable Devices</h1>
+        <p className="text-sm sm:text-base text-[#52796F] mt-1">
+          Connect your health devices to personalize your supplement formula.
+        </p>
       </div>
 
-      {/* Connected Devices */}
+      {/* ── Connected device chips or empty state ── */}
       {connections.length > 0 ? (
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          {connections.map((connection) => {
-            const colors = PROVIDER_COLORS[connection.provider] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
-
+        <div className="flex items-center gap-3 flex-wrap">
+          {connections.map(connection => {
+            const colors = PROVIDER_COLORS[connection.provider] || { color: 'text-gray-600', bgColor: 'bg-gray-50' };
             return (
-              <Card key={connection.id} className="relative overflow-hidden bg-[#FAF7F2] border-[#52796F]/20">
-                <div className={`absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 ${colors.bgColor} rounded-full -mr-12 sm:-mr-16 -mt-12 sm:-mt-16 opacity-20`} />
-
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className={`p-2 sm:p-3 rounded-lg ${colors.bgColor}`}>
-                      <ProviderLogo provider={connection.provider} logo={connection.logo} size="md" />
-                    </div>
-                    <Badge
-                      variant={connection.status === 'connected' ? 'default' : connection.status === 'error' ? 'destructive' : 'secondary'}
-                      className="gap-1 text-xs whitespace-nowrap bg-[#1B4332]"
-                    >
-                      {connection.status === 'connected' ? (
-                        <><CheckCircle2 className="h-3 w-3" /> Connected</>
-                      ) : connection.status === 'error' ? (
-                        <><XCircle className="h-3 w-3" /> Error</>
-                      ) : (
-                        <><XCircle className="h-3 w-3" /> Disconnected</>
-                      )}
-                    </Badge>
-                  </div>
-                  <CardTitle className="mt-3 text-lg text-[#1B4332]">{connection.providerName}</CardTitle>
-                  <CardDescription className="text-[#52796F]">
-                    Syncing activity, sleep & recovery data
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="space-y-3 pt-0">
-                  <div className="text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-[#52796F]">Connected</span>
-                      <span className="font-medium text-[#1B4332]">
-                        {new Date(connection.connectedAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    {connection.lastSyncedAt && (
-                      <div className="flex justify-between">
-                        <span className="text-[#52796F]">Last synced</span>
-                        <span className="font-medium text-[#1B4332]">
-                          {new Date(connection.lastSyncedAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    className="w-full border-red-300 text-red-600 hover:bg-red-50"
-                    onClick={() => handleDisconnect(connection.id)}
-                    disabled={disconnectMutation.isPending}
-                    size="sm"
-                  >
-                    {disconnectMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Disconnecting...
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="mr-2 h-4 w-4" />
-                        Disconnect
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
+              <div key={connection.id} className="flex items-center gap-2 bg-white border border-[#52796F]/20 rounded-xl px-3 py-2 shadow-sm">
+                <div className={`p-1.5 rounded-lg ${colors.bgColor}`}>
+                  <ProviderLogo provider={connection.provider} size="sm" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-[#1B4332] leading-tight">{connection.providerName}</p>
+                  <p className="text-xs text-[#52796F] flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+                    Syncing
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDisconnect(connection.id)}
+                  className="ml-1 text-[#52796F]/50 hover:text-red-500 transition-colors"
+                  title="Disconnect"
+                >
+                  <XCircle className="h-4 w-4" />
+                </button>
+              </div>
             );
           })}
+          <div className="flex gap-2 ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+              className="border-[#1B4332] text-[#1B4332]"
+            >
+              {syncMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              <span className="ml-1.5 hidden sm:inline">Sync</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleConnect()}
+              disabled={isConnecting}
+              className="bg-[#1B4332] hover:bg-[#1B4332]/90"
+            >
+              {isConnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              <span className="ml-1.5">Add Device</span>
+            </Button>
+          </div>
         </div>
       ) : (
-        <Card className="border-dashed bg-[#FAF7F2] border-[#52796F]/30">
-          <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 px-4">
-            <div className="h-12 w-12 rounded-full bg-[#1B4332]/10 flex items-center justify-center mb-4">
-              <Watch className="h-6 w-6 text-[#1B4332]" />
+        <div className="space-y-6">
+          <Card className="border-dashed bg-[#FAF7F2] border-[#52796F]/30">
+            <CardContent className="flex flex-col items-center justify-center py-10 px-4">
+              <div className="h-14 w-14 rounded-full bg-[#1B4332]/10 flex items-center justify-center mb-4">
+                <Watch className="h-7 w-7 text-[#1B4332]" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2 text-[#1B4332]">No devices connected</h3>
+              <p className="text-[#52796F] text-center text-sm max-w-md mb-5">
+                Connect a wearable to unlock personalized supplement recommendations based on your sleep, activity, and recovery.
+              </p>
+              <Button onClick={() => handleConnect()} disabled={isConnecting} className="bg-[#1B4332] hover:bg-[#1B4332]/90">
+                {isConnecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LinkIcon className="mr-2 h-4 w-4" />}
+                Connect Your First Device
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Featured integrations for new users */}
+          <Card className="bg-[#FAF7F2] border-[#52796F]/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-[#1B4332]"><Sparkles className="h-5 w-5" />Featured Integrations</CardTitle>
+              <CardDescription className="text-[#52796F]">Connect a device to start tracking your health</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {PRIORITY_PROVIDERS.map(provider => {
+                  const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
+                  return (
+                    <button
+                      key={provider.slug}
+                      onClick={() => handleConnect(provider.slug)}
+                      disabled={isConnecting}
+                      className="flex items-center gap-3 p-3 rounded-xl border-2 border-transparent bg-white/60 hover:bg-white hover:border-[#1B4332]/20 transition-all text-left disabled:opacity-60"
+                    >
+                      <div className={`p-2 rounded-lg ${colors.bgColor} flex-shrink-0`}>
+                        <ProviderLogo provider={provider.slug} size="md" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-sm text-[#1B4332] block truncate">{provider.name}</span>
+                        <p className="text-xs text-[#52796F] truncate">{provider.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Health Dashboard (connected only) ── */}
+      {connections.length > 0 && (
+        <Card className="bg-[#FAF7F2] border-[#52796F]/20 overflow-hidden">
+          <CardHeader className="pb-3 border-b border-[#52796F]/10">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <CardTitle className="text-[#1B4332] text-xl">Your Health Data</CardTitle>
+              {/* Day-range selector */}
+              <div className="flex items-center gap-1 bg-white border border-[#52796F]/20 rounded-lg p-1">
+                {([7, 30, 90] as const).map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setDayRange(d)}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                      dayRange === d
+                        ? 'bg-[#1B4332] text-white shadow-sm'
+                        : 'text-[#52796F] hover:text-[#1B4332]'
+                    }`}
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
             </div>
-            <h3 className="text-lg font-semibold mb-2 text-[#1B4332]">No devices connected</h3>
-            <p className="text-[#52796F] text-center text-sm sm:text-base max-w-md mb-4">
-              Connect your wearable device to get personalized supplement recommendations based on your activity, sleep, and recovery data.
-            </p>
-            <Button
-              onClick={handleConnect}
-              disabled={isConnecting}
-              className="w-full sm:w-auto bg-[#1B4332] hover:bg-[#1B4332]/90"
-            >
-              {isConnecting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <LinkIcon className="mr-2 h-4 w-4" />
-              )}
-              Connect Your First Device
-            </Button>
+          </CardHeader>
+
+          <CardContent className="p-4 sm:p-6">
+            {histLoading ? (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}
+              </div>
+            ) : (
+              <>
+                {/* 4 Stat Tiles */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <StatTile
+                    icon={Moon} iconBg="bg-indigo-100" iconColor="text-indigo-600" accentColor="#6366F1"
+                    label="Sleep" unit="" sub="avg per night"
+                    value={stats?.sleep?.avgDuration != null ? fmtSleep(stats.sleep.avgDuration) : null}
+                    sparkValues={sleepSparkline}
+                    onClick={() => toggleCard('sleep')}
+                    expanded={expandedCard === 'sleep'}
+                    detailRows={sleepRows}
+                  />
+                  <StatTile
+                    icon={Footprints} iconBg="bg-emerald-100" iconColor="text-emerald-600" accentColor="#10B981"
+                    label="Steps" unit="" sub="avg per day"
+                    value={stats?.activity?.avgSteps != null ? fmtNum(stats.activity.avgSteps) : null}
+                    sparkValues={stepsSparkline}
+                    onClick={() => toggleCard('steps')}
+                    expanded={expandedCard === 'steps'}
+                    detailRows={stepsRows}
+                  />
+                  <StatTile
+                    icon={Heart} iconBg="bg-rose-100" iconColor="text-rose-600" accentColor="#EF4444"
+                    label="HRV" unit="ms" sub="avg heart rate variability"
+                    value={stats?.sleep?.avgHRV?.toString() ?? null}
+                    sparkValues={hrvSparkline}
+                    onClick={() => toggleCard('hrv')}
+                    expanded={expandedCard === 'hrv'}
+                    detailRows={hrvRows}
+                  />
+                  <StatTile
+                    icon={Flame} iconBg="bg-amber-100" iconColor="text-amber-600" accentColor="#F59E0B"
+                    label="Active Cals" unit="kcal" sub="avg burned per day"
+                    value={stats?.activity?.avgCaloriesActive != null ? fmtNum(stats.activity.avgCaloriesActive) : null}
+                    sparkValues={calSparkline}
+                    onClick={() => toggleCard('cals')}
+                    expanded={expandedCard === 'cals'}
+                    detailRows={calRows}
+                  />
+                </div>
+
+                {/* Workout stat tiles */}
+                {(stats?.workouts?.totalCount ?? 0) > 0 && (
+                  <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-3 sm:gap-4">
+                    <StatTile
+                      icon={Dumbbell} iconBg="bg-violet-100" iconColor="text-violet-600" accentColor="#8B5CF6"
+                      label="Sessions" unit="" sub={`in ${dayRange} days`}
+                      value={String(stats!.workouts.totalCount)}
+                      sparkValues={workoutDurationSparkline}
+                      onClick={() => toggleCard('workouts')}
+                      expanded={expandedCard === 'workouts'}
+                      detailRows={workoutRows}
+                    />
+                    <StatTile
+                      icon={Activity} iconBg="bg-sky-100" iconColor="text-sky-600" accentColor="#0EA5E9"
+                      label="Per Week" unit="" sub="avg frequency"
+                      value={String(stats!.workouts.avgPerWeek)}
+                      sparkValues={workoutDurationSparkline}
+                      onClick={() => toggleCard('workouts')}
+                      expanded={expandedCard === 'workouts'}
+                      detailRows={workoutRows}
+                    />
+                    <StatTile
+                      icon={Clock} iconBg="bg-teal-100" iconColor="text-teal-600" accentColor="#14B8A6"
+                      label="Avg Duration" unit="" sub={stats!.workouts.mostCommonType ? `usually ${stats!.workouts.mostCommonType}` : 'per session'}
+                      value={stats!.workouts.avgDuration ? `${stats!.workouts.avgDuration}m` : null}
+                      sparkValues={workoutDurationSparkline}
+                      onClick={() => toggleCard('workouts')}
+                      expanded={expandedCard === 'workouts'}
+                      detailRows={workoutRows}
+                    />
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {(histData?.data?.sleep?.length ?? 0) === 0 && (histData?.data?.activity?.length ?? 0) === 0 && !histLoading && (
+                  <div className="text-center py-8 mt-2">
+                    <p className="text-[#52796F] text-sm">No biometric data yet — sync your device or wait for the first automatic pull.</p>
+                    <Button variant="outline" size="sm" className="mt-3 border-[#1B4332] text-[#1B4332]" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
+                      {syncMutation.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />}
+                      Sync Now
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Priority Providers */}
-      <Card className="bg-[#FAF7F2] border-[#52796F]/20">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-[#1B4332]">
-            <Sparkles className="h-5 w-5 text-[#1B4332]" />
-            Featured Integrations
-          </CardTitle>
-          <CardDescription className="text-[#52796F]">
-            Connect your favorite fitness tracker to unlock personalized supplement recommendations
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {PRIORITY_PROVIDERS.map((provider) => {
-              const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
-              const isConnected = connections.some(c => c.provider === provider.slug || c.provider === provider.slug.replace('_v2', ''));
-
-              return (
-                <div
-                  key={provider.slug}
-                  className={`flex items-center gap-3 p-3 sm:p-4 rounded-xl border-2 transition-all ${isConnected
-                    ? 'border-green-500 bg-green-50/50'
-                    : 'border-transparent bg-white/50 hover:bg-white hover:border-[#1B4332]/20'
-                    }`}
+      {/* ── Data Pillars (connected only) ── */}
+      {connections.length > 0 && (activePillars.length > 0 || unlockablePillars.length > 0) && (
+        <Card className="bg-[#FAF7F2] border-[#52796F]/20">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-[#1B4332] text-base flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Data Pillars
+              </CardTitle>
+              {unlockablePillars.length > 0 && (
+                <button
+                  onClick={() => setShowPillarDevices(true)}
+                  className="text-xs font-medium text-[#1B4332] hover:underline flex items-center gap-1"
                 >
-                  <div className={`p-2 rounded-lg ${colors.bgColor} flex-shrink-0`}>
-                    <ProviderLogo provider={provider.slug} logo={provider.logo} size="md" />
+                  <Plus className="h-3 w-3" />
+                  Add device to unlock more
+                </button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-1">
+            <div className="flex flex-wrap gap-2">
+              {/* Active pillars */}
+              {activePillars.map(pillar => {
+                const def = PILLAR_DEFS.find(p => p.id === pillar);
+                if (!def) return null;
+                const Icon = def.icon;
+                return (
+                  <div key={pillar} className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-[#1B4332] rounded-full px-3 py-1.5 text-sm font-medium">
+                    <Icon className="h-3.5 w-3.5 text-emerald-600" />
+                    {def.label}
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate text-[#1B4332]">{provider.name}</span>
-                      {isConnected && <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />}
-                    </div>
-                    <p className="text-xs text-[#52796F] truncate">{provider.description}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-xs text-[#52796F] mt-4">
-            Click "Connect Device" above to link any of these providers. Historical data (up to 180 days) will be automatically imported for AI analysis.
-          </p>
-        </CardContent>
-      </Card>
+                );
+              })}
+              {/* Locked pillars — muted chips */}
+              {unlockablePillars.map(up => {
+                const def = PILLAR_DEFS.find(p => p.id === up.pillar);
+                if (!def) return null;
+                const Icon = def.icon;
+                return (
+                  <button
+                    key={up.pillar}
+                    onClick={() => setShowPillarDevices(true)}
+                    title={`Unlock ${up.label}: ${up.description}`}
+                    className="flex items-center gap-1.5 bg-white border border-dashed border-[#52796F]/30 text-[#52796F] rounded-full px-3 py-1.5 text-sm hover:border-[#1B4332]/40 hover:text-[#1B4332] transition-colors"
+                  >
+                    <Icon className="h-3.5 w-3.5 opacity-50" />
+                    {def.label}
+                    <Lock className="h-3 w-3 opacity-40" />
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* How It Works */}
+      {/* ── Featured Integrations (connected — add more) ── */}
       {connections.length > 0 && (
         <Card className="bg-[#FAF7F2] border-[#52796F]/20">
           <CardHeader className="pb-3">
-            <CardTitle className="text-[#1B4332]">How It Works</CardTitle>
-            <CardDescription className="text-[#52796F]">
-              Your connected devices help us optimize your supplement formula
-            </CardDescription>
+            <CardTitle className="flex items-center gap-2 text-[#1B4332]"><Sparkles className="h-5 w-5" />Featured Integrations</CardTitle>
+            <CardDescription className="text-[#52796F]">Add more devices to unlock additional health pillars</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-semibold text-[#1B4332]">1</span>
-                  </div>
-                  <h4 className="font-medium text-[#1B4332]">Data Collection</h4>
-                </div>
-                <p className="text-sm text-[#52796F] pl-10">
-                  We securely sync your sleep, activity, and recovery metrics daily
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-semibold text-[#1B4332]">2</span>
-                  </div>
-                  <h4 className="font-medium text-[#1B4332]">AI Analysis</h4>
-                </div>
-                <p className="text-sm text-[#52796F] pl-10">
-                  Our AI identifies trends and patterns in your biometric data
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-semibold text-[#1B4332]">3</span>
-                  </div>
-                  <h4 className="font-medium text-[#1B4332]">Personalization</h4>
-                </div>
-                <p className="text-sm text-[#52796F] pl-10">
-                  Your formula is automatically adjusted based on your body's needs
-                </p>
-              </div>
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {PRIORITY_PROVIDERS.map(provider => {
+                const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
+                const isConnected = connections.some(c => c.provider === provider.slug || c.provider === provider.slug.replace('_v2', ''));
+                return (
+                  <button
+                    key={provider.slug}
+                    onClick={() => {
+                      if (!isConnected) {
+                        handleConnect(provider.slug);
+                      }
+                    }}
+                    disabled={isConnected || isConnecting}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
+                      isConnected
+                        ? 'border-emerald-400 bg-emerald-50/50'
+                        : 'border-transparent bg-white/60 hover:bg-white hover:border-[#1B4332]/20'
+                    } text-left disabled:cursor-default disabled:opacity-100`}
+                  >
+                    <div className={`p-2 rounded-lg ${colors.bgColor} flex-shrink-0`}>
+                        <ProviderLogo provider={provider.slug} size="md" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm text-[#1B4332] truncate">{provider.name}</span>
+                        {isConnected && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" />}
+                      </div>
+                      <p className="text-xs text-[#52796F] truncate">{provider.description}</p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
+            <p className="text-xs text-[#52796F] mt-4">Historical data up to 180 days is automatically imported for AI formula analysis.</p>
           </CardContent>
         </Card>
       )}
+
+      {/* ── Pillar Devices Modal ── */}
+      <Dialog open={showPillarDevices} onOpenChange={setShowPillarDevices}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-[#1B4332] flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Health Data Pillars
+            </DialogTitle>
+            <DialogDescription className="text-[#52796F]">
+              See which devices unlock each health pillar. Connected devices are highlighted in green.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 mt-4">
+            {/* Active Pillars */}
+            {activePillars.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-[#1B4332] mb-3 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  Active Pillars
+                </h3>
+                <div className="space-y-3">
+                  {activePillars.map(pillarId => {
+                    const def = PILLAR_DEFS.find(p => p.id === pillarId);
+                    if (!def) return null;
+                    const Icon = def.icon;
+                    const devices = PILLAR_DEVICE_MAP[pillarId] || [];
+                    
+                    return (
+                      <div key={pillarId} className="bg-emerald-50/50 border border-emerald-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Icon className="h-4 w-4 text-emerald-600" />
+                          <span className="font-medium text-sm text-[#1B4332]">{def.label}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {devices.map(device => {
+                            const isConnected = connections.some(c => c.provider === device.slug || c.provider === device.slug.replace('_v2', ''));
+                            return (
+                              <div
+                                key={device.slug}
+                                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs ${
+                                  isConnected
+                                    ? 'bg-emerald-500 text-white'
+                                    : 'bg-white border border-gray-200 text-gray-600'
+                                }`}
+                              >
+                                {device.name}
+                                {isConnected && <CheckCircle2 className="h-3 w-3" />}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Unlockable Pillars */}
+            {unlockablePillars.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-[#1B4332] mb-3 flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-[#52796F]" />
+                  Unlock More Pillars
+                </h3>
+                <div className="space-y-3">
+                  {unlockablePillars.map(up => {
+                    const def = PILLAR_DEFS.find(p => p.id === up.pillar);
+                    if (!def) return null;
+                    const Icon = def.icon;
+                    
+                    return (
+                      <div key={up.pillar} className="bg-white border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Icon className="h-4 w-4 text-[#52796F]" />
+                          <span className="font-medium text-sm text-[#1B4332]">{up.label}</span>
+                        </div>
+                        <p className="text-xs text-[#52796F] mb-2">{up.description}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {up.suggestedProviders.map(device => {
+                            const isConnected = connections.some(c => c.provider === device.slug || c.provider === device.slug.replace('_v2', ''));
+                            return (
+                              <button
+                                key={device.slug}
+                                onClick={() => {
+                                  setShowPillarDevices(false);
+                                  handleConnect(device.slug);
+                                }}
+                                disabled={isConnected}
+                                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors ${
+                                  isConnected
+                                    ? 'bg-emerald-500 text-white cursor-default'
+                                    : 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-[#1B4332]/30'
+                                }`}
+                              >
+                                {device.name}
+                                {isConnected && <CheckCircle2 className="h-3 w-3" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 pt-4 border-t">
+            <Button
+              onClick={() => handleConnect()}
+              disabled={isConnecting}
+              className="w-full bg-[#52796F] hover:bg-[#1B4332]"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Connect New Device
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
