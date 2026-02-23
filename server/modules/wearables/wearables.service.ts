@@ -39,6 +39,19 @@ const PILLAR_SUGGESTED: Record<string, { slug: string; name: string; logo?: stri
 };
 
 export class WearablesService {
+    private normalizeConnectProvider(provider?: string): string | undefined {
+        const normalized = String(provider || '').trim().toLowerCase();
+        if (!normalized) {
+            return undefined;
+        }
+
+        if (normalized === 'beurer') {
+            throw new Error('beurer is not currently supported in the web connection flow');
+        }
+
+        return normalized;
+    }
+
     private normalizeLabStatus(status: unknown): 'normal' | 'high' | 'low' | 'critical' {
         const normalized = String(status || '').toLowerCase().trim();
         if (normalized === 'high' || normalized === 'low' || normalized === 'critical') {
@@ -403,13 +416,14 @@ export class WearablesService {
     }
 
     async getConnectLink(userId: string, provider?: string, forceFreshUser: boolean = false, redirectUrl?: string) {
+        const normalizedProvider = this.normalizeConnectProvider(provider);
         let junctionUserId = await wearablesRepository.getJunctionUserId(userId);
 
         if (forceFreshUser) {
             const recoveryClientUserId = `${userId}-real-${Date.now()}`;
             junctionUserId = await createJunctionUserWithClientUserId(recoveryClientUserId);
             await wearablesRepository.updateJunctionUserId(userId, junctionUserId);
-            logger.info('Force-created fresh Junction user ID for connect flow', { userId, junctionUserId, provider });
+            logger.info('Force-created fresh Junction user ID for connect flow', { userId, junctionUserId, provider: normalizedProvider });
         } else if (!junctionUserId) {
             junctionUserId = await getOrCreateJunctionUser(userId, null);
             await wearablesRepository.updateJunctionUserId(userId, junctionUserId);
@@ -422,7 +436,7 @@ export class WearablesService {
                 logger.warn('Detected demo connection on Junction user; rotating to fresh real-data user before link generation', {
                     userId,
                     junctionUserId,
-                    provider,
+                    provider: normalizedProvider,
                 });
 
                 const recoveryClientUserId = `${userId}-real-${Date.now()}`;
@@ -438,7 +452,7 @@ export class WearablesService {
         let linkWebUrl: string;
 
         try {
-            const link = await generateLinkToken(junctionUserId, provider as any, redirectUrl);
+            const link = await generateLinkToken(junctionUserId, normalizedProvider as any, redirectUrl);
             linkToken = link.linkToken;
             linkWebUrl = link.linkWebUrl;
         } catch (error) {
@@ -453,7 +467,7 @@ export class WearablesService {
             await wearablesRepository.updateJunctionUserId(userId, freshJunctionUserId);
             junctionUserId = freshJunctionUserId;
 
-            const retryLink = await generateLinkToken(freshJunctionUserId, provider as any, redirectUrl);
+            const retryLink = await generateLinkToken(freshJunctionUserId, normalizedProvider as any, redirectUrl);
             linkToken = retryLink.linkToken;
             linkWebUrl = retryLink.linkWebUrl;
 

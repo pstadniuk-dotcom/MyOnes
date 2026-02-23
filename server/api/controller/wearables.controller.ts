@@ -53,6 +53,12 @@ export class WearablesController {
             res.json(linkData);
         } catch (error) {
             logger.error('Error generating Junction link:', error);
+            const message = error instanceof Error ? error.message : 'Failed to generate connection link';
+
+            if (message.toLowerCase().includes('not currently supported')) {
+                return res.status(400).json({ error: message });
+            }
+
             res.status(500).json({ error: 'Failed to generate connection link' });
         }
     }
