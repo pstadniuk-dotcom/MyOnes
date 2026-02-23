@@ -1477,7 +1477,8 @@ export default function ConsultationPage() {
   console.log('🔍 RENDER STATE - isTyping:', isTyping, 'thinkingMessage:', thinkingMessage);
 
   return (
-    <div className="flex h-full min-h-[calc(100dvh-8rem)] md:min-h-dvh md:max-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
+    // <div className="flex h-full min-h-[calc(100dvh-8rem)] md:min-h-dvh md:max-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
+    <div className="rounded-lg overflow-clip flex h-full min-h-0 bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
       {/* History Sidebar - Hidden on mobile, shown on desktop */}
       {showHistory && (
         <div className="hidden md:flex w-80 border-r bg-background/80 backdrop-blur-sm flex-col">
@@ -1563,7 +1564,7 @@ export default function ConsultationPage() {
         {/* Modern Gradient Header */}
         <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 border-b backdrop-blur-sm">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-secondary/5 opacity-50"></div>
-          <div className="relative p-4 md:p-6">
+          <div className="relative p-4 md:p-4">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-lg md:text-2xl font-bold flex items-center gap-2" data-testid="text-consultation-title">
@@ -1575,7 +1576,7 @@ export default function ConsultationPage() {
                     <span className="sm:hidden">AI</span>
                   </Badge>
                 </h1>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2">
                   <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">Your personalized supplement consultant</p>
                   {isConnected && (
                     <Badge variant="outline" className="text-xs text-green-600 border-green-200 bg-green-50">
@@ -1967,7 +1968,7 @@ export default function ConsultationPage() {
                     size="icon"
                     onClick={handleFileUpload}
                     disabled={isUploading}
-                    className="flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback"
+                    className="flex-shrink-0 hover-elevate touch-feedback"
                     data-testid="button-upload-file"
                   >
                     {isUploading ? (
@@ -1982,7 +1983,7 @@ export default function ConsultationPage() {
                     size="icon"
                     onClick={handleVoiceInput}
                     disabled={isRecording || isTyping}
-                    className={`flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback ${isRecording ? 'bg-red-50 border-red-200' : ''}`}
+                    className={`flex-shrink-0 hover-elevate touch-feedback ${isRecording ? 'bg-red-50 border-red-200' : ''}`}
                     data-testid="button-voice-input"
                   >
                     {isRecording ? (
@@ -1998,7 +1999,7 @@ export default function ConsultationPage() {
                     onClick={() => handleSendMessage(inputValue, uploadedFiles)}
                     size="icon"
                     disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isTyping}
-                    className="flex-shrink-0 hover-elevate h-11 w-11 md:h-10 md:w-10 touch-feedback"
+                    className="flex-shrink-0 hover-elevate touch-feedback"
                     data-testid="button-send-message"
                   >
                     {isTyping ? (
