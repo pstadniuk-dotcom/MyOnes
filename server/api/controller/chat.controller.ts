@@ -8,7 +8,7 @@ import { getClientIP, checkRateLimit } from '../middleware/middleware';
 import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
 import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builder';
 import { analyzeQueryIntent } from '../../utils/query-intent-analyzer';
-import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits } from '../../modules/formulas/formula-service';
+import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget } from '../../modules/formulas/formula-service';
 import OpenAI from 'openai';
 import logger from '../../infra/logging/logger';
 
@@ -156,8 +156,13 @@ export class ChatController {
                         sendSSE({ type: 'info', message: 'Note: Formula was slightly over budget and has been auto-trimmed.' });
                     }
 
+                    const budgetFit = autoFitFormulaToBudget(validatedFormula);
+                    if (budgetFit.adjusted && budgetFit.message) {
+                        sendSSE({ type: 'info', message: budgetFit.message });
+                    }
+
                     const finalChecks = validateFormulaLimits(validatedFormula);
-                    if (finalChecks.valid) {
+                    if (budgetFit.fitsBudget && finalChecks.valid) {
                         // Save the formula to database
                         sendSSE({ type: 'processing', message: 'Finalizing your personalized formula...' });
 
@@ -181,7 +186,9 @@ export class ChatController {
                         savedFormula = await formulasRepository.createFormula(formulaData);
                         logger.info(`Formula v${nextVersion} saved successfully for user ${userId}`);
                     } else {
-                        const errorMessage = finalChecks.errors.join(', ');
+                        const errorMessage = budgetFit.fitsBudget
+                            ? finalChecks.errors.join(', ')
+                            : `Unable to fit formula within ${targetCaps}-capsule budget (${budgetFit.newTotalMg}/${budgetFit.maxAllowedMg}mg) after dose-floor trimming. Please reduce ingredient count or increase capsule count.`;
                         sendSSE({ type: 'formula_error', error: `Formula validation failed: ${errorMessage}` });
                         fullResponse += `\n\n⚠️ **Formula Error**: Validation failed - ${errorMessage}`;
                     }
