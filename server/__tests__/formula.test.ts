@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { autoFitFormulaToBudget } from '../modules/formulas/formula-service';
 
 // Import the shared ingredients catalog
 import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS } from '../../shared/ingredients';
@@ -108,5 +109,44 @@ describe('Dose Calculations', () => {
     expect(basesTotal).toBe(800);
     expect(additionsTotal).toBe(1100);
     expect(total).toBe(1900);
+  });
+
+  it('auto-fits over-budget formula to capsule budget when reductions are possible', () => {
+    const formula = {
+      targetCapsules: 9,
+      bases: [],
+      additions: [
+        { ingredient: 'Resveratrol', amount: 300 },
+        { ingredient: 'Ginger Root', amount: 300 },
+        { ingredient: 'Cinnamon 20:1', amount: 200 },
+        { ingredient: 'Milk Thistle', amount: 300 },
+        { ingredient: 'Vitamin C', amount: 5000 },
+      ],
+    };
+
+    const result = autoFitFormulaToBudget(formula);
+
+    expect(result.adjusted).toBe(true);
+    expect(result.fitsBudget).toBe(true);
+    expect(result.newTotalMg).toBeLessThanOrEqual(result.maxAllowedMg);
+    expect(formula.totalMg).toBe(result.newTotalMg);
+  });
+
+  it('does not modify formula already inside budget', () => {
+    const formula = {
+      targetCapsules: 9,
+      bases: [],
+      additions: [
+        { ingredient: 'Resveratrol', amount: 100 },
+        { ingredient: 'Ginger Root', amount: 100 },
+        { ingredient: 'Cinnamon 20:1', amount: 50 },
+      ],
+    };
+
+    const result = autoFitFormulaToBudget(formula);
+
+    expect(result.adjusted).toBe(false);
+    expect(result.fitsBudget).toBe(true);
+    expect(result.reductionAppliedMg).toBe(0);
   });
 });

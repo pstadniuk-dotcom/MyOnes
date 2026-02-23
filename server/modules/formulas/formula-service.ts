@@ -67,6 +67,137 @@ export function getMaxDosageForCapsules(targetCapsules: number): number {
     return validCount * FORMULA_LIMITS.CAPSULE_CAPACITY_MG;
 }
 
+function getMinAllowedDoseForIngredient(ingredientName: string): number {
+    const support = SYSTEM_SUPPORTS.find((s) => s.name === ingredientName);
+    if (support) {
+        return Math.max(FORMULA_LIMITS.MIN_INGREDIENT_DOSE, support.doseMg || FORMULA_LIMITS.MIN_INGREDIENT_DOSE);
+    }
+
+    const individual = INDIVIDUAL_INGREDIENTS.find((i) => i.name === ingredientName);
+    if (individual) {
+        const explicitMin = typeof individual.doseRangeMin === 'number'
+            ? individual.doseRangeMin
+            : (typeof individual.doseMg === 'number' ? individual.doseMg : FORMULA_LIMITS.MIN_INGREDIENT_DOSE);
+        return Math.max(FORMULA_LIMITS.MIN_INGREDIENT_DOSE, explicitMin);
+    }
+
+    return FORMULA_LIMITS.MIN_INGREDIENT_DOSE;
+}
+
+export function autoFitFormulaToBudget(formula: any): {
+    adjusted: boolean;
+    fitsBudget: boolean;
+    previousTotalMg: number;
+    newTotalMg: number;
+    reductionAppliedMg: number;
+    maxAllowedMg: number;
+    message?: string;
+} {
+    const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+    const maxDosage = getMaxDosageForCapsules(targetCapsules);
+    const maxAllowedMg = Math.floor(maxDosage * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
+
+    const allItems = [...(formula.bases || []), ...(formula.additions || [])];
+    const previousTotalMg = allItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+    let excess = previousTotalMg - maxAllowedMg;
+
+    if (excess <= 0) {
+        formula.totalMg = previousTotalMg;
+        return {
+            adjusted: false,
+            fitsBudget: true,
+            previousTotalMg,
+            newTotalMg: previousTotalMg,
+            reductionAppliedMg: 0,
+            maxAllowedMg,
+        };
+    }
+
+    type Candidate = {
+        list: 'additions' | 'bases';
+        index: number;
+        ingredient: string;
+        currentAmount: number;
+        minAllowed: number;
+        reducible: number;
+    };
+
+    const candidates: Candidate[] = [];
+
+    (formula.additions || []).forEach((item: any, index: number) => {
+        const currentAmount = Number(item.amount || 0);
+        const minAllowed = getMinAllowedDoseForIngredient(item.ingredient);
+        const reducible = Math.max(0, currentAmount - minAllowed);
+        if (reducible > 0) {
+            candidates.push({
+                list: 'additions',
+                index,
+                ingredient: item.ingredient,
+                currentAmount,
+                minAllowed,
+                reducible,
+            });
+        }
+    });
+
+    (formula.bases || []).forEach((item: any, index: number) => {
+        const currentAmount = Number(item.amount || 0);
+        const minAllowed = getMinAllowedDoseForIngredient(item.ingredient);
+        const reducible = Math.max(0, currentAmount - minAllowed);
+        if (reducible > 0) {
+            candidates.push({
+                list: 'bases',
+                index,
+                ingredient: item.ingredient,
+                currentAmount,
+                minAllowed,
+                reducible,
+            });
+        }
+    });
+
+    candidates.sort((a, b) => {
+        if (a.list !== b.list) {
+            return a.list === 'additions' ? -1 : 1;
+        }
+        return b.reducible - a.reducible;
+    });
+
+    for (const candidate of candidates) {
+        if (excess <= 0) break;
+
+        const targetList = candidate.list === 'additions' ? formula.additions : formula.bases;
+        const current = targetList[candidate.index];
+        const currentAmount = Number(current?.amount || 0);
+        const minAllowed = getMinAllowedDoseForIngredient(current?.ingredient);
+        const reducible = Math.max(0, currentAmount - minAllowed);
+        if (reducible <= 0) continue;
+
+        const reduction = Math.min(excess, reducible);
+        current.amount = Math.max(minAllowed, Math.round(currentAmount - reduction));
+        excess -= reduction;
+    }
+
+    const newTotalMg = [...(formula.bases || []), ...(formula.additions || [])]
+        .reduce((sum, item) => sum + (item.amount || 0), 0);
+    formula.totalMg = newTotalMg;
+
+    const reductionAppliedMg = Math.max(0, previousTotalMg - newTotalMg);
+    const fitsBudget = newTotalMg <= maxAllowedMg;
+
+    return {
+        adjusted: reductionAppliedMg > 0,
+        fitsBudget,
+        previousTotalMg,
+        newTotalMg,
+        reductionAppliedMg,
+        maxAllowedMg,
+        message: reductionAppliedMg > 0
+            ? `Auto-trimmed ${reductionAppliedMg}mg to fit ${targetCapsules}-capsule budget (${newTotalMg}/${maxAllowedMg}mg).`
+            : undefined,
+    };
+}
+
 export function autoExpandFormula(formula: any): { expanded: boolean; addedIngredients: string[] } {
     const allIngredients = [...(formula.bases || []), ...(formula.additions || [])];
     const currentCount = allIngredients.length;
