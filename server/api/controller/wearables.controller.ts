@@ -3,7 +3,7 @@ import { wearablesService } from '../../modules/wearables/wearables.service';
 import logger from '../../infra/logging/logger';
 
 export class WearablesController {
-    private getFrontendBaseUrl(req: Request): string {
+    private getFrontendBaseUrl = (req: Request): string => {
         const configured = process.env.FRONTEND_URL;
         if (configured) {
             return configured.replace(/\/$/, '');
@@ -38,7 +38,7 @@ export class WearablesController {
         }
     }
 
-    async getConnectLink(req: Request, res: Response) {
+    getConnectLink = async (req: Request, res: Response) => {
         try {
             const userId = req.userId!;
             const provider = typeof req.query.provider === 'string' ? req.query.provider : undefined;
