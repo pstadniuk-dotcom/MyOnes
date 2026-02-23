@@ -116,7 +116,8 @@ export class ObjectStorageService {
       .from(LAB_REPORTS_BUCKET)
       .upload(filePath, fileBuffer, {
         contentType,
-        upsert: true
+        upsert: true,
+        cacheControl: '0'
       });
     if (error) throw new Error(`Supabase upload error: ${error.message}`);
     return filePath;

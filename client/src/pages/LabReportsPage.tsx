@@ -335,7 +335,7 @@ export default function LabReportsPage() {
     if (report.mimeType === 'text/plain') {
       setEditingFiles(prev => new Set(prev).add(report.id));
       try {
-        const response = await fetch(buildApiUrl(`/api/files/${report.id}/download`), {
+        const response = await fetch(buildApiUrl(`/api/files/${report.id}/download?t=${Date.now()}`), {
           headers: getAuthHeaders(),
           credentials: 'include'
         });
@@ -363,7 +363,7 @@ export default function LabReportsPage() {
   const handleViewFile = async (fileId: string) => {
     setLoadingFiles(prev => new Set(prev).add(fileId));
     try {
-      const response = await fetch(buildApiUrl(`/api/files/${fileId}/download`), {
+      const response = await fetch(buildApiUrl(`/api/files/${fileId}/download?t=${Date.now()}`), {
         headers: getAuthHeaders(),
         credentials: 'include'
       });
