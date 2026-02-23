@@ -91,6 +91,7 @@ export function autoFitFormulaToBudget(formula: any): {
     newTotalMg: number;
     reductionAppliedMg: number;
     maxAllowedMg: number;
+    removedIngredients?: string[];
     message?: string;
 } {
     const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
@@ -178,9 +179,35 @@ export function autoFitFormulaToBudget(formula: any): {
         excess -= reduction;
     }
 
-    const newTotalMg = [...(formula.bases || []), ...(formula.additions || [])]
+    let newTotalMg = [...(formula.bases || []), ...(formula.additions || [])]
         .reduce((sum, item) => sum + (item.amount || 0), 0);
     formula.totalMg = newTotalMg;
+
+    const removedIngredients: string[] = [];
+
+    if (newTotalMg > maxAllowedMg && Array.isArray(formula.additions) && formula.additions.length > 0) {
+        const sortedByAmount = formula.additions
+            .map((item: any, index: number) => ({ item, index, amount: Number(item?.amount || 0) }))
+            .sort((a: any, b: any) => a.amount - b.amount);
+
+        const toRemove = new Set<number>();
+        let overage = newTotalMg - maxAllowedMg;
+
+        for (const candidate of sortedByAmount) {
+            if (overage <= 0) break;
+            if (!candidate.item?.ingredient) continue;
+            toRemove.add(candidate.index);
+            removedIngredients.push(candidate.item.ingredient);
+            overage -= candidate.amount;
+        }
+
+        if (toRemove.size > 0) {
+            formula.additions = formula.additions.filter((_: any, index: number) => !toRemove.has(index));
+            newTotalMg = [...(formula.bases || []), ...(formula.additions || [])]
+                .reduce((sum, item) => sum + (item.amount || 0), 0);
+            formula.totalMg = newTotalMg;
+        }
+    }
 
     const reductionAppliedMg = Math.max(0, previousTotalMg - newTotalMg);
     const fitsBudget = newTotalMg <= maxAllowedMg;
@@ -192,8 +219,9 @@ export function autoFitFormulaToBudget(formula: any): {
         newTotalMg,
         reductionAppliedMg,
         maxAllowedMg,
+        removedIngredients,
         message: reductionAppliedMg > 0
-            ? `Auto-trimmed ${reductionAppliedMg}mg to fit ${targetCapsules}-capsule budget (${newTotalMg}/${maxAllowedMg}mg).`
+            ? `Auto-trimmed ${reductionAppliedMg}mg to fit ${targetCapsules}-capsule budget (${newTotalMg}/${maxAllowedMg}mg).${removedIngredients.length ? ` Removed: ${removedIngredients.slice(0, 3).join(', ')}${removedIngredients.length > 3 ? '…' : ''}.` : ''}`
             : undefined,
     };
 }

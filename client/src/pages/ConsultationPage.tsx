@@ -104,10 +104,6 @@ const removeJsonBlocks = (content: string): string => {
   cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
   cleaned = cleaned.replace(/__([^_]+)__/g, '$1');
 
-  // Remove most common emojis that might appear in responses
-  // Strip astral-plane characters (mostly emoji) to keep prompts clean without unicode regex flags
-  cleaned = cleaned.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '');
-
   // Clean up any resulting multiple blank lines
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 
