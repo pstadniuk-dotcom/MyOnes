@@ -8,6 +8,9 @@ export class FilesController {
             const result = await filesService.downloadFile(req.params.fileId, req.userId!);
             res.setHeader('Content-Type', result.mimeType);
             res.setHeader('Content-Disposition', `attachment; filename="${result.originalFileName}"`);
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
             res.send(result.buffer);
         } catch (error) {
             logger.error('File download error:', error);

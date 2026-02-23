@@ -175,13 +175,14 @@ export class FilesService {
             throw new Error(`File too large. Maximum size is 10MB.`);
         }
 
-        // Upload new content to storage
+        const oldObjectPath = fileUpload.objectPath;
+
+        // Upload new content to storage - generate a new path to prevent CDN caching
         const normalizedPath = await this.objectStorageService.uploadLabReportFile(
             userId,
             uploadedFile.data,
             uploadedFile.name,
-            uploadedFile.mimetype,
-            fileUpload.objectPath
+            uploadedFile.mimetype
         );
 
         // Update metadata
@@ -190,6 +191,13 @@ export class FilesService {
             fileSize: uploadedFile.size,
             mimeType: uploadedFile.mimetype
         });
+
+        // Delete the old file from storage to keep things clean
+        try {
+            await this.objectStorageService.secureDeleteLabReport(oldObjectPath, userId);
+        } catch (err) {
+            logger.warn(`Failed to delete old storage object ${oldObjectPath} during update`, err);
+        }
 
         // Trigger Re-analysis
         let labDataExtraction = null;
