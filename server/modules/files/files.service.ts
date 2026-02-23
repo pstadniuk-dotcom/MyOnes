@@ -251,6 +251,50 @@ export class FilesService {
         return labData;
     }
 
+    async startReanalyzeFile(fileId: string, userId: string) {
+        const fileUpload = await filesRepository.getFileUpload(fileId);
+
+        if (!fileUpload) throw new Error('File not found');
+        if (fileUpload.userId !== userId) throw new Error('Unauthorized');
+        if (fileUpload.type !== 'lab_report') throw new Error('Only lab reports can be re-analyzed');
+
+        const existingStatus = String((fileUpload.labReportData as any)?.analysisStatus || '').toLowerCase();
+        if (existingStatus === 'processing' || existingStatus === 'pending') {
+            return { queued: false, status: 'processing' as const };
+        }
+
+        await filesRepository.updateFileUpload(fileId, {
+            labReportData: {
+                ...((fileUpload.labReportData as any) || {}),
+                analysisStatus: 'processing'
+            }
+        });
+
+        void (async () => {
+            try {
+                const labData = await analyzeLabReport(
+                    fileUpload.objectPath,
+                    fileUpload.mimeType || 'text/plain',
+                    userId
+                );
+
+                await filesRepository.updateFileUpload(fileId, {
+                    labReportData: { ...labData, analysisStatus: 'completed' }
+                });
+            } catch (error) {
+                logger.error('Background re-analysis error:', error);
+                await filesRepository.updateFileUpload(fileId, {
+                    labReportData: {
+                        ...((fileUpload.labReportData as any) || {}),
+                        analysisStatus: 'error'
+                    }
+                });
+            }
+        })();
+
+        return { queued: true, status: 'processing' as const };
+    }
+
     async deleteFile(fileId: string, userId: string) {
         const fileUpload = await filesRepository.getFileUpload(fileId);
         if (!fileUpload) throw new Error('File not found');

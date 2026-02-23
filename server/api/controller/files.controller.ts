@@ -100,11 +100,14 @@ export class FilesController {
 
     async reanalyzeFile(req: Request, res: Response) {
         try {
-            const result = await filesService.reanalyzeFile(req.params.fileId, req.userId!);
-            res.json({
+            const result = await filesService.startReanalyzeFile(req.params.fileId, req.userId!);
+            res.status(202).json({
                 success: true,
-                message: 'Lab report re-analyzed successfully',
-                data: result
+                queued: result.queued,
+                status: result.status,
+                message: result.queued
+                    ? 'Lab report re-analysis started in background'
+                    : 'Lab report re-analysis is already in progress'
             });
         } catch (error) {
             logger.error('Re-analysis error:', error);

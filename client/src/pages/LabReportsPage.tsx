@@ -16,6 +16,55 @@ import { queryClient, apiRequest, getAuthHeaders } from '@/shared/lib/queryClien
 import { buildApiUrl } from '@/shared/lib/api';
 import type { FileUpload, UserConsent } from '@shared/schema';
 
+interface LabSummaryPayload {
+  labSummary?: string;
+  labMarkers?: Array<{
+    name: string;
+    value: string | number;
+    unit?: string;
+    status?: 'normal' | 'high' | 'low' | 'critical';
+  }>;
+  labReportDate?: string | null;
+  labChanges?: string[];
+  labNextActions?: string[];
+  labConfidenceSource?: string | null;
+}
+
+function deriveFallbackLabSummary(labReports?: FileUpload[]): string | null {
+  if (!labReports || labReports.length === 0) {
+    return null;
+  }
+
+  const latestCompleted = [...labReports]
+    .filter((report: any) => report?.labReportData?.analysisStatus === 'completed')
+    .sort((a, b) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime())[0];
+
+  if (!latestCompleted) {
+    return `${labReports.length} lab report${labReports.length > 1 ? 's are' : ' is'} uploaded. Analysis is still processing.`;
+  }
+
+  const extracted = Array.isArray((latestCompleted as any)?.labReportData?.extractedData)
+    ? ((latestCompleted as any).labReportData.extractedData as any[])
+    : [];
+
+  if (extracted.length === 0) {
+    return 'Latest report is uploaded and being interpreted. Marker-level extraction will appear shortly.';
+  }
+
+  const abnormal = extracted.filter((marker: any) => ['high', 'low', 'critical'].includes(String(marker?.status || '').toLowerCase()));
+  if (abnormal.length === 0) {
+    return 'Latest uploaded markers appear within normal ranges based on extracted data.';
+  }
+
+  const names = abnormal
+    .map((marker: any) => marker?.testName || marker?.name)
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(', ');
+
+  return `Found ${abnormal.length} out-of-range marker${abnormal.length > 1 ? 's' : ''}${names ? `: ${names}` : ''}.`;
+}
+
 function LabReportsSkeleton() {
   return (
     <div className="space-y-4">
@@ -63,6 +112,20 @@ export default function LabReportsPage() {
   const { data: labReports, isLoading: labReportsLoading } = useQuery<FileUpload[]>({
     queryKey: ['/api/files', 'user', user?.id, 'lab-reports'],
     enabled: isAuthenticated && !!user?.id,
+    refetchInterval: (query) => {
+      const reports = query.state.data as FileUpload[] | undefined;
+      const hasProcessing = Array.isArray(reports) && reports.some((report: any) => {
+        const status = String(report?.labReportData?.analysisStatus || '').toLowerCase();
+        return status === 'processing' || status === 'pending';
+      });
+      return hasProcessing ? 5000 : false;
+    },
+  });
+
+  const { data: labSummary } = useQuery<LabSummaryPayload>({
+    queryKey: ['/api/wearables/health-pulse'],
+    enabled: isAuthenticated && !!user?.id,
+    staleTime: 60 * 1000,
   });
 
   // Check if user has lab data processing consent
@@ -70,6 +133,23 @@ export default function LabReportsPage() {
   const hasLabDataConsent = consentsError ? false : (consents?.some(
     consent => consent.consentType === 'lab_data_processing' && !consent.revokedAt
   ) ?? false);
+
+  const effectiveLabSummary = labSummary?.labSummary || deriveFallbackLabSummary(labReports);
+  const effectiveLabMarkers = Array.isArray(labSummary?.labMarkers) && labSummary!.labMarkers!.length > 0
+    ? labSummary!.labMarkers!
+    : (() => {
+        const latestCompleted = (labReports || [])
+          .filter((report: any) => report?.labReportData?.analysisStatus === 'completed')
+          .sort((a, b) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime())[0] as any;
+        const extracted = Array.isArray(latestCompleted?.labReportData?.extractedData)
+          ? latestCompleted.labReportData.extractedData
+          : [];
+        return extracted.slice(0, 6).map((marker: any) => ({
+          name: marker.testName || marker.name || 'Unknown Marker',
+          value: marker.value,
+          unit: marker.unit || '',
+        }));
+      })();
 
   // Grant consent mutation
   const grantConsentMutation = useMutation({
@@ -128,6 +208,40 @@ export default function LabReportsPage() {
         variant: "destructive",
       });
     }
+  });
+
+  const reanalyzeMutation = useMutation({
+    mutationFn: async (fileId: string) => {
+      const response = await apiRequest('POST', `/api/files/${fileId}/reanalyze`);
+      return response.json();
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse'] }),
+      ]);
+      toast({
+        title: 'Re-analysis started',
+        description: 'Running in background now. You can leave this page and come back.',
+      });
+
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse'] });
+      }, 5000);
+
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse'] });
+      }, 15000);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Re-analysis failed',
+        description: error.message || 'Could not re-analyze this report.',
+        variant: 'destructive',
+      });
+    },
   });
 
   const uploadFile = async (file: File) => {
@@ -394,6 +508,8 @@ export default function LabReportsPage() {
     }
   };
 
+  const latestReportId = labReports?.[0]?.id;
+
   return (
     <div className="max-w-4xl mx-auto space-y-6" data-testid="page-lab-reports">
       {/* Header */}
@@ -464,6 +580,78 @@ export default function LabReportsPage() {
       </Card>
 
       {/* Lab Reports List */}
+      {effectiveLabSummary && (
+        <Card className="bg-[#FAF7F2] border-[#52796F]/20">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <CardTitle className="text-[#1B4332]">AI Lab Highlights</CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
+                disabled={!latestReportId || reanalyzeMutation.isPending}
+                onClick={() => latestReportId && reanalyzeMutation.mutate(latestReportId)}
+              >
+                {reanalyzeMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Re-analyzing...
+                  </>
+                ) : (
+                  'Re-analyze latest report'
+                )}
+              </Button>
+            </div>
+            <CardDescription className="text-[#52796F]">
+              {labSummary?.labReportDate ? `Based on report dated ${labSummary.labReportDate}` : 'Based on your latest available report'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-[#1B4332] leading-relaxed">{effectiveLabSummary}</p>
+
+            {Array.isArray(labSummary?.labChanges) && labSummary.labChanges.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-[#52796F] uppercase tracking-wide">What changed since last report</h4>
+                <ul className="mt-1 space-y-1">
+                  {labSummary.labChanges.slice(0, 3).map((change, index) => (
+                    <li key={`lab-change-${index}`} className="text-sm text-[#1B4332]">• {change}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {Array.isArray(labSummary?.labNextActions) && labSummary.labNextActions.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-[#52796F] uppercase tracking-wide">What to do now</h4>
+                <ul className="mt-1 space-y-1">
+                  {labSummary.labNextActions.slice(0, 3).map((action, index) => (
+                    <li key={`lab-action-${index}`} className="text-sm text-[#1B4332]">• {action}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {labSummary?.labConfidenceSource && (
+              <p className="text-xs text-[#52796F]">{labSummary.labConfidenceSource}</p>
+            )}
+
+            {effectiveLabMarkers.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {effectiveLabMarkers.slice(0, 6).map((marker: { name: string; value: string | number; unit?: string }, index: number) => (
+                  <Badge
+                    key={`${marker.name}-${index}`}
+                    variant="outline"
+                    className="border-[#1B4332]/20 text-[#1B4332] bg-white"
+                  >
+                    {marker.name}: {marker.value}{marker.unit ? ` ${marker.unit}` : ''}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card data-testid="section-lab-reports-list" className="bg-[#FAF7F2] border-[#52796F]/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-[#1B4332]">

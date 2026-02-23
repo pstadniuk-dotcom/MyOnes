@@ -3,6 +3,30 @@ import { wearablesService } from '../../modules/wearables/wearables.service';
 import logger from '../../infra/logging/logger';
 
 export class WearablesController {
+    private getFrontendBaseUrl(req: Request): string {
+        const configured = process.env.FRONTEND_URL;
+        if (configured) {
+            return configured.replace(/\/$/, '');
+        }
+
+        const originHeader = req.get('origin');
+        if (originHeader) {
+            return originHeader.replace(/\/$/, '');
+        }
+
+        const referer = req.get('referer');
+        if (referer) {
+            try {
+                const refererUrl = new URL(referer);
+                return refererUrl.origin;
+            } catch {
+                // ignore malformed referrer and fall back to host
+            }
+        }
+
+        return `${req.protocol}://${req.get('host')}`;
+    }
+
     async getConnections(req: Request, res: Response) {
         try {
             const userId = req.userId!;
@@ -18,7 +42,14 @@ export class WearablesController {
         try {
             const userId = req.userId!;
             const provider = typeof req.query.provider === 'string' ? req.query.provider : undefined;
-            const linkData = await wearablesService.getConnectLink(userId, provider);
+            const forceFreshUser = req.query.fresh === '1' || req.query.fresh === 'true';
+            const frontendBaseUrl = this.getFrontendBaseUrl(req);
+            const redirectUrl = `${frontendBaseUrl}/dashboard/wearables?connected=1`;
+            const linkData = await wearablesService.getConnectLink(userId, provider, forceFreshUser, redirectUrl);
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            res.setHeader('Surrogate-Control', 'no-store');
             res.json(linkData);
         } catch (error) {
             logger.error('Error generating Junction link:', error);

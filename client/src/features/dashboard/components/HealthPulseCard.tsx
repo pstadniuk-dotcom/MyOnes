@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiRequest } from '@/shared/lib/queryClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -47,8 +49,53 @@ interface HealthPulseData {
   today: TodayMetrics;
   trends: Trends;
   labMarkers: LabMarker[];
+  labSummary?: string;
   labReportDate: string | null;
+  labChanges?: string[];
+  labNextActions?: string[];
+  labConfidenceSource?: string | null;
+  uploadedLabCount?: number;
+  hasUploadedLabs?: boolean;
   lastUpdated: string;
+}
+
+function buildLabFallbackSummary(reports: any[]): string | null {
+  if (!Array.isArray(reports) || reports.length === 0) {
+    return null;
+  }
+
+  const latestCompleted = reports
+    .filter((report: any) => report?.labReportData?.analysisStatus === 'completed')
+    .sort((a: any, b: any) => new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime())[0];
+
+  if (!latestCompleted) {
+    return `${reports.length} lab report${reports.length > 1 ? 's are' : ' is'} uploaded. Analysis is still processing.`;
+  }
+
+  const extracted = Array.isArray(latestCompleted?.labReportData?.extractedData)
+    ? latestCompleted.labReportData.extractedData
+    : [];
+
+  if (extracted.length === 0) {
+    return `Latest lab report uploaded on ${new Date(latestCompleted.uploadedAt).toLocaleDateString()} is available. Detailed marker extraction is still in progress.`;
+  }
+
+  const abnormal = extracted.filter((marker: any) => {
+    const status = String(marker?.status || '').toLowerCase();
+    return status === 'high' || status === 'low' || status === 'critical';
+  });
+
+  if (abnormal.length === 0) {
+    return 'Latest uploaded markers appear within normal ranges based on extracted data.';
+  }
+
+  const names = abnormal
+    .map((marker: any) => marker?.testName || marker?.name)
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(', ');
+
+  return `Found ${abnormal.length} out-of-range marker${abnormal.length > 1 ? 's' : ''}${names ? `: ${names}` : ''}.`;
 }
 
 // Tiny inline sparkline bar chart
@@ -180,10 +227,30 @@ function NoDeviceState() {
 }
 
 export function HealthPulseCard() {
+  const { user } = useAuth();
+
   const { data, isLoading, error } = useQuery<HealthPulseData>({
     queryKey: ['/api/wearables/health-pulse'],
-    staleTime: 5 * 60 * 1000, // 5 mins
+    staleTime: 30 * 1000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
+
+  const { data: labReports = [] } = useQuery<any[]>({
+    queryKey: ['/api/files', 'user', user?.id, 'lab-reports', 'fallback'],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const response = await apiRequest('GET', `/api/files/user/${user.id}/lab-reports`);
+      return response.json();
+    },
+    staleTime: 60 * 1000,
+  });
+
+  const effectiveLabSummary = data?.labSummary || buildLabFallbackSummary(labReports);
+  const hasUploadedLabs = Boolean(data?.hasUploadedLabs) || (typeof data?.uploadedLabCount === 'number' ? data.uploadedLabCount > 0 : false) || labReports.length > 0;
+  const hasAnyLabData = hasUploadedLabs || (Array.isArray(data?.labMarkers) && data.labMarkers.length > 0) || Boolean(effectiveLabSummary);
 
   return (
     <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all">
@@ -268,6 +335,39 @@ export function HealthPulseCard() {
             </div>
 
             {/* Lab markers section */}
+            {effectiveLabSummary && (
+              <div className="p-3 rounded-xl bg-[#1B4332]/[0.03] border border-[#1B4332]/10">
+                <div className="text-xs font-medium text-[#52796F] uppercase tracking-wide mb-1">AI Lab Summary</div>
+                <p className="text-xs text-[#1B4332] leading-relaxed">{effectiveLabSummary}</p>
+
+                {Array.isArray(data.labChanges) && data.labChanges.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-[11px] font-medium text-[#52796F]">What changed since last report</div>
+                    <ul className="mt-1 space-y-0.5">
+                      {data.labChanges.slice(0, 3).map((change, index) => (
+                        <li key={`change-${index}`} className="text-[11px] text-[#1B4332]">• {change}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {Array.isArray(data.labNextActions) && data.labNextActions.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-[11px] font-medium text-[#52796F]">What to do now</div>
+                    <ul className="mt-1 space-y-0.5">
+                      {data.labNextActions.slice(0, 3).map((action, index) => (
+                        <li key={`action-${index}`} className="text-[11px] text-[#1B4332]">• {action}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {data.labConfidenceSource && (
+                  <div className="mt-2 text-[10px] text-[#52796F]/80">{data.labConfidenceSource}</div>
+                )}
+              </div>
+            )}
+
             {data.labMarkers.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -293,12 +393,22 @@ export function HealthPulseCard() {
               </div>
             )}
 
-            {data.labMarkers.length === 0 && (
+            {!hasAnyLabData && (
               <div className="flex items-center gap-2 p-3 rounded-xl bg-[#1B4332]/[0.03] text-[#52796F]">
                 <FlaskConical className="w-4 h-4 flex-shrink-0" />
                 <div>
                   <p className="text-xs font-medium">No lab data yet</p>
                   <Link href="/dashboard/lab-reports" className="text-[11px] underline underline-offset-2">Upload blood test results</Link>
+                </div>
+              </div>
+            )}
+
+            {hasUploadedLabs && !effectiveLabSummary && data.labMarkers.length === 0 && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-[#1B4332]/[0.03] text-[#52796F]">
+                <FlaskConical className="w-4 h-4 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-medium">Lab reports uploaded</p>
+                  <p className="text-[11px]">Analysis is processing. Re-analyze from Labs if this takes too long.</p>
                 </div>
               </div>
             )}

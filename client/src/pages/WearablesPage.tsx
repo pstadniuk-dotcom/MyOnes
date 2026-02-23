@@ -341,6 +341,7 @@ export default function WearablesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/wearables/connections'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse'] });
       toast({
         title: 'Device disconnected',
         description: 'Your wearable device has been disconnected successfully.',
@@ -363,6 +364,7 @@ export default function WearablesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/wearables/connections'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse'] });
       toast({
         title: 'Sync initiated',
         description: 'Your wearable data is being synced.',
@@ -389,7 +391,10 @@ export default function WearablesPage() {
 
     setIsConnecting(true);
     try {
-      const query = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+      const cacheBust = `_=${Date.now()}`;
+      const query = provider
+        ? `?provider=${encodeURIComponent(provider)}&fresh=1&${cacheBust}`
+        : `?fresh=1&${cacheBust}`;
       const res = await apiRequest('GET', `/api/wearables/connect${query}`);
 
       if (res.status === 401) {
@@ -470,6 +475,7 @@ export default function WearablesPage() {
   const workoutDurationSparkline = (histData?.data?.workouts ?? []).map((w: any) => w.durationMinutes ?? null);
   const activePillars    = pillarsData?.activePillars    ?? [];
   const unlockablePillars = pillarsData?.unlockablePillars ?? [];
+  const connectedConnections = connections.filter(connection => connection.status === 'connected');
 
   return (
     <div className="space-y-6 px-1 sm:px-0">
@@ -483,9 +489,9 @@ export default function WearablesPage() {
       </div>
 
       {/* ── Connected device chips or empty state ── */}
-      {connections.length > 0 ? (
+      {connectedConnections.length > 0 ? (
         <div className="flex items-center gap-3 flex-wrap">
-          {connections.map(connection => {
+          {connectedConnections.map(connection => {
             const colors = PROVIDER_COLORS[connection.provider] || { color: 'text-gray-600', bgColor: 'bg-gray-50' };
             return (
               <div key={connection.id} className="flex items-center gap-2 bg-white border border-[#52796F]/20 rounded-xl px-3 py-2 shadow-sm">
@@ -583,7 +589,7 @@ export default function WearablesPage() {
       )}
 
       {/* ── Health Dashboard (connected only) ── */}
-      {connections.length > 0 && (
+      {connectedConnections.length > 0 && (
         <Card className="bg-[#FAF7F2] border-[#52796F]/20 overflow-hidden">
           <CardHeader className="pb-3 border-b border-[#52796F]/10">
             <div className="flex items-center justify-between flex-wrap gap-3">
@@ -704,7 +710,7 @@ export default function WearablesPage() {
       )}
 
       {/* ── Data Pillars (connected only) ── */}
-      {connections.length > 0 && (activePillars.length > 0 || unlockablePillars.length > 0) && (
+      {connectedConnections.length > 0 && (activePillars.length > 0 || unlockablePillars.length > 0) && (
         <Card className="bg-[#FAF7F2] border-[#52796F]/20">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-3">
@@ -762,7 +768,7 @@ export default function WearablesPage() {
       )}
 
       {/* ── Featured Integrations (connected — add more) ── */}
-      {connections.length > 0 && (
+      {connectedConnections.length > 0 && (
         <Card className="bg-[#FAF7F2] border-[#52796F]/20">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-[#1B4332]"><Sparkles className="h-5 w-5" />Featured Integrations</CardTitle>
@@ -772,7 +778,7 @@ export default function WearablesPage() {
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {PRIORITY_PROVIDERS.map(provider => {
                 const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
-                const isConnected = connections.some(c => c.provider === provider.slug || c.provider === provider.slug.replace('_v2', ''));
+                const isConnected = connectedConnections.some(c => c.provider === provider.slug || c.provider === provider.slug.replace('_v2', ''));
                 return (
                   <button
                     key={provider.slug}
@@ -843,7 +849,7 @@ export default function WearablesPage() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {devices.map(device => {
-                            const isConnected = connections.some(c => c.provider === device.slug || c.provider === device.slug.replace('_v2', ''));
+                            const isConnected = connectedConnections.some(c => c.provider === device.slug || c.provider === device.slug.replace('_v2', ''));
                             return (
                               <div
                                 key={device.slug}
@@ -888,7 +894,7 @@ export default function WearablesPage() {
                         <p className="text-xs text-[#52796F] mb-2">{up.description}</p>
                         <div className="flex flex-wrap gap-2">
                           {up.suggestedProviders.map(device => {
-                            const isConnected = connections.some(c => c.provider === device.slug || c.provider === device.slug.replace('_v2', ''));
+                            const isConnected = connectedConnections.some(c => c.provider === device.slug || c.provider === device.slug.replace('_v2', ''));
                             return (
                               <button
                                 key={device.slug}

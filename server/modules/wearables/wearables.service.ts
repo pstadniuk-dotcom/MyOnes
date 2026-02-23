@@ -3,6 +3,7 @@ import { filesRepository } from '../files/files.repository';
 import logger from '../../infra/logging/logger';
 import {
     getOrCreateJunctionUser,
+    createJunctionUserWithClientUserId,
     generateLinkToken,
     getConnectedProviders,
     disconnectProvider,
@@ -38,6 +39,349 @@ const PILLAR_SUGGESTED: Record<string, { slug: string; name: string; logo?: stri
 };
 
 export class WearablesService {
+    private normalizeLabStatus(status: unknown): 'normal' | 'high' | 'low' | 'critical' {
+        const normalized = String(status || '').toLowerCase().trim();
+        if (normalized === 'high' || normalized === 'low' || normalized === 'critical') {
+            return normalized;
+        }
+        return 'normal';
+    }
+
+    private inferMarkerStatus(name: unknown, value: unknown, rawStatus: unknown, referenceRange?: unknown): 'normal' | 'high' | 'low' | 'critical' {
+        const normalizedStatus = this.normalizeLabStatus(rawStatus);
+        const markerName = String(name || '').toLowerCase();
+        const markerValue = String(value || '').toLowerCase();
+
+        // Respect explicit statuses from upstream extraction first.
+        if (normalizedStatus !== 'normal') {
+            return normalizedStatus;
+        }
+
+        // Semantic override for biological-age style markers where value text carries directionality
+        if (markerName.includes('biological age')) {
+            if (markerValue.includes('older') || markerValue.includes('accelerated') || markerValue.includes('higher')) {
+                return 'high';
+            }
+            if (markerValue.includes('younger') || markerValue.includes('decelerated') || markerValue.includes('lower')) {
+                return 'normal';
+            }
+        }
+
+        // Generic semantic parsing for extracted text values when status is missing.
+        const criticalKeywords = ['critical', 'severely high', 'severely low', 'dangerously', 'panic'];
+        if (criticalKeywords.some(keyword => markerValue.includes(keyword))) {
+            return 'critical';
+        }
+
+        const highKeywords = ['high', 'elevated', 'above range', 'above normal', 'increased', 'excess', 'older'];
+        if (highKeywords.some(keyword => markerValue.includes(keyword))) {
+            return 'high';
+        }
+
+        const lowKeywords = ['low', 'below range', 'below normal', 'decreased', 'deficient', 'insufficient'];
+        if (lowKeywords.some(keyword => markerValue.includes(keyword))) {
+            return 'low';
+        }
+
+        const normalKeywords = ['normal', 'within range', 'within normal', 'optimal', 'negative', 'non-reactive'];
+        if (normalKeywords.some(keyword => markerValue.includes(keyword))) {
+            return 'normal';
+        }
+
+        // Numeric fallback: compare value to reference range when status text is missing.
+        const numericValue = this.parseMarkerNumericValue(value);
+        const rangeText = String(referenceRange || '').toLowerCase().trim();
+        if (numericValue !== null && rangeText) {
+            const range = this.parseReferenceRange(rangeText);
+            if (range) {
+                if (range.type === 'between') {
+                    if (numericValue < range.min) return 'low';
+                    if (numericValue > range.max) return 'high';
+                    return 'normal';
+                }
+                if (range.type === 'lte') {
+                    return numericValue > range.max ? 'high' : 'normal';
+                }
+                if (range.type === 'lt') {
+                    return numericValue >= range.max ? 'high' : 'normal';
+                }
+                if (range.type === 'gte') {
+                    return numericValue < range.min ? 'low' : 'normal';
+                }
+                if (range.type === 'gt') {
+                    return numericValue <= range.min ? 'low' : 'normal';
+                }
+            }
+        }
+
+        return normalizedStatus;
+    }
+
+    private parseReferenceRange(referenceRange: string):
+        | { type: 'between'; min: number; max: number }
+        | { type: 'lt' | 'lte'; max: number }
+        | { type: 'gt' | 'gte'; min: number }
+        | null {
+        const normalized = referenceRange
+            .replace(/[–—]/g, '-')
+            .replace(/to/gi, '-')
+            .replace(/,/g, '')
+            .trim();
+
+        const betweenMatch = normalized.match(/(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)/);
+        if (betweenMatch) {
+            const min = Number(betweenMatch[1]);
+            const max = Number(betweenMatch[2]);
+            if (Number.isFinite(min) && Number.isFinite(max)) {
+                return { type: 'between', min: Math.min(min, max), max: Math.max(min, max) };
+            }
+        }
+
+        const lteMatch = normalized.match(/(?:<=|≤|up to|less than or equal to)\s*(-?\d+(?:\.\d+)?)/i);
+        if (lteMatch) {
+            const max = Number(lteMatch[1]);
+            if (Number.isFinite(max)) {
+                return { type: 'lte', max };
+            }
+        }
+
+        const ltMatch = normalized.match(/(?:<|less than)\s*(-?\d+(?:\.\d+)?)/i);
+        if (ltMatch) {
+            const max = Number(ltMatch[1]);
+            if (Number.isFinite(max)) {
+                return { type: 'lt', max };
+            }
+        }
+
+        const gteMatch = normalized.match(/(?:>=|≥|at least|greater than or equal to)\s*(-?\d+(?:\.\d+)?)/i);
+        if (gteMatch) {
+            const min = Number(gteMatch[1]);
+            if (Number.isFinite(min)) {
+                return { type: 'gte', min };
+            }
+        }
+
+        const gtMatch = normalized.match(/(?:>|greater than)\s*(-?\d+(?:\.\d+)?)/i);
+        if (gtMatch) {
+            const min = Number(gtMatch[1]);
+            if (Number.isFinite(min)) {
+                return { type: 'gt', min };
+            }
+        }
+
+        return null;
+    }
+
+    private buildLabSummary(markers: Array<{ name: string; status: 'normal' | 'high' | 'low' | 'critical' }>): string {
+        if (!markers.length) {
+            return 'No interpreted biomarker values were found yet. Upload or re-analyze your latest blood test for personalized insights.';
+        }
+
+        const abnormal = markers.filter(marker => marker.status !== 'normal');
+        if (!abnormal.length) {
+            return 'Your latest uploaded markers are within normal ranges based on the extracted report data.';
+        }
+
+        const critical = abnormal.filter(marker => marker.status === 'critical').map(marker => marker.name);
+        const high = abnormal.filter(marker => marker.status === 'high').map(marker => marker.name);
+        const low = abnormal.filter(marker => marker.status === 'low').map(marker => marker.name);
+
+        const parts: string[] = [];
+        if (critical.length) {
+            parts.push(`Critical: ${critical.slice(0, 3).join(', ')}`);
+        }
+        if (high.length) {
+            parts.push(`High: ${high.slice(0, 4).join(', ')}`);
+        }
+        if (low.length) {
+            parts.push(`Low: ${low.slice(0, 4).join(', ')}`);
+        }
+
+        return `Found ${abnormal.length} out-of-range marker${abnormal.length > 1 ? 's' : ''}. ${parts.join(' • ')}`;
+    }
+
+    private normalizeMarkerKey(name: unknown): string {
+        return String(name || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
+    }
+
+    private parseMarkerNumericValue(value: unknown): number | null {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return value;
+        }
+
+        const raw = String(value ?? '').replace(/,/g, '');
+        const match = raw.match(/-?\d+(\.\d+)?/);
+        if (!match) {
+            return null;
+        }
+
+        const parsed = Number(match[0]);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    private getStatusSeverity(status: 'normal' | 'high' | 'low' | 'critical'): number {
+        if (status === 'critical') return 2;
+        if (status === 'high' || status === 'low') return 1;
+        return 0;
+    }
+
+    private buildLabChangeHighlights(
+        latestMarkers: Array<{ name: string; value: string | number; unit?: string; status: 'normal' | 'high' | 'low' | 'critical' }>,
+        previousMarkers: Array<{ name: string; value: string | number; unit?: string; status: 'normal' | 'high' | 'low' | 'critical' }>,
+    ): string[] {
+        if (!latestMarkers.length || !previousMarkers.length) {
+            return [];
+        }
+
+        const previousByKey = new Map<string, { name: string; value: string | number; unit?: string; status: 'normal' | 'high' | 'low' | 'critical' }>();
+        for (const marker of previousMarkers) {
+            const key = this.normalizeMarkerKey(marker.name);
+            if (key && !previousByKey.has(key)) {
+                previousByKey.set(key, marker);
+            }
+        }
+
+        const trendPriority: Record<'worsened' | 'improved' | 'stable', number> = {
+            worsened: 0,
+            improved: 1,
+            stable: 2,
+        };
+
+        const highlights: Array<{ text: string; trend: 'worsened' | 'improved' | 'stable'; score: number }> = [];
+
+        for (const latest of latestMarkers) {
+            const key = this.normalizeMarkerKey(latest.name);
+            const previous = previousByKey.get(key);
+            if (!previous) {
+                continue;
+            }
+
+            const latestSeverity = this.getStatusSeverity(latest.status);
+            const previousSeverity = this.getStatusSeverity(previous.status);
+
+            let trend: 'worsened' | 'improved' | 'stable' = 'stable';
+            let score = 0;
+
+            if (latestSeverity !== previousSeverity) {
+                trend = latestSeverity > previousSeverity ? 'worsened' : 'improved';
+                score = Math.abs(latestSeverity - previousSeverity) * 100;
+            } else {
+                const latestNumeric = this.parseMarkerNumericValue(latest.value);
+                const previousNumeric = this.parseMarkerNumericValue(previous.value);
+
+                if (latestNumeric !== null && previousNumeric !== null && previousNumeric !== 0) {
+                    const percentDelta = ((latestNumeric - previousNumeric) / Math.abs(previousNumeric)) * 100;
+                    score = Math.abs(percentDelta);
+
+                    if (Math.abs(percentDelta) < 5) {
+                        trend = 'stable';
+                    } else {
+                        trend = percentDelta > 0 ? 'worsened' : 'improved';
+                    }
+                }
+            }
+
+            const unit = latest.unit || previous.unit || '';
+            const text = `${latest.name}: ${trend} (${previous.value}${unit ? ` ${unit}` : ''} → ${latest.value}${unit ? ` ${unit}` : ''})`;
+            highlights.push({ text, trend, score });
+        }
+
+        return highlights
+            .sort((a, b) => {
+                const trendOrder = trendPriority[a.trend] - trendPriority[b.trend];
+                if (trendOrder !== 0) {
+                    return trendOrder;
+                }
+                return b.score - a.score;
+            })
+            .slice(0, 3)
+            .map((highlight) => highlight.text);
+    }
+
+    private buildLabActionItems(
+        latestMarkers: Array<{ name: string; status: 'normal' | 'high' | 'low' | 'critical' }>,
+        hasPreviousReport: boolean,
+    ): string[] {
+        const abnormal = latestMarkers.filter((marker) => marker.status !== 'normal');
+
+        if (!latestMarkers.length) {
+            return [
+                'Use Re-analyze latest report to extract structured markers from your upload.',
+                'Upload your prior lab report to unlock change tracking between reports.',
+            ];
+        }
+
+        const actions: string[] = [];
+
+        if (abnormal.length > 0) {
+            const topMarkers = abnormal.slice(0, 2).map((marker) => marker.name).join(', ');
+            actions.push(`Review ${topMarkers} with your practitioner before making major supplement or medication changes.`);
+            actions.push('Re-test the same panel in 8–12 weeks to confirm whether markers are moving in the right direction.');
+            actions.push('Use Re-analyze latest report after each upload to keep your recommendations current.');
+        } else {
+            actions.push('Maintain your current protocol and repeat core bloodwork in 8–12 weeks.');
+            actions.push('Keep syncing wearable and symptom data so trend interpretation stays personalized.');
+            actions.push('Use Re-analyze latest report after each upload to keep your recommendations current.');
+        }
+
+        if (!hasPreviousReport) {
+            actions[1] = 'Upload one prior lab report to unlock stronger trend comparisons over time.';
+        }
+
+        return actions.slice(0, 3);
+    }
+
+    private isDemoConflictError(error: unknown): boolean {
+        const message = String((error as any)?.body?.detail || (error as any)?.message || '').toLowerCase();
+        return message.includes('demo connection') && message.includes('non-demo');
+    }
+
+    private hasDemoConnection(connections: any[]): boolean {
+        return connections.some((connection: any) => {
+            const slug = this.getProviderSlug(connection);
+            const name = String(connection?.name || '').toLowerCase();
+            const source = String(connection?.source || '').toLowerCase();
+            const mode = String(connection?.mode || '').toLowerCase();
+
+            return (
+                slug.includes('demo') ||
+                name.includes('demo') ||
+                source.includes('demo') ||
+                mode.includes('demo') ||
+                connection?.demo === true ||
+                connection?.isDemo === true
+            );
+        });
+    }
+
+    private isProviderConnected(provider: any): boolean {
+        const status = String(provider?.status || '').toLowerCase();
+        if (['connected', 'active', 'authorized', 'ok', 'success'].includes(status)) {
+            return true;
+        }
+
+        if (provider?.connected === true || provider?.isConnected === true) {
+            return true;
+        }
+
+        return Boolean(provider?.connectedAt || provider?.lastSyncAt || provider?.lastSyncedAt);
+    }
+
+    private getProviderSlug(provider: any): string {
+        return String(provider?.slug || provider?.provider || provider?.name || '')
+            .toLowerCase()
+            .trim();
+    }
+
+    private getProviderDisplayName(provider: any): string {
+        const rawSlug = this.getProviderSlug(provider);
+        const mappedSlug = PROVIDER_MAP[rawSlug] || rawSlug;
+        return PROVIDER_DISPLAY_NAMES[mappedSlug] || provider?.name || mappedSlug || 'Connected device';
+    }
+
     async getConnections(userId: string) {
         const junctionUserId = await wearablesRepository.getJunctionUserId(userId);
         if (!junctionUserId) {
@@ -47,27 +391,78 @@ export class WearablesService {
         const providers = await getConnectedProviders(junctionUserId);
 
         return providers.map((p: any) => ({
-            id: `${junctionUserId}_${p.slug}`,
+            id: `${junctionUserId}_${this.getProviderSlug(p)}`,
             userId,
-            provider: PROVIDER_MAP[p.slug] || p.slug,
-            providerName: PROVIDER_DISPLAY_NAMES[PROVIDER_MAP[p.slug]] || p.name,
-            status: p.status === 'connected' ? 'connected' : 'disconnected',
+            provider: PROVIDER_MAP[this.getProviderSlug(p)] || this.getProviderSlug(p),
+            providerName: this.getProviderDisplayName(p),
+            status: this.isProviderConnected(p) ? 'connected' : 'disconnected',
             connectedAt: p.connectedAt || new Date().toISOString(),
             lastSyncedAt: p.lastSyncAt || null,
             source: 'junction',
         }));
     }
 
-    async getConnectLink(userId: string, provider?: string) {
+    async getConnectLink(userId: string, provider?: string, forceFreshUser: boolean = false, redirectUrl?: string) {
         let junctionUserId = await wearablesRepository.getJunctionUserId(userId);
 
-        if (!junctionUserId) {
+        if (forceFreshUser) {
+            const recoveryClientUserId = `${userId}-real-${Date.now()}`;
+            junctionUserId = await createJunctionUserWithClientUserId(recoveryClientUserId);
+            await wearablesRepository.updateJunctionUserId(userId, junctionUserId);
+            logger.info('Force-created fresh Junction user ID for connect flow', { userId, junctionUserId, provider });
+        } else if (!junctionUserId) {
             junctionUserId = await getOrCreateJunctionUser(userId, null);
             await wearablesRepository.updateJunctionUserId(userId, junctionUserId);
             logger.info('Created and saved Junction user ID', { userId, junctionUserId });
         }
 
-        const { linkToken, linkWebUrl } = await generateLinkToken(junctionUserId, provider as any);
+        try {
+            const existingConnections = await getConnectedProviders(junctionUserId);
+            if (this.hasDemoConnection(existingConnections)) {
+                logger.warn('Detected demo connection on Junction user; rotating to fresh real-data user before link generation', {
+                    userId,
+                    junctionUserId,
+                    provider,
+                });
+
+                const recoveryClientUserId = `${userId}-real-${Date.now()}`;
+                const freshJunctionUserId = await createJunctionUserWithClientUserId(recoveryClientUserId);
+                await wearablesRepository.updateJunctionUserId(userId, freshJunctionUserId);
+                junctionUserId = freshJunctionUserId;
+            }
+        } catch (error) {
+            logger.warn('Unable to inspect existing Junction connections before link generation', { userId, junctionUserId, error });
+        }
+
+        let linkToken: string;
+        let linkWebUrl: string;
+
+        try {
+            const link = await generateLinkToken(junctionUserId, provider as any, redirectUrl);
+            linkToken = link.linkToken;
+            linkWebUrl = link.linkWebUrl;
+        } catch (error) {
+            if (!this.isDemoConflictError(error)) {
+                throw error;
+            }
+
+            const previousJunctionUserId = junctionUserId;
+            logger.warn('Detected demo/non-demo Junction conflict; rotating to a fresh Junction user', { userId, junctionUserId });
+            const recoveryClientUserId = `${userId}-real-${Date.now()}`;
+            const freshJunctionUserId = await createJunctionUserWithClientUserId(recoveryClientUserId);
+            await wearablesRepository.updateJunctionUserId(userId, freshJunctionUserId);
+            junctionUserId = freshJunctionUserId;
+
+            const retryLink = await generateLinkToken(freshJunctionUserId, provider as any, redirectUrl);
+            linkToken = retryLink.linkToken;
+            linkWebUrl = retryLink.linkWebUrl;
+
+            logger.info('Recovered Junction connect flow with fresh user', {
+                userId,
+                previousJunctionUserId,
+                freshJunctionUserId,
+            });
+        }
 
         return {
             linkUrl: linkWebUrl,
@@ -526,9 +921,9 @@ export class WearablesService {
 
         const connectedProviderSlugs = new Set<string>(
             (connectedProviders as any[])
-                .filter((provider: any) => provider?.status === 'connected')
+                .filter((provider: any) => this.isProviderConnected(provider))
                 .flatMap((provider: any) => {
-                    const raw = provider?.slug;
+                    const raw = this.getProviderSlug(provider);
                     if (!raw) return [];
                     const mapped = PROVIDER_MAP[raw] || raw;
                     return [raw, mapped];
@@ -581,11 +976,12 @@ export class WearablesService {
         const endDate = new Date().toISOString().split('T')[0];
         const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-        const [sleepData, activityData, bodyData, labAnalyses] = await Promise.all([
+        const [sleepData, activityData, bodyData, labAnalyses, labReports] = await Promise.all([
             junctionUserId ? getSleepData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
             junctionUserId ? getActivityData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
             junctionUserId ? getBodyData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
             filesRepository.listLabAnalysesByUser(userId).catch(() => []),
+            filesRepository.getLabReportsByUser(userId).catch(() => []),
         ]);
 
         // Check connected providers
@@ -593,7 +989,9 @@ export class WearablesService {
         if (junctionUserId) {
             try {
                 const connected = await getConnectedProviders(junctionUserId);
-                providers = connected.filter((p: any) => p.status === 'connected').map((p: any) => PROVIDER_DISPLAY_NAMES[PROVIDER_MAP[p.slug]] || p.name);
+                providers = connected
+                    .filter((provider: any) => this.isProviderConnected(provider))
+                    .map((provider: any) => this.getProviderDisplayName(provider));
             } catch {
                 providers = [];
             }
@@ -636,17 +1034,84 @@ export class WearablesService {
         const today = sortedDates[sortedDates.length - 1];
         const todayEntry = dateMap.get(today)!;
 
-        // Lab markers from most recent analysis
+        const mapAnalysisMarkers = (analysis: any) => (
+            analysis?.extractedMarkers
+                ? (analysis.extractedMarkers as any[]).slice(0, 8).map((m: any) => ({
+                    name: m.name,
+                    value: m.value,
+                    unit: m.unit || '',
+                    status: this.inferMarkerStatus(m.name, m.value, m.status, m.referenceRange),
+                    referenceRange: m.referenceRange || '',
+                }))
+                : []
+        );
+
+        const mapReportMarkers = (report: any) => (
+            report?.labReportData?.extractedData
+                ? (report.labReportData.extractedData as any[]).slice(0, 8).map((marker: any) => ({
+                    name: marker.testName || marker.name || 'Unknown Marker',
+                    value: marker.value,
+                    unit: marker.unit || '',
+                    status: this.inferMarkerStatus(marker.testName || marker.name, marker.value, marker.status, marker.referenceRange),
+                    referenceRange: marker.referenceRange || '',
+                }))
+                : []
+        );
+
+        const completedReports = (labReports as any[])
+            .filter((report: any) => report?.labReportData?.analysisStatus === 'completed' && Array.isArray(report?.labReportData?.extractedData))
+            .sort((a: any, b: any) => new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime());
+
+        const latestLabReport = completedReports[0] || null;
+        const previousLabReport = completedReports[1] || null;
+
+        const fallbackMarkers = latestLabReport ? mapReportMarkers(latestLabReport) : [];
+        const fallbackPreviousMarkers = previousLabReport ? mapReportMarkers(previousLabReport) : [];
+
+        // Lab markers from most recent analysis, with fallback to latest uploaded lab report extraction
         const latestLab = labAnalyses[0] || null;
-        const labMarkers = latestLab?.extractedMarkers
-            ? (latestLab.extractedMarkers as any[]).slice(0, 8).map((m: any) => ({
-                name: m.name,
-                value: m.value,
-                unit: m.unit || '',
-                status: m.status || 'normal',
-                referenceRange: m.referenceRange || '',
-            }))
-            : [];
+        const previousLab = labAnalyses[1] || null;
+        const analysisMarkers = mapAnalysisMarkers(latestLab);
+        const previousAnalysisMarkers = mapAnalysisMarkers(previousLab);
+        const labMarkers = analysisMarkers.length > 0 ? analysisMarkers : fallbackMarkers;
+        const previousMarkers = previousAnalysisMarkers.length > 0 ? previousAnalysisMarkers : fallbackPreviousMarkers;
+
+        const uploadedLabCount = Array.isArray(labReports) ? labReports.length : 0;
+        const hasUploadedLabs = uploadedLabCount > 0;
+
+        const labSummary = latestLab?.aiInsights?.summary
+            || (hasUploadedLabs
+                ? this.buildLabSummary(labMarkers.map((marker: any) => ({ name: marker.name, status: marker.status })))
+                : '');
+
+        const labReportDate = latestLab?.processedAt
+            ? new Date(latestLab.processedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : latestLabReport?.uploadedAt
+                ? new Date(latestLabReport.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : null;
+
+        const labChanges = this.buildLabChangeHighlights(labMarkers, previousMarkers);
+        const labNextActions = this.buildLabActionItems(labMarkers.map((marker: any) => ({ name: marker.name, status: marker.status })), previousMarkers.length > 0);
+
+        const labSummarySource = latestLab?.aiInsights?.summary
+            ? 'ai_insights'
+            : (labMarkers.length > 0 ? 'extracted_markers' : (hasUploadedLabs ? 'uploaded_reports' : 'none'));
+        const labSummaryConfidence = latestLab?.aiInsights?.summary
+            ? 'high'
+            : (labMarkers.length > 0 ? 'medium' : 'low');
+
+        const sourceLabel = labSummarySource === 'ai_insights'
+            ? 'AI analysis'
+            : labSummarySource === 'extracted_markers'
+                ? 'Extracted markers'
+                : labSummarySource === 'uploaded_reports'
+                    ? 'Uploaded reports'
+                    : 'No analyzed source';
+
+        const confidenceLabel = labSummaryConfidence.charAt(0).toUpperCase() + labSummaryConfidence.slice(1);
+        const labConfidenceSource = hasUploadedLabs
+            ? `Source: ${sourceLabel} • Confidence: ${confidenceLabel}${labReportDate ? ` • Report: ${labReportDate}` : ''}`
+            : null;
 
         return {
             connected: providers.length > 0,
@@ -666,7 +1131,15 @@ export class WearablesService {
                 steps: sortedDates.map(d => dateMap.get(d)!.steps),
             },
             labMarkers,
-            labReportDate: latestLab?.processedAt ? new Date(latestLab.processedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null,
+            labSummary,
+            labReportDate,
+            labChanges,
+            labNextActions,
+            labSummarySource,
+            labSummaryConfidence,
+            labConfidenceSource,
+            uploadedLabCount,
+            hasUploadedLabs,
             lastUpdated: new Date().toISOString(),
         };
     }
