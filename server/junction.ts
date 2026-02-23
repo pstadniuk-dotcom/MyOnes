@@ -75,6 +75,22 @@ export async function createJunctionUser(onesUserId: string): Promise<string> {
 }
 
 /**
+ * Create a new Junction user for a specific clientUserId.
+ * Used for recovery flows (e.g., demo/non-demo connection conflicts).
+ */
+export async function createJunctionUserWithClientUserId(clientUserId: string): Promise<string> {
+  try {
+    const client = junctionClient();
+    const response = await client.user.create({ clientUserId });
+    logger.info('Created Junction user with custom clientUserId', { clientUserId, junctionUserId: response.userId });
+    return response.userId;
+  } catch (error) {
+    logger.error('Failed to create Junction user with custom clientUserId', { error, clientUserId });
+    throw error;
+  }
+}
+
+/**
  * Get or create a Junction user for a ONES user
  */
 export async function getOrCreateJunctionUser(onesUserId: string, existingJunctionUserId?: string | null): Promise<string> {
@@ -90,7 +106,8 @@ export async function getOrCreateJunctionUser(onesUserId: string, existingJuncti
  */
 export async function generateLinkToken(
   junctionUserId: string,
-  provider?: Vital.Providers
+  provider?: Vital.Providers,
+  redirectUrl?: string
 ): Promise<{ linkToken: string; linkWebUrl: string }> {
   try {
     const client = junctionClient();
@@ -98,7 +115,10 @@ export async function generateLinkToken(
     const response = await client.link.token({
       userId: junctionUserId,
       provider,
+      redirectUrl,
       filterOnProviders: provider ? [provider] : undefined,
+      onClose: 'redirect',
+      onError: 'redirect',
     });
 
     return {
