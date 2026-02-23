@@ -70,6 +70,8 @@ const PRIORITY_PROVIDERS = [
   { slug: 'hammerhead', name: 'Hammerhead', priority: 21, description: 'Cycling computers' },
 ];
 
+const WEB_UNSUPPORTED_PROVIDERS = new Set(['beurer']);
+
 const PROVIDER_COLORS: Record<string, { color: string; bgColor: string }> = {
   garmin: { color: 'text-blue-600', bgColor: 'bg-blue-50' },
   google_fit: { color: 'text-green-600', bgColor: 'bg-green-50' },
@@ -312,6 +314,7 @@ export default function WearablesPage() {
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [showPillarDevices, setShowPillarDevices] = useState(false);
   const toggleCard = (id: string) => setExpandedCard(prev => prev === id ? null : id);
+  const featuredProviders = PRIORITY_PROVIDERS.filter((provider) => !WEB_UNSUPPORTED_PROVIDERS.has(provider.slug));
 
   // Fetch connected devices
   const { data: connections = [], isLoading } = useQuery<WearableConnection[]>({
@@ -381,6 +384,14 @@ export default function WearablesPage() {
 
   // Handle connect - opens Junction Link widget
   const handleConnect = async (provider?: string) => {
+    if (provider && WEB_UNSUPPORTED_PROVIDERS.has(provider)) {
+      toast({
+        title: 'Provider not available yet',
+        description: `${provider} is not currently supported in the web connection flow.`,
+      });
+      return;
+    }
+
     if (provider === 'apple_health_kit') {
       toast({
         title: 'Apple Health requires mobile SDK',
@@ -390,11 +401,17 @@ export default function WearablesPage() {
     }
 
     setIsConnecting(true);
-    try {
+
+    const buildConnectQuery = (forceFresh: boolean) => {
       const cacheBust = `_=${Date.now()}`;
-      const query = provider
-        ? `?provider=${encodeURIComponent(provider)}&fresh=1&${cacheBust}`
-        : `?fresh=1&${cacheBust}`;
+      const freshParam = forceFresh ? '&fresh=1' : '';
+      return provider
+        ? `?provider=${encodeURIComponent(provider)}${freshParam}&${cacheBust}`
+        : `?${forceFresh ? 'fresh=1&' : ''}${cacheBust}`;
+    };
+
+    const requestConnect = async (forceFresh: boolean) => {
+      const query = buildConnectQuery(forceFresh);
       const res = await apiRequest('GET', `/api/wearables/connect${query}`);
 
       if (res.status === 401) {
@@ -410,20 +427,27 @@ export default function WearablesPage() {
       const data = await res.json();
       if (data?.linkUrl) {
         window.location.href = data.linkUrl;
-      } else {
+        return;
+      }
+
+      throw new Error(data?.error || 'Failed to start the connection flow.');
+    };
+
+    try {
+      await requestConnect(false);
+    } catch (err) {
+      console.error('Connect error', err);
+
+      try {
+        await requestConnect(true);
+      } catch (retryErr: any) {
+        console.error('Connect retry error', retryErr);
         toast({
           title: 'Connection error',
-          description: data?.error || 'Failed to start the connection flow.',
+          description: retryErr?.message || 'Could not start the wearable connection flow. Please try again.',
           variant: 'destructive',
         });
       }
-    } catch (err) {
-      console.error('Connect error', err);
-      toast({
-        title: 'Network error',
-        description: 'Could not reach the server. Please try again.',
-        variant: 'destructive',
-      });
     } finally {
       setIsConnecting(false);
     }
@@ -563,7 +587,7 @@ export default function WearablesPage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {PRIORITY_PROVIDERS.map(provider => {
+                {featuredProviders.map(provider => {
                   const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
                   return (
                     <button
@@ -776,7 +800,7 @@ export default function WearablesPage() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {PRIORITY_PROVIDERS.map(provider => {
+              {featuredProviders.map(provider => {
                 const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
                 const isConnected = connectedConnections.some(c => c.provider === provider.slug || c.provider === provider.slug.replace('_v2', ''));
                 return (
