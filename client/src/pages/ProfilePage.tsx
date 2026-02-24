@@ -713,6 +713,7 @@ export default function ProfilePage() {
                       onChange={(e) => setHealthData({ ...healthData, age: e.target.value })}
                       placeholder="Enter your age"
                       data-testid="input-age"
+                      min="1"
                     />
                   )}
                 </div>
@@ -781,6 +782,7 @@ export default function ProfilePage() {
                       onChange={(e) => setHealthData({ ...healthData, weightLbs: e.target.value })}
                       placeholder="Enter weight in lbs"
                       data-testid="input-weight"
+                      min="0"
                     />
                   )}
                 </div>
