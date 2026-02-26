@@ -17,6 +17,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate",
+    "db:seed:ingredient-pricing": "tsx scripts/seed-ingredient-pricing.ts",
     "test:db": "node scripts/dev/test-supabase.mjs",
     "verify": "tsx scripts/dev/verify-server.ts",
     "migrate:supabase": "./scripts/migrate-to-supabase.sh",

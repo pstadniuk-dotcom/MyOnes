@@ -185,22 +185,7 @@ export const SYSTEM_SUPPORTS: IngredientInfo[] = [
 
 export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
   {
-    name: 'Alfalfa',
-    doseMg: 100,
-    doseRangeMin: 100,
-    doseRangeMax: 2000,
-    category: 'individual',
-    type: 'Hormonal Support, Antioxidant, Blood Health, Anti-inflammatory',
-    suggestedUse: 'May support hormonal balance, antioxidant activity, blood health, and help with inflammation.',
-    benefits: [
-      'May help lower cholesterol levels',
-      'Offers benefits for blood sugar management',
-      'Commonly used to relieve symptoms of menopause',
-      'Rich in antioxidants and essential nutrients like vitamin K, copper, folate, and magnesium'
-    ]
-  },
-  {
-    name: 'Aloe Vera Powder',
+    name: 'Aloe Vera',
     doseMg: 50,
     doseRangeMin: 50,
     doseRangeMax: 250,
@@ -381,22 +366,6 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
     ]
   },
   {
-    name: 'Fulvic Acid',
-    doseMg: 100,
-    doseRangeMin: 100,
-    doseRangeMax: 500,
-    category: 'individual',
-    type: 'Allergy Support, Anti-Inflammatory, Brain Health',
-    suggestedUse: 'May help with reducing inflammation, improving brain function, and supporting overall immune health. Might aid in blocking reactions that cause allergy symptoms.',
-    benefits: [
-      'May help alleviate allergy symptoms by blocking triggering reactions',
-      'Shown to have potential benefits for brain health',
-      'Possibly slows or prevents progression of neurodegenerative diseases',
-      'May help reduce swelling',
-      'Explored for potential anticancer properties'
-    ]
-  },
-  {
     name: 'GABA',
     doseMg: 50,
     doseRangeMin: 50,
@@ -482,25 +451,6 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
     ]
   },
   {
-    name: 'Glutathione',
-    doseMg: 50,
-    doseRangeMin: 50,
-    doseRangeMax: 600,
-    category: 'individual',
-    type: 'Antioxidant, Immune Support, Liver Health',
-    suggestedUse: 'May support immune system, assist in detoxification, and contribute to liver health by metabolizing toxins.',
-    benefits: [
-      'Tripeptide with various functions - acts as powerful antioxidant',
-      'Breaks down free radicals',
-      'Supports immune function',
-      'Regenerates vitamins C and E',
-      'Activates certain enzymes',
-      'Aids liver and gallbladder in processing fats',
-      'Helps metabolize toxins',
-      'Plays role in DNA creation and repair'
-    ]
-  },
-  {
     name: 'Hawthorn Berry',
     doseMg: 50,
     doseRangeMin: 50,
@@ -534,23 +484,7 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
       'Lowers glucose levels in healthy obese and pre-diabetic individuals with hyperlipidemia'
     ]
   },
-  {
-    name: 'L-Theanine',
-    doseMg: 50,
-    doseRangeMin: 50,
-    doseRangeMax: 400,
-    category: 'individual',
-    type: 'Antioxidant / Wellbeing',
-    suggestedUse: 'Supports stress relief, anxiety reduction, boosts focus, enhances immunity, and may help support blood pressure and improve sleep.',
-    benefits: [
-      'Known for promoting relaxation and reducing stress and anxiety',
-      'Boosts focus',
-      'Enhances immunity by reducing inflammation',
-      'May help support healthy blood pressure levels',
-      'Improves sleep quality',
-      'Often added as powerful antioxidant'
-    ]
-  },
+
   {
     name: 'Lutein',
     doseMg: 5,
@@ -599,53 +533,7 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
       'May improve sleep quality'
     ]
   },
-  {
-    name: 'NAD+',
-    doseMg: 100,
-    doseRangeMin: 100,
-    doseRangeMax: 300,
-    category: 'individual',
-    type: 'Anti-Aging / Cellular Health',
-    suggestedUse: 'Supports DNA repair, cell rejuvenation, and anti-aging processes.',
-    benefits: [
-      'Plays crucial role in many biological processes',
-      'Activates reactions within cells',
-      'Facilitates DNA repair',
-      'Helps with cosmetic aspects of aging and cell rejuvenation',
-      'Can reduce risks of age-related diseases'
-    ]
-  },
-  {
-    name: 'NMN',
-    doseMg: 50,
-    doseRangeMin: 50,
-    doseRangeMax: 250,
-    category: 'individual',
-    type: 'Anti-Aging / Cellular Health',
-    suggestedUse: 'Supports high blood pressure regulation, liver health, and metabolism.',
-    benefits: [
-      'Stimulates activity of mitochondria (vital to metabolism)',
-      'Mitochondria transform glucose and oxygen into cellular energy',
-      'Essential for mitochondrial health',
-      'Supports overall cellular function'
-    ]
-  },
-  {
-    name: 'Red Ginseng',
-    doseMg: 50,
-    doseRangeMin: 50,
-    doseRangeMax: 400,
-    category: 'individual',
-    type: 'Immune Support / Energy',
-    suggestedUse: 'Supports immune system function, enhances energy levels, and promotes blood sugar regulation.',
-    benefits: [
-      'May help increase insulin production',
-      'Enhances blood sugar uptake in cells',
-      'Provides powerful antioxidant protection',
-      'May improve energy production',
-      'Boosts overall immune system health'
-    ]
-  },
+
   {
     name: 'Resveratrol',
     doseMg: 20,
@@ -663,7 +551,7 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
     ]
   },
   {
-    name: 'Omega-3',
+    name: 'Omega 3',
     doseMg: 100,
     doseRangeMin: 100,
     doseRangeMax: 1000,
@@ -693,21 +581,7 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
       'Supports production of neurotransmitters like acetylcholine'
     ]
   },
-  {
-    name: 'Quercetin',
-    doseMg: 50,
-    doseRangeMin: 50,
-    doseRangeMax: 500,
-    category: 'individual',
-    type: 'Antioxidant / Heart Support, Immune System',
-    suggestedUse: 'Supports heart health, reduces inflammation, and stabilizes histamine release for antihistamine benefits.',
-    benefits: [
-      'May help protect against heart disease and cancer',
-      'Stabilizes cells that release histamine',
-      'Provides anti-inflammatory and antihistamine effects',
-      'Powerful antioxidant - supports overall health and reduces oxidative stress'
-    ]
-  },
+
   {
     name: 'Saw Palmetto Extract',
     doseMg: 50,
@@ -758,7 +632,7 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
     ]
   },
   {
-    name: 'Vitamin E',
+    name: 'Vitamin E (Mixed Tocopherols)',
     doseMg: 25,
     doseRangeMin: 25,
     doseRangeMax: 2000,
@@ -771,6 +645,70 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
       'May improve skin health by nourishing and balancing oil production',
       'May contribute to longer cell life',
       'Potential benefits for overall skin care'
+    ]
+  },
+  {
+    name: 'Milk Thistle',
+    doseMg: 150,
+    doseRangeMin: 150,
+    doseRangeMax: 450,
+    category: 'individual',
+    type: 'Liver Support, Antioxidant, Detox',
+    suggestedUse: 'Supports liver health and detoxification. Contains silymarin, a powerful antioxidant that protects liver cells from damage.',
+    benefits: [
+      'Protects liver cells from toxin damage',
+      'Supports liver regeneration',
+      'Powerful antioxidant (silymarin)',
+      'May help lower cholesterol',
+      'Supports healthy bile production'
+    ]
+  },
+  {
+    name: 'Calcium',
+    doseMg: 200,
+    doseRangeMin: 200,
+    doseRangeMax: 1000,
+    category: 'individual',
+    type: 'Bone Health, Muscle Function, Mineral',
+    suggestedUse: 'Essential mineral for bone strength, muscle function, nerve transmission, and cardiovascular health.',
+    benefits: [
+      'Supports strong bones and teeth',
+      'Essential for muscle contraction',
+      'Supports nerve signal transmission',
+      'May help regulate blood pressure',
+      'Important for blood clotting'
+    ]
+  },
+  {
+    name: 'Vitamin C',
+    doseMg: 250,
+    doseRangeMin: 250,
+    doseRangeMax: 2000,
+    category: 'individual',
+    type: 'Immune Support, Antioxidant',
+    suggestedUse: 'Essential vitamin supporting immune function, collagen synthesis, antioxidant protection, and iron absorption.',
+    benefits: [
+      'Powerful antioxidant protecting against free radicals',
+      'Essential for immune system function',
+      'Supports collagen production for skin and joint health',
+      'Enhances iron absorption',
+      'May reduce duration of common cold'
+    ]
+  },
+  {
+    name: 'Cape Aloe',
+    doseMg: 50,
+    doseRangeMin: 50,
+    doseRangeMax: 450,
+    category: 'individual',
+    type: 'Digestive Support, Detox, Anti-inflammatory',
+    suggestedUse: 'Supports digestive health, gentle detoxification, and may help with occasional constipation. Known for soothing properties.',
+    benefits: [
+      'Supports healthy digestion and bowel regularity',
+      'Gentle detoxification properties',
+      'Anti-inflammatory effects on digestive tract',
+      'Supports gut health',
+      'Rich in vitamins and minerals'
     ]
   },
 ];
@@ -1771,25 +1709,28 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'cboost': 'C Boost',
   'c-boost': 'C Boost',
 
-  // Ginseng variations
-  'ginseng': 'Red Ginseng',
-  'panax ginseng': 'Red Ginseng',
-  'korean ginseng': 'Red Ginseng',
-  'asian ginseng': 'Red Ginseng',
-
   // Common variations and misspellings
   'ahswaganda': 'Ashwagandha',
   'ashwaganda': 'Ashwagandha',
   'aswagandha': 'Ashwagandha',
   'curcuma': 'Curcumin',
   'turmeric': 'Curcumin',
-  'algae omega': 'Omega-3',
-  'omega 3': 'Omega-3',
-  'omega3': 'Omega-3',
-  'fish oil': 'Omega-3',
+  'turmeric root extract': 'Curcumin',
+  'algae omega': 'Omega 3',
+  'omega-3': 'Omega 3',
+  'omega3': 'Omega 3',
+  'fish oil': 'Omega 3',
   'ginko': 'Ginkgo Biloba Extract 24%',
   'ginkgo': 'Ginkgo Biloba Extract 24%',
   'ginkgo biloba': 'Ginkgo Biloba Extract 24%',
+  'aloe vera powder': 'Aloe Vera',
+  'cape aloe': 'Cape Aloe',
+  'vitamin e': 'Vitamin E (Mixed Tocopherols)',
+  'mixed tocopherols': 'Vitamin E (Mixed Tocopherols)',
+  'milk thistle': 'Milk Thistle',
+  'silymarin': 'Milk Thistle',
+  'vitamin c': 'Vitamin C',
+  'ascorbic acid': 'Vitamin C',
   'cinnamon': 'Cinnamon 20:1',
 
   // Unit/Qualifier variations

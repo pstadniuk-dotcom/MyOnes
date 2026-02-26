@@ -10,8 +10,19 @@ export class WebhooksController {
      */
     async handleTwilioSms(req: Request, res: Response) {
         try {
+            const isProduction = process.env.NODE_ENV === 'production';
             const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
             const twilioSignature = req.headers['x-twilio-signature'] as string | undefined;
+
+            if (isProduction && !twilioAuthToken) {
+                logger.error('TWILIO_AUTH_TOKEN is missing in production; rejecting Twilio webhook');
+                return res.status(503).send('Webhook configuration unavailable');
+            }
+
+            if (isProduction && !twilioSignature) {
+                logger.warn('Missing Twilio signature in production webhook request');
+                return res.status(401).send('Missing signature');
+            }
 
             if (twilioAuthToken && twilioSignature) {
                 const configuredWebhookUrl = process.env.TWILIO_WEBHOOK_URL;
@@ -27,6 +38,8 @@ export class WebhooksController {
                     logger.warn('Invalid Twilio webhook signature');
                     return res.status(403).send('Invalid signature');
                 }
+            } else if (!isProduction) {
+                logger.warn('Twilio webhook signature verification bypassed in non-production environment');
             }
 
             const { From: phoneNumber, Body: body } = req.body;
@@ -52,13 +65,26 @@ export class WebhooksController {
      */
     async handleJunctionWebhook(req: Request, res: Response) {
         try {
+            const isProduction = process.env.NODE_ENV === 'production';
             const signature = req.headers['x-vital-webhook-signature'] as string;
             const rawBody = JSON.stringify(req.body);
             const webhookSecret = process.env.JUNCTION_WEBHOOK_SECRET;
 
+            if (isProduction && !webhookSecret) {
+                logger.error('JUNCTION_WEBHOOK_SECRET is missing in production; rejecting Junction webhook');
+                return res.status(503).json({ error: 'Webhook configuration unavailable' });
+            }
+
+            if (isProduction && !signature) {
+                logger.warn('Missing Junction webhook signature in production request');
+                return res.status(401).json({ error: 'Missing signature' });
+            }
+
             if (webhookSecret && !webhooksService.verifyJunctionSignature(rawBody, signature, webhookSecret)) {
                 logger.warn('Invalid webhook signature');
                 return res.status(401).json({ error: 'Invalid signature' });
+            } else if (!webhookSecret && !isProduction) {
+                logger.warn('Junction webhook signature verification bypassed in non-production environment');
             }
 
             await webhooksService.handleJunctionEvent(req.body);

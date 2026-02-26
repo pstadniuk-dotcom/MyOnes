@@ -11,25 +11,25 @@ async function seedTiers() {
       tierKey: 'founding', 
       name: 'Founding Member', 
       priceCents: 900, 
-      maxCapacity: 250,
+      maxCapacity: 100,
       sortOrder: 1,
-      benefits: ['Unlimited AI health consultations', 'Lab and wearable data analysis', 'Supplements at member pricing', 'Formula updates as your health evolves', 'Lab testing at member rates', 'Direct AI practitioner messaging']
+      benefits: ['Unlimited AI health consultations', 'Lab and wearable data analysis', 'Supplements at member pricing', 'Formula updates as your health evolves', 'Lab testing at member rates', 'Future platform upgrades included']
     },
     { 
       tierKey: 'early', 
       name: 'Early Adopter', 
       priceCents: 1500, 
-      maxCapacity: 1000,
+      maxCapacity: 500,
       sortOrder: 2,
-      benefits: ['Unlimited AI health consultations', 'Lab and wearable data analysis', 'Supplements at member pricing', 'Formula updates as your health evolves', 'Lab testing at member rates', 'Direct AI practitioner messaging']
+      benefits: ['Unlimited AI health consultations', 'Lab and wearable data analysis', 'Supplements at member pricing', 'Formula updates as your health evolves', 'Lab testing at member rates', 'Future platform upgrades included']
     },
     { 
       tierKey: 'beta', 
       name: 'Beta Member', 
       priceCents: 1900, 
-      maxCapacity: 5000,
+      maxCapacity: 2000,
       sortOrder: 3,
-      benefits: ['Unlimited AI health consultations', 'Lab and wearable data analysis', 'Supplements at member pricing', 'Formula updates as your health evolves', 'Lab testing at member rates', 'Direct AI practitioner messaging']
+      benefits: ['Unlimited AI health consultations', 'Lab and wearable data analysis', 'Supplements at member pricing', 'Formula updates as your health evolves', 'Lab testing at member rates', 'Future platform upgrades included']
     },
     { 
       tierKey: 'standard', 
@@ -37,7 +37,7 @@ async function seedTiers() {
       priceCents: 2900, 
       maxCapacity: 999999,
       sortOrder: 4,
-      benefits: ['Unlimited AI health consultations', 'Lab and wearable data analysis', 'Supplements at member pricing', 'Formula updates as your health evolves', 'Lab testing at member rates', 'Direct AI practitioner messaging']
+      benefits: ['Unlimited AI health consultations', 'Lab and wearable data analysis', 'Supplements at member pricing', 'Formula updates as your health evolves', 'Lab testing at member rates', 'Future platform upgrades included']
     }
   ];
   

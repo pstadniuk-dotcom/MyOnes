@@ -11,7 +11,7 @@ type LabReportDataShape = {
     labName?: string;
     physicianName?: string;
     analysisStatus?: 'pending' | 'processing' | 'completed' | 'error';
-    extractedData?: Record<string, any>;
+    extractedData?: Array<Record<string, any>> | Record<string, any>;
 };
 
 function normalizeLabReportData(data?: unknown): DbInsertFileUpload['labReportData'] {

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
@@ -116,7 +116,10 @@ export default function LabReportsPage() {
       const reports = query.state.data as FileUpload[] | undefined;
       const hasProcessing = Array.isArray(reports) && reports.some((report: any) => {
         const status = String(report?.labReportData?.analysisStatus || '').toLowerCase();
-        return status === 'processing' || status === 'pending';
+        // Poll while processing/pending, or while any PDF hasn't been analyzed yet (NULL status)
+        const mimeType = report.mimeType || '';
+        const isPdf = mimeType === 'application/pdf' || mimeType.startsWith('image/');
+        return status === 'processing' || status === 'pending' || (isPdf && status === '');
       });
       return hasProcessing ? 5000 : false;
     },
@@ -244,65 +247,117 @@ export default function LabReportsPage() {
     },
   });
 
+  // Auto-trigger reanalysis for any uploaded lab file that has never been analyzed
+  // (status NULL) or previously failed (status 'error'). Runs once when page loads.
+  const autoReanalyzedRef = useRef(false);
+  useEffect(() => {
+    if (autoReanalyzedRef.current || !labReports || labReports.length === 0) return;
+
+    const unanalyzed = labReports.filter((report: any) => {
+      const mimeType = report.mimeType || '';
+      const isPdf = mimeType === 'application/pdf' || mimeType.startsWith('image/');
+      if (!isPdf) return false; // text files handle themselves
+      const status = String(report?.labReportData?.analysisStatus || '').toLowerCase();
+      // Trigger for NULL (never ran) or 'error' (failed last time)
+      return status === '' || status === 'error';
+    });
+
+    if (unanalyzed.length === 0) return;
+
+    autoReanalyzedRef.current = true;
+    console.log(`Auto-triggering reanalysis for ${unanalyzed.length} unanalyzed lab report(s)`);
+
+    // Fire-and-forget: queue each unanalyzed file
+    unanalyzed.forEach(async (report: any) => {
+      try {
+        await apiRequest('POST', `/api/files/${report.id}/reanalyze`);
+        console.log('Reanalysis queued for', report.originalFileName || report.id);
+      } catch (err) {
+        console.warn('Auto-reanalysis failed for', report.id, err);
+      }
+    });
+
+    // Poll for updated status
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
+    }, 8000);
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse'] });
+    }, 20000);
+  }, [labReports]);
+
   const uploadFile = async (file: File) => {
     setIsUploading(true);
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', 'lab-report');
-      formData.append('metadata', JSON.stringify({
-        uploadSource: 'lab-reports-page',
-        originalName: file.name
-      }));
+    // Show immediate toast — persists even if user navigates away
+    toast({
+      title: "Uploading in background",
+      description: `${file.name} is uploading. You can navigate away safely.`,
+    });
 
-      const response = await fetch(buildApiUrl('/api/files/upload'), {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: formData,
-        credentials: 'include'
-      });
+    // Kick off upload without awaiting inside the component lifecycle
+    const doUpload = async () => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', 'lab-report');
+        formData.append('metadata', JSON.stringify({
+          uploadSource: 'lab-reports-page',
+          originalName: file.name
+        }));
 
-      if (!response.ok) {
-        const error = await response.json();
-        console.log('Upload error response:', response.status, error);
+        const response = await fetch(buildApiUrl('/api/files/upload'), {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: formData,
+          credentials: 'include'
+        });
 
-        // Check for consent error specifically
-        if (response.status === 403) {
-          console.log('403 error detected, showing consent dialog');
-          setIsUploading(false);
-          setPendingFile(file);
-          setShowConsentDialog(true);
-          toast({
-            title: "Consent Required",
-            description: "Please grant consent to process your health data before uploading.",
-          });
-          return;
+        if (!response.ok) {
+          const error = await response.json();
+          console.log('Upload error response:', response.status, error);
+
+          // Check for consent error specifically
+          if (response.status === 403) {
+            console.log('403 error detected, showing consent dialog');
+            setIsUploading(false);
+            setPendingFile(file);
+            setShowConsentDialog(true);
+            toast({
+              title: "Consent Required",
+              description: "Please grant consent to process your health data before uploading.",
+            });
+            return;
+          }
+
+          throw new Error(error.error || 'Upload failed');
         }
 
-        throw new Error(error.error || 'Upload failed');
+        await queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
+
+        toast({
+          title: "Upload complete",
+          description: `${file.name} was uploaded successfully.`,
+        });
+
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } catch (error: any) {
+        toast({
+          title: "Upload failed",
+          description: error.message || "Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsUploading(false);
       }
+    };
 
-      await queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
-
-      toast({
-        title: "File uploaded successfully",
-        description: `${file.name} has been securely uploaded.`,
-      });
-
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } catch (error: any) {
-      toast({
-        title: "Upload failed",
-        description: error.message || "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-    }
+    // Don't await — runs in background, survives navigation
+    doUpload();
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -736,18 +791,9 @@ export default function LabReportsPage() {
               <div className="text-center py-8">
                 <FileText className="w-12 h-12 mx-auto text-[#52796F] mb-3" />
                 <h3 className="text-lg font-medium mb-2 text-[#1B4332]">No lab reports yet</h3>
-                <p className="text-sm text-[#52796F] mb-4">
-                  Upload your blood work, urine tests, or other medical documents to help optimize your formula.
+                <p className="text-sm text-[#52796F]">
+                  Upload your blood work, urine tests, or other medical documents using the button above to help optimize your formula.
                 </p>
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  variant="outline"
-                  data-testid="button-upload-first"
-                  className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Upload Your First Report
-                </Button>
               </div>
             )}
           </div>

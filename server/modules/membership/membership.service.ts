@@ -52,7 +52,7 @@ export class MembershipService {
                 tierKey: 'founding',
                 name: 'Founding Member',
                 priceCents: 1900,
-                maxCapacity: 250,
+                maxCapacity: 100,
                 sortOrder: 1,
                 benefits: [
                     'Lock in $19/month forever',
@@ -66,7 +66,7 @@ export class MembershipService {
                 tierKey: 'early',
                 name: 'Early Adopter',
                 priceCents: 2900,
-                maxCapacity: 1000,
+                maxCapacity: 500,
                 sortOrder: 2,
                 benefits: [
                     'Lock in $29/month forever',
@@ -79,7 +79,7 @@ export class MembershipService {
                 tierKey: 'beta',
                 name: 'Beta Member',
                 priceCents: 3900,
-                maxCapacity: 5000,
+                maxCapacity: 2000,
                 sortOrder: 3,
                 benefits: [
                     'Lock in $39/month forever',

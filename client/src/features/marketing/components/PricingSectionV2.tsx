@@ -8,7 +8,7 @@ const features = [
   "200+ clinical-grade ingredients",
   "Formula adjustments each cycle",
   "Wearable data integration",
-  "Direct practitioner messaging",
+  "Future platform upgrades included",
   "Free shipping on all orders",
 ];
 

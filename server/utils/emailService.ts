@@ -1,9 +1,9 @@
 import sgMail from '@sendgrid/mail';
 
 // Initialize SendGrid with API key from environment variables
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL;
-const SENDGRID_FROM_NAME = process.env.SENDGRID_FROM_NAME || 'ONES';
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY?.trim();
+const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL?.trim();
+const SENDGRID_FROM_NAME = (process.env.SENDGRID_FROM_NAME || 'ONES').trim();
 
 if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);
@@ -128,13 +128,16 @@ export async function sendNotificationEmail(notification: EmailNotification): Pr
       html: getEmailTemplate(notification),
     };
 
-    await sgMail.send(msg);
-    console.log(`✅ Email sent successfully to ${notification.to} - ${notification.subject}`);
+    console.log(`📤 Attempting SendGrid send to ${notification.to} from ${SENDGRID_FROM_EMAIL}...`);
+    const [response] = await sgMail.send(msg);
+    console.log(`✅ Email sent successfully to ${notification.to} - status: ${response.statusCode}`);
     return true;
-  } catch (error) {
-    console.error('❌ Error sending email via SendGrid:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', error.message);
+  } catch (error: any) {
+    console.error('❌ Error sending email via SendGrid:', error?.message || error);
+    if (error?.response) {
+      // SendGrid returns detailed errors in response.body
+      console.error('❌ SendGrid response status:', error.response.status);
+      console.error('❌ SendGrid response body:', JSON.stringify(error.response.body, null, 2));
     }
     return false;
   }

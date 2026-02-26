@@ -4,7 +4,7 @@ import {
     type User, type InsertUser,
     type HealthProfile, type InsertHealthProfile,
     type Subscription, type InsertSubscription,
-    type Order,
+    type Order, type InsertOrder,
     type Address, type InsertAddress,
     type PaymentMethodRef, type InsertPaymentMethodRef,
     type Formula
@@ -37,6 +37,16 @@ export class UsersRepository {
 
     async getUserByFacebookId(facebookId: string): Promise<User | undefined> {
         const [user] = await db.select().from(users).where(eq(users.facebookId, facebookId));
+        return user || undefined;
+    }
+
+    async getUserByStripeCustomerId(stripeCustomerId: string): Promise<User | undefined> {
+        const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, stripeCustomerId));
+        return user || undefined;
+    }
+
+    async getUserByStripeSubscriptionId(stripeSubscriptionId: string): Promise<User | undefined> {
+        const [user] = await db.select().from(users).where(eq(users.stripeSubscriptionId, stripeSubscriptionId));
         return user || undefined;
     }
 
@@ -223,6 +233,14 @@ export class UsersRepository {
         return subscription || undefined;
     }
 
+    async getSubscriptionByStripeSubscriptionId(stripeSubscriptionId: string): Promise<Subscription | undefined> {
+        const [subscription] = await db
+            .select()
+            .from(subscriptions)
+            .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId));
+        return subscription || undefined;
+    }
+
     async createSubscription(subscription: InsertSubscription): Promise<Subscription> {
         const [sub] = await db.insert(subscriptions).values(subscription).returning();
         return sub;
@@ -235,6 +253,29 @@ export class UsersRepository {
             .where(eq(subscriptions.userId, userId))
             .returning();
         return subscription || undefined;
+    }
+
+    async updateSubscriptionByStripeSubscriptionId(
+        stripeSubscriptionId: string,
+        updates: Partial<InsertSubscription>
+    ): Promise<Subscription | undefined> {
+        const [subscription] = await db
+            .update(subscriptions)
+            .set(updates)
+            .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId))
+            .returning();
+        return subscription || undefined;
+    }
+
+    async upsertSubscriptionForUser(userId: string, values: InsertSubscription): Promise<Subscription> {
+        const existing = await this.getSubscription(userId);
+        if (existing) {
+            const updated = await this.updateSubscription(userId, values);
+            if (updated) {
+                return updated;
+            }
+        }
+        return this.createSubscription(values);
     }
 
     async getUpcomingRenewals(daysAhead: number): Promise<Subscription[]> {
@@ -259,6 +300,25 @@ export class UsersRepository {
     async getOrder(id: string): Promise<Order | undefined> {
         const [order] = await db.select().from(orders).where(eq(orders.id, id));
         return order || undefined;
+    }
+
+    async getOrderByStripeSessionId(sessionId: string): Promise<Order | undefined> {
+        const [order] = await db.select().from(orders).where(eq(orders.stripeSessionId, sessionId));
+        return order || undefined;
+    }
+
+    async createOrder(order: InsertOrder): Promise<Order> {
+        const [created] = await db.insert(orders).values(order).returning();
+        return created;
+    }
+
+    async updateOrder(id: string, updates: Partial<InsertOrder>): Promise<Order | undefined> {
+        const [updated] = await db
+            .update(orders)
+            .set(updates)
+            .where(eq(orders.id, id))
+            .returning();
+        return updated || undefined;
     }
 
     async listOrdersByUser(userId: string): Promise<Order[]> {

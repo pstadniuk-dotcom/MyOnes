@@ -9,7 +9,7 @@ const chatMessages = [
   { role: "user", text: "I want more energy and better focus throughout the day." },
   { role: "assistant", text: "Got it. Do you have any recent blood work I can analyze? And are you taking any medications?" },
   { role: "user", text: "Yes, I uploaded my labs. I take sertraline for anxiety." },
-  { role: "assistant", text: "Perfect. Based on your labs, I see low magnesium and B12. I'm building a formula with Ashwagandha, Magnesium Glycinate, and L-Theanine, all safe with sertraline." },
+  { role: "assistant", text: "Perfect. Based on your labs, I see low magnesium and B12. I'm building a formula with Ashwagandha, Magnesium, and GABA, all safe with sertraline." },
 ];
 
 export default function HeroSectionV2() {

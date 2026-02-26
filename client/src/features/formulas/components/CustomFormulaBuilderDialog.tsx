@@ -26,6 +26,7 @@ import { Slider } from "@/shared/components/ui/slider";
 import { useToast } from "@/shared/hooks/use-toast";
 import { Plus, X, Beaker, ChevronDown, ChevronUp, CheckCircle, AlertCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
+import { VALID_CAPSULE_COUNTS, CAPSULE_TIER_INFO, getCapsuleBudget, type CapsuleCount } from "@/shared/lib/utils";
 
 interface IngredientInfo {
   name: string;
@@ -46,8 +47,8 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-const MAX_DOSAGE = 5500;
-const WARNING_THRESHOLD = 4950; // 90% of max
+const WARNING_THRESHOLD_PERCENT = 0.90; // 90% of budget
+const BUDGET_TOLERANCE_PERCENT = 0.025; // 2.5% over budget allowed (matches backend)
 
 export function CustomFormulaBuilderDialog({
   open,
@@ -55,6 +56,7 @@ export function CustomFormulaBuilderDialog({
 }: Props) {
   const { toast } = useToast();
   const [formulaName, setFormulaName] = useState("");
+  const [capsuleCount, setCapsuleCount] = useState<CapsuleCount>(9);
   const [selectedBase, setSelectedBase] = useState<string>("");
   const [selectedIndividual, setSelectedIndividual] = useState<string>("");
   const [selectedIndividualDose, setSelectedIndividualDose] = useState<number>(0);
@@ -116,15 +118,21 @@ export function CustomFormulaBuilderDialog({
     0
   );
 
-  const dosagePercent = (totalDosage / MAX_DOSAGE) * 100;
-  const isNearLimit = totalDosage >= WARNING_THRESHOLD;
-  const isAtLimit = totalDosage >= MAX_DOSAGE;
+  const baseBudget = getCapsuleBudget(capsuleCount);
+  const hardLimit = Math.floor(baseBudget * (1 + BUDGET_TOLERANCE_PERCENT)); // 2.5% tolerance
+  const warningThreshold = baseBudget * WARNING_THRESHOLD_PERCENT;
+
+  const dosagePercent = (totalDosage / baseBudget) * 100;
+  const isNearLimit = totalDosage >= warningThreshold;
+  const isOverBudget = totalDosage > baseBudget;   // Over target — amber/red warning
+  const isAtLimit = totalDosage >= hardLimit;        // At hard ceiling — blocks adding
 
   // Save custom formula mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
       return apiRequest("POST", `/api/users/me/formula/custom`, {
         name: formulaName || undefined,
+        targetCapsules: capsuleCount,
         bases: addedBases.map(b => ({
           ingredient: b.name,
           amount: b.selectedDose,
@@ -175,10 +183,10 @@ export function CustomFormulaBuilderDialog({
     const base = catalog?.systemSupports.find(b => b.name === selectedBase);
     if (base) {
       const newTotal = totalDosage + base.doseMg;
-      if (newTotal > MAX_DOSAGE) {
+      if (newTotal > hardLimit) {
         toast({
           title: "Cannot add ingredient",
-          description: `Adding ${base.name} (${base.doseMg}mg) would exceed the ${MAX_DOSAGE}mg limit.`,
+          description: `Adding ${base.name} (${base.doseMg}mg) would exceed the ${hardLimit}mg limit for ${capsuleCount} capsules/day.`,
           variant: "destructive",
         });
         return;
@@ -193,10 +201,10 @@ export function CustomFormulaBuilderDialog({
     const individual = catalog?.individualIngredients.find(i => i.name === selectedIndividual);
     if (individual) {
       const newTotal = totalDosage + selectedIndividualDose;
-      if (newTotal > MAX_DOSAGE) {
+      if (newTotal > hardLimit) {
         toast({
           title: "Cannot add ingredient",
-          description: `Adding ${individual.name} (${selectedIndividualDose}mg) would exceed the ${MAX_DOSAGE}mg limit.`,
+          description: `Adding ${individual.name} (${selectedIndividualDose}mg) would exceed the ${hardLimit}mg limit for ${capsuleCount} capsules/day.`,
           variant: "destructive",
         });
         return;
@@ -215,7 +223,7 @@ export function CustomFormulaBuilderDialog({
     setAddedIndividuals(addedIndividuals.filter((_, i) => i !== index));
   };
 
-  const canSave = (addedBases.length > 0 || addedIndividuals.length > 0) && totalDosage <= MAX_DOSAGE;
+  const canSave = (addedBases.length > 0 || addedIndividuals.length > 0) && totalDosage <= hardLimit;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -248,26 +256,78 @@ export function CustomFormulaBuilderDialog({
             </p>
           </div>
 
+          {/* Capsule Count Selector */}
+          <div className="space-y-3">
+            <Label>Capsules Per Day</Label>
+            <div className="grid grid-cols-3 gap-3">
+              {VALID_CAPSULE_COUNTS.map((count) => {
+                const tier = CAPSULE_TIER_INFO[count];
+                const budget = getCapsuleBudget(count);
+                const isSelected = capsuleCount === count;
+                const wouldExceed = totalDosage > Math.floor(budget * (1 + BUDGET_TOLERANCE_PERCENT));
+                return (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => setCapsuleCount(count)}
+                    className={`relative rounded-lg border-2 p-3 text-left transition-all ${
+                      isSelected
+                        ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/20 ring-1 ring-purple-600'
+                        : wouldExceed
+                          ? 'border-muted opacity-50 cursor-not-allowed'
+                          : 'border-muted hover:border-purple-300 hover:bg-muted/50'
+                    }`}
+                    data-testid={`capsule-count-${count}`}
+                  >
+                    {count === 9 && (
+                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-semibold bg-purple-600 text-white px-2 py-0.5 rounded-full">
+                        Popular
+                      </span>
+                    )}
+                    <div className="text-center space-y-1">
+                      <div className="text-2xl font-bold">{count}</div>
+                      <div className="text-xs font-semibold text-purple-600">{tier.label}</div>
+                      <div className="text-[11px] text-muted-foreground">{count / 3} per meal</div>
+                      <div className="text-[11px] text-muted-foreground">{budget.toLocaleString()}mg budget</div>
+                    </div>
+                    {wouldExceed && !isSelected && (
+                      <div className="mt-1 text-[10px] text-red-500 text-center">Over limit</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Each capsule holds 550mg. Your selection determines the total mg budget.
+            </p>
+          </div>
+
           {/* Dosage Progress */}
-          <Card className={`p-4 ${isNearLimit ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/20' : isAtLimit ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : 'bg-muted/30'}`}>
+          <Card className={`p-4 ${isAtLimit ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : isOverBudget ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/20' : isNearLimit ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/20' : 'bg-muted/30'}`}>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Total Dosage</span>
-                <span className={`text-lg font-bold ${isNearLimit ? 'text-amber-600' : isAtLimit ? 'text-red-600' : ''}`}>
-                  {totalDosage} / {MAX_DOSAGE} mg
+                <span className={`text-lg font-bold ${isAtLimit ? 'text-red-600' : isOverBudget ? 'text-amber-600' : isNearLimit ? 'text-amber-600' : ''}`}>
+                  {totalDosage} / {baseBudget} mg
                 </span>
               </div>
-              <Progress value={dosagePercent} className="h-2" />
+              <Progress value={Math.min(dosagePercent, 105)} className="h-2" />
               {isAtLimit && (
                 <div className="flex items-start gap-2 text-xs text-red-600 dark:text-red-400">
                   <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>Maximum dosage reached. Remove ingredients to add more.</span>
+                  <span>Maximum dosage reached ({hardLimit}mg hard limit). Remove ingredients to add more.</span>
                 </div>
               )}
-              {isNearLimit && !isAtLimit && (
+              {isOverBudget && !isAtLimit && (
                 <div className="flex items-start gap-2 text-xs text-amber-600 dark:text-amber-400">
                   <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>Approaching maximum dosage limit.</span>
+                  <span>Over target budget — up to {hardLimit}mg allowed (2.5% tolerance).</span>
+                </div>
+              )}
+              {isNearLimit && !isOverBudget && (
+                <div className="flex items-start gap-2 text-xs text-amber-600 dark:text-amber-400">
+                  <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <span>Approaching dosage budget.</span>
                 </div>
               )}
             </div>
