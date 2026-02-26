@@ -329,6 +329,19 @@ export class AdminController {
         }
     }
 
+    async retryManufacturerOrder(req: Request, res: Response) {
+        try {
+            const result = await adminService.retryManufacturerOrder(req.params.id);
+            if (!result.success) {
+                return res.status(result.error === 'Order not found' ? 404 : 400).json({ error: result.error });
+            }
+            res.json({ success: true, manufacturerOrderId: result.manufacturerOrderId });
+        } catch (error) {
+            logger.error('Error retrying manufacturer order', { error });
+            res.status(500).json({ error: 'Failed to retry manufacturer order' });
+        }
+    }
+
     async getUserNotes(req: Request, res: Response) {
         try {
             const notes = await adminService.getUserNotes(req.params.id);
@@ -396,6 +409,65 @@ export class AdminController {
         } catch (error) {
             logger.error('Error updating AI settings', { error });
             res.status(500).json({ error: 'Failed to update AI settings' });
+        }
+    }
+
+    async listIngredientPricing(req: Request, res: Response) {
+        try {
+            const pricing = await adminService.listIngredientPricing();
+            res.json(pricing);
+        } catch (error) {
+            logger.error('Error fetching ingredient pricing', { error });
+            res.status(500).json({ error: 'Failed to fetch ingredient pricing' });
+        }
+    }
+
+    async updateIngredientPricing(req: Request, res: Response) {
+        try {
+            const {
+                ingredientName,
+                typicalCapsuleMg,
+                typicalBottleCapsules,
+                typicalRetailPriceCents,
+                isActive,
+            } = req.body || {};
+
+            const parsedCapsuleMg = Number(typicalCapsuleMg);
+            const parsedBottleCapsules = Number(typicalBottleCapsules);
+            const parsedRetailPriceCents = Number(typicalRetailPriceCents);
+
+            if (!ingredientName || typeof ingredientName !== 'string') {
+                return res.status(400).json({ error: 'ingredientName is required' });
+            }
+            if (!Number.isFinite(parsedCapsuleMg) || parsedCapsuleMg <= 0) {
+                return res.status(400).json({ error: 'typicalCapsuleMg must be a positive number' });
+            }
+            if (!Number.isFinite(parsedBottleCapsules) || parsedBottleCapsules <= 0) {
+                return res.status(400).json({ error: 'typicalBottleCapsules must be a positive number' });
+            }
+            if (!Number.isFinite(parsedRetailPriceCents) || parsedRetailPriceCents <= 0) {
+                return res.status(400).json({ error: 'typicalRetailPriceCents must be a positive number' });
+            }
+            if (typeof isActive !== 'boolean') {
+                return res.status(400).json({ error: 'isActive must be a boolean' });
+            }
+
+            const updated = await adminService.updateIngredientPricing(req.params.id, {
+                ingredientName: ingredientName.trim(),
+                typicalCapsuleMg: Math.round(parsedCapsuleMg),
+                typicalBottleCapsules: Math.round(parsedBottleCapsules),
+                typicalRetailPriceCents: Math.round(parsedRetailPriceCents),
+                isActive,
+            });
+
+            if (!updated) {
+                return res.status(404).json({ error: 'Ingredient pricing not found' });
+            }
+
+            res.json(updated);
+        } catch (error) {
+            logger.error('Error updating ingredient pricing', { error });
+            res.status(500).json({ error: 'Failed to update ingredient pricing' });
         }
     }
 }

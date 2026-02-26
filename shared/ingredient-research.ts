@@ -590,9 +590,9 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
     ]
   },
   'n-acetyl cysteine': {
-    summary: 'N-Acetyl Cysteine (NAC) is a precursor to glutathione, the body\'s master antioxidant. It supports detoxification, respiratory health, and mental wellness.',
+    summary: 'N-Acetyl Cysteine (NAC) supports antioxidant defenses, detoxification, respiratory health, and mental wellness.',
     keyBenefits: [
-      'Supports glutathione production',
+      'Supports antioxidant pathways',
       'Aids detoxification',
       'Supports respiratory health',
       'May improve mental health'
@@ -845,77 +845,6 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
       }
     ]
   },
-  'glutathione': {
-    summary: 'Glutathione is the body\'s master antioxidant, crucial for detoxification, immune function, and cellular health. It helps neutralize free radicals and supports liver function.',
-    keyBenefits: [
-      'Master antioxidant for cellular protection',
-      'Supports liver detoxification',
-      'Enhances immune function',
-      'Regenerates other antioxidants'
-    ],
-    safetyProfile: 'Very safe. Oral absorption is limited; liposomal forms may be better absorbed.',
-    recommendedFor: ['Detoxification', 'Immune support', 'Antioxidant protection', 'Liver health'],
-    studies: [
-      {
-        title: 'Oral supplementation with liposomal glutathione elevates body stores of glutathione and markers of immune function',
-        journal: 'European Journal of Clinical Nutrition',
-        year: 2015,
-        authors: 'Sinha R, et al.',
-        findings: 'Liposomal glutathione supplementation significantly increased blood glutathione levels and improved immune markers.',
-        sampleSize: 54,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/25226822/',
-        evidenceLevel: 'moderate',
-        studyType: 'rct'
-      }
-    ]
-  },
-  'nad+': {
-    summary: 'NAD+ (Nicotinamide Adenine Dinucleotide) is a coenzyme essential for energy metabolism and cellular repair. Levels decline with age, making supplementation relevant for longevity.',
-    keyBenefits: [
-      'Supports cellular energy production',
-      'Promotes DNA repair mechanisms',
-      'May support healthy aging',
-      'Enhances mitochondrial function'
-    ],
-    safetyProfile: 'Generally safe. Limited long-term human data. Precursors like NMN or NR may be more effective orally.',
-    recommendedFor: ['Anti-aging', 'Energy support', 'Cellular health', 'Longevity'],
-    studies: [
-      {
-        title: 'NAD+ metabolism and its roles in cellular processes during ageing',
-        journal: 'Nature Reviews Molecular Cell Biology',
-        year: 2021,
-        authors: 'Covarrubias AJ, et al.',
-        findings: 'NAD+ decline is a hallmark of aging; boosting NAD+ levels shows promise for improving healthspan.',
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/33353981/',
-        evidenceLevel: 'strong',
-        studyType: 'review'
-      }
-    ]
-  },
-  'nmn': {
-    summary: 'NMN (Nicotinamide Mononucleotide) is a direct precursor to NAD+. Research shows it can effectively raise NAD+ levels and may support metabolic health and longevity.',
-    keyBenefits: [
-      'Boosts NAD+ levels effectively',
-      'Supports energy metabolism',
-      'May improve insulin sensitivity',
-      'Promotes healthy aging'
-    ],
-    safetyProfile: 'Well-tolerated in human studies. Long-term safety data still emerging.',
-    recommendedFor: ['Anti-aging', 'Metabolic health', 'Energy support', 'Longevity'],
-    studies: [
-      {
-        title: 'Effect of oral administration of nicotinamide mononucleotide on clinical parameters and nicotinamide metabolite levels in healthy Japanese men',
-        journal: 'Endocrine Journal',
-        year: 2020,
-        authors: 'Irie J, et al.',
-        findings: 'NMN supplementation safely increased NAD+ metabolites in blood without adverse effects.',
-        sampleSize: 10,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/31685720/',
-        evidenceLevel: 'preliminary',
-        studyType: 'rct'
-      }
-    ]
-  },
   'hawthorn berry': {
     summary: 'Hawthorn berry is traditionally used for cardiovascular support. Research supports its use for improving blood flow, supporting heart function, and managing mild heart conditions.',
     keyBenefits: [
@@ -1129,30 +1058,6 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
       }
     ]
   },
-  'alfalfa': {
-    summary: 'Alfalfa (Medicago sativa) is a nutrient-rich plant used traditionally for detoxification and hormone balance. It contains vitamins, minerals, and phytoestrogens.',
-    keyBenefits: [
-      'Rich source of vitamins and minerals',
-      'Contains natural phytoestrogens',
-      'Supports detoxification',
-      'May help balance cholesterol'
-    ],
-    safetyProfile: 'Generally safe in food amounts. May interact with blood thinners and immunosuppressants. Avoid with autoimmune conditions.',
-    recommendedFor: ['Hormonal balance', 'Nutritional support', 'Detoxification', 'Cholesterol support'],
-    studies: [
-      {
-        title: 'Effect of alfalfa seeds on lipid profile and atherosclerosis',
-        journal: 'Pakistan Journal of Pharmaceutical Sciences',
-        year: 2010,
-        authors: 'Mölgaard J, et al.',
-        findings: 'Alfalfa seed supplementation reduced total cholesterol and LDL levels in hyperlipidemic patients.',
-        sampleSize: 15,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/2838724/',
-        evidenceLevel: 'moderate',
-        studyType: 'rct'
-      }
-    ]
-  },
   'aloe vera': {
     summary: 'Aloe vera is a succulent plant with gel and latex used medicinally. Research supports digestive health, blood sugar regulation, and skin health benefits.',
     keyBenefits: [
@@ -1316,30 +1221,6 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         findings: 'Colostrum supplementation improved lean body mass and athletic performance compared to whey protein.',
         sampleSize: 40,
         pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/11985596/',
-        evidenceLevel: 'moderate',
-        studyType: 'rct'
-      }
-    ]
-  },
-  'fulvic acid': {
-    summary: 'Fulvic acid is a compound from decomposed organic matter rich in minerals and antioxidants. It enhances nutrient absorption and cellular function.',
-    keyBenefits: [
-      'Enhances mineral absorption',
-      'Supports cellular energy',
-      'Contains trace minerals',
-      'May support detoxification'
-    ],
-    safetyProfile: 'Generally safe from purified sources. Quality varies significantly between products.',
-    recommendedFor: ['Nutrient absorption', 'Mineral support', 'Energy', 'Cellular health'],
-    studies: [
-      {
-        title: 'Shilajit (fulvic acid) attenuates iron deficiency anemia',
-        journal: 'Andrologia',
-        year: 2012,
-        authors: 'Bhattacharyya S, et al.',
-        findings: 'Shilajit supplementation significantly improved iron and hemoglobin levels in iron-deficient subjects.',
-        sampleSize: 50,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/22754232/',
         evidenceLevel: 'moderate',
         studyType: 'rct'
       }

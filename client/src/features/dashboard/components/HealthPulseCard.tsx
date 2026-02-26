@@ -64,21 +64,40 @@ function buildLabFallbackSummary(reports: any[]): string | null {
     return null;
   }
 
-  const latestCompleted = reports
-    .filter((report: any) => report?.labReportData?.analysisStatus === 'completed')
-    .sort((a: any, b: any) => new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime())[0];
+  // Try to find a report with actual extracted data (prefer completed, but accept any status)
+  const reportsWithData = reports
+    .filter((report: any) => {
+      const data = report?.labReportData?.extractedData;
+      return Array.isArray(data) && data.length > 0;
+    })
+    .sort((a: any, b: any) => {
+      // Prefer completed status
+      const statusA = a?.labReportData?.analysisStatus === 'completed' ? 0 : 1;
+      const statusB = b?.labReportData?.analysisStatus === 'completed' ? 0 : 1;
+      if (statusA !== statusB) return statusA - statusB;
+      return new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime();
+    });
 
-  if (!latestCompleted) {
-    return `${reports.length} lab report${reports.length > 1 ? 's are' : ' is'} uploaded. Analysis is still processing.`;
+  const bestReport = reportsWithData[0] || null;
+
+  if (!bestReport) {
+    // Check if any reports have error or pending status
+    const hasError = reports.some((r: any) => r?.labReportData?.analysisStatus === 'error');
+    const hasProcessing = reports.some((r: any) =>
+      r?.labReportData?.analysisStatus === 'processing' || r?.labReportData?.analysisStatus === 'pending'
+    );
+
+    if (hasProcessing) {
+      return `${reports.length} lab report${reports.length > 1 ? 's' : ''} uploaded. Analysis is still processing.`;
+    }
+    if (hasError) {
+      return `${reports.length} lab report${reports.length > 1 ? 's' : ''} uploaded but analysis encountered an error. Try re-analyzing from the Labs page.`;
+    }
+    // No analysis status at all — probably never analyzed
+    return `${reports.length} lab report${reports.length > 1 ? 's' : ''} uploaded but not yet analyzed. Visit the Labs page to trigger analysis.`;
   }
 
-  const extracted = Array.isArray(latestCompleted?.labReportData?.extractedData)
-    ? latestCompleted.labReportData.extractedData
-    : [];
-
-  if (extracted.length === 0) {
-    return `Latest lab report uploaded on ${new Date(latestCompleted.uploadedAt).toLocaleDateString()} is available. Detailed marker extraction is still in progress.`;
-  }
+  const extracted = bestReport.labReportData.extractedData as any[];
 
   const abnormal = extracted.filter((marker: any) => {
     const status = String(marker?.status || '').toLowerCase();
@@ -248,7 +267,11 @@ export function HealthPulseCard() {
     staleTime: 60 * 1000,
   });
 
-  const effectiveLabSummary = data?.labSummary || buildLabFallbackSummary(labReports);
+  // Prefer server summary, but if it's the generic "no data" message and we have lab reports,
+  // use the client-side fallback which can inspect the actual report data
+  const serverSummaryIsEmpty = !data?.labSummary || data.labSummary.includes('No interpreted biomarker values');
+  const clientFallback = buildLabFallbackSummary(labReports);
+  const effectiveLabSummary = serverSummaryIsEmpty && clientFallback ? clientFallback : (data?.labSummary || clientFallback);
   const hasUploadedLabs = Boolean(data?.hasUploadedLabs) || (typeof data?.uploadedLabCount === 'number' ? data.uploadedLabCount > 0 : false) || labReports.length > 0;
   const hasAnyLabData = hasUploadedLabs || (Array.isArray(data?.labMarkers) && data.labMarkers.length > 0) || Boolean(effectiveLabSummary);
 

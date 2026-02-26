@@ -77,7 +77,7 @@ export default function SupplementPricingSection() {
         <div className="mt-12 text-center">
           <p className="text-lg text-[#52796F]">
             Typically{" "}
-            <span className="text-[#1B4332] font-medium">15-20% cheaper</span>{" "}
+            <span className="text-[#1B4332] font-medium">15% cheaper</span>{" "}
             than buying each ingredient separately—with better quality control.
           </p>
         </div>

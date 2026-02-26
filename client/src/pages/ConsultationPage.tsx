@@ -24,6 +24,70 @@ import { Link, useSearch } from 'wouter';
 import ThinkingIndicator from '@/features/chat/components/ThinkingIndicator';
 import { InlineCapsuleSelector } from '@/features/formulas/components/InlineCapsuleSelector';
 import { type CapsuleCount } from '@/shared/lib/utils';
+function deriveCapsuleRecommendationFromMessage(content: string): CapsuleRecommendation | null {
+  const normalized = String(content || '').toLowerCase();
+  if (!normalized) return null;
+
+  const persistedDecisionMatch = String(content || '').match(/\[\[CAPSULE_DECISION:([^\]]+)\]\]/i);
+  if (persistedDecisionMatch) {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(persistedDecisionMatch[1]));
+      const recommendedCapsules = Number(parsed?.recommendedCapsules);
+      if (recommendedCapsules === 6 || recommendedCapsules === 9 || recommendedCapsules === 12) {
+        return {
+          recommendedCapsules,
+          reasoning: typeof parsed?.summary === 'string' && parsed.summary.trim().length > 0
+            ? parsed.summary
+            : 'Select your preferred DAILY capsule count and I’ll create your formula immediately.',
+          priorities: Array.isArray(parsed?.signals)
+            ? parsed.signals.filter((signal: unknown) => typeof signal === 'string').slice(0, 6)
+            : [],
+          estimatedAmazonCost: 0,
+        };
+      }
+    } catch {
+      // Fall through to legacy token/fallback parsing
+    }
+  }
+
+  const persistedTokenMatch = normalized.match(/\[\[capsule_recommendation:(6|9|12)\]\]/i);
+  if (persistedTokenMatch) {
+    const parsed = Number(persistedTokenMatch[1]) as CapsuleCount;
+    return {
+      recommendedCapsules: parsed,
+      reasoning: 'Select your preferred DAILY capsule count and I’ll create your formula immediately. We recommend higher daily counts only when clinically needed.',
+      priorities: [],
+      estimatedAmazonCost: 0,
+    };
+  }
+
+  const asksForCapsuleSelection =
+    normalized.includes('select your preferred daily capsule count') ||
+    normalized.includes('select your preferred capsule count and i’ll create your formula immediately') ||
+    normalized.includes('select your preferred capsule count and i\'ll create your formula immediately') ||
+    normalized.includes('select your daily protocol');
+
+  if (!asksForCapsuleSelection) {
+    return null;
+  }
+
+  const directMatch = normalized.match(/\b(6|9|12)\s*(capsules?|caps)\b/);
+  if (!directMatch) {
+    return null;
+  }
+
+  const parsed = Number(directMatch[1]);
+  if (parsed !== 6 && parsed !== 9 && parsed !== 12) {
+    return null;
+  }
+
+  return {
+    recommendedCapsules: parsed,
+    reasoning: 'Select your preferred DAILY capsule count and I’ll create your formula immediately. We recommend higher daily counts only when clinically needed.',
+    priorities: [],
+    estimatedAmazonCost: 0,
+  };
+}
 
 interface CapsuleRecommendation {
   recommendedCapsules: CapsuleCount;
@@ -99,6 +163,10 @@ const removeJsonBlocks = (content: string): string => {
 
   // Remove markdown headers (### Header)
   cleaned = cleaned.replace(/^#{1,6}\s+(.+)$/gm, '$1');
+
+  // Remove persisted capsule recommendation token used for restore logic
+  cleaned = cleaned.replace(/\s*\[\[CAPSULE_RECOMMENDATION:(6|9|12)\]\]\s*/gi, '\n');
+  cleaned = cleaned.replace(/\s*\[\[CAPSULE_DECISION:[^\]]+\]\]\s*/gi, '\n');
 
   // Remove bold markdown (**text** or __text__)
   cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
@@ -280,7 +348,29 @@ export default function ConsultationPage() {
       const data = await response.json();
       return data as { sessions: ChatSession[], messages: Record<string, Message[]> };
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchInterval: (query) => {
+      const data = query.state.data as { sessions?: ChatSession[]; messages?: Record<string, any[]> } | undefined;
+      if (!data?.messages) return false;
+
+      const savedSessionId = localStorage.getItem(SESSION_KEY);
+      const activeSessionId = currentSessionId || savedSessionId || data.sessions?.[0]?.id;
+      if (!activeSessionId) return false;
+
+      const sessionMessages = data.messages[activeSessionId] || [];
+      if (sessionMessages.length === 0) {
+        // Session exists but has no messages loaded yet; keep polling briefly.
+        return 2000;
+      }
+
+      const lastMessage = sessionMessages[sessionMessages.length - 1] as any;
+      const lastSender = lastMessage?.sender || (lastMessage?.role === 'assistant' ? 'ai' : lastMessage?.role === 'user' ? 'user' : undefined);
+
+      // If user message is last, assistant reply is still pending.
+      return lastSender === 'user' ? 2000 : false;
+    }
   });
 
   // Persist current session ID to localStorage whenever it changes
@@ -339,8 +429,9 @@ export default function ConsultationPage() {
           console.log('Restoring most recent session:', sessionToRestore?.id);
         }
 
-        if (sessionToRestore && historyData.messages[sessionToRestore.id]) {
-          const sessionMessages = historyData.messages[sessionToRestore.id].map((msg: any) => {
+        if (sessionToRestore) {
+          const rawSessionMessages = historyData.messages[sessionToRestore.id] || [];
+          const sessionMessages = rawSessionMessages.map((msg: any) => {
             // CRITICAL: Backend sends 'role' but frontend needs 'sender'
             // Backend values: 'user' | 'assistant' | 'system'  
             // Frontend values: 'user' | 'ai' | 'system'
@@ -357,21 +448,91 @@ export default function ConsultationPage() {
             };
           });
 
-          setMessages(sessionMessages);
+          // Always restore the session ID so new messages continue in the right session
           setCurrentSessionId(sessionToRestore.id);
-          setIsNewSession(false);
-          setShowSuggestions(false);
+
+          if (sessionMessages.length > 0) {
+            // Session has messages — restore them fully
+            setMessages(sessionMessages);
+            setIsNewSession(false);
+            setShowSuggestions(false);
+            console.log('Auto-restored session with', sessionMessages.length, 'messages:', sessionToRestore.id);
+          } else {
+            // Session exists but no messages yet (e.g. race: saved before DB write)
+            // Keep isNewSession true so welcome message / suggestions still show
+            console.log('Session found but 0 messages, keeping fresh state for session:', sessionToRestore.id);
+          }
 
           // Clear query parameters to avoid re-triggering restoration on refresh
           if (urlSessionId) {
             window.history.replaceState({}, '', window.location.pathname);
           }
-
-          console.log('Auto-restored session:', sessionToRestore.id);
         }
       }
     }
   }, [historyData, messages.length, isNewSession]);
+
+  // Keep current session in sync with server history updates.
+  // This is critical when a user navigates away mid-response: the assistant reply
+  // may finish in the background and should appear automatically on return.
+  useEffect(() => {
+    if (!historyData?.messages) return;
+    if (activeStreamingMessageId) return; // Don't clobber active local stream UI
+
+    const targetSessionId = currentSessionId || localStorage.getItem(SESSION_KEY);
+    if (!targetSessionId) return;
+
+    const serverMessages = historyData.messages[targetSessionId];
+    if (!Array.isArray(serverMessages) || serverMessages.length === 0) return;
+
+    const normalizedServerMessages: Message[] = serverMessages.map((msg: any) => {
+      let sender = msg.sender;
+      if (!sender || sender === 'assistant') {
+        sender = msg.role === 'assistant' ? 'ai' : msg.role === 'user' ? 'user' : msg.role === 'system' ? 'system' : 'ai';
+      }
+
+      return {
+        ...msg,
+        sender,
+        timestamp: new Date(msg.timestamp)
+      };
+    });
+
+    // Keep "analyzing" indicator behavior consistent even after user navigates away.
+    const serverLastMessage = normalizedServerMessages[normalizedServerMessages.length - 1];
+    const isAssistantPending = serverLastMessage?.sender === 'user';
+    if (isAssistantPending) {
+      setIsTyping(true);
+      if (!thinkingMessage) {
+        setThinkingMessage('Analyzing your health data...');
+      }
+    } else {
+      setIsTyping(false);
+      if (thinkingMessage) {
+        setThinkingMessage(null);
+      }
+    }
+
+    const currentLastId = messages[messages.length - 1]?.id;
+    const serverLastId = normalizedServerMessages[normalizedServerMessages.length - 1]?.id;
+
+    // Never overwrite optimistic local messages with an older/shorter server snapshot.
+    // This preserves the basic chat UX where the user's message appears immediately.
+    if (messages.length > 0 && normalizedServerMessages.length < messages.length) {
+      return;
+    }
+
+    const needsUpdate =
+      messages.length === 0 ||
+      normalizedServerMessages.length > messages.length ||
+      serverLastId !== currentLastId;
+
+    if (!needsUpdate) return;
+
+    setMessages(normalizedServerMessages);
+    setIsNewSession(false);
+    setShowSuggestions(false);
+  }, [historyData, currentSessionId, activeStreamingMessageId, messages, thinkingMessage]);
 
   // Initialize welcome message ONLY if no sessions exist
   useEffect(() => {
@@ -574,6 +735,7 @@ export default function ConsultationPage() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    void queryClient.invalidateQueries({ queryKey: ['/api/chat/consultations/history', user?.id] });
     setInputValue('');
     clearDraft(); // Clear autosaved draft when message is sent
     initialInputRef.current = ''; // Clear voice input reference
@@ -1740,16 +1902,24 @@ export default function ConsultationPage() {
                         )}
 
                         {/* Inline Capsule Selector */}
-                        {message.capsuleRecommendation && (
+                        {(() => {
+                          if (message.sender !== 'ai') return null;
+                          const isLatestMessage = index === filteredMessages.length - 1;
+                          if (!isLatestMessage) return null;
+                          const capsuleRecommendation = message.capsuleRecommendation || deriveCapsuleRecommendationFromMessage(message.content);
+                          if (!capsuleRecommendation || message.formula) return null;
+
+                          return (
                           <InlineCapsuleSelector
-                            recommendedCapsules={message.capsuleRecommendation.recommendedCapsules}
-                            reasoning={message.capsuleRecommendation.reasoning}
-                            priorities={message.capsuleRecommendation.priorities}
+                            recommendedCapsules={capsuleRecommendation.recommendedCapsules}
+                            reasoning={capsuleRecommendation.reasoning}
+                            priorities={capsuleRecommendation.priorities}
                             onSelect={(count) => handleCapsuleSelection(message.id, count)}
                             isSelecting={selectingCapsuleMessageId === message.id}
                             selectedCapsules={message.selectedCapsules}
                           />
-                        )}
+                          );
+                        })()}
 
                         {/* File Attachment Display */}
                         {message.fileAttachment && (
@@ -1779,7 +1949,7 @@ export default function ConsultationPage() {
                                   {message.formula.totalMg}mg total
                                 </Badge>
                                 <Progress
-                                  value={(message.formula.totalMg / 5500) * 100}
+                                  value={Math.min((message.formula.totalMg / (9 * 550)) * 100, 100)}
                                   className="w-20 h-2"
                                 />
                               </div>

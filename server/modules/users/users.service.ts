@@ -1,8 +1,10 @@
 import { usersRepository } from './users.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
+import { consentsService } from '../consents/consents.service';
 import bcrypt from 'bcrypt';
 import logger from '../../infra/logging/logger';
 import { type InsertHealthProfile, type InsertSubscription, type InsertPaymentMethodRef } from '@shared/schema';
+import { billingService } from '../billing/billing.service';
 
 export class UsersService {
     // User profile operations
@@ -66,6 +68,54 @@ export class UsersService {
         }
     }
 
+    async saveMedicationDisclosure(
+        userId: string,
+        medications: string[],
+        metadata: { ipAddress?: string; userAgent?: string }
+    ) {
+        const disclosedAt = new Date();
+
+        // Save medications + stamp disclosure timestamp
+        const existingProfile = await usersRepository.getHealthProfile(userId);
+        if (existingProfile) {
+            await usersRepository.updateHealthProfile(userId, {
+                medications,
+                medicationDisclosedAt: disclosedAt,
+            } as any);
+        } else {
+            await usersRepository.createHealthProfile({
+                userId,
+                medications,
+                medicationDisclosedAt: disclosedAt,
+            } as any);
+        }
+
+        // Write permanent consent / audit record
+        const consentText = medications.length === 0
+            ? 'User confirmed: no current prescription medications.'
+            : `User disclosed the following prescription medications: ${medications.join(', ')}.`;
+
+        const consent = await consentsService.grantConsent({
+            userId,
+            consentType: 'medication_disclosure',
+            granted: true,
+            consentVersion: '1.0',
+            ipAddress: metadata.ipAddress,
+            userAgent: metadata.userAgent,
+            consentText,
+            metadata: { source: 'dashboard' },
+        });
+
+        logger.info('Medication disclosure saved', {
+            userId,
+            medicationCount: medications.length,
+            disclosedAt,
+            consentId: consent.id,
+        });
+
+        return { disclosedAt, consentId: consent.id };
+    }
+
     // Formula operations
     async getCurrentFormula(userId: string) {
         return await formulasRepository.getCurrentFormulaByUser(userId);
@@ -102,18 +152,7 @@ export class UsersService {
     }
 
     async getBillingHistory(userId: string) {
-        const orders = await usersRepository.listOrdersByUser(userId);
-
-        return orders
-            .filter(order => order.status === 'delivered')
-            .map(order => ({
-                id: order.id,
-                date: order.placedAt,
-                description: `Supplement Order - Formula v${order.formulaVersion}`,
-                amount: 89.99,
-                status: 'paid',
-                invoiceUrl: `/api/invoices/${order.id}`
-            }));
+        return await billingService.listBillingHistory(userId);
     }
 
     // Payment Method operations

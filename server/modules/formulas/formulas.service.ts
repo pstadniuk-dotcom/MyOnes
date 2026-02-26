@@ -3,16 +3,52 @@ import { notificationsService } from "../notifications/notifications.service";
 import { getIngredientDose, isValidIngredient } from "@shared/ingredients";
 import logger from "../../infra/logging/logger";
 import { type Formula, type ReviewSchedule } from "@shared/schema";
+import { manufacturerPricingService } from "./manufacturer-pricing.service";
+import { FORMULA_LIMITS as CAPSULE_LIMITS, getMaxDosageForCapsules } from "./formula-service";
 
-// SECURITY: Immutable formula limits - CANNOT be changed by user requests or AI prompts
+// Capsule-aware dosage limits derived from formula-service.ts
+// Max for any capsule count: 12 × 550mg = 6,600mg (absolute ceiling)
+// Default (9 caps): 9 × 550mg = 4,950mg
 const FORMULA_LIMITS = {
-    MAX_TOTAL_DOSAGE: 5500,        // Maximum total daily dosage in mg
+    ABSOLUTE_MAX_DOSAGE: CAPSULE_LIMITS.CAPSULE_CAPACITY_MG * 12, // 6,600mg — hard ceiling across all tiers
     DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance (0.9%) for rounding/calculation differences
     MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg
     MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
 
 export class FormulasService {
+    async getFormulaQuote(userId: string, formulaId?: string, capsuleCount?: number) {
+        const formula = formulaId
+            ? await formulasRepository.getFormula(formulaId)
+            : await formulasRepository.getCurrentFormulaByUser(userId);
+
+        if (!formula || formula.userId !== userId) {
+            throw new Error('Formula not found or access denied');
+        }
+
+        const quote = await manufacturerPricingService.quoteFormula({
+            bases: (formula.bases as any[]) || [],
+            additions: (formula.additions as any[]) || [],
+            targetCapsules: (formula.targetCapsules as number) || 9,
+        }, capsuleCount);
+
+        logger.info('Formula quote generated', {
+            userId,
+            formulaId: formula.id,
+            capsuleCount: quote.capsuleCount,
+            available: quote.available,
+            mappedIngredients: quote.mappedIngredients,
+            unmappedIngredients: quote.unmappedIngredients.length,
+        });
+
+        return {
+            formulaId: formula.id,
+            formulaVersion: formula.version,
+            formulaName: formula.name,
+            quote,
+        };
+    }
+
     async getCurrentFormula(userId: string) {
         const currentFormula = await formulasRepository.getCurrentFormulaByUser(userId);
 
@@ -119,9 +155,11 @@ export class FormulasService {
             throw new Error('Formula not found or access denied');
         }
 
-        // Validate that reverting to this formula doesn't exceed maximum dosage
-        if (originalFormula.totalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
-            throw new Error(`Cannot revert to this formula as it exceeds the maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg (this version has ${originalFormula.totalMg}mg). This formula was created before dosage limits were enforced. Please create a new formula instead.`);
+        // Validate that reverting to this formula doesn't exceed maximum dosage for its capsule count (with 2.5% tolerance)
+        const revertBaseBudget = getMaxDosageForCapsules(originalFormula.targetCapsules || CAPSULE_LIMITS.DEFAULT_CAPSULE_COUNT);
+        const revertHardLimit = Math.floor(revertBaseBudget * (1 + CAPSULE_LIMITS.BUDGET_TOLERANCE_PERCENT));
+        if (originalFormula.totalMg > revertHardLimit) {
+            throw new Error(`Cannot revert to this formula as it exceeds the maximum safe dosage of ${revertHardLimit}mg for ${originalFormula.targetCapsules || CAPSULE_LIMITS.DEFAULT_CAPSULE_COUNT} capsules (this version has ${originalFormula.totalMg}mg). This formula was created before dosage limits were enforced. Please create a new formula instead.`);
         }
 
         // Get current highest version for user
@@ -206,10 +244,12 @@ export class FormulasService {
             }
         }
 
-        // Validate that new total doesn't exceed maximum
-        if (newTotalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
+        // Validate that new total doesn't exceed maximum for this formula's capsule count (with 2.5% tolerance)
+        const customizeBaseBudget = getMaxDosageForCapsules(formula.targetCapsules || CAPSULE_LIMITS.DEFAULT_CAPSULE_COUNT);
+        const customizeHardLimit = Math.floor(customizeBaseBudget * (1 + CAPSULE_LIMITS.BUDGET_TOLERANCE_PERCENT));
+        if (newTotalMg > customizeHardLimit) {
             const addedMg = newTotalMg - formula.totalMg;
-            throw new Error(`Adding these ingredients would exceed the maximum safe dosage of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg. Current formula: ${formula.totalMg}mg, Adding: ${addedMg}mg, New total would be: ${newTotalMg}mg. Please remove some ingredients first or add fewer ingredients.`);
+            throw new Error(`Adding these ingredients would exceed the maximum safe dosage of ${customizeHardLimit}mg for ${formula.targetCapsules || CAPSULE_LIMITS.DEFAULT_CAPSULE_COUNT} capsules. Current formula: ${formula.totalMg}mg, Adding: ${addedMg}mg, New total would be: ${newTotalMg}mg. Please remove some ingredients first or add fewer ingredients.`);
         }
 
         // Update formula with customizations
@@ -222,7 +262,7 @@ export class FormulasService {
         return updatedFormula;
     }
 
-    async createCustomFormula(userId: string, name: string | undefined, bases: any[], individuals: any[]) {
+    async createCustomFormula(userId: string, name: string | undefined, bases: any[], individuals: any[], targetCapsules?: number) {
         // Validate that at least one ingredient is provided
         if ((!bases || bases.length === 0) && (!individuals || individuals.length === 0)) {
             throw new Error('At least one ingredient is required to create a formula');
@@ -257,9 +297,14 @@ export class FormulasService {
             }
         }
 
-        // Validate dosage limits
-        if (totalMg > FORMULA_LIMITS.MAX_TOTAL_DOSAGE) {
-            throw new Error(`Total dosage of ${totalMg}mg exceeds the maximum safe limit of ${FORMULA_LIMITS.MAX_TOTAL_DOSAGE}mg. Please remove some ingredients.`);
+        // Validate dosage limits against capsule budget (with 2.5% tolerance)
+        const capsuleCount = (targetCapsules && CAPSULE_LIMITS.VALID_CAPSULE_COUNTS.includes(targetCapsules as any))
+            ? targetCapsules
+            : CAPSULE_LIMITS.DEFAULT_CAPSULE_COUNT;
+        const baseBudget = getMaxDosageForCapsules(capsuleCount);
+        const hardLimit = Math.floor(baseBudget * (1 + CAPSULE_LIMITS.BUDGET_TOLERANCE_PERCENT));
+        if (totalMg > hardLimit) {
+            throw new Error(`Total dosage of ${totalMg}mg exceeds the maximum limit of ${hardLimit}mg for ${capsuleCount} capsules per day (${baseBudget}mg + 2.5% tolerance). Please remove some ingredients.`);
         }
 
         if (totalMg < 100) {
@@ -280,6 +325,7 @@ export class FormulasService {
             additions: individuals || [],
             userCustomizations: {},
             totalMg,
+            targetCapsules: capsuleCount,
             rationale: 'Custom formula built by user',
             warnings: [],
             disclaimers: [

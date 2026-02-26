@@ -75,7 +75,7 @@ node check-deployment.mjs         # Check all config before deploy
 **Source of truth:** `shared/ingredients.ts`
 - **System Supports (18):** Fixed-dose proprietary blends (e.g., "Adrenal Support" = 420mg)
 - **Individual Ingredients (200+):** Flexible dosing within ranges (e.g., Ashwagandha: 600mg fixed)
-- **Formula limits:** Max 5500mg total per formula (enforced server-side)
+- **Formula limits:** Capsule-aware budgets (6 caps=3,300mg, 9 caps=4,950mg, 12 caps=6,600mg) enforced server-side
 
 ### Prompt Building
 - **Location:** `server/prompt-builder.ts`
@@ -89,7 +89,7 @@ node check-deployment.mjs         # Check all config before deploy
 1. AI returns JSON block with `bases` and `additions` arrays
 2. Backend validates ingredients against approved catalog (`shared/ingredients.ts`)
 3. Backend normalizes ingredient names and validates dose ranges
-4. Backend enforces 5500mg total limit
+4. Backend enforces capsule-based dosage limits (targetCapsules × 550mg)
 5. Formula saved to `formulas` table with version tracking
 
 ### Streaming Chat Implementation
@@ -143,7 +143,7 @@ Three cron schedulers start in `server/index.ts`:
 3. **AI prompt modification:** Changes to `prompt-builder.ts` affect formula quality - test thoroughly
 4. **Hardcoded dosages:** Use ingredient catalog, not magic numbers
 5. **Missing auth middleware:** Protected routes must use `requireAuth` or `requireAdmin`
-6. **Formula total exceeds 5500mg:** Backend enforces limit, but AI should avoid suggesting it
+6. **Formula total exceeds capsule budget:** Backend enforces per-tier limits (6/9/12 caps × 550mg), but AI should avoid exceeding them
 7. **Wearable tokens unencrypted:** Always use `encryptToken()`/`decryptToken()` helpers
 
 ## Testing Shortcuts

@@ -89,6 +89,36 @@ export class UsersController {
         }
     }
 
+    async saveMedicationDisclosure(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+
+            const schema = z.object({
+                medications: z.array(z.string()),
+                noMedications: z.boolean(),
+            });
+
+            const { medications } = schema.parse(req.body);
+
+            const result = await usersService.saveMedicationDisclosure(
+                userId,
+                medications,
+                {
+                    ipAddress: req.ip,
+                    userAgent: req.headers['user-agent'],
+                }
+            );
+
+            res.json({ success: true, disclosedAt: result.disclosedAt, consentId: result.consentId });
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                return res.status(400).json({ error: 'Invalid request', details: error.errors });
+            }
+            logger.error('Medication disclosure save error', { error });
+            res.status(500).json({ error: 'Failed to save medication disclosure' });
+        }
+    }
+
     async updateProfile(req: Request, res: Response) {
         try {
             const userId = req.userId!;

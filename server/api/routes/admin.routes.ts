@@ -43,6 +43,7 @@ router.get('/activity-feed', requireAdmin, adminController.getActivityFeed);
 router.get('/orders/today', requireAdmin, adminController.getTodaysOrders);
 router.get('/orders', requireAdmin, adminController.listOrders);
 router.patch('/orders/:id/status', requireAdmin, adminController.updateOrderStatus);
+router.post('/orders/:id/retry-manufacturer', requireAdmin, adminController.retryManufacturerOrder);
 
 // Export
 router.get('/export/users', requireAdmin, adminController.exportUsers);
@@ -50,5 +51,8 @@ router.get('/export/orders', requireAdmin, adminController.exportOrders);
 
 router.get('/ai-settings', requireAdmin, adminController.getAiSettings);
 router.post('/ai-settings', requireAdmin, adminController.updateAiSettings);
+
+router.get('/ingredient-pricing', requireAdmin, adminController.listIngredientPricing);
+router.patch('/ingredient-pricing/:id', requireAdmin, adminController.updateIngredientPricing);
 
 export default router;
