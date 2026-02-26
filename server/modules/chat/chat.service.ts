@@ -379,7 +379,16 @@ export class ChatService {
         let labDataContext = '';
         if (labReports.length > 0) {
             const sortedReports = labReports
-                .filter(report => report.labReportData?.analysisStatus === 'completed' && report.labReportData?.extractedData)
+                .filter((report) => {
+                    const status = String(report.labReportData?.analysisStatus || '').toLowerCase();
+                    const extracted = report.labReportData?.extractedData;
+                    const hasExtractedMarkers = Array.isArray(extracted) && extracted.length > 0;
+
+                    // Use any report that already has extracted markers, even if a
+                    // background re-analysis currently marks it as "processing".
+                    // This prevents false "NO LAB DATA UPLOADED" prompts.
+                    return hasExtractedMarkers && status !== 'error';
+                })
                 .sort((a, b) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime());
 
             const labTrendSummary = buildLabTrendSummary(sortedReports);

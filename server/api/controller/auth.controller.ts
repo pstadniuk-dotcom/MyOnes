@@ -236,7 +236,10 @@ export class AuthController {
             if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
             const clientIP = getClientIP(req);
-            const rateLimit = checkRateLimit(`resend-verification-${clientIP}`, 3, 15 * 60 * 1000);
+            const isDev = process.env.NODE_ENV === 'development';
+            const rateLimit = isDev
+                ? { allowed: true, resetTime: 0 }
+                : checkRateLimit(`resend-verification-${clientIP}`, 3, 15 * 60 * 1000);
             if (!rateLimit.allowed) {
                 return res.status(429).json({
                     error: 'Too many verification requests. Please try again later.',

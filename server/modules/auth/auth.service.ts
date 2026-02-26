@@ -51,6 +51,11 @@ export class AuthService {
 
         const verificationUrl = `${process.env.FRONTEND_URL || 'https://my-ones.vercel.app'}/verify-email?token=${verificationToken}`;
 
+        // In development, log the link so you can test without needing email delivery
+        if (process.env.NODE_ENV === 'development') {
+            logger.info(`📧 DEV MODE — verification link for ${user.email}:\n  ${verificationUrl}`);
+        }
+
         try {
             await sendNotificationEmail({
                 to: user.email,

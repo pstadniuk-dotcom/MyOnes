@@ -10,6 +10,7 @@ router.get('/me/formula', requireAuth, usersController.getCurrentFormula);
 // Health Profile endpoints
 router.get('/me/health-profile', requireAuth, usersController.getHealthProfile);
 router.post('/me/health-profile', requireAuth, usersController.saveHealthProfile);
+router.post('/me/health-profile/medication-disclosure', requireAuth, usersController.saveMedicationDisclosure);
 
 // User Profile endpoints
 router.patch('/me/profile', requireAuth, usersController.updateProfile);

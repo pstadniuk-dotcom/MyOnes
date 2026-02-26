@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Badge } from '@/shared/components/ui/badge';
-import { Check, Loader2, Sparkles, Pill } from 'lucide-react';
+import { Check, Loader2, Sparkles, Pill, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { VALID_CAPSULE_COUNTS, CAPSULE_TIER_INFO, type CapsuleCount } from '@/shared/lib/utils';
 import { cn } from '@/shared/lib/utils';
 
@@ -19,6 +19,53 @@ interface InlineCapsuleSelectorProps {
   selectedCapsules?: CapsuleCount | null;
 }
 
+function normalizeRecommendationCopy(text: string): string {
+  return String(text || '')
+    .replace(/Clinical protocol engine recommends/gi, 'Clinical protocol engine suggests')
+    .replace(/\(high-confidence\)/gi, '(high confidence)')
+    .replace(/\(moderate-confidence\)/gi, '(moderate confidence)')
+    .replace(
+      /Cardiometabolic risk pattern present; avoid under-dosing with 6-capsule protocol\./gi,
+      'Cardiometabolic risk pattern present; a 9-capsule protocol offers more complete support than a 6-capsule baseline.'
+    );
+}
+
+function toUserCenteredReason(reason: string): string {
+  const normalized = normalizeRecommendationCopy(reason).trim();
+
+  if (/Cardiometabolic risk pattern present/i.test(normalized)) {
+    return 'Your cardiometabolic lab pattern suggests you benefit from stronger daily support than a baseline-only protocol.';
+  }
+  if (/Moderate biomarker\/complexity burden supports a 9-capsule targeted protocol/i.test(normalized)) {
+    return 'Multiple out-of-range markers and overall profile complexity support a targeted daily protocol.';
+  }
+  if (/Low-complexity baseline profile supports foundational 6-capsule protocol/i.test(normalized)) {
+    return 'Your current profile appears lower complexity, so a foundational protocol is appropriate to start.';
+  }
+
+  return normalized;
+}
+
+function buildDataBasedReasons(reasoning: string, priorities: string[]): string[] {
+  if (priorities.length > 0) {
+    const transformed = priorities
+      .map((reason) => toUserCenteredReason(reason))
+      .filter((reason, index, arr) => reason.length > 0 && arr.indexOf(reason) === index);
+    if (transformed.length > 0) {
+      return transformed.slice(0, 4);
+    }
+  }
+
+  return reasoning
+    .split('.')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .filter((part) => !/clinical protocol engine suggests/i.test(part))
+    .map((part) => toUserCenteredReason(part))
+    .filter((part, index, arr) => part.length > 0 && arr.indexOf(part) === index)
+    .slice(0, 3);
+}
+
 export function InlineCapsuleSelector({
   recommendedCapsules,
   reasoning,
@@ -28,6 +75,11 @@ export function InlineCapsuleSelector({
   selectedCapsules = null,
 }: InlineCapsuleSelectorProps) {
   const [hoveredOption, setHoveredOption] = useState<CapsuleCount | null>(null);
+  const [showRecommendationDetails, setShowRecommendationDetails] = useState(false);
+  const normalizedReasoning = normalizeRecommendationCopy(reasoning);
+  const normalizedPriorities = priorities.map((priority) => normalizeRecommendationCopy(priority));
+  const dataBasedReasons = buildDataBasedReasons(normalizedReasoning, normalizedPriorities);
+  const conciseReasoning = normalizedReasoning.split(/(?<=\.)\s+/)[0] || normalizedReasoning;
 
   // If already selected, show confirmation state
   if (selectedCapsules) {
@@ -61,7 +113,31 @@ export function InlineCapsuleSelector({
           <Pill className="w-5 h-5" />
           <h4 className="font-semibold text-base">Select Your Daily Protocol</h4>
         </div>
-        <p className="text-sm text-white/80 leading-relaxed">{reasoning}</p>
+        <p className="text-sm text-white/80 leading-relaxed">{conciseReasoning}</p>
+        <button
+          type="button"
+          onClick={() => setShowRecommendationDetails(prev => !prev)}
+          className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-white/90 hover:text-white"
+        >
+          <Info className="w-3.5 h-3.5" />
+          What in your data supports {recommendedCapsules} capsules/day?
+          {showRecommendationDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
+
+        {showRecommendationDetails && (
+          <div className="mt-3 rounded-lg border border-white/20 bg-white/10 p-3">
+            <p className="text-xs text-white/90 leading-relaxed">Based on your current labs and health profile:</p>
+            {dataBasedReasons.length > 0 && (
+              <ul className="mt-2 space-y-1.5">
+                {dataBasedReasons.map((reason) => (
+                  <li key={reason} className="text-xs text-white/85 leading-relaxed">
+                    • {reason}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Capsule Options */}

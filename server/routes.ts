@@ -18,7 +18,8 @@ import {
   membershipRoutes,
   chatRoutes,
   dashboardRoutes,
-  systemRoutes
+  systemRoutes,
+  billingRoutes
 } from "./api/routes";
 import { initializeAiSettings } from "./infra/ai/ai-config";
 import logger from "./infra/logging/logger";
@@ -80,6 +81,7 @@ export async function registerRoutes(app: Express, rateLimiters?: { authLimiter?
   app.use('/api/webhooks', webhooksRoutes);
   app.use('/api/optimize', optimizeRoutes);
   app.use('/api/membership', membershipRoutes);
+  app.use('/api/billing', billingRoutes);
 
   // AI & Communication
   app.use('/api/chat', chatRoutes);

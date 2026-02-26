@@ -99,8 +99,9 @@ describe('buildO1MiniPrompt', () => {
     const context = createTestContext();
     const prompt = buildO1MiniPrompt(context);
 
-    // Should mention the 5500mg limit
-    expect(prompt).toContain('5500');
+    // Should mention the capsule-based budget system (550mg per capsule)
+    expect(prompt).toContain('550mg');
+    expect(prompt).toContain('4,950mg');
   });
 
   it('should include ingredient catalog reference', () => {

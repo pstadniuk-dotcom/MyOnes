@@ -1,6 +1,6 @@
 import { db } from '../../infra/db/db';
 import { users, membershipTiers, type MembershipTier, type InsertMembershipTier, type User } from '@shared/schema';
-import { eq, sql, and, isNull } from 'drizzle-orm';
+import { eq, sql, and, isNull, lt, or } from 'drizzle-orm';
 
 export class MembershipRepository {
     async getMembershipTier(tierKey: string): Promise<MembershipTier | undefined> {
@@ -79,6 +79,11 @@ export class MembershipRepository {
         }
     }
 
+    /**
+     * Atomically increment tier count ONLY if capacity is available.
+     * Returns the updated tier if the increment succeeded, undefined if the tier
+     * is already at capacity (prevents overselling).
+     */
     async incrementTierCount(tierKey: string): Promise<MembershipTier | undefined> {
         try {
             const [updated] = await db
@@ -87,7 +92,16 @@ export class MembershipRepository {
                     currentCount: sql`${membershipTiers.currentCount} + 1`,
                     updatedAt: new Date()
                 })
-                .where(eq(membershipTiers.tierKey, tierKey))
+                .where(
+                    and(
+                        eq(membershipTiers.tierKey, tierKey),
+                        // Only increment if under capacity (null = unlimited)
+                        or(
+                            isNull(membershipTiers.maxCapacity),
+                            lt(membershipTiers.currentCount, membershipTiers.maxCapacity)
+                        )
+                    )
+                )
                 .returning();
             return updated || undefined;
         } catch (error) {
@@ -113,53 +127,96 @@ export class MembershipRepository {
         }
     }
 
+    /**
+     * Assign a user to a membership tier within a transaction.
+     * Atomically: update user row + increment tier count (with capacity guard).
+     * Returns undefined if the tier is at capacity or the user isn't found.
+     */
     async assignUserMembership(userId: string, tierKey: string, priceCents: number): Promise<User | undefined> {
         try {
-            const [updated] = await db
-                .update(users)
-                .set({
-                    membershipTier: tierKey,
-                    membershipPriceCents: priceCents,
-                    membershipLockedAt: new Date(),
-                    membershipCancelledAt: null
-                })
-                .where(eq(users.id, userId))
-                .returning();
+            return await db.transaction(async (tx) => {
+                // 1. Atomically increment tier count — fails if tier is full
+                const [tierUpdated] = await tx
+                    .update(membershipTiers)
+                    .set({
+                        currentCount: sql`${membershipTiers.currentCount} + 1`,
+                        updatedAt: new Date()
+                    })
+                    .where(
+                        and(
+                            eq(membershipTiers.tierKey, tierKey),
+                            or(
+                                isNull(membershipTiers.maxCapacity),
+                                lt(membershipTiers.currentCount, membershipTiers.maxCapacity)
+                            )
+                        )
+                    )
+                    .returning();
 
-            // Increment the tier count
-            if (updated) {
-                await this.incrementTierCount(tierKey);
+                if (!tierUpdated) {
+                    // Tier is at capacity — roll back
+                    throw new Error('TIER_AT_CAPACITY');
+                }
+
+                // 2. Update user with tier assignment
+                const [updated] = await tx
+                    .update(users)
+                    .set({
+                        membershipTier: tierKey,
+                        membershipPriceCents: priceCents,
+                        membershipLockedAt: new Date(),
+                        membershipCancelledAt: null
+                    })
+                    .where(eq(users.id, userId))
+                    .returning();
+
+                return updated || undefined;
+            });
+        } catch (error: any) {
+            if (error?.message === 'TIER_AT_CAPACITY') {
+                console.warn(`Tier ${tierKey} is at capacity, cannot assign user ${userId}`);
+                return undefined;
             }
-
-            return updated || undefined;
-        } catch (error) {
             console.error('Error assigning user membership:', error);
             return undefined;
         }
     }
 
+    /**
+     * Cancel a user's membership within a transaction.
+     * Atomically: mark user as cancelled + decrement tier count.
+     * Preserves membershipTier and membershipPriceCents for reactivation.
+     */
     async cancelUserMembership(userId: string): Promise<User | undefined> {
         try {
-            // Get user's current tier before cancelling
-            const [user] = await db.select().from(users).where(eq(users.id, userId));
-            if (!user || !user.membershipTier) {
-                return undefined;
-            }
+            return await db.transaction(async (tx) => {
+                // Get user's current tier before cancelling
+                const [user] = await tx.select().from(users).where(eq(users.id, userId));
+                if (!user || !user.membershipTier || user.membershipCancelledAt) {
+                    return undefined;
+                }
 
-            const [updated] = await db
-                .update(users)
-                .set({
-                    membershipCancelledAt: new Date()
-                })
-                .where(eq(users.id, userId))
-                .returning();
+                const [updated] = await tx
+                    .update(users)
+                    .set({
+                        membershipCancelledAt: new Date()
+                    })
+                    .where(and(eq(users.id, userId), isNull(users.membershipCancelledAt)))
+                    .returning();
 
-            // Decrement the tier count
-            if (updated && user.membershipTier) {
-                await this.decrementTierCount(user.membershipTier);
-            }
+                // Decrement the tier count
+                if (updated && user.membershipTier) {
+                    await tx
+                        .update(membershipTiers)
+                        .set({
+                            currentCount: sql`GREATEST(${membershipTiers.currentCount} - 1, 0)`,
+                            updatedAt: new Date()
+                        })
+                        .where(eq(membershipTiers.tierKey, user.membershipTier));
+                }
 
-            return updated || undefined;
+                return updated || undefined;
+            });
         } catch (error) {
             console.error('Error cancelling user membership:', error);
             return undefined;
@@ -193,6 +250,38 @@ export class MembershipRepository {
             console.error('Error getting membership stats:', error);
             return [];
         }
+    }
+
+    /**
+     * Reconcile tier counts by counting actual active members per tier.
+     * Corrects any drift from crashes or partial failures.
+     * Returns the number of tiers that had their count corrected.
+     */
+    async reconcileTierCounts(): Promise<{ tier: string; oldCount: number; newCount: number }[]> {
+        const corrections: { tier: string; oldCount: number; newCount: number }[] = [];
+        try {
+            const tiers = await this.getAllMembershipTiers();
+            for (const tier of tiers) {
+                const activeUsers = await db
+                    .select({ count: sql<number>`count(*)::int` })
+                    .from(users)
+                    .where(and(
+                        eq(users.membershipTier, tier.tierKey),
+                        isNull(users.membershipCancelledAt)
+                    ));
+                const actualCount = activeUsers[0]?.count ?? 0;
+                if (actualCount !== tier.currentCount) {
+                    await db
+                        .update(membershipTiers)
+                        .set({ currentCount: actualCount, updatedAt: new Date() })
+                        .where(eq(membershipTiers.tierKey, tier.tierKey));
+                    corrections.push({ tier: tier.tierKey, oldCount: tier.currentCount, newCount: actualCount });
+                }
+            }
+        } catch (error) {
+            console.error('Error reconciling tier counts:', error);
+        }
+        return corrections;
     }
 }
 

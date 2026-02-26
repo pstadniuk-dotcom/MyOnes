@@ -20,6 +20,8 @@ interface ReminderCheck {
 // Track which users we've sent reminders to today (to avoid duplicates)
 const sentRemindersToday = new Map<string, Set<string>>(); // userId -> Set<mealTypes>
 const sentOptimizeRemindersToday = new Map<string, Set<string>>(); // userId -> Set<reminderType>
+let consentEnumAvailable = true;
+let consentEnumWarningEmitted = false;
 
 function resetDailyTracking() {
   sentRemindersToday.clear();
@@ -68,8 +70,24 @@ function getCurrentTimeInTimezone(timezone: string): { hours: number; minutes: n
 }
 
 async function hasSmsAccountabilityConsent(userId: string): Promise<boolean> {
-  const consent = await consentsRepository.getUserConsent(userId, 'sms_accountability');
-  return !!consent;
+  if (!consentEnumAvailable) {
+    return false;
+  }
+
+  try {
+    const consent = await consentsRepository.getUserConsent(userId, 'sms_accountability');
+    return !!consent;
+  } catch (error: any) {
+    if (error?.code === '22P02') {
+      consentEnumAvailable = false;
+      if (!consentEnumWarningEmitted) {
+        consentEnumWarningEmitted = true;
+        logger.warn('sms_accountability consent enum value is not available in current DB schema; SMS accountability reminders disabled until schema is synced.');
+      }
+      return false;
+    }
+    throw error;
+  }
 }
 
 async function checkAndSendOptimizeReminders() {

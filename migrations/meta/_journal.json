@@ -22,6 +22,20 @@
       "when": 1763148117149,
       "tag": "0002_far_turbo",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1763955600000,
+      "tag": "0004_add_sms_accountability_consent_enum",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772050800000,
+      "tag": "0005_equivalent_stack_pricing",
+      "breakpoints": true
     }
   ]
 }

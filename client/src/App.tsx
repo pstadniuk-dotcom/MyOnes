@@ -57,6 +57,8 @@ import OrdersManagementPage from "@/pages/admin/OrdersManagementPage";
 
 // Import shared/public components
 import SharedFormulaPage from "@/pages/SharedFormulaPage";
+import MembershipPage from "@/pages/MembershipPage";
+import CheckoutSuccessPage from "@/pages/CheckoutSuccessPage";
 
 // Import all landing page components
 import Header from "@/features/marketing/components/Header";
@@ -269,6 +271,18 @@ function MainRouter() {
             <AdminSupportTicketsPage ticketId={params.id} />
           </ProtectedAdminRoute>
         )}
+      </Route>
+
+      {/* Membership & Checkout */}
+      <Route path="/membership/success">
+        <ProtectedRoute>
+          <CheckoutSuccessPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/membership">
+        <ProtectedRoute>
+          <MembershipPage />
+        </ProtectedRoute>
       </Route>
 
       {/* Public Shared Formula View */}

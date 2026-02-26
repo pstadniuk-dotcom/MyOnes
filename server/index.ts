@@ -37,6 +37,9 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
   next();
 });
 
@@ -84,6 +87,7 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use('/api/billing/webhooks/stripe', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -124,6 +128,13 @@ const aiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // Configure session middleware for OAuth state management
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+  console.error('[SECURITY] SESSION_SECRET not set in production — using insecure default. Set SESSION_SECRET env var.');
+}
+if (process.env.NODE_ENV === 'production' && (!process.env.FRONTEND_URL || process.env.FRONTEND_URL.includes('localhost'))) {
+  console.error('[CONFIG] FRONTEND_URL not set or points to localhost in production — Stripe redirects will fail. Set FRONTEND_URL env var.');
+}
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'wearable-oauth-secret-change-in-production',
   resave: false,
@@ -188,10 +199,11 @@ app.use((req, res, next) => {
     // It is the only port that is not firewalled.
     // ALWAYS serve the app on the port specified in the environment variable PORT
     // Other ports are firewalled. Default to 5000 if not specified.
-    const port = parseInt(process.env.PORT || '5000', 10);
+    const configuredPort = parseInt(process.env.PORT || '5000', 10);
     const host = process.env.HOST || '0.0.0.0';
-    server.listen(port, host, () => {
-      log(`serving on port ${port}`);
+
+    server.listen(configuredPort, host, () => {
+      log(`serving on port ${configuredPort}`);
 
       // Start SMS reminder scheduler
       startSmsReminderScheduler();
@@ -205,11 +217,8 @@ app.use((req, res, next) => {
 
     server.on('error', (e: any) => {
       if (e.code === 'EADDRINUSE') {
-        logger.error('Address in use, retrying...');
-        setTimeout(() => {
-          server.close();
-          server.listen(port, host);
-        }, 1000);
+        logger.error(`Address in use on port ${configuredPort}.`);
+        process.exit(1);
       } else {
         logger.error("Server error", { error: e });
       }

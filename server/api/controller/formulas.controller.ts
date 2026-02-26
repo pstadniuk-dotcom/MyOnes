@@ -4,6 +4,28 @@ import { formulaReviewService } from '../../modules/formulas/formula-review.serv
 import logger from '../../infra/logging/logger';
 
 export class FormulasController {
+    async getFormulaQuote(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const { formulaId } = req.params as { formulaId?: string };
+            const capsuleCountRaw = req.query.capsuleCount;
+            const capsuleCount = typeof capsuleCountRaw === 'string' ? parseInt(capsuleCountRaw, 10) : undefined;
+
+            if (capsuleCount !== undefined && ![6, 9, 12].includes(capsuleCount)) {
+                return res.status(400).json({ error: 'capsuleCount must be one of 6, 9, or 12' });
+            }
+
+            const result = await formulasService.getFormulaQuote(userId, formulaId, capsuleCount);
+            res.json(result);
+        } catch (error: any) {
+            logger.error('Error fetching formula quote:', error);
+            if (error.message?.includes('not found') || error.message?.includes('access denied')) {
+                return res.status(404).json({ error: error.message });
+            }
+            res.status(500).json({ error: 'Failed to fetch formula quote' });
+        }
+    }
+
     async getCurrentFormula(req: Request, res: Response) {
         try {
             const userId = req.userId!;
@@ -123,9 +145,9 @@ export class FormulasController {
     async createCustomFormula(req: Request, res: Response) {
         try {
             const userId = req.userId!;
-            const { name, bases, individuals } = req.body;
+            const { name, bases, individuals, targetCapsules } = req.body;
 
-            const newFormula = await formulasService.createCustomFormula(userId, name, bases, individuals);
+            const newFormula = await formulasService.createCustomFormula(userId, name, bases, individuals, targetCapsules);
 
             res.json({
                 success: true,

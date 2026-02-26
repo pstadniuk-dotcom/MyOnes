@@ -1060,21 +1060,46 @@ export class WearablesService {
                 : []
         );
 
-        const mapReportMarkers = (report: any) => (
-            report?.labReportData?.extractedData
-                ? (report.labReportData.extractedData as any[]).slice(0, 8).map((marker: any) => ({
-                    name: marker.testName || marker.name || 'Unknown Marker',
-                    value: marker.value,
-                    unit: marker.unit || '',
-                    status: this.inferMarkerStatus(marker.testName || marker.name, marker.value, marker.status, marker.referenceRange),
-                    referenceRange: marker.referenceRange || '',
-                }))
-                : []
-        );
+        const extractDataArray = (reportData: any): any[] => {
+            if (!reportData) return [];
+            const raw = reportData.extractedData;
+            if (Array.isArray(raw) && raw.length > 0) return raw;
+            // Handle nested formats: { extractedData: { results: [...] } }
+            if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+                for (const key of ['results', 'markers', 'data', 'tests', 'extractedData']) {
+                    if (Array.isArray(raw[key]) && raw[key].length > 0) return raw[key];
+                }
+            }
+            return [];
+        };
 
-        const completedReports = (labReports as any[])
-            .filter((report: any) => report?.labReportData?.analysisStatus === 'completed' && Array.isArray(report?.labReportData?.extractedData))
-            .sort((a: any, b: any) => new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime());
+        const mapReportMarkers = (report: any) => {
+            const items = extractDataArray(report?.labReportData);
+            return items.slice(0, 8).map((marker: any) => ({
+                name: marker.testName || marker.name || 'Unknown Marker',
+                value: marker.value,
+                unit: marker.unit || '',
+                status: this.inferMarkerStatus(marker.testName || marker.name, marker.value, marker.status, marker.referenceRange),
+                referenceRange: marker.referenceRange || '',
+            }));
+        };
+
+        // Prefer completed reports, but fall back to any report that has actual extracted data
+        const reportsWithData = (labReports as any[])
+            .filter((report: any) => extractDataArray(report?.labReportData).length > 0)
+            .sort((a: any, b: any) => {
+                // Prefer 'completed' status, then sort by date
+                const statusA = a?.labReportData?.analysisStatus === 'completed' ? 0 : 1;
+                const statusB = b?.labReportData?.analysisStatus === 'completed' ? 0 : 1;
+                if (statusA !== statusB) return statusA - statusB;
+                return new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime();
+            });
+
+        const completedReports = reportsWithData.length > 0
+            ? reportsWithData
+            : (labReports as any[])
+                .filter((report: any) => report?.labReportData?.analysisStatus === 'completed')
+                .sort((a: any, b: any) => new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime());
 
         const latestLabReport = completedReports[0] || null;
         const previousLabReport = completedReports[1] || null;
@@ -1094,15 +1119,20 @@ export class WearablesService {
         const hasUploadedLabs = uploadedLabCount > 0;
 
         const labSummary = latestLab?.aiInsights?.summary
-            || (hasUploadedLabs
+            || (labMarkers.length > 0
                 ? this.buildLabSummary(labMarkers.map((marker: any) => ({ name: marker.name, status: marker.status })))
                 : '');
+
+        const latestUploadedReport = (labReports as any[])
+            .sort((a: any, b: any) => new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime())[0] || null;
 
         const labReportDate = latestLab?.processedAt
             ? new Date(latestLab.processedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
             : latestLabReport?.uploadedAt
                 ? new Date(latestLabReport.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                : null;
+                : latestUploadedReport?.uploadedAt
+                    ? new Date(latestUploadedReport.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : null;
 
         const labChanges = this.buildLabChangeHighlights(labMarkers, previousMarkers);
         const labNextActions = this.buildLabActionItems(labMarkers.map((marker: any) => ({ name: marker.name, status: marker.status })), previousMarkers.length > 0);

@@ -9,11 +9,17 @@ const router = Router();
 // Get current active formula for user
 router.get('/current', requireAuth, formulasController.getCurrentFormula);
 
+// Get manufacturer quote for current active formula
+router.get('/current/quote', requireAuth, formulasController.getFormulaQuote);
+
 // Get formula version history for user
 router.get('/history', requireAuth, formulasController.getFormulaHistory);
 
 // Get specific formula version by ID
 router.get('/versions/:formulaId', requireAuth, formulasController.getFormulaVersion);
+
+// Get manufacturer quote for specific formula by ID
+router.get('/:formulaId/quote', requireAuth, formulasController.getFormulaQuote);
 
 // Compare two formula versions
 router.get('/compare/:id1/:id2', requireAuth, formulasController.compareFormulas);

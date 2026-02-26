@@ -15,8 +15,10 @@ import {
   getSystemSupportDetails,
 } from '@shared/ingredients';
 
-// Define the max formula limit (matches backend)
-const MAX_FORMULA_MG = 5500;
+// Max formula mg per capsule count: 6=3300, 9=4950, 12=6600
+const CAPSULE_CAPACITY_MG = 550;
+const MAX_CAPSULE_COUNT = 12;
+const ABSOLUTE_MAX_FORMULA_MG = MAX_CAPSULE_COUNT * CAPSULE_CAPACITY_MG; // 6,600mg
 
 describe('Ingredient Normalization', () => {
   it('should return canonical name for valid ingredients', () => {
@@ -136,7 +138,7 @@ describe('System Supports Structure', () => {
       expect(support.name).toBeDefined();
       expect(typeof support.name).toBe('string');
       expect(support.doseMg).toBeGreaterThan(0);
-      expect(support.doseMg).toBeLessThan(MAX_FORMULA_MG);
+      expect(support.doseMg).toBeLessThan(ABSOLUTE_MAX_FORMULA_MG);
     });
   });
 
@@ -185,18 +187,21 @@ describe('Individual Ingredients Structure', () => {
 });
 
 describe('Formula Total Limits', () => {
-  it('should respect maximum total dosage limit', () => {
-    expect(MAX_FORMULA_MG).toBe(5500);
+  it('should respect capsule-based maximum total dosage limit', () => {
+    // 12 capsules × 550mg = 6,600mg absolute ceiling
+    expect(ABSOLUTE_MAX_FORMULA_MG).toBe(6600);
+    expect(CAPSULE_CAPACITY_MG).toBe(550);
   });
 
-  it('should allow valid formula combinations', () => {
-    // A typical formula: 1 system support + a few individuals
+  it('should allow valid formula combinations within 9-capsule budget', () => {
+    // A typical formula: 1 system support + a few individuals (should fit in 9 caps = 4950mg)
     const adrenalDose = getIngredientDose('Adrenal Support') || 0;
     const ashwagandhaDose = getIngredientDose('Ashwagandha') || 0;
     const coq10Dose = getIngredientDose('CoEnzyme Q10') || 0;
 
     const total = adrenalDose + ashwagandhaDose + coq10Dose;
-    expect(total).toBeLessThan(MAX_FORMULA_MG);
+    const nineCapsBudget = 9 * CAPSULE_CAPACITY_MG; // 4,950mg
+    expect(total).toBeLessThan(nineCapsBudget);
   });
 });
 
