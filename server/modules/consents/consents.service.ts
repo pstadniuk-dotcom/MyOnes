@@ -21,7 +21,7 @@ export class ConsentsService {
         return await consentsRepository.getUserConsents(userId);
     }
 
-    async revokeConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing' | 'sms_accountability'): Promise<boolean> {
+    async revokeConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing' | 'sms_accountability' | 'medication_disclosure'): Promise<boolean> {
         const success = await consentsRepository.revokeUserConsent(userId, consentType);
 
         if (success) {

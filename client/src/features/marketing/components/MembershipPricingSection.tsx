@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/shared/components/ui/button";
 import { Check, ArrowRight, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface MembershipTier {
   id: string;
@@ -17,19 +18,19 @@ interface MembershipTier {
 
 // Fallback tiers if API fails
 const fallbackTiers = [
-  { id: 'founding', name: 'Founding', limit: 250, claimed: 0, priceMonthly: 9, priceYearly: 99, active: true },
-  { id: 'early', name: 'Early', limit: 1000, claimed: 0, priceMonthly: 15, priceYearly: 149, active: false },
-  { id: 'beta', name: 'Beta', limit: 5000, claimed: 0, priceMonthly: 19, priceYearly: 199, active: false },
+  { id: 'founding', name: 'Founding', limit: 100, claimed: 0, priceMonthly: 9, priceYearly: 99, active: true },
+  { id: 'early', name: 'Early', limit: 500, claimed: 0, priceMonthly: 15, priceYearly: 149, active: false },
+  { id: 'beta', name: 'Beta', limit: 2000, claimed: 0, priceMonthly: 19, priceYearly: 199, active: false },
   { id: 'standard', name: 'Standard', limit: null as number | null, claimed: 0, priceMonthly: 29, priceYearly: 299, active: false },
 ];
 
 const membershipIncludes = [
   "Unlimited AI health consultations",
   "Lab and wearable data analysis",
-  "Supplements at member pricing (15-20% savings)",
+  "Supplements at member pricing (15% savings)",
   "Formula updates as your health evolves",
   "Lab testing at member rates",
-  "Direct AI practitioner messaging",
+  "Future platform upgrades included",
 ];
 
 // Transform API tiers to display format
@@ -56,6 +57,8 @@ function findActiveTier(tiers: ReturnType<typeof transformTiers>) {
 }
 
 export default function MembershipPricingSection() {
+  const { user } = useAuth();
+  const ctaHref = user ? '/membership' : '/signup';
   // Fetch tiers from API
   const { data: apiTiers, isLoading } = useQuery<MembershipTier[]>({
     queryKey: ['/api/membership/tiers'],
@@ -204,7 +207,7 @@ export default function MembershipPricingSection() {
                 ))}
               </ul>
 
-              <Link href="/signup">
+              <Link href={ctaHref}>
                 <Button
                   className="w-full bg-[#1B4332] hover:bg-[#143728] text-white py-6 text-lg rounded-full group"
                 >

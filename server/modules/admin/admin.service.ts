@@ -5,6 +5,9 @@ import { sendNotificationEmail } from '../../utils/emailService';
 import { INDIVIDUAL_INGREDIENTS, SYSTEM_SUPPORTS } from '@shared/ingredients';
 import { aiRuntimeSettings, ALLOWED_MODELS, normalizeModel } from 'server/infra/ai/ai-config';
 import { systemRepository } from '../system/system.repository';
+import { manufacturerPricingService } from '../formulas/manufacturer-pricing.service';
+import { usersRepository } from '../users/users.repository';
+import { formulasRepository } from '../formulas/formulas.repository';
 
 export class AdminService {
     async getStats() {
@@ -320,6 +323,63 @@ Return ONLY valid JSON.`;
         return await adminRepository.updateOrderStatus(orderId, status, trackingUrl);
     }
 
+    async retryManufacturerOrder(orderId: string): Promise<{ success: boolean; manufacturerOrderId?: string; error?: string }> {
+        const order = await usersRepository.getOrder(orderId);
+        if (!order) {
+            return { success: false, error: 'Order not found' };
+        }
+
+        if (order.manufacturerOrderStatus === 'submitted') {
+            return { success: false, error: 'Manufacturer order already submitted' };
+        }
+
+        // Re-quote if no quote or quote expired
+        let quoteId = order.manufacturerQuoteId;
+        if (!quoteId || (order.manufacturerQuoteExpiresAt && order.manufacturerQuoteExpiresAt.getTime() < Date.now())) {
+            if (!order.formulaId) {
+                return { success: false, error: 'Order has no formula reference — cannot re-quote' };
+            }
+            const formula = await formulasRepository.getFormula(order.formulaId);
+            if (!formula) {
+                return { success: false, error: 'Formula not found — cannot re-quote' };
+            }
+
+            logger.info('Admin retry: re-quoting expired/missing quote', { orderId, formulaId: order.formulaId });
+            const freshQuote = await manufacturerPricingService.quoteFormula({
+                bases: (formula.bases as any[]) || [],
+                additions: (formula.additions as any[]) || [],
+                targetCapsules: (formula.targetCapsules as number) || 9,
+            }, (formula.targetCapsules as number) || 9);
+
+            if (!freshQuote.available || !freshQuote.quoteId) {
+                return { success: false, error: `Re-quote failed: ${freshQuote.reason || 'unavailable'}` };
+            }
+
+            quoteId = freshQuote.quoteId;
+            await usersRepository.updateOrder(orderId, {
+                manufacturerQuoteId: quoteId,
+                manufacturerQuoteExpiresAt: freshQuote.quoteExpiresAt ? new Date(freshQuote.quoteExpiresAt) : null,
+            });
+        }
+
+        // Place the manufacturer order
+        const result = await manufacturerPricingService.placeManufacturerOrder(quoteId);
+        if (result.success) {
+            await usersRepository.updateOrder(orderId, {
+                manufacturerOrderId: result.orderId || null,
+                manufacturerOrderStatus: 'submitted',
+            });
+            logger.info('Admin retry: manufacturer order placed', { orderId, manufacturerOrderId: result.orderId });
+            return { success: true, manufacturerOrderId: result.orderId };
+        } else {
+            logger.error('Admin retry: manufacturer order still failed', { orderId, error: result.error });
+            await usersRepository.updateOrder(orderId, {
+                manufacturerOrderStatus: 'failed',
+            });
+            return { success: false, error: result.error };
+        }
+    }
+
     async getUserNotes(userId: string) {
         return await adminRepository.getUserAdminNotes(userId);
     }
@@ -410,6 +470,20 @@ Return ONLY valid JSON.`;
             // Non-fatal; continue with in-memory override
         }
         return { success: true, settings: aiRuntimeSettings }
+    }
+
+    async listIngredientPricing() {
+        return await adminRepository.listIngredientPricing();
+    }
+
+    async updateIngredientPricing(id: string, updates: {
+        ingredientName: string;
+        typicalCapsuleMg: number;
+        typicalBottleCapsules: number;
+        typicalRetailPriceCents: number;
+        isActive: boolean;
+    }) {
+        return await adminRepository.updateIngredientPricing(id, updates);
     }
 }
 

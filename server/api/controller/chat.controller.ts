@@ -8,29 +8,50 @@ import { getClientIP, checkRateLimit } from '../middleware/middleware';
 import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
 import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builder';
 import { analyzeQueryIntent } from '../../utils/query-intent-analyzer';
-import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget } from '../../modules/formulas/formula-service';
+import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget, autoExpandFormula, validateSupplementInteractions } from '../../modules/formulas/formula-service';
+import { recommendDailyProtocolCapsules } from '../../modules/chat/protocol-recommendation';
 import OpenAI from 'openai';
 import logger from '../../infra/logging/logger';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+
 export class ChatController {
     async streamChat(req: Request, res: Response) {
         let streamStarted = false;
+        let clientDisconnected = false;
         const clientIP = getClientIP(req);
+
+        req.on('close', () => {
+            clientDisconnected = true;
+            logger.info('Chat stream client disconnected; continuing server-side processing', {
+                userId: req.userId,
+                path: req.path
+            });
+        });
 
         // Helper function to send SSE data
         const sendSSE = (data: any) => {
-            if (!res.destroyed) {
+            if (clientDisconnected || res.destroyed || res.writableEnded) {
+                return;
+            }
+
+            try {
                 res.write(`data: ${JSON.stringify(data)}\n\n`);
                 if (typeof (res as any).flush === 'function') {
                     (res as any).flush();
                 }
+            } catch (error) {
+                clientDisconnected = true;
+                logger.warn('SSE write failed; continuing processing without client stream', {
+                    userId: req.userId,
+                    error: (error as Error)?.message || String(error)
+                });
             }
         };
 
         const endStream = () => {
-            if (!res.destroyed) {
+            if (!clientDisconnected && !res.destroyed && !res.writableEnded) {
                 res.end();
             }
         };
@@ -66,6 +87,16 @@ export class ChatController {
             if (!chatSession) {
                 chatSession = await chatRepository.createChatSession({ userId, status: 'active' });
             }
+
+            // Persist user message immediately so it never disappears if the user
+            // navigates away while the assistant response is still streaming.
+            await chatService.createMessage({
+                sessionId: chatSession.id,
+                role: 'user',
+                content: message,
+                model: null,
+                formula: undefined
+            });
 
             const { healthProfile, labDataContext, activeFormula } = await chatService.getContext(userId);
 
@@ -161,6 +192,14 @@ export class ChatController {
                         sendSSE({ type: 'info', message: budgetFit.message });
                     }
 
+                    const expansion = autoExpandFormula(validatedFormula);
+                    if (expansion.expanded) {
+                        sendSSE({
+                            type: 'info',
+                            message: `Added ${expansion.addedIngredients.length} clinically compatible ingredient${expansion.addedIngredients.length === 1 ? '' : 's'} to meet minimum protocol depth.`
+                        });
+                    }
+
                     const finalChecks = validateFormulaLimits(validatedFormula);
                     if (budgetFit.fitsBudget && finalChecks.valid) {
                         // Save the formula to database
@@ -170,13 +209,33 @@ export class ChatController {
                         const currentFormula = await formulasRepository.getCurrentFormulaByUser(userId);
                         const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
 
+                        // Merge AI-generated warnings with rule-based medication interaction checks
+                        const aiWarnings: string[] = validatedFormula.warnings || [];
+                        const userMedications: string[] = (healthProfile as any)?.medications || [];
+                        const interactionWarnings = await validateSupplementInteractions(validatedFormula, userMedications);
+                        // Deduplicate: only add server-side warnings not already covered by AI
+                        const mergedWarnings = [...aiWarnings];
+                        for (const iw of interactionWarnings) {
+                            const iwLower = iw.toLowerCase();
+                            const alreadyCovered = aiWarnings.some(aw => {
+                                const awLower = aw.toLowerCase();
+                                // Check for significant keyword overlap
+                                const keywords = iwLower.split(/\s+/).filter(w => w.length > 4);
+                                const matchCount = keywords.filter(k => awLower.includes(k)).length;
+                                return matchCount >= 3;
+                            });
+                            if (!alreadyCovered) {
+                                mergedWarnings.push(iw);
+                            }
+                        }
+
                         const formulaData = {
                             userId,
                             bases: validatedFormula.bases,
                             additions: validatedFormula.additions,
                             totalMg: validatedFormula.totalMg,
                             rationale: validatedFormula.rationale,
-                            warnings: validatedFormula.warnings || [],
+                            warnings: mergedWarnings,
                             disclaimers: validatedFormula.disclaimers || [],
                             version: nextVersion,
                             targetCapsules: validatedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT,
@@ -219,11 +278,45 @@ export class ChatController {
 
             // Extract capsule recommendation from response if present
             let capsuleRecommendation = null;
+            let capsuleRecommendationForPersistence: 6 | 9 | 12 | null = null;
+            let capsuleDecisionTokenForPersistence: string | null = null;
             try {
                 const capsuleRecMatch = fullResponse.match(/```capsule-recommendation\s*({[\s\S]*?})\s*```/);
                 if (capsuleRecMatch) {
                     capsuleRecommendation = JSON.parse(capsuleRecMatch[1]);
                     logger.info('📊 Extracted capsule recommendation:', capsuleRecommendation);
+
+                    const protocolDecision = recommendDailyProtocolCapsules(labDataContext, healthProfile as any);
+                    capsuleRecommendation.recommendedCapsules = protocolDecision.recommendedCapsules;
+                    capsuleRecommendation.reasoning = protocolDecision.summary;
+                    const existingPriorities = Array.isArray(capsuleRecommendation.priorities)
+                        ? capsuleRecommendation.priorities.filter((value: unknown) => typeof value === 'string')
+                        : [];
+                    capsuleRecommendation.priorities = Array.from(new Set<string>([
+                        ...existingPriorities,
+                        ...protocolDecision.signals,
+                    ])).slice(0, 6);
+
+                    const encodedDecision = encodeURIComponent(JSON.stringify({
+                        recommendedCapsules: protocolDecision.recommendedCapsules,
+                        summary: protocolDecision.summary,
+                        signals: protocolDecision.signals,
+                        confidence: protocolDecision.confidence,
+                    }));
+                    capsuleDecisionTokenForPersistence = `[[CAPSULE_DECISION:${encodedDecision}]]`;
+
+                    logger.info('Protocol recommendation decision', {
+                        userId,
+                        recommendedCapsules: protocolDecision.recommendedCapsules,
+                        confidence: protocolDecision.confidence,
+                        metrics: protocolDecision.metrics,
+                        signals: protocolDecision.signals,
+                    });
+
+                    const parsedRecommendation = Number(capsuleRecommendation?.recommendedCapsules);
+                    if (parsedRecommendation === 6 || parsedRecommendation === 9 || parsedRecommendation === 12) {
+                        capsuleRecommendationForPersistence = parsedRecommendation as 6 | 9 | 12;
+                    }
 
                     // Send capsule recommendation to client via SSE
                     sendSSE({
@@ -303,27 +396,18 @@ export class ChatController {
                 };
             }
 
-            // Send completion event with transformed formula for frontend
-            sendSSE({
-                type: 'complete',
-                formula: formulaForDisplay,
-                sessionId: chatSession.id,
-                formulaId: savedFormulaId,
-                responseLength: fullResponse.length,
-                chunkCount
-            });
-
-            // Save messages
-            await chatService.createMessage({
-                sessionId: chatSession.id,
-                role: 'user',
-                content: message,
-                model: null,
-                formula: undefined
-            });
-
+            // Save messages to DB FIRST so they're always persisted before client
+            // receives the complete event (prevents messages disappearing if user
+            // navigates away immediately after receiving the response)
             let cleanResponse = fullResponse;
             cleanResponse = cleanResponse.trim();
+
+            if (capsuleRecommendationForPersistence) {
+                cleanResponse += `\n\n[[CAPSULE_RECOMMENDATION:${capsuleRecommendationForPersistence}]]`;
+            }
+            if (capsuleDecisionTokenForPersistence) {
+                cleanResponse += `\n${capsuleDecisionTokenForPersistence}`;
+            }
 
             await chatService.createMessage({
                 sessionId: chatSession.id,
@@ -333,6 +417,16 @@ export class ChatController {
                 formula: formulaForDisplay || undefined
             });
 
+            // Now send completion event — messages are already in DB at this point
+            sendSSE({
+                type: 'complete',
+                formula: formulaForDisplay,
+                sessionId: chatSession.id,
+                formulaId: savedFormulaId,
+                responseLength: fullResponse.length,
+                chunkCount
+            });
+
             endStream();
 
         } catch (error) {
@@ -340,7 +434,9 @@ export class ChatController {
             if (!streamStarted) {
                 res.status(500).json({ error: 'Failed to process chat' });
             } else {
-                sendSSE({ type: 'error', error: 'Internal server error during streaming' });
+                if (!clientDisconnected) {
+                    sendSSE({ type: 'error', error: 'Internal server error during streaming' });
+                }
                 endStream();
             }
         }

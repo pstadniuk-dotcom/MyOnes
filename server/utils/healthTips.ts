@@ -148,7 +148,7 @@ export const eveningTips: string[] = [
   // Reading & Calm Activities (4 tips)
   "Reading for 20 minutes after supplements calms your mind for sleep.",
   "Gentle activities like journaling help your body enter rest mode.",
-  "L-Theanine in your formula promotes calm without drowsiness.",
+  "GABA in your formula promotes calm without drowsiness.",
   
   // Recovery & Repair (5 tips)
   "Evening supplements support overnight cellular repair and regeneration.",

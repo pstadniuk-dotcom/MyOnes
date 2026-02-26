@@ -58,13 +58,16 @@ describe('Ingredient Catalog', () => {
 });
 
 describe('Formula Limits', () => {
-  const MAX_TOTAL_DOSAGE = 5500;
+  // Capsule-aware limits: max is 12 capsules × 550mg = 6600mg
+  const CAPSULE_CAPACITY_MG = 550;
+  const MAX_CAPSULE_COUNT = 12;
+  const MAX_TOTAL_DOSAGE = MAX_CAPSULE_COUNT * CAPSULE_CAPACITY_MG; // 6,600mg
   const MIN_INGREDIENT_DOSE = 10;
   const MAX_INGREDIENT_COUNT = 50;
 
   it('should enforce maximum total dosage', () => {
     const testFormula = {
-      bases: [{ ingredient: 'Test', amount: 3000 }],
+      bases: [{ ingredient: 'Test', amount: 4000 }],
       additions: [{ ingredient: 'Test2', amount: 3000 }],
     };
     

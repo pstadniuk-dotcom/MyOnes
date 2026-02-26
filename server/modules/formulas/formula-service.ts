@@ -7,11 +7,25 @@ export const FORMULA_LIMITS = {
     VALID_CAPSULE_COUNTS: [6, 9, 12] as const, // Allowed capsule counts (6, 9, or 12 - no 15)
     DEFAULT_CAPSULE_COUNT: 9,      // Default if not specified
     DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance for rounding differences
-    BUDGET_TOLERANCE_PERCENT: 0.05, // Allow 5% over capsule budget
+    BUDGET_TOLERANCE_PERCENT: 0.025, // Allow 2.5% over capsule budget
+    MIN_BUDGET_UTILIZATION_PERCENT: 0.90, // Require at least 90% budget utilization
     MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg
-    MIN_INGREDIENT_COUNT: 8,       // Minimum 8 ingredients for comprehensive formulas
+    MIN_INGREDIENT_COUNT: 8,       // Baseline minimum ingredient count
+    MIN_INGREDIENT_COUNT_BY_CAPSULES: {
+        6: 8,
+        9: 9,
+        12: 9,
+    } as const,
     MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
+
+export function getMinIngredientCountForCapsules(targetCapsules: number): number {
+    const normalizedCapsuleCount = FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(targetCapsules as any)
+        ? (targetCapsules as 6 | 9 | 12)
+        : FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+
+    return FORMULA_LIMITS.MIN_INGREDIENT_COUNT_BY_CAPSULES[normalizedCapsuleCount] || FORMULA_LIMITS.MIN_INGREDIENT_COUNT;
+}
 
 // Formula extraction schema for AI response parsing
 export const FormulaExtractionSchema = z.object({
@@ -70,7 +84,7 @@ export function getMaxDosageForCapsules(targetCapsules: number): number {
 function getMinAllowedDoseForIngredient(ingredientName: string): number {
     const support = SYSTEM_SUPPORTS.find((s) => s.name === ingredientName);
     if (support) {
-        return Math.max(FORMULA_LIMITS.MIN_INGREDIENT_DOSE, support.doseMg || FORMULA_LIMITS.MIN_INGREDIENT_DOSE);
+        return support.doseMg || FORMULA_LIMITS.MIN_INGREDIENT_DOSE;
     }
 
     const individual = INDIVIDUAL_INGREDIENTS.find((i) => i.name === ingredientName);
@@ -78,10 +92,26 @@ function getMinAllowedDoseForIngredient(ingredientName: string): number {
         const explicitMin = typeof individual.doseRangeMin === 'number'
             ? individual.doseRangeMin
             : (typeof individual.doseMg === 'number' ? individual.doseMg : FORMULA_LIMITS.MIN_INGREDIENT_DOSE);
-        return Math.max(FORMULA_LIMITS.MIN_INGREDIENT_DOSE, explicitMin);
+        return explicitMin;
     }
 
     return FORMULA_LIMITS.MIN_INGREDIENT_DOSE;
+}
+
+function getMaxAllowedDoseForIngredient(ingredientName: string): number {
+    const support = SYSTEM_SUPPORTS.find((s) => s.name === ingredientName);
+    if (support) {
+        return support.doseRangeMax || support.doseMg;
+    }
+
+    const individual = INDIVIDUAL_INGREDIENTS.find((i) => i.name === ingredientName);
+    if (individual) {
+        return typeof individual.doseRangeMax === 'number'
+            ? individual.doseRangeMax
+            : individual.doseMg;
+    }
+
+    return Number.MAX_SAFE_INTEGER;
 }
 
 export function autoFitFormulaToBudget(formula: any): {
@@ -229,13 +259,10 @@ export function autoFitFormulaToBudget(formula: any): {
 export function autoExpandFormula(formula: any): { expanded: boolean; addedIngredients: string[] } {
     const allIngredients = [...(formula.bases || []), ...(formula.additions || [])];
     const currentCount = allIngredients.length;
-    const neededCount = FORMULA_LIMITS.MIN_INGREDIENT_COUNT - currentCount;
-
-    if (neededCount <= 0) {
-        return { expanded: false, addedIngredients: [] };
-    }
-
     const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
+    const minIngredientCount = getMinIngredientCountForCapsules(targetCapsules);
+    const neededCount = minIngredientCount - currentCount;
+
     const maxDosage = getMaxDosageForCapsules(targetCapsules);
     const maxWithTolerance = Math.floor(maxDosage * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
 
@@ -250,9 +277,7 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
         { name: 'Garlic', minDose: 50, normalDose: 150, unit: 'mg', purpose: 'Supports cardiovascular health and healthy cholesterol levels through allicin and sulfur compounds.' },
         { name: 'Resveratrol', minDose: 50, normalDose: 150, unit: 'mg', purpose: 'Provides antioxidant support for endothelial function and healthy aging.' },
         { name: 'Ginkgo Biloba Extract 24%', minDose: 40, normalDose: 120, unit: 'mg', purpose: 'Supports circulation and cognitive function through improved blood flow.' },
-        { name: 'Milk Thistle', minDose: 100, normalDose: 150, unit: 'mg', purpose: 'Supports liver health and detoxification pathways.' },
         { name: 'Ginger Root', minDose: 75, normalDose: 150, unit: 'mg', purpose: 'Supports digestion, reduces inflammation, and aids metabolic function.' },
-        { name: 'Vitamin C', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Essential antioxidant supporting immune function and collagen synthesis.' },
         { name: 'CoEnzyme Q10', minDose: 200, normalDose: 200, unit: 'mg', purpose: 'Supports mitochondrial energy production and cardiovascular health.' },
         { name: 'Hawthorn Berry', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Traditional cardiovascular support for heart muscle function and blood pressure.' },
         { name: 'Cinnamon 20:1', minDose: 25, normalDose: 100, unit: 'mg', purpose: 'Supports healthy blood sugar metabolism and insulin sensitivity.' },
@@ -263,40 +288,56 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
     const addedIngredients: string[] = [];
     let runningBudget = remainingBudget;
 
+    const minTarget = Math.floor(maxDosage * FORMULA_LIMITS.MIN_BUDGET_UTILIZATION_PERCENT);
+
     for (const filler of fillerIngredients) {
-        if (addedIngredients.length >= neededCount) break;
-        if (runningBudget < filler.normalDose) continue;
+        if (runningBudget <= 0) break;
+        const shouldAddForCount = neededCount > 0 && addedIngredients.length < neededCount;
+        const shouldAddForBudget = currentTotal < minTarget;
+        if (!shouldAddForCount && !shouldAddForBudget) break;
+        const minAllowedForFiller = getMinAllowedDoseForIngredient(filler.name);
+        const maxAllowedForFiller = getMaxAllowedDoseForIngredient(filler.name);
+        const preferredDose = Math.min(maxAllowedForFiller, Math.max(minAllowedForFiller, filler.normalDose));
+        if (runningBudget < preferredDose) continue;
         if (existingNames.has(filler.name.toLowerCase())) continue;
 
         if (!formula.additions) formula.additions = [];
         formula.additions.push({
             ingredient: filler.name,
-            amount: filler.normalDose,
+                amount: preferredDose,
             unit: filler.unit,
             purpose: filler.purpose
         });
 
-        addedIngredients.push(`${filler.name} ${filler.normalDose}mg`);
-        runningBudget -= filler.normalDose;
+        addedIngredients.push(`${filler.name} ${preferredDose}mg`);
+        runningBudget -= preferredDose;
+        currentTotal += preferredDose;
         existingNames.add(filler.name.toLowerCase());
     }
 
-    if (addedIngredients.length < neededCount) {
+    if ((neededCount > 0 && addedIngredients.length < neededCount) || currentTotal < minTarget) {
         for (const filler of fillerIngredients) {
-            if (addedIngredients.length >= neededCount) break;
-            if (runningBudget < filler.minDose) continue;
+            if (runningBudget <= 0) break;
+            const shouldAddForCount = neededCount > 0 && addedIngredients.length < neededCount;
+            const shouldAddForBudget = currentTotal < minTarget;
+            if (!shouldAddForCount && !shouldAddForBudget) break;
+            const minAllowedForFiller = getMinAllowedDoseForIngredient(filler.name);
+            const maxAllowedForFiller = getMaxAllowedDoseForIngredient(filler.name);
+            const fallbackDose = Math.min(maxAllowedForFiller, Math.max(minAllowedForFiller, filler.minDose));
+            if (runningBudget < fallbackDose) continue;
             if (existingNames.has(filler.name.toLowerCase())) continue;
 
             if (!formula.additions) formula.additions = [];
             formula.additions.push({
                 ingredient: filler.name,
-                amount: filler.minDose,
+                    amount: fallbackDose,
                 unit: filler.unit,
                 purpose: filler.purpose
             });
 
-            addedIngredients.push(`${filler.name} ${filler.minDose}mg`);
-            runningBudget -= filler.minDose;
+            addedIngredients.push(`${filler.name} ${fallbackDose}mg`);
+            runningBudget -= fallbackDose;
+            currentTotal += fallbackDose;
             existingNames.add(filler.name.toLowerCase());
         }
     }
@@ -304,7 +345,6 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
     let finalTotal = [...(formula.bases || []), ...(formula.additions || [])]
         .reduce((sum, ing) => sum + (ing.amount || 0), 0);
 
-    const minTarget = maxDosage;
     if (finalTotal < minTarget) {
         const headroom = maxWithTolerance - finalTotal;
         const sortedAdditions = [...(formula.additions || [])].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0));
@@ -327,6 +367,47 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
             .reduce((sum, ing) => sum + (ing.amount || 0), 0);
     }
 
+    if (finalTotal < minTarget) {
+        const existing = new Set<string>([
+            ...(formula.bases || []).map((item: any) => item.ingredient),
+            ...(formula.additions || []).map((item: any) => item.ingredient),
+        ]);
+
+        const fallbackCandidates = [...INDIVIDUAL_INGREDIENTS]
+            .map((ingredient) => {
+                const minAllowed = getMinAllowedDoseForIngredient(ingredient.name);
+                const maxAllowed = getMaxAllowedDoseForIngredient(ingredient.name);
+                return {
+                    ingredient,
+                    minAllowed,
+                    maxAllowed,
+                };
+            })
+            .filter((candidate) => !existing.has(candidate.ingredient.name))
+            .sort((a, b) => a.minAllowed - b.minAllowed);
+
+        for (const candidate of fallbackCandidates) {
+            if (finalTotal >= minTarget) break;
+            const remainingHeadroom = maxWithTolerance - finalTotal;
+            if (remainingHeadroom < candidate.minAllowed) continue;
+
+            const targetDose = Math.min(
+                candidate.maxAllowed,
+                Math.max(candidate.minAllowed, Math.min(remainingHeadroom, candidate.ingredient.doseMg || candidate.minAllowed))
+            );
+
+            if (!formula.additions) formula.additions = [];
+            formula.additions.push({
+                ingredient: candidate.ingredient.name,
+                amount: targetDose,
+                unit: 'mg',
+                purpose: `Completes comprehensive coverage and meets protocol utilization for ${targetCapsules}-capsule plan.`,
+            });
+
+            finalTotal += targetDose;
+        }
+    }
+
     formula.totalMg = finalTotal;
     return { expanded: addedIngredients.length > 0, addedIngredients };
 }
@@ -335,6 +416,7 @@ export function validateFormulaLimits(formula: any): { valid: boolean; errors: s
     const errors: string[] = [];
     const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
     const maxDosage = getMaxDosageForCapsules(targetCapsules);
+    const minDosage = Math.floor(maxDosage * FORMULA_LIMITS.MIN_BUDGET_UTILIZATION_PERCENT);
     const maxWithTolerance = Math.floor(maxDosage * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
 
     if (formula.targetCapsules && !FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(formula.targetCapsules)) {
@@ -342,23 +424,29 @@ export function validateFormulaLimits(formula: any): { valid: boolean; errors: s
     }
 
     if (formula.totalMg > maxWithTolerance) {
-        errors.push(`Formula exceeds ${targetCapsules}-capsule budget of ${maxDosage}mg (max ${maxWithTolerance}mg with 5% tolerance). Attempted: ${formula.totalMg}mg. Reduce ingredients or increase capsule count.`);
+        errors.push(`Formula exceeds ${targetCapsules}-capsule budget of ${maxDosage}mg (max ${maxWithTolerance}mg with 2.5% tolerance). Attempted: ${formula.totalMg}mg. Reduce ingredients or increase capsule count.`);
+    }
+
+    if (formula.totalMg < minDosage) {
+        errors.push(`Formula under-fills ${targetCapsules}-capsule budget. Minimum required: ${minDosage}mg (90% of ${maxDosage}mg). Attempted: ${formula.totalMg}mg.`);
     }
 
     const allIngredients = [...(formula.bases || []), ...(formula.additions || [])];
+    const minIngredientCount = getMinIngredientCountForCapsules(targetCapsules);
+
+    if (allIngredients.length < minIngredientCount) {
+        errors.push(`Formula requires at least ${minIngredientCount} ingredients for a ${targetCapsules}-capsule daily protocol. Attempted: ${allIngredients.length}.`);
+    }
 
     for (const ingredient of allIngredients) {
-        if (ingredient.amount < FORMULA_LIMITS.MIN_INGREDIENT_DOSE) {
-            errors.push(`Ingredient "${ingredient.ingredient}" below minimum dose of ${FORMULA_LIMITS.MIN_INGREDIENT_DOSE}mg (attempted: ${ingredient.amount}mg)`);
+        const minAllowed = getMinAllowedDoseForIngredient(ingredient.ingredient);
+        const maxAllowed = getMaxAllowedDoseForIngredient(ingredient.ingredient);
+
+        if (ingredient.amount < minAllowed) {
+            errors.push(`Ingredient "${ingredient.ingredient}" below minimum dose of ${minAllowed}mg (attempted: ${ingredient.amount}mg)`);
         }
-        const individualIngredient = INDIVIDUAL_INGREDIENTS.find(i => i.name === ingredient.ingredient);
-        if (individualIngredient) {
-            if (individualIngredient.doseRangeMin && ingredient.amount < individualIngredient.doseRangeMin) {
-                errors.push(`"${ingredient.ingredient}" below allowed minimum of ${individualIngredient.doseRangeMin}mg`);
-            }
-            if (individualIngredient.doseRangeMax && ingredient.amount > individualIngredient.doseRangeMax) {
-                errors.push(`"${ingredient.ingredient}" exceeds allowed maximum of ${individualIngredient.doseRangeMax}mg`);
-            }
+        if (ingredient.amount > maxAllowed) {
+            errors.push(`Ingredient "${ingredient.ingredient}" exceeds allowed maximum of ${maxAllowed}mg (attempted: ${ingredient.amount}mg)`);
         }
     }
 
@@ -436,7 +524,28 @@ export function validateAndCorrectIngredientNames(formula: any) {
                 if (found.name !== rawName) {
                     warnings.push(`Auto-corrected "${rawName}" to "${found.name}"`);
                 }
-                list[i] = { ...item, ingredient: found.name };
+
+                const isSystemSupport = SYSTEM_SUPPORTS.some(s => s.name === found.name);
+                const numericAmount = Number(item.amount || found.doseMg || 0);
+                let normalizedAmount = Number.isFinite(numericAmount) ? numericAmount : found.doseMg;
+
+                if (isSystemSupport) {
+                    const baseDose = found.doseMg;
+                    const allowedMultipliers = [1, 2, 3];
+                    const closestMultiplier = allowedMultipliers.reduce((closest, candidate) => {
+                        const closestDelta = Math.abs(baseDose * closest - normalizedAmount);
+                        const candidateDelta = Math.abs(baseDose * candidate - normalizedAmount);
+                        return candidateDelta < closestDelta ? candidate : closest;
+                    }, 1);
+                    const clampedMultiplier = Math.min(3, Math.max(1, closestMultiplier));
+                    normalizedAmount = baseDose * clampedMultiplier;
+                } else {
+                    const minAllowed = getMinAllowedDoseForIngredient(found.name);
+                    const maxAllowed = getMaxAllowedDoseForIngredient(found.name);
+                    normalizedAmount = Math.min(maxAllowed, Math.max(minAllowed, Math.round(normalizedAmount)));
+                }
+
+                list[i] = { ...item, ingredient: found.name, amount: normalizedAmount };
             } else {
                 // SILENT REMOVAL logic from old_routes:
                 // Remove the unapproved item and add a warning instead of erroring
@@ -459,18 +568,224 @@ export function validateAndCorrectIngredientNames(formula: any) {
     };
 }
 
+/**
+ * Comprehensive rule-based medication–supplement interaction checker.
+ * Covers 19 drug categories plus antiplatelet stacking detection.
+ * Acts as a deterministic safety net on top of AI-generated warnings.
+ */
 export async function validateSupplementInteractions(formula: any, userMedications: string[]): Promise<string[]> {
     const warnings: string[] = [];
-    if (!userMedications || userMedications.length === 0) return [];
+    const allIngredients = [...(formula.bases || []), ...(formula.additions || [])].map((i: any) => (i.ingredient || '').toLowerCase());
 
-    // Basic rule-based interaction check
-    const allIngredients = [...(formula.bases || []), ...(formula.additions || [])].map(i => i.ingredient.toLowerCase());
+    // Helper: check if any user medication matches any drug keyword
+    const has = (meds: string[], drugList: string[]) =>
+        meds.some(m => drugList.some(d => m.includes(d)));
+    // Helper: check if any formula ingredient matches any supplement keyword
+    const hasIngr = (keywords: string[]) =>
+        allIngredients.some(i => keywords.some(k => i.includes(k)));
+    // Helper: collect matching ingredient names for the warning message
+    const matchingIngr = (keywords: string[]) => {
+        const matches = new Set<string>();
+        for (const i of allIngredients) {
+            for (const k of keywords) {
+                if (i.includes(k)) matches.add(i);
+            }
+        }
+        return [...matches];
+    };
+
+    // ── Antiplatelet stacking check (no medication needed) ──────────────
+    const antiplateletKeywords = ['omega', 'fish oil', 'garlic', 'ginger', 'vitamin e', 'resveratrol', 'curcumin', 'nattokinase', 'bromelain'];
+    const antiplateletMatches = matchingIngr(antiplateletKeywords);
+    if (antiplateletMatches.length >= 3) {
+        warnings.push(`Your formula stacks ${antiplateletMatches.length} ingredients with antiplatelet/anticoagulant activity (${antiplateletMatches.join(', ')}). This may increase bleeding risk even without a blood thinner — discuss with your physician.`);
+    }
+
+    // Early exit if no medications disclosed
+    if (!userMedications || userMedications.length === 0) {
+        if (allIngredients.length > 0) {
+            warnings.push('If you take any prescription medications, consult your physician or pharmacist before starting this formula.');
+        }
+        return warnings;
+    }
+
     const medsLower = userMedications.map(m => m.toLowerCase());
 
-    const bloodThinners = ['warfarin', 'coumadin', 'clopidogrel', 'plavix', 'aspirin', 'rivaroxaban', 'xarelto', 'apixaban', 'eliquis'];
-    if (medsLower.some(m => bloodThinners.some(bt => m.includes(bt)))) {
-        if (allIngredients.some(i => i.includes('garlic') || i.includes('ginger') || i.includes('ginkgo') || i.includes('omega') || i.includes('vitamin e'))) {
-            warnings.push('Contains ingredients (Garlic/Ginger/Ginkgo/Omega-3/Vit E) that may increase bleeding risk with your blood thinner.');
+    // ── 1. Anticoagulants / Blood Thinners ──────────────────────────────
+    const bloodThinners = ['warfarin', 'coumadin', 'clopidogrel', 'plavix', 'aspirin', 'rivaroxaban', 'xarelto', 'apixaban', 'eliquis', 'dabigatran', 'pradaxa', 'heparin', 'enoxaparin'];
+    const btSupplements = ['omega', 'fish oil', 'garlic', 'ginger', 'ginkgo', 'vitamin e', 'resveratrol', 'curcumin', 'nattokinase', 'bromelain'];
+    if (has(medsLower, bloodThinners) && hasIngr(btSupplements)) {
+        const found = matchingIngr(btSupplements);
+        warnings.push(`Contains ${found.join(', ')} which may increase bleeding risk with your blood thinner. Consult your physician.`);
+    }
+
+    // ── 2. Antidepressants / Psychiatric Medications ────────────────────
+    const ssriSnri = ['sertraline', 'zoloft', 'fluoxetine', 'prozac', 'escitalopram', 'lexapro', 'citalopram', 'paroxetine', 'paxil', 'venlafaxine', 'effexor', 'duloxetine', 'cymbalta', 'bupropion', 'wellbutrin', 'maoi', 'phenelzine', 'tranylcypromine', 'lithium', 'quetiapine', 'seroquel'];
+    const ssriSupplements = ["st. john's wort", 'st john', '5-htp', 'same', 'tryptophan', 'gaba', 'rhodiola', 'ashwagandha'];
+    if (has(medsLower, ssriSnri)) {
+        // Absolute contraindication: St. John's Wort
+        if (hasIngr(["st. john", "st john"])) {
+            warnings.push("CRITICAL: St. John's Wort must NEVER be combined with antidepressants — risk of serotonin syndrome. Remove immediately.");
+        }
+        const otherPsych = ssriSupplements.filter(s => !s.includes('st john'));
+        if (hasIngr(otherPsych)) {
+            const found = matchingIngr(otherPsych);
+            warnings.push(`Contains ${found.join(', ')} which may interact with your psychiatric medication. Discuss with your prescribing clinician.`);
+        }
+    }
+
+    // ── 3. Thyroid Medications ──────────────────────────────────────────
+    const thyroidMeds = ['levothyroxine', 'synthroid', 'tirosint', 'liothyronine', 'cytomel', 'armour thyroid'];
+    const thyroidSupplements = ['thyroid support', 'ashwagandha', 'iodine', 'kelp', 'seaweed', 'selenium', 'zinc'];
+    if (has(medsLower, thyroidMeds) && hasIngr(thyroidSupplements)) {
+        const found = matchingIngr(thyroidSupplements);
+        warnings.push(`Contains ${found.join(', ')} which may affect thyroid function while on thyroid medication. Take supplements 4+ hours apart from thyroid meds. Coordinate with your clinician.`);
+    }
+
+    // ── 4. Diabetes / Blood Sugar Medications ───────────────────────────
+    const diabetesMeds = ['metformin', 'insulin', 'glipizide', 'glyburide', 'semaglutide', 'ozempic', 'wegovy', 'tirzepatide', 'mounjaro', 'sitagliptin', 'januvia', 'empagliflozin', 'jardiance', 'dapagliflozin', 'canagliflozin'];
+    const diabetesSupplements = ['berberine', 'cinnamon', 'chromium', 'alpha lipoic', 'innoslim', 'bitter melon', 'gymnema'];
+    if (has(medsLower, diabetesMeds) && hasIngr(diabetesSupplements)) {
+        const found = matchingIngr(diabetesSupplements);
+        warnings.push(`Contains ${found.join(', ')} which may lower blood glucose alongside your diabetes medication. Monitor for hypoglycemia.`);
+    }
+
+    // ── 5. Blood Pressure Medications ───────────────────────────────────
+    const bpMeds = ['lisinopril', 'amlodipine', 'metoprolol', 'losartan', 'valsartan', 'hydrochlorothiazide', 'carvedilol', 'verapamil', 'diltiazem', 'enalapril', 'ramipril'];
+    const bpSupplements = ['magnesium', 'coq10', 'hawthorn', 'garlic', 'omega', 'potassium'];
+    if (has(medsLower, bpMeds) && hasIngr(bpSupplements)) {
+        const found = matchingIngr(bpSupplements);
+        warnings.push(`Contains ${found.join(', ')} which may further lower blood pressure with your antihypertensive medication. Monitor blood pressure closely.`);
+    }
+
+    // ── 6. Immunosuppressants / Transplant Medications ──────────────────
+    const immunoMeds = ['cyclosporine', 'tacrolimus', 'mycophenolate', 'prednisone', 'methotrexate', 'azathioprine', 'sirolimus'];
+    const immunoSupplements = ["st. john", "st john", 'echinacea', 'milk thistle', 'astragalus', 'elderberry', 'mushroom'];
+    if (has(medsLower, immunoMeds)) {
+        if (hasIngr(["st. john", "st john"])) {
+            warnings.push("CRITICAL: St. John's Wort dramatically reduces immunosuppressant drug levels — this is life-threatening for transplant patients. Remove immediately.");
+        }
+        if (hasIngr(['echinacea', 'astragalus', 'elderberry', 'mushroom'])) {
+            const found = matchingIngr(['echinacea', 'astragalus', 'elderberry', 'mushroom']);
+            warnings.push(`Contains immune-stimulating ingredients (${found.join(', ')}) which are contraindicated with immunosuppressant therapy. Consult your physician.`);
+        }
+        if (hasIngr(['milk thistle'])) {
+            warnings.push('Milk Thistle may alter CYP3A4 enzyme activity, affecting immunosuppressant drug levels. Physician review required.');
+        }
+    }
+
+    // ── 7. Chemotherapy / Oncology Medications ───────────────────────────
+    const chemoKeywords = ['chemotherapy', 'chemo', 'tamoxifen', 'anastrozole', 'letrozole', 'cisplatin', 'carboplatin', 'doxorubicin', 'paclitaxel', 'cyclophosphamide'];
+    const chemoSupplements = ["st. john", "st john", 'high-dose', 'nac', 'melatonin'];
+    if (has(medsLower, chemoKeywords) && hasIngr(chemoSupplements)) {
+        warnings.push('You are on oncology medications. High-dose antioxidants and certain supplements may interfere with treatment. Physician oncologist review is REQUIRED before using any supplement.');
+    }
+
+    // ── 8. Statins (Cholesterol Medications) ────────────────────────────
+    const statins = ['atorvastatin', 'lipitor', 'rosuvastatin', 'crestor', 'simvastatin', 'zocor', 'pravastatin', 'fluvastatin', 'lovastatin'];
+    if (has(medsLower, statins)) {
+        if (hasIngr(['red yeast rice'])) {
+            warnings.push('CRITICAL: Red Yeast Rice contains natural lovastatin and must NOT be combined with statin medications — risk of rhabdomyolysis. Remove immediately.');
+        }
+        const statinRisky = ['niacin', 'berberine'];
+        if (hasIngr(statinRisky)) {
+            const found = matchingIngr(statinRisky);
+            warnings.push(`Contains ${found.join(', ')} which has additive lipid-lowering effects with your statin. Monitor for muscle pain/weakness (myopathy).`);
+        }
+    }
+
+    // ── 9. Hormone Medications (HRT, Testosterone, Contraceptives) ──────
+    const hormoneMeds = ['estradiol', 'progesterone', 'testosterone', 'birth control', 'contraceptive', 'clomid', 'clomiphene', 'finasteride', 'propecia', 'spironolactone'];
+    const hormoneSupplements = ['ashwagandha', 'maca', 'dhea', 'dim', 'saw palmetto', 'black cohosh', 'vitex', 'tribulus'];
+    if (has(medsLower, hormoneMeds) && hasIngr(hormoneSupplements)) {
+        const found = matchingIngr(hormoneSupplements);
+        warnings.push(`Contains hormone-modulating ingredients (${found.join(', ')}) which may interact with your hormone therapy. Coordinate with your prescribing physician.`);
+    }
+
+    // ── 10. Seizure / Epilepsy Medications ──────────────────────────────
+    const seizureMeds = ['carbamazepine', 'tegretol', 'phenytoin', 'dilantin', 'valproic', 'depakote', 'lamotrigine', 'lamictal', 'gabapentin', 'neurontin', 'levetiracetam', 'keppra', 'topiramate', 'topamax'];
+    const seizureSupplements = ['ginkgo', 'evening primrose', 'vitamin b6', "st. john", "st john"];
+    if (has(medsLower, seizureMeds) && hasIngr(seizureSupplements)) {
+        const found = matchingIngr(seizureSupplements);
+        warnings.push(`Contains ${found.join(', ')} which may lower seizure threshold or alter anti-epileptic drug levels. Consult your neurologist before starting.`);
+    }
+
+    // ── 11. Sedatives / Benzodiazepines / Sleep Medications ─────────────
+    const sedativeMeds = ['diazepam', 'valium', 'alprazolam', 'xanax', 'lorazepam', 'ativan', 'clonazepam', 'klonopin', 'zolpidem', 'ambien', 'eszopiclone', 'lunesta', 'temazepam'];
+    const sedativeSupplements = ['valerian', 'gaba', 'melatonin', 'kava', 'passionflower', 'magnolia'];
+    if (has(medsLower, sedativeMeds) && hasIngr(sedativeSupplements)) {
+        const found = matchingIngr(sedativeSupplements);
+        warnings.push(`Contains ${found.join(', ')} which may cause additive sedation with your sedative/sleep medication. Risk of excessive drowsiness — consult your physician.`);
+    }
+
+    // ── 12. Opioid Pain Medications ─────────────────────────────────────
+    const opioidMeds = ['oxycodone', 'oxycontin', 'hydrocodone', 'vicodin', 'tramadol', 'ultram', 'morphine', 'codeine', 'fentanyl', 'methadone', 'buprenorphine', 'suboxone'];
+    const opioidSupplements = ['valerian', 'gaba', 'kava', 'passionflower', 'magnolia', 'melatonin'];
+    if (has(medsLower, opioidMeds) && hasIngr(opioidSupplements)) {
+        const found = matchingIngr(opioidSupplements);
+        warnings.push(`Contains sedating supplements (${found.join(', ')}) which may cause dangerous additive CNS depression with opioid medications. Physician approval required.`);
+    }
+
+    // ── 13. ADHD Stimulant Medications ───────────────────────────────────
+    const adhdMeds = ['methylphenidate', 'ritalin', 'concerta', 'amphetamine', 'adderall', 'lisdexamfetamine', 'vyvanse', 'dextroamphetamine', 'dexedrine', 'atomoxetine', 'strattera'];
+    const adhdSupplements = ['caffeine', 'rhodiola', 'ginseng', 'tyrosine', 'yohimbine', 'synephrine'];
+    if (has(medsLower, adhdMeds) && hasIngr(adhdSupplements)) {
+        const found = matchingIngr(adhdSupplements);
+        warnings.push(`Contains stimulating ingredients (${found.join(', ')}) which may cause additive cardiovascular stress and overstimulation with your ADHD medication. Discuss with your physician.`);
+    }
+
+    // ── 14. PPIs / Acid Reducers ────────────────────────────────────────
+    const ppiMeds = ['omeprazole', 'prilosec', 'pantoprazole', 'protonix', 'esomeprazole', 'nexium', 'lansoprazole', 'prevacid', 'famotidine', 'pepcid', 'ranitidine'];
+    const ppiSupplements = ['iron', 'calcium', 'magnesium', 'vitamin b12', 'zinc'];
+    if (has(medsLower, ppiMeds) && hasIngr(ppiSupplements)) {
+        const found = matchingIngr(ppiSupplements);
+        warnings.push(`PPIs reduce absorption of ${found.join(', ')}. Take these supplements at least 2 hours apart from your acid reducer for best absorption.`);
+    }
+
+    // ── 15. Antibiotics ─────────────────────────────────────────────────
+    const antibiotics = ['tetracycline', 'doxycycline', 'minocycline', 'ciprofloxacin', 'cipro', 'levofloxacin', 'levaquin', 'moxifloxacin', 'amoxicillin', 'azithromycin'];
+    const antibioticSupplements = ['calcium', 'iron', 'magnesium', 'zinc'];
+    if (has(medsLower, antibiotics) && hasIngr(antibioticSupplements)) {
+        const found = matchingIngr(antibioticSupplements);
+        warnings.push(`Minerals (${found.join(', ')}) can chelate and reduce absorption of your antibiotic. Take supplements at least 2-4 hours apart from your antibiotic dose.`);
+    }
+
+    // ── 16. Corticosteroids ─────────────────────────────────────────────
+    const corticosteroids = ['prednisone', 'prednisolone', 'dexamethasone', 'methylprednisolone', 'hydrocortisone', 'budesonide'];
+    if (has(medsLower, corticosteroids)) {
+        if (hasIngr(['licorice', 'glycyrrhizin'])) {
+            warnings.push('Licorice Root may worsen potassium depletion and fluid retention caused by corticosteroids. Avoid or use deglycyrrhizinated (DGL) form only.');
+        }
+        if (hasIngr(['echinacea', 'astragalus', 'elderberry', 'mushroom'])) {
+            const found = matchingIngr(['echinacea', 'astragalus', 'elderberry', 'mushroom']);
+            warnings.push(`Immune-stimulating ingredients (${found.join(', ')}) may counteract the immunosuppressive effect of your corticosteroid. Consult your physician.`);
+        }
+    }
+
+    // ── 17. Heart Rhythm / Cardiac Glycosides ───────────────────────────
+    const cardiacMeds = ['digoxin', 'lanoxin', 'amiodarone', 'flecainide', 'sotalol', 'dofetilide', 'dronedarone'];
+    const cardiacSupplements = ['magnesium', 'potassium', 'hawthorn', 'licorice', 'glycyrrhizin'];
+    if (has(medsLower, cardiacMeds) && hasIngr(cardiacSupplements)) {
+        const found = matchingIngr(cardiacSupplements);
+        warnings.push(`Contains ${found.join(', ')} which can shift electrolyte balance and affect heart rhythm while on cardiac medications. Physician monitoring required.`);
+    }
+
+    // ── 18. CYP450 Enzyme Interactions (Narrow Therapeutic Index) ────────
+    const narrowTIDrugs = ['warfarin', 'cyclosporine', 'tacrolimus', 'theophylline', 'phenytoin', 'digoxin', 'lithium', 'carbamazepine'];
+    const cyp450Supplements = ["st. john", "st john", 'goldenseal', 'grapefruit'];
+    if (has(medsLower, narrowTIDrugs) && hasIngr(cyp450Supplements)) {
+        const found = matchingIngr(cyp450Supplements);
+        warnings.push(`Contains CYP450 enzyme modulators (${found.join(', ')}) which can dramatically alter blood levels of your narrow-therapeutic-index medication. This is potentially dangerous — physician review required.`);
+    }
+
+    // ── 19. Kidney Impairment Considerations ────────────────────────────
+    const kidneyKeywords = ['kidney', 'renal', 'dialysis', 'ckd', 'chronic kidney'];
+    // Check both medications and conditions-as-medications (users sometimes list conditions)
+    if (has(medsLower, kidneyKeywords)) {
+        const kidneySupplements = ['potassium', 'magnesium', 'phosphorus', 'creatine', 'vitamin c'];
+        if (hasIngr(kidneySupplements)) {
+            const found = matchingIngr(kidneySupplements);
+            warnings.push(`Contains ${found.join(', ')} which require dose adjustment or avoidance with kidney impairment. Consult your nephrologist before starting.`);
         }
     }
 

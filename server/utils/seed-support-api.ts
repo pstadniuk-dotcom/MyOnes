@@ -94,7 +94,7 @@ The AI analyzes your health data including age, weight, medical conditions, medi
 
 Your formula combines system supports and individual ingredients from our approved catalog. The AI calculates precise dosages based on your body and needs.
 
-Every formula is validated against safety limits. Maximum total dosage is 5500mg per day, with minimum 50mg per ingredient.
+Every formula is validated against safety limits. Dosage limits are based on your selected capsule count (6, 9, or 12 capsules per day), with each capsule holding 550mg.
 
 READING YOUR FORMULA
 
@@ -190,7 +190,7 @@ SAFETY VALIDATION
 
 Before creating your formula, the AI checks every potential ingredient against your medications for interactions. It verifies dosages are within safe ranges for your age, weight, and health conditions.
 
-The system enforces a maximum total daily dosage of 5500mg and minimum 50mg per ingredient to ensure both safety and effectiveness.
+The system enforces dosage limits based on your capsule count (6 capsules = 3,300mg, 9 capsules = 4,950mg, 12 capsules = 6,600mg) and minimum 50mg per ingredient to ensure both safety and effectiveness.
 
 INGREDIENT INTERACTIONS
 

@@ -10,6 +10,7 @@ import {
     fileUploads,
     healthProfiles,
     appSettings,
+    ingredientPricing,
     userAdminNotes,
     wearableConnections,
     type User,
@@ -22,7 +23,8 @@ import {
     type FileUpload,
     type HealthProfile,
     type InsertSupportTicketResponse,
-    type WearableConnection
+    type WearableConnection,
+    type IngredientPricing
 } from '@shared/schema';
 import { eq, desc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull } from 'drizzle-orm';
 import { decryptToken } from '../../utils/tokenEncryption';
@@ -959,6 +961,49 @@ export class AdminRepository {
             return order || undefined;
         } catch (error) {
             console.error('Error updating order status:', error);
+            return undefined;
+        }
+    }
+
+    async listIngredientPricing(): Promise<IngredientPricing[]> {
+        try {
+            return await db
+                .select()
+                .from(ingredientPricing)
+                .orderBy(ingredientPricing.ingredientName);
+        } catch (error) {
+            console.error('Error listing ingredient pricing:', error);
+            return [];
+        }
+    }
+
+    async updateIngredientPricing(
+        id: string,
+        updates: {
+            ingredientName: string;
+            typicalCapsuleMg: number;
+            typicalBottleCapsules: number;
+            typicalRetailPriceCents: number;
+            isActive: boolean;
+        }
+    ): Promise<IngredientPricing | undefined> {
+        try {
+            const [updated] = await db
+                .update(ingredientPricing)
+                .set({
+                    ingredientName: updates.ingredientName,
+                    typicalCapsuleMg: updates.typicalCapsuleMg,
+                    typicalBottleCapsules: updates.typicalBottleCapsules,
+                    typicalRetailPriceCents: updates.typicalRetailPriceCents,
+                    isActive: updates.isActive,
+                    updatedAt: new Date(),
+                })
+                .where(eq(ingredientPricing.id, id))
+                .returning();
+
+            return updated || undefined;
+        } catch (error) {
+            console.error('Error updating ingredient pricing:', error);
             return undefined;
         }
     }

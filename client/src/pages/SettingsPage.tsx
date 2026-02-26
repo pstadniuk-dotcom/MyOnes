@@ -733,14 +733,14 @@ export default function SettingsPage() {
                                 <p className="text-xs font-medium text-blue-800 mb-1">🌤️ Afternoon ({notifications.reminderAfternoon})</p>
                                 <p className="text-sm text-blue-900">
                                   "⚗️ ONES: Afternoon check-in!
-                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'afternoon') && "💊 Take 2 capsules with lunch."}"
+                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'afternoon') && "💊 Take 3 capsules with lunch."}"
                                 </p>
                               </div>
                               <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
                                 <p className="text-xs font-medium text-purple-800 mb-1">🌙 Evening ({notifications.reminderEvening})</p>
                                 <p className="text-sm text-purple-900">
                                   "⚗️ ONES: Evening reminder!
-                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'evening') && "💊 Take 2 capsules with dinner."}"
+                                  {(notifications.pillsTimeSlot === 'all' || notifications.pillsTimeSlot === 'evening') && "💊 Take 3 capsules with dinner."}"
                                 </p>
                               </div>
                             </div>

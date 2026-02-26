@@ -38,7 +38,7 @@ export function ReviewScheduleCard({ formulaId }: ReviewScheduleCardProps) {
   const [frequency, setFrequency] = useState<ReviewFrequency>('monthly');
   const [daysBefore, setDaysBefore] = useState<number>(5);
   const [emailReminders, setEmailReminders] = useState(true);
-  const [smsReminders, setSmsReminders] = useState(false);
+  const [smsReminders, setSmsReminders] = useState(true);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 

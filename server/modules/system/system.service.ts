@@ -34,10 +34,32 @@ export class SystemService {
     async healthCheck() {
         // Basic connectivity check to DB
         await usersRepository.getUserByEmail('health-check@example.com');
+
+        const aiConfigured = Boolean(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
+        const pricingConfigured = Boolean(process.env.ALIVE_API_KEY);
+        const webhookSecurityConfigured = {
+            twilio: Boolean(process.env.TWILIO_AUTH_TOKEN),
+            junction: Boolean(process.env.JUNCTION_WEBHOOK_SECRET),
+        };
+
+        const degradedReasons: string[] = [];
+        if (!aiConfigured) degradedReasons.push('AI provider key missing');
+        if (!pricingConfigured) degradedReasons.push('Manufacturer pricing key missing');
+
         return {
-            status: 'healthy',
+            status: degradedReasons.length === 0 ? 'healthy' : 'degraded',
             timestamp: new Date().toISOString(),
-            version: process.env.npm_package_version || '1.0.0'
+            version: process.env.npm_package_version || '1.0.0',
+            components: {
+                database: 'healthy',
+                ai: aiConfigured ? 'configured' : 'missing-config',
+                pricing: pricingConfigured ? 'configured' : 'missing-config',
+                webhooks: {
+                    twilio: webhookSecurityConfigured.twilio ? 'configured' : 'missing-config',
+                    junction: webhookSecurityConfigured.junction ? 'configured' : 'missing-config',
+                },
+            },
+            degradedReasons,
         };
     }
 

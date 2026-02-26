@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
@@ -20,18 +20,19 @@ import {
   Clock, ArrowRight, ArrowLeft, GitBranch, Star, Zap,
   Heart, Brain, Activity, Target, Plus, Minus, RotateCcw,
   ExternalLink, Copy, Users, Lightbulb, BookOpen, Award,
-  Package, AlertCircle, Pencil, Sparkles
+  Package, AlertCircle, Pencil, Sparkles, ShieldCheck
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/shared/hooks/use-toast';
-import { apiRequest } from '@/shared/lib/queryClient';
+import { apiRequest, getAuthHeaders } from '@/shared/lib/queryClient';
+import { buildApiUrl } from '@/shared/lib/api';
 import { FormulaCustomizationDialog } from '@/features/formulas/components/FormulaCustomizationDialog';
 import { CustomFormulaBuilderDialog } from '@/features/formulas/components/CustomFormulaBuilderDialog';
 import { ResearchCitationCard, ResearchSummaryDialog } from '@/features/marketing/components/ResearchCitationCard';
 import { ReviewScheduleCard } from '@/features/dashboard/components/ReviewScheduleCard';
-import { calculateDosage } from '@/shared/lib/utils';
+import { calculateDosage, VALID_CAPSULE_COUNTS, type CapsuleCount } from '@/shared/lib/utils';
 import type { ResearchCitation } from '@shared/schema';
 import { generateFormulaPDF, type FormulaForPDF } from '@shared/pdf-generator';
 
@@ -117,6 +118,49 @@ interface FormulaComparison {
   };
 }
 
+interface FormulaQuotePayload {
+  formulaId: string;
+  formulaVersion: number;
+  formulaName?: string;
+  quote: {
+    available: boolean;
+    reason?: string;
+    capsuleCount: CapsuleCount;
+    totalCapsules: number;
+    weeks: number;
+    subtotal?: number;
+    shipping?: number;
+    total?: number;
+    currency: 'USD';
+    mappedIngredients: number;
+    unmappedIngredients: string[];
+  };
+}
+
+interface EquivalentStackPayload {
+  supplementsCount: number;
+  capsulesPerDay: number;
+  estimatedMonthlyCost: number | null;
+  coveragePct: number;
+  missingIngredients: string[];
+}
+
+interface MembershipTierPayload {
+  id: string;
+  tierKey: string;
+  name: string;
+  priceCents: number;
+  maxCapacity: number | null;
+  currentCount: number;
+}
+
+interface MyMembershipPayload {
+  hasMembership: boolean;
+  isCancelled?: boolean;
+  tier?: string;
+  priceCents?: number;
+}
+
 export default function MyFormulaPage() {
   // State management
   const [activeTab, setActiveTab] = useState('formulas');
@@ -128,13 +172,19 @@ export default function MyFormulaPage() {
   const [selectedFormulaId, setSelectedFormulaId] = useState<string | null>(null);
   const [expandedFormulaId, setExpandedFormulaId] = useState<string | null>(null);
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
-  const [smsOptInAtFirstPurchase, setSmsOptInAtFirstPurchase] = useState(false);
+  const [includeMembershipAtCheckout, setIncludeMembershipAtCheckout] = useState(true);
+  const [membershipBenefitsOpen, setMembershipBenefitsOpen] = useState(false);
+  const [smsOptInAtFirstPurchase, setSmsOptInAtFirstPurchase] = useState(true);
+  const [medDisclosureAcknowledged, setMedDisclosureAcknowledged] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [showCustomBuilderDialog, setShowCustomBuilderDialog] = useState(false);
   const [renamingFormulaId, setRenamingFormulaId] = useState<string | null>(null);
   const [newFormulaName, setNewFormulaName] = useState('');
   const [expandedIndividualIngredients, setExpandedIndividualIngredients] = useState<Record<string, boolean>>({});
   const [columnCount, setColumnCount] = useState<number>(3);
+  const [pricingCapsuleCount, setPricingCapsuleCount] = useState<CapsuleCount>(9);
+  const [pendingPricingFocusFormulaId, setPendingPricingFocusFormulaId] = useState<string | null>(null);
+  const pricingCardRef = useRef<HTMLDivElement | null>(null);
 
   // Hooks
   const { user } = useAuth();
@@ -173,6 +223,19 @@ export default function MyFormulaPage() {
     queryKey: ['/api/users/me/formula/compare', selectedVersions[0], selectedVersions[1]],
     enabled: selectedVersions.length === 2
   });
+
+  // Check if user has completed medication disclosure
+  const { data: healthProfileData } = useQuery<{ medicationDisclosedAt?: string | null } | null>({
+    queryKey: ['/api/users/me/health-profile'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/users/me/health-profile');
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!user?.id,
+  });
+
+  const needsMedicationDisclosure = healthProfileData !== undefined && !healthProfileData?.medicationDisclosedAt;
 
   // Fetch ingredient catalog for individual ingredient benefits
   const { data: ingredientCatalog } = useQuery<{
@@ -345,6 +408,32 @@ export default function MyFormulaPage() {
     },
   });
 
+  const checkoutSessionMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedFormula?.id) {
+        throw new Error('No formula selected for checkout.');
+      }
+
+      const response = await apiRequest('POST', '/api/billing/checkout/session', {
+        formulaId: selectedFormula.id,
+        includeMembership: membershipUpsellAvailable ? includeMembershipAtCheckout : false,
+        plan: 'monthly',
+      });
+
+      return response.json() as Promise<{ checkoutUrl: string; sessionId: string; expiresAt: string }>;
+    },
+    onSuccess: ({ checkoutUrl }) => {
+      window.location.href = checkoutUrl;
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Unable to continue to checkout',
+        description: error?.message || 'Please try again in a moment.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Derived data
   const currentFormula = currentFormulaData?.formula;
   const formulaHistory = historyData?.history;
@@ -375,6 +464,74 @@ export default function MyFormulaPage() {
     return allFormulas.find(f => f.id === selectedFormulaId) || currentFormula;
   }, [selectedFormulaId, currentFormula, allFormulas]);
 
+  const { data: formulaQuoteData, isLoading: isLoadingFormulaQuote } = useQuery<FormulaQuotePayload>({
+    queryKey: ['/api/users/me/formula/quote', selectedFormula?.id, pricingCapsuleCount],
+    enabled: !!user?.id && !!selectedFormula?.id,
+    queryFn: () => apiRequest('GET', `/api/users/me/formula/${selectedFormula!.id}/quote?capsuleCount=${pricingCapsuleCount}`).then(res => res.json()),
+  });
+
+  const { data: currentMembershipTier } = useQuery<MembershipTierPayload | null>({
+    queryKey: ['/api/membership/current-tier'],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const res = await fetch(buildApiUrl('/api/membership/current-tier'), {
+        method: 'GET',
+        headers: {
+          ...getAuthHeaders(),
+        },
+        credentials: 'include',
+      });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error('Failed to load membership tier');
+      return res.json();
+    },
+  });
+
+  const { data: myMembership } = useQuery<MyMembershipPayload>({
+    queryKey: ['/api/membership/me'],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const res = await fetch(buildApiUrl('/api/membership/me'), {
+        method: 'GET',
+        headers: {
+          ...getAuthHeaders(),
+        },
+        credentials: 'include',
+      });
+      if (res.status === 404) return { hasMembership: false };
+      if (!res.ok) throw new Error('Failed to load membership status');
+      return res.json();
+    },
+  });
+
+  const {
+    data: equivalentStackData,
+    isLoading: isLoadingEquivalentStack,
+    isError: hasEquivalentStackError,
+  } = useQuery<EquivalentStackPayload>({
+    queryKey: ['/api/billing/equivalent-stack', selectedFormula?.id],
+    enabled: !!user?.id && !!selectedFormula?.id,
+    queryFn: () => apiRequest('GET', `/api/billing/equivalent-stack?formulaId=${selectedFormula!.id}`).then(res => res.json()),
+  });
+
+  const hasActiveMembership = !!myMembership?.hasMembership && !myMembership?.isCancelled;
+  const membershipUpsellAvailable = !hasActiveMembership && !!currentMembershipTier;
+  const oneTimeFormulaPrice = formulaQuoteData?.quote?.available ? (formulaQuoteData.quote.total ?? 0) : 0;
+  const membershipMonthlyPrice = currentMembershipTier ? currentMembershipTier.priceCents / 100 : 0;
+  // Always compute the 15% savings so we can show savings regardless of toggle state
+  const membershipSavingsAmount = oneTimeFormulaPrice * 0.15;
+  const discountedFormulaPrice = Math.max(0, oneTimeFormulaPrice - membershipSavingsAmount);
+  const checkoutTotalToday = (includeMembershipAtCheckout && membershipUpsellAvailable)
+    ? discountedFormulaPrice + membershipMonthlyPrice
+    : hasActiveMembership
+      ? discountedFormulaPrice
+      : oneTimeFormulaPrice;
+  const membershipSpotsRemaining = currentMembershipTier?.maxCapacity !== null && currentMembershipTier?.maxCapacity !== undefined
+    ? Math.max(0, currentMembershipTier.maxCapacity - currentMembershipTier.currentCount)
+    : null;
+  // Standard tier price for anchoring (the "normally $X/mo" line)
+  const STANDARD_TIER_PRICE = 29;
+
   // Auto-select newest formula on load
   useEffect(() => {
     if (currentFormula && !selectedFormulaId) {
@@ -383,10 +540,55 @@ export default function MyFormulaPage() {
   }, [currentFormula, selectedFormulaId]);
 
   useEffect(() => {
-    if (!showOrderConfirmation) {
-      setSmsOptInAtFirstPurchase(false);
+    const targetCaps = selectedFormula?.targetCapsules;
+    if (VALID_CAPSULE_COUNTS.includes(targetCaps as CapsuleCount)) {
+      setPricingCapsuleCount(targetCaps as CapsuleCount);
+      return;
     }
-  }, [showOrderConfirmation]);
+    setPricingCapsuleCount(9);
+  }, [selectedFormula?.id, selectedFormula?.targetCapsules]);
+
+  useEffect(() => {
+    if (
+      activeTab !== 'actions' ||
+      !pendingPricingFocusFormulaId ||
+      selectedFormula?.id !== pendingPricingFocusFormulaId
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      pricingCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setPendingPricingFocusFormulaId(null);
+    }, 80);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activeTab, pendingPricingFocusFormulaId, selectedFormula?.id]);
+
+  const handleOpenPricingForFormula = useCallback((formulaId: string) => {
+    setSelectedFormulaId(formulaId);
+    setShowOrderConfirmation(true);
+  }, []);
+
+  const handleCustomizeFormula = useCallback((formulaId: string) => {
+    setSelectedFormulaId(formulaId);
+    setShowCustomizationDialog(true);
+  }, []);
+
+  useEffect(() => {
+    if (!showOrderConfirmation) {
+      setSmsOptInAtFirstPurchase(true);
+      setMedDisclosureAcknowledged(false);
+      setIncludeMembershipAtCheckout(true);
+      return;
+    }
+
+    if (hasActiveMembership) {
+      setIncludeMembershipAtCheckout(false);
+    } else {
+      setIncludeMembershipAtCheckout(true);
+    }
+  }, [showOrderConfirmation, hasActiveMembership]);
 
   // Update column count based on window width for masonry layout
   useEffect(() => {
@@ -505,6 +707,19 @@ export default function MyFormulaPage() {
 
   return (
     <div className="w-full px-4 py-4 md:px-0 space-y-4 md:space-y-6" data-testid="page-my-formula">
+      {/* Medication disclosure banner — shown once until user completes it in Profile */}
+      {needsMedicationDisclosure && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <ShieldCheck className="h-4 w-4 flex-shrink-0" />
+          <span>
+            <strong>One quick step:</strong> Please confirm your medication list in{' '}
+            <Link href="/dashboard/profile?tab=health" className="underline font-medium">
+              your health profile
+            </Link>{' '}
+            so we can flag any supplement–drug interactions in your formula. Takes 30 seconds.
+          </span>
+        </div>
+      )}
       {/* Header Section */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
@@ -585,6 +800,9 @@ export default function MyFormulaPage() {
                         }}
                         onArchive={(id) => archiveFormulaMutation.mutate(id)}
                         isArchiving={archiveFormulaMutation.isPending}
+                        onOpenPricing={() => handleOpenPricingForFormula(formula.id)}
+                        onCustomize={() => handleCustomizeFormula(formula.id)}
+                        onOrder={() => handleOpenPricingForFormula(formula.id)}
                         getIndividualIngredientDetails={getIndividualIngredientDetails}
                         expandedIndividualIngredients={expandedIndividualIngredients}
                         setExpandedIndividualIngredients={setExpandedIndividualIngredients}
@@ -593,6 +811,8 @@ export default function MyFormulaPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Build Custom Formula Card — hidden for now */}
 
               {/* Archived Formulas Section */}
               {(archivedData?.archived?.length || 0) > 0 && (
@@ -663,85 +883,7 @@ export default function MyFormulaPage() {
         {/* Actions Tab */}
         <TabsContent value="actions" className="space-y-6">
           {selectedFormula && (
-            <>
-              {/* Quick Actions Grid */}
-              <div className="grid md:grid-cols-2 gap-4">
-                {/* Build Custom Formula Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Beaker className="w-5 h-5 text-purple-600" />
-                      Build Custom Formula
-                    </CardTitle>
-                    <CardDescription>
-                      Create a completely custom formula from scratch using our ingredient catalog
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2 border-purple-600 text-purple-600 hover:bg-purple-50"
-                      data-testid="button-custom-formula"
-                      onClick={() => setShowCustomBuilderDialog(true)}
-                    >
-                      <Beaker className="w-4 h-4" />
-                      Start Building
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Discuss with AI Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MessageSquare className="w-5 h-5" />
-                      Discuss with AI
-                    </CardTitle>
-                    <CardDescription>
-                      Chat with our AI to refine your formula or ask health-related questions
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button
-                      asChild
-                      variant="outline"
-                      className="w-full gap-2"
-                      data-testid="button-discuss-formula"
-                    >
-                      <Link href="/dashboard/consultation">
-                        <MessageSquare className="w-4 h-4" />
-                        Open Consultation
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Customization Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5" />
-                    Customize Your Formula
-                  </CardTitle>
-                  <CardDescription>
-                    Add extra system supports or individual ingredients to personalize your formula
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    onClick={() => setShowCustomizationDialog(true)}
-                    className="w-full"
-                    data-testid="button-open-customization"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Ingredients
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <ActionsSection formula={selectedFormula} onOrderClick={() => setShowOrderConfirmation(true)} />
-            </>
+            <ActionsSection formula={selectedFormula} onOrderClick={() => setShowOrderConfirmation(true)} />
           )}
         </TabsContent>
       </Tabs>
@@ -799,7 +941,6 @@ export default function MyFormulaPage() {
                     </p>
                   </div>
 
-                  <Separator />
                   {/* System Supports */}
                   {selectedFormula.bases.length > 0 && (
                     <div>
@@ -823,7 +964,7 @@ export default function MyFormulaPage() {
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-2">
                         <Plus className="w-4 h-4" />
-                        AI-Recommended Additions ({selectedFormula.additions.length})
+                        Individual Ingredients ({selectedFormula.additions.length})
                       </h4>
                       <div className="space-y-2">
                         {selectedFormula.additions.map((addition, idx) => (
@@ -892,38 +1033,436 @@ export default function MyFormulaPage() {
                     </div>
                   )}
 
-                  {/* Warnings */}
-                  {selectedFormula.warnings && selectedFormula.warnings.length > 0 && (
-                    <div className="p-3 bg-orange-50 border border-orange-200 rounded">
-                      <h4 className="font-semibold mb-2 flex items-center gap-2 text-orange-800">
-                        <AlertTriangle className="w-4 h-4" />
-                        Important Warnings
-                      </h4>
-                      <ul className="space-y-1">
-                        {selectedFormula.warnings.map((warning, idx) => (
-                          <li key={idx} className="text-sm text-orange-700">• {warning}</li>
-                        ))}
-                      </ul>
-                    </div>
+                  {membershipUpsellAvailable ? (
+                    <Card className={`transition-all duration-200 ${
+                      includeMembershipAtCheckout
+                        ? 'border-[#1B4332] ring-2 ring-[#1B4332]/20 bg-[#1B4332]/5'
+                        : 'border-muted bg-muted/5'
+                    }`}>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            Activate Continuous Optimization
+                          </CardTitle>
+                          {includeMembershipAtCheckout && (
+                            <Badge className="bg-[#1B4332] text-white text-xs">Recommended</Badge>
+                          )}
+                        </div>
+                        <CardDescription>
+                          Save 15% today + your formula updates before each refill based on your latest data.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {/* Toggle line */}
+                        <div className="flex items-start gap-2">
+                          <Checkbox
+                            id="membership-upsell-toggle"
+                            checked={includeMembershipAtCheckout}
+                            onCheckedChange={(checked) => setIncludeMembershipAtCheckout(checked === true)}
+                            className="mt-0.5"
+                          />
+                          <label htmlFor="membership-upsell-toggle" className="text-sm leading-relaxed cursor-pointer">
+                            {membershipSavingsAmount > 0 ? (
+                              <>Add membership — <span className="font-semibold text-[#1B4332]">Save ${membershipSavingsAmount.toFixed(2)} today</span> + ${membershipMonthlyPrice.toFixed(0)}/mo locked for life</>
+                            ) : (
+                              <>Add membership — 15% off formula + ${membershipMonthlyPrice.toFixed(0)}/mo locked for life</>
+                            )}
+                          </label>
+                        </div>
+
+                        {/* Savings badge */}
+                        {membershipSavingsAmount > 0 && (
+                          <div className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 border border-green-200 rounded-full px-3 py-1 text-xs font-medium">
+                            <Zap className="w-3 h-3" />
+                            Save ${membershipSavingsAmount.toFixed(2)} today
+                          </div>
+                        )}
+
+                        {/* Pricing area */}
+                        <div className="rounded-lg border bg-white overflow-hidden">
+                          {includeMembershipAtCheckout ? (
+                            <>
+                              <div className="flex items-center justify-between p-3 bg-[#1B4332]/5">
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">8-week supply</p>
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">Auto-refills every 8 weeks</p>
+                                </div>
+                                <div className="text-right flex items-baseline gap-2">
+                                  <span className="text-2xl font-bold text-[#1B4332]">${discountedFormulaPrice.toFixed(2)}</span>
+                                  {membershipSavingsAmount > 0 && (
+                                    <span className="text-sm text-muted-foreground line-through">${oneTimeFormulaPrice.toFixed(2)}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between px-3 py-2 border-t border-dashed">
+                                <span className="text-xs text-muted-foreground">Shipping</span>
+                                <span className="text-sm font-semibold text-green-600">Free</span>
+                              </div>
+                              <div className="flex items-center justify-between px-3 py-2 border-t border-dashed">
+                                <span className="text-xs text-muted-foreground">Membership starting next month</span>
+                                <span className="text-sm font-medium text-[#1B4332]">${membershipMonthlyPrice.toFixed(0)}/mo <span className="text-muted-foreground line-through font-normal">${STANDARD_TIER_PRICE}/mo</span></span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center justify-between p-3">
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">8-week supply</p>
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">Auto-refills every 8 weeks</p>
+                                </div>
+                                <span className="text-2xl font-bold">${oneTimeFormulaPrice.toFixed(2)}</span>
+                              </div>
+                              <div className="flex items-center justify-between px-3 py-2 border-t border-dashed">
+                                <span className="text-xs text-muted-foreground">Shipping</span>
+                                <span className="text-sm font-semibold text-green-600">Free</span>
+                              </div>
+                              {membershipSavingsAmount > 0 && (
+                                <div className="px-3 pb-3">
+                                  <p className="text-xs text-[#1B4332] cursor-pointer hover:underline" onClick={() => setIncludeMembershipAtCheckout(true)}>
+                                    Add membership to save ${membershipSavingsAmount.toFixed(2)} today + ongoing optimization
+                                  </p>
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {!isLoadingFormulaQuote && formulaQuoteData?.quote?.available && (
+                            <div className="px-3 py-2 border-t text-xs text-muted-foreground">
+                              {formulaQuoteData.quote.totalCapsules} capsules over {formulaQuoteData.quote.weeks} weeks • {formulaQuoteData.quote.mappedIngredients} mapped ingredients
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Membership benefits collapsible */}
+                        <Collapsible open={membershipBenefitsOpen} onOpenChange={setMembershipBenefitsOpen}>
+                          <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-[#1B4332] font-medium hover:underline cursor-pointer">
+                            What's included
+                            {membershipBenefitsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-2">
+                            <ul className="space-y-1.5 text-xs text-muted-foreground">
+                              {[
+                                'Unlimited AI health consultations',
+                                'Lab & wearable data analysis',
+                                'Formula updates as your health evolves',
+                                '15% off every formula order',
+                                'Lab testing at member rates',
+                                'Future platform upgrades included',
+                              ].map((benefit) => (
+                                <li key={benefit} className="flex items-start gap-1.5">
+                                  <CheckCircle className="w-3 h-3 text-[#1B4332] mt-0.5 flex-shrink-0" />
+                                  {benefit}
+                                </li>
+                              ))}
+                            </ul>
+                            <p className="text-[10px] text-muted-foreground mt-2">
+                              ${membershipMonthlyPrice.toFixed(0)}/mo <span className="line-through">${STANDARD_TIER_PRICE}/mo</span> — founding rate locked for life. Cancel anytime.
+                            </p>
+                          </CollapsibleContent>
+                        </Collapsible>
+
+                        {/* Inline founding tier bar */}
+                        <div className="rounded-lg bg-white border p-3">
+                          <div className="flex justify-between items-end mb-2">
+                            {[
+                              { name: 'Founding', price: 9, limit: 100 },
+                              { name: 'Early', price: 15, limit: 500 },
+                              { name: 'Beta', price: 19, limit: 2000 },
+                              { name: 'Standard', price: STANDARD_TIER_PRICE, limit: null as number | null },
+                            ].map((tier) => {
+                              const isActive = tier.price === membershipMonthlyPrice;
+                              return (
+                                <div key={tier.name} className="text-center flex-1">
+                                  <div className={`text-lg font-light ${isActive ? 'text-[#1B4332]' : 'text-[#1B4332]/30'}`}>
+                                    ${tier.price}<span className="text-[10px] font-normal">/mo</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="relative h-1.5 bg-[#1B4332]/10 rounded-full mb-2">
+                            {[0, 33.33, 66.66, 100].map((pos, i) => {
+                              const isActive = i === 0; // founding is first
+                              return (
+                                <div
+                                  key={i}
+                                  className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 ${
+                                    isActive ? 'bg-[#1B4332] border-[#1B4332]' : 'bg-white border-[#1B4332]/20'
+                                  }`}
+                                  style={{ left: `${pos}%`, transform: 'translate(-50%, -50%)' }}
+                                />
+                              );
+                            })}
+                          </div>
+                          <div className="flex justify-between items-start">
+                            {[
+                              { name: 'Founding', note: 'First 100' },
+                              { name: 'Early', note: 'First 500' },
+                              { name: 'Beta', note: 'First 2,000' },
+                              { name: 'Standard', note: 'After launch' },
+                            ].map((tier, i) => {
+                              const isActive = i === 0;
+                              return (
+                                <div key={tier.name} className="text-center flex-1">
+                                  <div className={`text-xs font-medium ${isActive ? 'text-[#1B4332]' : 'text-[#1B4332]/30'}`}>
+                                    {tier.name}
+                                  </div>
+                                  <div className={`text-[10px] ${isActive ? 'text-[#52796F]' : 'text-[#52796F]/30'}`}>
+                                    {tier.note}
+                                  </div>
+                                  {isActive && membershipSpotsRemaining !== null && (
+                                    <div className="text-[10px] text-[#D4A574] font-medium">
+                                      {membershipSpotsRemaining} spots left
+                                    </div>
+                                  )}
+                                  {!isActive && i < 3 && (
+                                    <div className="text-[10px] text-[#52796F]/30">Coming next</div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <Package className="w-4 h-4" />
+                          {hasActiveMembership ? 'Member Order' : 'Your Order'}
+                        </CardTitle>
+                        <CardDescription>
+                          {hasActiveMembership
+                            ? '8-week supply with your 15% member discount applied.'
+                            : '8-week estimate based on your formula composition.'}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {isLoadingFormulaQuote ? (
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-40" />
+                            <Skeleton className="h-4 w-56" />
+                          </div>
+                        ) : formulaQuoteData?.quote?.available ? (
+                          <div className="rounded-lg border bg-white overflow-hidden">
+                            <div className="flex items-center justify-between p-3">
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">8-week supply</p>
+                                <p className="text-[10px] text-muted-foreground mt-0.5">Auto-refills every 8 weeks</p>
+                              </div>
+                              <div className="text-right">
+                                {hasActiveMembership ? (
+                                  <div className="flex items-baseline gap-2">
+                                    <span className="text-2xl font-bold text-[#1B4332]">${discountedFormulaPrice.toFixed(2)}</span>
+                                    <span className="text-sm text-muted-foreground line-through">${oneTimeFormulaPrice.toFixed(2)}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-2xl font-bold">${oneTimeFormulaPrice.toFixed(2)}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between px-3 py-2 border-t border-dashed">
+                              <span className="text-xs text-muted-foreground">Shipping</span>
+                              <span className="text-sm font-semibold text-green-600">Free</span>
+                            </div>
+                            {hasActiveMembership && (
+                              <div className="flex items-center justify-between px-3 py-2 border-t border-dashed">
+                                <span className="text-xs text-muted-foreground">Member discount (15%)</span>
+                                <span className="text-sm font-semibold text-[#1B4332]">-${membershipSavingsAmount.toFixed(2)}</span>
+                              </div>
+                            )}
+                            <div className="px-3 py-2 border-t text-xs text-muted-foreground">
+                              {formulaQuoteData.quote.totalCapsules} capsules over {formulaQuoteData.quote.weeks} weeks &bull; {formulaQuoteData.quote.mappedIngredients} mapped ingredients
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-md border border-muted p-2 text-sm text-muted-foreground">
+                            {formulaQuoteData?.quote?.reason || 'Pricing is currently unavailable.'}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   )}
 
-                  {isFirstFormulaOrder && !hasSmsAccountabilityConsent && (
-                    <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
-                      <div className="flex items-start gap-2">
+                  {/* ONES vs. Buying Separately — Conversion Section */}
+                  {isLoadingEquivalentStack ? (
+                    <Card>
+                      <CardContent className="p-6 space-y-3">
+                        <Skeleton className="h-5 w-48" />
+                        <Skeleton className="h-24 w-full" />
+                        <Skeleton className="h-24 w-full" />
+                      </CardContent>
+                    </Card>
+                  ) : hasEquivalentStackError ? (
+                    <Card>
+                      <CardContent className="p-6">
+                        <p className="text-muted-foreground text-sm">Equivalent stack estimate is temporarily unavailable.</p>
+                      </CardContent>
+                    </Card>
+                  ) : equivalentStackData ? (() => {
+                    const retailCost = equivalentStackData.estimatedMonthlyCost ?? 0;
+                    const effectiveOnesCost = (includeMembershipAtCheckout && membershipUpsellAvailable) || hasActiveMembership
+                      ? discountedFormulaPrice
+                      : oneTimeFormulaPrice;
+                    const supplyWeeks = formulaQuoteData?.quote?.weeks ?? 8;
+                    const onesMonthly = effectiveOnesCost > 0 ? Math.round(effectiveOnesCost / (supplyWeeks / 4.33)) : 0;
+                    const savingsMonthly = retailCost > 0 && onesMonthly > 0 ? Math.round(((retailCost - onesMonthly) / retailCost) * 100) : null;
+                    const retailCapsules = equivalentStackData.capsulesPerDay ?? 0;
+                    const onesCapsules = pricingCapsuleCount;
+                    const bottleCount = equivalentStackData.supplementsCount ?? 0;
+                    const isMemberPricing = (includeMembershipAtCheckout && membershipUpsellAvailable) || hasActiveMembership;
+
+                    return (
+                      <div className="rounded-xl overflow-hidden border border-[#1B4332]/15 shadow-sm">
+                        {/* Header */}
+                        <div className="bg-[#1B4332] px-5 py-3.5 flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <img src="/ones-logo-icon.svg" alt="ONES" className="w-5 h-5 brightness-0 invert" />
+                            <span className="text-white font-semibold text-sm">Your formula vs. buying separately</span>
+                          </div>
+                          {savingsMonthly !== null && savingsMonthly > 0 && (
+                            <span className="bg-[#D4A574] text-[#1B4332] font-bold text-[11px] px-2.5 py-1 rounded-full">
+                              SAVE {savingsMonthly}%
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Side-by-side comparison */}
+                        <div className="grid grid-cols-2">
+                          {/* Buying separately — left column */}
+                          <div className="p-5 bg-stone-50 border-r border-stone-200">
+                            <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-widest mb-4">Without ONES</div>
+
+                            <div className="space-y-4">
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-3xl font-black text-stone-700 tabular-nums">{bottleCount}</span>
+                                <span className="text-xs text-stone-400">bottles</span>
+                              </div>
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-3xl font-black text-stone-700 tabular-nums">{retailCapsules}</span>
+                                <span className="text-xs text-stone-400">pills / day</span>
+                              </div>
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-3xl font-black text-stone-700 tabular-nums">
+                                  {retailCost > 0 ? `$${retailCost}` : '—'}
+                                </span>
+                                <span className="text-xs text-stone-400">/ month</span>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 space-y-1.5">
+                              {['Generic formulas', 'Fillers & additives', 'One-size-fits-all', 'Re-buy every month'].map((item) => (
+                                <div key={item} className="flex items-center gap-1.5 text-[11px] text-stone-400">
+                                  <Minus className="w-3 h-3 flex-shrink-0" />
+                                  <span>{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* ONES — right column */}
+                          <div className="p-5 bg-[#f8faf9]">
+                            <div className="flex items-center gap-1.5 mb-4">
+                              <img src="/ones-logo-icon.svg" alt="" className="w-3.5 h-3.5" />
+                              <span className="text-[11px] font-semibold text-[#1B4332] uppercase tracking-widest">ONES</span>
+                            </div>
+
+                            <div className="space-y-4">
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-3xl font-black text-[#1B4332] tabular-nums">1</span>
+                                <span className="text-xs text-[#52796F]">formula</span>
+                              </div>
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-3xl font-black text-[#1B4332] tabular-nums">{onesCapsules}</span>
+                                <span className="text-xs text-[#52796F]">caps / day</span>
+                              </div>
+                              <div>
+                                <div className="flex items-baseline gap-1.5">
+                                  <span className="text-3xl font-black text-[#1B4332] tabular-nums">
+                                    {onesMonthly > 0 ? `$${onesMonthly}` : '—'}
+                                  </span>
+                                  <span className="text-xs text-[#52796F]">/ month</span>
+                                </div>
+                                <div className="text-[10px] text-[#52796F]/70 mt-0.5">
+                                  ${Math.round(effectiveOnesCost)} per {supplyWeeks}-week order
+                                  {isMemberPricing && <span className="text-[#D4A574] font-medium ml-1">· Member price</span>}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 space-y-1.5">
+                              {(isMemberPricing
+                                ? ['Fully personalized', 'Zero fillers', 'Premium ingredients', 'Formula evolves with you']
+                                : ['Fully personalized', 'Zero fillers', 'Premium ingredients', 'AI-optimized doses']
+                              ).map((item) => (
+                                <div key={item} className="flex items-center gap-1.5 text-[11px] text-[#1B4332]">
+                                  <CheckCircle className="w-3 h-3 text-[#2D6A4F] flex-shrink-0" />
+                                  <span>{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Member adapts callout */}
+                        {isMemberPricing && (
+                          <div className="bg-[#D4A574]/[0.08] border-t border-[#D4A574]/20 px-5 py-2.5 flex items-start gap-2">
+                            <RefreshCw className="w-3.5 h-3.5 text-[#D4A574] mt-0.5 flex-shrink-0" />
+                            <span className="text-xs text-[#1B4332]/80 leading-relaxed">
+                              As a member, your formula adapts over time — based on new labs, goals, and how your body responds. You'll always have the most up-to-date version.
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Savings bar */}
+                        {savingsMonthly !== null && savingsMonthly > 0 && retailCost > 0 && onesMonthly > 0 && (
+                          <div className="bg-[#1B4332]/[0.04] border-t border-[#1B4332]/10 px-5 py-3 flex items-center gap-2">
+                            <CheckCircle className="w-3.5 h-3.5 text-[#2D6A4F] flex-shrink-0" />
+                            <span className="text-sm text-[#1B4332]">
+                              <span className="font-semibold">You save ~${Math.round(retailCost - onesMonthly)}/mo</span>
+                              {' '}compared to buying {bottleCount} separate supplements
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Fine print */}
+                        <div className="px-5 py-2 border-t border-stone-100">
+                          <p className="text-[10px] text-muted-foreground leading-relaxed">
+                            Retail estimates based on typical pricing for premium-brand supplements and standard capsule sizes. Actual costs may vary.
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })() : null}
+
+                  {!hasSmsAccountabilityConsent && (
+                    <div className="rounded-lg border border-[#1B4332]/15 overflow-hidden">
+                      <div className="bg-[#1B4332]/[0.04] px-4 py-3 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center flex-shrink-0">
+                          <MessageSquare className="w-4 h-4 text-[#1B4332]" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-[#1B4332]">Want an AI accountability partner?</p>
+                          <p className="text-xs text-[#52796F]">We'll text you daily reminders to take your supplements and check in on how you're feeling.</p>
+                        </div>
+                      </div>
+                      <div className="px-4 py-3 flex items-start gap-2">
                         <Checkbox
                           id="sms-opt-in-first-purchase"
                           checked={smsOptInAtFirstPurchase}
                           onCheckedChange={(checked) => setSmsOptInAtFirstPurchase(checked === true)}
                           className="mt-0.5"
                         />
-                        <label htmlFor="sms-opt-in-first-purchase" className="text-sm leading-relaxed cursor-pointer">
-                          Yes, I want ONES accountability texts for supplement reminders and check-ins. Msg frequency varies. Msg & data rates may apply. Reply STOP to opt out and HELP for help.
+                        <label htmlFor="sms-opt-in-first-purchase" className="text-xs leading-relaxed cursor-pointer text-muted-foreground">
+                          Yes, text me! Msg frequency varies. Msg & data rates may apply. Reply STOP anytime.
                         </label>
                       </div>
                       {!user?.phone && smsOptInAtFirstPurchase && (
-                        <p className="text-xs text-muted-foreground">
-                          Add a phone number in your profile to enable SMS reminders.
-                        </p>
+                        <div className="px-4 pb-3">
+                          <p className="text-xs text-muted-foreground">
+                            Add a phone number in your profile to enable SMS reminders.
+                          </p>
+                        </div>
                       )}
                     </div>
                   )}
@@ -932,19 +1471,42 @@ export default function MyFormulaPage() {
             </div>
           )}
 
-          {/* Medical Disclaimer */}
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div className="text-xs text-amber-800">
-                <p className="font-semibold mb-1">Medical Disclaimer</p>
-                <p>
-                  This personalized formula is a supplement recommendation, not medical advice.
-                  Consult your healthcare provider before starting any new supplement regimen,
-                  especially if you have medical conditions or take medications. See our{' '}
-                  <Link href="/disclaimer" className="underline">Medical Disclaimer</Link> for full details.
-                </p>
-              </div>
+          {/* Safety & Consent */}
+          <div className="space-y-3">
+            {/* Collapsible safety notes */}
+            {selectedFormula && selectedFormula.warnings && selectedFormula.warnings.length > 0 && (
+              <details className="group rounded-lg border border-muted">
+                <summary className="flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-muted-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:bg-muted/30 rounded-lg transition-colors">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                  <span>{selectedFormula.warnings.length} safety note{selectedFormula.warnings.length !== 1 ? 's' : ''} for your formula</span>
+                  <ChevronDown className="w-3.5 h-3.5 ml-auto transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="px-3 pb-3">
+                  <ul className="space-y-2 text-xs text-muted-foreground">
+                    {selectedFormula.warnings.map((warning, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-amber-500 mt-0.5 flex-shrink-0">•</span>
+                        <span>{warning}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </details>
+            )}
+
+            {/* Consent checkbox with integrated disclaimer */}
+            <div className="flex items-start gap-2.5">
+              <Checkbox
+                id="med-disclosure-ack"
+                checked={medDisclosureAcknowledged}
+                onCheckedChange={(checked) => setMedDisclosureAcknowledged(checked === true)}
+                className="mt-0.5"
+              />
+              <label htmlFor="med-disclosure-ack" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                I have disclosed all medications, conditions, and allergies and will consult my physician before starting.
+                Not medical advice; not evaluated by the FDA.{' '}
+                <Link href="/disclaimer" className="underline hover:text-foreground">Full disclaimer</Link>.
+              </label>
             </div>
           </div>
 
@@ -963,47 +1525,28 @@ export default function MyFormulaPage() {
               onClick={async () => {
                 try {
                   await purchaseSmsOptInMutation.mutateAsync();
-                  setShowOrderConfirmation(false);
-                  toast({
-                    title: 'Redirecting to checkout...',
-                    description: 'Checkout page coming soon!',
-                  });
+                  await checkoutSessionMutation.mutateAsync();
                 } catch {
                   // Errors are handled in mutation onError
                 }
               }}
-              disabled={purchaseSmsOptInMutation.isPending}
+              disabled={purchaseSmsOptInMutation.isPending || checkoutSessionMutation.isPending || !medDisclosureAcknowledged}
               data-testid="button-proceed-checkout"
             >
               <ArrowRight className="w-4 h-4 mr-2" />
-              {purchaseSmsOptInMutation.isPending ? 'Saving...' : 'Proceed to Checkout'}
+              {purchaseSmsOptInMutation.isPending
+                ? 'Saving...'
+                : checkoutSessionMutation.isPending
+                  ? 'Opening checkout...'
+                  : 'Proceed to Checkout'}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Customization Dialog */}
-      {selectedFormula && (
-        <FormulaCustomizationDialog
-          open={showCustomizationDialog}
-          onOpenChange={setShowCustomizationDialog}
-          formulaId={selectedFormula.id}
-          existingBases={[
-            ...selectedFormula.bases.map(b => b.ingredient),
-            ...(selectedFormula.userCustomizations?.addedBases?.map(b => b.ingredient) || [])
-          ]}
-          existingIndividuals={[
-            ...selectedFormula.additions.map(a => a.ingredient),
-            ...(selectedFormula.userCustomizations?.addedIndividuals?.map(i => i.ingredient) || [])
-          ]}
-        />
-      )}
+      {/* Customization Dialog — hidden for now */}
 
-      {/* Custom Formula Builder Dialog */}
-      <CustomFormulaBuilderDialog
-        open={showCustomBuilderDialog}
-        onOpenChange={setShowCustomBuilderDialog}
-      />
+      {/* Custom Formula Builder Dialog — hidden for now */}
 
       {/* Rename Dialog */}
       <Dialog open={!!renamingFormulaId} onOpenChange={(open) => {
@@ -1071,6 +1614,9 @@ interface FormulaCardProps {
   isNewest: boolean;
   onSelect: () => void;
   onToggleExpand: () => void;
+  onOpenPricing: () => void;
+  onCustomize: () => void;
+  onOrder: () => void;
   onRename: (formulaId: string, currentName?: string) => void;
   onArchive: (formulaId: string) => void;
   isArchiving?: boolean;
@@ -1079,10 +1625,20 @@ interface FormulaCardProps {
   setExpandedIndividualIngredients: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
-function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onToggleExpand, onRename, onArchive, isArchiving, getIndividualIngredientDetails, expandedIndividualIngredients, setExpandedIndividualIngredients }: FormulaCardProps) {
+function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onToggleExpand, onOpenPricing, onCustomize, onOrder, onRename, onArchive, isArchiving, getIndividualIngredientDetails, expandedIndividualIngredients, setExpandedIndividualIngredients }: FormulaCardProps) {
   const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
   const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
   const createdDate = new Date(formula.createdAt).toLocaleDateString();
+  const pricingCapsuleCount: CapsuleCount = VALID_CAPSULE_COUNTS.includes(formula.targetCapsules as CapsuleCount)
+    ? formula.targetCapsules as CapsuleCount
+    : 9;
+
+  const { data: tileQuoteData, isLoading: isLoadingTileQuote } = useQuery<FormulaQuotePayload>({
+    queryKey: ['/api/users/me/formula/tile-quote', formula.id, pricingCapsuleCount],
+    queryFn: () => apiRequest('GET', `/api/users/me/formula/${formula.id}/quote?capsuleCount=${pricingCapsuleCount}`).then(res => res.json()),
+  });
+
+  const tileQuote = tileQuoteData?.quote;
 
   return (
     <Card
@@ -1169,6 +1725,17 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
           <div className="text-xs text-muted-foreground text-center tabular-nums">
             {formula.targetCapsules || calculateDosage(formula.totalMg).total} capsules/day • {formula.totalMg}mg total
           </div>
+          <button
+            type="button"
+            onClick={onOpenPricing}
+            className="w-full text-xs text-muted-foreground text-center tabular-nums border-t border-border/60 pt-2 hover:text-foreground hover:underline"
+          >
+            {isLoadingTileQuote
+              ? `Pricing: loading...`
+              : tileQuote?.available
+                ? `8-week est (${pricingCapsuleCount} caps): $${(tileQuote.total ?? 0).toFixed(2)}`
+                : `Pricing unavailable`}
+          </button>
         </div>
 
         {/* Spacer to push buttons to bottom */}
@@ -1206,7 +1773,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
               <div>
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
                   <Plus className="w-3 h-3" />
-                  AI-Recommended Additions
+                  Individual Ingredients
                 </h4>
                 <div className="space-y-1">
                   {formula.additions.map((addition, idx) => (
@@ -1305,26 +1872,18 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
 
         {/* Action Buttons */}
         <div className="flex gap-2">
-          {/* Select Button */}
+          {/* Order Button */}
           <Button
-            variant={isSelected ? "secondary" : "default"}
             size="sm"
             className="flex-1"
-            onClick={onSelect}
-            data-testid={`button-select-formula-${formula.version}`}
+            onClick={onOrder}
+            data-testid={`button-order-formula-${formula.version}`}
           >
-            {isSelected ? (
-              <>
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Selected
-              </>
-            ) : (
-              <>
-                <Target className="w-4 h-4 mr-2" />
-                Select
-              </>
-            )}
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            Order
           </Button>
+
+          {/* Customize Button — hidden for now */}
 
           {/* Archive Button */}
           <AlertDialog>
@@ -1556,39 +2115,38 @@ function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
             </>
           )}
 
-          {/* Warnings */}
-          {formula.warnings && formula.warnings.length > 0 && (
+          {/* Warnings & Disclaimers */}
+          {((formula.warnings && formula.warnings.length > 0) || (formula.disclaimers && formula.disclaimers.length > 0)) && (
             <>
               <Separator />
-              <div className="p-4 bg-amber-50 rounded-lg border-l-4 border-amber-400">
-                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2 text-amber-800">
-                  <AlertTriangle className="w-5 h-5" />
-                  Important Warnings
-                </h3>
-                <ul className="space-y-1">
-                  {formula.warnings.map((warning, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm text-amber-700">
-                      <span className="text-amber-600 mt-0.5 font-bold">•</span>
-                      <span>{warning}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </>
-          )}
-
-          {/* Disclaimers */}
-          {formula.disclaimers && formula.disclaimers.length > 0 && (
-            <>
-              <Separator />
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <h3 className="font-semibold text-sm mb-2 text-muted-foreground">Medical Disclaimers</h3>
-                <ul className="space-y-1">
-                  {formula.disclaimers.map((disclaimer, idx) => (
-                    <li key={idx} className="text-xs text-muted-foreground">• {disclaimer}</li>
-                  ))}
-                </ul>
-              </div>
+              <details className="group rounded-lg border border-muted">
+                <summary className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-muted-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:bg-muted/30 rounded-lg transition-colors">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                  <span>Safety Information</span>
+                  <ChevronDown className="w-4 h-4 ml-auto transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="px-4 pb-4 space-y-3">
+                  {formula.warnings && formula.warnings.length > 0 && (
+                    <ul className="space-y-2">
+                      {formula.warnings.map((warning, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                          <span className="text-amber-500 mt-0.5 flex-shrink-0">•</span>
+                          <span>{warning}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {formula.disclaimers && formula.disclaimers.length > 0 && (
+                    <div className="pt-2 border-t border-muted">
+                      <ul className="space-y-1">
+                        {formula.disclaimers.map((disclaimer, idx) => (
+                          <li key={idx} className="text-xs text-muted-foreground">• {disclaimer}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </details>
             </>
           )}
 
@@ -2485,38 +3043,6 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
 
         {/* Review Schedule */}
         <ReviewScheduleCard formulaId={formula.id} />
-
-        {/* Support Information */}
-        <Card data-testid="section-support-info">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Info className="w-5 h-5" />
-              Support & Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm">Formula last reviewed: {new Date(formula.createdAt).toLocaleDateString()}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-sm">All ingredients are third-party tested</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                <span className="text-sm">Need help? Contact our support team</span>
-              </div>
-            </div>
-
-            <Button asChild variant="ghost" className="mt-4 p-0 h-auto justify-start" data-testid="button-contact-support">
-              <Link href="/dashboard/support">
-                Questions about your formula? Get help →
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Share Dialog */}

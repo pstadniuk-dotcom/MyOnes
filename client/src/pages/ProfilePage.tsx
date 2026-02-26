@@ -5,6 +5,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Badge } from '@/shared/components/ui/badge';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Switch } from '@/shared/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
@@ -32,6 +33,7 @@ import {
   User,
   Activity,
   AlertCircle,
+  ShieldCheck,
   Loader2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -185,6 +187,7 @@ export default function ProfilePage() {
   const [conditionInput, setConditionInput] = useState('');
   const [medicationInput, setMedicationInput] = useState('');
   const [allergyInput, setAllergyInput] = useState('');
+  const [medicationDisclosureChecked, setMedicationDisclosureChecked] = useState(false);
 
   // Update form states when data is loaded
   useEffect(() => {
@@ -1002,6 +1005,30 @@ export default function ProfilePage() {
                         }}
                         data-testid="input-medications"
                       />
+                      {/* Medication Safety Disclosure */}
+                      <div className="mt-3">
+                        {healthProfile?.medicationDisclosedAt ? (
+                          <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                            <ShieldCheck className="h-4 w-4 flex-shrink-0" />
+                            <span>
+                              Medication disclosure recorded on{' '}
+                              {new Date(healthProfile.medicationDisclosedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                            <Checkbox
+                              id="medication-disclosure"
+                              checked={medicationDisclosureChecked}
+                              onCheckedChange={(v) => setMedicationDisclosureChecked(!!v)}
+                              className="mt-0.5"
+                            />
+                            <Label htmlFor="medication-disclosure" className="text-xs text-amber-800 leading-snug cursor-pointer font-normal">
+                              I confirm the medication list above is complete and accurate. I understand that ONES AI uses this information to flag potential supplement–drug interactions. I will update this list if my medications change.
+                            </Label>
+                          </div>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
@@ -1100,6 +1127,16 @@ export default function ProfilePage() {
                         allergies: currentAllergies,
                       };
                       await updateHealthProfileMutation.mutateAsync(healthProfileData);
+
+                      // If the user just confirmed their medication disclosure, record it
+                      if (medicationDisclosureChecked && !healthProfile?.medicationDisclosedAt) {
+                        await apiRequest('POST', '/api/users/me/health-profile/medication-disclosure', {
+                          medications: currentMedications,
+                          noMedications: currentMedications.length === 0,
+                        });
+                        setMedicationDisclosureChecked(false);
+                        queryClient.invalidateQueries({ queryKey: ['/api/users/me/health-profile'] });
+                      }
                     } catch (error) {
                       // Error handling is done in the mutation
                     }

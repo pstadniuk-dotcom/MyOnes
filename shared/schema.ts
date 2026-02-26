@@ -25,7 +25,7 @@ export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant', 'sys
 export const addressTypeEnum = pgEnum('address_type', ['shipping', 'billing']);
 export const fileTypeEnum = pgEnum('file_type', ['lab_report', 'medical_document', 'prescription', 'other']);
 export const auditActionEnum = pgEnum('audit_action', ['upload', 'view', 'download', 'delete', 'share', 'access_denied']);
-export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing', 'sms_accountability']);
+export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing', 'sms_accountability', 'medication_disclosure']);
 export const notificationTypeEnum = pgEnum('notification_type', ['order_update', 'formula_update', 'consultation_reminder', 'system']);
 export const evidenceLevelEnum = pgEnum('evidence_level', ['strong', 'moderate', 'preliminary', 'limited']);
 export const studyTypeEnum = pgEnum('study_type', ['rct', 'meta_analysis', 'systematic_review', 'observational', 'case_study', 'review']);
@@ -162,6 +162,9 @@ export const healthProfiles = pgTable("health_profiles", {
   // Health goals (e.g., "gut health", "brain optimization", "energy", "sleep")
   healthGoals: json("health_goals").$type<string[]>().default([]),
 
+  // Medication safety disclosure — null means never answered, timestamp means disclosed
+  medicationDisclosedAt: timestamp("medication_disclosed_at"),
+
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -247,13 +250,34 @@ export const subscriptions = pgTable("subscriptions", {
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  formulaId: varchar("formula_id").references(() => formulas.id, { onDelete: "set null" }),
   formulaVersion: integer("formula_version").notNull(),
   status: orderStatusEnum("status").default('pending').notNull(),
   amountCents: integer("amount_cents"), // Order total in cents (e.g., 12000 = $120.00)
-  supplyMonths: integer("supply_months"), // 3, 6, or 12 month supply
+  manufacturerCostCents: integer("manufacturer_cost_cents"), // Raw Alive cost before margin
+  supplyWeeks: integer("supply_weeks").default(8), // 8-week supply default
+  supplyMonths: integer("supply_months"), // Legacy: 3, 6, or 12 month supply
+  manufacturerQuoteId: text("manufacturer_quote_id"), // Alive quote_id from /get-quote
+  manufacturerQuoteExpiresAt: timestamp("manufacturer_quote_expires_at"), // When the Alive quote expires
+  manufacturerOrderId: text("manufacturer_order_id"), // Alive order reference from /mix-product
+  manufacturerOrderStatus: text("manufacturer_order_status"), // Status from Alive (e.g., 'submitted', 'in_production', 'shipped')
+  stripeSessionId: text("stripe_session_id"), // Stripe checkout session that created this order
   trackingUrl: text("tracking_url"),
   placedAt: timestamp("placed_at").defaultNow().notNull(),
   shippedAt: timestamp("shipped_at"),
+});
+
+// Ingredient pricing reference for equivalent stack estimates
+export const ingredientPricing = pgTable("ingredient_pricing", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ingredientKey: text("ingredient_key").notNull().unique(), // normalized lookup key
+  ingredientName: text("ingredient_name").notNull(),
+  typicalCapsuleMg: integer("typical_capsule_mg").notNull(),
+  typicalBottleCapsules: integer("typical_bottle_capsules").notNull(),
+  typicalRetailPriceCents: integer("typical_retail_price_cents").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // User addresses for shipping and billing
@@ -301,7 +325,7 @@ export const fileUploads = pgTable("file_uploads", {
     labName?: string;
     physicianName?: string;
     analysisStatus?: 'pending' | 'processing' | 'completed' | 'error';
-    extractedData?: Record<string, any>;
+    extractedData?: Array<Record<string, any>> | Record<string, any>;
   }>(),
   // Soft delete for compliance (never actually delete PHI)
   deletedAt: timestamp("deleted_at"),
@@ -447,7 +471,7 @@ export const reviewSchedules = pgTable("review_schedules", {
 
   // Notification preferences for this specific review schedule
   emailReminders: boolean("email_reminders").default(true).notNull(),
-  smsReminders: boolean("sms_reminders").default(false).notNull(),
+  smsReminders: boolean("sms_reminders").default(true).notNull(),
 
   // Calendar integration
   calendarIntegration: text("calendar_integration"), // 'google', 'apple', 'outlook', null
@@ -533,6 +557,12 @@ export const insertLabAnalysisSchema = createInsertSchema(labAnalyses).omit({
 export const insertNotificationSchema = createInsertSchema(notifications).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertIngredientPricingSchema = createInsertSchema(ingredientPricing).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 // App settings insert schema
@@ -1460,6 +1490,9 @@ export type DailyCompletion = typeof dailyCompletions.$inferSelect;
 export type InsertWeeklySummary = z.infer<typeof insertWeeklySummarySchema>;
 export type WeeklySummary = typeof weeklySummaries.$inferSelect;
 
+export type InsertIngredientPricing = z.infer<typeof insertIngredientPricingSchema>;
+export type IngredientPricing = typeof ingredientPricing.$inferSelect;
+
 // ============================================
 // MEMBERSHIP TIERS
 // ============================================
@@ -1469,7 +1502,7 @@ export const membershipTiers = pgTable("membership_tiers", {
   tierKey: text("tier_key").notNull().unique(), // 'founding' | 'early' | 'beta' | 'standard'
   name: text("name").notNull(), // Display name: "Founding Member"
   priceCents: integer("price_cents").notNull(), // Monthly price in cents (1900 = $19)
-  maxCapacity: integer("max_capacity"), // Max spots (250, 1000, 5000, null for unlimited)
+  maxCapacity: integer("max_capacity"), // Max spots (100, 500, 2000, null for unlimited)
   currentCount: integer("current_count").default(0).notNull(), // Current members at this tier
   sortOrder: integer("sort_order").default(0).notNull(), // For display ordering
   isActive: boolean("is_active").default(true).notNull(), // Whether tier is available
