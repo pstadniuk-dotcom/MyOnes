@@ -826,7 +826,11 @@ export default function OrdersPage() {
                     <div key={idx} className="flex justify-between items-center text-sm">
                       <div className="text-[#1B4332]">
                         <p className="font-medium">{item.label}</p>
-                        <p className="text-xs text-[#52796F]">Formula v{item.formulaVersion} • {item.supplyMonths || 2} month supply</p>
+                        {item.formulaVersion > 0 && (
+                          <p className="text-xs text-[#52796F]">
+                            Formula v{item.formulaVersion} • {item.supplyMonths || 2} month supply
+                          </p>
+                        )}
                       </div>
                       <p className="font-bold text-[#1B4332]">${item.amountCents ? (item.amountCents / 100).toFixed(2) : '0.00'}</p>
                     </div>

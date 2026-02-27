@@ -198,7 +198,7 @@ class DatabaseBillingProvider implements BillingProvider {
         return;
       }
 
-      const chargedCents = Number(metadata.formulaChargedCents || metadata.formulaPriceCents || 0);
+      const formulaCents = Number(metadata.formulaChargedCents || metadata.formulaPriceCents || 0);
       const mfrCostCents = Number(metadata.manufacturerCostCents || 0);
       let quoteId = metadata.manufacturerQuoteId || null;
       let quoteExpiresAt = metadata.manufacturerQuoteExpiresAt
@@ -240,13 +240,13 @@ class DatabaseBillingProvider implements BillingProvider {
         }
       }
 
-      // Create order record
+      // Create order record - use session total to capture both formula and membership
       const order = await usersRepository.createOrder({
         userId,
         formulaId,
         formulaVersion,
         status: 'processing',
-        amountCents: chargedCents,
+        amountCents: session.amount_total ?? formulaCents,
         manufacturerCostCents: mfrCostCents,
         supplyWeeks: 8,
         manufacturerQuoteId: quoteId,
@@ -259,7 +259,7 @@ class DatabaseBillingProvider implements BillingProvider {
         userId,
         formulaId,
         formulaVersion,
-        chargedCents,
+        chargedCents: formulaCents,
         mfrCostCents,
         quoteId,
       });
@@ -401,20 +401,46 @@ class DatabaseBillingProvider implements BillingProvider {
 
   async listBillingHistory(userId: string): Promise<BillingHistoryItem[]> {
     const orders = await usersRepository.listOrdersByUser(userId);
+    const stripe = this.getStripeClient();
 
-    return orders.map((order) => ({
-      id: order.id,
-      date: order.placedAt,
-      description: `Supplement Order - Formula v${order.formulaVersion}`,
-      amountCents: typeof order.amountCents === 'number' ? order.amountCents : null,
-      currency: 'USD',
-      status: order.status === 'delivered'
-        ? 'paid'
-        : order.status === 'cancelled'
+    return Promise.all(orders.map(async (order) => {
+      let amountCents = typeof order.amountCents === 'number' ? order.amountCents : null;
+      let description = `Supplement Order - Formula v${order.formulaVersion}`;
+
+      // Sync with Stripe session for accuracy (especially for historical records)
+      if (order.stripeSessionId) {
+        try {
+          const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
+          if (session.amount_total !== null) {
+            amountCents = session.amount_total;
+            // Lazy sync: update DB if it's different and not null
+            if (order.amountCents !== amountCents) {
+              await usersRepository.updateOrder(order.id, { amountCents });
+            }
+          }
+
+          if (session.metadata?.includeMembership === '1') {
+            description += ' + Membership';
+          }
+        } catch (error) {
+          logger.error('Error syncing order amount with Stripe', { orderId: order.id, error });
+        }
+      }
+
+      return {
+        id: order.id,
+        date: order.placedAt,
+        description,
+        amountCents,
+        currency: 'USD',
+        status: order.status === 'cancelled'
           ? 'failed'
-          : 'pending',
-      invoiceId: order.id,
-      invoiceUrl: `/api/billing/invoices/${order.id}`,
+          : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered')
+            ? 'paid'
+            : 'pending',
+        invoiceId: order.id,
+        invoiceUrl: `/api/billing/invoices/${order.id}`,
+      };
     }));
   }
 
@@ -424,26 +450,67 @@ class DatabaseBillingProvider implements BillingProvider {
       return null;
     }
 
+    let totalCents = typeof order.amountCents === 'number' ? order.amountCents : null;
+    let lineItems = [
+      {
+        label: `Custom Formula v${order.formulaVersion}`,
+        formulaVersion: order.formulaVersion,
+        supplyMonths: order.supplyMonths ?? null,
+        amountCents: totalCents,
+      },
+    ];
+
+    if (order.stripeSessionId) {
+      try {
+        const stripe = this.getStripeClient();
+        const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
+
+        if (session.amount_total !== null) {
+          totalCents = session.amount_total;
+        }
+
+        const fbCents = session.metadata?.formulaChargedCents ? parseInt(session.metadata.formulaChargedCents) : null;
+        const mbCents = session.metadata?.membershipPriceCents ? parseInt(session.metadata.membershipPriceCents) : null;
+        const includeMembership = session.metadata?.includeMembership === '1';
+        const tierKey = session.metadata?.membershipTier;
+
+        if (includeMembership && mbCents) {
+          const tierName = tierKey ? (tierKey.charAt(0).toUpperCase() + tierKey.slice(1)) : 'Founding';
+          lineItems = [
+            {
+              label: `Custom Formula v${order.formulaVersion}`,
+              formulaVersion: order.formulaVersion,
+              supplyMonths: order.supplyMonths ?? null,
+              amountCents: fbCents ?? (totalCents ? totalCents - mbCents : null),
+            },
+            {
+              label: `${tierName} Member Subscription`,
+              formulaVersion: 0,
+              supplyMonths: 1,
+              amountCents: mbCents,
+            },
+          ];
+        } else if (lineItems[0]) {
+          lineItems[0].amountCents = totalCents;
+        }
+      } catch (error) {
+        logger.error('Error fetching Stripe session in getInvoice', { orderId: order.id, error });
+      }
+    }
+
     return {
       id: order.id,
       userId,
       orderId: order.id,
-      amountCents: typeof order.amountCents === 'number' ? order.amountCents : null,
+      amountCents: totalCents,
       currency: 'USD',
-      status: order.status === 'delivered'
-        ? 'paid'
-        : order.status === 'cancelled'
-          ? 'failed'
+      status: order.status === 'cancelled'
+        ? 'failed'
+        : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered')
+          ? 'paid'
           : 'pending',
       issuedAt: order.placedAt,
-      lineItems: [
-        {
-          label: `Custom Formula v${order.formulaVersion}`,
-          formulaVersion: order.formulaVersion,
-          supplyMonths: order.supplyMonths ?? null,
-          amountCents: typeof order.amountCents === 'number' ? order.amountCents : null,
-        },
-      ],
+      lineItems,
     };
   }
 

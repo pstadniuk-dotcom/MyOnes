@@ -16,7 +16,7 @@ const {
   mockGetAvailableMembershipTier, mockGetMembershipTier,
   mockAssignUserMembership, mockCancelUserMembership,
   mockCustomersCreate, mockCheckoutSessionsCreate,
-  mockSubscriptionsCancel, mockSubscriptionsRetrieve, mockWebhooksConstructEvent,
+  mockSubscriptionsCancel, mockSubscriptionsUpdate, mockSubscriptionsRetrieve, mockWebhooksConstructEvent,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockUpdateUser: vi.fn(),
@@ -34,6 +34,7 @@ const {
   mockCustomersCreate: vi.fn(),
   mockCheckoutSessionsCreate: vi.fn(),
   mockSubscriptionsCancel: vi.fn(),
+  mockSubscriptionsUpdate: vi.fn(),
   mockSubscriptionsRetrieve: vi.fn(),
   mockWebhooksConstructEvent: vi.fn(),
 }));
@@ -63,10 +64,10 @@ vi.mock('../modules/membership/membership.repository', () => ({
 
 vi.mock('stripe', () => ({
   default: class {
-    public customers          = { create: mockCustomersCreate };
-    public checkout           = { sessions: { create: mockCheckoutSessionsCreate } };
-    public subscriptions      = { cancel: mockSubscriptionsCancel, retrieve: mockSubscriptionsRetrieve };
-    public webhooks           = { constructEvent: mockWebhooksConstructEvent };
+    public customers = { create: mockCustomersCreate };
+    public checkout = { sessions: { create: mockCheckoutSessionsCreate } };
+    public subscriptions = { cancel: mockSubscriptionsCancel, update: mockSubscriptionsUpdate, retrieve: mockSubscriptionsRetrieve };
+    public webhooks = { constructEvent: mockWebhooksConstructEvent };
   },
 }));
 
@@ -470,21 +471,21 @@ describe('cancelSubscription', () => {
     await expect(svc.cancelSubscription('user-123', '')).rejects.toThrow('SUBSCRIPTION_NOT_FOUND');
   });
 
-  it('calls stripe.subscriptions.cancel with user stripeSubscriptionId', async () => {
+  it('calls stripe.subscriptions.update with user stripeSubscriptionId and cancel_at_period_end', async () => {
     mockGetUser.mockResolvedValue(makeUser({ stripeSubscriptionId: 'sub_abc', membershipTier: null }));
-    mockSubscriptionsCancel.mockResolvedValue({});
+    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
     const result = await svc.cancelSubscription('user-123', 'sub_abc');
-    expect(mockSubscriptionsCancel).toHaveBeenCalledWith('sub_abc');
+    expect(mockSubscriptionsUpdate).toHaveBeenCalledWith('sub_abc', { cancel_at_period_end: true });
     expect(result.status).toBe('cancelled');
     expect(typeof result.cancelledAt).toBe('string');
   });
 
   it('uses param subscriptionId when user has none on record', async () => {
     mockGetUser.mockResolvedValue(makeUser({ stripeSubscriptionId: null, membershipTier: null }));
-    mockSubscriptionsCancel.mockResolvedValue({});
+    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
     // when stripeSubscriptionId is null on user, param is used as fallback
     const result = await svc.cancelSubscription('user-123', 'sub_from_param');
-    expect(mockSubscriptionsCancel).toHaveBeenCalledWith('sub_from_param');
+    expect(mockSubscriptionsUpdate).toHaveBeenCalledWith('sub_from_param', { cancel_at_period_end: true });
     expect(result.status).toBe('cancelled');
   });
 
@@ -494,7 +495,7 @@ describe('cancelSubscription', () => {
       membershipTier: 'founding',
       membershipCancelledAt: null,
     }));
-    mockSubscriptionsCancel.mockResolvedValue({});
+    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
     await svc.cancelSubscription('user-123', 'sub_abc');
     expect(mockCancelUserMembership).toHaveBeenCalledWith('user-123');
   });
@@ -505,7 +506,7 @@ describe('cancelSubscription', () => {
       membershipTier: 'founding',
       membershipCancelledAt: new Date('2025-12-01'),
     }));
-    mockSubscriptionsCancel.mockResolvedValue({});
+    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
     await svc.cancelSubscription('user-123', 'sub_abc');
     expect(mockCancelUserMembership).not.toHaveBeenCalled();
   });
@@ -515,14 +516,14 @@ describe('cancelSubscription', () => {
       stripeSubscriptionId: 'sub_abc',
       membershipTier: null,
     }));
-    mockSubscriptionsCancel.mockResolvedValue({});
+    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
     await svc.cancelSubscription('user-123', 'sub_abc');
     expect(mockCancelUserMembership).not.toHaveBeenCalled();
   });
 
   it('upserts subscription with cancelled status', async () => {
     mockGetUser.mockResolvedValue(makeUser({ stripeSubscriptionId: 'sub_abc', membershipTier: null }));
-    mockSubscriptionsCancel.mockResolvedValue({});
+    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
     await svc.cancelSubscription('user-123', 'sub_abc');
     expect(mockUpsertSubscriptionForUser).toHaveBeenCalledWith('user-123', expect.objectContaining({
       status: 'cancelled',
@@ -673,16 +674,20 @@ describe('handleStripeWebhook', () => {
       type: 'invoice.paid',
       data: {
         object: {
-          parent: { subscription_details: { subscription: 'sub_abc' } },
+          subscription: 'sub_abc',
         },
       },
     };
     mockWebhooksConstructEvent.mockReturnValue(event);
     mockGetSubscriptionByStripeSubscriptionId.mockResolvedValue({ id: 'int_sub_1' });
+    mockSubscriptionsRetrieve.mockResolvedValue({ current_period_end: 1735689600 }); // 2025-01-01
 
     await svc.handleStripeWebhook('sig_valid', Buffer.from('{}'));
 
-    expect(mockUpdateSubscriptionByStripeSubscriptionId).toHaveBeenCalledWith('sub_abc', { status: 'active' });
+    expect(mockUpdateSubscriptionByStripeSubscriptionId).toHaveBeenCalledWith('sub_abc', expect.objectContaining({
+      status: 'active',
+      renewsAt: expect.any(Date),
+    }));
   });
 
   it('handles invoice.payment_failed — sets status to past_due', async () => {
@@ -691,7 +696,7 @@ describe('handleStripeWebhook', () => {
       type: 'invoice.payment_failed',
       data: {
         object: {
-          parent: { subscription_details: { subscription: 'sub_abc' } },
+          subscription: 'sub_abc',
         },
       },
     };
@@ -717,7 +722,7 @@ describe('handleStripeWebhook', () => {
     const event = {
       id: 'evt_8',
       type: 'invoice.paid',
-      data: { object: { parent: null } },
+      data: { object: { subscription: null } },
     };
     mockWebhooksConstructEvent.mockReturnValue(event);
     await svc.handleStripeWebhook('sig_valid', Buffer.from('{}'));
@@ -757,14 +762,14 @@ describe('Stripe subscription status mapping', () => {
   }
 
   it.each([
-    ['active',             'active'],
-    ['trialing',           'active'],
-    ['past_due',           'past_due'],
-    ['unpaid',             'past_due'],
-    ['incomplete',         'past_due'],
+    ['active', 'active'],
+    ['trialing', 'active'],
+    ['past_due', 'past_due'],
+    ['unpaid', 'past_due'],
+    ['incomplete', 'past_due'],
     ['incomplete_expired', 'past_due'],
-    ['paused',             'paused'],
-    ['canceled',           'cancelled'],
+    ['paused', 'paused'],
+    ['canceled', 'cancelled'],
   ])('stripe %s → internal %s', async (stripeStatus, expected) => {
     vi.clearAllMocks();
     mockUpsertSubscriptionForUser.mockResolvedValue({});
