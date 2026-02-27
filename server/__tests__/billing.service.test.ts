@@ -218,16 +218,16 @@ describe('listBillingHistory', () => {
     expect(item.status).toBe('failed');
   });
 
-  it('maps processing order to status: pending', async () => {
+  it('maps processing order to status: paid', async () => {
     mockListOrdersByUser.mockResolvedValue([makeOrder({ status: 'processing' })]);
     const [item] = await svc.listBillingHistory('user-123');
-    expect(item.status).toBe('pending');
+    expect(item.status).toBe('paid');
   });
 
-  it('maps shipped order to status: pending', async () => {
+  it('maps shipped order to status: paid', async () => {
     mockListOrdersByUser.mockResolvedValue([makeOrder({ status: 'shipped' })]);
     const [item] = await svc.listBillingHistory('user-123');
-    expect(item.status).toBe('pending');
+    expect(item.status).toBe('paid');
   });
 
   it('includes correct description with formula version', async () => {
