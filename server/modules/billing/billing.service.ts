@@ -4,7 +4,7 @@ import { membershipRepository } from '../membership/membership.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
 import { manufacturerPricingService } from '../formulas/manufacturer-pricing.service';
 import { db } from '../../infra/db/db';
-import { ingredientPricing } from '@shared/schema';
+import { ingredientPricing, users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import logger from '../../infra/logging/logger';
 
@@ -53,8 +53,13 @@ export interface BillingProvider {
     expiresAt: string;
   }>;
   cancelSubscription(_userId: string, _subscriptionId: string): Promise<{
-    cancelledAt: string;
+    cancelledAt?: string;
+    expiresAt?: string;
     status: 'cancelled';
+  }>;
+  resumeSubscription(_userId: string, _subscriptionId: string): Promise<{
+    resumedAt: string;
+    status: 'active';
   }>;
   handleStripeWebhook(_signature: string | undefined, _rawBody: Buffer): Promise<void>;
 }
@@ -158,7 +163,7 @@ class DatabaseBillingProvider implements BillingProvider {
           status: this.mapStripeStatus(stripeSub.status),
           stripeCustomerId,
           stripeSubscriptionId,
-          renewsAt: null,
+          renewsAt: new Date((stripeSub as any).current_period_end * 1000),
           pausedUntil: stripeSub.pause_collection?.resumes_at ? new Date(stripeSub.pause_collection.resumes_at * 1000) : null,
         });
       }
@@ -320,7 +325,7 @@ class DatabaseBillingProvider implements BillingProvider {
       status: this.mapStripeStatus(sub.status),
       stripeCustomerId,
       stripeSubscriptionId,
-      renewsAt: null,
+      renewsAt: new Date((sub as any).current_period_end * 1000),
       pausedUntil: sub.pause_collection?.resumes_at ? new Date(sub.pause_collection.resumes_at * 1000) : null,
     });
   }
@@ -356,28 +361,32 @@ class DatabaseBillingProvider implements BillingProvider {
 
   private async handleInvoicePaid(event: Stripe.Event) {
     const invoice = event.data.object as Stripe.Invoice;
-    const subscriptionRef = invoice.parent?.subscription_details?.subscription;
-    const stripeSubscriptionId = typeof subscriptionRef === 'string'
-      ? subscriptionRef
-      : subscriptionRef?.id || null;
+    const stripeSubscriptionId = typeof (invoice as any).subscription === 'string'
+      ? (invoice as any).subscription
+      : (invoice as any).subscription?.id || null;
+
     if (!stripeSubscriptionId) {
       return;
     }
+
+    const stripe = this.getStripeClient();
+    const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
 
     const existing = await usersRepository.getSubscriptionByStripeSubscriptionId(stripeSubscriptionId);
     if (existing) {
       await usersRepository.updateSubscriptionByStripeSubscriptionId(stripeSubscriptionId, {
         status: 'active',
+        renewsAt: new Date((sub as any).current_period_end * 1000),
       });
     }
   }
 
   private async handleInvoicePaymentFailed(event: Stripe.Event) {
     const invoice = event.data.object as Stripe.Invoice;
-    const subscriptionRef = invoice.parent?.subscription_details?.subscription;
-    const stripeSubscriptionId = typeof subscriptionRef === 'string'
-      ? subscriptionRef
-      : subscriptionRef?.id || null;
+    const stripeSubscriptionId = typeof (invoice as any).subscription === 'string'
+      ? (invoice as any).subscription
+      : (invoice as any).subscription?.id || null;
+
     if (!stripeSubscriptionId) {
       return;
     }
@@ -695,8 +704,8 @@ class DatabaseBillingProvider implements BillingProvider {
       metadata,
       subscription_data: includeMembership
         ? {
-            metadata,
-          }
+          metadata,
+        }
         : undefined,
       line_items: lineItems,
       client_reference_id: user.id,
@@ -714,7 +723,7 @@ class DatabaseBillingProvider implements BillingProvider {
     };
   }
 
-  async cancelSubscription(userId: string, subscriptionId: string): Promise<{ cancelledAt: string; status: 'cancelled' }> {
+  async cancelSubscription(userId: string, subscriptionId: string): Promise<{ cancelledAt?: string; expiresAt?: string; status: 'cancelled' }> {
     const stripe = this.getStripeClient();
     const user = await usersRepository.getUser(userId);
     if (!user) {
@@ -726,14 +735,19 @@ class DatabaseBillingProvider implements BillingProvider {
       throw new Error('SUBSCRIPTION_NOT_FOUND');
     }
 
-    await stripe.subscriptions.cancel(stripeSubscriptionId);
+    // Use cancel_at_period_end: true instead of immediate cancellation
+    const stripeSub = await stripe.subscriptions.update(stripeSubscriptionId, {
+      cancel_at_period_end: true
+    });
+
+    const expiresAt = stripeSub && 'current_period_end' in stripeSub ? new Date((stripeSub as any).current_period_end * 1000) : null;
 
     await this.upsertInternalSubscription(userId, {
       plan: 'monthly',
       status: 'cancelled',
       stripeCustomerId: user.stripeCustomerId,
       stripeSubscriptionId,
-      renewsAt: null,
+      renewsAt: expiresAt,
       pausedUntil: null,
     });
 
@@ -743,7 +757,49 @@ class DatabaseBillingProvider implements BillingProvider {
 
     return {
       cancelledAt: new Date().toISOString(),
+      expiresAt: expiresAt?.toISOString(),
       status: 'cancelled',
+    };
+  }
+
+  async resumeSubscription(userId: string, subscriptionId: string): Promise<{ resumedAt: string; status: 'active' }> {
+    const stripe = this.getStripeClient();
+    const user = await usersRepository.getUser(userId);
+    if (!user) {
+      throw new Error('USER_NOT_FOUND');
+    }
+
+    const stripeSubscriptionId = user.stripeSubscriptionId || subscriptionId;
+    if (!stripeSubscriptionId) {
+      throw new Error('SUBSCRIPTION_NOT_FOUND');
+    }
+
+    // Re-active in Stripe by unsetting cancel_at_period_end
+    const stripeSub = await stripe.subscriptions.update(stripeSubscriptionId, {
+      cancel_at_period_end: false
+    });
+
+    const renewsAt = stripeSub && 'current_period_end' in stripeSub ? new Date((stripeSub as any).current_period_end * 1000) : null;
+
+    await this.upsertInternalSubscription(userId, {
+      plan: 'monthly',
+      status: 'active',
+      stripeCustomerId: user.stripeCustomerId,
+      stripeSubscriptionId,
+      renewsAt,
+      pausedUntil: null,
+    });
+
+    // Also reactivate membership if it was cancelled
+    if (user.membershipTier && user.membershipCancelledAt) {
+      await db.update(users)
+        .set({ membershipCancelledAt: null })
+        .where(eq(users.id, userId));
+    }
+
+    return {
+      resumedAt: new Date().toISOString(),
+      status: 'active',
     };
   }
 
@@ -782,7 +838,7 @@ class DatabaseBillingProvider implements BillingProvider {
 }
 
 export class BillingService {
-  constructor(private readonly provider: BillingProvider = new DatabaseBillingProvider()) {}
+  constructor(private readonly provider: BillingProvider = new DatabaseBillingProvider()) { }
 
   async listBillingHistory(userId: string) {
     return this.provider.listBillingHistory(userId);
@@ -802,6 +858,10 @@ export class BillingService {
 
   async cancelSubscription(userId: string, subscriptionId: string) {
     return this.provider.cancelSubscription(userId, subscriptionId);
+  }
+
+  async resumeSubscription(userId: string, subscriptionId: string) {
+    return this.provider.resumeSubscription(userId, subscriptionId);
   }
 
   async handleStripeWebhook(signature: string | undefined, rawBody: Buffer) {
