@@ -105,6 +105,27 @@ export class BillingController {
     }
   }
 
+  async resumeSubscription(req: Request, res: Response) {
+    try {
+      const userId = req.userId!;
+      const { subscriptionId } = req.params;
+      const result = await billingService.resumeSubscription(userId, subscriptionId);
+      return res.json(result);
+    } catch (error: any) {
+      if (error?.message === 'STRIPE_SECRET_KEY_NOT_CONFIGURED') {
+        return res.status(500).json({ error: 'Billing is not configured' });
+      }
+      if (error?.message === 'USER_NOT_FOUND') {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      if (error?.message === 'SUBSCRIPTION_NOT_FOUND') {
+        return res.status(404).json({ error: 'Subscription not found' });
+      }
+      logger.error('Error resuming subscription', { error });
+      res.status(500).json({ error: 'Failed to resume subscription' });
+    }
+  }
+
   async stripeWebhook(req: Request, res: Response) {
     try {
       const signature = req.headers['stripe-signature'];

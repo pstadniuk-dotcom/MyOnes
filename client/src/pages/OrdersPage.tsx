@@ -26,7 +26,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest, queryClient } from '@/shared/lib/queryClient';
-import type { Order, Subscription, PaymentMethodRef } from '@shared/schema';
+import type { Order, Subscription as BaseSubscription, PaymentMethodRef } from '@shared/schema';
+
+// Extend Subscription type with membership details returned from the backend
+interface Subscription extends BaseSubscription {
+  membershipTier?: string | null;
+  membershipPriceCents?: number | null;
+}
 import {
   Package,
   CreditCard,
@@ -197,6 +203,41 @@ export default function OrdersPage() {
     }
   });
 
+  const resumeSubscriptionMutation = useMutation({
+    mutationFn: (subscriptionId: string) =>
+      apiRequest('POST', `/api/billing/subscriptions/${subscriptionId}/resume`).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/subscription'] });
+      toast({
+        title: 'Subscription resumed',
+        description: 'Your subscription has been successfully reactivated.'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error resuming subscription',
+        description: error.message || 'Failed to resume subscription',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const cancelSubscriptionActionMutation = useMutation({
+    mutationFn: (subscriptionId: string) =>
+      apiRequest('POST', `/api/billing/subscriptions/${subscriptionId}/cancel`).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/subscription'] });
+      toast({
+        title: 'Subscription cancelled',
+        description: 'Your subscription has been set to cancel at the end of the period.'
+      });
+    },
+    onError: (error: any) => {
+      // Fallback to internal update if billing API fails (e.g. stripe not configured)
+      updateSubscriptionMutation.mutate({ status: 'cancelled' });
+    }
+  });
+
   const deletePaymentMethodMutation = useMutation({
     mutationFn: (paymentMethodId: string) =>
       apiRequest('DELETE', `/api/users/me/payment-methods/${paymentMethodId}`).then(res => res.json()),
@@ -289,8 +330,20 @@ export default function OrdersPage() {
   };
 
   const confirmCancelSubscription = () => {
-    updateSubscriptionMutation.mutate({ status: 'cancelled' });
+    if (subscription?.stripeSubscriptionId) {
+      cancelSubscriptionActionMutation.mutate(subscription.stripeSubscriptionId);
+    } else {
+      updateSubscriptionMutation.mutate({ status: 'cancelled' });
+    }
     setShowCancelDialog(false);
+  };
+
+  const handleResumeSubscription = () => {
+    if (subscription?.stripeSubscriptionId) {
+      resumeSubscriptionMutation.mutate(subscription.stripeSubscriptionId);
+    } else {
+      updateSubscriptionMutation.mutate({ status: 'active' });
+    }
   };
 
   const handleRemovePaymentMethod = (paymentMethodId: string) => {
@@ -375,7 +428,10 @@ export default function OrdersPage() {
                   </CardTitle>
                   <CardDescription className="text-[#52796F]">
                     {subscription && (
-                      <>Next billing: {subscription.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}</>
+                      <>
+                        {subscription.status === 'cancelled' ? 'Expires on: ' : 'Next billing: '}
+                        {subscription.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
+                      </>
                     )}
                   </CardDescription>
                 </div>
@@ -393,9 +449,13 @@ export default function OrdersPage() {
                       <span className="text-sm font-medium text-[#52796F]">Monthly Price</span>
                     </div>
                     <div className="text-2xl font-bold text-[#1B4332]">
-                      ${orders && orders.length > 0 && orders[0].amountCents
-                        ? (orders[0].amountCents / 100).toFixed(2)
-                        : (subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00')}
+                      {subscription?.membershipPriceCents ? (
+                        `$${(subscription.membershipPriceCents / 100).toFixed(2)}`
+                      ) : orders && orders.length > 0 && orders[0].amountCents ? (
+                        `$${(orders[0].amountCents / 100).toFixed(2)}`
+                      ) : (
+                        `$${(subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00')}`
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -407,7 +467,7 @@ export default function OrdersPage() {
                       <span className="text-sm font-medium text-[#52796F]">Next Billing</span>
                     </div>
                     <div className="text-lg font-semibold text-[#1B4332]">
-                      {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
+                      {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : (orders?.[0]?.placedAt ? new Date(new Date(orders[0].placedAt).getTime() + 8 * 7 * 24 * 60 * 60 * 1000).toLocaleDateString() : 'N/A')}
                     </div>
                   </CardContent>
                 </Card>
@@ -438,18 +498,34 @@ export default function OrdersPage() {
                   <Pause className="w-4 h-4 mr-2" />
                   Pause Subscription
                 </Button>
+
+                {(subscription?.status === 'cancelled' || subscription?.status === 'paused') && (
+                  <Button
+                    variant="outline"
+                    data-testid="button-resume-subscription"
+                    onClick={handleResumeSubscription}
+                    disabled={resumeSubscriptionMutation.isPending}
+                    className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Resume Subscription
+                  </Button>
+                )}
+
                 <Button variant="outline" data-testid="button-change-plan" className="border-[#52796F] text-[#52796F] hover:bg-[#52796F] hover:text-white">
                   Change Plan
                 </Button>
-                <Button
-                  variant="destructive"
-                  data-testid="button-cancel-subscription"
-                  onClick={handleCancelSubscription}
-                  // disabled={updateSubscriptionMutation.isPending}
-                  disabled={true}
-                >
-                  Cancel Subscription
-                </Button>
+
+                {subscription?.status === 'active' && (
+                  <Button
+                    variant="destructive"
+                    data-testid="button-cancel-subscription"
+                    onClick={handleCancelSubscription}
+                    disabled={updateSubscriptionMutation.isPending}
+                  >
+                    Cancel Subscription
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -690,7 +766,7 @@ export default function OrdersPage() {
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                               <Button
                                 variant="ghost"
-                                size="sm"
+                                size="icon"
                                 onClick={() => handleViewInvoice(record)}
                                 disabled={isFetchingInvoice === record.id}
                                 className="h-8 w-8 p-0 text-[#1B4332] hover:bg-[#1B4332] hover:text-white rounded-full opacity-40 group-hover:opacity-100 transition-opacity"

@@ -10,6 +10,7 @@ router.get('/equivalent-stack', requireAuth, billingController.getEquivalentStac
 
 router.post('/checkout/session', requireAuth, billingController.createCheckoutSession);
 router.post('/subscriptions/:subscriptionId/cancel', requireAuth, billingController.cancelSubscription);
+router.post('/subscriptions/:subscriptionId/resume', requireAuth, billingController.resumeSubscription);
 router.post('/webhooks/stripe', billingController.stripeWebhook);
 
 export default router;
