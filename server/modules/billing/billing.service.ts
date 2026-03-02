@@ -94,6 +94,18 @@ class DatabaseBillingProvider implements BillingProvider {
     return 'cancelled';
   }
 
+  /**
+   * In Stripe SDK v18+, `current_period_end` lives on SubscriptionItem,
+   * not on Subscription directly. Extract it from the first item.
+   */
+  private getCurrentPeriodEnd(sub: Stripe.Subscription): Date | null {
+    const item = sub.items?.data?.[0];
+    if (item && typeof item.current_period_end === 'number') {
+      return new Date(item.current_period_end * 1000);
+    }
+    return null;
+  }
+
   private normalizeIngredientKey(name: string): string {
     return String(name || '')
       .toLowerCase()
@@ -158,13 +170,18 @@ class DatabaseBillingProvider implements BillingProvider {
       if (stripeSubscriptionId) {
         const stripe = this.getStripeClient();
         const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        const currentPeriodEnd = this.getCurrentPeriodEnd(stripeSub);
+        const pausedUntil =
+          typeof stripeSub.pause_collection?.resumes_at === 'number'
+            ? new Date(stripeSub.pause_collection.resumes_at * 1000)
+            : null;
         await this.upsertInternalSubscription(userId, {
           plan,
           status: this.mapStripeStatus(stripeSub.status),
           stripeCustomerId,
           stripeSubscriptionId,
-          renewsAt: new Date((stripeSub as any).current_period_end * 1000),
-          pausedUntil: stripeSub.pause_collection?.resumes_at ? new Date(stripeSub.pause_collection.resumes_at * 1000) : null,
+          renewsAt: currentPeriodEnd,
+          pausedUntil,
         });
       }
 
@@ -325,7 +342,7 @@ class DatabaseBillingProvider implements BillingProvider {
       status: this.mapStripeStatus(sub.status),
       stripeCustomerId,
       stripeSubscriptionId,
-      renewsAt: new Date((sub as any).current_period_end * 1000),
+      renewsAt: this.getCurrentPeriodEnd(sub),
       pausedUntil: sub.pause_collection?.resumes_at ? new Date(sub.pause_collection.resumes_at * 1000) : null,
     });
   }
@@ -376,7 +393,7 @@ class DatabaseBillingProvider implements BillingProvider {
     if (existing) {
       await usersRepository.updateSubscriptionByStripeSubscriptionId(stripeSubscriptionId, {
         status: 'active',
-        renewsAt: new Date((sub as any).current_period_end * 1000),
+        renewsAt: this.getCurrentPeriodEnd(sub),
       });
     }
   }
@@ -807,7 +824,7 @@ class DatabaseBillingProvider implements BillingProvider {
       cancel_at_period_end: true
     });
 
-    const expiresAt = stripeSub && 'current_period_end' in stripeSub ? new Date((stripeSub as any).current_period_end * 1000) : null;
+    const expiresAt = this.getCurrentPeriodEnd(stripeSub);
 
     await this.upsertInternalSubscription(userId, {
       plan: 'monthly',
@@ -846,7 +863,7 @@ class DatabaseBillingProvider implements BillingProvider {
       cancel_at_period_end: false
     });
 
-    const renewsAt = stripeSub && 'current_period_end' in stripeSub ? new Date((stripeSub as any).current_period_end * 1000) : null;
+    const renewsAt = this.getCurrentPeriodEnd(stripeSub);
 
     await this.upsertInternalSubscription(userId, {
       plan: 'monthly',

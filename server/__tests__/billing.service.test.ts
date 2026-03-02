@@ -473,7 +473,7 @@ describe('cancelSubscription', () => {
 
   it('calls stripe.subscriptions.update with user stripeSubscriptionId and cancel_at_period_end', async () => {
     mockGetUser.mockResolvedValue(makeUser({ stripeSubscriptionId: 'sub_abc', membershipTier: null }));
-    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
+    mockSubscriptionsUpdate.mockResolvedValue({ items: { data: [{ current_period_end: 1234567890 }] } });
     const result = await svc.cancelSubscription('user-123', 'sub_abc');
     expect(mockSubscriptionsUpdate).toHaveBeenCalledWith('sub_abc', { cancel_at_period_end: true });
     expect(result.status).toBe('cancelled');
@@ -482,7 +482,7 @@ describe('cancelSubscription', () => {
 
   it('uses param subscriptionId when user has none on record', async () => {
     mockGetUser.mockResolvedValue(makeUser({ stripeSubscriptionId: null, membershipTier: null }));
-    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
+    mockSubscriptionsUpdate.mockResolvedValue({ items: { data: [{ current_period_end: 1234567890 }] } });
     // when stripeSubscriptionId is null on user, param is used as fallback
     const result = await svc.cancelSubscription('user-123', 'sub_from_param');
     expect(mockSubscriptionsUpdate).toHaveBeenCalledWith('sub_from_param', { cancel_at_period_end: true });
@@ -495,7 +495,7 @@ describe('cancelSubscription', () => {
       membershipTier: 'founding',
       membershipCancelledAt: null,
     }));
-    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
+    mockSubscriptionsUpdate.mockResolvedValue({ items: { data: [{ current_period_end: 1234567890 }] } });
     await svc.cancelSubscription('user-123', 'sub_abc');
     expect(mockCancelUserMembership).toHaveBeenCalledWith('user-123');
   });
@@ -506,7 +506,7 @@ describe('cancelSubscription', () => {
       membershipTier: 'founding',
       membershipCancelledAt: new Date('2025-12-01'),
     }));
-    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
+    mockSubscriptionsUpdate.mockResolvedValue({ items: { data: [{ current_period_end: 1234567890 }] } });
     await svc.cancelSubscription('user-123', 'sub_abc');
     expect(mockCancelUserMembership).not.toHaveBeenCalled();
   });
@@ -516,14 +516,14 @@ describe('cancelSubscription', () => {
       stripeSubscriptionId: 'sub_abc',
       membershipTier: null,
     }));
-    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
+    mockSubscriptionsUpdate.mockResolvedValue({ items: { data: [{ current_period_end: 1234567890 }] } });
     await svc.cancelSubscription('user-123', 'sub_abc');
     expect(mockCancelUserMembership).not.toHaveBeenCalled();
   });
 
   it('upserts subscription with cancelled status', async () => {
     mockGetUser.mockResolvedValue(makeUser({ stripeSubscriptionId: 'sub_abc', membershipTier: null }));
-    mockSubscriptionsUpdate.mockResolvedValue({ current_period_end: 1234567890 });
+    mockSubscriptionsUpdate.mockResolvedValue({ items: { data: [{ current_period_end: 1234567890 }] } });
     await svc.cancelSubscription('user-123', 'sub_abc');
     expect(mockUpsertSubscriptionForUser).toHaveBeenCalledWith('user-123', expect.objectContaining({
       status: 'cancelled',
@@ -575,7 +575,7 @@ describe('handleStripeWebhook', () => {
     };
     mockWebhooksConstructEvent.mockReturnValue(event);
     mockGetUser.mockResolvedValue(makeUser({ id: 'user-123', membershipTier: null }));
-    mockSubscriptionsRetrieve.mockResolvedValue({ status: 'active', pause_collection: null });
+    mockSubscriptionsRetrieve.mockResolvedValue({ status: 'active', pause_collection: null, items: { data: [{ current_period_end: 0 }] } });
     mockGetMembershipTier.mockResolvedValue(makeTier());
     mockGetAvailableMembershipTier.mockResolvedValue(makeTier());
 
@@ -609,7 +609,7 @@ describe('handleStripeWebhook', () => {
     };
     mockWebhooksConstructEvent.mockReturnValue(event);
     mockGetUser.mockResolvedValue(makeUser({ id: 'user-123', membershipTier: 'founding', membershipCancelledAt: null }));
-    mockSubscriptionsRetrieve.mockResolvedValue({ status: 'active', pause_collection: null });
+    mockSubscriptionsRetrieve.mockResolvedValue({ status: 'active', pause_collection: null, items: { data: [{ current_period_end: 0 }] } });
 
     await svc.handleStripeWebhook('sig_valid', Buffer.from('{}'));
 
@@ -680,7 +680,7 @@ describe('handleStripeWebhook', () => {
     };
     mockWebhooksConstructEvent.mockReturnValue(event);
     mockGetSubscriptionByStripeSubscriptionId.mockResolvedValue({ id: 'int_sub_1' });
-    mockSubscriptionsRetrieve.mockResolvedValue({ current_period_end: 1735689600 }); // 2025-01-01
+    mockSubscriptionsRetrieve.mockResolvedValue({ items: { data: [{ current_period_end: 1735689600 }] } }); // 2025-01-01
 
     await svc.handleStripeWebhook('sig_valid', Buffer.from('{}'));
 
