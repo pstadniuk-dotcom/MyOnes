@@ -530,34 +530,34 @@ export default function OrdersPage() {
             </CardContent>
           </Card>
 
-          {/* Upcoming Delivery */}
-          <Card data-testid="section-upcoming-delivery" className="bg-[#FAF7F2] border-[#52796F]/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-[#1B4332]">
-                <Truck className="w-5 h-5" />
-                Upcoming Delivery
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <PreReorderReviewGate />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-[#1B4332]">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
-                  <p className="text-sm text-[#52796F]">
-                    Expected delivery: {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
-                  </p>
-                  <p className="text-sm text-[#52796F]">
-                    Current Formula • ${orders && orders.length > 0 && orders[0].amountCents
-                      ? (orders[0].amountCents / 100).toFixed(2)
-                      : (subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00')}
-                  </p>
+          {/* Upcoming Delivery - only show when user has an active subscription */}
+          {subscription?.status === 'active' && (
+            <Card data-testid="section-upcoming-delivery" className="bg-[#FAF7F2] border-[#52796F]/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-[#1B4332]">
+                  <Truck className="w-5 h-5" />
+                  Upcoming Delivery
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <PreReorderReviewGate />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-[#1B4332]">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
+                    <p className="text-sm text-[#52796F]">
+                      Expected delivery: {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
+                    </p>
+                    <p className="text-sm text-[#52796F]">
+                      Current Formula • ${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant="outline" className="border-[#D4A574] text-[#D4A574]">Scheduled</Badge>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <Badge variant="outline" className="border-[#D4A574] text-[#D4A574]">Scheduled</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="orders" className="space-y-6">

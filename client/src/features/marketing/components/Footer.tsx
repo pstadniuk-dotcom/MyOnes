@@ -32,6 +32,7 @@ export default function Footer() {
       { name: 'Privacy Policy', href: '/privacy', isSection: false },
       { name: 'Terms of Service', href: '/terms', isSection: false },
       { name: 'Refund Policy', href: '/refunds', isSection: false },
+      { name: 'Returns Policy', href: '/returns', isSection: false },
       { name: 'Medical Disclaimer', href: '/disclaimer', isSection: false }
     ]
   };

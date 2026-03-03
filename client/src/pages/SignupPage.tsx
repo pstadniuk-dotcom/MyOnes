@@ -6,6 +6,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/components/ui/form';
 import { Input } from '@/shared/components/ui/input';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,7 +34,8 @@ export default function SignupPage() {
       name: '',
       email: '',
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
+      acceptedTerms: undefined as unknown as true,
     }
   });
 
@@ -187,6 +189,33 @@ export default function SignupPage() {
                           </Button>
                         </div>
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="acceptedTerms"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-start gap-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === true}
+                            onCheckedChange={(checked) => field.onChange(checked === true ? true : undefined)}
+                            id="acceptedTerms"
+                            className="mt-0.5"
+                            data-testid="checkbox-terms"
+                          />
+                        </FormControl>
+                        <label htmlFor="acceptedTerms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                          I agree to the{' '}
+                          <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
+                          {' '}and{' '}
+                          <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
+                        </label>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}

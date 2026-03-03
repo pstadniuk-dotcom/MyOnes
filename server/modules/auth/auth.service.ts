@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { usersRepository } from '../users/users.repository';
 import { authRepository } from './auth.repository';
+import { consentsRepository } from '../consents/consents.repository';
 import { signupSchema, loginSchema, type InsertUser, type User } from '@shared/schema';
 import { generateToken } from '../../api/middleware/middleware';
 import { sendNotificationEmail } from '../../utils/emailService';
@@ -34,6 +35,22 @@ export class AuthService {
         };
 
         const user = await usersRepository.createUser(userData);
+
+        // Record Terms of Service & Privacy Policy acceptance
+        try {
+            await consentsRepository.createUserConsent({
+                userId: user.id,
+                consentType: 'data_retention' as any,
+                granted: true,
+                consentVersion: '1.0',
+                ipAddress: null,
+                userAgent: null,
+                consentText: 'I agree to the Terms of Service and Privacy Policy.',
+                metadata: { source: 'signup', additionalInfo: `Accepted at signup on ${new Date().toISOString()}` },
+            });
+        } catch (err) {
+            logger.warn('Failed to record TOS consent at signup', { userId: user.id, error: err });
+        }
 
         // Generate and send verification email
         await this.sendVerificationEmail(user);

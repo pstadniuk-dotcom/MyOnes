@@ -21,9 +21,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getAuthHeaders } from '@/shared/lib/queryClient';
 import { buildApiUrl } from '@/shared/lib/api';
 import { Link, useSearch } from 'wouter';
-import ThinkingIndicator from '@/features/chat/components/ThinkingIndicator';
+import ThinkingSteps, { type ThinkingStep } from '@/features/chat/components/ThinkingSteps';
 import { InlineCapsuleSelector } from '@/features/formulas/components/InlineCapsuleSelector';
 import { type CapsuleCount } from '@/shared/lib/utils';
+
+// Default step definitions for the AI thinking progress
+const INITIAL_THINKING_STEPS: ThinkingStep[] = [
+  { id: 'review_data',      label: 'Reviewing your data',        status: 'active' },
+  { id: 'understand_query', label: 'Understanding your question', status: 'waiting' },
+  { id: 'build_context',    label: 'Referencing materials',      status: 'waiting' },
+  { id: 'generate',         label: 'Crafting your response',     status: 'waiting' },
+];
+
 function deriveCapsuleRecommendationFromMessage(content: string): CapsuleRecommendation | null {
   const normalized = String(content || '').toLowerCase();
   if (!normalized) return null;
@@ -207,10 +216,14 @@ export default function ConsultationPage() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [thinkingMessage, setThinkingMessage] = useState<string | null>(null);
+  const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
   const [activeStreamingMessageId, setActiveStreamingMessageId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Pending lab marker discussion (set from Labs page, consumed after handleSendMessage is ready)
+  const [pendingLabMessage, setPendingLabMessage] = useState<string | null>(null);
 
   // UI state
   const [showHistory, setShowHistory] = useState(false);
@@ -395,6 +408,13 @@ export default function ConsultationPage() {
         handleNewSession();
         // Clear the query param to avoid sticking (optional but good UI)
         window.history.replaceState({}, '', window.location.pathname);
+
+        // Check for lab marker discussion message (from Labs page "Discuss" link)
+        const labMarkerMessage = localStorage.getItem('labMarkerDiscuss');
+        if (labMarkerMessage) {
+          localStorage.removeItem('labMarkerDiscuss');
+          setPendingLabMessage(labMarkerMessage);
+        }
         return;
       }
 
@@ -470,7 +490,7 @@ export default function ConsultationPage() {
         }
       }
     }
-  }, [historyData, messages.length, isNewSession]);
+  }, [historyData, messages.length, isNewSession, search, handleNewSession]);
 
   // Keep current session in sync with server history updates.
   // This is critical when a user navigates away mid-response: the assistant reply
@@ -510,6 +530,7 @@ export default function ConsultationPage() {
       setIsTyping(false);
       if (thinkingMessage) {
         setThinkingMessage(null);
+        setThinkingSteps([]);
       }
     }
 
@@ -816,6 +837,7 @@ export default function ConsultationPage() {
               }
               setIsTyping(false);
               setThinkingMessage(null);
+              setThinkingSteps([]);
               setActiveStreamingMessageId(null);
             }
             break;
@@ -836,18 +858,39 @@ export default function ConsultationPage() {
                 if (data.type === 'connected') {
                   connected = true;
                   setIsConnected(true);
+                  // Initialize thinking steps when connection starts
+                  setThinkingSteps([...INITIAL_THINKING_STEPS]);
+                  setThinkingMessage('thinking');
                   console.log('✅ SSE: Connected');
+                } else if (data.type === 'thinking_step') {
+                  // Progressive step updates from server
+                  setThinkingSteps(prev => prev.map(s => {
+                    if (s.id === data.step) {
+                      return { ...s, status: data.status, detail: data.detail || s.detail };
+                    }
+                    // If the current step is done, advance the NEXT waiting step to active
+                    if (data.status === 'done') {
+                      const doneIdx = prev.findIndex(p => p.id === data.step);
+                      const thisIdx = prev.findIndex(p => p.id === s.id);
+                      if (thisIdx === doneIdx + 1 && s.status === 'waiting') {
+                        return { ...s, status: 'active' };
+                      }
+                    }
+                    return s;
+                  }));
+                  setIsTyping(false);
                 } else if (data.type === 'thinking') {
-                  // Update thinking status message
-                  console.log('🧠 SSE: Thinking status received:', data.message);
-                  console.log('🧠 Setting isTyping=false, thinkingMessage=', data.message);
+                  // Legacy fallback — still handle old-style thinking events
                   setIsTyping(false);
                   setThinkingMessage(data.message);
-                  console.log('🧠 State updated');
                 } else if (data.type === 'processing') {
                   // Formula is being processed - show status to prevent "timeout" appearance
                   console.log('⚙️ SSE: Processing status received:', data.message);
                   setThinkingMessage(data.message || 'Creating your formula...');
+                  // Update the last step label to reflect formula processing
+                  setThinkingSteps(prev => prev.map(s =>
+                    s.id === 'generate' ? { ...s, label: 'Creating your formula', detail: data.message, status: 'active' } : s
+                  ));
                 } else if (data.type === 'chunk') {
                   // Accumulate content and show cleaned version in real-time
                   // This lets user see the "thinking" process without JSON code
@@ -861,10 +904,11 @@ export default function ConsultationPage() {
                       : msg
                   ));
 
-                  // Clear initial thinking message once we have visible content
+                  // Clear thinking steps once we have visible content
                   // But allow processing messages to override this during formula creation
-                  if (cleanedContent.trim().length > 0 && thinkingMessage === 'Analyzing your health data...') {
+                  if (cleanedContent.trim().length > 0 && (thinkingMessage === 'thinking' || thinkingMessage === 'Analyzing your health data...')) {
                     setThinkingMessage(null);
+                    setThinkingSteps([]);
                   }
 
                   if (data.sessionId && !currentSessionId) {
@@ -890,6 +934,7 @@ export default function ConsultationPage() {
                 } else if (data.type === 'complete') {
                   completed = true;
                   setThinkingMessage(null); // Clear thinking status
+                  setThinkingSteps([]);     // Clear thinking steps
                   setActiveStreamingMessageId(null); // Now clear the streaming indicator
 
                   // Now show the final accumulated content (cleaned by removeJsonBlocks during render)
@@ -990,6 +1035,16 @@ export default function ConsultationPage() {
       clearTimeout(timeoutId);
     }
   }, [inputValue, currentSessionId, toast, user?.id, isRecording]);
+
+  // Auto-send pending lab marker discussion message (from Labs page "Discuss with practitioner" link)
+  useEffect(() => {
+    if (!pendingLabMessage) return;
+    const timer = setTimeout(() => {
+      handleSendMessage(pendingLabMessage);
+      setPendingLabMessage(null);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [pendingLabMessage, handleSendMessage]);
 
   // Enhanced file upload with object storage
   const handleFileUpload = useCallback(async () => {
@@ -1516,6 +1571,7 @@ export default function ConsultationPage() {
               ));
             }
             setThinkingMessage(null);
+            setThinkingSteps([]);
             setActiveStreamingMessageId(null);
             break;
           }
@@ -1553,10 +1609,12 @@ export default function ConsultationPage() {
                   // Clear thinking message once we have visible content
                   if (cleanedContent.trim().length > 0) {
                     setThinkingMessage(null);
+                    setThinkingSteps([]);
                   }
                 } else if (data.type === 'complete') {
                   completed = true;
                   setThinkingMessage(null);
+                  setThinkingSteps([]);
                   console.log('💊 Stream complete, formula:', !!data.formula);
 
                   // Now show the final accumulated content
@@ -1894,9 +1952,16 @@ export default function ConsultationPage() {
 
                       {/* Message content - left aligned */}
                       <div className="w-full">
-                        {/* Show thinking indicator ONLY when this specific message is streaming and has no content yet */}
+                        {/* Show thinking steps ONLY when this specific message is streaming and has no content yet */}
                         {message.sender === 'ai' && message.id === activeStreamingMessageId && !message.content ? (
-                          <ThinkingIndicator message={thinkingMessage || 'Analyzing your health data...'} />
+                          thinkingSteps.length > 0 ? (
+                            <ThinkingSteps steps={thinkingSteps} />
+                          ) : (
+                            <div className="text-sm text-muted-foreground italic flex items-center gap-1.5">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#52796F] animate-pulse" />
+                              {thinkingMessage || 'Thinking...'}
+                            </div>
+                          )
                         ) : (
                           <p className="text-sm whitespace-pre-wrap leading-relaxed">{removeJsonBlocks(message.content)}</p>
                         )}
@@ -2046,19 +2111,7 @@ export default function ConsultationPage() {
           </div>
         </ScrollArea>
 
-        {/* Processing Indicator - Shows thinking/processing status during AI operations */}
-        {thinkingMessage && (
-          <div className="border-t border-border/50 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 px-4 py-3">
-            <div className="flex items-center gap-3 justify-center">
-              <div className="flex space-x-1">
-                <span className="animate-bounce [animation-delay:-0.3s] h-2 w-2 rounded-full bg-primary"></span>
-                <span className="animate-bounce [animation-delay:-0.15s] h-2 w-2 rounded-full bg-primary"></span>
-                <span className="animate-bounce h-2 w-2 rounded-full bg-primary"></span>
-              </div>
-              <span className="text-sm font-medium text-foreground">{thinkingMessage}</span>
-            </div>
-          </div>
-        )}
+
 
         {/* Modern Input Area */}
         <div className="border-t bg-background/95 backdrop-blur-sm safe-bottom">

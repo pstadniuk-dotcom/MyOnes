@@ -4,7 +4,7 @@ import { getIngredientDose, isValidIngredient } from "@shared/ingredients";
 import logger from "../../infra/logging/logger";
 import { type Formula, type ReviewSchedule } from "@shared/schema";
 import { manufacturerPricingService } from "./manufacturer-pricing.service";
-import { FORMULA_LIMITS as CAPSULE_LIMITS, getMaxDosageForCapsules } from "./formula-service";
+import { FORMULA_LIMITS as CAPSULE_LIMITS, getMaxDosageForCapsules, getMinIngredientCountForCapsules } from "./formula-service";
 
 // Capsule-aware dosage limits derived from formula-service.ts
 // Max for any capsule count: 12 × 550mg = 6,600mg (absolute ceiling)
@@ -162,6 +162,16 @@ export class FormulasService {
             throw new Error(`Cannot revert to this formula as it exceeds the maximum safe dosage of ${revertHardLimit}mg for ${originalFormula.targetCapsules || CAPSULE_LIMITS.DEFAULT_CAPSULE_COUNT} capsules (this version has ${originalFormula.totalMg}mg). This formula was created before dosage limits were enforced. Please create a new formula instead.`);
         }
 
+        // Validate minimum ingredient count
+        const revertCapsules = originalFormula.targetCapsules || CAPSULE_LIMITS.DEFAULT_CAPSULE_COUNT;
+        const revertMinIngredients = getMinIngredientCountForCapsules(revertCapsules);
+        const revertBases = (originalFormula.bases as any[]) || [];
+        const revertAdditions = (originalFormula.additions as any[]) || [];
+        const revertTotalIngredients = revertBases.length + revertAdditions.length;
+        if (revertTotalIngredients < revertMinIngredients) {
+            throw new Error(`Cannot revert to this formula — it only has ${revertTotalIngredients} ingredients, but ${revertCapsules} capsules/day requires at least ${revertMinIngredients}. Please create a new formula instead.`);
+        }
+
         // Get current highest version for user
         const currentFormula = await formulasRepository.getCurrentFormulaByUser(userId);
         const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
@@ -309,6 +319,12 @@ export class FormulasService {
 
         if (totalMg < 100) {
             throw new Error(`Total dosage of ${totalMg}mg is too low. Please add more ingredients (minimum 100mg recommended).`);
+        }
+
+        // Validate minimum ingredient count for the chosen capsule tier
+        const minIngredients = getMinIngredientCountForCapsules(capsuleCount);
+        if (allIngredients.length < minIngredients) {
+            throw new Error(`A ${capsuleCount}-capsule formula requires at least ${minIngredients} ingredients. You've added ${allIngredients.length}. Please add ${minIngredients - allIngredients.length} more ingredient${minIngredients - allIngredients.length > 1 ? 's' : ''}.`);
         }
 
         // Get user's current formula count to determine version number

@@ -643,6 +643,14 @@ class DatabaseBillingProvider implements BillingProvider {
       throw new Error('FORMULA_NOT_FOUND_OR_ACCESS_DENIED');
     }
 
+    // SAFETY GATE: If formula has serious warnings, require acknowledgment before checkout
+    if (formula) {
+      const safetyValidation = (formula as any).safetyValidation;
+      if (safetyValidation?.requiresAcknowledgment && !formula.warningsAcknowledgedAt) {
+        throw new Error('SAFETY_WARNINGS_NOT_ACKNOWLEDGED');
+      }
+    }
+
     let formulaAmountCents = 0;
     let manufacturerCostCents = 0;
     let manufacturerQuoteId: string | undefined;

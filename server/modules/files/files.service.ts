@@ -1,6 +1,7 @@
 import { filesRepository } from './files.repository';
 import { ObjectStorageService } from '../../utils/objectStorage';
 import { analyzeLabReport } from '../../utils/fileAnalysis';
+import { labsService } from '../labs/labs.service';
 import logger from '../../infra/logging/logger';
 import { type InsertFileUpload } from '@shared/schema';
 
@@ -40,7 +41,17 @@ export class FilesService {
 
     async getUserFiles(userId: string, type?: string) {
         const fileType = type === 'lab-reports' ? 'lab_report' : undefined;
-        return await filesRepository.listFileUploadsByUser(userId, fileType as any, false);
+        const files = await filesRepository.listFileUploadsByUser(userId, fileType as any, false);
+
+        // Strip rawText from lab report data to reduce API payload size
+        // rawText can be 100KB+ for multi-page PDFs and is only used server-side
+        return files.map(f => {
+            if (f.labReportData && typeof f.labReportData === 'object' && 'rawText' in (f.labReportData as any)) {
+                const { rawText, ...rest } = f.labReportData as any;
+                return { ...f, labReportData: rest };
+            }
+            return f;
+        });
     }
 
     async uploadFile(userId: string, uploadedFile: any, auditInfo: any) {
@@ -87,7 +98,7 @@ export class FilesService {
             uploadedFile.mimetype
         );
 
-        // Save metadata
+        // Save metadata — set initial processing status for lab reports
         const fileUpload = await filesRepository.createFileUpload({
             userId,
             type: fileType,
@@ -97,61 +108,63 @@ export class FilesService {
             mimeType: uploadedFile.mimetype,
             hipaaCompliant: true,
             encryptedAtRest: true,
-            retentionPolicyId: '7_years'
+            retentionPolicyId: '7_years',
+            ...(fileType === 'lab_report' ? { labReportData: { analysisStatus: 'processing' } } : {})
         });
 
-        // Trigger Analysis
-        let labDataExtraction = null;
+        // Trigger Analysis in the background (non-blocking)
         if (fileType === 'lab_report') {
-            if (uploadedFile.mimetype === 'application/pdf' || uploadedFile.mimetype.startsWith('image/')) {
+            const fileId = fileUpload.id;
+            const mimeType = uploadedFile.mimetype;
+            const fileName = uploadedFile.name;
+
+            void (async () => {
                 try {
-                    logger.info(`✨ Analyzing lab report: ${uploadedFile.name}`);
-                    labDataExtraction = await analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId);
-                    if (labDataExtraction && fileUpload.id) {
-                        await filesRepository.updateFileUpload(fileUpload.id, {
+                    logger.info(`✨ Analyzing lab report in background: ${fileName}`);
+
+                    // Progress callback: update DB so the client can poll for status
+                    const onProgress = async (step: string, detail?: string) => {
+                        try {
+                            await filesRepository.updateFileUpload(fileId, {
+                                labReportData: {
+                                    analysisStatus: 'processing',
+                                    progressStep: step,
+                                    progressDetail: detail,
+                                }
+                            });
+                        } catch (_) { /* best-effort */ }
+                    };
+
+                    const labDataExtraction = await analyzeLabReport(normalizedPath, mimeType, userId, onProgress);
+                    if (labDataExtraction && fileId) {
+                        // Generate AI insights for all markers in batch
+                        const markerInsights = await labsService.generateAllMarkerInsights(
+                            labDataExtraction.extractedData || []
+                        );
+                        await filesRepository.updateFileUpload(fileId, {
                             labReportData: {
                                 testDate: labDataExtraction.testDate,
                                 testType: labDataExtraction.testType,
                                 labName: labDataExtraction.labName,
                                 physicianName: labDataExtraction.physicianName,
+                                overallAssessment: labDataExtraction.overallAssessment,
+                                riskPatterns: labDataExtraction.riskPatterns,
                                 analysisStatus: 'completed',
-                                extractedData: labDataExtraction.extractedData || []
+                                extractedData: labDataExtraction.extractedData || [],
+                                markerInsights,
                             }
                         });
+                        logger.info(`✅ Lab report analysis completed: ${fileName}`);
                     }
                 } catch (error) {
-                    logger.error('Lab report analysis failed:', error);
-                    if (fileUpload.id) {
-                        await filesRepository.updateFileUpload(fileUpload.id, {
+                    logger.error('Lab report background analysis failed:', error);
+                    if (fileId) {
+                        await filesRepository.updateFileUpload(fileId, {
                             labReportData: { analysisStatus: 'error' }
                         });
                     }
                 }
-            } else if (uploadedFile.mimetype === 'text/plain') {
-                // Background analysis
-                analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId)
-                    .then(async (extraction) => {
-                        if (extraction && fileUpload.id) {
-                            await filesRepository.updateFileUpload(fileUpload.id, {
-                                labReportData: {
-                                    testDate: extraction.testDate,
-                                    testType: extraction.testType,
-                                    labName: extraction.labName,
-                                    physicianName: extraction.physicianName,
-                                    analysisStatus: 'completed',
-                                    extractedData: extraction.extractedData || []
-                                }
-                            });
-                        }
-                    })
-                    .catch(async () => {
-                        if (fileUpload.id) {
-                            await filesRepository.updateFileUpload(fileUpload.id, {
-                                labReportData: { analysisStatus: 'error' }
-                            });
-                        }
-                    });
-            }
+            })();
         }
 
         return {
@@ -162,7 +175,7 @@ export class FilesService {
             size: uploadedFile.size,
             uploadedAt: fileUpload.uploadedAt,
             hipaaCompliant: true,
-            labData: labDataExtraction
+            labData: null
         };
     }
 
@@ -199,25 +212,41 @@ export class FilesService {
             logger.warn(`Failed to delete old storage object ${oldObjectPath} during update`, err);
         }
 
-        // Trigger Re-analysis
-        let labDataExtraction = null;
+        // Trigger Re-analysis in background
         if (fileUpload.type === 'lab_report') {
-            try {
-                labDataExtraction = await analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId);
-                if (labDataExtraction) {
+            await filesRepository.updateFileUpload(fileId, {
+                labReportData: { analysisStatus: 'processing' }
+            });
+
+            void (async () => {
+                try {
+                    const labDataExtraction = await analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId);
+                    if (labDataExtraction) {
+                        const markerInsights = await labsService.generateAllMarkerInsights(
+                            labDataExtraction.extractedData || []
+                        );
+                        await filesRepository.updateFileUpload(fileId, {
+                            labReportData: {
+                                testDate: labDataExtraction.testDate,
+                                testType: labDataExtraction.testType,
+                                labName: labDataExtraction.labName,
+                                physicianName: labDataExtraction.physicianName,
+                                overallAssessment: labDataExtraction.overallAssessment,
+                                riskPatterns: labDataExtraction.riskPatterns,
+                                analysisStatus: 'completed',
+                                extractedData: labDataExtraction.extractedData || [],
+                                markerInsights,
+                            }
+                        });
+                        logger.info(`✅ Lab report re-analysis completed: ${uploadedFile.name}`);
+                    }
+                } catch (error) {
+                    logger.error('Lab report analysis failed during update:', error);
                     await filesRepository.updateFileUpload(fileId, {
-                        labReportData: {
-                            ...labDataExtraction,
-                            analysisStatus: 'completed'
-                        }
+                        labReportData: { analysisStatus: 'error' }
                     });
                 }
-            } catch (error) {
-                logger.error('Lab report analysis failed during update:', error);
-                await filesRepository.updateFileUpload(fileId, {
-                    labReportData: { analysisStatus: 'error' }
-                });
-            }
+            })();
         }
 
         return {
@@ -227,7 +256,7 @@ export class FilesService {
             type: fileUpload.type,
             size: uploadedFile.size,
             uploadedAt: new Date(),
-            labData: labDataExtraction
+            labData: null
         };
     }
 
@@ -244,8 +273,12 @@ export class FilesService {
             userId
         );
 
+        const markerInsights = await labsService.generateAllMarkerInsights(
+            labData?.extractedData || []
+        );
+
         await filesRepository.updateFileUpload(fileId, {
-            labReportData: { ...labData, analysisStatus: 'completed' }
+            labReportData: { ...labData, analysisStatus: 'completed', markerInsights }
         });
 
         return labData;
@@ -278,8 +311,12 @@ export class FilesService {
                     userId
                 );
 
+                const markerInsights = await labsService.generateAllMarkerInsights(
+                    labData?.extractedData || []
+                );
+
                 await filesRepository.updateFileUpload(fileId, {
-                    labReportData: { ...labData, analysisStatus: 'completed' }
+                    labReportData: { ...labData, analysisStatus: 'completed', markerInsights }
                 });
             } catch (error) {
                 logger.error('Background re-analysis error:', error);

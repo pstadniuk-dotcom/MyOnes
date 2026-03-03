@@ -19,7 +19,8 @@ import {
   chatRoutes,
   dashboardRoutes,
   systemRoutes,
-  billingRoutes
+  billingRoutes,
+  labsRoutes
 } from "./api/routes";
 import { initializeAiSettings } from "./infra/ai/ai-config";
 import logger from "./infra/logging/logger";
@@ -82,6 +83,7 @@ export async function registerRoutes(app: Express, rateLimiters?: { authLimiter?
   app.use('/api/optimize', optimizeRoutes);
   app.use('/api/membership', membershipRoutes);
   app.use('/api/billing', billingRoutes);
+  app.use('/api/labs', labsRoutes);
 
   // AI & Communication
   app.use('/api/chat', chatRoutes);

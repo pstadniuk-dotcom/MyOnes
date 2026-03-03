@@ -99,6 +99,10 @@ export const users = pgTable("users", {
   // and sends email + SMS notification. Default false = manual review required.
   autoOptimizeFormula: boolean("auto_optimize_formula").default(false).notNull(),
 
+  // Dashboard metric preferences: ordered list of metric IDs the user wants visible
+  // null = use defaults from shared/metricCatalog.ts
+  metricPreferences: json("metric_preferences"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -220,8 +224,64 @@ export const formulas = pgTable("formulas", {
   warnings: json("warnings").$type<string[]>().default([]),
   disclaimers: json("disclaimers").$type<string[]>().default([]),
   notes: text("notes"),
+
+  // Structured safety validation result (severity-aware warnings)
+  safetyValidation: json("safety_validation").$type<{
+    requiresAcknowledgment: boolean;
+    warnings: Array<{
+      category: string;
+      severity: 'critical' | 'serious' | 'informational';
+      message: string;
+      ingredients?: string[];
+      drugs?: string[];
+    }>;
+  }>(),
+
+  // Warning acknowledgment tracking for legal compliance
+  warningsAcknowledgedAt: timestamp("warnings_acknowledged_at"),
+  warningsAcknowledgedIp: text("warnings_acknowledged_ip"),
+  disclaimerVersion: text("disclaimer_version").default('1.0'),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"), // Null = active, timestamp = archived
+});
+
+// Formula warning acknowledgments — legal paper trail
+export const formulaWarningAcknowledgments = pgTable("formula_warning_acknowledgments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formulaId: varchar("formula_id").notNull().references(() => formulas.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  acknowledgedWarnings: json("acknowledged_warnings").$type<Array<{
+    category: string;
+    severity: 'critical' | 'serious' | 'informational';
+    message: string;
+    ingredients?: string[];
+    drugs?: string[];
+  }>>().notNull(),
+  disclaimerVersion: text("disclaimer_version").notNull().default('1.0'),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  acknowledgedAt: timestamp("acknowledged_at").defaultNow().notNull(),
+});
+
+// Safety audit log — tracks all safety-related events for compliance
+export const safetyAuditLogs = pgTable("safety_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  formulaId: varchar("formula_id").references(() => formulas.id, { onDelete: "set null" }),
+  action: text("action").notNull(), // e.g., 'formula_blocked', 'interaction_warning', 'warning_acknowledged'
+  severity: text("severity").notNull(), // 'critical', 'serious', 'informational'
+  details: json("details").$type<{
+    warnings?: Array<{ category: string; severity: string; message: string; ingredients?: string[]; drugs?: string[] }>;
+    ingredients?: string[];
+    medications?: string[];
+    conditions?: string[];
+    allergies?: string[];
+    blockedReasons?: string[];
+  }>().notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Formula version changes for tracking modifications
@@ -325,7 +385,12 @@ export const fileUploads = pgTable("file_uploads", {
     labName?: string;
     physicianName?: string;
     analysisStatus?: 'pending' | 'processing' | 'completed' | 'error';
+    progressStep?: string;
+    progressDetail?: string;
+    overallAssessment?: string;
+    riskPatterns?: string[];
     extractedData?: Array<Record<string, any>> | Record<string, any>;
+    markerInsights?: Record<string, any>;
   }>(),
   // Soft delete for compliance (never actually delete PHI)
   deletedAt: timestamp("deleted_at"),
@@ -514,6 +579,16 @@ export const insertFormulaVersionChangeSchema = createInsertSchema(formulaVersio
   createdAt: true,
 });
 
+export const insertFormulaWarningAcknowledgmentSchema = createInsertSchema(formulaWarningAcknowledgments).omit({
+  id: true,
+  acknowledgedAt: true,
+});
+
+export const insertSafetyAuditLogSchema = createInsertSchema(safetyAuditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
   id: true,
   createdAt: true,
@@ -606,6 +681,12 @@ export type Formula = typeof formulas.$inferSelect;
 export type InsertFormulaVersionChange = z.infer<typeof insertFormulaVersionChangeSchema>;
 export type FormulaVersionChange = typeof formulaVersionChanges.$inferSelect;
 
+export type InsertFormulaWarningAcknowledgment = z.infer<typeof insertFormulaWarningAcknowledgmentSchema>;
+export type FormulaWarningAcknowledgment = typeof formulaWarningAcknowledgments.$inferSelect;
+
+export type InsertSafetyAuditLog = z.infer<typeof insertSafetyAuditLogSchema>;
+export type SafetyAuditLog = typeof safetyAuditLogs.$inferSelect;
+
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
 export type Subscription = typeof subscriptions.$inferSelect;
 
@@ -653,6 +734,9 @@ export const signupSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters long'),
   phone: z.string().optional(),
+  acceptedTerms: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the Terms of Service and Privacy Policy' }),
+  }),
 });
 
 export const loginSchema = z.object({
