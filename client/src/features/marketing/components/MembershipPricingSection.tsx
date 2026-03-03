@@ -18,7 +18,7 @@ interface MembershipTier {
 
 // Fallback tiers if API fails
 const fallbackTiers = [
-  { id: 'founding', name: 'Founding', limit: 100, claimed: 0, priceMonthly: 9, priceYearly: 99, active: true },
+  { id: 'founding', name: 'Founding', limit: 250, claimed: 0, priceMonthly: 9, priceYearly: 99, active: true },
   { id: 'early', name: 'Early', limit: 500, claimed: 0, priceMonthly: 15, priceYearly: 149, active: false },
   { id: 'beta', name: 'Beta', limit: 2000, claimed: 0, priceMonthly: 19, priceYearly: 199, active: false },
   { id: 'standard', name: 'Standard', limit: null as number | null, claimed: 0, priceMonthly: 29, priceYearly: 299, active: false },

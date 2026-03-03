@@ -314,6 +314,31 @@ export class FormulasRepository {
         }
     }
 
+    async updateFormulaAcknowledgment(formulaId: string, data: {
+        warningsAcknowledgedAt: Date;
+        warningsAcknowledgedIp: string;
+    }): Promise<Formula> {
+        try {
+            const [updated] = await db
+                .update(formulas)
+                .set({
+                    warningsAcknowledgedAt: data.warningsAcknowledgedAt,
+                    warningsAcknowledgedIp: data.warningsAcknowledgedIp,
+                })
+                .where(eq(formulas.id, formulaId))
+                .returning();
+
+            if (!updated) {
+                throw new Error('Formula not found');
+            }
+
+            return updated;
+        } catch (error) {
+            console.error('Error updating formula acknowledgment:', error);
+            throw new Error('Failed to update formula acknowledgment');
+        }
+    }
+
     // Formula Version Change operations
     async createFormulaVersionChange(insertChange: InsertFormulaVersionChange): Promise<FormulaVersionChange> {
         try {

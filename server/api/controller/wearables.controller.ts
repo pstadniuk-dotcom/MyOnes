@@ -191,6 +191,40 @@ export class WearablesController {
             res.status(500).json({ error: 'Failed to fetch health pulse summary' });
         }
     }
+
+    async getAiAnalysis(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const days = parseInt(req.query.days as string) || 30;
+            const analysis = await wearablesService.getAiAnalysis(userId, days);
+            res.json(analysis);
+        } catch (error) {
+            logger.error('Error generating AI wearable analysis:', error);
+            res.status(500).json({ error: 'Failed to generate analysis' });
+        }
+    }
+
+    async getWeeklyBrief(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const brief = await wearablesService.getWeeklyBrief(userId);
+            res.json(brief);
+        } catch (error) {
+            logger.error('Error generating weekly brief:', error);
+            res.status(500).json({ error: 'Failed to generate weekly brief' });
+        }
+    }
+
+    async getHealthPulseIntelligence(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const intelligence = await wearablesService.getHealthPulseIntelligence(userId);
+            res.json(intelligence);
+        } catch (error) {
+            logger.error('Error generating health pulse intelligence:', error);
+            res.status(500).json({ error: 'Failed to generate health pulse intelligence' });
+        }
+    }
 }
 
 export const wearablesController = new WearablesController();

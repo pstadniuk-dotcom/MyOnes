@@ -81,7 +81,7 @@ export default function PricingSectionV2() {
               </Link>
 
               <p className="mt-6 text-center text-sm text-[#52796F]">
-                30-day satisfaction guarantee. Cancel anytime.
+                Cancel your membership anytime. No commitments.
               </p>
 
               {/* Asterisk explanation */}
