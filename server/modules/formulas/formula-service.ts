@@ -10,21 +10,14 @@ export const FORMULA_LIMITS = {
     BUDGET_TOLERANCE_PERCENT: 0.025, // Allow 2.5% over capsule budget
     MIN_BUDGET_UTILIZATION_PERCENT: 0.90, // Require at least 90% budget utilization
     MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg
-    MIN_INGREDIENT_COUNT: 8,       // Baseline minimum ingredient count
-    MIN_INGREDIENT_COUNT_BY_CAPSULES: {
-        6: 8,
-        9: 9,
-        12: 9,
-    } as const,
+    MIN_INGREDIENT_COUNT: 8,       // Hard minimum ingredient count for ALL capsule tiers
     MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
 
-export function getMinIngredientCountForCapsules(targetCapsules: number): number {
-    const normalizedCapsuleCount = FORMULA_LIMITS.VALID_CAPSULE_COUNTS.includes(targetCapsules as any)
-        ? (targetCapsules as 6 | 9 | 12)
-        : FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
-
-    return FORMULA_LIMITS.MIN_INGREDIENT_COUNT_BY_CAPSULES[normalizedCapsuleCount] || FORMULA_LIMITS.MIN_INGREDIENT_COUNT;
+export function getMinIngredientCountForCapsules(_targetCapsules?: number): number {
+    // Flat minimum of 8 ingredients regardless of capsule count.
+    // The AI decides whether to go higher based on the user's clinical needs.
+    return FORMULA_LIMITS.MIN_INGREDIENT_COUNT;
 }
 
 // Formula extraction schema for AI response parsing

@@ -29,9 +29,18 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  Settings2,
+  GripVertical,
+  Eye,
+  EyeOff,
+  TrendingUp,
+  Lightbulb,
+  AlertTriangle,
+  Pill,
   LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { METRIC_CATALOG, METRIC_MAP, DEFAULT_VISIBLE_METRICS, metricsByPillar, type MetricDefinition } from '@shared/metricCatalog';
 
 interface WearableConnection {
   id: string;
@@ -154,17 +163,12 @@ interface PillarsData {
 interface HistoricalData {
   success: boolean;
   data: {
-    sleep: { date: string; totalMinutes: number | null; hrv: number | null; score: number | null; source: string }[];
-    activity: { date: string; steps: number | null; caloriesActive: number | null; activeMinutes: number | null; source: string }[];
-    body: any[];
-    workouts: any[];
+    sleep: Record<string, any>[];
+    activity: Record<string, any>[];
+    body: Record<string, any>[];
+    workouts: Record<string, any>[];
   };
-  statistics: {
-    sleep: { avgDuration: number | null; avgScore: number | null; avgHRV: number | null };
-    activity: { avgSteps: number | null; avgActiveMinutes: number | null; avgCaloriesActive: number | null };
-    body: { latestWeight: number | null; avgRestingHR: number | null; avgHRV: number | null };
-    workouts: { totalCount: number; avgPerWeek: number; avgDuration: number | null; mostCommonType: string | null };
-  };
+  statistics: Record<string, Record<string, number | string | null>>;
 }
 
 // --- Pillar definitions ---
@@ -200,6 +204,37 @@ const fmtNum = (n: number | null) =>
 function fmtDate(d: string) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
+
+// --- Icon lookup for catalog-driven rendering ---
+const ICON_MAP: Record<string, LucideIcon> = {
+  Moon, Footprints, Heart, Flame, Dumbbell, Activity, Clock, Scale,
+  Droplets, HeartPulse, Salad, Zap,
+};
+function getIcon(name: string): LucideIcon { return ICON_MAP[name] ?? Activity; }
+
+// --- Format a metric value for display ---
+function formatMetric(val: number | null | undefined, format: string, unit: string): { display: string; unit: string } {
+  if (val == null) return { display: '—', unit: '' };
+  switch (format) {
+    case 'sleep':   return { display: `${Math.floor(val / 60)}h ${Math.round(val % 60)}m`, unit: '' };
+    case 'number':  return { display: val.toLocaleString(), unit };
+    case 'integer': return { display: String(Math.round(val)), unit };
+    case 'decimal1':return { display: (Math.round(val * 10) / 10).toFixed(1), unit };
+    case 'percent': return { display: String(Math.round(val)), unit: unit || '%' };
+    case 'weight':  return { display: (Math.round(val * 10) / 10).toFixed(1), unit };
+    case 'distance': {
+      const km = val / 1000;
+      return { display: km >= 10 ? km.toFixed(0) : km.toFixed(1), unit: 'km' };
+    }
+    default:        return { display: String(val), unit };
+  }
+}
+
+// --- Resolve a dot-path like "sleep.avgDuration" from an object ---
+function resolvePath(obj: any, path: string): any {
+  return path.split('.').reduce((o, k) => o?.[k], obj);
+}
+
 
 // --- SparkBars mini chart ---
 function SparkBars({ values, color }: { values: (number | null)[]; color: string }) {
@@ -306,6 +341,151 @@ function StatTile({
   );
 }
 
+// ─── Customize Metrics Modal ──────────────────────────────────────────
+
+const PILLAR_ORDER: string[] = ['sleep', 'recovery', 'activity', 'body', 'workouts'];
+const PILLAR_LABELS: Record<string, string> = {
+  sleep: 'Sleep', recovery: 'Recovery', activity: 'Activity',
+  body: 'Body', workouts: 'Workouts', heart: 'Heart',
+  glucose: 'Glucose', nutrition: 'Nutrition',
+};
+
+function CustomizeMetricsModal({
+  open,
+  onOpenChange,
+  visibleMetricIds,
+  metricsWithData,
+  connectedProviders,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  visibleMetricIds: string[];
+  metricsWithData: string[];
+  connectedProviders: string[];
+}) {
+  const { toast } = useToast();
+  const [selected, setSelected] = useState<string[]>(visibleMetricIds);
+  const [saving, setSaving] = useState(false);
+
+  // Sync local state when modal opens or prefs change
+  useState(() => { setSelected(visibleMetricIds); });
+
+  const toggle = (id: string) => {
+    setSelected(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await apiRequest('PUT', '/api/users/me/metric-preferences', { metrics: selected });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/metric-preferences'] });
+      toast({ title: 'Metrics updated', description: `Showing ${selected.length} metric${selected.length === 1 ? '' : 's'} on your dashboard.` });
+      onOpenChange(false);
+    } catch {
+      toast({ title: 'Save failed', description: 'Could not save your metric preferences.', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = () => { setSelected([...DEFAULT_VISIBLE_METRICS]); };
+
+  const grouped = metricsByPillar();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-[#1B4332] flex items-center gap-2">
+            <Settings2 className="h-5 w-5" />
+            Customize Health Metrics
+          </DialogTitle>
+          <DialogDescription className="text-[#52796F]">
+            Choose which metrics appear on your dashboard. Metrics with data from your connected devices are highlighted.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 mt-4">
+          {PILLAR_ORDER.map(pillarId => {
+            const metrics = grouped[pillarId as keyof typeof grouped];
+            if (!metrics || metrics.length === 0) return null;
+            return (
+              <div key={pillarId}>
+                <h3 className="text-sm font-semibold text-[#1B4332] mb-2 flex items-center gap-2">
+                  {(() => { const Icon = getIcon(metrics[0].icon); return <Icon className="h-4 w-4 text-[#52796F]" />; })()}
+                  {PILLAR_LABELS[pillarId] || pillarId}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {metrics.map(metric => {
+                    const isSelected = selected.includes(metric.id);
+                    const hasDataForMetric = metricsWithData.includes(metric.id);
+                    const providerMatch = metric.providers.some(p => connectedProviders.includes(p) || connectedProviders.includes(p.replace('_v2', '')));
+                    return (
+                      <button
+                        key={metric.id}
+                        onClick={() => toggle(metric.id)}
+                        className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
+                          isSelected
+                            ? 'border-[#1B4332] bg-[#1B4332]/5'
+                            : hasDataForMetric
+                              ? 'border-transparent bg-white hover:border-[#52796F]/30'
+                              : 'border-transparent bg-gray-50 opacity-60 hover:opacity-80'
+                        }`}
+                      >
+                        <div className={`h-8 w-8 rounded-full ${metric.iconBg} flex items-center justify-center flex-shrink-0`}>
+                          {(() => { const Icon = getIcon(metric.icon); return <Icon className={`h-4 w-4 ${metric.iconColor}`} />; })()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium text-[#1B4332] truncate">{metric.label}</span>
+                            {hasDataForMetric && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" title="Has data" />
+                            )}
+                          </div>
+                          <p className="text-xs text-[#52796F] truncate">{metric.subLabel}{metric.unit ? ` (${metric.unit})` : ''}</p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {isSelected ? (
+                            <Eye className="h-4 w-4 text-[#1B4332]" />
+                          ) : (
+                            <EyeOff className="h-4 w-4 text-[#52796F]/40" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center justify-between mt-6 pt-4 border-t border-[#52796F]/10">
+          <button
+            onClick={handleReset}
+            className="text-xs text-[#52796F] hover:text-[#1B4332] transition-colors"
+          >
+            Reset to defaults
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#52796F]">{selected.length} selected</span>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-[#1B4332] hover:bg-[#1B4332]/90"
+            >
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function WearablesPage() {
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
@@ -335,6 +515,30 @@ export default function WearablesPage() {
     staleTime: 3 * 60 * 1000,
   });
 
+  // Fetch Weekly Brief (tiered health analysis)
+  const { data: weeklyBrief, isLoading: briefLoading } = useQuery<{
+    tier: 'insufficient' | 'snapshot' | 'early_trends' | 'weekly' | 'full';
+    daysOfData: number;
+    narrative: string | null;
+    actions: string[];
+    formulaNote: string | null;
+    generatedAt?: string;
+    error?: string;
+  }>({
+    queryKey: ['/api/wearables/weekly-brief'],
+    queryFn: () => apiRequest('GET', '/api/wearables/weekly-brief').then(r => r.json()),
+    enabled: connections.length > 0 && !histLoading,
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+  });
+
+  // --- Metric preferences (must be before any early return) ---
+  const { data: metricPrefsData } = useQuery<{ metricPreferences: string[] | null }>({
+    queryKey: ['/api/users/me/metric-preferences'],
+    staleTime: 60 * 1000,
+  });
+  const [showCustomize, setShowCustomize] = useState(false);
+
   // Disconnect mutation
   const disconnectMutation = useMutation({
     mutationFn: async (connectionId: string) => {
@@ -344,6 +548,7 @@ export default function WearablesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/wearables/connections'] });
       queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse-intelligence'] });
       toast({
         title: 'Device disconnected',
         description: 'Your wearable device has been disconnected successfully.',
@@ -367,6 +572,7 @@ export default function WearablesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/wearables/connections'] });
       queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse-intelligence'] });
       toast({
         title: 'Sync initiated',
         description: 'Your wearable data is being synced.',
@@ -448,6 +654,62 @@ export default function WearablesPage() {
     disconnectMutation.mutate(connectionId);
   };
 
+  // Derived dashboard values (must be before early return for hook consistency)
+  const stats = histData?.statistics;
+  const activePillars    = pillarsData?.activePillars    ?? [];
+  const unlockablePillars = pillarsData?.unlockablePillars ?? [];
+  const connectedConnections = connections.filter(connection => connection.status === 'connected');
+
+  const savedPrefs = metricPrefsData?.metricPreferences;
+  const visibleMetricIds = useMemo(() => savedPrefs ?? DEFAULT_VISIBLE_METRICS, [savedPrefs]);
+
+  // Build sparkline + detail rows dynamically for a given metric
+  const buildSparkline = useCallback((metric: MetricDefinition): (number | null)[] => {
+    const dataArr = histData?.data?.[metric.dataCategory] ?? [];
+    return dataArr.map((row: any) => row[metric.sparkPath] ?? null);
+  }, [histData]);
+
+  const buildDetailRows = useCallback((metric: MetricDefinition): DetailRow[] => {
+    const dataArr = histData?.data?.[metric.dataCategory] ?? [];
+    return dataArr.slice(0, 7).map((row: any) => {
+      const raw = row[metric.sparkPath];
+      const { display, unit } = formatMetric(raw, metric.format, metric.unit);
+      return {
+        date: fmtDate(row.date),
+        value: display + (unit ? ` ${unit}` : ''),
+      };
+    }).filter((r: DetailRow) => r.value !== '—');
+  }, [histData]);
+
+  // Resolve stat value for a metric
+  const getStatValue = useCallback((metric: MetricDefinition): string | null => {
+    const raw = resolvePath(stats, metric.statPath);
+    if (raw == null) return null;
+    const { display, unit } = formatMetric(raw, metric.format, metric.unit);
+    if (metric.id === 'workout_duration' && raw) return `${raw}m`;
+    return display + (unit ? ` ${unit}` : '');
+  }, [stats]);
+
+  // Resolve visible metrics
+  const visibleMetrics = useMemo(() => {
+    return visibleMetricIds
+      .map(id => METRIC_MAP.get(id))
+      .filter((m): m is MetricDefinition => m != null);
+  }, [visibleMetricIds]);
+
+  // Check if an individual metric has data available
+  const hasData = useCallback((metric: MetricDefinition): boolean => {
+    const spark = buildSparkline(metric);
+    if (spark.some(v => v != null)) return true;
+    const statVal = resolvePath(stats, metric.statPath);
+    return statVal != null;
+  }, [buildSparkline, stats]);
+
+  // Metrics with available data (for the customize modal)
+  const metricsWithData = useMemo(() => {
+    return METRIC_CATALOG.filter(m => hasData(m)).map(m => m.id);
+  }, [hasData]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -455,42 +717,6 @@ export default function WearablesPage() {
       </div>
     );
   }
-
-  // Derived dashboard values
-  const stats = histData?.statistics;
-  const sleepSparkline = (histData?.data?.sleep  ?? []).map(s => s.totalMinutes ?? null);
-  const stepsSparkline = (histData?.data?.activity ?? []).map(a => a.steps ?? null);
-  const hrvSparkline   = (histData?.data?.sleep  ?? []).map(s => s.hrv ?? null);
-  const calSparkline   = (histData?.data?.activity ?? []).map(a => a.caloriesActive ?? null);
-  // Detail rows for expandable tiles
-  const sleepRows: DetailRow[] = (histData?.data?.sleep ?? []).slice(0, 7).map(s => ({
-    date: fmtDate(s.date),
-    value: fmtSleep(s.totalMinutes),
-    sub: s.totalMinutes ? undefined : undefined,
-  }));
-  const stepsRows: DetailRow[] = (histData?.data?.activity ?? []).slice(0, 7).map(a => ({
-    date: fmtDate(a.date),
-    value: a.steps != null ? fmtNum(a.steps) + ' steps' : '—',
-    sub: a.activeMinutes ? `${a.activeMinutes}m active` : undefined,
-  }));
-  const hrvRows: DetailRow[] = (histData?.data?.sleep ?? []).filter(s => s.hrv != null).slice(0, 7).map(s => ({
-    date: fmtDate(s.date),
-    value: `${s.hrv}ms`,
-  }));
-  const calRows: DetailRow[] = (histData?.data?.activity ?? []).filter(a => a.caloriesActive != null).slice(0, 7).map(a => ({
-    date: fmtDate(a.date),
-    value: a.caloriesActive != null ? fmtNum(a.caloriesActive) + ' kcal' : '—',
-  }));
-  const workoutRows: DetailRow[] = (histData?.data?.workouts ?? []).slice(0, 7).map(w => ({
-    date: fmtDate(w.date),
-    value: w.type ? `${w.type}` : 'Workout',
-    sub: w.durationMinutes ? `${w.durationMinutes}m` : undefined,
-  }));
-  // Workout sparklines from individual records
-  const workoutDurationSparkline = (histData?.data?.workouts ?? []).map((w: any) => w.durationMinutes ?? null);
-  const activePillars    = pillarsData?.activePillars    ?? [];
-  const unlockablePillars = pillarsData?.unlockablePillars ?? [];
-  const connectedConnections = connections.filter(connection => connection.status === 'connected');
 
   return (
     <div className="space-y-6 px-1 sm:px-0">
@@ -603,27 +829,124 @@ export default function WearablesPage() {
         </div>
       )}
 
+      {/* ── ONES AI Weekly Brief (connected only) ── */}
+      {connectedConnections.length > 0 && (
+        <Card className="bg-[#FAF7F2] border-[#52796F]/20 overflow-hidden">
+          <CardHeader className="pb-1">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-[#1B4332] text-base flex items-center gap-2">
+                <img src="/ones-logo-icon.svg" alt="" className="h-5 w-5" />
+                {weeklyBrief?.tier === 'snapshot' ? 'Your Health Snapshot' :
+                 weeklyBrief?.tier === 'early_trends' ? 'Early Trends' :
+                 'Your Weekly Brief'}
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                {weeklyBrief?.tier && weeklyBrief.tier !== 'insufficient' && (
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                    weeklyBrief.tier === 'full' ? 'bg-emerald-100 text-emerald-700' :
+                    weeklyBrief.tier === 'weekly' ? 'bg-blue-100 text-blue-700' :
+                    'bg-slate-100 text-slate-600'
+                  }`}>
+                    {weeklyBrief.daysOfData}d of data
+                  </span>
+                )}
+                {weeklyBrief?.generatedAt && (
+                  <span className="text-[10px] text-[#52796F]/60">
+                    {new Date(weeklyBrief.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-1 pb-4 space-y-3">
+            {briefLoading ? (
+              <div className="space-y-2 animate-pulse">
+                <Skeleton className="h-3 w-full bg-[#52796F]/10" />
+                <Skeleton className="h-3 w-full bg-[#52796F]/10" />
+                <Skeleton className="h-3 w-4/5 bg-[#52796F]/10" />
+                <div className="pt-2 space-y-1.5">
+                  <Skeleton className="h-3 w-2/3 bg-[#52796F]/10" />
+                  <Skeleton className="h-3 w-1/2 bg-[#52796F]/10" />
+                </div>
+              </div>
+            ) : weeklyBrief?.narrative ? (
+              <>
+                {/* AI narrative */}
+                <p className="text-sm text-[#52796F] leading-relaxed">{weeklyBrief.narrative}</p>
+
+                {/* Actions */}
+                {weeklyBrief.actions.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <h4 className="text-xs font-semibold text-[#1B4332] uppercase tracking-wide flex items-center gap-1.5">
+                      <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
+                      Recommended Actions
+                    </h4>
+                    <div className="space-y-1.5">
+                      {weeklyBrief.actions.map((action, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-xs text-[#52796F] bg-white/60 rounded-lg px-3 py-2 border border-[#52796F]/10">
+                          <span className="text-[#1B4332] font-medium mt-px">{idx + 1}.</span>
+                          <span className="leading-relaxed">{action}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Formula note */}
+                {weeklyBrief.formulaNote && (
+                  <div className="flex items-start gap-2 text-xs bg-[#1B4332]/5 rounded-lg px-3 py-2.5 border border-[#1B4332]/10">
+                    <Pill className="h-3.5 w-3.5 text-[#1B4332] flex-shrink-0 mt-0.5" />
+                    <span className="text-[#1B4332]/80 leading-relaxed">{weeklyBrief.formulaNote}</span>
+                  </div>
+                )}
+              </>
+            ) : weeklyBrief?.tier === 'insufficient' ? (
+              <div className="flex items-center gap-2 text-sm text-[#52796F] py-2">
+                <Clock className="h-4 w-4 text-[#52796F]" />
+                <span>{weeklyBrief.narrative || 'Wear your device for a few more days to unlock your first health brief.'}</span>
+              </div>
+            ) : weeklyBrief?.error ? (
+              <div className="flex items-center gap-2 text-sm text-[#52796F] py-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <span>Unable to generate your weekly brief right now. Check back later.</span>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Health Dashboard (connected only) ── */}
       {connectedConnections.length > 0 && (
         <Card className="bg-[#FAF7F2] border-[#52796F]/20 overflow-hidden">
           <CardHeader className="pb-3 border-b border-[#52796F]/10">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <CardTitle className="text-[#1B4332] text-xl">Your Health Data</CardTitle>
-              {/* Day-range selector */}
-              <div className="flex items-center gap-1 bg-white border border-[#52796F]/20 rounded-lg p-1">
-                {([7, 30, 90] as const).map(d => (
-                  <button
-                    key={d}
-                    onClick={() => setDayRange(d)}
-                    className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                      dayRange === d
-                        ? 'bg-[#1B4332] text-white shadow-sm'
-                        : 'text-[#52796F] hover:text-[#1B4332]'
-                    }`}
-                  >
-                    {d}d
-                  </button>
-                ))}
+              <div className="flex items-center gap-2">
+                {/* Customize button */}
+                <button
+                  onClick={() => setShowCustomize(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#52796F] hover:text-[#1B4332] bg-white border border-[#52796F]/20 rounded-lg transition-colors"
+                  title="Customize metrics"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Customize</span>
+                </button>
+                {/* Day-range selector */}
+                <div className="flex items-center gap-1 bg-white border border-[#52796F]/20 rounded-lg p-1">
+                  {([7, 30, 90] as const).map(d => (
+                    <button
+                      key={d}
+                      onClick={() => setDayRange(d)}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                        dayRange === d
+                          ? 'bg-[#1B4332] text-white shadow-sm'
+                          : 'text-[#52796F] hover:text-[#1B4332]'
+                      }`}
+                    >
+                      {d}d
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -635,81 +958,47 @@ export default function WearablesPage() {
               </div>
             ) : (
               <>
-                {/* 4 Stat Tiles */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                  <StatTile
-                    icon={Moon} iconBg="bg-indigo-100" iconColor="text-indigo-600" accentColor="#6366F1"
-                    label="Sleep" unit="" sub="avg per night"
-                    value={stats?.sleep?.avgDuration != null ? fmtSleep(stats.sleep.avgDuration) : null}
-                    sparkValues={sleepSparkline}
-                    onClick={() => toggleCard('sleep')}
-                    expanded={expandedCard === 'sleep'}
-                    detailRows={sleepRows}
-                  />
-                  <StatTile
-                    icon={Footprints} iconBg="bg-emerald-100" iconColor="text-emerald-600" accentColor="#10B981"
-                    label="Steps" unit="" sub="avg per day"
-                    value={stats?.activity?.avgSteps != null ? fmtNum(stats.activity.avgSteps) : null}
-                    sparkValues={stepsSparkline}
-                    onClick={() => toggleCard('steps')}
-                    expanded={expandedCard === 'steps'}
-                    detailRows={stepsRows}
-                  />
-                  <StatTile
-                    icon={Heart} iconBg="bg-rose-100" iconColor="text-rose-600" accentColor="#EF4444"
-                    label="HRV" unit="ms" sub="avg heart rate variability"
-                    value={stats?.sleep?.avgHRV?.toString() ?? null}
-                    sparkValues={hrvSparkline}
-                    onClick={() => toggleCard('hrv')}
-                    expanded={expandedCard === 'hrv'}
-                    detailRows={hrvRows}
-                  />
-                  <StatTile
-                    icon={Flame} iconBg="bg-amber-100" iconColor="text-amber-600" accentColor="#F59E0B"
-                    label="Active Cals" unit="kcal" sub="avg burned per day"
-                    value={stats?.activity?.avgCaloriesActive != null ? fmtNum(stats.activity.avgCaloriesActive) : null}
-                    sparkValues={calSparkline}
-                    onClick={() => toggleCard('cals')}
-                    expanded={expandedCard === 'cals'}
-                    detailRows={calRows}
-                  />
-                </div>
-
-                {/* Workout stat tiles */}
-                {(stats?.workouts?.totalCount ?? 0) > 0 && (
-                  <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-3 sm:gap-4">
-                    <StatTile
-                      icon={Dumbbell} iconBg="bg-violet-100" iconColor="text-violet-600" accentColor="#8B5CF6"
-                      label="Sessions" unit="" sub={`in ${dayRange} days`}
-                      value={String(stats!.workouts.totalCount)}
-                      sparkValues={workoutDurationSparkline}
-                      onClick={() => toggleCard('workouts')}
-                      expanded={expandedCard === 'workouts'}
-                      detailRows={workoutRows}
-                    />
-                    <StatTile
-                      icon={Activity} iconBg="bg-sky-100" iconColor="text-sky-600" accentColor="#0EA5E9"
-                      label="Per Week" unit="" sub="avg frequency"
-                      value={String(stats!.workouts.avgPerWeek)}
-                      sparkValues={workoutDurationSparkline}
-                      onClick={() => toggleCard('workouts')}
-                      expanded={expandedCard === 'workouts'}
-                      detailRows={workoutRows}
-                    />
-                    <StatTile
-                      icon={Clock} iconBg="bg-teal-100" iconColor="text-teal-600" accentColor="#14B8A6"
-                      label="Avg Duration" unit="" sub={stats!.workouts.mostCommonType ? `usually ${stats!.workouts.mostCommonType}` : 'per session'}
-                      value={stats!.workouts.avgDuration ? `${stats!.workouts.avgDuration}m` : null}
-                      sparkValues={workoutDurationSparkline}
-                      onClick={() => toggleCard('workouts')}
-                      expanded={expandedCard === 'workouts'}
-                      detailRows={workoutRows}
-                    />
+                {/* Dynamic metric tiles */}
+                {visibleMetrics.length > 0 && (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    {visibleMetrics.map(metric => {
+                      const IconComp = getIcon(metric.icon);
+                      const statVal = getStatValue(metric);
+                      const sparkVals = buildSparkline(metric);
+                      const detailRows = buildDetailRows(metric);
+                      // Special sub-label for workout sessions
+                      const subLabel = metric.id === 'workout_sessions' ? `in ${dayRange} days` :
+                        metric.id === 'workout_duration' && stats?.workouts?.mostCommonType
+                          ? `usually ${stats.workouts.mostCommonType}` : metric.subLabel;
+                      return (
+                        <StatTile
+                          key={metric.id}
+                          icon={IconComp}
+                          iconBg={metric.iconBg}
+                          iconColor={metric.iconColor}
+                          accentColor={metric.accentColor}
+                          label={metric.shortLabel}
+                          unit=""
+                          sub={subLabel}
+                          value={statVal}
+                          sparkValues={sparkVals}
+                          onClick={() => toggleCard(metric.id)}
+                          expanded={expandedCard === metric.id}
+                          detailRows={detailRows}
+                        />
+                      );
+                    })}
                   </div>
                 )}
 
                 {/* Empty state */}
-                {(histData?.data?.sleep?.length ?? 0) === 0 && (histData?.data?.activity?.length ?? 0) === 0 && !histLoading && (
+                {visibleMetrics.length === 0 && !histLoading && (
+                  <div className="text-center py-8 mt-2">
+                    <p className="text-[#52796F] text-sm">No metrics selected. Click "Customize" to choose which metrics to display.</p>
+                  </div>
+                )}
+
+                {(histData?.data?.sleep?.length ?? 0) === 0 && (histData?.data?.activity?.length ?? 0) === 0 && !histLoading && visibleMetrics.length > 0 && (
                   <div className="text-center py-8 mt-2">
                     <p className="text-[#52796F] text-sm">No biometric data yet — sync your device or wait for the first automatic pull.</p>
                     <Button variant="outline" size="sm" className="mt-3 border-[#1B4332] text-[#1B4332]" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
@@ -827,6 +1116,15 @@ export default function WearablesPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Customize Metrics Modal ── */}
+      <CustomizeMetricsModal
+        open={showCustomize}
+        onOpenChange={setShowCustomize}
+        visibleMetricIds={visibleMetricIds}
+        metricsWithData={metricsWithData}
+        connectedProviders={connectedConnections.map(c => c.provider)}
+      />
 
       {/* ── Pillar Devices Modal ── */}
       <Dialog open={showPillarDevices} onOpenChange={setShowPillarDevices}>

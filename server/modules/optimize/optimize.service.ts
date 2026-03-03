@@ -125,7 +125,7 @@ Meal Plan: ${mealsText}`;
 
             try {
                 const response = await openai.chat.completions.create({
-                    model: 'gpt-4o-2024-08-06',
+                    model: 'gpt-4.1',
                     messages: [{ role: 'system', content: systemMessage }, { role: 'user', content: prompt }],
                     temperature: 0.7,
                     max_tokens: 16000,
@@ -361,7 +361,7 @@ Meal Plan: ${mealsText}`;
         const { mealName, ingredients, dietaryRestrictions } = data;
         const prompt = buildRecipePrompt(mealName, ingredients || [], dietaryRestrictions || []);
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'gpt-4.1',
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.7,
         });
@@ -423,7 +423,7 @@ Meal Plan: ${mealsText}`;
 
         const prompt = `Suggest replacement for ${currentMeal.name} (${mealType})`;
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'gpt-4.1',
             messages: [{ role: 'user', content: prompt }],
             response_format: { type: 'json_object' }
         });
@@ -442,7 +442,7 @@ Meal Plan: ${mealsText}`;
 
         const prompt = `Suggest replacement for exercise ${currentEx.name}`;
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'gpt-4.1',
             messages: [{ role: 'user', content: prompt }],
             response_format: { type: 'json_object' }
         });

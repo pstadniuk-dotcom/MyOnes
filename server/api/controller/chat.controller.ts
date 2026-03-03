@@ -3,12 +3,15 @@ import { chatService } from '../../modules/chat/chat.service';
 import { chatRepository } from '../../modules/chat/chat.repository';
 import { usersRepository } from '../../modules/users/users.repository';
 import { formulasRepository } from '../../modules/formulas/formulas.repository';
+import { systemRepository } from '../../modules/system/system.repository';
 
 import { getClientIP, checkRateLimit } from '../middleware/middleware';
 import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
 import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builder';
 import { analyzeQueryIntent } from '../../utils/query-intent-analyzer';
-import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget, autoExpandFormula, validateSupplementInteractions } from '../../modules/formulas/formula-service';
+import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget, autoExpandFormula } from '../../modules/formulas/formula-service';
+import { validateFormulaSafety, safetyWarningsToStrings } from '../../modules/formulas/safety-validator';
+import type { SafetyWarning } from '@shared/safety-types';
 import { recommendDailyProtocolCapsules } from '../../modules/chat/protocol-recommendation';
 import OpenAI from 'openai';
 import logger from '../../infra/logging/logger';
@@ -100,14 +103,30 @@ export class ChatController {
 
             const { healthProfile, labDataContext, activeFormula } = await chatService.getContext(userId);
 
-            const aiProvider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'anthropic';
-            let model = aiRuntimeSettings.model || process.env.AI_MODEL || (aiProvider === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'gpt-4o');
-            model = normalizeModel(aiProvider, model) || model;
+            // --- Stepped thinking progress ---
+            const contextParts: string[] = [];
+            if (healthProfile) contextParts.push('health profile');
+            if (labDataContext) contextParts.push(`${labDataContext.split('\n').length} biomarkers`);
+            if (activeFormula) contextParts.push('active formula');
+            sendSSE({
+                type: 'thinking_step',
+                step: 'review_data',
+                status: 'done',
+                detail: contextParts.length > 0 ? contextParts.join(', ') : 'No prior data on file'
+            });
 
-            sendSSE({ type: 'thinking', message: 'Analyzing your health data...' });
+            const aiProvider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'anthropic';
+            let model = aiRuntimeSettings.model || process.env.AI_MODEL || (aiProvider === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o');
+            model = normalizeModel(aiProvider, model) || model;
 
             // Analyze query intent to determine scope
             const queryIntent = await analyzeQueryIntent(message);
+            sendSSE({
+                type: 'thinking_step',
+                step: 'understand_query',
+                status: 'done',
+                detail: queryIntent?.scope || 'General consultation'
+            });
 
             const previousMessages = await chatRepository.listMessagesBySession(chatSession.id);
             const promptContext: PromptContext = {
@@ -120,6 +139,18 @@ export class ChatController {
             };
 
             const fullSystemPrompt = buildO1MiniPrompt(promptContext);
+            sendSSE({
+                type: 'thinking_step',
+                step: 'build_context',
+                status: 'done',
+                detail: 'Safety guidelines and ingredient catalog'
+            });
+            sendSSE({
+                type: 'thinking_step',
+                step: 'generate',
+                status: 'active',
+                detail: 'Generating response'
+            });
             const conversationHistory: any[] = [
                 { role: 'system', content: fullSystemPrompt },
                 ...promptContext.recentMessages!,
@@ -132,7 +163,7 @@ export class ChatController {
             if (aiProvider === 'anthropic') {
                 const systemPrompt = fullSystemPrompt;
                 const msgs = conversationHistory.slice(1);
-                for await (const chunk of chatService.streamAnthropic(systemPrompt, msgs, model, 0.7, 3000)) {
+                for await (const chunk of chatService.streamAnthropic(systemPrompt, msgs, model, 0.7, 4096)) {
                     if (chunk.type === 'text') {
                         fullResponse += chunk.content;
                         chunkCount++;
@@ -144,7 +175,7 @@ export class ChatController {
                     model: model,
                     messages: conversationHistory,
                     stream: true,
-                    max_completion_tokens: 3000,
+                    max_completion_tokens: 4096,
                     temperature: 0.7
                 });
 
@@ -209,41 +240,145 @@ export class ChatController {
                         const currentFormula = await formulasRepository.getCurrentFormulaByUser(userId);
                         const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
 
-                        // Merge AI-generated warnings with rule-based medication interaction checks
-                        const aiWarnings: string[] = validatedFormula.warnings || [];
+                        // ── COMPREHENSIVE SAFETY VALIDATION ─────────────────
+                        // Run the new severity-aware safety validator that covers:
+                        // drug interactions, pregnancy/nursing, allergies, organ flags
                         const userMedications: string[] = (healthProfile as any)?.medications || [];
-                        const interactionWarnings = await validateSupplementInteractions(validatedFormula, userMedications);
-                        // Deduplicate: only add server-side warnings not already covered by AI
-                        const mergedWarnings = [...aiWarnings];
-                        for (const iw of interactionWarnings) {
-                            const iwLower = iw.toLowerCase();
-                            const alreadyCovered = aiWarnings.some(aw => {
-                                const awLower = aw.toLowerCase();
-                                // Check for significant keyword overlap
-                                const keywords = iwLower.split(/\s+/).filter(w => w.length > 4);
-                                const matchCount = keywords.filter(k => awLower.includes(k)).length;
-                                return matchCount >= 3;
-                            });
-                            if (!alreadyCovered) {
-                                mergedWarnings.push(iw);
-                            }
-                        }
+                        const userConditions: string[] = (healthProfile as any)?.conditions || [];
+                        const userAllergies: string[] = (healthProfile as any)?.allergies || [];
 
-                        const formulaData = {
+                        // Detect pregnancy/nursing from conditions list
+                        const conditionsLower = userConditions.map(c => c.toLowerCase());
+                        const isPregnant = conditionsLower.some(c =>
+                          c.includes('pregnant') || c.includes('pregnancy') || c.includes('expecting')
+                        );
+                        const isNursing = conditionsLower.some(c =>
+                          c.includes('nursing') || c.includes('breastfeeding') || c.includes('lactating')
+                        );
+
+                        const safetyResult = validateFormulaSafety({
+                          formula: validatedFormula,
+                          userMedications,
+                          userConditions,
+                          userAllergies,
+                          isPregnant,
+                          isNursing,
+                        });
+
+                        // HARD BLOCK: If critical safety issues found, do NOT save formula
+                        if (!safetyResult.safe) {
+                          const blockedMsg = safetyResult.blockedReasons.join('\n\n');
+                          logger.warn('Formula BLOCKED by safety validator', {
                             userId,
-                            bases: validatedFormula.bases,
-                            additions: validatedFormula.additions,
-                            totalMg: validatedFormula.totalMg,
-                            rationale: validatedFormula.rationale,
-                            warnings: mergedWarnings,
-                            disclaimers: validatedFormula.disclaimers || [],
-                            version: nextVersion,
-                            targetCapsules: validatedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT,
-                            chatSessionId: chatSession.id,
-                        };
+                            blockedReasons: safetyResult.blockedReasons,
+                            criticalWarnings: safetyResult.warnings.filter(w => w.severity === 'critical'),
+                          });
 
-                        savedFormula = await formulasRepository.createFormula(formulaData);
-                        logger.info(`Formula v${nextVersion} saved successfully for user ${userId}`);
+                          // Audit log: formula blocked
+                          try {
+                            await systemRepository.createSafetyAuditLog({
+                              userId,
+                              action: 'formula_blocked',
+                              severity: 'critical',
+                              details: {
+                                warnings: safetyResult.warnings,
+                                blockedReasons: safetyResult.blockedReasons,
+                                medications: userMedications,
+                                conditions: userConditions,
+                                allergies: userAllergies,
+                                ingredients: [...(validatedFormula.bases || []), ...(validatedFormula.additions || [])].map((i: any) => i.ingredient),
+                              },
+                              ipAddress: getClientIP(req),
+                            });
+                          } catch (auditErr) {
+                            logger.error('Failed to write safety audit log', auditErr);
+                          }
+
+                          sendSSE({
+                            type: 'safety_block',
+                            error: `Formula cannot be created due to safety concerns:\n\n${blockedMsg}`,
+                            warnings: safetyResult.warnings,
+                            blockedReasons: safetyResult.blockedReasons,
+                          });
+                          fullResponse += `\n\n🚫 **Formula Blocked**: ${blockedMsg}`;
+                        } else {
+                          // Formula is safe to save — merge AI warnings with structured safety warnings
+                          const aiWarnings: string[] = validatedFormula.warnings || [];
+                          const structuredWarningStrings = safetyWarningsToStrings(safetyResult.warnings);
+
+                          // Deduplicate: only add server-side warnings not already covered by AI
+                          const mergedWarnings = [...aiWarnings];
+                          for (const sw of structuredWarningStrings) {
+                              const swLower = sw.toLowerCase();
+                              const alreadyCovered = aiWarnings.some(aw => {
+                                  const awLower = aw.toLowerCase();
+                                  const keywords = swLower.split(/\s+/).filter(w => w.length > 4);
+                                  const matchCount = keywords.filter(k => awLower.includes(k)).length;
+                                  return matchCount >= 3;
+                              });
+                              if (!alreadyCovered) {
+                                  mergedWarnings.push(sw);
+                              }
+                          }
+
+                          const formulaData = {
+                              userId,
+                              bases: validatedFormula.bases,
+                              additions: validatedFormula.additions,
+                              totalMg: validatedFormula.totalMg,
+                              rationale: validatedFormula.rationale,
+                              warnings: mergedWarnings,
+                              disclaimers: validatedFormula.disclaimers || [],
+                              version: nextVersion,
+                              targetCapsules: validatedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT,
+                              chatSessionId: chatSession.id,
+                              // Store structured safety data for acknowledgment tracking
+                              safetyValidation: {
+                                requiresAcknowledgment: safetyResult.requiresAcknowledgment,
+                                warnings: safetyResult.warnings,
+                              },
+                          };
+
+                          savedFormula = await formulasRepository.createFormula(formulaData);
+                          logger.info(`Formula v${nextVersion} saved successfully for user ${userId}`, {
+                            safetyWarningCount: safetyResult.warnings.length,
+                            requiresAcknowledgment: safetyResult.requiresAcknowledgment,
+                            severities: {
+                              serious: safetyResult.warnings.filter(w => w.severity === 'serious').length,
+                              informational: safetyResult.warnings.filter(w => w.severity === 'informational').length,
+                            },
+                          });
+
+                          // Send safety warnings to client via SSE for real-time display
+                          if (safetyResult.warnings.length > 0) {
+                            sendSSE({
+                              type: 'safety_warnings',
+                              warnings: safetyResult.warnings,
+                              requiresAcknowledgment: safetyResult.requiresAcknowledgment,
+                            });
+
+                            // Audit log: interaction warnings generated
+                            try {
+                              const highestSeverity = safetyResult.warnings.some(w => w.severity === 'serious') ? 'serious' : 'informational';
+                              await systemRepository.createSafetyAuditLog({
+                                userId,
+                                formulaId: savedFormula.id,
+                                action: 'interaction_warning',
+                                severity: highestSeverity,
+                                details: {
+                                  warnings: safetyResult.warnings,
+                                  medications: userMedications,
+                                  conditions: userConditions,
+                                  allergies: userAllergies,
+                                  ingredients: [...(validatedFormula.bases || []), ...(validatedFormula.additions || [])].map((i: any) => i.ingredient),
+                                },
+                                ipAddress: getClientIP(req),
+                              });
+                            } catch (auditErr) {
+                              logger.error('Failed to write safety audit log', auditErr);
+                            }
+                          }
+                        }
                     } else {
                         const errorMessage = budgetFit.fitsBudget
                             ? finalChecks.errors.join(', ')

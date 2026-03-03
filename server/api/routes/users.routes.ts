@@ -29,6 +29,10 @@ router.patch('/me/subscription', requireAuth, usersController.updateSubscription
 router.get('/me/auto-optimize', requireAuth, usersController.getAutoOptimize);
 router.patch('/me/auto-optimize', requireAuth, usersController.updateAutoOptimize);
 
+// Dashboard metric preferences
+router.get('/me/metric-preferences', requireAuth, usersController.getMetricPreferences);
+router.put('/me/metric-preferences', requireAuth, usersController.updateMetricPreferences);
+
 // Chat Session endpoints
 router.get('/me/sessions', requireAuth, usersController.getChatSessions);
 

@@ -14,11 +14,15 @@ export const ALLOWED_MODELS: Record<'openai' | 'anthropic', string[]> = {
         'o3', 'o3-mini', 'o3-pro', 'o4-mini'
     ],
     anthropic: [
-        // Claude 4.5 (latest)
+        // Claude 4.6 (latest)
+        'claude-opus-4-6-20260115', 'claude-opus-4-6',
+        'claude-sonnet-4-6-20260201', 'claude-sonnet-4-6',
+        'claude-haiku-4-6-20260115', 'claude-haiku-4-6',
+        // Claude 4.5
         'claude-opus-4-5-20251101', 'claude-opus-4-5',
         'claude-sonnet-4-5-20250929', 'claude-sonnet-4-5',
         'claude-haiku-4-5-20251001', 'claude-haiku-4-5',
-        // Claude 4.1 (previous)
+        // Claude 4.1 (legacy)
         'claude-opus-4-1-20250805', 'claude-opus-4-1',
         // Claude 3.5 (legacy)
         'claude-3-5-sonnet-20241022',
@@ -34,11 +38,23 @@ export function normalizeModel(provider: 'openai' | 'anthropic', model: string |
     // Common Anthropic aliases
     if (provider === 'anthropic') {
         const lower = m.toLowerCase();
-        // Map "claude 4.5" or "sonnet 4.5" variants to the alias
+        // Map "claude 4.6" or "sonnet 4.6" or "opus 4.6" variants
+        if (/opus-?4[\.-]?6/i.test(lower)) {
+            return 'claude-opus-4-6';
+        }
+        if (/claude-?4[\.-]?6(-sonnet)?(-latest)?/i.test(lower) || /sonnet-?4[\.-]?6/i.test(lower)) {
+            return 'claude-sonnet-4-6';
+        }
+        if (/haiku-?4[\.-]?6/i.test(lower)) {
+            return 'claude-haiku-4-6';
+        }
+        // Map "claude 4.5" or "sonnet 4.5" variants
+        if (/opus-?4[\.-]?5/i.test(lower)) {
+            return 'claude-opus-4-5';
+        }
         if (/claude-?4[\.-]?5(-sonnet)?(-latest)?/i.test(lower) || /sonnet-?4[\.-]?5/i.test(lower)) {
             return 'claude-sonnet-4-5';
         }
-        // Map "haiku 4.5" variants
         if (/haiku-?4[\.-]?5/i.test(lower)) {
             return 'claude-haiku-4-5';
         }

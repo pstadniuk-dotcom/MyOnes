@@ -3,6 +3,17 @@ import { ObjectStorageService } from './objectStorage';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+/** Wraps a promise with a timeout. Rejects if the promise doesn't resolve in time. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timeout: ${label} exceeded ${ms / 1000}s`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
 export interface LabDataExtraction {
   testDate?: string;
   testType?: string;
@@ -14,7 +25,16 @@ export interface LabDataExtraction {
     unit?: string;
     referenceRange?: string;
     status?: string;
+    category?: string;
+    clinicalNote?: string;
   }>;
+  riskPatterns?: Array<{
+    pattern: string;
+    markers: string[];
+    severity: 'info' | 'moderate' | 'urgent';
+    recommendation: string;
+  }>;
+  overallAssessment?: string;
   rawText?: string;
 }
 
@@ -46,60 +66,95 @@ export async function extractTextFromTextFile(buffer: Buffer): Promise<string> {
   }
 }
 
+/** OCR a single page image via GPT-4.1 Vision */
+async function ocrPage(dataUrl: string, pageNum: number): Promise<string> {
+  const response = await withTimeout(
+    openai.chat.completions.create({
+      model: 'gpt-4.1',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Extract all text from this lab report page. Include test names, values, units, reference ranges, and any other relevant information. Preserve the structure and formatting as much as possible.'
+            },
+            {
+              type: 'image_url',
+              image_url: { url: dataUrl, detail: 'high' }
+            }
+          ]
+        }
+      ],
+      max_tokens: 2000
+    }),
+    60_000,
+    `PDF page ${pageNum} OCR`
+  );
+  return response.choices[0]?.message?.content || '';
+}
+
+export type AnalysisProgressCallback = (step: string, detail?: string) => void;
+
+const PDF_CONCURRENCY = 4; // process 4 pages at a time
+
 /**
  * Extracts text from PDF files using OpenAI Vision API
- * Converts PDF pages to images and processes them with GPT-4o Vision
+ * Converts PDF pages to images then OCRs them in parallel batches
  */
-export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+export async function extractTextFromPDF(buffer: Buffer, onProgress?: AnalysisProgressCallback): Promise<string> {
   try {
     console.log('📄 Converting PDF to images...');
-    // Dynamic import to avoid loading browser-dependent pdfjs-dist at startup
     const { pdf } = await import('pdf-to-img');
-    const document = await pdf(buffer, { scale: 2.0 });
-    const extractedTexts: string[] = [];
+    const document = await pdf(buffer, { scale: 1.5 });
 
+    // Collect all page images first
+    const pageImages: { pageNum: number; dataUrl: string }[] = [];
     let pageNum = 1;
     for await (const page of document) {
-      console.log(`📄 Processing PDF page ${pageNum}...`);
-
-      // Convert page to base64
       const base64Image = page.toString('base64');
-      const dataUrl = `data:image/png;base64,${base64Image}`;
-
-      // Extract text using OpenAI Vision
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Extract all text from this lab report page. Include test names, values, units, reference ranges, and any other relevant information. Preserve the structure and formatting as much as possible.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: dataUrl,
-                  detail: 'high'
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 2000
-      });
-
-      const pageText = response.choices[0]?.message?.content || '';
-      if (pageText) {
-        extractedTexts.push(`--- Page ${pageNum} ---\n${pageText}`);
-      }
-
+      pageImages.push({ pageNum, dataUrl: `data:image/png;base64,${base64Image}` });
       pageNum++;
     }
 
-    console.log(`✅ Successfully extracted text from ${pageNum - 1} PDF page(s)`);
-    return extractedTexts.join('\n\n');
+    const totalPages = pageImages.length;
+    console.log(`📄 Collected ${totalPages} page(s), OCRing in batches of ${PDF_CONCURRENCY}...`);
+    onProgress?.('ocr', `Scanning ${totalPages} pages...`);
+
+    // Process pages in parallel batches, freeing image data as we go
+    const extractedTexts: string[] = new Array(totalPages).fill('');
+    for (let i = 0; i < totalPages; i += PDF_CONCURRENCY) {
+      const batch = pageImages.slice(i, i + PDF_CONCURRENCY);
+      const batchNums = batch.map(p => p.pageNum).join(', ');
+      console.log(`📄 Processing pages ${batchNums}...`);
+
+      const results = await Promise.allSettled(
+        batch.map(p => ocrPage(p.dataUrl, p.pageNum))
+      );
+
+      // Free image data for this batch to reduce memory pressure
+      for (const p of batch) {
+        (p as any).dataUrl = '';
+      }
+
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
+        const pg = batch[j].pageNum;
+        if (result.status === 'fulfilled' && result.value) {
+          extractedTexts[pg - 1] = `--- Page ${pg} ---\n${result.value}`;
+        } else if (result.status === 'rejected') {
+          console.warn(`⚠️ Page ${pg} OCR failed: ${result.reason?.message || result.reason}`);
+          extractedTexts[pg - 1] = `--- Page ${pg} ---\n[OCR failed]`;
+        }
+      }
+    }
+
+    // Free all image references
+    pageImages.length = 0;
+
+    const successCount = extractedTexts.filter(t => !t.includes('[OCR failed]') && t).length;
+    console.log(`✅ Successfully extracted text from ${successCount}/${totalPages} PDF page(s)`);
+    return extractedTexts.filter(Boolean).join('\n\n');
   } catch (error) {
     console.error('PDF parsing error:', error);
     throw new Error('Failed to extract text from PDF');
@@ -115,28 +170,32 @@ export async function extractTextFromImage(buffer: Buffer, mimeType: string): Pr
     const base64Image = buffer.toString('base64');
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o', // GPT-4 Vision model
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Extract all text from this lab report image. Include test names, values, units, reference ranges, and any other relevant information. Preserve the structure and formatting as much as possible.'
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: dataUrl,
-                detail: 'high'
+    const response = await withTimeout(
+      openai.chat.completions.create({
+        model: 'gpt-4.1', // Vision model for lab report OCR
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Extract all text from this lab report image. Include test names, values, units, reference ranges, and any other relevant information. Preserve the structure and formatting as much as possible.'
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: dataUrl,
+                  detail: 'high'
+                }
               }
-            }
-          ]
-        }
-      ],
-      max_tokens: 2000
-    });
+            ]
+          }
+        ],
+        max_tokens: 2000
+      }),
+      60_000,
+      'Image OCR'
+    );
 
     return response.choices[0]?.message?.content || '';
   } catch (error) {
@@ -146,61 +205,167 @@ export async function extractTextFromImage(buffer: Buffer, mimeType: string): Pr
 }
 
 /**
- * Analyzes extracted text and structures lab data using AI
+ * Analyzes extracted text and structures lab data using AI.
+ * Uses gpt-4o with high token limit. If the response is truncated,
+ * retries with gpt-4o at a higher token budget.
  */
 export async function structureLabData(rawText: string): Promise<LabDataExtraction> {
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a medical lab report analyzer. Extract structured data from lab reports and return it as JSON.
+  const systemPrompt = `You are an expert medical lab report analyzer. Extract structured data from lab reports and return it as JSON.
 
-Extract the following information:
-- testDate: Date of the test (ISO format if possible)
-- testType: Type of test (e.g., "Complete Blood Count", "Lipid Panel", "Vitamin D Test")
+Extract the following top-level fields:
+- testDate: Date of the test (ISO format YYYY-MM-DD if possible)
+- testType: Type of test (e.g., "Complete Blood Count", "Comprehensive Metabolic Panel", "Lipid Panel")
 - labName: Name of the laboratory
 - physicianName: Ordering physician's name
-- extractedData: Array of test results, where each item has:
-  - testName: Name of the test
-  - value: The numeric or text value
+- overallAssessment: A 2-3 sentence clinical summary of the report: how many markers are out of range, which are most concerning, and what the results suggest overall. Write for an informed consumer, not a doctor.
+- extractedData: Array of EVERY test result found, where each item has:
+  - testName: Standardized name of the test (e.g., "LDL Cholesterol" not "LDL-C Direct")
+  - value: The numeric or text value exactly as shown
   - unit: The unit of measurement (if present)
-  - referenceRange: The normal reference range (if present)
-  - status: "high", "low", or "normal" based on the reference range
+  - referenceRange: The normal reference range exactly as shown (e.g., "< 100 mg/dL", "30-100 ng/mL")
+  - status: "high", "low", "critical", or "normal" based on the reference range. Use "critical" only for values far outside the range that need urgent attention.
+  - category: The panel category this marker belongs to. Use one of: "Lipid Panel", "Complete Blood Count", "Metabolic Panel", "Liver Function", "Thyroid", "Vitamins & Minerals", "Hormones", "Inflammation", "Diabetes & Blood Sugar", "Kidney Function", "Cardiac", "Omega & Fatty Acids", "Urinalysis", "Autoimmune & Immune", "Prostate", "Toxicology & Metals", "Blood Type", "Other"
+  - clinicalNote: For any marker that is NOT normal, provide a brief 1-sentence explanation of what this value means for the patient's health. Leave empty string for normal markers.
+- riskPatterns: Array of multi-marker patterns you identify. Each has:
+  - pattern: A short name for the pattern (e.g., "Metabolic Syndrome Risk", "Methylation Concern", "Iron Deficiency")
+  - markers: Array of marker names involved in this pattern
+  - severity: "info", "moderate", or "urgent"
+  - recommendation: One actionable sentence about what to do
 
-Return ONLY valid JSON without any markdown formatting.`
-        },
-        {
-          role: 'user',
-          content: `Extract structured data from this lab report:\n\n${rawText}`
+Extract EVERY marker — do not skip any test results. If a reference range is not provided, still include the marker with an empty referenceRange.
+
+Return ONLY valid JSON without any markdown formatting.`;
+
+  const userMessage = `Extract structured data from this lab report:\n\n${rawText}`;
+
+  // Try with increasing token budgets
+  const attempts: Array<{ maxTokens: number; timeout: number }> = [
+    { maxTokens: 16384, timeout: 120_000 },
+    { maxTokens: 32768, timeout: 180_000 },
+  ];
+
+  for (let i = 0; i < attempts.length; i++) {
+    const { maxTokens, timeout } = attempts[i];
+    try {
+      console.log(`🔬 Structuring lab data (attempt ${i + 1}, max_tokens=${maxTokens})...`);
+      const response = await withTimeout(
+        openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+          ],
+          temperature: 0.1,
+          max_tokens: maxTokens,
+          response_format: { type: 'json_object' }
+        }),
+        timeout,
+        `Lab data structuring (attempt ${i + 1})`
+      );
+
+      const finishReason = response.choices[0]?.finish_reason;
+      const content = response.choices[0]?.message?.content;
+
+      if (!content) {
+        throw new Error('No response from AI');
+      }
+
+      // If truncated, try higher budget on next iteration
+      if (finishReason === 'length' && i < attempts.length - 1) {
+        console.warn(`⚠️ Response truncated at ${maxTokens} tokens, retrying with higher limit...`);
+        continue;
+      }
+
+      if (finishReason === 'length') {
+        console.warn('⚠️ Response still truncated at maximum budget. Attempting partial parse...');
+      }
+
+      let structured: any;
+      try {
+        structured = JSON.parse(content);
+      } catch (parseErr) {
+        // Try to salvage truncated JSON by closing open structures
+        console.warn('JSON parse failed, attempting to salvage truncated response...');
+        const salvaged = salvageTruncatedJSON(content);
+        if (salvaged) {
+          structured = salvaged;
+        } else {
+          throw parseErr;
         }
-      ],
-      temperature: 0.1,
-      response_format: { type: 'json_object' }
-    });
+      }
 
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No response from AI');
+      // Ensure extractedData is always an array
+      if (!Array.isArray(structured.extractedData)) {
+        console.warn('AI returned non-array extractedData, normalizing to empty array');
+        structured.extractedData = [];
+      }
+
+      console.log(`✅ Structured ${structured.extractedData.length} markers from lab data`);
+      return {
+        ...structured,
+        rawText
+      };
+    } catch (error) {
+      if (i < attempts.length - 1) {
+        console.warn(`Attempt ${i + 1} failed, retrying...`, (error as Error).message);
+        continue;
+      }
+      console.error('Lab data structuring error:', error);
+      return { rawText };
+    }
+  }
+
+  return { rawText };
+}
+
+/**
+ * Attempts to fix truncated JSON by closing open arrays/objects.
+ * Returns parsed object or null if unsalvageable.
+ */
+function salvageTruncatedJSON(content: string): any | null {
+  try {
+    // Try progressively trimming and closing
+    let trimmed = content.trimEnd();
+    
+    // Remove trailing incomplete string (end at last complete value)
+    const lastCompleteValue = Math.max(
+      trimmed.lastIndexOf('}'),
+      trimmed.lastIndexOf(']'),
+      trimmed.lastIndexOf('"'),
+      trimmed.lastIndexOf('null'),
+    );
+    
+    if (lastCompleteValue > 0) {
+      trimmed = trimmed.substring(0, lastCompleteValue + 1);
     }
 
-    const structured = JSON.parse(content);
+    // Count open brackets/braces and close them
+    let openBraces = 0;
+    let openBrackets = 0;
+    let inString = false;
+    let escaped = false;
 
-    // Ensure extractedData is always an array
-    if (!Array.isArray(structured.extractedData)) {
-      console.warn('AI returned non-array extractedData, normalizing to empty array');
-      structured.extractedData = [];
+    for (const ch of trimmed) {
+      if (escaped) { escaped = false; continue; }
+      if (ch === '\\') { escaped = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === '{') openBraces++;
+      if (ch === '}') openBraces--;
+      if (ch === '[') openBrackets++;
+      if (ch === ']') openBrackets--;
     }
 
-    return {
-      ...structured,
-      rawText
-    };
-  } catch (error) {
-    console.error('Lab data structuring error:', error);
-    // Return raw text if structuring fails
-    return { rawText };
+    // If we're in a string, close it
+    if (inString) trimmed += '"';
+
+    // Close brackets/braces
+    for (let i = 0; i < openBrackets; i++) trimmed += ']';
+    for (let i = 0; i < openBraces; i++) trimmed += '}';
+
+    return JSON.parse(trimmed);
+  } catch {
+    return null;
   }
 }
 
@@ -210,12 +375,15 @@ Return ONLY valid JSON without any markdown formatting.`
 export async function analyzeLabReport(
   objectPath: string,
   mimeType: string,
-  userId: string
+  userId: string,
+  onProgress?: AnalysisProgressCallback
 ): Promise<LabDataExtraction> {
-  try {
-    // Get file buffer directly from ObjectStorageService
-    const objectStorageService = new ObjectStorageService();
-    const fileBuffer = await objectStorageService.getLabReportFile(objectPath, userId);
+  // Overall 5-minute timeout for the entire analysis pipeline
+  return withTimeout((async () => {
+    try {
+      // Get file buffer directly from ObjectStorageService
+      const objectStorageService = new ObjectStorageService();
+      const fileBuffer = await objectStorageService.getLabReportFile(objectPath, userId);
 
     if (!fileBuffer) {
       throw new Error(`Failed to download file from storage`);
@@ -228,8 +396,10 @@ export async function analyzeLabReport(
 
     // Extract text based on file type
     if (fileType === 'pdf') {
-      extractedText = await extractTextFromPDF(fileBuffer);
+      onProgress?.('ocr', 'Converting PDF pages...');
+      extractedText = await extractTextFromPDF(fileBuffer, onProgress);
     } else if (fileType === 'image') {
+      onProgress?.('ocr', 'Reading image...');
       extractedText = await extractTextFromImage(fileBuffer, mimeType);
     } else if (fileType === 'text') {
       extractedText = await extractTextFromTextFile(fileBuffer);
@@ -238,11 +408,16 @@ export async function analyzeLabReport(
     }
 
     // Structure the extracted text into lab data
+    console.log(`📊 OCR text length: ${extractedText.length} chars (~${Math.round(extractedText.length / 4)} tokens). Sending to structuring...`);
+    onProgress?.('structuring', 'Analyzing biomarkers...');
     const labData = await structureLabData(extractedText);
+
+    onProgress?.('insights', 'Generating insights...');
 
     return labData;
   } catch (error) {
     console.error('Lab report analysis error:', error);
     throw error;
   }
+  })(), 5 * 60_000, 'Overall lab report analysis');
 }

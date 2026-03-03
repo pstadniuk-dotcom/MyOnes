@@ -174,8 +174,10 @@ export default function MyFormulaPage() {
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
   const [includeMembershipAtCheckout, setIncludeMembershipAtCheckout] = useState(true);
   const [membershipBenefitsOpen, setMembershipBenefitsOpen] = useState(false);
+  const [formulaDetailsOpen, setFormulaDetailsOpen] = useState(false);
   const [smsOptInAtFirstPurchase, setSmsOptInAtFirstPurchase] = useState(true);
   const [medDisclosureAcknowledged, setMedDisclosureAcknowledged] = useState(false);
+  const [safetyWarningsAcknowledged, setSafetyWarningsAcknowledged] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [showCustomBuilderDialog, setShowCustomBuilderDialog] = useState(false);
   const [renamingFormulaId, setRenamingFormulaId] = useState<string | null>(null);
@@ -426,9 +428,42 @@ export default function MyFormulaPage() {
       window.location.href = checkoutUrl;
     },
     onError: (error: any) => {
+      const errorMessage = error?.message || 'Please try again in a moment.';
+      // Handle safety acknowledgment error specifically
+      if (errorMessage.includes('safety warnings') || errorMessage.includes('SAFETY_WARNINGS_NOT_ACKNOWLEDGED')) {
+        toast({
+          title: 'Safety Acknowledgment Required',
+          description: 'Please review and acknowledge the safety warnings for this formula before proceeding.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Unable to continue to checkout',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      }
+    },
+  });
+
+  // Acknowledge safety warnings before checkout
+  const acknowledgeWarningsMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedFormula?.id) {
+        throw new Error('No formula selected.');
+      }
+
+      const response = await apiRequest('POST', `/api/users/me/formula/${selectedFormula.id}/acknowledge-warnings`);
+      return response.json() as Promise<{ acknowledged: boolean; acknowledgedAt: string; warningCount: number }>;
+    },
+    onSuccess: () => {
+      setSafetyWarningsAcknowledged(true);
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/current'] });
+    },
+    onError: (error: any) => {
       toast({
-        title: 'Unable to continue to checkout',
-        description: error?.message || 'Please try again in a moment.',
+        title: 'Could not acknowledge warnings',
+        description: error?.message || 'Please try again.',
         variant: 'destructive',
       });
     },
@@ -924,115 +959,6 @@ export default function MyFormulaPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Daily Dosage Instructions */}
-                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-sm flex items-center gap-2">
-                        <Pill className="w-4 h-4" />
-                        Daily Dosage Instructions
-                      </h4>
-                      <span className="font-medium text-base" data-testid="text-order-dosage">
-                        {calculateDosage(selectedFormula.totalMg, selectedFormula.targetCapsules || undefined).display}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Take {calculateDosage(selectedFormula.totalMg, selectedFormula.targetCapsules || undefined).perMeal} capsules with each meal (morning, lunch, dinner) •
-                      {selectedFormula.targetCapsules || calculateDosage(selectedFormula.totalMg).total} capsules per day
-                    </p>
-                  </div>
-
-                  {/* System Supports */}
-                  {selectedFormula.bases.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        <Beaker className="w-4 h-4" />
-                        System Supports ({selectedFormula.bases.length})
-                      </h4>
-                      <div className="space-y-2">
-                        {selectedFormula.bases.map((base, idx) => (
-                          <div key={idx} className="p-2 bg-muted/30 rounded text-sm">
-                            <div className="font-medium">{base.ingredient} - {base.amount}{base.unit}</div>
-                            {base.purpose && <div className="text-muted-foreground text-xs mt-1">{base.purpose}</div>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Custom Additions */}
-                  {selectedFormula.additions.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        <Plus className="w-4 h-4" />
-                        Individual Ingredients ({selectedFormula.additions.length})
-                      </h4>
-                      <div className="space-y-2">
-                        {selectedFormula.additions.map((addition, idx) => (
-                          <div key={idx} className="p-2 bg-muted/30 rounded text-sm">
-                            <div className="font-medium">{addition.ingredient} - {addition.amount}{addition.unit}</div>
-                            {addition.purpose && <div className="text-muted-foreground text-xs mt-1">{addition.purpose}</div>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* User Customizations */}
-                  {((selectedFormula.userCustomizations?.addedBases?.length || 0) > 0 || (selectedFormula.userCustomizations?.addedIndividuals?.length || 0) > 0) && (
-                    <div>
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-purple-600" />
-                        <span className="text-purple-600">Your Customizations ({(selectedFormula.userCustomizations?.addedBases?.length || 0) + (selectedFormula.userCustomizations?.addedIndividuals?.length || 0)})</span>
-                      </h4>
-                      <div className="space-y-2">
-                        {selectedFormula.userCustomizations?.addedBases?.map((base, idx) => (
-                          <div key={`base-${idx}`} className="p-2 bg-purple-50 rounded text-sm border border-purple-200">
-                            <div className="font-medium text-purple-900">{base.ingredient} - {base.amount}{base.unit}</div>
-                          </div>
-                        ))}
-                        {selectedFormula.userCustomizations?.addedIndividuals?.map((ind, idx) => {
-                          const ingredientDetails = getIndividualIngredientDetails(ind.ingredient);
-                          const expandKey = `order-ind-${idx}`;
-                          return (
-                            <div key={`ind-${idx}`} className="p-2 bg-purple-50 rounded text-sm border border-purple-200">
-                              {ingredientDetails?.benefits && ingredientDetails.benefits.length > 0 ? (
-                                <Collapsible
-                                  open={expandedIndividualIngredients[expandKey]}
-                                  onOpenChange={(open) => {
-                                    setExpandedIndividualIngredients(prev => ({ ...prev, [expandKey]: open }));
-                                  }}
-                                >
-                                  <CollapsibleTrigger className="w-full hover-elevate active-elevate-2 rounded p-1 -m-1">
-                                    <div className="flex items-center justify-between">
-                                      <div className="font-medium text-purple-900">{ind.ingredient} - {ind.amount}{ind.unit}</div>
-                                      {expandedIndividualIngredients[expandKey] ? (
-                                        <ChevronUp className="w-3 h-3 text-purple-600" />
-                                      ) : (
-                                        <ChevronDown className="w-3 h-3 text-purple-600" />
-                                      )}
-                                    </div>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent className="mt-2">
-                                    <div className="bg-primary/5 rounded-md p-2 space-y-1">
-                                      {ingredientDetails.benefits.map((benefit, bidx) => (
-                                        <div key={bidx} className="flex items-start gap-2">
-                                          <CheckCircle className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
-                                          <span className="text-xs text-muted-foreground">{benefit}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </CollapsibleContent>
-                                </Collapsible>
-                              ) : (
-                                <div className="font-medium text-purple-900">{ind.ingredient} - {ind.amount}{ind.unit}</div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
                   {membershipUpsellAvailable ? (
                     <Card className={`transition-all duration-200 ${
                       includeMembershipAtCheckout
@@ -1164,7 +1090,7 @@ export default function MyFormulaPage() {
                         <div className="rounded-lg bg-white border p-3">
                           <div className="flex justify-between items-end mb-2">
                             {[
-                              { name: 'Founding', price: 9, limit: 100 },
+                              { name: 'Founding', price: 9, limit: currentMembershipTier?.maxCapacity ?? 250 },
                               { name: 'Early', price: 15, limit: 500 },
                               { name: 'Beta', price: 19, limit: 2000 },
                               { name: 'Standard', price: STANDARD_TIER_PRICE, limit: null as number | null },
@@ -1195,7 +1121,7 @@ export default function MyFormulaPage() {
                           </div>
                           <div className="flex justify-between items-start">
                             {[
-                              { name: 'Founding', note: 'First 100' },
+                              { name: 'Founding', note: `First ${currentMembershipTier?.maxCapacity?.toLocaleString() ?? '250'}` },
                               { name: 'Early', note: 'First 500' },
                               { name: 'Beta', note: 'First 2,000' },
                               { name: 'Standard', note: 'After launch' },
@@ -1435,37 +1361,169 @@ export default function MyFormulaPage() {
                     );
                   })() : null}
 
-                  {!hasSmsAccountabilityConsent && (
-                    <div className="rounded-lg border border-[#1B4332]/15 overflow-hidden">
-                      <div className="bg-[#1B4332]/[0.04] px-4 py-3 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center flex-shrink-0">
-                          <MessageSquare className="w-4 h-4 text-[#1B4332]" />
+                  {/* Formula Details — Collapsible */}
+                  <Collapsible open={formulaDetailsOpen} onOpenChange={setFormulaDetailsOpen}>
+                    <CollapsibleTrigger className="w-full group">
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-muted hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <FlaskConical className="w-4 h-4 text-muted-foreground" />
+                          View formula details
+                          <span className="text-muted-foreground font-normal">
+                            ({selectedFormula.bases.length + selectedFormula.additions.length + (selectedFormula.userCustomizations?.addedBases?.length || 0) + (selectedFormula.userCustomizations?.addedIndividuals?.length || 0)} ingredients • {selectedFormula.totalMg}mg)
+                          </span>
                         </div>
+                        {formulaDetailsOpen ? (
+                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-4 mt-3">
+                      {/* Daily Dosage Instructions */}
+                      <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold text-sm flex items-center gap-2">
+                            <Pill className="w-4 h-4" />
+                            Daily Dosage Instructions
+                          </h4>
+                          <span className="font-medium text-base" data-testid="text-order-dosage">
+                            {calculateDosage(selectedFormula.totalMg, selectedFormula.targetCapsules || undefined).display}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Take {calculateDosage(selectedFormula.totalMg, selectedFormula.targetCapsules || undefined).perMeal} capsules with each meal (morning, lunch, dinner) •
+                          {selectedFormula.targetCapsules || calculateDosage(selectedFormula.totalMg).total} capsules per day
+                        </p>
+                      </div>
+
+                      {/* System Supports */}
+                      {selectedFormula.bases.length > 0 && (
                         <div>
-                          <p className="text-sm font-semibold text-[#1B4332]">Want an AI accountability partner?</p>
-                          <p className="text-xs text-[#52796F]">We'll text you daily reminders to take your supplements and check in on how you're feeling.</p>
-                        </div>
-                      </div>
-                      <div className="px-4 py-3 flex items-start gap-2">
-                        <Checkbox
-                          id="sms-opt-in-first-purchase"
-                          checked={smsOptInAtFirstPurchase}
-                          onCheckedChange={(checked) => setSmsOptInAtFirstPurchase(checked === true)}
-                          className="mt-0.5"
-                        />
-                        <label htmlFor="sms-opt-in-first-purchase" className="text-xs leading-relaxed cursor-pointer text-muted-foreground">
-                          Yes, text me! Msg frequency varies. Msg & data rates may apply. Reply STOP anytime.
-                        </label>
-                      </div>
-                      {!user?.phone && smsOptInAtFirstPurchase && (
-                        <div className="px-4 pb-3">
-                          <p className="text-xs text-muted-foreground">
-                            Add a phone number in your profile to enable SMS reminders.
-                          </p>
+                          <h4 className="font-semibold mb-2 flex items-center gap-2">
+                            <Beaker className="w-4 h-4" />
+                            System Supports ({selectedFormula.bases.length})
+                          </h4>
+                          <div className="space-y-2">
+                            {selectedFormula.bases.map((base, idx) => (
+                              <div key={idx} className="p-2 bg-muted/30 rounded text-sm">
+                                <div className="font-medium">{base.ingredient} - {base.amount}{base.unit}</div>
+                                {base.purpose && <div className="text-muted-foreground text-xs mt-1">{base.purpose}</div>}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
+
+                      {/* Individual Ingredients */}
+                      {selectedFormula.additions.length > 0 && (
+                        <div>
+                          <h4 className="font-semibold mb-2 flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Individual Ingredients ({selectedFormula.additions.length})
+                          </h4>
+                          <div className="space-y-2">
+                            {selectedFormula.additions.map((addition, idx) => (
+                              <div key={idx} className="p-2 bg-muted/30 rounded text-sm">
+                                <div className="font-medium">{addition.ingredient} - {addition.amount}{addition.unit}</div>
+                                {addition.purpose && <div className="text-muted-foreground text-xs mt-1">{addition.purpose}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* User Customizations */}
+                      {((selectedFormula.userCustomizations?.addedBases?.length || 0) > 0 || (selectedFormula.userCustomizations?.addedIndividuals?.length || 0) > 0) && (
+                        <div>
+                          <h4 className="font-semibold mb-2 flex items-center gap-2">
+                            <Users className="w-4 h-4 text-purple-600" />
+                            <span className="text-purple-600">Your Customizations ({(selectedFormula.userCustomizations?.addedBases?.length || 0) + (selectedFormula.userCustomizations?.addedIndividuals?.length || 0)})</span>
+                          </h4>
+                          <div className="space-y-2">
+                            {selectedFormula.userCustomizations?.addedBases?.map((base, idx) => (
+                              <div key={`base-${idx}`} className="p-2 bg-purple-50 rounded text-sm border border-purple-200">
+                                <div className="font-medium text-purple-900">{base.ingredient} - {base.amount}{base.unit}</div>
+                              </div>
+                            ))}
+                            {selectedFormula.userCustomizations?.addedIndividuals?.map((ind, idx) => {
+                              const ingredientDetails = getIndividualIngredientDetails(ind.ingredient);
+                              const expandKey = `order-ind-${idx}`;
+                              return (
+                                <div key={`ind-${idx}`} className="p-2 bg-purple-50 rounded text-sm border border-purple-200">
+                                  {ingredientDetails?.benefits && ingredientDetails.benefits.length > 0 ? (
+                                    <Collapsible
+                                      open={expandedIndividualIngredients[expandKey]}
+                                      onOpenChange={(open) => {
+                                        setExpandedIndividualIngredients(prev => ({ ...prev, [expandKey]: open }));
+                                      }}
+                                    >
+                                      <CollapsibleTrigger className="w-full hover-elevate active-elevate-2 rounded p-1 -m-1">
+                                        <div className="flex items-center justify-between">
+                                          <div className="font-medium text-purple-900">{ind.ingredient} - {ind.amount}{ind.unit}</div>
+                                          {expandedIndividualIngredients[expandKey] ? (
+                                            <ChevronUp className="w-3 h-3 text-purple-600" />
+                                          ) : (
+                                            <ChevronDown className="w-3 h-3 text-purple-600" />
+                                          )}
+                                        </div>
+                                      </CollapsibleTrigger>
+                                      <CollapsibleContent className="mt-2">
+                                        <div className="bg-primary/5 rounded-md p-2 space-y-1">
+                                          {ingredientDetails.benefits.map((benefit, bidx) => (
+                                            <div key={bidx} className="flex items-start gap-2">
+                                              <CheckCircle className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                                              <span className="text-xs text-muted-foreground">{benefit}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </CollapsibleContent>
+                                    </Collapsible>
+                                  ) : (
+                                    <div className="font-medium text-purple-900">{ind.ingredient} - {ind.amount}{ind.unit}</div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <div className="rounded-lg border border-[#1B4332]/15 overflow-hidden">
+                    <div className="bg-[#1B4332]/[0.04] px-4 py-3 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center flex-shrink-0">
+                        <MessageSquare className="w-4 h-4 text-[#1B4332]" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-[#1B4332]">
+                          {hasSmsAccountabilityConsent ? 'ONES Accountability AI enabled' : 'Want an AI accountability partner?'}
+                        </p>
+                        <p className="text-xs text-[#52796F]">We'll text you daily reminders to take your supplements and check in on how you're feeling.</p>
+                      </div>
                     </div>
-                  )}
+                    <div className="px-4 py-3 flex items-start gap-2">
+                      <Checkbox
+                        id="sms-opt-in-first-purchase"
+                        checked={smsOptInAtFirstPurchase}
+                        onCheckedChange={(checked) => setSmsOptInAtFirstPurchase(checked === true)}
+                        className="mt-0.5"
+                      />
+                      <label htmlFor="sms-opt-in-first-purchase" className="text-xs leading-relaxed cursor-pointer text-muted-foreground">
+                        {hasSmsAccountabilityConsent
+                          ? 'Keep sending me daily reminders with this order.'
+                          : 'Yes, text me! Msg frequency varies. Msg & data rates may apply. Reply STOP anytime.'}
+                      </label>
+                    </div>
+                    {!user?.phone && smsOptInAtFirstPurchase && (
+                      <div className="px-4 pb-3">
+                        <p className="text-xs text-muted-foreground">
+                          Add a phone number in your profile to enable SMS reminders.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -1473,26 +1531,109 @@ export default function MyFormulaPage() {
 
           {/* Safety & Consent */}
           <div className="space-y-3">
-            {/* Collapsible safety notes */}
-            {selectedFormula && selectedFormula.warnings && selectedFormula.warnings.length > 0 && (
-              <details className="group rounded-lg border border-muted">
-                <summary className="flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-muted-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:bg-muted/30 rounded-lg transition-colors">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                  <span>{selectedFormula.warnings.length} safety note{selectedFormula.warnings.length !== 1 ? 's' : ''} for your formula</span>
-                  <ChevronDown className="w-3.5 h-3.5 ml-auto transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="px-3 pb-3">
-                  <ul className="space-y-2 text-xs text-muted-foreground">
-                    {selectedFormula.warnings.map((warning, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-amber-500 mt-0.5 flex-shrink-0">•</span>
-                        <span>{warning}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </details>
-            )}
+            {/* Severity-aware safety warnings */}
+            {selectedFormula && selectedFormula.warnings && selectedFormula.warnings.length > 0 && (() => {
+              // Categorize warnings by severity using prefix markers
+              const criticalWarnings = selectedFormula.warnings.filter(w => w.startsWith('🚫 ') || w.includes('BLOCKED'));
+              const seriousWarnings = selectedFormula.warnings.filter(w => (w.startsWith('⚠️ ') || w.includes('CRITICAL')) && !w.startsWith('🚫 ') && !w.includes('BLOCKED'));
+              const infoWarnings = selectedFormula.warnings.filter(w => !w.startsWith('🚫 ') && !w.includes('BLOCKED') && !w.startsWith('⚠️ ') && !w.includes('CRITICAL'));
+              const hasSeriousOrCritical = criticalWarnings.length > 0 || seriousWarnings.length > 0;
+              const safetyValidation = (selectedFormula as any)?.safetyValidation;
+              const requiresAck = safetyValidation?.requiresAcknowledgment || hasSeriousOrCritical;
+              const alreadyAcked = !!(selectedFormula as any)?.warningsAcknowledgedAt;
+
+              return (
+                <>
+                  {/* Critical warnings (always expanded, red border) */}
+                  {criticalWarnings.length > 0 && (
+                    <div className="rounded-lg border-2 border-red-400 bg-red-50 dark:bg-red-950/30 p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                        <span className="text-xs font-semibold text-red-700 dark:text-red-400">
+                          {criticalWarnings.length} critical safety issue{criticalWarnings.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <ul className="space-y-2 text-xs text-red-700 dark:text-red-300">
+                        {criticalWarnings.map((warning, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-red-500 mt-0.5 flex-shrink-0">●</span>
+                            <span>{warning.replace(/^🚫 /, '')}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Serious warnings (expanded, amber border) */}
+                  {seriousWarnings.length > 0 && (
+                    <div className="rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                          {seriousWarnings.length} important warning{seriousWarnings.length !== 1 ? 's' : ''} — review required
+                        </span>
+                      </div>
+                      <ul className="space-y-2 text-xs text-amber-700 dark:text-amber-300">
+                        {seriousWarnings.map((warning, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-amber-500 mt-0.5 flex-shrink-0">▲</span>
+                            <span>{warning.replace(/^⚠️ /, '')}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Informational warnings (collapsible) */}
+                  {infoWarnings.length > 0 && (
+                    <details className="group rounded-lg border border-muted">
+                      <summary className="flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-muted-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:bg-muted/30 rounded-lg transition-colors">
+                        <AlertTriangle className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                        <span>{infoWarnings.length} informational note{infoWarnings.length !== 1 ? 's' : ''}</span>
+                        <ChevronDown className="w-3.5 h-3.5 ml-auto transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="px-3 pb-3">
+                        <ul className="space-y-2 text-xs text-muted-foreground">
+                          {infoWarnings.map((warning, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <span className="text-blue-400 mt-0.5 flex-shrink-0">•</span>
+                              <span>{warning.replace(/^ℹ️ /, '')}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </details>
+                  )}
+
+                  {/* Safety acknowledgment checkbox (required for serious warnings) */}
+                  {requiresAck && !alreadyAcked && (
+                    <div className="flex items-start gap-2.5 rounded-lg border-2 border-amber-300 bg-amber-50/50 dark:bg-amber-950/20 p-3">
+                      <Checkbox
+                        id="safety-warnings-ack"
+                        checked={safetyWarningsAcknowledged}
+                        onCheckedChange={(checked) => {
+                          setSafetyWarningsAcknowledged(checked === true);
+                          if (checked === true && selectedFormula?.id) {
+                            acknowledgeWarningsMutation.mutate();
+                          }
+                        }}
+                        className="mt-0.5"
+                      />
+                      <label htmlFor="safety-warnings-ack" className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed cursor-pointer font-medium">
+                        I have reviewed all safety warnings above and understand the potential risks. I will consult my physician about the flagged interactions before starting this formula.
+                      </label>
+                    </div>
+                  )}
+
+                  {alreadyAcked && (
+                    <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400 px-1">
+                      <span>✓</span>
+                      <span>Safety warnings acknowledged</span>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             {/* Consent checkbox with integrated disclaimer */}
             <div className="flex items-start gap-2.5">
@@ -1530,7 +1671,15 @@ export default function MyFormulaPage() {
                   // Errors are handled in mutation onError
                 }
               }}
-              disabled={purchaseSmsOptInMutation.isPending || checkoutSessionMutation.isPending || !medDisclosureAcknowledged}
+              disabled={purchaseSmsOptInMutation.isPending || checkoutSessionMutation.isPending || !medDisclosureAcknowledged || (() => {
+                // Block checkout if formula has serious warnings that haven't been acknowledged
+                if (!selectedFormula) return false;
+                const sv = (selectedFormula as any)?.safetyValidation;
+                const hasSerious = selectedFormula.warnings?.some(w => w.startsWith('⚠️ ') || w.includes('CRITICAL') || w.startsWith('🚫 ') || w.includes('BLOCKED'));
+                const requiresAck = sv?.requiresAcknowledgment || hasSerious;
+                const alreadyAcked = !!(selectedFormula as any)?.warningsAcknowledgedAt;
+                return requiresAck && !alreadyAcked && !safetyWarningsAcknowledged;
+              })()}
               data-testid="button-proceed-checkout"
             >
               <ArrowRight className="w-4 h-4 mr-2" />

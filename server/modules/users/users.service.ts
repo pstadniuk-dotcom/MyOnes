@@ -213,6 +213,18 @@ export class UsersService {
         if (!user) return undefined;
         return { autoOptimizeFormula: user.autoOptimizeFormula ?? false };
     }
+
+    async getMetricPreferences(userId: string) {
+        const user = await usersRepository.getUser(userId);
+        if (!user) return undefined;
+        return { metricPreferences: user.metricPreferences ?? null };
+    }
+
+    async updateMetricPreferences(userId: string, metrics: string[]) {
+        const updated = await usersRepository.updateUser(userId, { metricPreferences: metrics });
+        if (!updated) return undefined;
+        return { metricPreferences: updated.metricPreferences };
+    }
 }
 
 export const usersService = new UsersService();
