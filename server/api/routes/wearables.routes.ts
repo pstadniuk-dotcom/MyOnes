@@ -59,4 +59,19 @@ router.get('/health-pulse', requireAuth, wearablesController.getHealthPulseSumma
  */
 router.get('/pillars', requireAuth, wearablesController.getPillars);
 
+/**
+ * AI-powered analysis of wearable health data with actionable insights
+ */
+router.get('/ai-analysis', requireAuth, wearablesController.getAiAnalysis);
+
+/**
+ * Weekly Brief: tiered health analysis with deterministic signals + AI narrative
+ */
+router.get('/weekly-brief', requireAuth, wearablesController.getWeeklyBrief);
+
+/**
+ * Health Pulse Intelligence: deterministic signal detection + AI narrative
+ */
+router.get('/health-pulse-intelligence', requireAuth, wearablesController.getHealthPulseIntelligence);
+
 export default router;

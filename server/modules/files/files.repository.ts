@@ -11,7 +11,12 @@ type LabReportDataShape = {
     labName?: string;
     physicianName?: string;
     analysisStatus?: 'pending' | 'processing' | 'completed' | 'error';
+    progressStep?: string;
+    progressDetail?: string;
     extractedData?: Array<Record<string, any>> | Record<string, any>;
+    markerInsights?: Record<string, any>;
+    overallAssessment?: string;
+    riskPatterns?: Array<Record<string, any>>;
 };
 
 function normalizeLabReportData(data?: unknown): DbInsertFileUpload['labReportData'] {
@@ -31,6 +36,21 @@ function normalizeLabReportData(data?: unknown): DbInsertFileUpload['labReportDa
     }
     if (payload.extractedData && typeof payload.extractedData === 'object') {
         normalized.extractedData = payload.extractedData as Record<string, any>;
+    }
+    if (payload.markerInsights && typeof payload.markerInsights === 'object') {
+        normalized.markerInsights = payload.markerInsights;
+    }
+    if (typeof payload.overallAssessment === 'string') {
+        normalized.overallAssessment = payload.overallAssessment;
+    }
+    if (Array.isArray(payload.riskPatterns)) {
+        normalized.riskPatterns = payload.riskPatterns;
+    }
+    if (typeof payload.progressStep === 'string') {
+        normalized.progressStep = payload.progressStep;
+    }
+    if (typeof payload.progressDetail === 'string') {
+        normalized.progressDetail = payload.progressDetail;
     }
 
     return (Object.keys(normalized).length > 0 ? normalized : null) as DbInsertFileUpload['labReportData'];
@@ -90,6 +110,34 @@ export class FilesRepository {
         }
 
         return await db.select().from(fileUploads).where(whereClause).orderBy(desc(fileUploads.uploadedAt));
+    }
+
+    /**
+     * Recover stale processing records on server startup.
+     * Any file stuck in 'processing' or 'pending' gets set to 'error' so the user can retry.
+     */
+    async recoverStaleProcessing(): Promise<number> {
+        const allFiles = await db.select().from(fileUploads)
+            .where(and(
+                eq(fileUploads.type, 'lab_report'),
+                isNull(fileUploads.deletedAt)
+            ));
+
+        let recovered = 0;
+        for (const file of allFiles) {
+            const status = (file.labReportData as any)?.analysisStatus;
+            if (status === 'processing' || status === 'pending') {
+                await this.updateFileUpload(file.id, {
+                    labReportData: {
+                        ...((file.labReportData as any) || {}),
+                        analysisStatus: 'error',
+                        progressDetail: 'Analysis interrupted — please re-analyze.',
+                    }
+                });
+                recovered++;
+            }
+        }
+        return recovered;
     }
 
     async getLabReportsByUser(userId: string): Promise<FileUpload[]> {

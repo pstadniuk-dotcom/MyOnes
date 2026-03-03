@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { formulasService } from '../../modules/formulas/formulas.service';
 import { formulaReviewService } from '../../modules/formulas/formula-review.service';
+import { formulasRepository } from '../../modules/formulas/formulas.repository';
+import { systemRepository } from '../../modules/system/system.repository';
+import { getClientIP } from '../middleware/middleware';
 import logger from '../../infra/logging/logger';
 
 export class FormulasController {
@@ -336,6 +339,104 @@ export class FormulasController {
         } catch (error) {
             logger.error('Error fetching formula review status:', error);
             res.status(500).json({ error: 'Failed to fetch formula review status' });
+        }
+    }
+
+    // ── Safety Warning Acknowledgment ───────────────────────────────────
+
+    async acknowledgeWarnings(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const { formulaId } = req.params;
+
+            // Validate formula exists and belongs to user
+            const formula = await formulasRepository.getFormula(formulaId);
+            if (!formula || formula.userId !== userId) {
+                return res.status(404).json({ error: 'Formula not found or access denied' });
+            }
+
+            // Check if formula has warnings that need acknowledgment
+            const safetyValidation = formula.safetyValidation as any;
+            if (!safetyValidation?.requiresAcknowledgment) {
+                return res.json({ acknowledged: true, message: 'No acknowledgment required for this formula.' });
+            }
+
+            const acknowledgedWarnings = safetyValidation.warnings || [];
+
+            // Create acknowledgment record
+            const ack = await systemRepository.createWarningAcknowledgment({
+                formulaId,
+                userId,
+                acknowledgedWarnings,
+                disclaimerVersion: '1.0',
+                ipAddress: getClientIP(req),
+                userAgent: req.headers['user-agent'] || null,
+            });
+
+            // Update formula with acknowledgment timestamp
+            await formulasRepository.updateFormulaAcknowledgment(formulaId, {
+                warningsAcknowledgedAt: new Date(),
+                warningsAcknowledgedIp: getClientIP(req),
+            });
+
+            // Safety audit log: warnings acknowledged
+            try {
+                await systemRepository.createSafetyAuditLog({
+                    userId,
+                    formulaId,
+                    action: 'warning_acknowledged',
+                    severity: 'informational',
+                    details: {
+                        warnings: acknowledgedWarnings,
+                    },
+                    ipAddress: getClientIP(req),
+                    userAgent: req.headers['user-agent'] || null,
+                });
+            } catch (auditErr) {
+                logger.error('Failed to write safety audit log for acknowledgment', auditErr);
+            }
+
+            logger.info(`User ${userId} acknowledged ${acknowledgedWarnings.length} warnings for formula ${formulaId}`);
+
+            res.json({
+                acknowledged: true,
+                acknowledgedAt: ack.acknowledgedAt,
+                warningCount: acknowledgedWarnings.length,
+            });
+        } catch (error) {
+            logger.error('Error acknowledging formula warnings:', error);
+            res.status(500).json({ error: 'Failed to acknowledge warnings' });
+        }
+    }
+
+    async getAcknowledgmentStatus(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const { formulaId } = req.params;
+
+            const formula = await formulasRepository.getFormula(formulaId);
+            if (!formula || formula.userId !== userId) {
+                return res.status(404).json({ error: 'Formula not found or access denied' });
+            }
+
+            const safetyValidation = formula.safetyValidation as any;
+            const requiresAcknowledgment = safetyValidation?.requiresAcknowledgment || false;
+            const isAcknowledged = !!formula.warningsAcknowledgedAt;
+
+            const ack = requiresAcknowledgment
+                ? await systemRepository.getWarningAcknowledgment(formulaId, userId)
+                : null;
+
+            res.json({
+                requiresAcknowledgment,
+                isAcknowledged,
+                acknowledgedAt: ack?.acknowledgedAt || formula.warningsAcknowledgedAt || null,
+                warnings: safetyValidation?.warnings || [],
+                canCheckout: !requiresAcknowledgment || isAcknowledged,
+            });
+        } catch (error) {
+            logger.error('Error fetching acknowledgment status:', error);
+            res.status(500).json({ error: 'Failed to fetch acknowledgment status' });
         }
     }
 }

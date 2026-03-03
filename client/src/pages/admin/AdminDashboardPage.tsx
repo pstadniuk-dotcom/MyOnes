@@ -774,12 +774,13 @@ function AISettingsCard({ onChanged }: { onChanged?: () => void }) {
       { value: 'o4-mini', label: 'o4 Mini' },
     ],
     anthropic: [
-      { value: 'claude-opus-4-5', label: 'Claude Opus 4.5 (most intelligent) 🔥' },
-      { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 (best for coding)' },
-      { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (fastest)' },
+      { value: 'claude-opus-4-6', label: 'Claude Opus 4.6 (most intelligent) 🔥' },
+      { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (fast + smart)' },
+      { value: 'claude-haiku-4-6', label: 'Claude Haiku 4.6 (fastest)' },
+      { value: 'claude-opus-4-5', label: 'Claude Opus 4.5' },
+      { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+      { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
       { value: 'claude-opus-4-1', label: 'Claude Opus 4.1 (legacy)' },
-      { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (legacy)' },
-      { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (legacy)' },
     ],
   };
 

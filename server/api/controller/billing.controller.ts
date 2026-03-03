@@ -70,6 +70,12 @@ export class BillingController {
       if (error?.message === 'FORMULA_NOT_FOUND_OR_ACCESS_DENIED') {
         return res.status(404).json({ error: 'Formula not found or access denied' });
       }
+      if (error?.message === 'SAFETY_WARNINGS_NOT_ACKNOWLEDGED') {
+        return res.status(403).json({
+          error: 'You must acknowledge the safety warnings for this formula before proceeding to checkout.',
+          code: 'SAFETY_WARNINGS_NOT_ACKNOWLEDGED',
+        });
+      }
       if (error?.message === 'FORMULA_ID_REQUIRED') {
         return res.status(400).json({ error: 'Formula ID is required for non-membership checkout' });
       }

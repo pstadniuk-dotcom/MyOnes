@@ -62,6 +62,14 @@ router.get('/:formulaId/review-schedule/calendar', requireAuth, formulasControll
 // Get formula drift / review status
 router.get('/review-status', requireAuth, formulasController.getReviewStatus);
 
+// ==================== SAFETY ACKNOWLEDGMENT ENDPOINTS ====================
+
+// Acknowledge formula warnings (required before checkout for serious warnings)
+router.post('/:formulaId/acknowledge-warnings', requireAuth, formulasController.acknowledgeWarnings);
+
+// Get acknowledgment status for a formula
+router.get('/:formulaId/acknowledgment-status', requireAuth, formulasController.getAcknowledgmentStatus);
+
 // Public endpoint - Get shared formula by ID (no auth required)
 router.get('/shared/:formulaId', formulasController.getSharedFormula);
 

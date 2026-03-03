@@ -1,5 +1,11 @@
 import { db } from '../../infra/db/db';
-import { auditLogs, appSettings, type AuditLog, type InsertAuditLog, type AppSetting } from '@shared/schema';
+import {
+    auditLogs, appSettings,
+    safetyAuditLogs, formulaWarningAcknowledgments,
+    type AuditLog, type InsertAuditLog, type AppSetting,
+    type SafetyAuditLog, type InsertSafetyAuditLog,
+    type FormulaWarningAcknowledgment, type InsertFormulaWarningAcknowledgment,
+} from '@shared/schema';
 import { eq, and, desc, gte, lte } from 'drizzle-orm';
 
 export class SystemRepository {
@@ -60,6 +66,48 @@ export class SystemRepository {
     async deleteAppSetting(key: string): Promise<boolean> {
         const result = await db.delete(appSettings).where(eq(appSettings.key, key));
         return (result.rowCount ?? 0) > 0;
+    }
+
+    // ── Safety Audit Log operations ─────────────────────────────────────
+    async createSafetyAuditLog(entry: InsertSafetyAuditLog): Promise<SafetyAuditLog> {
+        const [log] = await db.insert(safetyAuditLogs).values(entry as any).returning();
+        return log;
+    }
+
+    async getSafetyAuditLogsByUser(userId: string, limit: number = 50): Promise<SafetyAuditLog[]> {
+        return await db
+            .select()
+            .from(safetyAuditLogs)
+            .where(eq(safetyAuditLogs.userId, userId))
+            .orderBy(desc(safetyAuditLogs.createdAt))
+            .limit(limit);
+    }
+
+    async getSafetyAuditLogsByFormula(formulaId: string): Promise<SafetyAuditLog[]> {
+        return await db
+            .select()
+            .from(safetyAuditLogs)
+            .where(eq(safetyAuditLogs.formulaId, formulaId))
+            .orderBy(desc(safetyAuditLogs.createdAt));
+    }
+
+    // ── Formula Warning Acknowledgment operations ───────────────────────
+    async createWarningAcknowledgment(ack: InsertFormulaWarningAcknowledgment): Promise<FormulaWarningAcknowledgment> {
+        const [created] = await db.insert(formulaWarningAcknowledgments).values(ack as any).returning();
+        return created;
+    }
+
+    async getWarningAcknowledgment(formulaId: string, userId: string): Promise<FormulaWarningAcknowledgment | undefined> {
+        const [ack] = await db
+            .select()
+            .from(formulaWarningAcknowledgments)
+            .where(and(
+                eq(formulaWarningAcknowledgments.formulaId, formulaId),
+                eq(formulaWarningAcknowledgments.userId, userId),
+            ))
+            .orderBy(desc(formulaWarningAcknowledgments.acknowledgedAt))
+            .limit(1);
+        return ack || undefined;
     }
 }
 

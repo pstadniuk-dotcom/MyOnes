@@ -368,6 +368,34 @@ export class UsersController {
             res.status(500).json({ error: 'Failed to update auto-optimize setting' });
         }
     }
+
+    async getMetricPreferences(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const result = await usersService.getMetricPreferences(userId);
+            if (!result) return res.status(404).json({ error: 'User not found' });
+            res.json(result);
+        } catch (error) {
+            logger.error('Get metric preferences error', { error });
+            res.status(500).json({ error: 'Failed to get metric preferences' });
+        }
+    }
+
+    async updateMetricPreferences(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const { metrics } = req.body;
+            if (!Array.isArray(metrics) || !metrics.every((m: unknown) => typeof m === 'string')) {
+                return res.status(400).json({ error: '"metrics" must be an array of strings' });
+            }
+            const result = await usersService.updateMetricPreferences(userId, metrics);
+            if (!result) return res.status(404).json({ error: 'User not found' });
+            res.json(result);
+        } catch (error) {
+            logger.error('Update metric preferences error', { error });
+            res.status(500).json({ error: 'Failed to update metric preferences' });
+        }
+    }
 }
 
 export const usersController = new UsersController();

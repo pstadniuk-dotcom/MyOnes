@@ -236,7 +236,7 @@ Provide a JSON response with the following structure:
 Return ONLY valid JSON.`;
 
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'gpt-4.1',
             messages: [{ role: 'user', content: analysisPrompt }],
             max_completion_tokens: 4000,
             temperature: 0.3

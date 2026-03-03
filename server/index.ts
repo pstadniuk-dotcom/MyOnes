@@ -10,6 +10,16 @@ import { startAutoOptimizeScheduler } from "./utils/autoOptimizeScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
 
+// Catch unhandled errors so the server doesn't silently die
+process.on('uncaughtException', (err) => {
+  console.error('💥 UNCAUGHT EXCEPTION:', err);
+  logger.error('Uncaught exception', { error: err.message, stack: err.stack });
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('💥 UNHANDLED REJECTION:', reason);
+  logger.error('Unhandled rejection', { reason: String(reason) });
+});
+
 const app = express();
 // Trust reverse proxy (needed for secure cookies and correct protocol detection in production)
 app.set('trust proxy', 1);
@@ -202,8 +212,19 @@ app.use((req, res, next) => {
     const configuredPort = parseInt(process.env.PORT || '5000', 10);
     const host = process.env.HOST || '0.0.0.0';
 
-    server.listen(configuredPort, host, () => {
+    server.listen(configuredPort, host, async () => {
       log(`serving on port ${configuredPort}`);
+
+      // Recover any lab reports stuck in "processing" from a previous crash
+      try {
+        const { filesRepository } = await import('./modules/files/files.repository');
+        const recovered = await filesRepository.recoverStaleProcessing();
+        if (recovered > 0) {
+          logger.info(`Recovered ${recovered} stale lab report(s) from interrupted processing`);
+        }
+      } catch (err) {
+        logger.warn('Failed to recover stale processing records', { error: err });
+      }
 
       // Start SMS reminder scheduler
       startSmsReminderScheduler();
