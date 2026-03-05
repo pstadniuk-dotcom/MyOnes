@@ -128,6 +128,8 @@ Before deploying this branch to staging or production:
 
 ## Notes for the Team
 
+- **Large video files in `client/public/`** — This branch includes ~1.7 GB of raw video assets committed to git. These need to be moved to a CDN (S3, Cloudflare, etc.) before this branch is merged. The Adobe Stock `.mov` files (`AdobeStock_443422537.mov` at 1.1 GB, `AdobeStock_211927150.mov` at 414 MB, `AdobeStock_723953147.mov` at 82.5 MB) are likely raw source footage and should not live in the repo. Once final/compressed videos are hosted externally, update the src URLs in the landing page components, remove the files from git tracking, and add `.mp4`, `.mov`, and the `Hero Section/` folder to `.gitignore`.
+
 - **Do not bypass** `safety-validator.ts` — all formula submissions must pass validation before saving.
 - **Ingredient catalog** (`shared/ingredients.ts`) is the single source of truth for dosing ranges. If you need to add or adjust an ingredient, update that file and re-test formula generation.
 - **AI module** (`server/modules/ai/`) is new — it wraps both OpenAI and Anthropic. Admin can switch providers at runtime via the Admin Dashboard → AI Settings.
