@@ -229,7 +229,7 @@ app.use((req, res, next) => {
       // Start SMS reminder scheduler
       startSmsReminderScheduler();
 
-      // Start auto-optimize formula drift scheduler (daily at 9am UTC)
+      // Start formula review scheduler (checks subscription renewals daily at 9am UTC)
       startAutoOptimizeScheduler();
 
       // Note: Wearable data sync is now handled via Junction webhooks

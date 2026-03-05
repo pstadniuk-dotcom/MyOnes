@@ -55,4 +55,10 @@ router.post('/ai-settings', requireAdmin, adminController.updateAiSettings);
 router.get('/ingredient-pricing', requireAdmin, adminController.listIngredientPricing);
 router.patch('/ingredient-pricing/:id', requireAdmin, adminController.updateIngredientPricing);
 
+// Audit & Compliance
+router.get('/audit-logs', requireAdmin, adminController.listAuditLogs);
+router.get('/safety-logs', requireAdmin, adminController.listSafetyLogs);
+router.get('/warning-acknowledgments', requireAdmin, adminController.listWarningAcknowledgments);
+router.get('/consents', requireAdmin, adminController.listConsents);
+
 export default router;

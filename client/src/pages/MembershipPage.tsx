@@ -83,19 +83,19 @@ export default function MembershipPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#1B4332]" />
+      <div className="min-h-screen bg-[#ede8e2] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#054700]" />
       </div>
     );
   }
 
   if (error || !activeTier) {
     return (
-      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center px-6">
+      <div className="min-h-screen bg-[#ede8e2] flex items-center justify-center px-6">
         <div className="text-center max-w-sm">
           <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-4" />
-          <h2 className="text-xl font-medium text-[#1B4332] mb-2">Membership unavailable</h2>
-          <p className="text-[#52796F] text-sm">We couldn't load membership options. Please try again later.</p>
+          <h2 className="text-xl font-medium text-[#054700] mb-2">Membership unavailable</h2>
+          <p className="text-[#5a6623] text-sm">We couldn't load membership options. Please try again later.</p>
           <Button onClick={() => navigate('/dashboard')} variant="outline" className="mt-6">
             Back to dashboard
           </Button>
@@ -109,11 +109,11 @@ export default function MembershipPage() {
   const tierLabel = activeTier.name.replace(' Member', '').replace(' Adopter', '');
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center px-6 py-16">
+    <div className="min-h-screen bg-[#ede8e2] flex flex-col items-center justify-center px-6 py-16">
       {/* Header */}
       <div className="text-center mb-10 max-w-lg">
         <span className="text-[#D4A574] font-medium tracking-wider text-sm uppercase">Membership</span>
-        <h1 className="mt-3 text-4xl text-[#1B4332] font-light leading-tight">
+        <h1 className="mt-3 text-4xl text-[#054700] font-light leading-tight">
           Lock in your rate <span className="font-medium">forever</span>
         </h1>
         {spotsRemaining > 0 && (
@@ -124,9 +124,9 @@ export default function MembershipPage() {
       </div>
 
       {/* Card */}
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-[#1B4332]/5 overflow-hidden">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-[#054700]/5 overflow-hidden">
         {/* Card header */}
-        <div className="bg-[#1B4332] px-8 py-8 text-center">
+        <div className="bg-[#054700] px-8 py-8 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-white/80 text-sm mb-4">
             🎉 {tierLabel} Member
           </div>
@@ -141,15 +141,15 @@ export default function MembershipPage() {
 
         {/* Plan selector */}
         <div className="px-8 pt-6">
-          <div className="flex rounded-full border border-[#1B4332]/20 p-1 gap-1">
+          <div className="flex rounded-full border border-[#054700]/20 p-1 gap-1">
             {PLAN_OPTIONS.map(opt => (
               <button
                 key={opt.key}
                 onClick={() => setPlan(opt.key)}
                 className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
                   plan === opt.key
-                    ? 'bg-[#1B4332] text-white'
-                    : 'text-[#52796F] hover:text-[#1B4332]'
+                    ? 'bg-[#054700] text-white'
+                    : 'text-[#5a6623] hover:text-[#054700]'
                 }`}
               >
                 {opt.label}
@@ -168,8 +168,8 @@ export default function MembershipPage() {
           <ul className="space-y-3 mb-6">
             {MEMBERSHIP_BENEFITS.map((benefit, i) => (
               <li key={i} className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#1B4332]/10 flex items-center justify-center">
-                  <Check className="w-3 h-3 text-[#1B4332]" />
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#054700]/10 flex items-center justify-center">
+                  <Check className="w-3 h-3 text-[#054700]" />
                 </div>
                 <span className="text-[#2D3436] text-sm">{benefit}</span>
               </li>
@@ -179,7 +179,7 @@ export default function MembershipPage() {
           <Button
             onClick={() => checkoutMutation.mutate()}
             disabled={checkoutMutation.isPending}
-            className="w-full bg-[#1B4332] hover:bg-[#143728] text-white py-6 text-base rounded-full group"
+            className="w-full bg-[#054700] hover:bg-[#043d00] text-white py-6 text-base rounded-full group"
           >
             {checkoutMutation.isPending ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Redirecting to checkout…</>
@@ -188,14 +188,14 @@ export default function MembershipPage() {
             )}
           </Button>
 
-          <div className="mt-5 pt-5 border-t border-[#1B4332]/10 text-center space-y-1">
-            <p className="text-xs text-[#52796F]">Cancel anytime. Rejoin within 3 months to keep your rate.</p>
-            <p className="text-xs text-[#52796F]">Your tier is locked when you become a paying member.</p>
+          <div className="mt-5 pt-5 border-t border-[#054700]/10 text-center space-y-1">
+            <p className="text-xs text-[#5a6623]">Cancel anytime. Rejoin within 3 months to keep your rate.</p>
+            <p className="text-xs text-[#5a6623]">Your tier is locked when you become a paying member.</p>
           </div>
         </div>
       </div>
 
-      <p className="mt-6 text-xs text-[#52796F]">
+      <p className="mt-6 text-xs text-[#5a6623]">
         Secure checkout powered by Stripe
       </p>
     </div>

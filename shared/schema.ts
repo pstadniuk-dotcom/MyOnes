@@ -25,12 +25,12 @@ export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant', 'sys
 export const addressTypeEnum = pgEnum('address_type', ['shipping', 'billing']);
 export const fileTypeEnum = pgEnum('file_type', ['lab_report', 'medical_document', 'prescription', 'other']);
 export const auditActionEnum = pgEnum('audit_action', ['upload', 'view', 'download', 'delete', 'share', 'access_denied']);
-export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing', 'sms_accountability', 'medication_disclosure']);
+export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing', 'sms_accountability', 'medication_disclosure', 'tos_acceptance']);
 export const notificationTypeEnum = pgEnum('notification_type', ['order_update', 'formula_update', 'consultation_reminder', 'system']);
 export const evidenceLevelEnum = pgEnum('evidence_level', ['strong', 'moderate', 'preliminary', 'limited']);
 export const studyTypeEnum = pgEnum('study_type', ['rct', 'meta_analysis', 'systematic_review', 'observational', 'case_study', 'review']);
 export const reviewFrequencyEnum = pgEnum('review_frequency', ['monthly', 'bimonthly', 'quarterly']);
-export const wearableProviderEnum = pgEnum('wearable_provider', ['fitbit', 'oura', 'whoop']);
+export const wearableProviderEnum = pgEnum('wearable_provider', ['fitbit', 'oura', 'whoop', 'garmin', 'apple_health', 'google_fit', 'samsung', 'polar', 'withings', 'eight_sleep', 'strava', 'peloton', 'ultrahuman', 'dexcom', 'freestyle_libre', 'cronometer', 'omron', 'kardia', 'junction']);
 export const wearableConnectionStatusEnum = pgEnum('wearable_connection_status', ['connected', 'disconnected', 'error', 'token_expired']);
 export const streakTypeEnum = pgEnum('streak_type', ['overall', 'nutrition', 'workout', 'supplements', 'lifestyle']);
 // Users table - updated with name, email, phone, password
@@ -94,6 +94,9 @@ export const users = pgTable("users", {
   stripeSubscriptionId: text("stripe_subscription_id"), // Stripe subscription ID
 
   emailVerified: boolean("email_verified").default(false).notNull(),
+
+  // Terms of Service acceptance tracking
+  tosAcceptedAt: timestamp("tos_accepted_at"),
 
   // Formula auto-optimization: when true, system auto-applies AI-suggested changes before reorder
   // and sends email + SMS notification. Default false = manual review required.
@@ -176,6 +179,7 @@ export const healthProfiles = pgTable("health_profiles", {
 export const chatSessions = pgTable("chat_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }),
   status: chatStatusEnum("status").default('active').notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -325,6 +329,36 @@ export const orders = pgTable("orders", {
   trackingUrl: text("tracking_url"),
   placedAt: timestamp("placed_at").defaultNow().notNull(),
   shippedAt: timestamp("shipped_at"),
+
+  // ── Order-level consent & safety snapshot (legal non-repudiation) ──
+  consentSnapshot: json("consent_snapshot").$type<{
+    /** Which consent types were active at time of purchase */
+    activeConsents: Array<{
+      consentType: string;
+      grantedAt: string;
+      consentVersion: string;
+    }>;
+    /** Safety warnings displayed to user for this formula at purchase */
+    formulaWarnings: Array<{
+      category: string;
+      severity: string;
+      message: string;
+      ingredients?: string[];
+      drugs?: string[];
+    }>;
+    /** When the user acknowledged safety warnings (if applicable) */
+    warningsAcknowledgedAt: string | null;
+    /** Disclaimer version at time of purchase */
+    disclaimerVersion: string;
+    /** Full disclaimer text shown at checkout */
+    disclaimerText: string;
+    /** IP address at time of purchase */
+    ipAddress: string | null;
+    /** User agent at time of purchase */
+    userAgent: string | null;
+    /** Timestamp when this snapshot was captured */
+    capturedAt: string;
+  }>(),
 });
 
 // Ingredient pricing reference for equivalent stack estimates
@@ -818,7 +852,7 @@ export const wearableConnections = pgTable("wearable_connections", {
 export const biometricData = pgTable("biometric_data", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  connectionId: varchar("connection_id").notNull().references(() => wearableConnections.id, { onDelete: "cascade" }),
+  connectionId: varchar("connection_id").references(() => wearableConnections.id, { onDelete: "cascade" }),
   provider: wearableProviderEnum("provider").notNull(),
   dataDate: timestamp("data_date").notNull(), // The day this data represents
 

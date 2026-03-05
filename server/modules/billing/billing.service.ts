@@ -2,7 +2,10 @@ import Stripe from 'stripe';
 import { usersRepository } from '../users/users.repository';
 import { membershipRepository } from '../membership/membership.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
+import { consentsRepository } from '../consents/consents.repository';
 import { manufacturerPricingService } from '../formulas/manufacturer-pricing.service';
+import { notificationsService } from '../notifications/notifications.service';
+import { sendNotificationEmail } from '../../utils/emailService';
 import { db } from '../../infra/db/db';
 import { ingredientPricing } from '@shared/schema';
 import { eq } from 'drizzle-orm';
@@ -153,12 +156,13 @@ class DatabaseBillingProvider implements BillingProvider {
       if (stripeSubscriptionId) {
         const stripe = this.getStripeClient();
         const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        const periodEnd = stripeSub.items?.data?.[0]?.current_period_end ?? null;
         await this.upsertInternalSubscription(userId, {
           plan,
           status: this.mapStripeStatus(stripeSub.status),
           stripeCustomerId,
           stripeSubscriptionId,
-          renewsAt: null,
+          renewsAt: periodEnd ? new Date(periodEnd * 1000) : null,
           pausedUntil: stripeSub.pause_collection?.resumes_at ? new Date(stripeSub.pause_collection.resumes_at * 1000) : null,
         });
       }
@@ -235,6 +239,38 @@ class DatabaseBillingProvider implements BillingProvider {
         }
       }
 
+      // ── Build order-level consent & safety snapshot ──────────────────
+      let consentSnapshot: any = null;
+      try {
+        const formula = await formulasRepository.getFormula(formulaId);
+        const userConsents = await consentsRepository.getUserConsents(userId);
+        const activeConsents: Array<{ consentType: string; grantedAt: string; consentVersion: string }> = userConsents
+          .filter(c => c.granted && !c.revokedAt)
+          .map(c => ({
+            consentType: c.consentType,
+            grantedAt: c.grantedAt.toISOString(),
+            consentVersion: c.consentVersion,
+          }));
+
+        const safetyValidation = (formula as any)?.safetyValidation;
+        const formulaWarnings = safetyValidation?.warnings || [];
+
+        consentSnapshot = {
+          activeConsents,
+          formulaWarnings,
+          warningsAcknowledgedAt: formula?.warningsAcknowledgedAt
+            ? formula.warningsAcknowledgedAt.toISOString()
+            : null,
+          disclaimerVersion: (formula as any)?.disclaimerVersion || '1.0',
+          disclaimerText: 'These statements have not been evaluated by the Food and Drug Administration. This product is not intended to diagnose, treat, cure, or prevent any disease. Consult your healthcare provider before starting any supplement regimen. By placing this order, you confirm you have reviewed all safety warnings and accept full responsibility for your supplementation choices.',
+          ipAddress: null, // Stripe webhook context — no direct user IP available
+          userAgent: null,
+          capturedAt: new Date().toISOString(),
+        };
+      } catch (snapErr) {
+        logger.warn('Failed to build order consent snapshot', { userId, formulaId, error: snapErr });
+      }
+
       // Create order record
       const order = await usersRepository.createOrder({
         userId,
@@ -247,6 +283,7 @@ class DatabaseBillingProvider implements BillingProvider {
         manufacturerQuoteId: quoteId,
         manufacturerQuoteExpiresAt: quoteExpiresAt,
         stripeSessionId: session.id,
+        ...(consentSnapshot ? { consentSnapshot } : {}),
       });
 
       logger.info('Order created from Stripe checkout', {
@@ -257,12 +294,54 @@ class DatabaseBillingProvider implements BillingProvider {
         chargedCents,
         mfrCostCents,
         quoteId,
+        hasConsentSnapshot: !!consentSnapshot,
       });
 
       // Update user's last order date
       await usersRepository.updateUser(userId, {
         lastOrderDate: new Date(),
       });
+
+      // ── Send order confirmation email + in-app notification ──────────
+      try {
+        const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+        const amountDisplay = chargedCents > 0 ? `$${(chargedCents / 100).toFixed(2)}` : '';
+
+        if (await notificationsService.shouldSendEmail(userId, 'billing')) {
+          await sendNotificationEmail({
+            to: user.email,
+            subject: 'Your ONES order is confirmed!',
+            title: 'Order Confirmed',
+            type: 'order_update',
+            content: `
+              <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
+              <p>Great news — your personalized supplement order has been placed! 🎉</p>
+              ${amountDisplay ? `<p><strong>Total:</strong> ${amountDisplay}</p>` : ''}
+              <p><strong>Formula:</strong> V${formulaVersion}</p>
+              <p><strong>Supply:</strong> 8 weeks</p>
+              <p>We'll notify you when your formula ships. In the meantime, you can track your order status in your dashboard.</p>
+            `,
+            actionUrl: `${frontendUrl}/dashboard/orders`,
+            actionText: 'View My Order',
+          });
+        }
+
+        await notificationsService.create({
+          userId,
+          type: 'order_update',
+          title: 'Order Confirmed',
+          content: `Your supplement order (Formula V${formulaVersion}) has been placed and is being prepared.`,
+          orderId: order.id,
+          formulaId,
+          metadata: {
+            actionUrl: '/dashboard/orders',
+            icon: 'package',
+            priority: 'medium',
+          },
+        });
+      } catch (notifErr) {
+        logger.warn('Failed to send order confirmation notification', { userId, orderId: order.id, error: notifErr });
+      }
 
       // Place production order with Alive if we have a quote
       if (quoteId) {
@@ -315,12 +394,13 @@ class DatabaseBillingProvider implements BillingProvider {
     });
 
     const plan = this.resolvePlan(sub.metadata?.plan).plan;
+    const periodEnd = sub.items?.data?.[0]?.current_period_end ?? null;
     await this.upsertInternalSubscription(user.id, {
       plan,
       status: this.mapStripeStatus(sub.status),
       stripeCustomerId,
       stripeSubscriptionId,
-      renewsAt: null,
+      renewsAt: periodEnd ? new Date(periodEnd * 1000) : null,
       pausedUntil: sub.pause_collection?.resumes_at ? new Date(sub.pause_collection.resumes_at * 1000) : null,
     });
   }
@@ -351,6 +431,42 @@ class DatabaseBillingProvider implements BillingProvider {
 
     if (user.membershipTier && !user.membershipCancelledAt) {
       await membershipRepository.cancelUserMembership(user.id);
+    }
+
+    // ── Send subscription cancelled notification ──────────────────────
+    try {
+      const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+
+      if (await notificationsService.shouldSendEmail(user.id, 'billing')) {
+        await sendNotificationEmail({
+          to: user.email,
+          subject: 'Your ONES subscription has been cancelled',
+          title: 'Subscription Cancelled',
+          type: 'order_update',
+          content: `
+            <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
+            <p>Your ONES subscription has been cancelled. You won't be charged going forward.</p>
+            <p>If you still have supply remaining, keep taking your formula as directed. Your health data and formula history are saved and ready whenever you'd like to come back.</p>
+            <p>We'd love to know what we could do better — feel free to reach out to our support team anytime.</p>
+          `,
+          actionUrl: `${frontendUrl}/dashboard`,
+          actionText: 'Visit Dashboard',
+        });
+      }
+
+      await notificationsService.create({
+        userId: user.id,
+        type: 'order_update',
+        title: 'Subscription Cancelled',
+        content: 'Your subscription has been cancelled. Your formula and health data are saved if you decide to return.',
+        metadata: {
+          actionUrl: '/dashboard/orders',
+          icon: 'x-circle',
+          priority: 'medium',
+        },
+      });
+    } catch (notifErr) {
+      logger.warn('Failed to send subscription cancelled notification', { userId: user.id, error: notifErr });
     }
   }
 
@@ -387,6 +503,44 @@ class DatabaseBillingProvider implements BillingProvider {
       await usersRepository.updateSubscriptionByStripeSubscriptionId(stripeSubscriptionId, {
         status: 'past_due',
       });
+
+      // ── Send payment failed notification ──────────────────────────────
+      try {
+        const user = await usersRepository.getUser(existing.userId);
+        if (user) {
+          const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+
+          if (await notificationsService.shouldSendEmail(user.id, 'billing')) {
+            await sendNotificationEmail({
+              to: user.email,
+              subject: 'Action needed: Payment failed for your ONES subscription',
+              title: 'Payment Failed',
+              type: 'order_update',
+              content: `
+                <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
+                <p>We weren't able to process your latest subscription payment. Your subscription is now <strong>past due</strong>.</p>
+                <p>Please update your payment method to avoid any interruption to your supplement deliveries.</p>
+              `,
+              actionUrl: `${frontendUrl}/dashboard/orders`,
+              actionText: 'Update Payment Method',
+            });
+          }
+
+          await notificationsService.create({
+            userId: user.id,
+            type: 'order_update',
+            title: 'Payment Failed',
+            content: 'Your subscription payment could not be processed. Please update your payment method.',
+            metadata: {
+              actionUrl: '/dashboard/orders',
+              icon: 'alert-circle',
+              priority: 'high',
+            },
+          });
+        }
+      } catch (notifErr) {
+        logger.warn('Failed to send payment failed notification', { stripeSubscriptionId, error: notifErr });
+      }
     }
   }
 

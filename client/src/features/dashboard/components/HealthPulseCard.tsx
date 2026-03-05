@@ -94,8 +94,8 @@ const STATE_THEME: Record<PulseState, {
   },
   baseline: {
     gradient: 'from-slate-50/60 to-white',
-    iconBg: 'bg-[#1B4332]/10',
-    iconColor: 'text-[#1B4332]',
+    iconBg: 'bg-[#054700]/10',
+    iconColor: 'text-[#054700]',
     dotColor: 'bg-slate-400',
     pulseRing: 'ring-slate-300/30',
     icon: Zap,
@@ -128,7 +128,7 @@ function DriverRow({ driver }: { driver: PulseDriver }) {
       <div className="mt-0.5 flex-shrink-0">
         <CatIcon className={`w-3.5 h-3.5 ${sev.color}`} />
       </div>
-      <span className="text-sm text-[#1B4332] leading-snug flex-1">{driver.signal}</span>
+      <span className="text-sm text-[#054700] leading-snug flex-1">{driver.signal}</span>
       <SevIcon className={`w-3 h-3 mt-1 flex-shrink-0 ${sev.color} opacity-60`} />
     </div>
   );
@@ -137,10 +137,10 @@ function DriverRow({ driver }: { driver: PulseDriver }) {
 function ActionRow({ action, index }: { action: string; index: number }) {
   return (
     <div className="flex items-start gap-2.5 py-1">
-      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#1B4332]/[0.08] flex items-center justify-center mt-0.5">
-        <span className="text-[10px] font-semibold text-[#1B4332]">{index + 1}</span>
+      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#054700]/[0.08] flex items-center justify-center mt-0.5">
+        <span className="text-[10px] font-semibold text-[#054700]">{index + 1}</span>
       </span>
-      <span className="text-sm text-[#1B4332]/80 leading-snug">{action}</span>
+      <span className="text-sm text-[#054700]/80 leading-snug">{action}</span>
     </div>
   );
 }
@@ -159,24 +159,24 @@ function NoDataState() {
   return (
     <div className="flex flex-col items-center text-center gap-4 py-6">
       <div className="relative">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1B4332]/10 to-[#52796F]/10 flex items-center justify-center">
-          <Zap className="w-6 h-6 text-[#1B4332]" />
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#054700]/10 to-[#5a6623]/10 flex items-center justify-center">
+          <Zap className="w-6 h-6 text-[#054700]" />
         </div>
       </div>
       <div className="space-y-1.5">
-        <p className="text-sm font-medium text-[#1B4332]">Your Health Pulse awaits</p>
-        <p className="text-xs text-[#52796F] max-w-[240px] leading-relaxed">
+        <p className="text-sm font-medium text-[#054700]">Your Health Pulse awaits</p>
+        <p className="text-xs text-[#5a6623] max-w-[240px] leading-relaxed">
           Connect a wearable or upload lab results to unlock personalized health intelligence.
         </p>
       </div>
       <div className="flex gap-2">
-        <Button asChild variant="outline" size="sm" className="rounded-full border-[#1B4332]/20 text-[#1B4332] hover:bg-[#1B4332] hover:text-white text-xs h-8 px-3">
+        <Button asChild variant="outline" size="sm" className="rounded-full border-[#054700]/20 text-[#054700] hover:bg-[#054700] hover:text-white text-xs h-8 px-3">
           <Link href="/dashboard/wearables">
             <WifiOff className="w-3 h-3 mr-1.5" />
             Connect device
           </Link>
         </Button>
-        <Button asChild variant="outline" size="sm" className="rounded-full border-[#1B4332]/20 text-[#1B4332] hover:bg-[#1B4332] hover:text-white text-xs h-8 px-3">
+        <Button asChild variant="outline" size="sm" className="rounded-full border-[#054700]/20 text-[#054700] hover:bg-[#054700] hover:text-white text-xs h-8 px-3">
           <Link href="/dashboard/lab-reports">
             <FlaskConical className="w-3 h-3 mr-1.5" />
             Upload labs
@@ -203,7 +203,7 @@ export function HealthPulseCard() {
   const hasData = data && (data.hasWearable || data.hasLabs);
 
   return (
-    <Card className={`relative overflow-hidden bg-gradient-to-br ${theme.gradient} border-[#1B4332]/8 hover:border-[#1B4332]/15 hover:shadow-lg transition-all duration-300`}>
+    <Card className={`relative overflow-hidden bg-gradient-to-br ${theme.gradient} border-[#054700]/8 hover:border-[#054700]/15 hover:shadow-lg transition-all duration-300`}>
       <CardContent className="p-0">
         {/* Loading state */}
         {isLoading && (
@@ -226,7 +226,7 @@ export function HealthPulseCard() {
         {/* Error state */}
         {error && !isLoading && (
           <div className="p-6 text-center">
-            <p className="text-sm text-[#52796F]">Unable to load health intelligence</p>
+            <p className="text-sm text-[#5a6623]">Unable to load health intelligence</p>
           </div>
         )}
 
@@ -248,33 +248,33 @@ export function HealthPulseCard() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <PulseDot state={state} />
-                  <span className="text-[11px] font-medium text-[#52796F] uppercase tracking-wider">
+                  <span className="text-[11px] font-medium text-[#5a6623] uppercase tracking-wider">
                     Health Pulse
                   </span>
                   {data.providers.length > 0 && (
-                    <span className="text-[10px] text-[#52796F]/50 ml-auto">
+                    <span className="text-[10px] text-[#5a6623]/50 ml-auto">
                       {data.providers[0]}
                     </span>
                   )}
                 </div>
-                <h3 className="text-base sm:text-lg font-semibold text-[#1B4332] leading-tight">
+                <h3 className="text-base sm:text-lg font-semibold text-[#054700] leading-tight">
                   {data.headline}
                 </h3>
               </div>
             </div>
 
             {/* Summary */}
-            <p className="text-sm text-[#52796F] leading-relaxed pl-[3.375rem]">
+            <p className="text-sm text-[#5a6623] leading-relaxed pl-[3.375rem]">
               {data.summary}
             </p>
 
             {/* Key Drivers */}
             {data.drivers.length > 0 && (
-              <div className="bg-white/60 rounded-xl border border-[#1B4332]/[0.06] p-3.5">
-                <div className="text-[10px] font-semibold text-[#52796F] uppercase tracking-wider mb-1.5">
+              <div className="bg-white/60 rounded-xl border border-[#054700]/[0.06] p-3.5">
+                <div className="text-[10px] font-semibold text-[#5a6623] uppercase tracking-wider mb-1.5">
                   Key Drivers
                 </div>
-                <div className="divide-y divide-[#1B4332]/5">
+                <div className="divide-y divide-[#054700]/5">
                   {data.drivers.map((driver, i) => (
                     <DriverRow key={i} driver={driver} />
                   ))}
@@ -285,7 +285,7 @@ export function HealthPulseCard() {
             {/* Actions */}
             {data.actions.length > 0 && (
               <div className="pl-0.5">
-                <div className="text-[10px] font-semibold text-[#52796F] uppercase tracking-wider mb-1.5">
+                <div className="text-[10px] font-semibold text-[#5a6623] uppercase tracking-wider mb-1.5">
                   Next Steps
                 </div>
                 <div className="space-y-0.5">
@@ -297,24 +297,24 @@ export function HealthPulseCard() {
             )}
 
             {/* Footer links */}
-            <div className="flex items-center justify-between pt-1 border-t border-[#1B4332]/5">
+            <div className="flex items-center justify-between pt-1 border-t border-[#054700]/5">
               <div className="flex gap-3">
                 {data.hasLabs && (
-                  <Link href="/dashboard/lab-reports" className="text-[11px] text-[#52796F] hover:text-[#1B4332] transition-colors flex items-center gap-1">
+                  <Link href="/dashboard/lab-reports" className="text-[11px] text-[#5a6623] hover:text-[#054700] transition-colors flex items-center gap-1">
                     <FlaskConical className="w-3 h-3" />
                     Labs
                     <ArrowRight className="w-2.5 h-2.5" />
                   </Link>
                 )}
                 {data.hasWearable && (
-                  <Link href="/dashboard/wearables" className="text-[11px] text-[#52796F] hover:text-[#1B4332] transition-colors flex items-center gap-1">
+                  <Link href="/dashboard/wearables" className="text-[11px] text-[#5a6623] hover:text-[#054700] transition-colors flex items-center gap-1">
                     <Activity className="w-3 h-3" />
                     Devices
                     <ArrowRight className="w-2.5 h-2.5" />
                   </Link>
                 )}
               </div>
-              <span className="text-[10px] text-[#52796F]/40">
+              <span className="text-[10px] text-[#5a6623]/40">
                 Updated {new Date(data.lastUpdated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </span>
             </div>

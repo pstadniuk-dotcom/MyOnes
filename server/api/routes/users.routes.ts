@@ -25,10 +25,6 @@ router.get('/me/billing-history', requireAuth, usersController.getBillingHistory
 router.get('/me/subscription', requireAuth, usersController.getSubscription);
 router.patch('/me/subscription', requireAuth, usersController.updateSubscription);
 
-// Auto-optimize formula toggle
-router.get('/me/auto-optimize', requireAuth, usersController.getAutoOptimize);
-router.patch('/me/auto-optimize', requireAuth, usersController.updateAutoOptimize);
-
 // Dashboard metric preferences
 router.get('/me/metric-preferences', requireAuth, usersController.getMetricPreferences);
 router.put('/me/metric-preferences', requireAuth, usersController.updateMetricPreferences);

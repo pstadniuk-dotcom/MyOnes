@@ -54,50 +54,16 @@ import UserDetailPage from "@/pages/admin/UserDetailPage";
 import AdminSupportTicketsPage from "@/pages/admin/AdminSupportTicketsPage";
 import ConversationsPage from "@/pages/admin/ConversationsPage";
 import OrdersManagementPage from "@/pages/admin/OrdersManagementPage";
+import AuditLogsPage from "@/pages/admin/AuditLogsPage";
 
 // Import shared/public components
 import SharedFormulaPage from "@/pages/SharedFormulaPage";
 import MembershipPage from "@/pages/MembershipPage";
 import CheckoutSuccessPage from "@/pages/CheckoutSuccessPage";
 
-// Import all landing page components
-import Header from "@/features/marketing/components/Header";
-import HeroSection from "@/features/marketing/components/HeroSection";
-import ProblemSection from "@/features/marketing/components/ProblemSection";
-import HowItWorksSection from "@/features/marketing/components/HowItWorksSection";
-import ScienceSection from "@/features/marketing/components/ScienceSection";
-import PersonalizationShowcase from "@/features/marketing/components/PersonalizationShowcase";
-import TestimonialsSection from "@/features/marketing/components/TestimonialsSection";
-import PricingSection from "@/features/marketing/components/PricingSection";
-import FAQSection from "@/features/marketing/components/FAQSection";
-import CTASection from "@/features/marketing/components/CTASection";
-import Footer from "@/features/marketing/components/Footer";
-
 // Import V2 landing page (premium design)
 import LandingPageV2 from "@/pages/LandingPageV2";
 import ScrollToTop from "./shared/components/ScrollToTop";
-
-function LandingPage() {
-  return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main>
-        <HeroSection />
-        <ProblemSection />
-        <HowItWorksSection />
-        <ScienceSection />
-        <div className="py-16">
-          <PersonalizationShowcase />
-        </div>
-        <TestimonialsSection />
-        <PricingSection />
-        <FAQSection />
-        <CTASection />
-      </main>
-      <Footer />
-    </div>
-  );
-}
 
 // Main Router
 function MainRouter() {
@@ -263,6 +229,11 @@ function MainRouter() {
       <Route path="/admin/orders">
         <ProtectedAdminRoute>
           <OrdersManagementPage />
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/audit-logs">
+        <ProtectedAdminRoute>
+          <AuditLogsPage />
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/support-tickets/:id">

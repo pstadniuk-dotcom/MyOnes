@@ -17,7 +17,7 @@ export class ConsentsRepository {
         return consent;
     }
 
-    async getUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing' | 'sms_accountability' | 'medication_disclosure'): Promise<UserConsent | undefined> {
+    async getUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing' | 'sms_accountability' | 'medication_disclosure' | 'tos_acceptance'): Promise<UserConsent | undefined> {
         const [consent] = await db
             .select()
             .from(userConsents)
@@ -35,7 +35,7 @@ export class ConsentsRepository {
         return await db.select().from(userConsents).where(eq(userConsents.userId, userId)).orderBy(desc(userConsents.grantedAt));
     }
 
-    async revokeUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing' | 'sms_accountability' | 'medication_disclosure'): Promise<boolean> {
+    async revokeUserConsent(userId: string, consentType: 'lab_data_processing' | 'ai_analysis' | 'data_retention' | 'third_party_sharing' | 'sms_accountability' | 'medication_disclosure' | 'tos_acceptance'): Promise<boolean> {
         const result = await db
             .update(userConsents)
             .set({ revokedAt: new Date() })

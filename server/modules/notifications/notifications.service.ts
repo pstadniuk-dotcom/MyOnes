@@ -116,6 +116,47 @@ export class NotificationsService {
     async create(notification: InsertNotification): Promise<Notification> {
         return await notificationsRepository.createNotification(notification);
     }
+
+    /**
+     * Check if user has opted in to email for a given category.
+     * Categories: 'consultation' | 'shipping' | 'billing' | 'system'
+     * System/transactional emails (welcome, verification, password reset) always send.
+     */
+    async shouldSendEmail(userId: string, category: 'consultation' | 'shipping' | 'billing' | 'system'): Promise<boolean> {
+        if (category === 'system') return true; // transactional emails always send
+        try {
+            const prefs = await this.getPreferences(userId);
+            if (!prefs) return true; // default to sending if no prefs found
+            switch (category) {
+                case 'consultation': return prefs.emailConsultation !== false;
+                case 'shipping': return prefs.emailShipping !== false;
+                case 'billing': return prefs.emailBilling !== false;
+                default: return true;
+            }
+        } catch (err) {
+            logger.warn('Failed to check email preferences, defaulting to send', { userId, category, error: err });
+            return true;
+        }
+    }
+
+    /**
+     * Check if user has opted in to SMS for a given category.
+     */
+    async shouldSendSms(userId: string, category: 'consultation' | 'shipping' | 'billing'): Promise<boolean> {
+        try {
+            const prefs = await this.getPreferences(userId);
+            if (!prefs) return false; // default to NOT sending SMS if no prefs
+            switch (category) {
+                case 'consultation': return prefs.smsConsultation === true;
+                case 'shipping': return prefs.smsShipping === true;
+                case 'billing': return prefs.smsBilling === true;
+                default: return false;
+            }
+        } catch (err) {
+            logger.warn('Failed to check SMS preferences, defaulting to no-send', { userId, category, error: err });
+            return false;
+        }
+    }
 }
 
 export const notificationsService = new NotificationsService();

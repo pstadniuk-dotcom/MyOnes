@@ -49,11 +49,11 @@ function ArticleContent({ content }: { content: string }) {
         const isMainHeading = content === content.toUpperCase() && content.length > 3;
         elements.push(
           isMainHeading ? (
-            <h2 key={key++} className="text-2xl font-bold text-gray-900 mt-8 mb-4 first:mt-0">
+            <h2 key={key++} className="text-2xl font-bold text-[#054700] mt-8 mb-4 first:mt-0">
               {content}
             </h2>
           ) : (
-            <h3 key={key++} className="text-xl font-semibold text-gray-800 mt-6 mb-3">
+            <h3 key={key++} className="text-xl font-semibold text-[#054700] mt-6 mb-3">
               {content}
             </h3>
           )
@@ -62,7 +62,7 @@ function ArticleContent({ content }: { content: string }) {
         elements.push(
           <ul key={key++} className="space-y-2 my-4 ml-6">
             {currentSection.map((item, idx) => (
-              <li key={idx} className="text-gray-700 text-base leading-relaxed list-disc">
+              <li key={idx} className="text-[#054700]/80 text-base leading-relaxed list-disc">
                 {formatInlineText(item.replace(/^[-*]\s*/, ''))}
               </li>
             ))}
@@ -70,7 +70,7 @@ function ArticleContent({ content }: { content: string }) {
         );
       } else {
         elements.push(
-          <p key={key++} className="text-gray-700 text-base leading-relaxed my-4">
+          <p key={key++} className="text-[#054700]/80 text-base leading-relaxed my-4">
             {formatInlineText(content)}
           </p>
         );
@@ -84,7 +84,7 @@ function ArticleContent({ content }: { content: string }) {
       const parts = text.split(/(\*\*[^*]+\*\*)/g);
       return parts.map((part, idx) => {
         if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={idx} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
+          return <strong key={idx} className="font-semibold text-[#054700]">{part.slice(2, -2)}</strong>;
         }
         return part;
       });
@@ -175,7 +175,7 @@ const getStatusIcon = (status: string) => {
     case 'open':
       return <AlertCircle className="w-4 h-4 text-blue-600" />;
     case 'closed':
-      return <CheckCircle className="w-4 h-4 text-gray-600" />;
+      return <CheckCircle className="w-4 h-4 text-[#5a6623]" />;
     default:
       return <AlertCircle className="w-4 h-4 text-red-600" />;
   }
@@ -190,7 +190,7 @@ const getStatusColor = (status: string) => {
     case 'open':
       return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
     case 'closed':
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
+      return 'bg-gray-100 text-[#054700] dark:bg-gray-900/30 dark:text-gray-300';
     default:
       return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
   }
@@ -385,7 +385,7 @@ export default function SupportPage() {
                 {/* Article Content */}
                 <div className="space-y-6">
                   <div className="border-b pb-6">
-                    <h1 className="text-3xl md:text-4xl font-bold mb-3 text-gray-900" data-testid="article-title">
+                    <h1 className="text-3xl md:text-4xl font-bold mb-3 text-[#054700]" data-testid="article-title">
                       {selectedArticle.title}
                     </h1>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">

@@ -962,7 +962,7 @@ export default function MyFormulaPage() {
                   {membershipUpsellAvailable ? (
                     <Card className={`transition-all duration-200 ${
                       includeMembershipAtCheckout
-                        ? 'border-[#1B4332] ring-2 ring-[#1B4332]/20 bg-[#1B4332]/5'
+                        ? 'border-[#054700] ring-2 ring-[#054700]/20 bg-[#054700]/5'
                         : 'border-muted bg-muted/5'
                     }`}>
                       <CardHeader className="pb-2">
@@ -971,7 +971,7 @@ export default function MyFormulaPage() {
                             Activate Continuous Optimization
                           </CardTitle>
                           {includeMembershipAtCheckout && (
-                            <Badge className="bg-[#1B4332] text-white text-xs">Recommended</Badge>
+                            <Badge className="bg-[#054700] text-white text-xs">Recommended</Badge>
                           )}
                         </div>
                         <CardDescription>
@@ -989,7 +989,7 @@ export default function MyFormulaPage() {
                           />
                           <label htmlFor="membership-upsell-toggle" className="text-sm leading-relaxed cursor-pointer">
                             {membershipSavingsAmount > 0 ? (
-                              <>Add membership — <span className="font-semibold text-[#1B4332]">Save ${membershipSavingsAmount.toFixed(2)} today</span> + ${membershipMonthlyPrice.toFixed(0)}/mo locked for life</>
+                              <>Add membership — <span className="font-semibold text-[#054700]">Save ${membershipSavingsAmount.toFixed(2)} today</span> + ${membershipMonthlyPrice.toFixed(0)}/mo locked for life</>
                             ) : (
                               <>Add membership — 15% off formula + ${membershipMonthlyPrice.toFixed(0)}/mo locked for life</>
                             )}
@@ -1008,13 +1008,13 @@ export default function MyFormulaPage() {
                         <div className="rounded-lg border bg-white overflow-hidden">
                           {includeMembershipAtCheckout ? (
                             <>
-                              <div className="flex items-center justify-between p-3 bg-[#1B4332]/5">
+                              <div className="flex items-center justify-between p-3 bg-[#054700]/5">
                                 <div>
                                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">8-week supply</p>
                                   <p className="text-[10px] text-muted-foreground mt-0.5">Auto-refills every 8 weeks</p>
                                 </div>
                                 <div className="text-right flex items-baseline gap-2">
-                                  <span className="text-2xl font-bold text-[#1B4332]">${discountedFormulaPrice.toFixed(2)}</span>
+                                  <span className="text-2xl font-bold text-[#054700]">${discountedFormulaPrice.toFixed(2)}</span>
                                   {membershipSavingsAmount > 0 && (
                                     <span className="text-sm text-muted-foreground line-through">${oneTimeFormulaPrice.toFixed(2)}</span>
                                   )}
@@ -1026,7 +1026,7 @@ export default function MyFormulaPage() {
                               </div>
                               <div className="flex items-center justify-between px-3 py-2 border-t border-dashed">
                                 <span className="text-xs text-muted-foreground">Membership starting next month</span>
-                                <span className="text-sm font-medium text-[#1B4332]">${membershipMonthlyPrice.toFixed(0)}/mo <span className="text-muted-foreground line-through font-normal">${STANDARD_TIER_PRICE}/mo</span></span>
+                                <span className="text-sm font-medium text-[#054700]">${membershipMonthlyPrice.toFixed(0)}/mo <span className="text-muted-foreground line-through font-normal">${STANDARD_TIER_PRICE}/mo</span></span>
                               </div>
                             </>
                           ) : (
@@ -1044,7 +1044,7 @@ export default function MyFormulaPage() {
                               </div>
                               {membershipSavingsAmount > 0 && (
                                 <div className="px-3 pb-3">
-                                  <p className="text-xs text-[#1B4332] cursor-pointer hover:underline" onClick={() => setIncludeMembershipAtCheckout(true)}>
+                                  <p className="text-xs text-[#054700] cursor-pointer hover:underline" onClick={() => setIncludeMembershipAtCheckout(true)}>
                                     Add membership to save ${membershipSavingsAmount.toFixed(2)} today + ongoing optimization
                                   </p>
                                 </div>
@@ -1060,7 +1060,7 @@ export default function MyFormulaPage() {
 
                         {/* Membership benefits collapsible */}
                         <Collapsible open={membershipBenefitsOpen} onOpenChange={setMembershipBenefitsOpen}>
-                          <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-[#1B4332] font-medium hover:underline cursor-pointer">
+                          <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-[#054700] font-medium hover:underline cursor-pointer">
                             What's included
                             {membershipBenefitsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                           </CollapsibleTrigger>
@@ -1075,7 +1075,7 @@ export default function MyFormulaPage() {
                                 'Future platform upgrades included',
                               ].map((benefit) => (
                                 <li key={benefit} className="flex items-start gap-1.5">
-                                  <CheckCircle className="w-3 h-3 text-[#1B4332] mt-0.5 flex-shrink-0" />
+                                  <CheckCircle className="w-3 h-3 text-[#054700] mt-0.5 flex-shrink-0" />
                                   {benefit}
                                 </li>
                               ))}
@@ -1098,21 +1098,21 @@ export default function MyFormulaPage() {
                               const isActive = tier.price === membershipMonthlyPrice;
                               return (
                                 <div key={tier.name} className="text-center flex-1">
-                                  <div className={`text-lg font-light ${isActive ? 'text-[#1B4332]' : 'text-[#1B4332]/30'}`}>
+                                  <div className={`text-lg font-light ${isActive ? 'text-[#054700]' : 'text-[#054700]/30'}`}>
                                     ${tier.price}<span className="text-[10px] font-normal">/mo</span>
                                   </div>
                                 </div>
                               );
                             })}
                           </div>
-                          <div className="relative h-1.5 bg-[#1B4332]/10 rounded-full mb-2">
+                          <div className="relative h-1.5 bg-[#054700]/10 rounded-full mb-2">
                             {[0, 33.33, 66.66, 100].map((pos, i) => {
                               const isActive = i === 0; // founding is first
                               return (
                                 <div
                                   key={i}
                                   className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 ${
-                                    isActive ? 'bg-[#1B4332] border-[#1B4332]' : 'bg-white border-[#1B4332]/20'
+                                    isActive ? 'bg-[#054700] border-[#054700]' : 'bg-white border-[#054700]/20'
                                   }`}
                                   style={{ left: `${pos}%`, transform: 'translate(-50%, -50%)' }}
                                 />
@@ -1129,10 +1129,10 @@ export default function MyFormulaPage() {
                               const isActive = i === 0;
                               return (
                                 <div key={tier.name} className="text-center flex-1">
-                                  <div className={`text-xs font-medium ${isActive ? 'text-[#1B4332]' : 'text-[#1B4332]/30'}`}>
+                                  <div className={`text-xs font-medium ${isActive ? 'text-[#054700]' : 'text-[#054700]/30'}`}>
                                     {tier.name}
                                   </div>
-                                  <div className={`text-[10px] ${isActive ? 'text-[#52796F]' : 'text-[#52796F]/30'}`}>
+                                  <div className={`text-[10px] ${isActive ? 'text-[#5a6623]' : 'text-[#5a6623]/30'}`}>
                                     {tier.note}
                                   </div>
                                   {isActive && membershipSpotsRemaining !== null && (
@@ -1141,7 +1141,7 @@ export default function MyFormulaPage() {
                                     </div>
                                   )}
                                   {!isActive && i < 3 && (
-                                    <div className="text-[10px] text-[#52796F]/30">Coming next</div>
+                                    <div className="text-[10px] text-[#5a6623]/30">Coming next</div>
                                   )}
                                 </div>
                               );
@@ -1179,7 +1179,7 @@ export default function MyFormulaPage() {
                               <div className="text-right">
                                 {hasActiveMembership ? (
                                   <div className="flex items-baseline gap-2">
-                                    <span className="text-2xl font-bold text-[#1B4332]">${discountedFormulaPrice.toFixed(2)}</span>
+                                    <span className="text-2xl font-bold text-[#054700]">${discountedFormulaPrice.toFixed(2)}</span>
                                     <span className="text-sm text-muted-foreground line-through">${oneTimeFormulaPrice.toFixed(2)}</span>
                                   </div>
                                 ) : (
@@ -1194,7 +1194,7 @@ export default function MyFormulaPage() {
                             {hasActiveMembership && (
                               <div className="flex items-center justify-between px-3 py-2 border-t border-dashed">
                                 <span className="text-xs text-muted-foreground">Member discount (15%)</span>
-                                <span className="text-sm font-semibold text-[#1B4332]">-${membershipSavingsAmount.toFixed(2)}</span>
+                                <span className="text-sm font-semibold text-[#054700]">-${membershipSavingsAmount.toFixed(2)}</span>
                               </div>
                             )}
                             <div className="px-3 py-2 border-t text-xs text-muted-foreground">
@@ -1239,15 +1239,15 @@ export default function MyFormulaPage() {
                     const isMemberPricing = (includeMembershipAtCheckout && membershipUpsellAvailable) || hasActiveMembership;
 
                     return (
-                      <div className="rounded-xl overflow-hidden border border-[#1B4332]/15 shadow-sm">
+                      <div className="rounded-xl overflow-hidden border border-[#054700]/15 shadow-sm">
                         {/* Header */}
-                        <div className="bg-[#1B4332] px-5 py-3.5 flex items-center justify-between">
+                        <div className="bg-[#054700] px-5 py-3.5 flex items-center justify-between">
                           <div className="flex items-center gap-2.5">
                             <img src="/ones-logo-icon.svg" alt="ONES" className="w-5 h-5 brightness-0 invert" />
                             <span className="text-white font-semibold text-sm">Your formula vs. buying separately</span>
                           </div>
                           {savingsMonthly !== null && savingsMonthly > 0 && (
-                            <span className="bg-[#D4A574] text-[#1B4332] font-bold text-[11px] px-2.5 py-1 rounded-full">
+                            <span className="bg-[#D4A574] text-[#054700] font-bold text-[11px] px-2.5 py-1 rounded-full">
                               SAVE {savingsMonthly}%
                             </span>
                           )}
@@ -1290,26 +1290,26 @@ export default function MyFormulaPage() {
                           <div className="p-5 bg-[#f8faf9]">
                             <div className="flex items-center gap-1.5 mb-4">
                               <img src="/ones-logo-icon.svg" alt="" className="w-3.5 h-3.5" />
-                              <span className="text-[11px] font-semibold text-[#1B4332] uppercase tracking-widest">ONES</span>
+                              <span className="text-[11px] font-semibold text-[#054700] uppercase tracking-widest">ONES</span>
                             </div>
 
                             <div className="space-y-4">
                               <div className="flex items-baseline gap-1.5">
-                                <span className="text-3xl font-black text-[#1B4332] tabular-nums">1</span>
-                                <span className="text-xs text-[#52796F]">formula</span>
+                                <span className="text-3xl font-black text-[#054700] tabular-nums">1</span>
+                                <span className="text-xs text-[#5a6623]">formula</span>
                               </div>
                               <div className="flex items-baseline gap-1.5">
-                                <span className="text-3xl font-black text-[#1B4332] tabular-nums">{onesCapsules}</span>
-                                <span className="text-xs text-[#52796F]">caps / day</span>
+                                <span className="text-3xl font-black text-[#054700] tabular-nums">{onesCapsules}</span>
+                                <span className="text-xs text-[#5a6623]">caps / day</span>
                               </div>
                               <div>
                                 <div className="flex items-baseline gap-1.5">
-                                  <span className="text-3xl font-black text-[#1B4332] tabular-nums">
+                                  <span className="text-3xl font-black text-[#054700] tabular-nums">
                                     {onesMonthly > 0 ? `$${onesMonthly}` : '—'}
                                   </span>
-                                  <span className="text-xs text-[#52796F]">/ month</span>
+                                  <span className="text-xs text-[#5a6623]">/ month</span>
                                 </div>
-                                <div className="text-[10px] text-[#52796F]/70 mt-0.5">
+                                <div className="text-[10px] text-[#5a6623]/70 mt-0.5">
                                   ${Math.round(effectiveOnesCost)} per {supplyWeeks}-week order
                                   {isMemberPricing && <span className="text-[#D4A574] font-medium ml-1">· Member price</span>}
                                 </div>
@@ -1321,7 +1321,7 @@ export default function MyFormulaPage() {
                                 ? ['Fully personalized', 'Zero fillers', 'Premium ingredients', 'Formula evolves with you']
                                 : ['Fully personalized', 'Zero fillers', 'Premium ingredients', 'AI-optimized doses']
                               ).map((item) => (
-                                <div key={item} className="flex items-center gap-1.5 text-[11px] text-[#1B4332]">
+                                <div key={item} className="flex items-center gap-1.5 text-[11px] text-[#054700]">
                                   <CheckCircle className="w-3 h-3 text-[#2D6A4F] flex-shrink-0" />
                                   <span>{item}</span>
                                 </div>
@@ -1334,7 +1334,7 @@ export default function MyFormulaPage() {
                         {isMemberPricing && (
                           <div className="bg-[#D4A574]/[0.08] border-t border-[#D4A574]/20 px-5 py-2.5 flex items-start gap-2">
                             <RefreshCw className="w-3.5 h-3.5 text-[#D4A574] mt-0.5 flex-shrink-0" />
-                            <span className="text-xs text-[#1B4332]/80 leading-relaxed">
+                            <span className="text-xs text-[#054700]/80 leading-relaxed">
                               As a member, your formula adapts over time — based on new labs, goals, and how your body responds. You'll always have the most up-to-date version.
                             </span>
                           </div>
@@ -1342,9 +1342,9 @@ export default function MyFormulaPage() {
 
                         {/* Savings bar */}
                         {savingsMonthly !== null && savingsMonthly > 0 && retailCost > 0 && onesMonthly > 0 && (
-                          <div className="bg-[#1B4332]/[0.04] border-t border-[#1B4332]/10 px-5 py-3 flex items-center gap-2">
+                          <div className="bg-[#054700]/[0.04] border-t border-[#054700]/10 px-5 py-3 flex items-center gap-2">
                             <CheckCircle className="w-3.5 h-3.5 text-[#2D6A4F] flex-shrink-0" />
-                            <span className="text-sm text-[#1B4332]">
+                            <span className="text-sm text-[#054700]">
                               <span className="font-semibold">You save ~${Math.round(retailCost - onesMonthly)}/mo</span>
                               {' '}compared to buying {bottleCount} separate supplements
                             </span>
@@ -1406,7 +1406,7 @@ export default function MyFormulaPage() {
                           </h4>
                           <div className="space-y-2">
                             {selectedFormula.bases.map((base, idx) => (
-                              <div key={idx} className="p-2 bg-muted/30 rounded text-sm">
+                              <div key={idx} className="p-2 bg-white/30 rounded text-sm">
                                 <div className="font-medium">{base.ingredient} - {base.amount}{base.unit}</div>
                                 {base.purpose && <div className="text-muted-foreground text-xs mt-1">{base.purpose}</div>}
                               </div>
@@ -1424,7 +1424,7 @@ export default function MyFormulaPage() {
                           </h4>
                           <div className="space-y-2">
                             {selectedFormula.additions.map((addition, idx) => (
-                              <div key={idx} className="p-2 bg-muted/30 rounded text-sm">
+                              <div key={idx} className="p-2 bg-white/30 rounded text-sm">
                                 <div className="font-medium">{addition.ingredient} - {addition.amount}{addition.unit}</div>
                                 {addition.purpose && <div className="text-muted-foreground text-xs mt-1">{addition.purpose}</div>}
                               </div>
@@ -1491,16 +1491,16 @@ export default function MyFormulaPage() {
                     </CollapsibleContent>
                   </Collapsible>
 
-                  <div className="rounded-lg border border-[#1B4332]/15 overflow-hidden">
-                    <div className="bg-[#1B4332]/[0.04] px-4 py-3 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center flex-shrink-0">
-                        <MessageSquare className="w-4 h-4 text-[#1B4332]" />
+                  <div className="rounded-lg border border-[#054700]/15 overflow-hidden">
+                    <div className="bg-[#054700]/[0.04] px-4 py-3 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-[#054700]/10 flex items-center justify-center flex-shrink-0">
+                        <MessageSquare className="w-4 h-4 text-[#054700]" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-[#1B4332]">
+                        <p className="text-sm font-semibold text-[#054700]">
                           {hasSmsAccountabilityConsent ? 'ONES Accountability AI enabled' : 'Want an AI accountability partner?'}
                         </p>
-                        <p className="text-xs text-[#52796F]">We'll text you daily reminders to take your supplements and check in on how you're feeling.</p>
+                        <p className="text-xs text-[#5a6623]">We'll text you daily reminders to take your supplements and check in on how you're feeling.</p>
                       </div>
                     </div>
                     <div className="px-4 py-3 flex items-start gap-2">
@@ -1849,14 +1849,14 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
       <CardContent className="flex-1 flex flex-col space-y-4">
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col items-center justify-center p-3 bg-muted/30 rounded-lg min-h-[72px]">
+          <div className="flex flex-col items-center justify-center p-3 bg-white/40 rounded-lg min-h-[72px]">
             <div className="font-bold text-lg text-primary leading-none mb-1.5">
               {formula.bases.length + (formula.userCustomizations?.addedBases?.length || 0)}
             </div>
             <div className="text-xs text-muted-foreground text-center leading-tight">System Supports</div>
           </div>
-          <div className="flex flex-col items-center justify-center p-3 bg-muted/30 rounded-lg min-h-[72px]">
-            <div className="font-bold text-lg text-blue-600 leading-none mb-1.5">
+          <div className="flex flex-col items-center justify-center p-3 bg-white/40 rounded-lg min-h-[72px]">
+            <div className="font-bold text-lg text-[#5a6623] leading-none mb-1.5">
               {formula.additions.length + (formula.userCustomizations?.addedIndividuals?.length || 0)}
             </div>
             <div className="text-xs text-muted-foreground text-center leading-tight">Additions</div>
@@ -1864,7 +1864,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
         </div>
 
         {/* Daily Dosage */}
-        <div className="space-y-2 p-3 bg-muted/20 rounded-lg">
+        <div className="space-y-2 p-3 bg-white/30 rounded-lg">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm text-muted-foreground whitespace-nowrap">Daily Dosage:</span>
             <span className="font-medium text-sm tabular-nums" data-testid={`text-formula-dosage-${formula.version}`}>
@@ -1908,7 +1908,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
                 </h4>
                 <div className="space-y-1">
                   {formula.bases.map((base, idx) => (
-                    <div key={idx} className="text-xs p-2 bg-muted/20 rounded">
+                    <div key={idx} className="text-xs p-2 bg-white/30 rounded">
                       <div className="font-medium">{base.ingredient} - {base.amount}{base.unit}</div>
                       {base.purpose && <div className="text-muted-foreground mt-1">{base.purpose}</div>}
                     </div>
@@ -1926,7 +1926,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
                 </h4>
                 <div className="space-y-1">
                   {formula.additions.map((addition, idx) => (
-                    <div key={idx} className="text-xs p-2 bg-muted/20 rounded">
+                    <div key={idx} className="text-xs p-2 bg-white/30 rounded">
                       <div className="font-medium">{addition.ingredient} - {addition.amount}{addition.unit}</div>
                       {addition.purpose && <div className="text-muted-foreground mt-1">{addition.purpose}</div>}
                     </div>
@@ -2110,11 +2110,11 @@ function ArchivedFormulaCard({ formula, onRestore, isRestoring }: ArchivedFormul
       <CardContent className="space-y-4">
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col items-center justify-center p-2 bg-muted/20 rounded-lg">
+          <div className="flex flex-col items-center justify-center p-2 bg-white/40 rounded-lg">
             <div className="font-medium text-muted-foreground">{totalIngredients}</div>
             <div className="text-xs text-muted-foreground">Ingredients</div>
           </div>
-          <div className="flex flex-col items-center justify-center p-2 bg-muted/20 rounded-lg">
+          <div className="flex flex-col items-center justify-center p-2 bg-white/40 rounded-lg">
             <div className="font-medium text-muted-foreground">{formula.totalMg}mg</div>
             <div className="text-xs text-muted-foreground">Total</div>
           </div>
@@ -2162,15 +2162,15 @@ function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
         <CardContent className="space-y-6">
           {/* Quick Stats */}
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="text-center p-4 bg-muted/30 rounded-lg" data-testid="stat-system-supports">
+            <div className="text-center p-4 bg-white/40 rounded-lg" data-testid="stat-system-supports">
               <div className="text-2xl font-bold text-primary">{formula.bases.length}</div>
               <p className="text-sm text-muted-foreground">System Supports</p>
             </div>
-            <div className="text-center p-4 bg-muted/30 rounded-lg" data-testid="stat-custom-additions">
-              <div className="text-2xl font-bold text-blue-600">{formula.additions.length}</div>
+            <div className="text-center p-4 bg-white/40 rounded-lg" data-testid="stat-custom-additions">
+              <div className="text-2xl font-bold text-[#5a6623]">{formula.additions.length}</div>
               <p className="text-sm text-muted-foreground">Custom Additions</p>
             </div>
-            <div className="text-center p-4 bg-muted/30 rounded-lg" data-testid="stat-total-dosage">
+            <div className="text-center p-4 bg-white/40 rounded-lg" data-testid="stat-total-dosage">
               <div className="text-2xl font-bold text-green-600">{formula.totalMg}mg</div>
               <p className="text-sm text-muted-foreground">Total Dosage</p>
             </div>
@@ -2303,7 +2303,7 @@ function CurrentFormulaDisplay({ formula }: { formula: Formula }) {
           {formula.notes && (
             <>
               <Separator />
-              <div className="p-4 bg-muted/50 rounded-lg">
+              <div className="p-4 bg-white/50 rounded-lg">
                 <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
                   <Info className="w-5 h-5" />
                   Formula Notes
@@ -2958,7 +2958,7 @@ function FormulaComparison({ comparison }: { comparison: FormulaComparison }) {
     <div className="space-y-6">
       {/* Summary */}
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="text-center p-4 bg-muted/30 rounded-lg" data-testid={`comparison-version-${formula1.version}`}>
+        <div className="text-center p-4 bg-white/40 rounded-lg" data-testid={`comparison-version-${formula1.version}`}>
           <div className="text-lg font-semibold">{formula1.name || `Version ${formula1.version}`}</div>
           {formula1.name && (
             <div className="text-xs text-muted-foreground">Version {formula1.version}</div>
@@ -2968,7 +2968,7 @@ function FormulaComparison({ comparison }: { comparison: FormulaComparison }) {
           </div>
           <div className="text-lg font-bold mt-2">{formula1.totalMg}mg</div>
         </div>
-        <div className="text-center p-4 bg-muted/30 rounded-lg" data-testid={`comparison-version-${formula2.version}`}>
+        <div className="text-center p-4 bg-white/40 rounded-lg" data-testid={`comparison-version-${formula2.version}`}>
           <div className="text-lg font-semibold">{formula2.name || `Version ${formula2.version}`}</div>
           {formula2.name && (
             <div className="text-xs text-muted-foreground">Version {formula2.version}</div>
@@ -2981,7 +2981,7 @@ function FormulaComparison({ comparison }: { comparison: FormulaComparison }) {
       </div>
 
       {/* Changes Summary */}
-      <div className="p-4 bg-muted/50 rounded-lg">
+      <div className="p-4 bg-white/50 rounded-lg">
         <h4 className="font-medium mb-3">Changes Summary</h4>
         <div className="space-y-2 text-sm">
           <p>Total dosage change: {differences.totalMgChange > 0 ? '+' : ''}{differences.totalMgChange}mg</p>

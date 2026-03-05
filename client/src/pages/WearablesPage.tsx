@@ -84,13 +84,13 @@ const PROVIDER_COLORS: Record<string, { color: string; bgColor: string }> = {
   garmin: { color: 'text-blue-600', bgColor: 'bg-blue-50' },
   google_fit: { color: 'text-green-600', bgColor: 'bg-green-50' },
   fitbit: { color: 'text-[#00B0B9]', bgColor: 'bg-[#00B0B9]/10' },
-  oura: { color: 'text-[#0B0F1C]', bgColor: 'bg-slate-100' },
+  oura: { color: 'text-[#0B0F1C]', bgColor: 'bg-[#054700]/5' },
   whoop_v2: { color: 'text-black', bgColor: 'bg-yellow-50' },
   whoop: { color: 'text-black', bgColor: 'bg-yellow-50' },
   peloton: { color: 'text-red-600', bgColor: 'bg-red-50' },
   freestyle_libre: { color: 'text-blue-500', bgColor: 'bg-blue-50' },
   apple_health_kit: { color: 'text-pink-600', bgColor: 'bg-pink-50' },
-  withings: { color: 'text-slate-700', bgColor: 'bg-slate-50' },
+  withings: { color: 'text-[#054700]', bgColor: 'bg-[#054700]/5' },
   strava: { color: 'text-orange-600', bgColor: 'bg-orange-50' },
   polar: { color: 'text-red-700', bgColor: 'bg-red-50' },
   eight_sleep: { color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
@@ -102,7 +102,7 @@ const PROVIDER_COLORS: Record<string, { color: string; bgColor: string }> = {
   omron: { color: 'text-blue-600', bgColor: 'bg-blue-50' },
   kardia: { color: 'text-red-500', bgColor: 'bg-red-50' },
   beurer: { color: 'text-cyan-600', bgColor: 'bg-cyan-50' },
-  hammerhead: { color: 'text-slate-800', bgColor: 'bg-slate-100' },
+  hammerhead: { color: 'text-[#054700]', bgColor: 'bg-[#054700]/5' },
 };
 
 function ProviderLogo({ provider, size = 'md' }: { provider: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -295,9 +295,9 @@ function StatTile({
     <div
       onClick={onClick}
       className={`bg-white rounded-2xl border p-4 sm:p-5 flex flex-col gap-3 shadow-sm transition-all ${
-        onClick ? 'cursor-pointer hover:shadow-md hover:border-[#52796F]/25' : ''
+        onClick ? 'cursor-pointer hover:shadow-md hover:border-[#5a6623]/25' : ''
       } ${
-        expanded ? 'border-[#52796F]/30 ring-1 ring-[#1B4332]/10' : 'border-[#52796F]/10'
+        expanded ? 'border-[#5a6623]/30 ring-1 ring-[#054700]/10' : 'border-[#5a6623]/10'
       }`}
     >
       <div className="flex items-center justify-between">
@@ -305,37 +305,37 @@ function StatTile({
           <Icon className={`h-4 w-4 ${iconColor}`} />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-[#52796F]">{label}</span>
-          {onClick && <Chevron className="h-3.5 w-3.5 text-[#52796F]/50" />}
+          <span className="text-xs font-medium text-[#5a6623]">{label}</span>
+          {onClick && <Chevron className="h-3.5 w-3.5 text-[#5a6623]/50" />}
         </div>
       </div>
       <div>
         {value !== null ? (
-          <p className="text-2xl sm:text-3xl font-bold text-[#1B4332] leading-tight">
+          <p className="text-2xl sm:text-3xl font-bold text-[#054700] leading-tight">
             {value}
-            {unit && <span className="text-sm font-normal text-[#52796F] ml-1">{unit}</span>}
+            {unit && <span className="text-sm font-normal text-[#5a6623] ml-1">{unit}</span>}
           </p>
         ) : (
-          <p className="text-base text-[#52796F] italic">No data yet</p>
+          <p className="text-base text-[#5a6623] italic">No data yet</p>
         )}
-        <p className="text-xs text-[#52796F] mt-0.5">{sub}</p>
+        <p className="text-xs text-[#5a6623] mt-0.5">{sub}</p>
       </div>
       <SparkBars values={sparkValues} color={accentColor} />
       {expanded && detailRows && detailRows.length > 0 && (
-        <div className="border-t border-[#52796F]/10 pt-3 space-y-2" onClick={e => e.stopPropagation()}>
+        <div className="border-t border-[#5a6623]/10 pt-3 space-y-2" onClick={e => e.stopPropagation()}>
           {detailRows.map((row, i) => (
             <div key={i} className="flex items-center justify-between">
-              <span className="text-xs text-[#52796F]">{row.date}</span>
+              <span className="text-xs text-[#5a6623]">{row.date}</span>
               <div className="text-right">
-                <span className="text-xs font-semibold text-[#1B4332]">{row.value}</span>
-                {row.sub && <span className="text-xs text-[#52796F] ml-1">{row.sub}</span>}
+                <span className="text-xs font-semibold text-[#054700]">{row.value}</span>
+                {row.sub && <span className="text-xs text-[#5a6623] ml-1">{row.sub}</span>}
               </div>
             </div>
           ))}
         </div>
       )}
       {expanded && (!detailRows || detailRows.length === 0) && (
-        <p className="text-xs text-[#52796F] border-t border-[#52796F]/10 pt-3 text-center italic">No detail data available</p>
+        <p className="text-xs text-[#5a6623] border-t border-[#5a6623]/10 pt-3 text-center italic">No detail data available</p>
       )}
     </div>
   );
@@ -398,11 +398,11 @@ function CustomizeMetricsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-[#1B4332] flex items-center gap-2">
+          <DialogTitle className="text-[#054700] flex items-center gap-2">
             <Settings2 className="h-5 w-5" />
             Customize Health Metrics
           </DialogTitle>
-          <DialogDescription className="text-[#52796F]">
+          <DialogDescription className="text-[#5a6623]">
             Choose which metrics appear on your dashboard. Metrics with data from your connected devices are highlighted.
           </DialogDescription>
         </DialogHeader>
@@ -413,8 +413,8 @@ function CustomizeMetricsModal({
             if (!metrics || metrics.length === 0) return null;
             return (
               <div key={pillarId}>
-                <h3 className="text-sm font-semibold text-[#1B4332] mb-2 flex items-center gap-2">
-                  {(() => { const Icon = getIcon(metrics[0].icon); return <Icon className="h-4 w-4 text-[#52796F]" />; })()}
+                <h3 className="text-sm font-semibold text-[#054700] mb-2 flex items-center gap-2">
+                  {(() => { const Icon = getIcon(metrics[0].icon); return <Icon className="h-4 w-4 text-[#5a6623]" />; })()}
                   {PILLAR_LABELS[pillarId] || pillarId}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -428,10 +428,10 @@ function CustomizeMetricsModal({
                         onClick={() => toggle(metric.id)}
                         className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
                           isSelected
-                            ? 'border-[#1B4332] bg-[#1B4332]/5'
+                            ? 'border-[#054700] bg-[#054700]/5'
                             : hasDataForMetric
-                              ? 'border-transparent bg-white hover:border-[#52796F]/30'
-                              : 'border-transparent bg-gray-50 opacity-60 hover:opacity-80'
+                              ? 'border-transparent bg-white hover:border-[#5a6623]/30'
+                              : 'border-transparent bg-white/40 opacity-60 hover:opacity-80'
                         }`}
                       >
                         <div className={`h-8 w-8 rounded-full ${metric.iconBg} flex items-center justify-center flex-shrink-0`}>
@@ -439,18 +439,18 @@ function CustomizeMetricsModal({
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-medium text-[#1B4332] truncate">{metric.label}</span>
+                            <span className="text-sm font-medium text-[#054700] truncate">{metric.label}</span>
                             {hasDataForMetric && (
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" title="Has data" />
                             )}
                           </div>
-                          <p className="text-xs text-[#52796F] truncate">{metric.subLabel}{metric.unit ? ` (${metric.unit})` : ''}</p>
+                          <p className="text-xs text-[#5a6623] truncate">{metric.subLabel}{metric.unit ? ` (${metric.unit})` : ''}</p>
                         </div>
                         <div className="flex-shrink-0">
                           {isSelected ? (
-                            <Eye className="h-4 w-4 text-[#1B4332]" />
+                            <Eye className="h-4 w-4 text-[#054700]" />
                           ) : (
-                            <EyeOff className="h-4 w-4 text-[#52796F]/40" />
+                            <EyeOff className="h-4 w-4 text-[#5a6623]/40" />
                           )}
                         </div>
                       </button>
@@ -462,19 +462,19 @@ function CustomizeMetricsModal({
           })}
         </div>
 
-        <div className="flex items-center justify-between mt-6 pt-4 border-t border-[#52796F]/10">
+        <div className="flex items-center justify-between mt-6 pt-4 border-t border-[#5a6623]/10">
           <button
             onClick={handleReset}
-            className="text-xs text-[#52796F] hover:text-[#1B4332] transition-colors"
+            className="text-xs text-[#5a6623] hover:text-[#054700] transition-colors"
           >
             Reset to defaults
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#52796F]">{selected.length} selected</span>
+            <span className="text-xs text-[#5a6623]">{selected.length} selected</span>
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-[#1B4332] hover:bg-[#1B4332]/90"
+              className="bg-[#054700] hover:bg-[#054700]/90"
             >
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save
@@ -723,8 +723,8 @@ export default function WearablesPage() {
 
       {/* ── Page Header ── */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1B4332]">Wearable Devices</h1>
-        <p className="text-sm sm:text-base text-[#52796F] mt-1">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#054700]">Wearable Devices</h1>
+        <p className="text-sm sm:text-base text-[#5a6623] mt-1">
           Connect your health devices to personalize your supplement formula.
         </p>
       </div>
@@ -733,22 +733,22 @@ export default function WearablesPage() {
       {connectedConnections.length > 0 ? (
         <div className="flex items-center gap-3 flex-wrap">
           {connectedConnections.map(connection => {
-            const colors = PROVIDER_COLORS[connection.provider] || { color: 'text-gray-600', bgColor: 'bg-gray-50' };
+            const colors = PROVIDER_COLORS[connection.provider] || { color: 'text-[#054700]', bgColor: 'bg-[#054700]/5' };
             return (
-              <div key={connection.id} className="flex items-center gap-2 bg-white border border-[#52796F]/20 rounded-xl px-3 py-2 shadow-sm">
+              <div key={connection.id} className="flex items-center gap-2 bg-white border border-[#5a6623]/20 rounded-xl px-3 py-2 shadow-sm">
                 <div className={`p-1.5 rounded-lg ${colors.bgColor}`}>
                   <ProviderLogo provider={connection.provider} size="sm" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-[#1B4332] leading-tight">{connection.providerName}</p>
-                  <p className="text-xs text-[#52796F] flex items-center gap-1">
+                  <p className="text-sm font-medium text-[#054700] leading-tight">{connection.providerName}</p>
+                  <p className="text-xs text-[#5a6623] flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
                     Syncing
                   </p>
                 </div>
                 <button
                   onClick={() => handleDisconnect(connection.id)}
-                  className="ml-1 text-[#52796F]/50 hover:text-red-500 transition-colors"
+                  className="ml-1 text-[#5a6623]/50 hover:text-red-500 transition-colors"
                   title="Disconnect"
                 >
                   <XCircle className="h-4 w-4" />
@@ -762,7 +762,7 @@ export default function WearablesPage() {
               size="sm"
               onClick={() => syncMutation.mutate()}
               disabled={syncMutation.isPending}
-              className="border-[#1B4332] text-[#1B4332]"
+              className="border-[#054700] text-[#054700]"
             >
               {syncMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               <span className="ml-1.5 hidden sm:inline">Sync</span>
@@ -771,7 +771,7 @@ export default function WearablesPage() {
               size="sm"
               onClick={() => handleConnect()}
               disabled={isConnecting}
-              className="bg-[#1B4332] hover:bg-[#1B4332]/90"
+              className="bg-[#054700] hover:bg-[#054700]/90"
             >
               {isConnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
               <span className="ml-1.5">Add Device</span>
@@ -780,16 +780,16 @@ export default function WearablesPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          <Card className="border-dashed bg-[#FAF7F2] border-[#52796F]/30">
+          <Card className="border-dashed bg-white border-[#5a6623]/30">
             <CardContent className="flex flex-col items-center justify-center py-10 px-4">
-              <div className="h-14 w-14 rounded-full bg-[#1B4332]/10 flex items-center justify-center mb-4">
-                <Watch className="h-7 w-7 text-[#1B4332]" />
+              <div className="h-14 w-14 rounded-full bg-[#054700]/10 flex items-center justify-center mb-4">
+                <Watch className="h-7 w-7 text-[#054700]" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-[#1B4332]">No devices connected</h3>
-              <p className="text-[#52796F] text-center text-sm max-w-md mb-5">
+              <h3 className="text-lg font-semibold mb-2 text-[#054700]">No devices connected</h3>
+              <p className="text-[#5a6623] text-center text-sm max-w-md mb-5">
                 Connect a wearable to unlock personalized supplement recommendations based on your sleep, activity, and recovery.
               </p>
-              <Button onClick={() => handleConnect()} disabled={isConnecting} className="bg-[#1B4332] hover:bg-[#1B4332]/90">
+              <Button onClick={() => handleConnect()} disabled={isConnecting} className="bg-[#054700] hover:bg-[#054700]/90">
                 {isConnecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LinkIcon className="mr-2 h-4 w-4" />}
                 Connect Your First Device
               </Button>
@@ -797,28 +797,28 @@ export default function WearablesPage() {
           </Card>
 
           {/* Featured integrations for new users */}
-          <Card className="bg-[#FAF7F2] border-[#52796F]/20">
+          <Card className="border-[#5a6623]/10 shadow-2xl">
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-[#1B4332]"><Sparkles className="h-5 w-5" />Featured Integrations</CardTitle>
-              <CardDescription className="text-[#52796F]">Connect a device to start tracking your health</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-[#054700]"><Sparkles className="h-5 w-5" />Featured Integrations</CardTitle>
+              <CardDescription className="text-[#5a6623]">Connect a device to start tracking your health</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {featuredProviders.map(provider => {
-                  const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
+                  const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-[#054700]', bgColor: 'bg-[#054700]/5' };
                   return (
                     <button
                       key={provider.slug}
                       onClick={() => handleConnect(provider.slug)}
                       disabled={isConnecting}
-                      className="flex items-center gap-3 p-3 rounded-xl border-2 border-transparent bg-white/60 hover:bg-white hover:border-[#1B4332]/20 transition-all text-left disabled:opacity-60"
+                      className="flex items-center gap-3 p-3 rounded-xl border-2 border-transparent bg-white/60 hover:bg-white hover:border-[#054700]/20 transition-all text-left disabled:opacity-60"
                     >
                       <div className={`p-2 rounded-lg ${colors.bgColor} flex-shrink-0`}>
                         <ProviderLogo provider={provider.slug} size="md" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <span className="font-medium text-sm text-[#1B4332] block truncate">{provider.name}</span>
-                        <p className="text-xs text-[#52796F] truncate">{provider.description}</p>
+                        <span className="font-medium text-sm text-[#054700] block truncate">{provider.name}</span>
+                        <p className="text-xs text-[#5a6623] truncate">{provider.description}</p>
                       </div>
                     </button>
                   );
@@ -831,10 +831,10 @@ export default function WearablesPage() {
 
       {/* ── ONES AI Weekly Brief (connected only) ── */}
       {connectedConnections.length > 0 && (
-        <Card className="bg-[#FAF7F2] border-[#52796F]/20 overflow-hidden">
+        <Card className="border-[#5a6623]/10 shadow-2xl overflow-hidden">
           <CardHeader className="pb-1">
             <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-[#1B4332] text-base flex items-center gap-2">
+              <CardTitle className="text-[#054700] text-base flex items-center gap-2">
                 <img src="/ones-logo-icon.svg" alt="" className="h-5 w-5" />
                 {weeklyBrief?.tier === 'snapshot' ? 'Your Health Snapshot' :
                  weeklyBrief?.tier === 'early_trends' ? 'Early Trends' :
@@ -845,13 +845,13 @@ export default function WearablesPage() {
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                     weeklyBrief.tier === 'full' ? 'bg-emerald-100 text-emerald-700' :
                     weeklyBrief.tier === 'weekly' ? 'bg-blue-100 text-blue-700' :
-                    'bg-slate-100 text-slate-600'
+                    'bg-[#054700]/5 text-[#5a6623]'
                   }`}>
                     {weeklyBrief.daysOfData}d of data
                   </span>
                 )}
                 {weeklyBrief?.generatedAt && (
-                  <span className="text-[10px] text-[#52796F]/60">
+                  <span className="text-[10px] text-[#5a6623]/60">
                     {new Date(weeklyBrief.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
@@ -861,30 +861,30 @@ export default function WearablesPage() {
           <CardContent className="pt-1 pb-4 space-y-3">
             {briefLoading ? (
               <div className="space-y-2 animate-pulse">
-                <Skeleton className="h-3 w-full bg-[#52796F]/10" />
-                <Skeleton className="h-3 w-full bg-[#52796F]/10" />
-                <Skeleton className="h-3 w-4/5 bg-[#52796F]/10" />
+                <Skeleton className="h-3 w-full bg-[#5a6623]/10" />
+                <Skeleton className="h-3 w-full bg-[#5a6623]/10" />
+                <Skeleton className="h-3 w-4/5 bg-[#5a6623]/10" />
                 <div className="pt-2 space-y-1.5">
-                  <Skeleton className="h-3 w-2/3 bg-[#52796F]/10" />
-                  <Skeleton className="h-3 w-1/2 bg-[#52796F]/10" />
+                  <Skeleton className="h-3 w-2/3 bg-[#5a6623]/10" />
+                  <Skeleton className="h-3 w-1/2 bg-[#5a6623]/10" />
                 </div>
               </div>
             ) : weeklyBrief?.narrative ? (
               <>
                 {/* AI narrative */}
-                <p className="text-sm text-[#52796F] leading-relaxed">{weeklyBrief.narrative}</p>
+                <p className="text-sm text-[#5a6623] leading-relaxed">{weeklyBrief.narrative}</p>
 
                 {/* Actions */}
                 {weeklyBrief.actions.length > 0 && (
                   <div className="space-y-1.5 pt-1">
-                    <h4 className="text-xs font-semibold text-[#1B4332] uppercase tracking-wide flex items-center gap-1.5">
+                    <h4 className="text-xs font-semibold text-[#054700] uppercase tracking-wide flex items-center gap-1.5">
                       <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
                       Recommended Actions
                     </h4>
                     <div className="space-y-1.5">
                       {weeklyBrief.actions.map((action, idx) => (
-                        <div key={idx} className="flex items-start gap-2 text-xs text-[#52796F] bg-white/60 rounded-lg px-3 py-2 border border-[#52796F]/10">
-                          <span className="text-[#1B4332] font-medium mt-px">{idx + 1}.</span>
+                        <div key={idx} className="flex items-start gap-2 text-xs text-[#5a6623] bg-white/60 rounded-lg px-3 py-2 border border-[#5a6623]/10">
+                          <span className="text-[#054700] font-medium mt-px">{idx + 1}.</span>
                           <span className="leading-relaxed">{action}</span>
                         </div>
                       ))}
@@ -894,19 +894,19 @@ export default function WearablesPage() {
 
                 {/* Formula note */}
                 {weeklyBrief.formulaNote && (
-                  <div className="flex items-start gap-2 text-xs bg-[#1B4332]/5 rounded-lg px-3 py-2.5 border border-[#1B4332]/10">
-                    <Pill className="h-3.5 w-3.5 text-[#1B4332] flex-shrink-0 mt-0.5" />
-                    <span className="text-[#1B4332]/80 leading-relaxed">{weeklyBrief.formulaNote}</span>
+                  <div className="flex items-start gap-2 text-xs bg-[#054700]/5 rounded-lg px-3 py-2.5 border border-[#054700]/10">
+                    <Pill className="h-3.5 w-3.5 text-[#054700] flex-shrink-0 mt-0.5" />
+                    <span className="text-[#054700]/80 leading-relaxed">{weeklyBrief.formulaNote}</span>
                   </div>
                 )}
               </>
             ) : weeklyBrief?.tier === 'insufficient' ? (
-              <div className="flex items-center gap-2 text-sm text-[#52796F] py-2">
-                <Clock className="h-4 w-4 text-[#52796F]" />
+              <div className="flex items-center gap-2 text-sm text-[#5a6623] py-2">
+                <Clock className="h-4 w-4 text-[#5a6623]" />
                 <span>{weeklyBrief.narrative || 'Wear your device for a few more days to unlock your first health brief.'}</span>
               </div>
             ) : weeklyBrief?.error ? (
-              <div className="flex items-center gap-2 text-sm text-[#52796F] py-2">
+              <div className="flex items-center gap-2 text-sm text-[#5a6623] py-2">
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                 <span>Unable to generate your weekly brief right now. Check back later.</span>
               </div>
@@ -917,30 +917,30 @@ export default function WearablesPage() {
 
       {/* ── Health Dashboard (connected only) ── */}
       {connectedConnections.length > 0 && (
-        <Card className="bg-[#FAF7F2] border-[#52796F]/20 overflow-hidden">
-          <CardHeader className="pb-3 border-b border-[#52796F]/10">
+        <Card className="border-[#5a6623]/10 shadow-2xl overflow-hidden">
+          <CardHeader className="pb-3 border-b border-[#5a6623]/10">
             <div className="flex items-center justify-between flex-wrap gap-3">
-              <CardTitle className="text-[#1B4332] text-xl">Your Health Data</CardTitle>
+              <CardTitle className="text-[#054700] text-xl">Your Health Data</CardTitle>
               <div className="flex items-center gap-2">
                 {/* Customize button */}
                 <button
                   onClick={() => setShowCustomize(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#52796F] hover:text-[#1B4332] bg-white border border-[#52796F]/20 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#5a6623] hover:text-[#054700] bg-white border border-[#5a6623]/20 rounded-lg transition-colors"
                   title="Customize metrics"
                 >
                   <Settings2 className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Customize</span>
                 </button>
                 {/* Day-range selector */}
-                <div className="flex items-center gap-1 bg-white border border-[#52796F]/20 rounded-lg p-1">
+                <div className="flex items-center gap-1 bg-white border border-[#5a6623]/20 rounded-lg p-1">
                   {([7, 30, 90] as const).map(d => (
                     <button
                       key={d}
                       onClick={() => setDayRange(d)}
                       className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                         dayRange === d
-                          ? 'bg-[#1B4332] text-white shadow-sm'
-                          : 'text-[#52796F] hover:text-[#1B4332]'
+                          ? 'bg-[#054700] text-white shadow-sm'
+                          : 'text-[#5a6623] hover:text-[#054700]'
                       }`}
                     >
                       {d}d
@@ -994,14 +994,14 @@ export default function WearablesPage() {
                 {/* Empty state */}
                 {visibleMetrics.length === 0 && !histLoading && (
                   <div className="text-center py-8 mt-2">
-                    <p className="text-[#52796F] text-sm">No metrics selected. Click "Customize" to choose which metrics to display.</p>
+                    <p className="text-[#5a6623] text-sm">No metrics selected. Click "Customize" to choose which metrics to display.</p>
                   </div>
                 )}
 
                 {(histData?.data?.sleep?.length ?? 0) === 0 && (histData?.data?.activity?.length ?? 0) === 0 && !histLoading && visibleMetrics.length > 0 && (
                   <div className="text-center py-8 mt-2">
-                    <p className="text-[#52796F] text-sm">No biometric data yet — sync your device or wait for the first automatic pull.</p>
-                    <Button variant="outline" size="sm" className="mt-3 border-[#1B4332] text-[#1B4332]" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
+                    <p className="text-[#5a6623] text-sm">No biometric data yet — sync your device or wait for the first automatic pull.</p>
+                    <Button variant="outline" size="sm" className="mt-3 border-[#054700] text-[#054700]" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
                       {syncMutation.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />}
                       Sync Now
                     </Button>
@@ -1015,17 +1015,17 @@ export default function WearablesPage() {
 
       {/* ── Data Pillars (connected only) ── */}
       {connectedConnections.length > 0 && (activePillars.length > 0 || unlockablePillars.length > 0) && (
-        <Card className="bg-[#FAF7F2] border-[#52796F]/20">
+        <Card className="border-[#5a6623]/10 shadow-2xl">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-[#1B4332] text-base flex items-center gap-2">
+              <CardTitle className="text-[#054700] text-base flex items-center gap-2">
                 <Zap className="h-4 w-4" />
                 Data Pillars
               </CardTitle>
               {unlockablePillars.length > 0 && (
                 <button
                   onClick={() => setShowPillarDevices(true)}
-                  className="text-xs font-medium text-[#1B4332] hover:underline flex items-center gap-1"
+                  className="text-xs font-medium text-[#054700] hover:underline flex items-center gap-1"
                 >
                   <Plus className="h-3 w-3" />
                   Add device to unlock more
@@ -1041,7 +1041,7 @@ export default function WearablesPage() {
                 if (!def) return null;
                 const Icon = def.icon;
                 return (
-                  <div key={pillar} className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-[#1B4332] rounded-full px-3 py-1.5 text-sm font-medium">
+                  <div key={pillar} className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-[#054700] rounded-full px-3 py-1.5 text-sm font-medium">
                     <Icon className="h-3.5 w-3.5 text-emerald-600" />
                     {def.label}
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
@@ -1058,7 +1058,7 @@ export default function WearablesPage() {
                     key={up.pillar}
                     onClick={() => setShowPillarDevices(true)}
                     title={`Unlock ${up.label}: ${up.description}`}
-                    className="flex items-center gap-1.5 bg-white border border-dashed border-[#52796F]/30 text-[#52796F] rounded-full px-3 py-1.5 text-sm hover:border-[#1B4332]/40 hover:text-[#1B4332] transition-colors"
+                    className="flex items-center gap-1.5 bg-white border border-dashed border-[#5a6623]/30 text-[#5a6623] rounded-full px-3 py-1.5 text-sm hover:border-[#054700]/40 hover:text-[#054700] transition-colors"
                   >
                     <Icon className="h-3.5 w-3.5 opacity-50" />
                     {def.label}
@@ -1073,15 +1073,15 @@ export default function WearablesPage() {
 
       {/* ── Featured Integrations (connected — add more) ── */}
       {connectedConnections.length > 0 && (
-        <Card className="bg-[#FAF7F2] border-[#52796F]/20">
+        <Card className="border-[#5a6623]/10 shadow-2xl">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-[#1B4332]"><Sparkles className="h-5 w-5" />Featured Integrations</CardTitle>
-            <CardDescription className="text-[#52796F]">Add more devices to unlock additional health pillars</CardDescription>
+            <CardTitle className="flex items-center gap-2 text-[#054700]"><Sparkles className="h-5 w-5" />Featured Integrations</CardTitle>
+            <CardDescription className="text-[#5a6623]">Add more devices to unlock additional health pillars</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {featuredProviders.map(provider => {
-                const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-gray-600', bgColor: 'bg-gray-100' };
+                const colors = PROVIDER_COLORS[provider.slug] || { color: 'text-[#054700]', bgColor: 'bg-[#054700]/5' };
                 const isConnected = connectedConnections.some(c => c.provider === provider.slug || c.provider === provider.slug.replace('_v2', ''));
                 return (
                   <button
@@ -1095,7 +1095,7 @@ export default function WearablesPage() {
                     className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
                       isConnected
                         ? 'border-emerald-400 bg-emerald-50/50'
-                        : 'border-transparent bg-white/60 hover:bg-white hover:border-[#1B4332]/20'
+                        : 'border-transparent bg-white/60 hover:bg-white hover:border-[#054700]/20'
                     } text-left disabled:cursor-default disabled:opacity-100`}
                   >
                     <div className={`p-2 rounded-lg ${colors.bgColor} flex-shrink-0`}>
@@ -1103,16 +1103,16 @@ export default function WearablesPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm text-[#1B4332] truncate">{provider.name}</span>
+                        <span className="font-medium text-sm text-[#054700] truncate">{provider.name}</span>
                         {isConnected && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" />}
                       </div>
-                      <p className="text-xs text-[#52796F] truncate">{provider.description}</p>
+                      <p className="text-xs text-[#5a6623] truncate">{provider.description}</p>
                     </div>
                   </button>
                 );
               })}
             </div>
-            <p className="text-xs text-[#52796F] mt-4">Historical data up to 180 days is automatically imported for AI formula analysis.</p>
+            <p className="text-xs text-[#5a6623] mt-4">Historical data up to 180 days is automatically imported for AI formula analysis.</p>
           </CardContent>
         </Card>
       )}
@@ -1130,11 +1130,11 @@ export default function WearablesPage() {
       <Dialog open={showPillarDevices} onOpenChange={setShowPillarDevices}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-[#1B4332] flex items-center gap-2">
+            <DialogTitle className="text-[#054700] flex items-center gap-2">
               <Zap className="h-5 w-5" />
               Health Data Pillars
             </DialogTitle>
-            <DialogDescription className="text-[#52796F]">
+            <DialogDescription className="text-[#5a6623]">
               See which devices unlock each health pillar. Connected devices are highlighted in green.
             </DialogDescription>
           </DialogHeader>
@@ -1143,7 +1143,7 @@ export default function WearablesPage() {
             {/* Active Pillars */}
             {activePillars.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-[#1B4332] mb-3 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-[#054700] mb-3 flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                   Active Pillars
                 </h3>
@@ -1158,7 +1158,7 @@ export default function WearablesPage() {
                       <div key={pillarId} className="bg-emerald-50/50 border border-emerald-200 rounded-lg p-3">
                         <div className="flex items-center gap-2 mb-2">
                           <Icon className="h-4 w-4 text-emerald-600" />
-                          <span className="font-medium text-sm text-[#1B4332]">{def.label}</span>
+                          <span className="font-medium text-sm text-[#054700]">{def.label}</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {devices.map(device => {
@@ -1169,7 +1169,7 @@ export default function WearablesPage() {
                                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs ${
                                   isConnected
                                     ? 'bg-emerald-500 text-white'
-                                    : 'bg-white border border-gray-200 text-gray-600'
+                                    : 'bg-white border border-[#054700]/10 text-[#5a6623]'
                                 }`}
                               >
                                 {device.name}
@@ -1188,8 +1188,8 @@ export default function WearablesPage() {
             {/* Unlockable Pillars */}
             {unlockablePillars.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-[#1B4332] mb-3 flex items-center gap-2">
-                  <Lock className="h-4 w-4 text-[#52796F]" />
+                <h3 className="text-sm font-semibold text-[#054700] mb-3 flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-[#5a6623]" />
                   Unlock More Pillars
                 </h3>
                 <div className="space-y-3">
@@ -1201,10 +1201,10 @@ export default function WearablesPage() {
                     return (
                       <div key={up.pillar} className="bg-white border border-gray-200 rounded-lg p-3">
                         <div className="flex items-center gap-2 mb-1">
-                          <Icon className="h-4 w-4 text-[#52796F]" />
-                          <span className="font-medium text-sm text-[#1B4332]">{up.label}</span>
+                          <Icon className="h-4 w-4 text-[#5a6623]" />
+                          <span className="font-medium text-sm text-[#054700]">{up.label}</span>
                         </div>
-                        <p className="text-xs text-[#52796F] mb-2">{up.description}</p>
+                        <p className="text-xs text-[#5a6623] mb-2">{up.description}</p>
                         <div className="flex flex-wrap gap-2">
                           {up.suggestedProviders.map(device => {
                             const isConnected = connectedConnections.some(c => c.provider === device.slug || c.provider === device.slug.replace('_v2', ''));
@@ -1219,7 +1219,7 @@ export default function WearablesPage() {
                                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors ${
                                   isConnected
                                     ? 'bg-emerald-500 text-white cursor-default'
-                                    : 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-[#1B4332]/30'
+                                    : 'bg-white/40 border border-[#054700]/10 text-[#054700] hover:bg-white/60 hover:border-[#054700]/30'
                                 }`}
                               >
                                 {device.name}
@@ -1240,7 +1240,7 @@ export default function WearablesPage() {
             <Button
               onClick={() => handleConnect()}
               disabled={isConnecting}
-              className="w-full bg-[#52796F] hover:bg-[#1B4332]"
+              className="w-full bg-[#5a6623] hover:bg-[#054700]"
             >
               {isConnecting ? (
                 <>

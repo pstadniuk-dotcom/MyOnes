@@ -328,6 +328,110 @@ export class WearablesRepository {
     async updateJunctionUserId(userId: string, junctionUserId: string): Promise<void> {
         await db.update(users).set({ junctionUserId }).where(eq(users.id, userId));
     }
+
+    async getUserByJunctionId(junctionUserId: string): Promise<User | null> {
+        const [user] = await db.select().from(users).where(eq(users.junctionUserId, junctionUserId));
+        return user || null;
+    }
+
+    /**
+     * Save biometric data from Junction webhook events.
+     * Does not require a wearable_connections entry (connectionId is optional).
+     */
+    async saveJunctionBiometricData(data: {
+        userId: string;
+        provider: string;
+        dataDate: Date;
+        sleepScore?: number | null;
+        sleepHours?: number | null;
+        deepSleepMinutes?: number | null;
+        remSleepMinutes?: number | null;
+        lightSleepMinutes?: number | null;
+        hrvMs?: number | null;
+        restingHeartRate?: number | null;
+        averageHeartRate?: number | null;
+        maxHeartRate?: number | null;
+        recoveryScore?: number | null;
+        readinessScore?: number | null;
+        strainScore?: number | null;
+        steps?: number | null;
+        caloriesBurned?: number | null;
+        activeMinutes?: number | null;
+        spo2Percentage?: number | null;
+        skinTempCelsius?: number | null;
+        respiratoryRate?: number | null;
+        rawData?: Record<string, any>;
+    }): Promise<void> {
+        try {
+            // Map Junction provider slugs to our enum values
+            const providerMap: Record<string, string> = {
+                'oura': 'oura', 'fitbit': 'fitbit', 'fitbit_web': 'fitbit',
+                'whoop': 'whoop', 'whoop_v2': 'whoop',
+                'garmin': 'garmin', 'garmin_connect': 'garmin',
+                'apple_health_kit': 'apple_health', 'apple_health': 'apple_health',
+                'google_fit': 'google_fit', 'samsung_health': 'samsung',
+                'polar': 'polar', 'withings': 'withings',
+                'eight_sleep': 'eight_sleep', 'strava': 'strava',
+                'peloton': 'peloton', 'ultrahuman': 'ultrahuman',
+                'dexcom': 'dexcom', 'freestyle_libre': 'freestyle_libre',
+                'cronometer': 'cronometer', 'omron': 'omron', 'kardia': 'kardia',
+            };
+            const mappedProvider = providerMap[data.provider.toLowerCase()] || 'junction';
+
+            await db.insert(biometricData).values({
+                userId: data.userId,
+                connectionId: null,
+                provider: mappedProvider as any,
+                dataDate: data.dataDate,
+                sleepScore: data.sleepScore,
+                sleepHours: data.sleepHours,
+                deepSleepMinutes: data.deepSleepMinutes,
+                remSleepMinutes: data.remSleepMinutes,
+                lightSleepMinutes: data.lightSleepMinutes,
+                hrvMs: data.hrvMs,
+                restingHeartRate: data.restingHeartRate,
+                averageHeartRate: data.averageHeartRate,
+                maxHeartRate: data.maxHeartRate,
+                recoveryScore: data.recoveryScore,
+                readinessScore: data.readinessScore,
+                strainScore: data.strainScore,
+                steps: data.steps,
+                caloriesBurned: data.caloriesBurned,
+                activeMinutes: data.activeMinutes,
+                spo2Percentage: data.spo2Percentage,
+                skinTempCelsius: data.skinTempCelsius,
+                respiratoryRate: data.respiratoryRate,
+                rawData: data.rawData || null,
+            }).onConflictDoUpdate({
+                target: [biometricData.userId, biometricData.dataDate, biometricData.provider],
+                set: {
+                    sleepScore: data.sleepScore ?? undefined,
+                    sleepHours: data.sleepHours ?? undefined,
+                    deepSleepMinutes: data.deepSleepMinutes ?? undefined,
+                    remSleepMinutes: data.remSleepMinutes ?? undefined,
+                    lightSleepMinutes: data.lightSleepMinutes ?? undefined,
+                    hrvMs: data.hrvMs ?? undefined,
+                    restingHeartRate: data.restingHeartRate ?? undefined,
+                    averageHeartRate: data.averageHeartRate ?? undefined,
+                    maxHeartRate: data.maxHeartRate ?? undefined,
+                    recoveryScore: data.recoveryScore ?? undefined,
+                    readinessScore: data.readinessScore ?? undefined,
+                    strainScore: data.strainScore ?? undefined,
+                    steps: data.steps ?? undefined,
+                    caloriesBurned: data.caloriesBurned ?? undefined,
+                    activeMinutes: data.activeMinutes ?? undefined,
+                    spo2Percentage: data.spo2Percentage ?? undefined,
+                    skinTempCelsius: data.skinTempCelsius ?? undefined,
+                    respiratoryRate: data.respiratoryRate ?? undefined,
+                    rawData: data.rawData || undefined,
+                    syncedAt: new Date(),
+                },
+            });
+        } catch (error) {
+            console.error('Error saving Junction biometric data:', error);
+            // Don't throw — webhook handlers should not crash on DB errors
+        }
+    }
 }
 
 export const wearablesRepository = new WearablesRepository();

@@ -45,6 +45,7 @@ export interface PromptContext {
   healthProfile?: HealthProfile;
   activeFormula?: Formula;
   labDataContext?: string;
+  biometricDataContext?: string;
   recentMessages?: Array<{ role: string, content: string }>;
   queryIntent?: QueryIntent;
   currentUserMessage?: string;
@@ -1408,6 +1409,47 @@ WRONG: Keep all 4000mg + add more ingredients = exceeds budget ❌
     prompt += `✅ Create formulas based on their stated health concerns and goals\n\n`;
     prompt += `**If the user claims they uploaded lab results but you don't see them here, tell them:**\n`;
     prompt += `"I don't see any lab results in your profile yet. Please make sure to upload your blood test PDF through the upload feature, and I'll analyze it for you."\n\n`;
+  }
+
+  // Add wearable biometric data context
+  if (context.biometricDataContext && context.biometricDataContext.length > 20) {
+    prompt += `\n=== ⌚ WEARABLE BIOMETRIC DATA ===\n\n${context.biometricDataContext}\n`;
+    prompt += `\n**WEARABLE DATA USAGE RULES:**\n`;
+    prompt += `✅ Reference specific wearable metrics when making formula recommendations (e.g., "Your average HRV of 32ms is low")\n`;
+    prompt += `✅ Use sleep data to inform sleep-support ingredient decisions (GABA, Magnesium, Melatonin)\n`;
+    prompt += `✅ Use HRV and recovery data to guide adaptogen/stress-support dosing (Ashwagandha, Adrenal Support)\n`;
+    prompt += `✅ Use activity data to inform energy and recovery ingredient choices\n`;
+    prompt += `✅ Cross-reference wearable trends with lab data for stronger clinical reasoning\n`;
+    prompt += `✅ Mention wearable data in the "What the data said" section of formula responses\n`;
+    prompt += `❌ DO NOT fabricate wearable data — only reference values shown above\n`;
+    prompt += `❌ DO NOT override lab data with wearable data — they are complementary\n\n`;
+
+    prompt += `**BIOMETRIC-TO-INGREDIENT MAPPING GUIDE:**\n`;
+    prompt += `Use these evidence-based mappings when wearable data suggests specific needs:\n\n`;
+    prompt += `| Wearable Signal | What It Indicates | Priority Ingredients |\n`;
+    prompt += `|---|---|---|\n`;
+    prompt += `| HRV consistently <40ms | Autonomic stress, poor recovery | Ashwagandha 600mg, Magnesium 400mg, Omega-3 1000mg |\n`;
+    prompt += `| HRV 40-60ms (moderate) | Mild stress load | Adrenal Support 1x, Magnesium 400mg |\n`;
+    prompt += `| Sleep score <70 or <6hrs | Poor sleep quality/quantity | GABA 750mg, Magnesium 400mg, consider Adrenal Support |\n`;
+    prompt += `| Deep sleep <60min | Insufficient restorative sleep | Magnesium 400mg, GABA 750mg (supports deep sleep onset) |\n`;
+    prompt += `| REM sleep <60min | Cognitive recovery deficit | Omega-3 1000mg (supports brain during REM), B-Complex |\n`;
+    prompt += `| Resting HR >75 bpm | Cardiovascular stress | Heart Support 1x, CoQ10 200mg, Omega-3 1000mg |\n`;
+    prompt += `| Resting HR declining trend | Positive adaptation | Maintain current cardiovascular support |\n`;
+    prompt += `| Recovery/readiness <50% | Overtraining or chronic stress | Ashwagandha 600mg, Adrenal Support 2x, Omega-3 1000mg |\n`;
+    prompt += `| Steps <5,000/day consistently | Sedentary pattern | Energy Support, B-Complex, CoQ10 200mg |\n`;
+    prompt += `| SpO2 <95% | Possible respiratory concern | Flag for medical attention, NAC 600mg |\n`;
+    prompt += `| Skin temp deviation >1°C | Possible inflammation/illness | Curcumin 500mg, Immune Support |\n\n`;
+
+    prompt += `**When creating formulas with wearable data available, you MUST:**\n`;
+    prompt += `1. Reference at least 2-3 specific wearable metrics in the "What the data said" section\n`;
+    prompt += `2. Explain how the biometric data influenced your ingredient selection\n`;
+    prompt += `3. Set expectations tied to wearable metrics: "As your HRV improves above 50ms, you'll notice..."\n`;
+    prompt += `4. Suggest the user track specific metrics to monitor formula effectiveness\n\n`;
+  } else {
+    prompt += `\n=== ⌚ WEARABLE BIOMETRIC DATA ===\n\n`;
+    prompt += `No wearable device connected. The user has not linked a fitness tracker or health wearable.\n`;
+    prompt += `You may suggest connecting a wearable (Oura, WHOOP, Fitbit, Garmin, Apple Watch, etc.) for more personalized formula recommendations.\n`;
+    prompt += `Do NOT fabricate any biometric data (HRV, sleep scores, step counts, etc.).\n\n`;
   }
 
   prompt += `

@@ -87,8 +87,8 @@ export default function MedicationDisclosureModal({ open }: MedicationDisclosure
       >
         <DialogHeader>
           <div className="flex items-center gap-2 mb-1">
-            <ShieldCheck className="h-5 w-5 text-[#1B4332]" />
-            <DialogTitle className="text-[#1B4332]">Medication Safety Check</DialogTitle>
+            <ShieldCheck className="h-5 w-5 text-[#054700]" />
+            <DialogTitle className="text-[#054700]">Medication Safety Check</DialogTitle>
           </div>
           <DialogDescription className="text-sm text-gray-600 leading-relaxed">
             Before we build your formula, we need to know if you take any prescription medications.
@@ -175,7 +175,7 @@ export default function MedicationDisclosureModal({ open }: MedicationDisclosure
 
           {/* Submit */}
           <Button
-            className="w-full bg-[#1B4332] hover:bg-[#1B4332]/90 text-white"
+            className="w-full bg-[#054700] hover:bg-[#054700]/90 text-white"
             disabled={!canSubmit || disclosureMutation.isPending}
             onClick={() => disclosureMutation.mutate()}
           >

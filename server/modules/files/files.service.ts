@@ -2,6 +2,9 @@ import { filesRepository } from './files.repository';
 import { ObjectStorageService } from '../../utils/objectStorage';
 import { analyzeLabReport } from '../../utils/fileAnalysis';
 import { labsService } from '../labs/labs.service';
+import { notificationsService } from '../notifications/notifications.service';
+import { usersRepository } from '../users/users.repository';
+import { sendNotificationEmail } from '../../utils/emailService';
 import logger from '../../infra/logging/logger';
 import { type InsertFileUpload } from '@shared/schema';
 
@@ -155,7 +158,42 @@ export class FilesService {
                             }
                         });
                         logger.info(`✅ Lab report analysis completed: ${fileName}`);
-                    }
+                        // Send lab results ready notification
+                        try {
+                            const markerCount = labDataExtraction.extractedData?.length || 0;
+                            await notificationsService.create({
+                                userId,
+                                type: 'system',
+                                title: 'Lab Results Analyzed',
+                                content: `Your lab report has been analyzed — ${markerCount} biomarker${markerCount !== 1 ? 's' : ''} extracted. Chat with your AI practitioner to discuss findings.`,
+                                metadata: {
+                                    actionUrl: '/dashboard/labs',
+                                    icon: 'file-check',
+                                    priority: 'high'
+                                }
+                            });
+
+                            const labUser = await usersRepository.getUser(userId);
+                            if (labUser && await notificationsService.shouldSendEmail(userId, 'consultation')) {
+                                const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+                                await sendNotificationEmail({
+                                    to: labUser.email,
+                                    subject: 'Your lab results have been analyzed',
+                                    title: 'Lab Results Ready',
+                                    type: 'system',
+                                    content: `
+                                        <p>Hi ${labUser.name?.split(' ')[0] || 'there'},</p>
+                                        <p>We've finished analyzing your lab report${labDataExtraction.labName ? ` from ${labDataExtraction.labName}` : ''}.</p>
+                                        <p><strong>${markerCount} biomarker${markerCount !== 1 ? 's' : ''}</strong> were extracted and are ready for review.</p>
+                                        <p>Chat with your AI practitioner to get personalized insights and see how your results might affect your formula.</p>
+                                    `,
+                                    actionUrl: `${frontendUrl}/dashboard/labs`,
+                                    actionText: 'View Lab Results',
+                                });
+                            }
+                        } catch (notifErr) {
+                            logger.warn('Failed to send lab results notification', { userId, error: notifErr });
+                        }                    }
                 } catch (error) {
                     logger.error('Lab report background analysis failed:', error);
                     if (fileId) {
@@ -318,6 +356,24 @@ export class FilesService {
                 await filesRepository.updateFileUpload(fileId, {
                     labReportData: { ...labData, analysisStatus: 'completed', markerInsights }
                 });
+
+                // Send lab re-analysis notification
+                try {
+                    const markerCount = labData?.extractedData?.length || 0;
+                    await notificationsService.create({
+                        userId,
+                        type: 'system',
+                        title: 'Lab Re-Analysis Complete',
+                        content: `Your lab report has been re-analyzed — ${markerCount} biomarker${markerCount !== 1 ? 's' : ''} extracted.`,
+                        metadata: {
+                            actionUrl: '/dashboard/labs',
+                            icon: 'file-check',
+                            priority: 'medium'
+                        }
+                    });
+                } catch (notifErr) {
+                    logger.warn('Failed to send re-analysis notification', { userId, error: notifErr });
+                }
             } catch (error) {
                 logger.error('Background re-analysis error:', error);
                 await filesRepository.updateFileUpload(fileId, {

@@ -131,16 +131,22 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
   if (medsLower.length > 0) {
 
     // ── 3b. Anticoagulants / Blood Thinners ─────────────────────────────
-    const bloodThinners = ['warfarin', 'coumadin', 'clopidogrel', 'plavix', 'aspirin', 'rivaroxaban', 'xarelto', 'apixaban', 'eliquis', 'dabigatran', 'pradaxa', 'heparin', 'enoxaparin'];
+    // Warfarin/Coumadin specifically is CRITICAL (narrow therapeutic index)
+    const warfarinFamily = ['warfarin', 'coumadin'];
+    const otherBloodThinners = ['clopidogrel', 'plavix', 'rivaroxaban', 'xarelto', 'apixaban', 'eliquis', 'dabigatran', 'pradaxa', 'heparin', 'enoxaparin'];
+    const allBloodThinners = [...warfarinFamily, ...otherBloodThinners, 'aspirin'];
     const btSupplements = ['omega', 'fish oil', 'garlic', 'ginger', 'ginkgo', 'vitamin e', 'resveratrol', 'curcumin', 'nattokinase', 'bromelain'];
-    if (has(medsLower, bloodThinners) && hasIngr(allIngredients, btSupplements)) {
+    if (has(medsLower, allBloodThinners) && hasIngr(allIngredients, btSupplements)) {
       const found = matchingIngr(allIngredients, btSupplements);
+      const onWarfarin = has(medsLower, warfarinFamily);
       warnings.push({
         category: 'blood_thinner_interaction',
-        severity: 'serious',
-        message: `Contains ${found.join(', ')} which may increase bleeding risk with your blood thinner. Consult your physician before starting.`,
+        severity: onWarfarin ? 'critical' : 'serious',
+        message: onWarfarin
+          ? `BLOCKED: Contains ${found.join(', ')} which may dangerously increase bleeding risk with warfarin/Coumadin. Warfarin has a narrow therapeutic index — even small changes in INR can be life-threatening. Physician approval is REQUIRED before proceeding.`
+          : `Contains ${found.join(', ')} which may increase bleeding risk with your blood thinner. Consult your physician before starting.`,
         ingredients: found,
-        drugs: medsLower.filter(m => bloodThinners.some(d => m.includes(d))),
+        drugs: medsLower.filter(m => allBloodThinners.some(d => m.includes(d))),
       });
     }
 
@@ -445,6 +451,58 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
           ingredients: found,
         });
       }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 3u. HIGH-RISK POPULATION HARD BLOCKS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── Minors (under 18) — block ALL formulas ────────────────────────────
+  if (has(conditionsLower, ['minor', 'under 18', 'child', 'pediatric', 'teenager', 'adolescent'])) {
+    warnings.push({
+      category: 'minor_block',
+      severity: 'critical',
+      message: 'BLOCKED: Personalized supplement formulas are not available for individuals under 18. This product is formulated for adults only.',
+    });
+  }
+
+  // ── Severe kidney disease — block if kidney + high-risk supplements ───
+  const severeKidneyKeywords = ['dialysis', 'kidney failure', 'end stage renal', 'esrd', 'ckd stage 4', 'ckd stage 5', 'stage 4 kidney', 'stage 5 kidney'];
+  if (has(conditionsLower, severeKidneyKeywords)) {
+    warnings.push({
+      category: 'severe_kidney_block',
+      severity: 'critical',
+      message: 'BLOCKED: With severe kidney disease or dialysis, supplement use requires direct nephrologist supervision. We cannot create a formula without documented nephrology clearance.',
+    });
+  }
+
+  // ── Immunosuppressants — escalate immune-stimulating supplements to critical ──
+  if (medsLower.length > 0) {
+    const immunoMedsHigh = ['cyclosporine', 'tacrolimus', 'mycophenolate', 'azathioprine', 'sirolimus'];
+    if (has(medsLower, immunoMedsHigh)) {
+      const immuneStims = ['echinacea', 'astragalus', 'elderberry', 'mushroom', 'beta glucan', 'colostrum'];
+      if (hasIngr(allIngredients, immuneStims)) {
+        const found = matchingIngr(allIngredients, immuneStims);
+        // Check if we already pushed a 'serious' immuno_stimulant warning — upgrade it
+        const existingIdx = warnings.findIndex(w => w.category === 'immuno_stimulant');
+        if (existingIdx >= 0) {
+          warnings[existingIdx].severity = 'critical';
+          warnings[existingIdx].message = `BLOCKED: Contains immune-stimulating ingredients (${found.join(', ')}) which are contraindicated with transplant immunosuppressants. Risk of organ rejection. Remove these ingredients.`;
+        }
+      }
+    }
+  }
+
+  // ── Active chemotherapy — block ALL formulas if chemo noted in conditions ──
+  if (has(conditionsLower, ['chemotherapy', 'chemo', 'cancer treatment', 'radiation therapy', 'oncology treatment'])) {
+    // Only add if not already caught by 3h medication check
+    if (!warnings.some(w => w.category === 'chemo_interaction')) {
+      warnings.push({
+        category: 'chemo_condition_block',
+        severity: 'critical',
+        message: 'BLOCKED: You indicated active cancer treatment. Supplements may interfere with chemotherapy or radiation. An oncologist must review and approve any supplement use during active treatment.',
+      });
     }
   }
 

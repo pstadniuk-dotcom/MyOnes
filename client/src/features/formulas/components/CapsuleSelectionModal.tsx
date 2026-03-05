@@ -51,7 +51,7 @@ export function CapsuleSelectionModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-[#1B4332]">
+          <DialogTitle className="flex items-center gap-2 text-[#054700]">
             <Pill className="w-5 h-5" />
             Choose Your Daily Protocol
           </DialogTitle>
@@ -76,8 +76,8 @@ export function CapsuleSelectionModal({
                 className={cn(
                   'w-full p-4 rounded-lg border-2 transition-all text-left',
                   isSelected
-                    ? 'border-[#1B4332] bg-[#1B4332]/5'
-                    : 'border-gray-200 hover:border-[#1B4332]/50 hover:bg-gray-50'
+                    ? 'border-[#054700] bg-[#054700]/5'
+                    : 'border-gray-200 hover:border-[#054700]/50 hover:bg-gray-50'
                 )}
               >
                 <div className="flex items-center justify-between">
@@ -86,7 +86,7 @@ export function CapsuleSelectionModal({
                       className={cn(
                         'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0',
                         isSelected
-                          ? 'border-[#1B4332] bg-[#1B4332]'
+                          ? 'border-[#054700] bg-[#054700]'
                           : 'border-gray-300'
                       )}
                     >
@@ -94,12 +94,12 @@ export function CapsuleSelectionModal({
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-[#1B4332]">
+                        <span className="font-semibold text-[#054700]">
                           {count} capsules/day
                         </span>
                         <span className="text-sm text-gray-500">({info.label})</span>
                         {isRecommended && (
-                          <Badge className="bg-[#1B4332] text-white text-xs">
+                          <Badge className="bg-[#054700] text-white text-xs">
                             <Star className="w-3 h-3 mr-1" />
                             Recommended
                           </Badge>
@@ -116,13 +116,13 @@ export function CapsuleSelectionModal({
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0 ml-4">
-                    <div className="text-lg font-bold text-[#1B4332]">
+                    <div className="text-lg font-bold text-[#054700]">
                       ${pricing.monthlyPrice}/mo
                     </div>
                     <div className="text-xs text-gray-500">
                       ${pricing.perCapsule.toFixed(2)}/capsule
                     </div>
-                    <div className="text-xs text-[#52796F]">
+                    <div className="text-xs text-[#5a6623]">
                       {budgetMg.toLocaleString()}mg total
                     </div>
                   </div>
@@ -133,8 +133,8 @@ export function CapsuleSelectionModal({
         </div>
 
         {/* Value Proposition */}
-        <div className="bg-gradient-to-r from-[#1B4332]/10 to-[#52796F]/10 rounded-lg p-4">
-          <h4 className="font-semibold text-[#1B4332] mb-3 flex items-center gap-2">
+        <div className="bg-gradient-to-r from-[#054700]/10 to-[#5a6623]/10 rounded-lg p-4">
+          <h4 className="font-semibold text-[#054700] mb-3 flex items-center gap-2">
             <Sparkles className="w-4 h-4" />
             Why ONES vs. Buying Separately
           </h4>
@@ -155,19 +155,19 @@ export function CapsuleSelectionModal({
 
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="flex items-start gap-2">
-              <Shield className="w-4 h-4 text-[#1B4332] mt-0.5 flex-shrink-0" />
+              <Shield className="w-4 h-4 text-[#054700] mt-0.5 flex-shrink-0" />
               <span className="text-gray-700"><strong>Medical-grade</strong> ingredients, no fillers</span>
             </div>
             <div className="flex items-start gap-2">
-              <Sparkles className="w-4 h-4 text-[#1B4332] mt-0.5 flex-shrink-0" />
+              <Sparkles className="w-4 h-4 text-[#054700] mt-0.5 flex-shrink-0" />
               <span className="text-gray-700"><strong>Personalized</strong> to your health data</span>
             </div>
             <div className="flex items-start gap-2">
-              <Leaf className="w-4 h-4 text-[#1B4332] mt-0.5 flex-shrink-0" />
+              <Leaf className="w-4 h-4 text-[#054700] mt-0.5 flex-shrink-0" />
               <span className="text-gray-700"><strong>All-in-one</strong> daily pack, no pill chaos</span>
             </div>
             <div className="flex items-start gap-2">
-              <TrendingDown className="w-4 h-4 text-[#1B4332] mt-0.5 flex-shrink-0" />
+              <TrendingDown className="w-4 h-4 text-[#054700] mt-0.5 flex-shrink-0" />
               <span className="text-gray-700"><strong>Evolves</strong> with your health over time</span>
             </div>
           </div>
@@ -179,7 +179,7 @@ export function CapsuleSelectionModal({
           </Button>
           <Button
             onClick={handleConfirm}
-            className="bg-[#1B4332] hover:bg-[#143728] text-white"
+            className="bg-[#054700] hover:bg-[#043d00] text-white"
           >
             Continue with {selected} Capsules (${CAPSULE_PRICING[selected].monthlyPrice}/mo)
           </Button>

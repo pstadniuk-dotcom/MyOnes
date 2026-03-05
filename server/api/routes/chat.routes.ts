@@ -11,6 +11,7 @@ router.post('/stream', requireAuth, chatController.streamChat);
 router.get('/consultations/history', requireAuth, chatController.getHistory);
 router.get('/consultations/:sessionId', requireAuth, chatController.getSession);
 router.delete('/consultations/:sessionId', requireAuth, chatController.deleteConsultation);
+router.patch('/consultations/:sessionId/rename', requireAuth, chatController.renameConsultation);
 
 // Session Management (General)
 router.get('/sessions', requireAuth, chatController.listSessions);

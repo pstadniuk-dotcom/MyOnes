@@ -25,7 +25,7 @@ export function OnesLogo({ className = "w-6 h-6" }: { className?: string }) {
 // Small circular logo badge for chat avatars
 export function OnesLogoBadge({ className = "w-10 h-10" }: { className?: string }) {
   return (
-    <div className={`${className} rounded-full bg-[#1B4332] flex items-center justify-center`}>
+    <div className={`${className} rounded-full bg-[#054700] flex items-center justify-center`}>
       <span className="text-white font-bold text-xs tracking-wider">ONES</span>
     </div>
   );

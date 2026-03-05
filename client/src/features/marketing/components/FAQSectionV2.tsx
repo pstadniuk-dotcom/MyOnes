@@ -40,18 +40,18 @@ export default function FAQSectionV2() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="py-24 md:py-32 bg-white">
+    <section id="faq" className="py-24 md:py-32 bg-[#ede8e2]">
       <div className="container mx-auto px-6 max-w-4xl">
         {/* Header */}
         <div className="text-center mb-16">
-          <span className="text-[#D4A574] font-medium tracking-wider text-sm uppercase">
+          <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             Questions & Answers
           </span>
-          <h2 className="mt-4 text-4xl md:text-5xl text-[#1B4332] font-light leading-tight">
+          <h2 className="mt-4 text-4xl md:text-5xl text-[#054700] font-light leading-tight">
             Frequently Asked{" "}
             <span className="font-medium">Questions</span>
           </h2>
-          <p className="mt-6 text-lg text-[#52796F] max-w-2xl mx-auto">
+          <p className="mt-6 text-lg text-[#054700]/60 max-w-2xl mx-auto">
             Get answers to common questions about our personalized supplement approach.
           </p>
         </div>
@@ -61,17 +61,17 @@ export default function FAQSectionV2() {
           {faqs.map((faq, index) => (
             <div
               key={index}
-              className="bg-[#FAF7F2] rounded-2xl overflow-hidden"
+              className="bg-[#ede8e2] rounded-2xl overflow-hidden"
             >
               <button
                 onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                className="w-full px-5 sm:px-8 py-5 sm:py-6 text-left flex items-center justify-between gap-4 hover:bg-[#F5F0E8] transition-colors"
+                className="w-full px-5 sm:px-8 py-5 sm:py-6 text-left flex items-center justify-between gap-4 hover:bg-[#e4ddd6] transition-colors"
               >
-                <span className="text-base sm:text-lg font-medium text-[#1B4332]">
+                <span className="text-base sm:text-lg font-medium text-[#054700]">
                   {faq.question}
                 </span>
                 <ChevronDown 
-                  className={`w-5 h-5 text-[#52796F] flex-shrink-0 transition-transform duration-300 ${
+                  className={`w-5 h-5 text-[#054700]/60 flex-shrink-0 transition-transform duration-300 ${
                     openIndex === index ? "rotate-180" : ""
                   }`}
                 />
@@ -83,7 +83,7 @@ export default function FAQSectionV2() {
                 }`}
               >
                 <div className="px-5 sm:px-8 pb-5 sm:pb-6">
-                  <p className="text-[#52796F] leading-relaxed text-sm sm:text-base">
+                  <p className="text-[#054700]/60 leading-relaxed text-sm sm:text-base">
                     {faq.answer}
                   </p>
                 </div>

@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest, queryClient } from '@/shared/lib/queryClient';
+import { Link } from 'wouter';
 import type { Order, Subscription, PaymentMethodRef } from '@shared/schema';
 import {
   Package,
@@ -77,11 +78,9 @@ interface ReviewStatus {
   needsReview: boolean;
   reasons: string[];
   driftScore: number;
-  autoOptimizeEnabled: boolean;
 }
 
 function PreReorderReviewGate() {
-  const qc = useQueryClient();
   const { data: status } = useQuery<ReviewStatus>({
     queryKey: ['/api/formulas/review-status'],
     queryFn: () => apiRequest('GET', '/api/formulas/review-status').then((r: Response) => r.json()),
@@ -109,12 +108,12 @@ function PreReorderReviewGate() {
             </ul>
           )}
         </div>
-        <a
+        <Link
           href="/dashboard/chat?context=formula-review"
           className="shrink-0 text-xs font-medium text-amber-700 underline underline-offset-2 hover:text-amber-900"
         >
           Review now
-        </a>
+        </Link>
       </div>
     </div>
   );
@@ -299,79 +298,79 @@ export default function OrdersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#1B4332]" data-testid="text-orders-title">
+          <h1 className="text-3xl font-bold tracking-tight text-[#054700]" data-testid="text-orders-title">
             Orders & Billing
           </h1>
-          <p className="text-[#52796F]">
+          <p className="text-[#5a6623]">
             Manage your subscription, view orders, and update payment methods
           </p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 bg-[#FAF7F2]">
-          <TabsTrigger value="subscription" data-testid="tab-subscription" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">Subscription</TabsTrigger>
-          <TabsTrigger value="orders" data-testid="tab-orders" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">Order History</TabsTrigger>
-          <TabsTrigger value="billing" data-testid="tab-billing" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">Billing</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 bg-white/60 backdrop-blur-sm">
+          <TabsTrigger value="subscription" data-testid="tab-subscription" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Subscription</TabsTrigger>
+          <TabsTrigger value="orders" data-testid="tab-orders" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Order History</TabsTrigger>
+          <TabsTrigger value="billing" data-testid="tab-billing" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Billing</TabsTrigger>
         </TabsList>
 
         <TabsContent value="subscription" className="space-y-6">
           {/* Current Subscription */}
-          <Card data-testid="section-subscription-overview" className="bg-[#FAF7F2] border-[#52796F]/20">
+          <Card data-testid="section-subscription-overview" className="border-[#5a6623]/10 shadow-2xl">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2 text-[#1B4332]">
+                  <CardTitle className="flex items-center gap-2 text-[#054700]">
                     <Package className="w-5 h-5" />
                     {subscription?.plan || 'No Subscription'}
                   </CardTitle>
-                  <CardDescription className="text-[#52796F]">
+                  <CardDescription className="text-[#5a6623]">
                     {subscription && (
                       <>Next billing: {subscription.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}</>
                     )}
                   </CardDescription>
                 </div>
-                <Badge className={subscription?.status === 'active' ? 'bg-[#1B4332] text-white' : 'bg-[#52796F]/20 text-[#52796F]'}>
+                <Badge className={subscription?.status === 'active' ? 'bg-[#054700] text-white' : 'bg-[#5a6623]/20 text-[#5a6623]'}>
                   {subscription?.status || 'inactive'}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-4 md:grid-cols-3">
-                <Card className="bg-white border-[#1B4332]/10">
+                <Card className="border-[#054700]/10 shadow-2xl">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="w-4 h-4 text-[#52796F]" />
-                      <span className="text-sm font-medium text-[#52796F]">Monthly Price</span>
+                      <DollarSign className="w-4 h-4 text-[#5a6623]" />
+                      <span className="text-sm font-medium text-[#5a6623]">Monthly Price</span>
                     </div>
-                    <div className="text-2xl font-bold text-[#1B4332]">${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}</div>
+                    <div className="text-2xl font-bold text-[#054700]">${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}</div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white border-[#52796F]/10">
+                <Card className="border-[#5a6623]/10 shadow-2xl">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Calendar className="w-4 h-4 text-[#52796F]" />
-                      <span className="text-sm font-medium text-[#52796F]">Next Billing</span>
+                      <Calendar className="w-4 h-4 text-[#5a6623]" />
+                      <span className="text-sm font-medium text-[#5a6623]">Next Billing</span>
                     </div>
-                    <div className="text-lg font-semibold text-[#1B4332]">
+                    <div className="text-lg font-semibold text-[#054700]">
                       {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white border-[#D4A574]/10">
+                <Card className="border-[#D4A574]/10">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Package className="w-4 h-4 text-[#52796F]" />
-                      <span className="text-sm font-medium text-[#52796F]">Formula Version</span>
+                      <Package className="w-4 h-4 text-[#5a6623]" />
+                      <span className="text-sm font-medium text-[#5a6623]">Formula Version</span>
                     </div>
                     <div className="text-lg font-semibold text-[#D4A574]">Current</div>
                   </CardContent>
                 </Card>
               </div>
 
-              <Separator className="bg-[#52796F]/20" />
+              <Separator className="bg-[#5a6623]/20" />
 
               <div className="flex gap-3">
                 <Button
@@ -379,12 +378,12 @@ export default function OrdersPage() {
                   data-testid="button-pause-subscription"
                   onClick={handlePauseSubscription}
                   disabled={updateSubscriptionMutation.isPending || subscription?.status !== 'active'}
-                  className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
+                  className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white"
                 >
                   <Pause className="w-4 h-4 mr-2" />
                   Pause Subscription
                 </Button>
-                <Button variant="outline" data-testid="button-change-plan" className="border-[#52796F] text-[#52796F] hover:bg-[#52796F] hover:text-white">
+                <Button variant="outline" data-testid="button-change-plan" className="border-[#5a6623] text-[#5a6623] hover:bg-[#5a6623] hover:text-white">
                   Change Plan
                 </Button>
                 <Button
@@ -402,9 +401,9 @@ export default function OrdersPage() {
 
           {/* Upcoming Delivery - only show when user has an active subscription */}
           {subscription?.status === 'active' && (
-            <Card data-testid="section-upcoming-delivery" className="bg-[#FAF7F2] border-[#52796F]/20">
+            <Card data-testid="section-upcoming-delivery" className="border-[#5a6623]/10 shadow-2xl">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-[#1B4332]">
+                <CardTitle className="flex items-center gap-2 text-[#054700]">
                   <Truck className="w-5 h-5" />
                   Upcoming Delivery
                 </CardTitle>
@@ -413,11 +412,11 @@ export default function OrdersPage() {
                 <PreReorderReviewGate />
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-[#1B4332]">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
-                    <p className="text-sm text-[#52796F]">
+                    <p className="font-medium text-[#054700]">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
+                    <p className="text-sm text-[#5a6623]">
                       Expected delivery: {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
                     </p>
-                    <p className="text-sm text-[#52796F]">
+                    <p className="text-sm text-[#5a6623]">
                       Current Formula • ${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}
                     </p>
                   </div>
@@ -431,13 +430,13 @@ export default function OrdersPage() {
         </TabsContent>
 
         <TabsContent value="orders" className="space-y-6">
-          <Card data-testid="section-order-history" className="bg-[#FAF7F2] border-[#52796F]/20">
+          <Card data-testid="section-order-history" className="border-[#5a6623]/10 shadow-2xl">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-[#1B4332]">
+              <CardTitle className="flex items-center gap-2 text-[#054700]">
                 <Package className="w-5 h-5" />
                 Order History
               </CardTitle>
-              <CardDescription className="text-[#52796F]">
+              <CardDescription className="text-[#5a6623]">
                 View all your past supplement orders and deliveries
               </CardDescription>
             </CardHeader>
@@ -445,26 +444,26 @@ export default function OrdersPage() {
               <div className="space-y-4">
                 {!orders || orders.length === 0 ? (
                   <div className="text-center py-8">
-                    <Package className="w-12 h-12 text-[#52796F] mx-auto mb-4" />
-                    <p className="text-[#52796F]">No orders found</p>
+                    <Package className="w-12 h-12 text-[#5a6623] mx-auto mb-4" />
+                    <p className="text-[#5a6623]">No orders found</p>
                   </div>
                 ) : (
                   orders.map((order) => (
-                    <Card key={order.id} className="border-l-4 border-l-[#1B4332] bg-white" data-testid={`order-${order.id}`}>
+                    <Card key={order.id} className="border-l-4 border-l-[#054700] bg-white" data-testid={`order-${order.id}`}>
                       <CardContent className="pt-4">
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-3">
                             <div className="flex items-center gap-2">
                               {getStatusIcon(order.status)}
-                              <span className="font-medium text-[#1B4332]">{order.id}</span>
+                              <span className="font-medium text-[#054700]">{order.id}</span>
                             </div>
                             <Badge className={getStatusColor(order.status)}>
                               {order.status}
                             </Badge>
                           </div>
                           <div className="text-right">
-                            <div className="font-medium text-[#1B4332]">$89.99</div>
-                            <div className="text-sm text-[#52796F]">
+                            <div className="font-medium text-[#054700]">$89.99</div>
+                            <div className="text-sm text-[#5a6623]">
                               Formula v{order.formulaVersion}
                             </div>
                           </div>
@@ -472,20 +471,20 @@ export default function OrdersPage() {
 
                         <div className="grid gap-4 md:grid-cols-3 text-sm">
                           <div>
-                            <span className="text-[#52796F]">Placed:</span>
-                            <div className="text-[#1B4332]">{new Date(order.placedAt).toLocaleDateString()}</div>
+                            <span className="text-[#5a6623]">Placed:</span>
+                            <div className="text-[#054700]">{new Date(order.placedAt).toLocaleDateString()}</div>
                           </div>
                           {order.shippedAt && (
                             <div>
-                              <span className="text-[#52796F]">Shipped:</span>
-                              <div className="text-[#1B4332]">{new Date(order.shippedAt).toLocaleDateString()}</div>
+                              <span className="text-[#5a6623]">Shipped:</span>
+                              <div className="text-[#054700]">{new Date(order.shippedAt).toLocaleDateString()}</div>
                             </div>
                           )}
                         </div>
 
                         {order.status === 'shipped' && order.trackingUrl && (
-                          <div className="mt-4 pt-4 border-t border-[#52796F]/20">
-                            <Button variant="outline" size="sm" asChild data-testid={`button-track-${order.id}`} className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white">
+                          <div className="mt-4 pt-4 border-t border-[#5a6623]/20">
+                            <Button variant="outline" size="sm" asChild data-testid={`button-track-${order.id}`} className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white">
                               <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer">
                                 <ExternalLink className="w-4 h-4 mr-2" />
                                 Track Package
@@ -504,19 +503,19 @@ export default function OrdersPage() {
 
         <TabsContent value="billing" className="space-y-6">
           {/* Payment Methods */}
-          <Card data-testid="section-payment-methods" className="bg-[#FAF7F2] border-[#52796F]/20">
+          <Card data-testid="section-payment-methods" className="border-[#5a6623]/10 shadow-2xl">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2 text-[#1B4332]">
+                  <CardTitle className="flex items-center gap-2 text-[#054700]">
                     <CreditCard className="w-5 h-5" />
                     Payment Methods
                   </CardTitle>
-                  <CardDescription className="text-[#52796F]">
+                  <CardDescription className="text-[#5a6623]">
                     Manage your saved payment methods
                   </CardDescription>
                 </div>
-                <Button data-testid="button-add-payment-method" className="bg-[#1B4332] hover:bg-[#1B4332]/90 text-white">
+                <Button data-testid="button-add-payment-method" className="bg-[#054700] hover:bg-[#054700]/90 text-white">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Method
                 </Button>
@@ -526,25 +525,25 @@ export default function OrdersPage() {
               <div className="space-y-3">
                 {!paymentMethods || paymentMethods.length === 0 ? (
                   <div className="text-center py-8">
-                    <CreditCard className="w-12 h-12 text-[#52796F] mx-auto mb-4" />
-                    <p className="text-[#52796F]">No payment methods found</p>
-                    <p className="text-sm text-[#52796F] mt-2">Add a payment method to get started</p>
+                    <CreditCard className="w-12 h-12 text-[#5a6623] mx-auto mb-4" />
+                    <p className="text-[#5a6623]">No payment methods found</p>
+                    <p className="text-sm text-[#5a6623] mt-2">Add a payment method to get started</p>
                   </div>
                 ) : (
                   paymentMethods.map((method) => (
-                    <div key={method.id} className="flex items-center justify-between p-4 border border-[#52796F]/20 rounded-lg bg-white" data-testid={`payment-method-${method.id}`}>
+                    <div key={method.id} className="flex items-center justify-between p-4 border border-[#5a6623]/20 rounded-lg bg-white" data-testid={`payment-method-${method.id}`}>
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-6 bg-[#1B4332]/10 rounded flex items-center justify-center">
-                          <CreditCard className="w-4 h-4 text-[#1B4332]" />
+                        <div className="w-10 h-6 bg-[#054700]/10 rounded flex items-center justify-center">
+                          <CreditCard className="w-4 h-4 text-[#054700]" />
                         </div>
                         <div>
-                          <div className="font-medium text-[#1B4332]">
+                          <div className="font-medium text-[#054700]">
                             {method.brand?.toUpperCase()} ****{method.last4}
                           </div>
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="border-[#52796F] text-[#52796F]">Edit</Button>
+                        <Button variant="outline" size="sm" className="border-[#5a6623] text-[#5a6623]">Edit</Button>
                         <Button
                           variant="destructive"
                           size="sm"
@@ -562,12 +561,12 @@ export default function OrdersPage() {
           </Card>
 
           {/* Billing History */}
-          <Card data-testid="section-billing-history" className="bg-[#FAF7F2] border-[#52796F]/20">
+          <Card data-testid="section-billing-history" className="border-[#5a6623]/10 shadow-2xl">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-[#1B4332]">Billing History</CardTitle>
-                  <CardDescription className="text-[#52796F]">
+                  <CardTitle className="text-[#054700]">Billing History</CardTitle>
+                  <CardDescription className="text-[#5a6623]">
                     Download invoices and view payment history
                   </CardDescription>
                 </div>
@@ -577,32 +576,32 @@ export default function OrdersPage() {
               <div className="space-y-3">
                 {!billingHistory || billingHistory.length === 0 ? (
                   <div className="text-center py-8">
-                    <Calendar className="w-12 h-12 text-[#52796F] mx-auto mb-4" />
-                    <p className="text-[#52796F]">No billing history found</p>
-                    <p className="text-sm text-[#52796F] mt-2">Your payment history will appear here</p>
+                    <Calendar className="w-12 h-12 text-[#5a6623] mx-auto mb-4" />
+                    <p className="text-[#5a6623]">No billing history found</p>
+                    <p className="text-sm text-[#5a6623] mt-2">Your payment history will appear here</p>
                   </div>
                 ) : (
                   billingHistory.map((record) => (
-                    <div key={record.id} className="flex items-center justify-between p-4 border border-[#52796F]/20 rounded-lg bg-white">
+                    <div key={record.id} className="flex items-center justify-between p-4 border border-[#5a6623]/20 rounded-lg bg-white">
                       <div className="flex items-center gap-3">
                         {record.status === 'paid' ? (
-                          <CheckCircle className="w-5 h-5 text-[#1B4332]" />
+                          <CheckCircle className="w-5 h-5 text-[#054700]" />
                         ) : record.status === 'pending' ? (
                           <Clock className="w-5 h-5 text-[#D4A574]" />
                         ) : (
                           <AlertCircle className="w-5 h-5 text-red-600" />
                         )}
                         <div>
-                          <div className="font-medium text-[#1B4332]">{record.description}</div>
-                          <div className="text-sm text-[#52796F]">
+                          <div className="font-medium text-[#054700]">{record.description}</div>
+                          <div className="text-sm text-[#5a6623]">
                             {record.status === 'paid' ? 'Paid' : record.status === 'pending' ? 'Pending' : 'Failed'} on {new Date(record.date).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="font-medium text-[#1B4332]">${record.amount.toFixed(2)}</span>
+                        <span className="font-medium text-[#054700]">${record.amount.toFixed(2)}</span>
                         {record.invoiceUrl && record.status === 'paid' && (
-                          <Button variant="outline" size="sm" data-testid="button-download-invoice" className="border-[#1B4332] text-[#1B4332]">
+                          <Button variant="outline" size="sm" data-testid="button-download-invoice" className="border-[#054700] text-[#054700]">
                             <Download className="w-4 h-4" />
                           </Button>
                         )}

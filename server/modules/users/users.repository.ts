@@ -308,14 +308,14 @@ export class UsersRepository {
     }
 
     async createOrder(order: InsertOrder): Promise<Order> {
-        const [created] = await db.insert(orders).values(order).returning();
+        const [created] = await db.insert(orders).values([order] as any).returning();
         return created;
     }
 
     async updateOrder(id: string, updates: Partial<InsertOrder>): Promise<Order | undefined> {
         const [updated] = await db
             .update(orders)
-            .set(updates)
+            .set(updates as any)
             .where(eq(orders.id, id))
             .returning();
         return updated || undefined;

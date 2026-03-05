@@ -130,17 +130,17 @@ export function SupplementTrackerCard() {
   }
 
   return (
-    <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 transition-all h-full">
+    <Card className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 transition-all h-full">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold text-[#1B4332] flex items-center gap-2">
-            <Pill className="h-5 w-5 text-[#52796F]" />
+          <CardTitle className="text-base font-semibold text-[#054700] flex items-center gap-2">
+            <Pill className="h-5 w-5 text-[#5a6623]" />
             Today's Supplements
           </CardTitle>
           <div className="flex items-center gap-1.5">
             <span className={cn(
               "text-sm font-medium",
-              allTaken ? "text-green-600" : "text-[#52796F]"
+              allTaken ? "text-green-600" : "text-[#5a6623]"
             )}>
               {dosesTaken}/{totalDoses}
             </span>
@@ -162,7 +162,7 @@ export function SupplementTrackerCard() {
                 variant="outline"
                 className={cn(
                   "h-auto py-4 px-3 flex flex-col items-center gap-2 transition-all min-h-[100px]",
-                  "border-[#1B4332]/10 hover:border-[#1B4332]/30",
+                  "border-[#054700]/10 hover:border-[#054700]/30",
                   dose.taken && "bg-green-50 border-green-200 hover:bg-green-100 hover:border-green-300",
                   isPending && "opacity-70"
                 )}
@@ -173,7 +173,7 @@ export function SupplementTrackerCard() {
                   "h-12 w-12 rounded-full flex items-center justify-center transition-colors",
                   dose.taken
                     ? "bg-green-500 text-white"
-                    : "bg-[#1B4332]/5 text-[#52796F]"
+                    : "bg-[#054700]/5 text-[#5a6623]"
                 )}>
                   {isPending ? (
                     <Loader2 className="h-6 w-6 animate-spin" />
@@ -185,7 +185,7 @@ export function SupplementTrackerCard() {
                 </div>
                 <span className={cn(
                   "text-sm font-medium",
-                  dose.taken ? "text-green-700" : "text-[#52796F]"
+                  dose.taken ? "text-green-700" : "text-[#5a6623]"
                 )}>
                   {dose.label}
                 </span>
@@ -211,7 +211,7 @@ export function SupplementTrackerCard() {
 
 export function SupplementTrackerCardSkeleton() {
   return (
-    <Card className="bg-white border-[#1B4332]/10">
+    <Card className="border-[#054700]/10 shadow-2xl">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <Skeleton className="h-5 w-40" />
@@ -231,13 +231,13 @@ export function SupplementTrackerCardSkeleton() {
 
 export function SupplementTrackerCardEmpty() {
   return (
-    <Card className="bg-white border-[#1B4332]/10 border-dashed">
+    <Card className="border-[#054700]/10 shadow-2xl border-dashed">
       <CardContent className="py-8 text-center">
-        <Pill className="h-10 w-10 text-[#52796F]/50 mx-auto mb-3" />
-        <p className="text-[#52796F] text-sm">
+        <Pill className="h-10 w-10 text-[#5a6623]/50 mx-auto mb-3" />
+        <p className="text-[#5a6623] text-sm">
           No active formula yet
         </p>
-        <p className="text-[#52796F]/70 text-xs mt-1">
+        <p className="text-[#5a6623]/70 text-xs mt-1">
           Complete your consultation to get started
         </p>
       </CardContent>

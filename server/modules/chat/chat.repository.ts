@@ -33,6 +33,15 @@ export class ChatRepository {
         await db.delete(chatSessions).where(eq(chatSessions.id, id));
     }
 
+    async renameChatSession(id: string, title: string): Promise<ChatSession | undefined> {
+        const [session] = await db
+            .update(chatSessions)
+            .set({ title })
+            .where(eq(chatSessions.id, id))
+            .returning();
+        return session || undefined;
+    }
+
     async createMessage(insertMessage: any): Promise<Message> {
         const [message] = await db.insert(messages).values(insertMessage).returning();
         return message;

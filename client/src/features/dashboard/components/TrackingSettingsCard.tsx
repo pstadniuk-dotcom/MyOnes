@@ -70,13 +70,13 @@ export function TrackingSettingsCard({ initialPrefs, onSaved }: TrackingSettings
   };
 
   return (
-    <Card className="border-[#1B4332]/10">
+    <Card className="border-[#054700]/10">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
+        <CardTitle className="text-base flex items-center gap-2 text-[#054700]">
           <Settings2 className="h-4 w-4" />
           Tracking settings
         </CardTitle>
-        <CardDescription className="text-sm text-[#52796F]">
+        <CardDescription className="text-sm text-[#5a6623]">
           Choose what counts toward your streaks.
         </CardDescription>
       </CardHeader>
@@ -84,7 +84,7 @@ export function TrackingSettingsCard({ initialPrefs, onSaved }: TrackingSettings
       <CardContent className="space-y-4">
         {/* Row 1: Category chips */}
         <div>
-          <Label className="text-xs text-[#52796F] mb-2 block">Categories</Label>
+          <Label className="text-xs text-[#5a6623] mb-2 block">Categories</Label>
           <div className="flex flex-wrap gap-2">
             {categoryKeys.map(cat => (
               <CategoryChip
@@ -101,7 +101,7 @@ export function TrackingSettingsCard({ initialPrefs, onSaved }: TrackingSettings
         {/* Row 2: Hydration goal and Pause until */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="hydration" className="text-xs text-[#52796F]">
+            <Label htmlFor="hydration" className="text-xs text-[#5a6623]">
               Hydration goal (oz)
             </Label>
             <Input
@@ -122,7 +122,7 @@ export function TrackingSettingsCard({ initialPrefs, onSaved }: TrackingSettings
           </div>
 
           <div>
-            <Label htmlFor="pause" className="text-xs text-[#52796F]">
+            <Label htmlFor="pause" className="text-xs text-[#5a6623]">
               Pause until
             </Label>
             <Input
@@ -155,13 +155,13 @@ export function TrackingSettingsCard({ initialPrefs, onSaved }: TrackingSettings
             size="sm"
             onClick={handleSave}
             disabled={savePrefs.isPending}
-            className="bg-[#1B4332] hover:bg-[#143728] text-white"
+            className="bg-[#054700] hover:bg-[#043d00] text-white"
           >
             {savePrefs.isPending ? 'Saving…' : 'Save'}
           </Button>
         </div>
 
-        <p className="text-[10px] text-[#52796F] text-right">
+        <p className="text-[10px] text-[#5a6623] text-right">
           Changes apply immediately to streaks.
         </p>
       </CardContent>

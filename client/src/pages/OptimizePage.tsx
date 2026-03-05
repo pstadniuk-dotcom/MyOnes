@@ -75,8 +75,8 @@ export default function OptimizePage() {
       title: 'Nutrition',
       description: 'Meal plans & macros',
       icon: Salad,
-      accent: 'from-green-500 to-green-600',
-      badgeClass: 'bg-green-100 text-green-700',
+      accent: 'from-[#054700] to-[#054700]/80',
+      badgeClass: 'bg-[#054700]/10 text-[#054700]',
       isActive: !!nutritionPlan,
       content: (
         <NutritionPlanTab
@@ -90,8 +90,8 @@ export default function OptimizePage() {
       title: 'Workout',
       description: 'Training schedule',
       icon: Dumbbell,
-      accent: 'from-blue-500 to-blue-600',
-      badgeClass: 'bg-blue-100 text-blue-700',
+      accent: 'from-[#054700] to-[#5a6623]',
+      badgeClass: 'bg-[#5a6623]/10 text-[#5a6623]',
       isActive: !!workoutPlan,
       content: (
         <WorkoutPlanTab
@@ -105,8 +105,8 @@ export default function OptimizePage() {
       title: 'Lifestyle',
       description: 'Sleep & recovery',
       icon: Heart,
-      accent: 'from-purple-500 to-purple-600',
-      badgeClass: 'bg-purple-100 text-purple-700',
+      accent: 'from-[#5a6623] to-[#054700]',
+      badgeClass: 'bg-[#054700]/10 text-[#054700]',
       isActive: !!lifestylePlan,
       content: <LifestylePlanTab plan={lifestylePlan} healthProfile={healthProfile} />,
     },
@@ -138,15 +138,15 @@ export default function OptimizePage() {
     return (
       <div className="container mx-auto p-6 max-w-6xl">
         <div className="mb-6">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold mb-2 text-[#054700]">
             Optimize
           </h1>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-[#5a6623] text-lg">
             AI-powered personalized plans for nutrition, fitness, and lifestyle
           </p>
         </div>
         <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#054700]"></div>
         </div>
       </div>
     );
@@ -156,17 +156,17 @@ export default function OptimizePage() {
     return (
       <div className="container mx-auto p-6 max-w-6xl">
         <div className="mb-6">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold mb-2 text-[#054700]">
             Optimize
           </h1>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-[#5a6623] text-lg">
             AI-powered personalized plans for nutrition, fitness, and lifestyle
           </p>
         </div>
 
-        <Card className="border-dashed border-2">
+        <Card className="bg-white border-dashed border-2 border-[#054700]/20">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="rounded-full bg-gradient-to-br from-green-500 to-blue-500 p-4 mb-4">
+            <div className="rounded-full bg-[#054700] p-4 mb-4">
               <Sparkles className="h-10 w-10 text-white" />
             </div>
             <h3 className="text-2xl font-semibold mb-2">Complete Your Health Profile</h3>
@@ -175,7 +175,7 @@ export default function OptimizePage() {
               current status, and preferences. This takes just 2 minutes.
             </p>
             <Link href="/dashboard/profile">
-              <Button size="lg" className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700">
+              <Button size="lg" className="bg-[#054700] hover:bg-[#043d00] text-white">
                 <Sparkles className="mr-2 h-5 w-5" />
                 Set Up Health Profile
                 <ArrowRight className="ml-2 h-5 w-5" />
@@ -193,10 +193,10 @@ export default function OptimizePage() {
       {/* Header Section */}
       <div className="flex flex-col gap-4 md:gap-6">
         <div>
-          <h1 className="text-xl md:text-4xl font-bold mb-1 md:mb-2 bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-xl md:text-4xl font-bold mb-1 md:mb-2 text-[#054700]">
             Optimize
           </h1>
-          <p className="text-muted-foreground text-sm md:text-lg">
+          <p className="text-[#5a6623] text-sm md:text-lg">
             Your AI-powered health optimization dashboard
           </p>
         </div>
@@ -229,11 +229,11 @@ export default function OptimizePage() {
         </TabsList>
 
         {/* Reminders Setup Prompt - Hidden on mobile to save space */}
-        <Card className="hidden md:block bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 border-none">
+        <Card className="hidden md:block border-[#054700]/10 shadow-2xl">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-full bg-[#054700] flex items-center justify-center">
                   <Clock className="h-5 w-5 text-white" />
                 </div>
                 <div>
@@ -241,18 +241,18 @@ export default function OptimizePage() {
                     <p className="font-semibold">Stay on Track with Reminders</p>
                     <HoverCard>
                       <HoverCardTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 text-purple-500 hover:text-purple-600 hover:bg-purple-100/50 rounded-full p-0">
+                        <Button variant="ghost" size="icon" className="h-5 w-5 text-[#5a6623] hover:text-[#054700] hover:bg-[#054700]/10 rounded-full p-0">
                           <Sparkles className="h-3 w-3" />
                         </Button>
                       </HoverCardTrigger>
-                      <HoverCardContent className="w-80 bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200">
+                      <HoverCardContent className="w-80 bg-white/90 backdrop-blur-sm border-[#054700]/10">
                         <div className="flex gap-3">
-                          <div className="h-8 w-8 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
+                          <div className="h-8 w-8 rounded-full bg-[#054700] flex items-center justify-center flex-shrink-0">
                             <Sparkles className="h-4 w-4 text-white" />
                           </div>
                           <div>
-                            <p className="font-semibold text-purple-900 mb-1 text-sm">Pro Tip</p>
-                            <p className="text-xs text-purple-800">
+                            <p className="font-semibold text-[#054700] mb-1 text-sm">Pro Tip</p>
+                            <p className="text-xs text-[#5a6623]">
                               Set up personalized reminders for supplements, workouts, meals, and check-ins.
                               Daily reminders help you stay consistent and achieve your health goals faster.
                             </p>
@@ -269,7 +269,7 @@ export default function OptimizePage() {
                   <Button
                     variant="default"
                     size="sm"
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                    className="bg-[#054700] hover:bg-[#043d00] text-white"
                   >
                     <Clock className="mr-2 h-4 w-4" />
                     Set Up Reminders

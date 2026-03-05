@@ -4,7 +4,7 @@ import FooterV2 from "@/features/marketing/components/FooterV2";
 
 export default function SciencePage() {
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
+    <div className="min-h-screen bg-[#ede8e2]">
       <HeaderV2 />
       <main>
         <ScienceSection />

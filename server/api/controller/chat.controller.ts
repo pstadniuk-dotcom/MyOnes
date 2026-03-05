@@ -4,6 +4,8 @@ import { chatRepository } from '../../modules/chat/chat.repository';
 import { usersRepository } from '../../modules/users/users.repository';
 import { formulasRepository } from '../../modules/formulas/formulas.repository';
 import { systemRepository } from '../../modules/system/system.repository';
+import { notificationsService } from '../../modules/notifications/notifications.service';
+import { sendNotificationEmail } from '../../utils/emailService';
 
 import { getClientIP, checkRateLimit } from '../middleware/middleware';
 import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
@@ -11,6 +13,7 @@ import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builde
 import { analyzeQueryIntent } from '../../utils/query-intent-analyzer';
 import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget, autoExpandFormula } from '../../modules/formulas/formula-service';
 import { validateFormulaSafety, safetyWarningsToStrings } from '../../modules/formulas/safety-validator';
+import { filterAIOutputClaims } from '../../modules/ai/claims-filter';
 import type { SafetyWarning } from '@shared/safety-types';
 import { recommendDailyProtocolCapsules } from '../../modules/chat/protocol-recommendation';
 import OpenAI from 'openai';
@@ -101,13 +104,14 @@ export class ChatController {
                 formula: undefined
             });
 
-            const { healthProfile, labDataContext, activeFormula } = await chatService.getContext(userId);
+            const { healthProfile, labDataContext, activeFormula, biometricDataContext } = await chatService.getContext(userId);
 
             // --- Stepped thinking progress ---
             const contextParts: string[] = [];
             if (healthProfile) contextParts.push('health profile');
             if (labDataContext) contextParts.push(`${labDataContext.split('\n').length} biomarkers`);
             if (activeFormula) contextParts.push('active formula');
+            if (biometricDataContext) contextParts.push('wearable data');
             sendSSE({
                 type: 'thinking_step',
                 step: 'review_data',
@@ -133,6 +137,7 @@ export class ChatController {
                 healthProfile: healthProfile as any,
                 activeFormula: activeFormula as any,
                 labDataContext: labDataContext || undefined,
+                biometricDataContext: biometricDataContext || undefined,
                 recentMessages: previousMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
                 queryIntent,
                 currentUserMessage: message
@@ -340,6 +345,53 @@ export class ChatController {
                           };
 
                           savedFormula = await formulasRepository.createFormula(formulaData);
+
+                          // Send first-formula-created email + in-app notification
+                          try {
+                            const formulaUser = await usersRepository.getUser(userId);
+                            if (formulaUser) {
+                              const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+                              const ingredientCount = (savedFormula.bases?.length || 0) + (savedFormula.additions?.length || 0);
+
+                              await notificationsService.create({
+                                userId,
+                                type: 'formula_update',
+                                title: `Formula V${nextVersion} Created`,
+                                content: `Your AI practitioner created a personalized formula with ${ingredientCount} ingredients (${savedFormula.totalMg}mg total).`,
+                                formulaId: savedFormula.id,
+                                metadata: {
+                                  actionUrl: '/dashboard/formula',
+                                  icon: 'sparkles',
+                                  priority: 'high'
+                                }
+                              });
+
+                              if (await notificationsService.shouldSendEmail(userId, 'consultation')) {
+                                await sendNotificationEmail({
+                                to: formulaUser.email,
+                                subject: nextVersion === 1
+                                  ? 'Your first ONES formula is ready!'
+                                  : `Your ONES formula has been updated (V${nextVersion})`,
+                                title: nextVersion === 1 ? 'Your Formula Is Ready' : 'Formula Updated',
+                                type: 'formula_update',
+                                content: `
+                                  <p>Hi ${formulaUser.name?.split(' ')[0] || 'there'},</p>
+                                  <p>${nextVersion === 1
+                                    ? 'Your AI practitioner has designed your first personalized supplement formula!'
+                                    : `Your formula has been updated to version ${nextVersion}.`
+                                  }</p>
+                                  <p><strong>${ingredientCount} ingredients</strong> totalling <strong>${savedFormula.totalMg}mg</strong> across <strong>${savedFormula.targetCapsules} capsules</strong>.</p>
+                                  <p>Review your formula, check the ingredient breakdown, and order when you're ready.</p>
+                                `,
+                                actionUrl: `${frontendUrl}/dashboard/formula`,
+                                actionText: 'View Your Formula',
+                              });
+                              }
+                            }
+                          } catch (notifErr) {
+                            logger.warn('Failed to send formula creation notification', { userId, error: notifErr });
+                          }
+
                           logger.info(`Formula v${nextVersion} saved successfully for user ${userId}`, {
                             safetyWarningCount: safetyResult.warnings.length,
                             requiresAcknowledgment: safetyResult.requiresAcknowledgment,
@@ -488,6 +540,39 @@ export class ChatController {
             fullResponse = fullResponse.replace(/```[\s\S]*?```/g, '').trim();
             fullResponse = fullResponse.replace(/`{1,3}/g, '').trim();
 
+            // ── CLAIMS FIREWALL: deterministic medical claims filter ──────
+            const claimsResult = filterAIOutputClaims(fullResponse);
+            if (claimsResult.hasViolations) {
+              fullResponse = claimsResult.filteredText;
+              logger.info('Claims filter applied to AI output', {
+                userId,
+                sessionId: chatSession.id,
+                violationCount: claimsResult.violations.length,
+                categories: [...new Set(claimsResult.violations.map(v => v.category))],
+              });
+
+              // Audit log claims filter activations
+              if (claimsResult.violations.some(v => v.severity === 'critical')) {
+                try {
+                  await systemRepository.createSafetyAuditLog({
+                    userId,
+                    action: 'claims_filter_triggered',
+                    severity: 'serious',
+                    details: {
+                      warnings: claimsResult.violations.map(v => ({
+                        category: v.category,
+                        severity: v.severity as any,
+                        message: v.matchedPhrase,
+                      })),
+                    },
+                    ipAddress: getClientIP(req),
+                  });
+                } catch (auditErr) {
+                  logger.error('Failed to write claims filter audit log', auditErr);
+                }
+              }
+            }
+
             // Normalize dosing schedule emojis — the AI inconsistently drops 🌅 🌙 ☀️
             // Strip any existing emoji at start of line first, then re-apply consistently
             fullResponse = fullResponse.replace(/^[🌅☀️🌙\s]*\*{0,2}(Morning)\*{0,2}(.+)$/gm, '🌅 **$1**$2');
@@ -603,6 +688,20 @@ export class ChatController {
             res.json({ success: true, sessionId });
         } catch (error) {
             logger.error('Delete consultation error:', error);
+            res.status(500).json({ error: (error as Error).message });
+        }
+    }
+
+    async renameConsultation(req: Request, res: Response) {
+        try {
+            const { title } = req.body;
+            if (!title || typeof title !== 'string' || title.trim().length === 0) {
+                return res.status(400).json({ error: 'Title is required' });
+            }
+            const session = await chatService.renameConsultation(req.userId!, req.params.sessionId, title.trim());
+            res.json({ success: true, session });
+        } catch (error) {
+            logger.error('Rename consultation error:', error);
             res.status(500).json({ error: (error as Error).message });
         }
     }

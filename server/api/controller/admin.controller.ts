@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { adminService } from '../../modules/admin/admin.service';
+import { systemRepository } from '../../modules/system/system.repository';
 import { logger } from '../../infra/logging/logger';
 
 export class AdminController {
@@ -468,6 +469,67 @@ export class AdminController {
         } catch (error) {
             logger.error('Error updating ingredient pricing', { error });
             res.status(500).json({ error: 'Failed to update ingredient pricing' });
+        }
+    }
+
+    // ── Audit & Compliance Endpoints ────────────────────────────────────
+
+    async listAuditLogs(req: Request, res: Response) {
+        try {
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 50;
+            const userId = req.query.userId as string | undefined;
+            const action = req.query.action as string | undefined;
+
+            const result = await systemRepository.listAuditLogs({ page, limit, userId, action });
+            res.json({ data: result.data, total: result.total, page, limit });
+        } catch (error) {
+            logger.error('Error fetching audit logs', { error });
+            res.status(500).json({ error: 'Failed to fetch audit logs' });
+        }
+    }
+
+    async listSafetyLogs(req: Request, res: Response) {
+        try {
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 50;
+            const userId = req.query.userId as string | undefined;
+            const severity = req.query.severity as string | undefined;
+
+            const result = await systemRepository.listSafetyAuditLogs({ page, limit, userId, severity });
+            res.json({ data: result.data, total: result.total, page, limit });
+        } catch (error) {
+            logger.error('Error fetching safety logs', { error });
+            res.status(500).json({ error: 'Failed to fetch safety logs' });
+        }
+    }
+
+    async listWarningAcknowledgments(req: Request, res: Response) {
+        try {
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 50;
+            const userId = req.query.userId as string | undefined;
+
+            const result = await systemRepository.listWarningAcknowledgments({ page, limit, userId });
+            res.json({ data: result.data, total: result.total, page, limit });
+        } catch (error) {
+            logger.error('Error fetching warning acknowledgments', { error });
+            res.status(500).json({ error: 'Failed to fetch warning acknowledgments' });
+        }
+    }
+
+    async listConsents(req: Request, res: Response) {
+        try {
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 50;
+            const userId = req.query.userId as string | undefined;
+            const consentType = req.query.consentType as string | undefined;
+
+            const result = await systemRepository.listUserConsents({ page, limit, userId, consentType });
+            res.json({ data: result.data, total: result.total, page, limit });
+        } catch (error) {
+            logger.error('Error fetching consents', { error });
+            res.status(500).json({ error: 'Failed to fetch consents' });
         }
     }
 }

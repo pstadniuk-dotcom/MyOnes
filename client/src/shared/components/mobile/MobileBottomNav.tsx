@@ -87,7 +87,7 @@ export function MobileBottomNav() {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#1B4332]/10 safe-bottom"
+        className="fixed bottom-0 left-0 right-0 z-50 bg-[#ede8e2]/95 backdrop-blur-md border-t border-[#054700]/10 safe-bottom"
         role="navigation"
         aria-label="Main navigation"
       >
@@ -102,8 +102,8 @@ export function MobileBottomNav() {
                     "flex flex-col items-center justify-center w-full h-14 rounded-xl transition-all duration-200",
                     "touch-feedback",
                     active
-                      ? "text-[#1B4332]"
-                      : "text-[#52796F] hover:text-[#1B4332]"
+                      ? "text-[#054700]"
+                      : "text-[#5a6623] hover:text-[#054700]"
                   )}
                   aria-label={item.label}
                   aria-current={active ? 'page' : undefined}
@@ -122,7 +122,7 @@ export function MobileBottomNav() {
                   </span>
                   {/* Active indicator dot */}
                   {active && (
-                    <span className="absolute -bottom-1 w-1 h-1 rounded-full bg-[#1B4332]" />
+                    <span className="absolute -bottom-1 w-1 h-1 rounded-full bg-[#054700]" />
                   )}
                 </button>
               </Link>
@@ -134,7 +134,7 @@ export function MobileBottomNav() {
             onClick={() => setMenuOpen(true)}
             className={cn(
               "flex flex-col items-center justify-center flex-1 h-14 rounded-xl transition-all duration-200",
-              "touch-feedback text-[#52796F] hover:text-[#1B4332]"
+              "touch-feedback text-[#5a6623] hover:text-[#054700]"
             )}
             aria-label="Open menu"
           >
@@ -149,13 +149,13 @@ export function MobileBottomNav() {
         <SheetContent side="bottom" className="rounded-t-3xl max-h-[85vh] overflow-auto pb-safe" hideCloseButton>
           <SheetHeader className="pb-4 border-b">
             <div className="flex items-center justify-between">
-              <SheetTitle className="text-lg font-semibold text-[#1B4332]">Navigation</SheetTitle>
+              <SheetTitle className="text-lg font-semibold text-[#054700]">Navigation</SheetTitle>
               <button
                 onClick={() => setMenuOpen(false)}
-                className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                className="p-2 rounded-full bg-[#054700]/10 hover:bg-[#054700]/20 transition-colors"
                 aria-label="Close menu"
               >
-                <X className="h-5 w-5 text-gray-600" />
+                <X className="h-5 w-5 text-[#054700]" />
               </button>
             </div>
           </SheetHeader>
@@ -171,29 +171,29 @@ export function MobileBottomNav() {
                     "w-full flex items-center gap-4 p-4 rounded-xl transition-all",
                     "touch-feedback text-left",
                     active
-                      ? "bg-[#1B4332]/10 text-[#1B4332]"
-                      : "hover:bg-gray-100 text-gray-700"
+                      ? "bg-[#054700]/10 text-[#054700]"
+                      : "hover:bg-[#054700]/5 text-[#054700]/80"
                   )}
                 >
                   <div className={cn(
                     "h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0",
-                    active ? "bg-[#1B4332] text-white" : "bg-gray-100 text-gray-600"
+                    active ? "bg-[#054700] text-white" : "bg-[#054700]/10 text-[#5a6623]"
                   )}>
                     <item.icon className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={cn(
                       "font-semibold text-base",
-                      active && "text-[#1B4332]"
+                      active && "text-[#054700]"
                     )}>
                       {item.label}
                     </p>
-                    <p className="text-sm text-gray-500 truncate">
+                    <p className="text-sm text-[#5a6623] truncate">
                       {item.description}
                     </p>
                   </div>
                   {active && (
-                    <div className="h-2 w-2 rounded-full bg-[#1B4332] flex-shrink-0" />
+                    <div className="h-2 w-2 rounded-full bg-[#054700] flex-shrink-0" />
                   )}
                 </button>
               );

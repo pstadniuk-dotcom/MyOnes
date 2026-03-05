@@ -114,16 +114,15 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar data-testid="sidebar-main" className="border-r border-[#1B4332]/10 bg-[#FAF7F2]">
-      <SidebarHeader className="p-[13.5px] pl-6 border-b border-[#1B4332]/10">
-        <Link href="/" className="flex items-center -space-x-3">
-          <img src="/ones-logo-icon.svg" alt="" className="h-9 w-9" />
-          <img src="/ones-logo-green.svg" alt="ONES" className="h-7" />
+    <Sidebar data-testid="sidebar-main" className="border-r border-[#054700]/10 bg-[#ede8e2]/80 backdrop-blur-md">
+      <SidebarHeader className="!flex-row h-16 items-center px-6 border-b border-[#054700]/10">
+        <Link href="/" className="flex items-center">
+          <img src="/ones-logo-light.svg" alt="ONES" className="h-7" />
         </Link>
       </SidebarHeader>
       <SidebarContent className="px-3 py-4">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-[#52796F] text-xs font-medium uppercase tracking-wider px-3 mb-2">
+          <SidebarGroupLabel className="text-[#5a6623] text-xs font-medium uppercase tracking-wider px-3 mb-2">
             Your Health Journey
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -136,8 +135,8 @@ export function AppSidebar() {
                     className={`
                       rounded-lg px-3 py-2.5 transition-all duration-200
                       ${isActive(item.url)
-                        ? 'bg-[#1B4332] text-white font-medium shadow-sm'
-                        : 'text-[#1B4332] hover:bg-[#1B4332]/10 hover:text-[#1B4332]'
+                        ? 'bg-[#054700] text-white font-medium shadow-sm'
+                        : 'text-[#054700] hover:bg-[#054700]/10 hover:text-[#054700]'
                       }
                     `}
                     data-testid={`nav-${item.title.toLowerCase().replace(' ', '-')}`}
@@ -156,7 +155,7 @@ export function AppSidebar() {
         {/* Optimize Section - Hidden when features are disabled */}
         {isOptimizeEnabled() && (
           <SidebarGroup className="mt-4">
-            <SidebarGroupLabel className="text-[#52796F] text-xs font-medium uppercase tracking-wider px-3 mb-2">
+            <SidebarGroupLabel className="text-[#5a6623] text-xs font-medium uppercase tracking-wider px-3 mb-2">
               Optimize
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -169,8 +168,8 @@ export function AppSidebar() {
                       className={`
                       rounded-lg px-3 py-2.5 transition-all duration-200
                       ${isActive(item.url)
-                          ? 'bg-[#1B4332] text-white font-medium shadow-sm'
-                          : 'text-[#1B4332] hover:bg-[#1B4332]/10 hover:text-[#1B4332]'
+                          ? 'bg-[#054700] text-white font-medium shadow-sm'
+                          : 'text-[#054700] hover:bg-[#054700]/10 hover:text-[#054700]'
                         }
                     `}
                       data-testid={`nav-optimize-${item.title.toLowerCase()}`}
@@ -188,7 +187,7 @@ export function AppSidebar() {
         )}
 
         <SidebarGroup className="mt-4">
-          <SidebarGroupLabel className="text-[#52796F] text-xs font-medium uppercase tracking-wider px-3 mb-2">
+          <SidebarGroupLabel className="text-[#5a6623] text-xs font-medium uppercase tracking-wider px-3 mb-2">
             Account
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -201,8 +200,8 @@ export function AppSidebar() {
                     className={`
                       rounded-lg px-3 py-2.5 transition-all duration-200
                       ${isActive(item.url)
-                        ? 'bg-[#1B4332] text-white font-medium shadow-sm'
-                        : 'text-[#1B4332] hover:bg-[#1B4332]/10 hover:text-[#1B4332]'
+                        ? 'bg-[#054700] text-white font-medium shadow-sm'
+                        : 'text-[#054700] hover:bg-[#054700]/10 hover:text-[#054700]'
                       }
                     `}
                     data-testid={`nav-${item.title.toLowerCase().replace(' ', '-')}`}
@@ -218,8 +217,8 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4 border-t border-[#1B4332]/10">
-        <p className="text-[#52796F] text-xs text-center">
+      <SidebarFooter className="p-4 border-t border-[#054700]/10">
+        <p className="text-[#5a6623] text-xs text-center">
           © 2026 ONES AI
         </p>
       </SidebarFooter>

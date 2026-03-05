@@ -1,12 +1,13 @@
 import { db } from '../../infra/db/db';
 import {
     auditLogs, appSettings,
-    safetyAuditLogs, formulaWarningAcknowledgments,
+    safetyAuditLogs, formulaWarningAcknowledgments, userConsents, users,
     type AuditLog, type InsertAuditLog, type AppSetting,
     type SafetyAuditLog, type InsertSafetyAuditLog,
     type FormulaWarningAcknowledgment, type InsertFormulaWarningAcknowledgment,
+    type UserConsent,
 } from '@shared/schema';
-import { eq, and, desc, gte, lte } from 'drizzle-orm';
+import { eq, and, desc, gte, lte, sql, count } from 'drizzle-orm';
 
 export class SystemRepository {
     // Audit Log operations
@@ -108,6 +109,110 @@ export class SystemRepository {
             .orderBy(desc(formulaWarningAcknowledgments.acknowledgedAt))
             .limit(1);
         return ack || undefined;
+    }
+
+    // ── Admin-scoped list methods (paginated) ───────────────────────────
+
+    async listAuditLogs(options: { page?: number; limit?: number; userId?: string; action?: string }): Promise<{ data: AuditLog[]; total: number }> {
+        const page = options.page || 1;
+        const limit = Math.min(options.limit || 50, 200);
+        const offset = (page - 1) * limit;
+
+        const conditions = [];
+        if (options.userId) conditions.push(eq(auditLogs.userId, options.userId));
+        if (options.action) conditions.push(eq(auditLogs.action, options.action as any));
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const [totalResult] = await db.select({ count: count() }).from(auditLogs).where(whereClause);
+        const data = await db
+            .select()
+            .from(auditLogs)
+            .where(whereClause)
+            .orderBy(desc(auditLogs.timestamp))
+            .limit(limit)
+            .offset(offset);
+
+        return { data, total: totalResult.count };
+    }
+
+    async listSafetyAuditLogs(options: { page?: number; limit?: number; userId?: string; severity?: string }): Promise<{ data: SafetyAuditLog[]; total: number }> {
+        const page = options.page || 1;
+        const limit = Math.min(options.limit || 50, 200);
+        const offset = (page - 1) * limit;
+
+        const conditions = [];
+        if (options.userId) conditions.push(eq(safetyAuditLogs.userId, options.userId));
+        if (options.severity) conditions.push(eq(safetyAuditLogs.severity, options.severity));
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const [totalResult] = await db.select({ count: count() }).from(safetyAuditLogs).where(whereClause);
+        const data = await db
+            .select()
+            .from(safetyAuditLogs)
+            .where(whereClause)
+            .orderBy(desc(safetyAuditLogs.createdAt))
+            .limit(limit)
+            .offset(offset);
+
+        return { data, total: totalResult.count };
+    }
+
+    async listWarningAcknowledgments(options: { page?: number; limit?: number; userId?: string }): Promise<{ data: FormulaWarningAcknowledgment[]; total: number }> {
+        const page = options.page || 1;
+        const limit = Math.min(options.limit || 50, 200);
+        const offset = (page - 1) * limit;
+
+        const conditions = [];
+        if (options.userId) conditions.push(eq(formulaWarningAcknowledgments.userId, options.userId));
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const [totalResult] = await db.select({ count: count() }).from(formulaWarningAcknowledgments).where(whereClause);
+        const data = await db
+            .select()
+            .from(formulaWarningAcknowledgments)
+            .where(whereClause)
+            .orderBy(desc(formulaWarningAcknowledgments.acknowledgedAt))
+            .limit(limit)
+            .offset(offset);
+
+        return { data, total: totalResult.count };
+    }
+
+    async listUserConsents(options: { page?: number; limit?: number; userId?: string; consentType?: string }): Promise<{ data: (UserConsent & { userName?: string; userEmail?: string })[]; total: number }> {
+        const page = options.page || 1;
+        const limit = Math.min(options.limit || 50, 200);
+        const offset = (page - 1) * limit;
+
+        const conditions = [];
+        if (options.userId) conditions.push(eq(userConsents.userId, options.userId));
+        if (options.consentType) conditions.push(eq(userConsents.consentType, options.consentType as any));
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const [totalResult] = await db.select({ count: count() }).from(userConsents).where(whereClause);
+        const rows = await db
+            .select({
+                consent: userConsents,
+                userName: users.name,
+                userEmail: users.email,
+            })
+            .from(userConsents)
+            .leftJoin(users, eq(userConsents.userId, users.id))
+            .where(whereClause)
+            .orderBy(desc(userConsents.grantedAt))
+            .limit(limit)
+            .offset(offset);
+
+        const data = rows.map(r => ({
+            ...r.consent,
+            userName: r.userName ?? undefined,
+            userEmail: r.userEmail ?? undefined,
+        }));
+
+        return { data, total: totalResult.count };
     }
 }
 

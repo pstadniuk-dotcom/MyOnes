@@ -88,9 +88,9 @@ export default function ScienceSection() {
   ];
 
   return (
-    <section className="bg-[#FAF7F2]">
+    <section className="bg-[#ede8e2]">
       {/* Hero */}
-      <div className="bg-[#1B4332] py-20 md:py-28">
+      <div className="bg-[#054700] py-20 md:py-28">
         <div className="container mx-auto px-6 max-w-4xl text-center">
           <span className="text-[#D4A574] font-medium tracking-wider text-sm uppercase">
             The Science
@@ -109,11 +109,11 @@ export default function ScienceSection() {
       <div className="py-20 md:py-24">
         <div className="container mx-auto px-6 max-w-6xl">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl text-[#1B4332] font-light">
+            <h2 className="text-3xl md:text-4xl text-[#054700] font-light">
               The Same Formula{" "}
               <span className="font-semibold">Problem</span>
             </h2>
-            <p className="mt-4 text-lg text-[#52796F] max-w-2xl mx-auto">
+            <p className="mt-4 text-lg text-[#5a6623] max-w-2xl mx-auto">
               Major brands give identical formulas to completely different people.
             </p>
           </div>
@@ -136,8 +136,8 @@ export default function ScienceSection() {
                   <div className="flex items-start gap-3">
                     <div className="w-2.5 h-2.5 bg-red-400 rounded-full flex-shrink-0 mt-1.5" />
                     <div>
-                      <h4 className="font-semibold text-[#1B4332] mb-1">{competitor.name}</h4>
-                      <p className="text-sm text-[#52796F]">{competitor.formula}</p>
+                      <h4 className="font-semibold text-[#054700] mb-1">{competitor.name}</h4>
+                      <p className="text-sm text-[#5a6623]">{competitor.formula}</p>
                     </div>
                   </div>
                 </div>
@@ -147,7 +147,7 @@ export default function ScienceSection() {
 
           {/* Going to different audiences */}
           <div className="text-center mb-8">
-            <span className="text-[#52796F] italic">All serving the same formula to:</span>
+            <span className="text-[#5a6623] italic">All serving the same formula to:</span>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4 max-w-3xl mx-auto mb-12">
@@ -156,16 +156,16 @@ export default function ScienceSection() {
                 key={index}
                 className="flex items-center gap-3 p-4 bg-white rounded-xl"
               >
-                <Users className="w-5 h-5 text-[#52796F] flex-shrink-0" />
-                <span className="text-[#52796F]">{audience.text}</span>
+                <Users className="w-5 h-5 text-[#5a6623] flex-shrink-0" />
+                <span className="text-[#5a6623]">{audience.text}</span>
               </div>
             ))}
           </div>
 
           {/* Quote highlight */}
           <div className="text-center">
-            <div className="inline-block bg-[#1B4332]/5 border border-[#1B4332]/10 rounded-2xl px-10 py-6">
-              <p className="text-xl md:text-2xl text-[#1B4332] font-light italic">
+            <div className="inline-block bg-[#054700]/5 border border-[#054700]/10 rounded-2xl px-10 py-6">
+              <p className="text-xl md:text-2xl text-[#054700] font-light italic">
                 "You wouldn't take someone else's prescription.{" "}
                 <span className="font-semibold not-italic">Why take their vitamins?"</span>
               </p>
@@ -178,7 +178,7 @@ export default function ScienceSection() {
       <div className="py-20 md:py-24 bg-white">
         <div className="container mx-auto px-6 max-w-5xl">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl text-[#1B4332] font-light">
+            <h2 className="text-3xl md:text-4xl text-[#054700] font-light">
               The ONES{" "}
               <span className="font-semibold">Difference</span>
             </h2>
@@ -207,7 +207,7 @@ export default function ScienceSection() {
             </div>
 
             {/* ONES: AI Conversation */}
-            <div className="bg-[#1B4332] rounded-2xl p-8 md:p-10">
+            <div className="bg-[#054700] rounded-2xl p-8 md:p-10">
               <div className="text-center mb-8">
                 <div className="w-14 h-14 bg-[#2D5A45] rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <Brain className="w-7 h-7 text-white" />
@@ -230,9 +230,9 @@ export default function ScienceSection() {
 
           {/* Stat callout */}
           <div className="mt-12 text-center">
-            <div className="inline-flex items-center gap-4 bg-[#FAF7F2] rounded-full px-8 py-4">
+            <div className="inline-flex items-center gap-4 bg-[#ede8e2] rounded-full px-8 py-4">
               <span className="text-3xl font-bold text-[#D4A574]">42%</span>
-              <span className="text-[#52796F]">of Americans take prescription meds. Most brands never ask.</span>
+              <span className="text-[#5a6623]">of Americans take prescription meds. Most brands never ask.</span>
             </div>
           </div>
         </div>
@@ -245,11 +245,11 @@ export default function ScienceSection() {
             <span className="text-[#D4A574] font-medium tracking-wider text-sm uppercase">
               Our Standards
             </span>
-            <h2 className="mt-4 text-3xl md:text-4xl text-[#1B4332] font-light">
+            <h2 className="mt-4 text-3xl md:text-4xl text-[#054700] font-light">
               Built on research.{" "}
               <span className="font-semibold">Backed by data.</span>
             </h2>
-            <p className="mt-4 text-lg text-[#52796F] max-w-2xl mx-auto">
+            <p className="mt-4 text-lg text-[#5a6623] max-w-2xl mx-auto">
               We don't guess. Every formula is rooted in clinical science and personalized to your unique biochemistry.
             </p>
           </div>
@@ -261,14 +261,14 @@ export default function ScienceSection() {
                 className="group p-8 rounded-2xl bg-white hover:shadow-md transition-all duration-300"
               >
                 <div className="flex items-start gap-5">
-                  <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-[#1B4332]/10 flex items-center justify-center group-hover:bg-[#1B4332] transition-colors duration-300">
-                    <point.icon className="w-6 h-6 text-[#1B4332] group-hover:text-white transition-colors duration-300" />
+                  <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-[#054700]/10 flex items-center justify-center group-hover:bg-[#054700] transition-colors duration-300">
+                    <point.icon className="w-6 h-6 text-[#054700] group-hover:text-white transition-colors duration-300" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-[#1B4332] mb-2">
+                    <h3 className="text-lg font-semibold text-[#054700] mb-2">
                       {point.title}
                     </h3>
-                    <p className="text-[#52796F] leading-relaxed">
+                    <p className="text-[#5a6623] leading-relaxed">
                       {point.description}
                     </p>
                   </div>
@@ -280,7 +280,7 @@ export default function ScienceSection() {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-[#1B4332] py-20">
+      <div className="bg-[#054700] py-20">
         <div className="container mx-auto px-6 max-w-3xl text-center">
           <h2 className="text-3xl md:text-4xl text-white font-light mb-6">
             Ready for{" "}

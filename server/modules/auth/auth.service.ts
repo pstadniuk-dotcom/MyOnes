@@ -13,7 +13,7 @@ import axios from 'axios';
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export class AuthService {
-    async signup(data: any) {
+    async signup(data: any, ipAddress?: string | null, userAgent?: string | null) {
         const validatedData = signupSchema.parse(data);
 
         // Check if user already exists
@@ -26,27 +26,28 @@ export class AuthService {
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(validatedData.password, saltRounds);
 
-        // Create user
+        // Create user with ToS acceptance timestamp
         const userData: InsertUser = {
             name: validatedData.name,
             email: validatedData.email,
             phone: validatedData.phone || null,
-            password: hashedPassword
+            password: hashedPassword,
+            tosAcceptedAt: new Date(),
         };
 
         const user = await usersRepository.createUser(userData);
 
-        // Record Terms of Service & Privacy Policy acceptance
+        // Record Terms of Service & Privacy Policy acceptance as consent record
         try {
             await consentsRepository.createUserConsent({
                 userId: user.id,
-                consentType: 'data_retention' as any,
+                consentType: 'tos_acceptance' as any,
                 granted: true,
                 consentVersion: '1.0',
-                ipAddress: null,
-                userAgent: null,
+                ipAddress: ipAddress || null,
+                userAgent: userAgent || null,
                 consentText: 'I agree to the Terms of Service and Privacy Policy.',
-                metadata: { source: 'signup', additionalInfo: `Accepted at signup on ${new Date().toISOString()}` },
+                metadata: { source: 'signup' as const, additionalInfo: { acceptedAt: new Date().toISOString() } },
             });
         } catch (err) {
             logger.warn('Failed to record TOS consent at signup', { userId: user.id, error: err });
@@ -103,6 +104,35 @@ export class AuthService {
         await authRepository.deleteEmailVerificationToken(token);
 
         const user = await usersRepository.getUser(verificationToken.userId);
+
+        // Send welcome email after verification
+        if (user) {
+            try {
+                const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+                await sendNotificationEmail({
+                    to: user.email,
+                    subject: 'Welcome to ONES — let\'s build your formula',
+                    title: 'Welcome to ONES',
+                    type: 'system',
+                    content: `
+                        <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
+                        <p>Your account is verified and ready to go! Here's how to get started:</p>
+                        <ol style="padding-left:20px;margin:16px 0;">
+                            <li style="margin-bottom:8px;"><strong>Chat with your AI practitioner</strong> — answer a few questions about your health goals, lifestyle, and any supplements you're currently taking.</li>
+                            <li style="margin-bottom:8px;"><strong>Upload blood work</strong> (optional) — if you have recent lab results, upload them for a more precise formula.</li>
+                            <li style="margin-bottom:8px;"><strong>Connect a wearable</strong> (optional) — sync your Fitbit, Oura, or Whoop to give your AI practitioner real-time insights from your biometric data.</li>
+                            <li style="margin-bottom:8px;"><strong>Get your personalized formula</strong> — your AI practitioner will design a custom supplement blend just for you.</li>
+                        </ol>
+                        <p>Your formula is backed by research and tailored to your unique biology. Let's get started!</p>
+                    `,
+                    actionUrl: `${frontendUrl}/dashboard/chat`,
+                    actionText: 'Start Your Consultation',
+                });
+            } catch (emailErr) {
+                logger.warn('Failed to send welcome email', { userId: user.id, error: emailErr });
+            }
+        }
+
         return user;
     }
 
@@ -141,7 +171,7 @@ export class AuthService {
         return { user, token };
     }
 
-    async googleLogin(googleToken: string) {
+    async googleLogin(googleToken: string, ipAddress?: string | null, userAgent?: string | null) {
         try {
             let email: string | undefined;
             let name: string | undefined;
@@ -178,6 +208,7 @@ export class AuthService {
 
             // 1. Try to find user by googleId
             let user = await usersRepository.getUserByGoogleId(googleId);
+            let isNewUser = false;
 
             if (!user) {
                 // 2. Try to find user by email (to link account)
@@ -193,19 +224,39 @@ export class AuthService {
                         email,
                         googleId,
                         emailVerified: true,
+                        tosAcceptedAt: new Date(),
                     });
+                    isNewUser = true;
+                }
+            }
+
+            // Record ToS consent for new OAuth users
+            if (isNewUser) {
+                try {
+                    await consentsRepository.createUserConsent({
+                        userId: user.id,
+                        consentType: 'tos_acceptance' as any,
+                        granted: true,
+                        consentVersion: '1.0',
+                        ipAddress: ipAddress || null,
+                        userAgent: userAgent || null,
+                        consentText: 'Terms of Service and Privacy Policy accepted via Google sign-in.',
+                        metadata: { source: 'signup' as const, additionalInfo: { provider: 'google', acceptedAt: new Date().toISOString() } },
+                    });
+                } catch (err) {
+                    logger.warn('Failed to record TOS consent for Google user', { userId: user.id, error: err });
                 }
             }
 
             const token = generateToken(user.id, user.isAdmin || false);
-            return { user, token };
+            return { user, token, isNewUser };
         } catch (error: any) {
             logger.error('Google login error', { error: error.message });
             throw new Error('Google authentication failed');
         }
     }
 
-    async facebookLogin(accessToken: string) {
+    async facebookLogin(accessToken: string, ipAddress?: string | null, userAgent?: string | null) {
         try {
             logger.debug('Attempting Facebook login with token...');
             // Verify Facebook token and get user info
@@ -222,6 +273,7 @@ export class AuthService {
 
             // 1. Try to find user by facebookId
             let user = await usersRepository.getUserByFacebookId(facebookId);
+            let isNewUser = false;
 
             if (!user) {
                 // 2. Try to find user by email (to link account)
@@ -239,12 +291,32 @@ export class AuthService {
                         email,
                         facebookId,
                         emailVerified: true,
+                        tosAcceptedAt: new Date(),
                     });
+                    isNewUser = true;
+                }
+            }
+
+            // Record ToS consent for new OAuth users
+            if (isNewUser) {
+                try {
+                    await consentsRepository.createUserConsent({
+                        userId: user.id,
+                        consentType: 'tos_acceptance' as any,
+                        granted: true,
+                        consentVersion: '1.0',
+                        ipAddress: ipAddress || null,
+                        userAgent: userAgent || null,
+                        consentText: 'Terms of Service and Privacy Policy accepted via Facebook sign-in.',
+                        metadata: { source: 'signup' as const, additionalInfo: { provider: 'facebook', acceptedAt: new Date().toISOString() } },
+                    });
+                } catch (err) {
+                    logger.warn('Failed to record TOS consent for Facebook user', { userId: user.id, error: err });
                 }
             }
 
             const token = generateToken(user.id, user.isAdmin || false);
-            return { user, token };
+            return { user, token, isNewUser };
         } catch (error: any) {
             const fbError = error.response?.data?.error?.message || error.message;
             logger.error('Facebook login error details', {

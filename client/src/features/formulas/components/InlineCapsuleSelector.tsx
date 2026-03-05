@@ -85,10 +85,10 @@ export function InlineCapsuleSelector({
   if (selectedCapsules) {
     const info = CAPSULE_TIER_INFO[selectedCapsules];
     return (
-      <div className="bg-gradient-to-br from-[#1B4332]/5 to-[#52796F]/5 border border-[#1B4332]/30 rounded-xl p-5 my-4 shadow-sm">
-        <div className="flex items-center gap-3 text-[#1B4332]">
-          <div className="w-10 h-10 rounded-full bg-[#1B4332]/10 flex items-center justify-center">
-            <Check className="w-5 h-5 text-[#1B4332]" />
+      <div className="bg-gradient-to-br from-[#054700]/5 to-[#5a6623]/5 border border-[#054700]/30 rounded-xl p-5 my-4 shadow-sm">
+        <div className="flex items-center gap-3 text-[#054700]">
+          <div className="w-10 h-10 rounded-full bg-[#054700]/10 flex items-center justify-center">
+            <Check className="w-5 h-5 text-[#054700]" />
           </div>
           <div>
             <span className="font-semibold text-base">
@@ -97,7 +97,7 @@ export function InlineCapsuleSelector({
             <p className="text-sm text-gray-600">{info.label} Protocol</p>
           </div>
         </div>
-        <div className="mt-4 flex items-center gap-2 text-sm text-[#1B4332]/70">
+        <div className="mt-4 flex items-center gap-2 text-sm text-[#054700]/70">
           <Loader2 className="w-4 h-4 animate-spin" />
           <span>Creating your personalized formula...</span>
         </div>
@@ -108,7 +108,7 @@ export function InlineCapsuleSelector({
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm my-4 overflow-hidden">
       {/* Header Section */}
-      <div className="bg-gradient-to-r from-[#1B4332] to-[#2D5A45] px-5 py-4 text-white">
+      <div className="bg-gradient-to-r from-[#054700] to-[#2D5A45] px-5 py-4 text-white">
         <div className="flex items-center gap-2 mb-1">
           <Pill className="w-5 h-5" />
           <h4 className="font-semibold text-base">Select Your Daily Protocol</h4>
@@ -159,8 +159,8 @@ export function InlineCapsuleSelector({
                   'relative flex-1 p-4 rounded-xl border-2 transition-all duration-200',
                   'flex flex-row sm:flex-col items-center sm:items-center gap-4 sm:gap-2',
                   isRecommended
-                    ? 'border-[#1B4332] bg-[#1B4332]/5 shadow-md'
-                    : 'border-gray-200 hover:border-[#1B4332]/40 hover:bg-gray-50',
+                    ? 'border-[#054700] bg-[#054700]/5 shadow-md'
+                    : 'border-gray-200 hover:border-[#054700]/40 hover:bg-gray-50',
                   isSelecting && 'opacity-50 cursor-not-allowed',
                   !isSelecting && 'hover:shadow-md cursor-pointer'
                 )}
@@ -168,7 +168,7 @@ export function InlineCapsuleSelector({
                 {/* Recommended Badge */}
                 {isRecommended && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-[#1B4332] hover:bg-[#1B4332] text-white text-[10px] px-3 py-1 shadow-sm whitespace-nowrap">
+                    <Badge className="bg-[#054700] hover:bg-[#054700] text-white text-[10px] px-3 py-1 shadow-sm whitespace-nowrap">
                       <Sparkles className="w-3 h-3 mr-1" />
                       Recommended
                     </Badge>
@@ -180,8 +180,8 @@ export function InlineCapsuleSelector({
                   'flex items-center justify-center',
                   'w-16 h-16 sm:w-20 sm:h-20 rounded-full',
                   isRecommended
-                    ? 'bg-[#1B4332] text-white'
-                    : 'bg-gray-100 text-[#1B4332]',
+                    ? 'bg-[#054700] text-white'
+                    : 'bg-gray-100 text-[#054700]',
                   'transition-colors duration-200'
                 )}>
                   <span className="text-2xl sm:text-3xl font-bold">{count}</span>
@@ -191,7 +191,7 @@ export function InlineCapsuleSelector({
                 <div className="flex-1 sm:flex-none text-left sm:text-center">
                   <div className={cn(
                     'text-sm font-semibold uppercase tracking-wide',
-                    isRecommended ? 'text-[#1B4332]' : 'text-gray-700'
+                    isRecommended ? 'text-[#054700]' : 'text-gray-700'
                   )}>
                     {info.label}
                   </div>
@@ -202,7 +202,7 @@ export function InlineCapsuleSelector({
                   {/* Per meal info */}
                   <div className={cn(
                     'mt-2 text-xs font-medium',
-                    isRecommended ? 'text-[#1B4332]/70' : 'text-gray-400'
+                    isRecommended ? 'text-[#054700]/70' : 'text-gray-400'
                   )}>
                     {count / 3} caps × 3 meals
                   </div>
@@ -228,7 +228,7 @@ export function InlineCapsuleSelector({
       {/* Loading state */}
       {isSelecting && (
         <div className="border-t border-gray-100 px-5 py-3 bg-gray-50">
-          <div className="flex items-center justify-center gap-2 text-sm text-[#1B4332]">
+          <div className="flex items-center justify-center gap-2 text-sm text-[#054700]">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span>Creating your formula...</span>
           </div>

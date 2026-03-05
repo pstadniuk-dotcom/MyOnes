@@ -5,6 +5,7 @@ import { formulasRepository } from '../formulas/formulas.repository';
 import { type MessageFormulaPayload, type MessageFormulaIngredientPayload, InsertMessage, messages } from '@shared/schema';
 import { filesRepository } from '../files/files.repository';
 import { usersRepository } from '../users/users.repository';
+import { wearablesService } from '../wearables/wearables.service';
 import { DEFAULT_CLINICAL_DIRECTION, LAB_TREND_RULES, type ClinicalDirection } from './lab-trend-rules';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -283,7 +284,7 @@ export class ChatService {
 
             return {
                 id: session.id,
-                title: `Consultation ${new Date(session.createdAt).toLocaleDateString()}`,
+                title: session.title || `Consultation ${new Date(session.createdAt).toLocaleDateString()}`,
                 lastMessage: lastMessage?.content?.substring(0, 100) + '...' || 'New consultation',
                 timestamp: session.createdAt,
                 messageCount: sessionMsgs.length,
@@ -333,6 +334,17 @@ export class ChatService {
         return sessionId;
     }
 
+    async renameConsultation(userId: string, sessionId: string, title: string) {
+        const session = await chatRepository.getChatSession(sessionId);
+
+        if (!session || session.userId !== userId) {
+            throw new Error('Session not found');
+        }
+
+        const updated = await chatRepository.renameChatSession(sessionId, title);
+        return updated;
+    }
+
     async listSessions(userId: string) {
         return await chatRepository.listChatSessionsByUser(userId);
     }
@@ -370,10 +382,14 @@ export class ChatService {
     }
 
     async getContext(userId: string) {
-        const [healthProfile, labReports, activeFormula] = await Promise.all([
+        const endDate = new Date().toISOString().split('T')[0];
+        const startDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        const [healthProfile, labReports, activeFormula, biometricResult] = await Promise.all([
             usersRepository.getHealthProfile(userId).catch(() => null),
             filesRepository.getLabReportsByUser(userId),
-            formulasRepository.getCurrentFormulaByUser(userId)
+            formulasRepository.getCurrentFormulaByUser(userId),
+            wearablesService.getBiometricData(userId, startDate, endDate).catch(() => ({ data: [] }))
         ]);
 
         let labDataContext = '';
@@ -410,7 +426,103 @@ export class ChatService {
             }
         }
 
-        return { healthProfile, labDataContext, activeFormula };
+        // Build biometric (wearable) data context
+        let biometricDataContext = '';
+        const biometricDays = biometricResult?.data || [];
+        if (biometricDays.length > 0) {
+            const lines: string[] = [];
+            lines.push(`Data source: Wearable device(s) via Junction`);
+            lines.push(`Period: ${startDate} to ${endDate} (${biometricDays.length} days with data)\n`);
+
+            // Compute averages for summary
+            const sleepScores: number[] = [];
+            const sleepMinutes: number[] = [];
+            const deepSleepMins: number[] = [];
+            const remSleepMins: number[] = [];
+            const hrvValues: number[] = [];
+            const restingHRs: number[] = [];
+            const recoveryScores: number[] = [];
+            const stepCounts: number[] = [];
+            const spo2Values: number[] = [];
+
+            for (const day of biometricDays) {
+                if (day.sleep?.score) sleepScores.push(day.sleep.score);
+                if (day.sleep?.totalMinutes) sleepMinutes.push(day.sleep.totalMinutes);
+                if (day.sleep?.deepSleepMinutes) deepSleepMins.push(day.sleep.deepSleepMinutes);
+                if (day.sleep?.remSleepMinutes) remSleepMins.push(day.sleep.remSleepMinutes);
+                if (day.heart?.hrvMs) hrvValues.push(day.heart.hrvMs);
+                if (day.heart?.restingRate) restingHRs.push(day.heart.restingRate);
+                if (day.heart?.recoveryScore) recoveryScores.push(day.heart.recoveryScore);
+                if (day.activity?.steps) stepCounts.push(day.activity.steps);
+                if (day.body?.spo2) spo2Values.push(day.body.spo2);
+            }
+
+            const avg = (arr: number[]) => arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+            const trend = (arr: number[]) => {
+                if (arr.length < 4) return 'insufficient data';
+                const half = Math.floor(arr.length / 2);
+                const firstHalf = avg(arr.slice(0, half))!;
+                const secondHalf = avg(arr.slice(half))!;
+                const diff = ((secondHalf - firstHalf) / firstHalf) * 100;
+                if (diff > 5) return 'improving ↑';
+                if (diff < -5) return 'declining ↓';
+                return 'stable →';
+            };
+
+            lines.push(`📊 **14-Day Biometric Summary:**\n`);
+
+            // Sleep metrics
+            if (sleepScores.length > 0 || sleepMinutes.length > 0) {
+                lines.push(`**Sleep:**`);
+                if (sleepScores.length > 0) lines.push(`  • Average sleep score: ${avg(sleepScores)}/100 (trend: ${trend(sleepScores)})`);
+                if (sleepMinutes.length > 0) {
+                    const avgMins = avg(sleepMinutes)!;
+                    lines.push(`  • Average sleep duration: ${Math.floor(avgMins / 60)}h ${avgMins % 60}m (trend: ${trend(sleepMinutes)})`);
+                }
+                if (deepSleepMins.length > 0) lines.push(`  • Average deep sleep: ${avg(deepSleepMins)} min`);
+                if (remSleepMins.length > 0) lines.push(`  • Average REM sleep: ${avg(remSleepMins)} min`);
+            }
+
+            // Heart / HRV metrics
+            if (hrvValues.length > 0 || restingHRs.length > 0) {
+                lines.push(`\n**Heart & Recovery:**`);
+                if (hrvValues.length > 0) lines.push(`  • Average HRV: ${avg(hrvValues)}ms (trend: ${trend(hrvValues)})`);
+                if (restingHRs.length > 0) lines.push(`  • Average resting heart rate: ${avg(restingHRs)} bpm (trend: ${trend(restingHRs)})`);
+                if (recoveryScores.length > 0) lines.push(`  • Average recovery score: ${avg(recoveryScores)}% (trend: ${trend(recoveryScores)})`);
+            }
+
+            // Activity metrics
+            if (stepCounts.length > 0) {
+                lines.push(`\n**Activity:**`);
+                lines.push(`  • Average daily steps: ${avg(stepCounts)?.toLocaleString()} (trend: ${trend(stepCounts)})`);
+            }
+
+            // SpO2
+            if (spo2Values.length > 0) {
+                lines.push(`\n**Blood Oxygen:**`);
+                lines.push(`  • Average SpO2: ${avg(spo2Values)}%`);
+            }
+
+            // Recent daily data (last 5 days for context)
+            const recentDays = biometricDays.slice(-5);
+            if (recentDays.length > 0) {
+                lines.push(`\n📅 **Recent Daily Data (most recent ${recentDays.length} days):**`);
+                for (const day of recentDays) {
+                    const parts: string[] = [`${day.date}:`];
+                    if (day.sleep?.score) parts.push(`Sleep ${day.sleep.score}/100`);
+                    if (day.sleep?.totalMinutes) parts.push(`${Math.floor(day.sleep.totalMinutes / 60)}h${day.sleep.totalMinutes % 60}m sleep`);
+                    if (day.heart?.hrvMs) parts.push(`HRV ${day.heart.hrvMs}ms`);
+                    if (day.heart?.restingRate) parts.push(`RHR ${day.heart.restingRate}bpm`);
+                    if (day.activity?.steps) parts.push(`${day.activity.steps.toLocaleString()} steps`);
+                    if (day.heart?.recoveryScore) parts.push(`Recovery ${day.heart.recoveryScore}%`);
+                    lines.push(`  ${parts.join(' | ')}`);
+                }
+            }
+
+            biometricDataContext = lines.join('\n');
+        }
+
+        return { healthProfile, labDataContext, activeFormula, biometricDataContext };
     }
 }
 

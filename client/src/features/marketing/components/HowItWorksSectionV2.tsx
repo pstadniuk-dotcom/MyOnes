@@ -1,4 +1,4 @@
-import { Upload, Brain, Sparkles, RefreshCw } from "lucide-react";
+import { Upload, SearchCheck, Sparkles, RefreshCw } from "lucide-react";
 
 const steps = [
   {
@@ -9,7 +9,7 @@ const steps = [
   },
   {
     number: "02",
-    icon: Brain,
+    icon: SearchCheck,
     title: "We Analyze Everything",
     description: "Our AI cross references your data with clinical research to understand exactly what your body needs.",
   },
@@ -31,18 +31,32 @@ export default function HowItWorksSectionV2() {
   return (
     <section 
       id="how-it-works" 
-      className="py-24 md:py-32 bg-[#FAF7F2] relative scroll-mt-24"
+      className="relative py-24 md:py-32 overflow-hidden scroll-mt-24"
     >
-      <div className="container mx-auto px-6 max-w-6xl">
+      {/* Lifestyle video background */}
+      <video
+        src="/Hero%20Section/AdobeStock_1717805080.mov"
+        autoPlay
+        loop
+        muted
+        playsInline
+        disablePictureInPicture
+        controlsList="noplaybackrate nodownload"
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+      />
+      {/* Light overlay to keep text readable */}
+      <div className="absolute inset-0 bg-[#ede8e2]/85 backdrop-blur-[2px] z-[1]" />
+
+      <div className="relative z-10 container mx-auto px-6 max-w-6xl">
         <div className="max-w-2xl mx-auto text-center mb-16">
-          <span className="text-[#D4A574] font-medium tracking-wider text-sm uppercase">
+          <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             How It Works
           </span>
-          <h2 className="mt-4 text-4xl md:text-5xl text-[#1B4332] font-light leading-tight">
+          <h2 className="mt-4 text-4xl md:text-5xl text-[#054700] font-light leading-tight">
             How your membership{" "}
             <span className="font-medium">works</span>
           </h2>
-          <p className="mt-6 text-lg leading-relaxed text-[#52796F]">
+          <p className="mt-6 text-lg leading-relaxed text-[#054700]/60">
             Your health changes. Your plan changes with it.
           </p>
         </div>
@@ -54,19 +68,19 @@ export default function HowItWorksSectionV2() {
               <div key={index} className="relative group">
                 <div className="text-center">
                   {/* Step number */}
-                  <div className="text-[#D4A574] font-medium text-sm mb-4">
+                  <div className="text-[#5a6623] font-medium text-sm mb-4">
                     Step {step.number}
                   </div>
                   
                   {/* Icon */}
-                  <div className="inline-flex w-16 h-16 rounded-2xl items-center justify-center mb-6 bg-white shadow-sm group-hover:shadow-md transition-shadow">
-                    <Icon className="w-8 h-8 text-[#1B4332]" />
+                  <div className="inline-flex w-16 h-16 rounded-2xl items-center justify-center mb-6 bg-white/80 backdrop-blur-sm shadow-sm group-hover:shadow-md transition-shadow">
+                    <Icon className="w-8 h-8 text-[#054700]" />
                   </div>
                   
-                  <h3 className="text-xl font-medium text-[#1B4332] mb-3">
+                  <h3 className="text-xl font-medium text-[#054700] mb-3">
                     {step.title}
                   </h3>
-                  <p className="leading-relaxed text-[#52796F]">
+                  <p className="leading-relaxed text-[#054700]/60">
                     {step.description}
                   </p>
                 </div>

@@ -1,5 +1,7 @@
 import { formulasRepository } from "./formulas.repository";
 import { notificationsService } from "../notifications/notifications.service";
+import { usersRepository } from "../users/users.repository";
+import { sendNotificationEmail } from "../../utils/emailService";
 import { getIngredientDose, isValidIngredient } from "@shared/ingredients";
 import logger from "../../infra/logging/logger";
 import { type Formula, type ReviewSchedule } from "@shared/schema";
@@ -352,7 +354,7 @@ export class FormulasService {
             notes: null
         });
 
-        // 📬 Create notification for user-built formula
+        // 📬 Create notification + email for user-built formula
         try {
             await notificationsService.create({
                 userId,
@@ -366,6 +368,29 @@ export class FormulasService {
                     priority: 'medium'
                 }
             });
+
+            const formulaUser = await usersRepository.getUser(userId);
+            if (formulaUser) {
+                const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+                const ingredientCount = (bases?.length || 0) + (individuals?.length || 0);
+                if (await notificationsService.shouldSendEmail(userId, 'consultation')) {
+                    await sendNotificationEmail({
+                    to: formulaUser.email,
+                    subject: nextVersion === 1
+                        ? 'Your first ONES formula is ready!'
+                        : `Your custom ONES formula has been updated (V${nextVersion})`,
+                    title: nextVersion === 1 ? 'Your Formula Is Ready' : 'Custom Formula Updated',
+                    type: 'formula_update',
+                    content: `
+                        <p>Hi ${formulaUser.name?.split(' ')[0] || 'there'},</p>
+                        <p>You've built a custom formula with <strong>${ingredientCount} ingredients</strong> totalling <strong>${totalMg}mg</strong> across <strong>${capsuleCount} capsules</strong>.</p>
+                        <p>Consider chatting with your AI practitioner to review it for safety and optimization before ordering.</p>
+                    `,
+                    actionUrl: `${frontendUrl}/dashboard/formula`,
+                    actionText: 'View Your Formula',
+                });
+                }
+            }
         } catch (notifError) {
             logger.error('Failed to create formula notification:', notifError);
         }

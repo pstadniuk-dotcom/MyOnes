@@ -264,7 +264,7 @@ export default function AdminDashboardPage() {
         }} />
 
         {/* Quick Links */}
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-6">
           <Card
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => setLocation('/admin/users')}
@@ -336,6 +336,21 @@ export default function AdminDashboardPage() {
               </CardTitle>
               <CardDescription>
                 Platform analytics
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setLocation('/admin/audit-logs')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Audit Logs
+              </CardTitle>
+              <CardDescription>
+                Compliance &amp; safety logs
               </CardDescription>
             </CardHeader>
           </Card>

@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/shared/components/ui/button";
-import { Check, ArrowRight, Loader2 } from "lucide-react";
+import { Check, ArrowRight, Loader2, Scale, Layers, ShieldCheck, Package, Beaker } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -24,13 +24,13 @@ const fallbackTiers = [
   { id: 'standard', name: 'Standard', limit: null as number | null, claimed: 0, priceMonthly: 29, priceYearly: 299, active: false },
 ];
 
-const membershipIncludes = [
-  "Unlimited AI health consultations",
-  "Lab and wearable data analysis",
-  "Supplements at member pricing (15% savings)",
-  "Formula updates as your health evolves",
-  "Lab testing at member rates",
-  "Future platform upgrades included",
+// Supplement pricing factors
+const pricingFactors = [
+  { icon: Scale, title: "Daily Milligrams", description: "More total milligrams means more raw material and more capsules per day." },
+  { icon: Layers, title: "Ingredient Count", description: "More active ingredients requires additional manufacturing complexity." },
+  { icon: ShieldCheck, title: "Premium Ingredients", description: "Third-party tested for purity and potency. No fillers, no additives, no artificial ingredients." },
+  { icon: Package, title: "Replaces 5–10 Bottles", description: "One custom formula replaces 5–10 individual supplement bottles. Simpler, cheaper, and more effective." },
+  { icon: Beaker, title: "Made-to-Order", description: "Your formula is manufactured fresh when you order — not pulled from a warehouse shelf." },
 ];
 
 // Transform API tiers to display format
@@ -87,62 +87,60 @@ export default function MembershipPricingSection() {
   // Loading state
   if (isLoading) {
     return (
-      <section id="pricing" className="py-24 md:py-32 bg-[#FAF7F2]">
+      <section id="pricing" className="py-24 md:py-32 bg-[#ede8e2]">
         <div className="container mx-auto px-6 max-w-5xl flex items-center justify-center min-h-[400px]">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1B4332]" />
+          <Loader2 className="w-8 h-8 animate-spin text-[#054700]" />
         </div>
       </section>
     );
   }
 
   return (
-    <section id="pricing" className="py-24 md:py-32 bg-[#FAF7F2] scroll-mt-24">
-      <div className="container mx-auto px-6 max-w-5xl">
-        {/* Header */}
-        <div className="max-w-2xl mx-auto text-center mb-12">
-          <span className="text-[#D4A574] font-medium tracking-wider text-sm uppercase">
-            Membership
+    <section id="pricing" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
+      <div className="container mx-auto px-6 max-w-6xl">
+        {/* ── Section Header ── */}
+        <div className="max-w-2xl mx-auto text-center mb-10">
+          <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
+            Membership & Pricing
           </span>
-          <h2 className="mt-4 text-4xl md:text-5xl text-[#1B4332] font-light leading-tight">
-            Lock in your rate{" "}
-            <span className="font-medium">forever</span>
+          <h2 className="mt-4 text-4xl md:text-5xl text-[#054700] font-light leading-tight">
+            One membership.{" "}
+            <span className="font-medium">Everything you need.</span>
           </h2>
-          <p className="mt-6 text-lg text-[#52796F]">
-            Early members get founding pricing for ongoing AI consultations and formula optimization.
+          <p className="mt-6 text-lg text-[#054700]/60 leading-relaxed">
+            Lock in your rate forever. AI consultations, formula optimization, and member pricing on supplements and labs.
           </p>
         </div>
 
-        {/* Tier Slider Visual */}
-        <div className="max-w-3xl mx-auto mb-12">
-          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm">
+        {/* ── Tier Strip ── */}
+        <div className="max-w-3xl mx-auto mb-10">
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl px-6 md:px-10 py-5 shadow-sm">
             {/* Price points */}
-            <div className="flex justify-between items-end mb-4 px-2">
-              {tiers.map((tier, index) => (
+            <div className="flex justify-between items-end mb-3">
+              {tiers.map((tier) => (
                 <div key={tier.id} className="text-center flex-1">
-                  <div className={`text-2xl md:text-3xl font-light ${tier.active ? "text-[#1B4332]" : "text-[#1B4332]/40"
-                    }`}>
+                  <div className={`text-2xl md:text-3xl font-light transition-colors ${tier.active ? "text-[#054700]" : "text-[#054700]/25"}`}>
                     ${tier.priceMonthly}
-                    <span className="text-sm font-normal">/mo</span>
+                    <span className="text-xs font-normal">/mo</span>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Progress bar */}
-            <div className="relative h-2 bg-[#1B4332]/10 rounded-full mb-4">
+            <div className="relative h-1.5 bg-[#054700]/10 rounded-full mb-3">
               <div
-                className="absolute left-0 top-0 h-full bg-[#1B4332] rounded-full transition-all duration-500"
+                className="absolute left-0 top-0 h-full bg-[#054700]/40 rounded-full transition-all duration-500"
                 style={{ width: `${((activeTier.claimed || 0) / (activeTier.limit || 100)) * 25}%` }}
               />
-              {/* Tier markers */}
               {tiers.map((tier, index) => (
                 <div
                   key={tier.id}
-                  className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 ${tier.active
-                    ? "bg-[#1B4332] border-[#1B4332]"
+                  className={`absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-colors ${tier.active
+                    ? "bg-[#054700] border-[#054700]"
                     : index < tiers.findIndex(t => t.active)
-                      ? "bg-[#1B4332] border-[#1B4332]"
-                      : "bg-white border-[#1B4332]/30"
+                      ? "bg-[#054700]/70 border-[#054700]/70"
+                      : "bg-white/70 backdrop-blur-sm border-[#054700]/20"
                     }`}
                   style={{ left: `${index * 33.33}%`, transform: 'translate(-50%, -50%)' }}
                 />
@@ -150,24 +148,22 @@ export default function MembershipPricingSection() {
             </div>
 
             {/* Tier labels */}
-            <div className="flex justify-between items-start px-2">
+            <div className="flex justify-between items-start">
               {tiers.map((tier) => (
                 <div key={tier.id} className="text-center flex-1">
-                  <div className={`text-sm font-medium ${tier.active ? "text-[#1B4332]" : "text-[#1B4332]/40"
-                    }`}>
+                  <div className={`text-xs font-medium ${tier.active ? "text-[#054700]" : "text-[#054700]/30"}`}>
                     {tier.name}
                   </div>
-                  <div className={`text-xs mt-1 ${tier.active ? "text-[#52796F]" : "text-[#52796F]/40"
-                    }`}>
+                  <div className={`text-[10px] mt-0.5 ${tier.active ? "text-[#054700]/60" : "text-[#054700]/25"}`}>
                     {tier.limit ? `First ${tier.limit.toLocaleString()}` : "After launch"}
                   </div>
                   {tier.active && spotsRemaining && (
-                    <div className="text-xs text-[#D4A574] font-medium mt-1">
+                    <div className="text-[10px] text-[#5a6623] font-medium mt-0.5">
                       {spotsRemaining} spots left
                     </div>
                   )}
                   {!tier.active && tier.id !== 'standard' && (
-                    <div className="text-xs text-[#52796F]/40 mt-1">
+                    <div className="text-[10px] text-[#054700]/20 mt-0.5">
                       Coming next
                     </div>
                   )}
@@ -177,11 +173,11 @@ export default function MembershipPricingSection() {
           </div>
         </div>
 
-        {/* Membership Card */}
-        <div className="max-w-xl mx-auto">
-          <div className="bg-white rounded-3xl shadow-xl shadow-[#1B4332]/5 overflow-hidden">
-            {/* Card Header */}
-            <div className="bg-[#1B4332] px-8 py-8 text-center">
+        {/* ── Two-column: Membership Card + Supplement Pricing ── */}
+        <div className="grid lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          {/* Left — Membership Card */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl shadow-[#054700]/5 overflow-hidden flex flex-col">
+            <div className="bg-[#054700] px-8 py-10 text-center">
               <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-white/80 text-sm mb-4">
                 🎉 {activeTier.name} Member
               </div>
@@ -194,61 +190,109 @@ export default function MembershipPricingSection() {
               </p>
             </div>
 
-            {/* Card Body */}
-            <div className="px-8 py-8">
-              <ul className="space-y-4 mb-8">
-                {membershipIncludes.map((feature, index) => (
-                  <li key={index} className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#1B4332]/10 flex items-center justify-center">
-                      <Check className="w-3 h-3 text-[#1B4332]" />
+            <div className="px-8 py-10 flex-1 flex flex-col">
+              <ul className="space-y-5 mb-10 flex-1">
+                {[
+                  "Unlimited AI health consultations",
+                  "Lab and wearable data analysis",
+                  "Supplements at member pricing",
+                  "Formula updates as your health evolves",
+                  "Lab testing at member rates",
+                  "Future platform upgrades included",
+                ].map((feature, index) => (
+                  <li key={index} className="flex items-center gap-4">
+                    <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[#054700]/10 flex items-center justify-center">
+                      <Check className="w-4 h-4 text-[#054700]" />
                     </div>
-                    <span className="text-[#2D3436]">{feature}</span>
+                    <span className="text-[#054700]/80 text-base">{feature}</span>
                   </li>
                 ))}
               </ul>
 
               <Link href={ctaHref}>
-                <Button
-                  className="w-full bg-[#1B4332] hover:bg-[#143728] text-white py-6 text-lg rounded-full group"
-                >
+                <Button className="w-full bg-[#054700] hover:bg-[#053600] text-[#ede8e2] py-6 text-lg rounded-full group">
                   Claim Your {activeTier.name} Spot
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
 
-              {/* Annual option */}
-              <div className="mt-6 text-center">
-                <p className="text-sm text-[#52796F]">
-                  Or pay annually: <span className="font-medium text-[#1B4332]">${activeTier.priceYearly}/year</span>
-                  <span className="text-[#D4A574]"> (save ${activeTier.priceMonthly * 12 - activeTier.priceYearly})</span>
+              <div className="mt-5 text-center">
+                <p className="text-sm text-[#054700]/60">
+                  Or pay annually: <span className="font-medium text-[#054700]">${activeTier.priceYearly}/year</span>
+                  <span className="text-[#5a6623]"> (save ${activeTier.priceMonthly * 12 - activeTier.priceYearly})</span>
                 </p>
               </div>
 
-              {/* Policy notes */}
-              <div className="mt-6 pt-6 border-t border-[#1B4332]/10 text-center">
-                <p className="text-xs text-[#52796F]">
-                  Cancel anytime. Rejoin within 3 months to keep your rate.
+              <div className="mt-5 pt-5 border-t border-[#054700]/10 text-center">
+                <p className="text-xs text-[#054700]/50">
+                  Cancel anytime. Rejoin within 3 months to keep your rate. Tier locked when you become a paying member.
                 </p>
-                <p className="text-xs text-[#52796F] mt-1">
-                  Your tier is locked when you become a paying member.
+                <p className="text-xs text-[#054700]/40 mt-2">
+                  Membership not required to order supplements. Members get discounted pricing and ongoing formula updates.
                 </p>
               </div>
             </div>
           </div>
+
+          {/* Right — Supplement Pricing */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl shadow-[#054700]/5 overflow-hidden flex flex-col">
+              <div className="bg-[#074700] px-8 py-10 text-center">
+                <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-white/80 text-sm mb-4">
+                  💊 Your Supplements
+                </div>
+                <div className="flex items-center justify-center gap-3">
+                  <span className="text-5xl md:text-6xl font-light text-white">$100</span>
+                  <span className="text-xl text-white/40">–</span>
+                  <span className="text-5xl md:text-6xl font-light text-white">$200</span>
+                </div>
+                <p className="mt-3 text-white/70 text-sm">/month based on your formula</p>
+              </div>
+
+              <div className="px-8 py-8 flex-1 flex flex-col">
+                <p className="text-sm text-[#074700]/60 mb-6">
+                  Your formula cost depends on what your body needs, not what we want to charge you.
+                </p>
+
+                <div className="space-y-5 flex-1">
+                  {pricingFactors.map((factor, index) => (
+                    <div key={index} className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[#074700]/10 flex items-center justify-center">
+                        <factor.icon className="w-5 h-5 text-[#074700]" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-[#074700] mb-1">{factor.title}</h4>
+                        <p className="text-xs text-[#074700]/60 leading-relaxed">{factor.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 pt-5 border-t border-[#074700]/10 text-center">
+                  <p className="text-sm text-[#074700]/60">
+                    Typically{" "}
+                    <span className="text-[#074700] font-medium">15% cheaper</span>{" "}
+                    than buying each ingredient separately.
+                  </p>
+                  <p className="text-xs text-[#074700]/50 mt-2">
+                    You see your exact formula cost before you order. No surprises.
+                  </p>
+                </div>
+              </div>
+          </div>
         </div>
 
-        {/* Trust badges */}
-        <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm text-[#52796F]">
+        {/* ── Trust badges ── */}
+        <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm text-[#054700]/60">
           <div className="flex items-center gap-2">
-            <Check className="w-4 h-4 text-[#1B4332]" />
+            <Check className="w-4 h-4 text-[#054700]" />
             <span>No credit card to start</span>
           </div>
           <div className="flex items-center gap-2">
-            <Check className="w-4 h-4 text-[#1B4332]" />
+            <Check className="w-4 h-4 text-[#054700]" />
             <span>Cancel anytime</span>
           </div>
           <div className="flex items-center gap-2">
-            <Check className="w-4 h-4 text-[#1B4332]" />
+            <Check className="w-4 h-4 text-[#054700]" />
             <span>Rate locked forever</span>
           </div>
         </div>

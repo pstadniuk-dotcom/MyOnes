@@ -84,10 +84,10 @@ export function TodaySummaryCard({ data }: TodaySummaryCardProps) {
   ].filter(item => item.show);
 
   return (
-    <Card className="border-[#1B4332]/10 hover:border-[#1B4332]/20 transition-all">
+    <Card className="border-[#054700]/10 hover:border-[#054700]/20 transition-all">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-[#1B4332] flex items-center gap-2">
+          <CardTitle className="text-lg font-semibold text-[#054700] flex items-center gap-2">
             <Calendar className="h-5 w-5 text-[#D4A574]" />
             Today's Progress
           </CardTitle>
@@ -104,7 +104,7 @@ export function TodaySummaryCard({ data }: TodaySummaryCardProps) {
             {dailyScore}%
           </Badge>
         </div>
-        <p className="text-xs text-[#52796F]">
+        <p className="text-xs text-[#5a6623]">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
       </CardHeader>
@@ -142,11 +142,11 @@ export function TodaySummaryCard({ data }: TodaySummaryCardProps) {
               <div>
                 <p className={cn(
                   "font-medium text-sm",
-                  item.complete ? "text-green-700" : "text-[#1B4332]"
+                  item.complete ? "text-green-700" : "text-[#054700]"
                 )}>
                   {item.label}
                 </p>
-                <p className="text-xs text-[#52796F]">{item.detail}</p>
+                <p className="text-xs text-[#5a6623]">{item.detail}</p>
               </div>
             </div>
             {item.complete ? (
@@ -165,7 +165,7 @@ export function TodaySummaryCard({ data }: TodaySummaryCardProps) {
           dailyScore === 100
             ? "bg-green-100 text-green-700"
             : dailyScore >= 75
-              ? "bg-[#1B4332]/10 text-[#1B4332]"
+              ? "bg-[#054700]/10 text-[#054700]"
               : dailyScore >= 50
                 ? "bg-[#D4A574]/10 text-[#D4A574]"
                 : "bg-gray-100 text-gray-600"
@@ -190,10 +190,10 @@ export function TodaySummaryCard({ data }: TodaySummaryCardProps) {
 // Empty state
 export function TodaySummaryCardEmpty() {
   return (
-    <Card className="border-[#1B4332]/10 border-dashed">
+    <Card className="border-[#054700]/10 border-dashed">
       <CardContent className="flex flex-col items-center justify-center py-8 text-center">
         <Calendar className="h-8 w-8 text-gray-300 mb-3" />
-        <p className="text-sm text-[#52796F]">
+        <p className="text-sm text-[#5a6623]">
           Set up your plans to track daily progress
         </p>
       </CardContent>

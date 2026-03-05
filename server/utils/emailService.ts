@@ -115,8 +115,6 @@ function getEmailTemplate(notification: EmailNotification): string {
 export async function sendNotificationEmail(notification: EmailNotification): Promise<boolean> {
   try {
     if (!SENDGRID_API_KEY || !SENDGRID_FROM_EMAIL) {
-      console.log('sendgrid api key ', SENDGRID_API_KEY)
-      console.log('sendgrid from email ', SENDGRID_FROM_EMAIL)
       console.error('❌ SendGrid not configured: Missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL environment variables');
       return false;
     }

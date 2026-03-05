@@ -80,8 +80,8 @@ export function WeeklyProgressRings({ data }: WeeklyProgressRingsProps) {
       value: data.nutrition.daysLogged,
       total: data.nutrition.totalDays,
       percentage: data.nutrition.percentage,
-      color: '#52796F', // Sage green
-      bgColor: '#52796F/20'
+      color: '#5a6623', // Sage green
+      bgColor: '#5a6623/20'
     },
     {
       key: 'supplements',
@@ -91,23 +91,23 @@ export function WeeklyProgressRings({ data }: WeeklyProgressRingsProps) {
       value: data.supplements.daysTaken,
       total: data.supplements.totalDays,
       percentage: data.supplements.percentage,
-      color: '#1B4332', // Dark forest green
-      bgColor: '#1B4332/20'
+      color: '#054700', // Dark forest green
+      bgColor: '#054700/20'
     }
   ];
 
   return (
-    <Card className="border-[#1B4332]/10 hover:border-[#1B4332]/20 transition-all">
+    <Card className="border-[#054700]/10 hover:border-[#054700]/20 transition-all">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-[#1B4332]">
+          <CardTitle className="text-lg font-semibold text-[#054700]">
             This Week
           </CardTitle>
-          <span className="text-2xl font-bold text-[#1B4332]">
+          <span className="text-2xl font-bold text-[#054700]">
             {data.overallScore}%
           </span>
         </div>
-        <p className="text-xs text-[#52796F]">Your weekly consistency score</p>
+        <p className="text-xs text-[#5a6623]">Your weekly consistency score</p>
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-around py-2">
@@ -123,32 +123,32 @@ export function WeeklyProgressRings({ data }: WeeklyProgressRingsProps) {
                 <ring.Icon className="h-5 w-5" style={{ color: ring.color }} />
               </ProgressRing>
               <div className="text-center">
-                <p className="text-sm font-semibold text-[#1B4332]">
+                <p className="text-sm font-semibold text-[#054700]">
                   {ring.value}/{ring.total}
                 </p>
-                <p className="text-xs text-[#52796F]">{ring.label}</p>
-                <p className="text-[10px] text-[#52796F]/70">{ring.sublabel}</p>
+                <p className="text-xs text-[#5a6623]">{ring.label}</p>
+                <p className="text-[10px] text-[#5a6623]/70">{ring.sublabel}</p>
               </div>
             </div>
           ))}
         </div>
 
         {/* Motivational message based on progress */}
-        <div className="mt-4 p-3 rounded-lg bg-[#1B4332]/5 text-center">
+        <div className="mt-4 p-3 rounded-lg bg-[#054700]/5 text-center">
           {data.overallScore >= 80 ? (
-            <p className="text-sm text-[#1B4332] font-medium">
+            <p className="text-sm text-[#054700] font-medium">
               🔥 Crushing it! You're on fire this week.
             </p>
           ) : data.overallScore >= 50 ? (
-            <p className="text-sm text-[#1B4332] font-medium">
+            <p className="text-sm text-[#054700] font-medium">
               💪 Good progress! Keep the momentum going.
             </p>
           ) : data.overallScore > 0 ? (
-            <p className="text-sm text-[#1B4332] font-medium">
+            <p className="text-sm text-[#054700] font-medium">
               🌱 Every step counts. You've got this!
             </p>
           ) : (
-            <p className="text-sm text-[#52796F]">
+            <p className="text-sm text-[#5a6623]">
               Start tracking to see your progress
             </p>
           )}
@@ -161,7 +161,7 @@ export function WeeklyProgressRings({ data }: WeeklyProgressRingsProps) {
 // Empty state
 export function WeeklyProgressRingsEmpty() {
   return (
-    <Card className="border-[#1B4332]/10 border-dashed">
+    <Card className="border-[#054700]/10 border-dashed">
       <CardContent className="flex flex-col items-center justify-center py-8 text-center">
         <div className="flex gap-4 mb-4 opacity-40">
           <ProgressRing progress={0} size={60} strokeWidth={5} color="#e5e7eb">
@@ -174,7 +174,7 @@ export function WeeklyProgressRingsEmpty() {
             <Pill className="h-4 w-4 text-gray-400" />
           </ProgressRing>
         </div>
-        <p className="text-sm text-[#52796F]">
+        <p className="text-sm text-[#5a6623]">
           Track your first workout or meal to see your weekly progress
         </p>
       </CardContent>

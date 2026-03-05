@@ -124,10 +124,10 @@ export default function HomePage() {
       {/* Personal Greeting - V2 Branding */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-3xl font-semibold text-[#1B4332] mb-1" data-testid="text-greeting">
+          <h1 className="text-xl md:text-3xl font-semibold text-[#054700] mb-1" data-testid="text-greeting">
             Long live {userName}.
           </h1>
-          <p className="text-sm md:text-base text-[#52796F]">
+          <p className="text-sm md:text-base text-[#5a6623]">
             {isNewUser
               ? "Start your personalized supplement journey"
               : "Your health journey overview"
@@ -141,40 +141,40 @@ export default function HomePage() {
         {/* Profile Completeness */}
         <Card
           data-testid="card-profile-completeness"
-          className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer"
+          className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all cursor-pointer"
           onClick={() => setShowProfileDialog(true)}
         >
           <CardHeader className="space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#52796F]">Profile Completeness</CardTitle>
+            <CardTitle className="text-sm font-medium text-[#5a6623]">Profile Completeness</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold text-[#1B4332] mb-1">
+            <div className="text-3xl font-semibold text-[#054700] mb-1">
               {metrics?.profileCompleteness || 0}%
             </div>
-            <p className="text-xs text-[#52796F]">
+            <p className="text-xs text-[#5a6623]">
               {metrics?.nextAction || 'Complete your profile'}
             </p>
-            <Progress value={metrics?.profileCompleteness || 0} className="mt-2 h-1 bg-[#1B4332]/10" />
+            <Progress value={metrics?.profileCompleteness || 0} className="mt-2 h-1 bg-[#054700]/10" />
           </CardContent>
         </Card>
 
         {/* Formula Version */}
-        <Card data-testid="card-formula-version" className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all">
+        <Card data-testid="card-formula-version" className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all">
           <CardHeader className="space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#52796F]">Current Formula</CardTitle>
+            <CardTitle className="text-sm font-medium text-[#5a6623]">Current Formula</CardTitle>
           </CardHeader>
           <CardContent>
             {currentFormula ? (
               <>
-                <div className="text-3xl font-semibold text-[#1B4332] mb-1">
+                <div className="text-3xl font-semibold text-[#054700] mb-1">
                   {currentFormula.name || `Version ${currentFormula.version}`}
                 </div>
-                <p className="text-xs text-[#52796F]">
+                <p className="text-xs text-[#5a6623]">
                   {currentFormula.name && `Version ${currentFormula.version} • `}
                   {currentFormula.bases.length + (currentFormula.additions?.length || 0)} ingredients
                 </p>
                 <div className="mt-2">
-                  <Badge className="text-xs gap-1 bg-[#1B4332]/10 text-[#1B4332] hover:bg-[#1B4332]/20">
+                  <Badge className="text-xs gap-1 bg-[#054700]/10 text-[#054700] hover:bg-[#054700]/20">
                     <Shield className="w-3 h-3" />
                     Active
                   </Badge>
@@ -182,10 +182,10 @@ export default function HomePage() {
               </>
             ) : (
               <>
-                <div className="text-2xl font-semibold mb-1 text-[#52796F]">
+                <div className="text-2xl font-semibold mb-1 text-[#5a6623]">
                   Not created
                 </div>
-                <p className="text-xs text-[#52796F]">
+                <p className="text-xs text-[#5a6623]">
                   Start consultation
                 </p>
               </>
@@ -194,15 +194,15 @@ export default function HomePage() {
         </Card>
 
         {/* Consultations */}
-        <Card data-testid="card-consultations" className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all">
+        <Card data-testid="card-consultations" className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all">
           <CardHeader className="space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#52796F]">Consultations</CardTitle>
+            <CardTitle className="text-sm font-medium text-[#5a6623]">Consultations</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold text-[#1B4332] mb-1">
+            <div className="text-3xl font-semibold text-[#054700] mb-1">
               {metrics?.consultationsSessions || 0}
             </div>
-            <p className="text-xs text-[#52796F]">
+            <p className="text-xs text-[#5a6623]">
               AI sessions completed
             </p>
           </CardContent>
@@ -211,14 +211,14 @@ export default function HomePage() {
 
       {/* New User Onboarding - V2 Styled */}
       {isNewUser && (
-        <Card className="border-[#1B4332]/20 bg-gradient-to-r from-[#1B4332]/5 to-[#52796F]/10" data-testid="card-onboarding">
+        <Card className="border-[#054700]/20 bg-gradient-to-r from-[#054700]/5 to-[#5a6623]/10" data-testid="card-onboarding">
           <CardContent className="p-6">
             <div className="space-y-4">
               <div>
-                <h2 className="text-2xl font-semibold text-[#1B4332] mb-2">
+                <h2 className="text-2xl font-semibold text-[#054700] mb-2">
                   Welcome to ONES AI
                 </h2>
-                <p className="text-[#52796F]">
+                <p className="text-[#5a6623]">
                   Let's create your personalized supplement formula. First, tell us about yourself so our AI can make the best recommendations.
                 </p>
               </div>
@@ -228,20 +228,20 @@ export default function HomePage() {
                 <div className="flex items-center gap-3">
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${isStep1Complete
                     ? 'bg-green-600 text-white'
-                    : 'bg-[#1B4332] text-white'
+                    : 'bg-[#054700] text-white'
                     }`}>
                     {isStep1Complete ? '✓' : '1'}
                   </div>
                   <div className="flex-1">
-                    <span className="text-sm text-[#1B4332] font-medium">Complete your health profile</span>
-                    <p className="text-xs text-[#52796F]">
+                    <span className="text-sm text-[#054700] font-medium">Complete your health profile</span>
+                    <p className="text-xs text-[#5a6623]">
                       {isStep1Complete
                         ? `${metrics?.profileCompleteness}% complete`
                         : 'Age, medications, health goals & more'}
                     </p>
                   </div>
                   {!isStep1Complete && (
-                    <Button asChild variant="outline" size="sm" className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white rounded-full">
+                    <Button asChild variant="outline" size="sm" className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white rounded-full">
                       <Link href="/dashboard/profile?tab=profile">
                         Start
                       </Link>
@@ -253,19 +253,19 @@ export default function HomePage() {
                 <div className="flex items-center gap-3">
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${isStep2Complete
                     ? 'bg-green-600 text-white'
-                    : (isStep1Complete ? 'bg-[#1B4332] text-white' : 'bg-[#1B4332]/10 text-[#52796F]')
+                    : (isStep1Complete ? 'bg-[#054700] text-white' : 'bg-[#054700]/10 text-[#5a6623]')
                     }`}>
                     {isStep2Complete ? '✓' : '2'}
                   </div>
                   <div className="flex-1">
-                    <span className={`text-sm font-medium ${isStep2Complete || isStep1Complete ? 'text-[#1B4332]' : 'text-[#52796F]'}`}>
+                    <span className={`text-sm font-medium ${isStep2Complete || isStep1Complete ? 'text-[#054700]' : 'text-[#5a6623]'}`}>
                       Upload blood tests
                     </span>
-                    <p className="text-xs text-[#52796F]/70">
+                    <p className="text-xs text-[#5a6623]/70">
                       {isStep2Complete ? 'Tests uploaded' : 'Optional but recommended for precision'}
                     </p>
                   </div>
-                  <Button asChild variant="ghost" size="sm" className="text-[#52796F] hover:text-[#1B4332] hover:bg-[#1B4332]/5 rounded-full">
+                  <Button asChild variant="ghost" size="sm" className="text-[#5a6623] hover:text-[#054700] hover:bg-[#054700]/5 rounded-full">
                     <Link href="/dashboard/lab-reports">
                       <Upload className="w-4 h-4" />
                     </Link>
@@ -276,15 +276,15 @@ export default function HomePage() {
                 <div className="flex items-center gap-3">
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${isStep3Complete
                     ? 'bg-green-600 text-white'
-                    : (isStep1Complete ? 'bg-[#1B4332] text-white' : 'bg-[#1B4332]/10 text-[#52796F]')
+                    : (isStep1Complete ? 'bg-[#054700] text-white' : 'bg-[#054700]/10 text-[#5a6623]')
                     }`}>
                     {isStep3Complete ? '✓' : '3'}
                   </div>
                   <div className="flex-1">
-                    <span className={`text-sm font-medium ${isStep3Complete || isStep1Complete ? 'text-[#1B4332]' : 'text-[#52796F]'}`}>
+                    <span className={`text-sm font-medium ${isStep3Complete || isStep1Complete ? 'text-[#054700]' : 'text-[#5a6623]'}`}>
                       Start AI consultation
                     </span>
-                    <p className="text-xs text-[#52796F]/70">Get your personalized formula</p>
+                    <p className="text-xs text-[#5a6623]/70">Get your personalized formula</p>
                   </div>
                 </div>
 
@@ -292,11 +292,11 @@ export default function HomePage() {
                 <div className="flex items-center gap-3">
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${isStep4Complete
                     ? 'bg-green-600 text-white'
-                    : (isStep3Complete ? 'bg-[#1B4332] text-white' : 'bg-[#1B4332]/10 text-[#52796F]')
+                    : (isStep3Complete ? 'bg-[#054700] text-white' : 'bg-[#054700]/10 text-[#5a6623]')
                     }`}>
                     {isStep4Complete ? '✓' : '4'}
                   </div>
-                  <span className={`text-sm font-medium ${isStep4Complete || isStep3Complete ? 'text-[#1B4332]' : 'text-[#52796F]'}`}>
+                  <span className={`text-sm font-medium ${isStep4Complete || isStep3Complete ? 'text-[#054700]' : 'text-[#5a6623]'}`}>
                     Receive supplements monthly
                   </span>
                 </div>
@@ -305,13 +305,13 @@ export default function HomePage() {
               {/* Conditional CTA based on profile completeness */}
               {!isStep1Complete ? (
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button asChild className="gap-2 bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-6" data-testid="button-complete-profile">
+                  <Button asChild className="gap-2 bg-[#054700] hover:bg-[#043d00] text-white rounded-full px-6" data-testid="button-complete-profile">
                     <Link href="/dashboard/profile?tab=profile">
                       <Sparkles className="w-4 h-4" />
                       Complete Health Profile
                     </Link>
                   </Button>
-                  <Button asChild variant="outline" className="gap-2 border-[#1B4332]/30 text-[#52796F] hover:bg-[#1B4332]/5 rounded-full px-6" data-testid="button-start-consultation">
+                  <Button asChild variant="outline" className="gap-2 border-[#054700]/30 text-[#5a6623] hover:bg-[#054700]/5 rounded-full px-6" data-testid="button-start-consultation">
                     <Link href="/dashboard/chat">
                       <MessageSquare className="w-4 h-4" />
                       Skip to Consultation
@@ -319,7 +319,7 @@ export default function HomePage() {
                   </Button>
                 </div>
               ) : (
-                <Button asChild className="gap-2 bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-6" data-testid="button-start-consultation">
+                <Button asChild className="gap-2 bg-[#054700] hover:bg-[#043d00] text-white rounded-full px-6" data-testid="button-start-consultation">
                   <Link href="/dashboard/chat?new=true">
                     <PlayCircle className="w-4 h-4" />
                     Start AI Consultation
@@ -333,19 +333,19 @@ export default function HomePage() {
 
       {/* Current Formula Preview - V2 Styled */}
       {currentFormula && (
-        <Card data-testid="card-formula-preview" className="bg-white border-[#1B4332]/10">
+        <Card data-testid="card-formula-preview" className="border-[#054700]/10 shadow-2xl">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2 text-[#1B4332]">
-                  <FlaskConical className="w-5 h-5 text-[#1B4332]" />
+                <CardTitle className="flex items-center gap-2 text-[#054700]">
+                  <FlaskConical className="w-5 h-5 text-[#054700]" />
                   {currentFormula.name || `Version ${currentFormula.version}`}
                 </CardTitle>
-                <CardDescription className="text-[#52796F]">
+                <CardDescription className="text-[#5a6623]">
                   {currentFormula.name && `Version ${currentFormula.version} • `}{currentFormula.totalMg}mg total
                 </CardDescription>
               </div>
-              <Button asChild variant="outline" size="sm" className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white rounded-full" data-testid="button-view-full">
+              <Button asChild variant="outline" size="sm" className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white rounded-full" data-testid="button-view-full">
                 <Link href="/dashboard/formula">View Full</Link>
               </Button>
             </div>
@@ -355,12 +355,12 @@ export default function HomePage() {
               {/* Daily Dosage */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-[#52796F]">Daily Dosage</span>
-                  <span className="font-medium text-base text-[#1B4332]" data-testid="text-dosage-display">
+                  <span className="text-[#5a6623]">Daily Dosage</span>
+                  <span className="font-medium text-base text-[#054700]" data-testid="text-dosage-display">
                     {calculateDosage(currentFormula.totalMg, currentFormula.targetCapsules || undefined).display}
                   </span>
                 </div>
-                <p className="text-xs text-[#52796F]">
+                <p className="text-xs text-[#5a6623]">
                   {currentFormula.targetCapsules || calculateDosage(currentFormula.totalMg).total} capsules per day ({currentFormula.totalMg}mg total)
                   {currentFormula.targetCapsules && CAPSULE_TIER_INFO[currentFormula.targetCapsules as CapsuleCount] && (
                     <span className="ml-1">• {CAPSULE_TIER_INFO[currentFormula.targetCapsules as CapsuleCount].label}</span>
@@ -371,29 +371,29 @@ export default function HomePage() {
               {/* Dosage Progress - now based on capsule budget */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-[#52796F]">
+                  <span className="text-[#5a6623]">
                     Capsule Fill ({currentFormula.targetCapsules || 9} caps = {((currentFormula.targetCapsules || 9) * 550).toLocaleString()}mg)
                   </span>
-                  <span className="font-medium text-[#1B4332]">{currentFormula.totalMg}mg</span>
+                  <span className="font-medium text-[#054700]">{currentFormula.totalMg}mg</span>
                 </div>
                 <Progress
                   value={Math.min((currentFormula.totalMg / ((currentFormula.targetCapsules || 9) * 550)) * 100, 100)}
-                  className="h-2 bg-[#1B4332]/10"
+                  className="h-2 bg-[#054700]/10"
                 />
               </div>
 
               {/* Top Ingredients Preview */}
               <div>
-                <h4 className="font-medium text-sm mb-2 text-[#52796F]">Top Ingredients</h4>
+                <h4 className="font-medium text-sm mb-2 text-[#5a6623]">Top Ingredients</h4>
                 <div className="space-y-2">
                   {currentFormula.bases.slice(0, 3).map((base, index) => (
                     <div key={index} className="flex justify-between text-sm">
-                      <span className="text-[#1B4332]">{base.ingredient}</span>
-                      <span className="text-[#52796F]">{base.amount}mg</span>
+                      <span className="text-[#054700]">{base.ingredient}</span>
+                      <span className="text-[#5a6623]">{base.amount}mg</span>
                     </div>
                   ))}
                   {currentFormula.bases.length > 3 && (
-                    <div className="text-xs text-[#52796F] pt-1">
+                    <div className="text-xs text-[#5a6623] pt-1">
                       +{currentFormula.bases.length - 3} more ingredients
                     </div>
                   )}
@@ -402,13 +402,13 @@ export default function HomePage() {
 
               {/* Action Buttons */}
               <div className="flex gap-2 pt-2">
-                <Button size="sm" asChild className="flex-1 bg-[#1B4332] hover:bg-[#143728] text-white rounded-full" data-testid="button-order-now">
+                <Button size="sm" asChild className="flex-1 bg-[#054700] hover:bg-[#043d00] text-white rounded-full" data-testid="button-order-now">
                   <Link href="/dashboard/orders">
                     <Package className="w-4 h-4 mr-2" />
                     Order Now
                   </Link>
                 </Button>
-                <Button variant="outline" size="sm" asChild className="flex-1 border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white rounded-full" data-testid="button-refine-formula">
+                <Button variant="outline" size="sm" asChild className="flex-1 border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white rounded-full" data-testid="button-refine-formula">
                   <Link href={currentFormula.chatSessionId ? `/dashboard/chat?session_id=${currentFormula.chatSessionId}` : "/dashboard/chat"}>
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Refine
@@ -429,32 +429,32 @@ export default function HomePage() {
       {/* Quick Actions for Users with Formula - V2 Styled */}
       {!isNewUser && currentFormula && (
         <div className="grid gap-4 md:grid-cols-2">
-          <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-upload-labs">
+          <Card className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-upload-labs">
             <Link href="/dashboard/lab-reports">
               <CardHeader className="space-y-0 pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
-                  <Upload className="w-4 h-4 text-[#1B4332]" />
+                <CardTitle className="text-base flex items-center gap-2 text-[#054700]">
+                  <Upload className="w-4 h-4 text-[#054700]" />
                   Upload Lab Results
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-[#52796F]">
+                <p className="text-sm text-[#5a6623]">
                   Add blood tests for better formula optimization
                 </p>
               </CardContent>
             </Link>
           </Card>
 
-          <Card className="bg-white border-[#1B4332]/10 hover:border-[#1B4332]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-view-orders">
+          <Card className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all cursor-pointer" data-testid="card-view-orders">
             <Link href="/dashboard/orders">
               <CardHeader className="space-y-0 pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-[#1B4332]">
-                  <Package className="w-4 h-4 text-[#1B4332]" />
+                <CardTitle className="text-base flex items-center gap-2 text-[#054700]">
+                  <Package className="w-4 h-4 text-[#054700]" />
                   View Orders
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-[#52796F]">
+                <p className="text-sm text-[#5a6623]">
                   Track your supplement orders and shipping status
                 </p>
               </CardContent>
@@ -465,16 +465,16 @@ export default function HomePage() {
 
       {/* Promotional/Info Section - V2 Styled */}
       {!isNewUser && (
-        <Card className="bg-gradient-to-br from-[#1B4332]/10 to-[#52796F]/5 border-[#1B4332]/20">
+        <Card className="bg-gradient-to-br from-[#054700]/10 to-[#5a6623]/5 border-[#054700]/20">
           <CardContent className="p-6">
             <div className="flex items-start gap-4">
               <Sparkles className="w-8 h-8 text-[#D4A574] flex-shrink-0" />
               <div>
-                <h3 className="font-semibold mb-1 text-[#1B4332]">Optimize Your Formula</h3>
-                <p className="text-sm text-[#52796F] mb-3">
+                <h3 className="font-semibold mb-1 text-[#054700]">Optimize Your Formula</h3>
+                <p className="text-sm text-[#5a6623] mb-3">
                   Chat with our AI to refine your supplement blend based on your latest health goals and lab results.
                 </p>
-                <Button asChild size="sm" className="bg-[#1B4332] hover:bg-[#143728] text-white rounded-full">
+                <Button asChild size="sm" className="bg-[#054700] hover:bg-[#043d00] text-white rounded-full">
                   <Link href="/dashboard/chat?new=true">
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Start Chat

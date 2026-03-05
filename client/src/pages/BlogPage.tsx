@@ -34,7 +34,7 @@ export default function BlogPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
+    <div className="min-h-screen bg-[#ede8e2]">
       <HeaderV2 />
       {/* Hero Section */}
       <section className="pt-32 pb-24">
@@ -43,10 +43,10 @@ export default function BlogPage() {
             <span className="text-[#D4A574] font-medium tracking-wider text-sm uppercase mb-4 block">
               Insights
             </span>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-light text-[#1B4332] mb-6" data-testid="heading-blog-hero">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-light text-[#054700] mb-6" data-testid="heading-blog-hero">
               Health & Wellness Blog
             </h1>
-            <p className="text-xl text-[#52796F] max-w-2xl mx-auto" data-testid="text-blog-description">
+            <p className="text-xl text-[#5a6623] max-w-2xl mx-auto" data-testid="text-blog-description">
               Insights on personalized nutrition, supplement science, and optimizing your health journey.
             </p>
           </div>
@@ -58,16 +58,16 @@ export default function BlogPage() {
         <div className="container mx-auto px-6 max-w-6xl">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {blogPosts.map((post) => (
-              <div key={post.id} className="bg-[#FAF7F2] rounded-2xl p-8 hover:shadow-md transition-shadow" data-testid={`card-blog-${post.id}`}>
-                <div className="flex items-center gap-2 text-sm text-[#52796F] mb-4">
+              <div key={post.id} className="bg-[#ede8e2] rounded-2xl p-8 hover:shadow-md transition-shadow" data-testid={`card-blog-${post.id}`}>
+                <div className="flex items-center gap-2 text-sm text-[#5a6623] mb-4">
                   <Calendar className="w-4 h-4" />
                   <span>{new Date(post.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
                   <span>•</span>
                   <span>{post.readTime}</span>
                 </div>
-                <h3 className="text-xl font-medium text-[#1B4332] mb-2">{post.title}</h3>
-                <p className="text-[#52796F] mb-4">{post.excerpt}</p>
-                <Button variant="ghost" size="sm" className="text-[#1B4332] hover:text-[#1B4332]/80" data-testid={`button-read-${post.id}`}>
+                <h3 className="text-xl font-medium text-[#054700] mb-2">{post.title}</h3>
+                <p className="text-[#5a6623] mb-4">{post.excerpt}</p>
+                <Button variant="ghost" size="sm" className="text-[#054700] hover:text-[#054700]/80" data-testid={`button-read-${post.id}`}>
                   Read More <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
@@ -76,9 +76,9 @@ export default function BlogPage() {
 
           {/* Coming Soon Message */}
           <div className="mt-16 text-center">
-            <div className="inline-flex items-center gap-3 px-6 py-4 bg-[#FAF7F2] rounded-2xl">
-              <BookOpen className="w-5 h-5 text-[#1B4332]" />
-              <p className="text-[#52796F]">
+            <div className="inline-flex items-center gap-3 px-6 py-4 bg-[#ede8e2] rounded-2xl">
+              <BookOpen className="w-5 h-5 text-[#054700]" />
+              <p className="text-[#5a6623]">
                 More articles coming soon. Subscribe to our newsletter to stay updated!
               </p>
             </div>
@@ -90,14 +90,14 @@ export default function BlogPage() {
       <section className="py-20">
         <div className="container mx-auto px-6 max-w-4xl">
           <div className="text-center">
-            <h2 className="text-3xl font-light text-[#1B4332] mb-6">
+            <h2 className="text-3xl font-light text-[#054700] mb-6">
               Never Miss a Health Tip
             </h2>
-            <p className="text-[#52796F] mb-8">
+            <p className="text-[#5a6623] mb-8">
               Get the latest insights on personalized nutrition delivered to your inbox.
             </p>
             <Link href="/">
-              <Button size="lg" className="bg-[#1B4332] hover:bg-[#1B4332]/90" data-testid="button-subscribe-blog">
+              <Button size="lg" className="bg-[#054700] hover:bg-[#054700]/90" data-testid="button-subscribe-blog">
                 Subscribe to Newsletter <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>

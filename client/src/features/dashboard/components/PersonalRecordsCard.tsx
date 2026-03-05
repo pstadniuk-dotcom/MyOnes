@@ -15,10 +15,10 @@ export function PersonalRecordsCard({ records, insights, totalWorkouts = 0 }: Pe
   const topRecords = records.slice(0, 5);
 
   return (
-    <Card className="border-[#1B4332]/10 hover:border-[#1B4332]/20 transition-all">
+    <Card className="border-[#054700]/10 hover:border-[#054700]/20 transition-all">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-[#1B4332] flex items-center gap-2">
+          <CardTitle className="text-lg font-semibold text-[#054700] flex items-center gap-2">
             <Trophy className="h-5 w-5 text-[#D4A574]" />
             Personal Records
           </CardTitle>
@@ -33,10 +33,10 @@ export function PersonalRecordsCard({ records, insights, totalWorkouts = 0 }: Pe
       <CardContent className="space-y-4">
         {/* Quick Stats */}
         {totalWorkouts > 0 && (
-          <div className="p-3 rounded-lg bg-gradient-to-r from-[#1B4332]/5 to-[#52796F]/5">
+          <div className="p-3 rounded-lg bg-gradient-to-r from-[#054700]/5 to-[#5a6623]/5">
             <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-[#1B4332]" />
-              <span className="text-sm font-medium text-[#1B4332]">
+              <TrendingUp className="h-4 w-4 text-[#054700]" />
+              <span className="text-sm font-medium text-[#054700]">
                 {totalWorkouts} workouts logged
               </span>
             </div>
@@ -53,14 +53,14 @@ export function PersonalRecordsCard({ records, insights, totalWorkouts = 0 }: Pe
                   insight.type === 'achievement' ? 'bg-[#D4A574]/10' :
                   insight.type === 'streak' ? 'bg-orange-50' :
                   insight.type === 'improvement' ? 'bg-green-50' :
-                  'bg-[#1B4332]/5'
+                  'bg-[#054700]/5'
                 }`}
               >
                 <span className="text-lg">{insight.icon}</span>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-[#1B4332]">{insight.message}</p>
+                  <p className="text-sm font-medium text-[#054700]">{insight.message}</p>
                   {insight.metric && (
-                    <p className="text-xs text-[#52796F]">{insight.metric}</p>
+                    <p className="text-xs text-[#5a6623]">{insight.metric}</p>
                   )}
                 </div>
               </div>
@@ -71,7 +71,7 @@ export function PersonalRecordsCard({ records, insights, totalWorkouts = 0 }: Pe
         {/* PR List */}
         {topRecords.length > 0 ? (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-[#52796F] uppercase tracking-wide">
+            <p className="text-xs font-medium text-[#5a6623] uppercase tracking-wide">
               Top Lifts
             </p>
             {topRecords.map((record, i) => (
@@ -85,12 +85,12 @@ export function PersonalRecordsCard({ records, insights, totalWorkouts = 0 }: Pe
                   {record.isNew && (
                     <Star className="h-3 w-3 text-[#D4A574] fill-current" />
                   )}
-                  <span className="text-sm text-[#1B4332] font-medium">
+                  <span className="text-sm text-[#054700] font-medium">
                     {record.exerciseName}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-[#1B4332]">
+                  <span className="text-sm font-bold text-[#054700]">
                     {record.weight} lbs
                   </span>
                   {record.isNew && record.previousWeight && (
@@ -105,7 +105,7 @@ export function PersonalRecordsCard({ records, insights, totalWorkouts = 0 }: Pe
           </div>
         ) : (
           <div className="text-center py-4">
-            <p className="text-sm text-[#52796F]">
+            <p className="text-sm text-[#5a6623]">
               Complete your first strength workout to track PRs
             </p>
           </div>
@@ -113,8 +113,8 @@ export function PersonalRecordsCard({ records, insights, totalWorkouts = 0 }: Pe
 
         {/* Motivational footer */}
         {newRecords.length > 0 && (
-          <div className="pt-2 border-t border-[#1B4332]/10 text-center">
-            <p className="text-xs text-[#52796F]">
+          <div className="pt-2 border-t border-[#054700]/10 text-center">
+            <p className="text-xs text-[#5a6623]">
               🎯 You're getting stronger! Keep pushing.
             </p>
           </div>
@@ -127,11 +127,11 @@ export function PersonalRecordsCard({ records, insights, totalWorkouts = 0 }: Pe
 // Empty state when no PRs
 export function PersonalRecordsEmpty() {
   return (
-    <Card className="border-[#1B4332]/10 border-dashed">
+    <Card className="border-[#054700]/10 border-dashed">
       <CardContent className="flex flex-col items-center justify-center py-8 text-center">
         <Trophy className="h-8 w-8 text-gray-300 mb-3" />
-        <h3 className="font-semibold text-[#1B4332] mb-1">No PRs Yet</h3>
-        <p className="text-sm text-[#52796F] max-w-xs">
+        <h3 className="font-semibold text-[#054700] mb-1">No PRs Yet</h3>
+        <p className="text-sm text-[#5a6623] max-w-xs">
           Log your workouts with weights to start tracking personal records.
         </p>
       </CardContent>
