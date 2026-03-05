@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { Request } from 'express';
 import { usersRepository } from '../users/users.repository';
 import { membershipRepository } from '../membership/membership.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
@@ -7,6 +8,7 @@ import { db } from '../../infra/db/db';
 import { ingredientPricing, users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import logger from '../../infra/logging/logger';
+import { getBaseUrl } from '../../utils/urlHelper';
 
 type InternalSubscriptionStatus = 'active' | 'paused' | 'cancelled' | 'past_due';
 
@@ -47,7 +49,7 @@ export interface BillingProvider {
     coveragePct: number;
     missingIngredients: string[];
   }>;
-  createCheckoutSession(_userId: string, _payload: Record<string, any>): Promise<{
+  createCheckoutSession(_userId: string, _payload: Record<string, any>, _req?: Request): Promise<{
     checkoutUrl: string;
     sessionId: string;
     expiresAt: string;
@@ -67,7 +69,6 @@ export interface BillingProvider {
 class DatabaseBillingProvider implements BillingProvider {
   private readonly stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   private readonly stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  private readonly frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5000').replace(/\/$/, '');
 
   private getStripeClient(): Stripe {
     if (!this.stripeSecretKey) {
@@ -627,12 +628,15 @@ class DatabaseBillingProvider implements BillingProvider {
     };
   }
 
-  async createCheckoutSession(userId: string, payload: Record<string, any>): Promise<{ checkoutUrl: string; sessionId: string; expiresAt: string }> {
+  async createCheckoutSession(userId: string, payload: Record<string, any>, req?: Request): Promise<{ checkoutUrl: string; sessionId: string; expiresAt: string }> {
     const stripe = this.getStripeClient();
     const user = await usersRepository.getUser(userId);
     if (!user) {
       throw new Error('USER_NOT_FOUND');
     }
+
+    // Get frontend URL dynamically from request or environment
+    const frontendUrl = req ? getBaseUrl(req) : (process.env.FRONTEND_URL || 'http://localhost:5000').replace(/\/$/, '');
 
     const includeMembership = payload?.includeMembership !== false;
     const formulaId = typeof payload?.formulaId === 'string' ? payload.formulaId : undefined;
@@ -713,10 +717,10 @@ class DatabaseBillingProvider implements BillingProvider {
 
     const successUrl = typeof payload?.successUrl === 'string' && payload.successUrl.length > 0
       ? payload.successUrl
-      : `${this.frontendUrl}/membership/success?session_id={CHECKOUT_SESSION_ID}&membership=${includeMembership ? '1' : '0'}`;
+      : `${frontendUrl}/membership/success?session_id={CHECKOUT_SESSION_ID}&membership=${includeMembership ? '1' : '0'}`;
     const cancelUrl = typeof payload?.cancelUrl === 'string' && payload.cancelUrl.length > 0
       ? payload.cancelUrl
-      : `${this.frontendUrl}/dashboard/formula`;
+      : `${frontendUrl}/dashboard/formula`;
 
     // Apply 15% member discount to formula when user is signing up for membership
     // OR already has an active membership
@@ -944,8 +948,8 @@ export class BillingService {
     return this.provider.getEquivalentStack(userId, formulaId);
   }
 
-  async createCheckoutSession(userId: string, payload: Record<string, any>) {
-    return this.provider.createCheckoutSession(userId, payload);
+  async createCheckoutSession(userId: string, payload: Record<string, any>, req?: Request) {
+    return this.provider.createCheckoutSession(userId, payload, req);
   }
 
   async cancelSubscription(userId: string, subscriptionId: string) {
