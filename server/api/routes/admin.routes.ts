@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { adminController } from '../controller/admin.controller';
 import { requireAdmin } from '../middleware/middleware';
+import { runFormulaReviewCheck } from '../../utils/autoOptimizeScheduler';
 
 const router = Router();
 
@@ -60,5 +61,15 @@ router.get('/audit-logs', requireAdmin, adminController.listAuditLogs);
 router.get('/safety-logs', requireAdmin, adminController.listSafetyLogs);
 router.get('/warning-acknowledgments', requireAdmin, adminController.listWarningAcknowledgments);
 router.get('/consents', requireAdmin, adminController.listConsents);
+
+// Formula Review Scheduler — manual trigger for testing
+router.post('/formula-review/trigger', requireAdmin, async (req, res) => {
+  try {
+    const results = await runFormulaReviewCheck();
+    return res.json({ success: true, results });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 export default router;

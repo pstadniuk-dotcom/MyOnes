@@ -149,20 +149,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <MobileHeader />
 
         {/* Main content - no extra padding, let pages control their own layout */}
-        <main className="flex-1 overflow-auto pb-20 bg-gradient-to-br from-[#f5f2ed] via-[#ede8e2] to-[#e8e2db] relative">
-          {/* Decorative gradient blobs — white + warm beige */}
-          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-            {/* Warm beige blobs (sidebar color) */}
-            <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-[#ede8e2]/60 blur-3xl animate-blob-1" />
-            <div className="absolute top-1/4 right-0 w-80 h-80 rounded-full bg-[#e5dfd8]/50 blur-3xl animate-blob-2" />
-            <div className="absolute top-1/2 left-0 w-72 h-72 rounded-full bg-[#ede8e2]/45 blur-3xl animate-blob-4" />
-            {/* White blobs */}
-            <div className="absolute bottom-0 left-1/3 w-[500px] h-[500px] rounded-full bg-white/55 blur-3xl animate-blob-3" />
-            <div className="absolute top-16 left-1/4 w-[400px] h-[400px] rounded-full bg-white/50 blur-3xl animate-blob-5" />
-            <div className="absolute top-2/3 right-1/4 w-96 h-96 rounded-full bg-white/45 blur-3xl animate-blob-6" />
-            <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full bg-white/40 blur-3xl animate-blob-7" />
-            <div className="absolute top-[15%] right-[10%] w-[350px] h-[350px] rounded-full bg-white/50 blur-3xl animate-blob-3" />
-            <div className="absolute bottom-[20%] left-[10%] w-80 h-80 rounded-full bg-white/45 blur-3xl animate-blob-1" />
+        <main className="flex-1 overflow-auto pb-20 bg-gradient-to-br from-[#eef2eb] via-[#ede8e2] to-[#e4e8de] relative">
+          {/* Decorative gradient blobs — fixed so they cover full viewport with no cutoff */}
+          <div className="pointer-events-none fixed inset-0 overflow-hidden z-0" aria-hidden="true">
+            <div className="absolute -top-20 -left-20 w-[500px] h-[500px] rounded-full bg-[#054700]/15 blur-[100px] animate-blob-1" />
+            <div className="absolute top-1/4 right-0 w-[450px] h-[450px] rounded-full bg-[#5a6623]/12 blur-[90px] animate-blob-2" />
+            <div className="absolute top-1/2 left-0 w-[400px] h-[400px] rounded-full bg-[#8fa370]/18 blur-[80px] animate-blob-4" />
+            <div className="absolute bottom-0 left-1/3 w-[550px] h-[550px] rounded-full bg-[#054700]/10 blur-[100px] animate-blob-3" />
+            <div className="absolute top-[15%] right-[10%] w-[400px] h-[400px] rounded-full bg-[#5a6623]/14 blur-[90px] animate-blob-5" />
+            <div className="absolute bottom-[15%] left-[10%] w-[350px] h-[350px] rounded-full bg-[#8fa370]/15 blur-[80px] animate-blob-6" />
           </div>
           <div className="relative z-10">
             {children}
@@ -200,20 +195,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </header>
 
             {/* Dashboard Content */}
-            <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-[#f5f2ed] via-[#ede8e2] to-[#e8e2db] relative">
-              {/* Decorative gradient blobs — white + warm beige */}
-              <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-                {/* Warm beige blobs (sidebar color) */}
-                <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-[#ede8e2]/60 blur-3xl animate-blob-1" />
-                <div className="absolute top-1/4 right-0 w-80 h-80 rounded-full bg-[#e5dfd8]/50 blur-3xl animate-blob-2" />
-                <div className="absolute top-1/2 left-0 w-72 h-72 rounded-full bg-[#ede8e2]/45 blur-3xl animate-blob-4" />
-                {/* White blobs */}
-                <div className="absolute bottom-0 left-1/3 w-[500px] h-[500px] rounded-full bg-white/55 blur-3xl animate-blob-3" />
-                <div className="absolute top-16 left-1/4 w-[400px] h-[400px] rounded-full bg-white/50 blur-3xl animate-blob-5" />
-                <div className="absolute top-2/3 right-1/4 w-96 h-96 rounded-full bg-white/45 blur-3xl animate-blob-6" />
-                <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full bg-white/40 blur-3xl animate-blob-7" />
-                <div className="absolute top-[15%] right-[10%] w-[350px] h-[350px] rounded-full bg-white/50 blur-3xl animate-blob-3" />
-                <div className="absolute bottom-[20%] left-[10%] w-80 h-80 rounded-full bg-white/45 blur-3xl animate-blob-1" />
+            <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-[#eef2eb] via-[#ede8e2] to-[#e4e8de] relative">
+              {/* Decorative gradient blobs — fixed so they cover full viewport with no cutoff */}
+              <div className="pointer-events-none fixed inset-0 overflow-hidden z-0" aria-hidden="true">
+                <div className="absolute -top-20 -left-20 w-[500px] h-[500px] rounded-full bg-[#054700]/15 blur-[100px] animate-blob-1" />
+                <div className="absolute top-1/4 right-0 w-[450px] h-[450px] rounded-full bg-[#5a6623]/12 blur-[90px] animate-blob-2" />
+                <div className="absolute top-1/2 left-0 w-[400px] h-[400px] rounded-full bg-[#8fa370]/18 blur-[80px] animate-blob-4" />
+                <div className="absolute bottom-0 left-1/3 w-[550px] h-[550px] rounded-full bg-[#054700]/10 blur-[100px] animate-blob-3" />
+                <div className="absolute top-[15%] right-[10%] w-[400px] h-[400px] rounded-full bg-[#5a6623]/14 blur-[90px] animate-blob-5" />
+                <div className="absolute bottom-[15%] left-[10%] w-[350px] h-[350px] rounded-full bg-[#8fa370]/15 blur-[80px] animate-blob-6" />
               </div>
               <div className="relative z-10">
                 {children}

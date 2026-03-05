@@ -199,7 +199,7 @@ export default function CompetitiveComparisonSection() {
           <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             How We Compare
           </span>
-          <h2 className="mt-4 text-4xl md:text-5xl text-[#054700] font-light leading-tight">
+          <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl text-[#054700] font-light leading-tight text-balance">
             The only platform that goes from{" "}
             <span className="font-medium">data to done</span>
           </h2>

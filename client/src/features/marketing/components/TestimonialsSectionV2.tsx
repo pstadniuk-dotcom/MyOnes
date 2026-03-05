@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, FlaskConical, Quote } from "lucide-react";
+import { ChevronDown, ChevronUp, Star, Quote } from "lucide-react";
 
 const testimonials = [
   {
@@ -42,7 +42,7 @@ function TestimonialCard({ testimonial }: { testimonial: typeof testimonials[num
       {/* Rating */}
       <div className="flex gap-1 mb-4">
         {[...Array(testimonial.rating)].map((_, i) => (
-          <FlaskConical key={i} className="w-3.5 h-3.5 fill-[#5a6623]/20 text-[#5a6623]" />
+          <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
         ))}
       </div>
 
@@ -95,7 +95,7 @@ export default function TestimonialsSectionV2() {
           <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             From Our Clinical Program
           </span>
-          <h2 className="mt-4 text-4xl md:text-5xl text-[#054700] font-light leading-tight">
+          <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl text-[#054700] font-light leading-tight text-balance">
             Real people.{" "}
 <span className="font-medium">Real results.</span>
           </h2>

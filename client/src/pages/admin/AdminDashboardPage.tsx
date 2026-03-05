@@ -13,7 +13,11 @@ import {
   UserCheck,
   Clock,
   MessageSquare,
-  Download
+  Download,
+  FileText,
+  RefreshCw,
+  Loader2,
+  Calendar,
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useEffect, useMemo, useState } from 'react';
@@ -166,6 +170,63 @@ function DashboardSkeleton() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// ── Formula Review Scheduler Test Trigger ──────────────────────────────────
+function FormulaReviewTrigger() {
+  const { toast } = useToast();
+  const [result, setResult] = useState<any>(null);
+
+  const triggerMutation = useMutation({
+    mutationFn: () =>
+      apiRequest('POST', '/api/admin/formula-review/trigger').then(r => r.json()),
+    onSuccess: (data) => {
+      setResult(data.results ?? data);
+      toast({ title: 'Formula review check complete' });
+    },
+    onError: (err: any) => {
+      toast({ title: err.message || 'Trigger failed', variant: 'destructive' });
+    },
+  });
+
+  return (
+    <Card className="border-amber-200">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Calendar className="h-4 w-4 text-amber-600" />
+          Formula Review Scheduler
+        </CardTitle>
+        <CardDescription>
+          Manually trigger the daily formula review check. Normally runs at 9am UTC — notifies users with formula drift
+          whose subscription renews in 7 or 3 days.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-4 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-2"
+            disabled={triggerMutation.isPending}
+            onClick={() => triggerMutation.mutate()}
+          >
+            {triggerMutation.isPending ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Running...</>
+            ) : (
+              <><RefreshCw className="w-3.5 h-3.5" /> Trigger Now</>
+            )}
+          </Button>
+          {result && (
+            <div className="text-sm text-gray-600 bg-gray-50 rounded-md px-3 py-2 font-mono">
+              7-day: checked {result.day7?.checked ?? 0}, notified {result.day7?.notified ?? 0} &nbsp;|&nbsp;
+              3-day: checked {result.day3?.checked ?? 0}, notified {result.day3?.notified ?? 0} &nbsp;|&nbsp;
+              <strong>Total notified: {result.totalNotified ?? 0}</strong>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -351,6 +412,21 @@ export default function AdminDashboardPage() {
               </CardTitle>
               <CardDescription>
                 Compliance &amp; safety logs
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow border-[#054700]/20"
+            onClick={() => setLocation('/admin/blog')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-[#054700]">
+                <FileText className="h-5 w-5" />
+                Blog
+              </CardTitle>
+              <CardDescription>
+                Articles, AI generation &amp; editing
               </CardDescription>
             </CardHeader>
           </Card>
@@ -563,6 +639,9 @@ export default function AdminDashboardPage() {
           <CohortRetentionChart />
           <FormulaInsightsWidget />
         </div>
+
+        {/* Formula Review Scheduler — Test Trigger */}
+        <FormulaReviewTrigger />
       </div>
     </div>
   );

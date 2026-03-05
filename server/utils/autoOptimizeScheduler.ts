@@ -89,11 +89,14 @@ async function runFormulaReviewCheck() {
         checkRenewalCohort(3),
     ]);
 
-    logger.info('Formula review scheduler: daily check complete', {
+    const summary = {
         day7,
         day3,
         totalNotified: day7.notified + day3.notified,
-    });
+    };
+
+    logger.info('Formula review scheduler: daily check complete', summary);
+    return summary;
 }
 
 export function startAutoOptimizeScheduler() {

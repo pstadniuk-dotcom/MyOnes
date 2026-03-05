@@ -1638,6 +1638,39 @@ export const insertMembershipTierSchema = createInsertSchema(membershipTiers).om
 export type InsertMembershipTier = z.infer<typeof insertMembershipTierSchema>;
 export type MembershipTier = typeof membershipTiers.$inferSelect;
 
+// ============================================
+// BLOG POSTS
+// ============================================
+
+export const blogPosts = pgTable("blog_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  title: varchar("title", { length: 500 }).notNull(),
+  metaTitle: varchar("meta_title", { length: 70 }),
+  metaDescription: varchar("meta_description", { length: 160 }),
+  excerpt: text("excerpt"),
+  content: text("content").notNull(),
+  category: varchar("category", { length: 100 }),
+  tags: text("tags").array(),
+  tier: varchar("tier", { length: 50 }),
+  primaryKeyword: varchar("primary_keyword", { length: 255 }),
+  secondaryKeywords: text("secondary_keywords").array(),
+  wordCount: integer("word_count"),
+  readTimeMinutes: integer("read_time_minutes"),
+  schemaJson: text("schema_json"),
+  internalLinks: text("internal_links").array(),
+  featuredImage: varchar("featured_image", { length: 500 }),
+  isPublished: boolean("is_published").default(true).notNull(),
+  publishedAt: timestamp("published_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  authorName: varchar("author_name", { length: 255 }).default('ONES AI Editorial Team'),
+  viewCount: integer("view_count").default(0),
+});
+
+export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({ id: true, updatedAt: true, viewCount: true });
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+export type BlogPost = typeof blogPosts.$inferSelect;
+
 // Membership tier keys for type safety
 export const MEMBERSHIP_TIERS = {
   FOUNDING: 'founding',

@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Moon, TestTube, HeartPulse, Activity, HelpCircle, Leaf, Zap, ArrowRight, Watch, ClipboardList } from "lucide-react";
+import { Moon, TestTube, HeartPulse, Activity, Leaf, Zap, ArrowRight } from "lucide-react";
 import { motion, useInView } from "framer-motion";
 import { useLocation } from "wouter";
 
@@ -110,67 +110,62 @@ export default function InterventionSection() {
 
             <motion.h2
               variants={fadeUp}
-              className="mt-4 text-3xl md:text-4xl text-[#054700] font-light leading-tight"
+              className="mt-4 text-2xl sm:text-3xl md:text-4xl text-[#054700] font-light leading-snug text-balance"
             >
-              Blood tests give you biomarkers.<br />
-              Wearables give you metrics.<br />
+              Blood tests give you biomarkers.<span className="hidden sm:inline"><br /></span>{" "}
+              Wearables give you metrics.<span className="hidden sm:inline"><br /></span>{" "}
               <span className="font-semibold text-[#5a6623]">But who gives you a solution?</span>
             </motion.h2>
 
-            {/* The typical journey — card layout */}
-            <motion.div
-              variants={fadeUp}
-              className="mt-14 flex flex-col md:flex-row items-center justify-center gap-3 md:gap-4"
-            >
-              {/* Card: 100+ biomarkers */}
-              <div className="flex items-center gap-3.5 bg-gradient-to-br from-[#ede8e2] to-[#e4ddd6] border border-[#054700]/10 rounded-2xl px-6 py-5 min-w-[190px] shadow-sm">
-                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/70 flex items-center justify-center">
-                  <TestTube className="w-6 h-6 text-[#054700]/70" />
-                </div>
-                <span className="text-[15px] font-medium text-[#054700]/80">100+ biomarkers</span>
-              </div>
-
-              {/* Plus */}
-              <span className="text-[#054700]/30 text-2xl font-light hidden md:block">+</span>
-              <span className="text-[#054700]/30 text-xl font-light md:hidden">+</span>
-
-              {/* Card: Sleep, HRV, strain */}
-              <div className="flex items-center gap-3.5 bg-gradient-to-br from-[#ede8e2] to-[#e4ddd6] border border-[#054700]/10 rounded-2xl px-6 py-5 min-w-[210px] shadow-sm">
-                <div className="flex-shrink-0 flex items-center gap-1.5">
-                  <div className="w-12 h-12 rounded-xl bg-white/70 flex items-center justify-center">
-                    <Activity className="w-6 h-6 text-[#054700]/70" />
+            {/* The typical journey — photo card layout */}
+            {(() => {
+              const tiles = [
+                { src: "/problem section/your labs.png",        label: "Your labs",      sub: "100+ biomarkers",    connector: "+" },
+                { src: "/problem section/wearables.jpg",        label: "Your wearables", sub: "Sleep, HRV, strain", connector: "→" },
+                { src: "/problem section/generic advice 2.png", label: "Generic advice", sub: "Charts & reports",   connector: "→" },
+                { src: "/problem section/now what.png",         label: "Now what?",      sub: "No clear action",    connector: null },
+              ];
+              return (
+                <motion.div variants={fadeUp} className="mt-14">
+                  {/* Mobile: 2×2 grid, no connectors */}
+                  <div className="grid grid-cols-2 gap-4 sm:hidden">
+                    {tiles.map((tile, i) => (
+                      <div key={i} className="flex flex-col items-center">
+                        <div className="w-full aspect-[3/4] rounded-2xl overflow-hidden shadow-md border border-[#054700]/8">
+                          <img src={tile.src} alt={tile.label} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="mt-3 text-center">
+                          <p className="text-sm font-semibold text-[#054700]">{tile.label}</p>
+                          <p className="text-xs text-[#054700]/50 mt-0.5">{tile.sub}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="w-12 h-12 rounded-xl bg-white/70 flex items-center justify-center">
-                    <Watch className="w-6 h-6 text-[#054700]/70" />
+
+                  {/* Desktop: flex row with connectors */}
+                  <div className="hidden sm:flex items-center justify-center gap-0">
+                    {tiles.map((tile, i) => (
+                      <>
+                        <div key={`tile-${i}`} className="flex flex-col items-center">
+                          <div className="w-44 aspect-[3/4] rounded-2xl overflow-hidden shadow-md border border-[#054700]/8">
+                            <img src={tile.src} alt={tile.label} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="mt-4 text-center">
+                            <p className="text-sm font-semibold text-[#054700]">{tile.label}</p>
+                            <p className="text-xs text-[#054700]/50 mt-0.5">{tile.sub}</p>
+                          </div>
+                        </div>
+                        {tile.connector && (
+                          <span key={`connector-${i}`} className="text-[#054700]/30 text-xl font-light mx-3 mb-12 flex-shrink-0">
+                            {tile.connector}
+                          </span>
+                        )}
+                      </>
+                    ))}
                   </div>
-                </div>
-                <span className="text-[15px] font-medium text-[#054700]/80">Sleep, HRV, strain</span>
-              </div>
-
-              {/* Arrow */}
-              <span className="text-[#054700]/25 text-2xl hidden md:block">→</span>
-              <span className="text-[#054700]/25 text-xl md:hidden rotate-90">→</span>
-
-              {/* Card: Charts & reports */}
-              <div className="flex items-center gap-3.5 bg-gradient-to-br from-[#ede8e2] to-[#e4ddd6] border border-[#054700]/10 rounded-2xl px-6 py-5 min-w-[200px] shadow-sm">
-                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/70 flex items-center justify-center">
-                  <ClipboardList className="w-6 h-6 text-[#054700]/70" />
-                </div>
-                <span className="text-[15px] font-medium text-[#054700]/80">Charts & reports</span>
-              </div>
-
-              {/* Arrow */}
-              <span className="text-[#054700]/25 text-2xl hidden md:block">→</span>
-              <span className="text-[#054700]/25 text-xl md:hidden rotate-90">→</span>
-
-              {/* Card: Now what? */}
-              <div className="flex items-center gap-3.5 bg-gradient-to-br from-[#ede8e2] to-[#e4ddd6] border border-[#054700]/10 rounded-2xl px-6 py-5 min-w-[165px] shadow-sm">
-                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/70 flex items-center justify-center">
-                  <HelpCircle className="w-7 h-7 text-[#054700]/70" />
-                </div>
-                <span className="text-[15px] font-medium text-[#054700]/80">Now what?</span>
-              </div>
-            </motion.div>
+                </motion.div>
+              );
+            })()}
 
             <motion.div
               variants={fadeUp}
@@ -208,9 +203,9 @@ export default function InterventionSection() {
 
             <motion.h3
               variants={fadeUp}
-              className="text-3xl md:text-[2.75rem] text-[#054700] font-light leading-tight"
+              className="text-2xl sm:text-3xl md:text-[2.75rem] text-[#054700] font-light leading-tight text-balance"
             >
-              We don't recommend supplements.<br />
+              We don't recommend supplements.<span className="hidden sm:inline"><br /></span>{" "}
               <span className="font-semibold">We formulate yours.</span>
             </motion.h3>
 

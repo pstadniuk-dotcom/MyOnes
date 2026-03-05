@@ -317,7 +317,7 @@ function PanelScoreBar({ panel }: { panel: PanelScore }) {
       <span className="text-sm flex-shrink-0 w-5 text-center">{icon}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium text-[#054700] truncate">{panel.category}</span>
+          <span className="text-xs font-medium text-[#054700] truncate">{PANEL_FRIENDLY_NAMES[panel.category] || panel.category}</span>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <span className={`text-xs font-bold ${textColor}`}>{panel.score}</span>
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${panel.score >= 90 ? 'bg-emerald-100 text-emerald-700' : panel.score >= 80 ? 'bg-teal-100 text-teal-700' : panel.score >= 70 ? 'bg-amber-100 text-amber-700' : panel.score >= 60 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>{panel.grade}</span>
@@ -712,7 +712,8 @@ export default function LabReportsPage() {
       if (statusFilter !== 'all' && m.latest.status !== statusFilter) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        return m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q);
+        const friendlyCategory = (PANEL_FRIENDLY_NAMES[m.category] || m.category).toLowerCase();
+        return m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q) || friendlyCategory.includes(q);
       }
       return true;
     });
@@ -1264,7 +1265,7 @@ export default function LabReportsPage() {
               >
                 <option value="all">All Categories</option>
                 {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                  <option key={cat} value={cat}>{PANEL_FRIENDLY_NAMES[cat] || cat}</option>
                 ))}
               </select>
 
@@ -1324,7 +1325,7 @@ export default function LabReportsPage() {
                             <span className="text-base flex-shrink-0">{CATEGORY_ICONS[marker.category] || '📋'}</span>
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-[#054700] truncate">{marker.name}</p>
-                              <p className="text-xs text-[#5a6623] truncate">{marker.category}</p>
+                              <p className="text-xs text-[#5a6623] truncate">{PANEL_FRIENDLY_NAMES[marker.category] || marker.category}</p>
                             </div>
                           </div>
 
@@ -1365,7 +1366,7 @@ export default function LabReportsPage() {
                               <span className="text-base flex-shrink-0">{CATEGORY_ICONS[marker.category] || '📋'}</span>
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-[#054700] truncate">{marker.name}</p>
-                                <p className="text-xs text-[#5a6623]">{marker.category}</p>
+                                <p className="text-xs text-[#5a6623]">{PANEL_FRIENDLY_NAMES[marker.category] || marker.category}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">

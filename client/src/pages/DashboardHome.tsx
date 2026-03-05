@@ -3,6 +3,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Progress } from '@/shared/components/ui/progress';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Input } from '@/shared/components/ui/input';
 import {
   MessageSquare,
   FlaskConical,
@@ -12,17 +13,94 @@ import {
   Sparkles,
   PlayCircle,
   TrendingUp,
-
+  Bell,
+  X,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Formula } from '@shared/schema';
 import { calculateDosage, CAPSULE_TIER_INFO, type CapsuleCount } from '@/shared/lib/utils';
 import { useState } from 'react';
 import { ProfileCompletionDialog } from '@/features/auth/components/ProfileCompletionDialog';
 import { HealthPulseCard } from '@/features/dashboard/components/HealthPulseCard';
 import FormulaReviewBanner from '@/features/dashboard/components/FormulaReviewBanner';
+import { apiRequest } from '@/shared/lib/queryClient';
+import { useToast } from '@/shared/hooks/use-toast';
+
+// ── Phone number prompt banner ─────────────────────────────────────────────
+const PHONE_DISMISS_KEY = 'ones_phone_prompt_dismissed';
+
+function PhonePromptBanner({ userPhone }: { userPhone: string | null | undefined }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [phone, setPhone] = useState('');
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      const stored = localStorage.getItem(PHONE_DISMISS_KEY);
+      if (!stored) return false;
+      const { until } = JSON.parse(stored);
+      return Date.now() < until;
+    } catch {
+      return false;
+    }
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: () => apiRequest('PATCH', '/api/users/me/profile', { phone: phone.trim() }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      toast({ title: 'Phone number saved! You\'ll now receive supplement reminders.' });
+      setDismissed(true);
+    },
+    onError: () => toast({ title: 'Could not save phone number', variant: 'destructive' }),
+  });
+
+  const dismiss = () => {
+    // Dismiss for 7 days
+    localStorage.setItem(PHONE_DISMISS_KEY, JSON.stringify({ until: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
+    setDismissed(true);
+  };
+
+  if (dismissed || userPhone) return null;
+
+  return (
+    <div className="flex items-center gap-3 bg-[#054700]/5 border border-[#054700]/15 rounded-xl px-4 py-3">
+      <div className="flex items-center justify-center w-8 h-8 bg-[#054700]/10 rounded-full flex-shrink-0">
+        <Bell className="w-4 h-4 text-[#054700]" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-[#054700]">Add your phone for supplement reminders</p>
+        <p className="text-xs text-[#5a6623] mt-0.5">Get daily SMS reminders to take your ONES formula on schedule.</p>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <Input
+          placeholder="+1 (555) 000-0000"
+          value={phone}
+          onChange={e => setPhone(e.target.value)}
+          className="w-40 h-8 text-sm"
+          type="tel"
+          onKeyDown={e => e.key === 'Enter' && phone.trim() && saveMutation.mutate()}
+        />
+        <Button
+          size="sm"
+          className="h-8 bg-[#054700] hover:bg-[#043d00] text-white text-xs px-3 whitespace-nowrap"
+          disabled={!phone.trim() || saveMutation.isPending}
+          onClick={() => saveMutation.mutate()}
+        >
+          {saveMutation.isPending ? '...' : 'Save'}
+        </Button>
+        <button
+          onClick={dismiss}
+          className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+          aria-label="Dismiss"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // Map next actions to their appropriate routes
 function getNextActionRoute(nextAction: string): string {
@@ -135,6 +213,9 @@ export default function HomePage() {
           </p>
         </div>
       </div>
+
+      {/* Phone number prompt — only shown to users without a phone on file */}
+      <PhonePromptBanner userPhone={(user as any)?.phone} />
 
       {/* Quick Stats - V2 Styled Cards */}
       <div className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-3">

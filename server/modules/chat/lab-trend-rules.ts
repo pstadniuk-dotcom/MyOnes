@@ -9,16 +9,22 @@ export const LAB_TREND_RULES: MarkerTrendRule[] = [
     {
         direction: 'lower_is_better',
         keywords: [
-            // Lipid Panel
+            // Lipid Panel — standard
             'ldl',
             'ldl p',
             'ldl particle',
+            'ldl particle number',
+            'ldl small',
+            'ldl medium',
+            'ldl pattern',
             'apob',
             'triglyceride',
             'non hdl cholesterol',
             'vldl',
             'lp a',
             'lipoprotein a',
+            'chol hdl ratio',
+            'total cholesterol hdl ratio',
             // Diabetes & Blood Sugar
             'glucose',
             'fasting glucose',
@@ -70,8 +76,13 @@ export const LAB_TREND_RULES: MarkerTrendRule[] = [
     {
         direction: 'higher_is_better',
         keywords: [
-            // Lipid Panel
+            // Lipid Panel — higher is better
             'hdl',
+            'hdl large',
+            'large hdl',
+            'ldl large',
+            'ldl peak size',
+            'ldl particle size',
             // Vitamins & Minerals
             'vitamin d',
             '25 hydroxy',

@@ -103,7 +103,7 @@ export default function MembershipPricingSection() {
           <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             Membership & Pricing
           </span>
-          <h2 className="mt-4 text-4xl md:text-5xl text-[#054700] font-light leading-tight">
+          <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl text-[#054700] font-light leading-tight text-balance">
             One membership.{" "}
             <span className="font-medium">Everything you need.</span>
           </h2>

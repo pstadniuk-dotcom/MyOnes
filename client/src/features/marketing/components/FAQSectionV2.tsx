@@ -47,7 +47,7 @@ export default function FAQSectionV2() {
           <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             Questions & Answers
           </span>
-          <h2 className="mt-4 text-4xl md:text-5xl text-[#054700] font-light leading-tight">
+          <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl text-[#054700] font-light leading-tight text-balance">
             Frequently Asked{" "}
             <span className="font-medium">Questions</span>
           </h2>

@@ -125,8 +125,58 @@ const BIOMARKER_ALIASES: Record<string, string> = {
 
     'chol hdlc ratio':              'Chol/HDL Ratio',
     'tc hdl ratio':                 'Chol/HDL Ratio',
-    'cholesterol hdl ratio':        'Chol/HDL Ratio',
+    'cholesterol hdl ratio':        'Chol/HDL Ratio',    'total cholesterol hdl ratio':  'Chol/HDL Ratio',
+    'chol hdl ratio':               'Chol/HDL Ratio',
 
+    // ── Advanced NMR Lipid Panel ──
+    'ldl particle number':          'LDL Particle Number',
+    'ldl p':                        'LDL Particle Number',
+    'total ldl particles':          'LDL Particle Number',
+    'ldl particles':                'LDL Particle Number',
+    'nmr ldl p':                    'LDL Particle Number',
+
+    'ldl small':                    'LDL Small',
+    'small ldl':                    'LDL Small',
+    'small ldl p':                  'LDL Small',
+    'small ldl particles':          'LDL Small',
+    'ldl small p':                  'LDL Small',
+
+    'ldl medium':                   'LDL Medium',
+    'medium ldl':                   'LDL Medium',
+    'medium ldl p':                 'LDL Medium',
+    'medium ldl particles':         'LDL Medium',
+
+    'ldl large':                    'LDL Large',
+    'large ldl':                    'LDL Large',
+    'large ldl p':                  'LDL Large',
+    'large ldl particles':          'LDL Large',
+
+    'hdl large':                    'HDL Large',
+    'large hdl':                    'HDL Large',
+    'large hdl p':                  'HDL Large',
+    'large hdl particles':          'HDL Large',
+    'hdl large p':                  'HDL Large',
+
+    'ldl pattern':                  'LDL Pattern',
+    'ldl size pattern':             'LDL Pattern',
+    'lipoprotein pattern':          'LDL Pattern',
+
+    'ldl peak size':                'LDL Peak Size',
+    'ldl peak diameter':            'LDL Peak Size',
+    'ldl size':                     'LDL Peak Size',
+    'mean ldl size':                'LDL Peak Size',
+    'ldl particle size':            'LDL Peak Size',
+
+    // ── Inflammation (hs-CRP variants) ──
+    'hs crp':                       'hs-CRP',
+    'hscrp':                        'hs-CRP',
+    'high sensitivity crp':         'hs-CRP',
+    'high sensitivity c reactive protein': 'hs-CRP',
+    'high sensitivity c-reactive protein': 'hs-CRP',
+    'c reactive protein hs':        'hs-CRP',
+    'crp high sensitivity':         'hs-CRP',
+    'cardiac crp':                  'hs-CRP',
+    'crp cardiac':                  'hs-CRP',
     // ── Metabolic Panel ──
     'glucose':                      'Glucose',
     'glucose serum':                'Glucose',
@@ -317,8 +367,6 @@ const BIOMARKER_ALIASES: Record<string, string> = {
     // ── Inflammation ──
     'crp':                          'CRP',
     'c reactive protein':           'CRP',
-    'hs crp':                       'hs-CRP',
-    'high sensitivity crp':         'hs-CRP',
     'c reactive protein quantitative': 'hs-CRP',
 
     'esr':                          'ESR',

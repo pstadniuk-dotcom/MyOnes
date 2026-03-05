@@ -8,10 +8,9 @@ const heroVideos = [
   "/Hero%20Section/1pN_Da9wiBpM9pX6mF7-C_492e42aee93d4081b12e21a02db3620d.mp4",
   "/Hero%20Section/25cb723f64c24ff7a5b473eaf3ddf957.mp4",
   "/Hero%20Section/6d9efde5ac45418c979e43130ecc6e77.mp4",
-  "/Hero%20Section/ci8WKa11CT14gg5wbDeTA_bec958a14ba04effbdcea88863093f03.mp4",
   "/Hero%20Section/vE0MK5wrO4j1XjnPPU4rB_59b0b5398dac438eafa639b096553f72.mp4",
+  "/Hero%20Section/AdobeStock_1717805080.mov",
   "/Hero%20Section/AdobeStock_211927150.mov",
-  "/Hero%20Section/AdobeStock_443422537.mov",
   "/Hero%20Section/AdobeStock_723953147.mov",
 ];
 
@@ -67,11 +66,11 @@ export default function HeroSectionV2() {
   }, [activeTab]);
 
   return (
-    <section className="relative min-h-[90vh] flex overflow-hidden">
+    <section className="relative flex flex-col-reverse lg:flex-row overflow-hidden">
       {/* ═══════════════════════════════════════════════════
           LEFT HALF — Copy on cream with pill outlines
           ═══════════════════════════════════════════════════ */}
-      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-8 md:px-16 lg:px-16 xl:px-20 py-16 lg:py-24 overflow-hidden">
+      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-8 md:px-16 lg:px-16 xl:px-20 py-10 lg:py-24 overflow-hidden">
         {/* Decorative pill outlines with faint traveling glow */}
         <svg
           aria-hidden="true"
@@ -131,9 +130,9 @@ export default function HeroSectionV2() {
           <use href="#heroCapsule" transform="translate(750, 700) rotate(-30, 60, 144)" fill="none" stroke="url(#metallicGreen)" strokeWidth="3" strokeLinecap="round" filter="url(#metallicGlow)" opacity="0.55" strokeDasharray="59 800"><animate attributeName="stroke-dashoffset" values="0;-859" dur="15s" repeatCount="indefinite"/></use>
         </svg>
 
-        <div className="relative z-10 max-w-xl space-y-8">
+        <div className="relative z-10 max-w-xl space-y-8 text-center lg:text-left mx-auto lg:mx-0">
           {/* Pill labels */}
-          <div className="inline-flex items-center gap-8 border border-[#c5c5c5] rounded-full px-6 py-3">
+          <div className="inline-flex items-center gap-8 border border-[#c5c5c5] rounded-full px-6 py-3 mx-auto lg:mx-0">
             <span className="flex items-center gap-2 text-sm text-[#757575] font-light tracking-wide">
               <span className="w-1.5 h-1.5 bg-[#5a6623] rounded-full" />
               Blood Data
@@ -149,7 +148,7 @@ export default function HeroSectionV2() {
           </div>
 
           {/* Headline */}
-          <h1 className="text-5xl md:text-6xl lg:text-[72px] leading-[1.05] tracking-[-0.02em]">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[72px] leading-[1.05] tracking-[-0.02em]">
             <span className="block font-light text-[#054700]">One formula.</span>
             <span className="block font-light text-[#054700]">Built for you.</span>
             <span className="block font-light text-[#5a6623]">Always evolving.</span>
@@ -163,11 +162,11 @@ export default function HeroSectionV2() {
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 pt-2">
-            <Link href="/signup">
+          <div className="flex flex-col sm:flex-row gap-4 pt-2 items-center lg:items-start">
+            <Link href="/signup" className="w-full sm:w-auto">
               <Button
                 size="lg"
-                className="bg-[#074700] hover:bg-[#053600] text-[#ede8e2] px-8 py-6 text-lg rounded-full shadow-lg transition-all hover:shadow-xl group"
+                className="w-full sm:w-auto bg-[#074700] hover:bg-[#053600] text-[#ede8e2] px-8 py-6 text-lg rounded-full shadow-lg transition-all hover:shadow-xl group"
               >
                 Start Your Formula
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -176,7 +175,7 @@ export default function HeroSectionV2() {
             <Button
               variant="outline"
               size="lg"
-              className="border-[#054700]/20 text-[#054700] hover:bg-[#054700]/5 px-8 py-6 text-lg rounded-full"
+              className="w-full sm:w-auto border-[#054700]/20 text-[#054700] hover:bg-[#054700]/5 px-8 py-6 text-lg rounded-full"
               onClick={() => {
                 document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
               }}
@@ -186,17 +185,14 @@ export default function HeroSectionV2() {
           </div>
 
           {/* Mini Progression */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-4 text-sm">
-            <span className="text-[#054700] font-medium">Consultation</span>
-            <span className="text-[#054700]/40 hidden sm:inline">&rarr;</span>
-            <span className="text-[#054700]/40 sm:hidden">&bull;</span>
-            <span className="text-[#054700] font-medium">Upload Labs</span>
-            <span className="text-[#054700]/40 hidden sm:inline">&rarr;</span>
-            <span className="text-[#054700]/40 sm:hidden">&bull;</span>
-            <span className="text-[#054700] font-medium">Your Formula</span>
-            <span className="text-[#054700]/40 hidden sm:inline">&rarr;</span>
-            <span className="text-[#054700]/40 sm:hidden">&bull;</span>
-            <span className="text-[#054700] font-medium">Ongoing Updates</span>
+          <div className="flex items-center justify-center lg:justify-start gap-x-1.5 pt-4 text-xs sm:text-sm overflow-hidden">
+            <span className="text-[#054700] font-medium whitespace-nowrap">Consultation</span>
+            <span className="text-[#054700]/40">&bull;</span>
+            <span className="text-[#054700] font-medium whitespace-nowrap">Upload Labs</span>
+            <span className="text-[#054700]/40">&bull;</span>
+            <span className="text-[#054700] font-medium whitespace-nowrap">Your Formula</span>
+            <span className="text-[#054700]/40">&bull;</span>
+            <span className="text-[#054700] font-medium whitespace-nowrap">Ongoing Updates</span>
           </div>
         </div>
       </div>
@@ -204,7 +200,7 @@ export default function HeroSectionV2() {
       {/* ═══════════════════════════════════════════════════
           RIGHT HALF — Nature photo + frosted glass chat with video
           ═══════════════════════════════════════════════════ */}
-      <div className="hidden lg:flex relative w-1/2 items-center justify-center">
+      <div className="flex relative w-full lg:w-1/2 min-h-[70vh] lg:min-h-screen items-center justify-center">
         {/* Background video cycle */}
         {heroVideos.map((src, idx) => (
           <video
@@ -225,7 +221,7 @@ export default function HeroSectionV2() {
         <div className="absolute inset-0 bg-black/20 z-[1]" />
 
         {/* Frosted glass chat widget */}
-        <div className="relative z-10 w-[420px] backdrop-blur-[24px] bg-[rgba(32,40,31,0.36)] rounded-[32px] p-2 shadow-2xl">
+        <div className="relative z-10 w-full max-w-[380px] mx-auto px-4 sm:px-0 sm:max-w-[420px] backdrop-blur-[24px] bg-[rgba(32,40,31,0.36)] rounded-[32px] p-2 shadow-2xl">
           {/* Widget header */}
           <div className="flex items-center justify-center gap-4 px-6 py-5">
             <img src="/Ones%20AI%20transparent.png" alt="Ones AI" className="h-[27px]" />
@@ -254,7 +250,7 @@ export default function HeroSectionV2() {
 
           {/* Video content area — plays inside the chat widget */}
           <div className="bg-[#f8f8f8] rounded-b-[24px] overflow-hidden">
-            <div className="relative h-[420px]">
+            <div className="relative h-[340px] sm:h-[420px]">
               {personas.map((persona, idx) => (
                 <video
                   key={persona.name}

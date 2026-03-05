@@ -21,6 +21,7 @@ import SciencePage from "@/pages/SciencePage";
 // Import static pages
 import AboutPage from "@/pages/AboutPage";
 import BlogPage from "@/pages/BlogPage";
+import BlogArticlePage from "@/pages/BlogArticlePage";
 import CareersPage from "@/pages/CareersPage";
 import PartnershipsPage from "@/pages/PartnershipsPage";
 import ContactPage from "@/pages/ContactPage";
@@ -53,6 +54,7 @@ import AdminSupportTicketsPage from "@/pages/admin/AdminSupportTicketsPage";
 import ConversationsPage from "@/pages/admin/ConversationsPage";
 import OrdersManagementPage from "@/pages/admin/OrdersManagementPage";
 import AuditLogsPage from "@/pages/admin/AuditLogsPage";
+import AdminBlogPage from "@/pages/admin/AdminBlogPage";
 
 // Import shared/public components
 import SharedFormulaPage from "@/pages/SharedFormulaPage";
@@ -78,6 +80,7 @@ function MainRouter() {
       {/* Static Pages */}
       <Route path="/about" component={AboutPage} />
       <Route path="/blog" component={BlogPage} />
+      <Route path="/blog/:slug" component={BlogArticlePage} />
       <Route path="/careers" component={CareersPage} />
       <Route path="/press">{() => { window.location.href = '/contact?type=press'; return null; }}</Route>
       <Route path="/partnerships" component={PartnershipsPage} />
@@ -232,6 +235,11 @@ function MainRouter() {
       <Route path="/admin/audit-logs">
         <ProtectedAdminRoute>
           <AuditLogsPage />
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/blog">
+        <ProtectedAdminRoute>
+          <AdminBlogPage />
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/support-tickets/:id">
