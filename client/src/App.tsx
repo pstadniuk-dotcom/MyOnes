@@ -6,8 +6,6 @@ import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
-import { ApiConfigError } from "@/shared/components/ApiConfigError";
-import { isApiConfigurationValid } from "@/shared/lib/api";
 import { FEATURES, isOptimizeEnabled } from "@/shared/config/features";
 import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
 import ProtectedAdminRoute from "@/features/admin/components/ProtectedAdminRoute";
@@ -294,11 +292,6 @@ function MainRouter() {
 }
 
 function App() {
-  // Check API configuration before rendering the app
-  // In production, this prevents confusing errors when VITE_API_BASE is missing
-  if (!isApiConfigurationValid()) {
-    return <ApiConfigError />;
-  }
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const appContent = (

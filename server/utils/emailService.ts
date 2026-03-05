@@ -1,4 +1,5 @@
 import sgMail from '@sendgrid/mail';
+import { getFrontendUrl } from './urlHelper';
 
 // Initialize SendGrid with API key from environment variables
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY?.trim();
@@ -88,7 +89,7 @@ function getEmailTemplate(notification: EmailNotification): string {
           <!-- Footer -->
           <tr>
             <td style="padding:24px 40px;text-align:center;">
-              <img src="${process.env.FRONTEND_URL || 'https://myones.ai'}/ones-logo-light.svg"
+              <img src="${getFrontendUrl()}/ones-logo-light.svg"
                    alt="ONES"
                    width="140"
                    style="display:block;margin:0 auto 10px;height:auto;"
@@ -96,9 +97,9 @@ function getEmailTemplate(notification: EmailNotification): string {
               <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#111827;">Personalized AI Supplements</p>
               <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">Your custom formula, delivered to your door.</p>
               <p style="margin:0;font-size:12px;color:#9ca3af;">
-                <a href="${process.env.FRONTEND_URL || 'https://myones.ai'}/dashboard/settings?tab=notifications" style="color:#9ca3af;">Manage preferences</a>
+                <a href="${getFrontendUrl()}/dashboard/settings?tab=notifications" style="color:#9ca3af;">Manage preferences</a>
                 &nbsp;·&nbsp;
-                <a href="${process.env.FRONTEND_URL || 'https://myones.ai'}" style="color:#9ca3af;">myones.ai</a>
+                <a href="${getFrontendUrl()}" style="color:#9ca3af;">myones.ai</a>
               </p>
             </td>
           </tr>

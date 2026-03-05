@@ -9,6 +9,7 @@ import { sendNotificationEmail } from '../../utils/emailService';
 import { logger } from '../../infra/logging/logger';
 import { OAuth2Client } from 'google-auth-library';
 import axios from 'axios';
+import { getFrontendUrl } from '../../utils/urlHelper';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -66,7 +67,7 @@ export class AuthService {
 
         await authRepository.createEmailVerificationToken(user.id, verificationToken, expiresAt);
 
-        const verificationUrl = `${process.env.FRONTEND_URL || 'https://my-ones.vercel.app'}/verify-email?token=${verificationToken}`;
+        const verificationUrl = `${getFrontendUrl()}/verify-email?token=${verificationToken}`;
 
         // In development, log the link so you can test without needing email delivery
         if (process.env.NODE_ENV === 'development') {
@@ -276,7 +277,7 @@ export class AuthService {
 
         await authRepository.createPasswordResetToken(user.id, resetToken, expiresAt);
 
-        const resetUrl = `${process.env.FRONTEND_URL || 'https://my-ones.vercel.app'}/reset-password?token=${resetToken}`;
+        const resetUrl = `${getFrontendUrl()}/reset-password?token=${resetToken}`;
 
         try {
             await sendNotificationEmail({

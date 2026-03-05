@@ -24,6 +24,7 @@ import logger from '../../infra/logging/logger';
 import { sendNotificationEmail } from '../../utils/emailService';
 import { sendNotificationSms } from '../../utils/smsService';
 import { consentsRepository } from '../consents/consents.repository';
+import { getFrontendUrl } from '../../utils/urlHelper';
 
 const FORMULA_REVIEW_DAYS = 30;          // Review if formula is older than 30 days
 const HRV_DECLINE_THRESHOLD = 0.12;     // 12% decline triggers review
@@ -182,7 +183,7 @@ export class FormulaReviewService {
         const user = await usersRepository.getUser(userId);
         if (!user) return;
 
-        const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+        const frontendUrl = getFrontendUrl();
         const reviewUrl = `${frontendUrl}/dashboard`;
 
         if (mode === 'auto_updated') {
