@@ -170,7 +170,7 @@ describe('BillingService — delegation', () => {
     };
     const svc = new BillingService(mockProvider as any);
     const res = await svc.createCheckoutSession('user-1', { plan: 'annual' });
-    expect(mockProvider.createCheckoutSession).toHaveBeenCalledWith('user-1', { plan: 'annual' });
+    expect(mockProvider.createCheckoutSession).toHaveBeenCalledWith('user-1', { plan: 'annual' }, undefined);
     expect(res).toEqual(result);
   });
 

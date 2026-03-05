@@ -141,9 +141,6 @@ app.use('/api/', apiLimiter);
 if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
   console.error('[SECURITY] SESSION_SECRET not set in production — using insecure default. Set SESSION_SECRET env var.');
 }
-if (process.env.NODE_ENV === 'production' && (!process.env.FRONTEND_URL || process.env.FRONTEND_URL.includes('localhost'))) {
-  console.error('[CONFIG] FRONTEND_URL not set or points to localhost in production — Stripe redirects will fail. Set FRONTEND_URL env var.');
-}
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'wearable-oauth-secret-change-in-production',

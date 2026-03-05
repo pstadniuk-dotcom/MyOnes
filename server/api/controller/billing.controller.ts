@@ -55,7 +55,7 @@ export class BillingController {
   async createCheckoutSession(req: Request, res: Response) {
     try {
       const userId = req.userId!;
-      const session = await billingService.createCheckoutSession(userId, req.body || {});
+      const session = await billingService.createCheckoutSession(userId, req.body || {}, req);
       return res.json(session);
     } catch (error: any) {
       if (error?.message === 'STRIPE_SECRET_KEY_NOT_CONFIGURED') {

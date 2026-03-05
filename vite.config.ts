@@ -10,11 +10,11 @@ const __dirname = path.dirname(__filename);
 export default defineConfig({
   plugins: [
     react(),
-    // Validate environment variables during production builds
+    // No longer need to validate VITE_API_BASE in monorepo setup
+    // Frontend and backend share the same origin, so relative URLs work
     validateEnvPlugin({
-      requiredInProduction: ['VITE_API_BASE'],
-      urlVariables: ['VITE_API_BASE'],
-      failOnError: true, // Fail build if validation fails
+      // Empty config - no environment variables required for API base URL
+      failOnError: true,
     }),
   ],
   resolve: {
