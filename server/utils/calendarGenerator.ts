@@ -23,7 +23,7 @@ export function generateReviewCalendarEvent(schedule: ReviewSchedule, userName: 
   };
   
   // Create unique ID for the event
-  const uid = `review-${schedule.id}@myones.ai`;
+  const uid = `review-${schedule.id}@ones.health`;
   
   // Set review duration (1 hour)
   const endDate = new Date(reviewDate);
@@ -55,12 +55,12 @@ export function generateReviewCalendarEvent(schedule: ReviewSchedule, userName: 
       '- Update recent lab results if available\\n' +
       '- Discuss how you\'re feeling on your current formula\\n' +
       '- Make any necessary adjustments\\n\\n' +
-      'Join your review session at: https://myones.ai/chat?review=true',
-    'LOCATION:https://myones.ai/chat?review=true',
+      'Join your review session at: https://ones.health/chat?review=true',
+    'LOCATION:https://ones.health/chat?review=true',
     'STATUS:CONFIRMED',
     'SEQUENCE:0',
-    `ORGANIZER:mailto:support@myones.ai`,
-    `ATTENDEE;CN=${userName}:mailto:support@myones.ai`,
+    `ORGANIZER:mailto:support@ones.health`,
+    `ATTENDEE;CN=${userName}:mailto:support@ones.health`,
     // Add reminders
     'BEGIN:VALARM',
     'ACTION:DISPLAY',

@@ -371,7 +371,7 @@ export class FormulasService {
 
             const formulaUser = await usersRepository.getUser(userId);
             if (formulaUser) {
-                const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+                const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
                 const ingredientCount = (bases?.length || 0) + (individuals?.length || 0);
                 if (await notificationsService.shouldSendEmail(userId, 'consultation')) {
                     await sendNotificationEmail({

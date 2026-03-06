@@ -7,6 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startSmsReminderScheduler } from "./utils/smsReminderScheduler";
 import { startAutoOptimizeScheduler } from "./utils/autoOptimizeScheduler";
+import { startBlogGenerationScheduler } from "./utils/blogGenerationScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
 
@@ -57,8 +58,8 @@ app.use((req, res, next) => {
 const isProduction = process.env.NODE_ENV === 'production';
 const allowedOriginsList = [
   'https://my-ones.vercel.app',
-  'https://myones.ai',
-  'https://www.myones.ai',
+  'https://ones.health',
+  'https://www.ones.health',
   'https://myones.onrender.com',
   // Local development only
   ...(!isProduction ? ['http://localhost:5000', 'http://localhost:5173', 'http://127.0.0.1:5000', 'http://127.0.0.1:5173'] : [])
@@ -228,6 +229,9 @@ app.use((req, res, next) => {
 
       // Start formula review scheduler (checks subscription renewals daily at 9am UTC)
       startAutoOptimizeScheduler();
+
+      // Start blog auto-generation scheduler (OFF by default — enabled via Admin → Blog Settings)
+      startBlogGenerationScheduler();
 
       // Note: Wearable data sync is now handled via Junction webhooks
       // No polling schedulers needed - data is pushed to /api/webhooks/junction

@@ -33,7 +33,7 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-medium text-[#054700] mb-3">Account Responsibilities</h3>
             <p className="text-[#5a6623] leading-relaxed">
-              You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You must notify us immediately at info@myones.ai of any unauthorized use. We are not liable for losses arising from unauthorized account access that is not caused by our negligence.
+              You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You must notify us immediately at support@ones.health of any unauthorized use. We are not liable for losses arising from unauthorized account access that is not caused by our negligence.
             </p>
           </section>
 
@@ -105,7 +105,7 @@ export default function TermsPage() {
               <li>Subscriptions renew automatically until you cancel through your account settings or by contacting us</li>
               <li>Cancellation takes effect at the end of the current billing period — no partial-month refunds are issued for the current cycle</li>
               <li>We may change pricing with at least 30 days' advance notice via email; continued use after the effective date constitutes acceptance</li>
-              <li>Refund requests for product issues should be directed to info@myones.ai and will be reviewed on a case-by-case basis</li>
+              <li>Refund requests for product issues should be directed to support@ones.health and will be reviewed on a case-by-case basis</li>
             </ul>
           </section>
 
@@ -199,7 +199,7 @@ export default function TermsPage() {
             <h2 className="text-2xl font-medium text-[#054700] mb-4">17. Contact Information</h2>
             <p className="text-[#5a6623] leading-relaxed">
               Questions or concerns about these Terms of Service should be sent to{' '}
-              <a href="mailto:info@myones.ai" className="text-[#054700] underline underline-offset-2 hover:text-[#054700]/80">info@myones.ai</a>.
+              <a href="mailto:support@ones.health" className="text-[#054700] underline underline-offset-2 hover:text-[#054700]/80">support@ones.health</a>.
             </p>
           </section>
         </div>

@@ -350,7 +350,7 @@ export class ChatController {
                           try {
                             const formulaUser = await usersRepository.getUser(userId);
                             if (formulaUser) {
-                              const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+                              const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
                               const ingredientCount = (savedFormula.bases?.length || 0) + (savedFormula.additions?.length || 0);
 
                               await notificationsService.create({

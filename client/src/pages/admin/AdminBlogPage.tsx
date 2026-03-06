@@ -19,6 +19,10 @@ import {
   Wand2,
   Save,
   ExternalLink,
+  Settings,
+  Play,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -83,7 +87,7 @@ interface BlogPost {
   viewCount: number | null;
 }
 
-type ViewMode = 'list' | 'edit' | 'generate';
+type ViewMode = 'list' | 'edit' | 'generate' | 'bulk' | 'settings';
 
 const CATEGORIES = [
   'Health & Wellness',
@@ -213,9 +217,11 @@ interface ListViewProps {
   onEdit: (post: BlogPost) => void;
   onNew: () => void;
   onGenerate: () => void;
+  onBulk: () => void;
+  onSettings: () => void;
 }
 
-function ListView({ onEdit, onNew, onGenerate }: ListViewProps) {
+function ListView({ onEdit, onNew, onGenerate, onBulk, onSettings }: ListViewProps) {
   const [, setLocation] = useLocation();
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState<'all' | 'published' | 'drafts'>('all');
@@ -278,6 +284,12 @@ function ListView({ onEdit, onNew, onGenerate }: ListViewProps) {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={onSettings} className="gap-2">
+              <Settings className="w-4 h-4" /> Auto-Generate
+            </Button>
+            <Button variant="outline" onClick={onBulk} className="gap-2">
+              <Sparkles className="w-4 h-4" /> Bulk Generate
+            </Button>
             <Button variant="outline" onClick={onGenerate} className="gap-2">
               <Wand2 className="w-4 h-4" /> Generate with AI
             </Button>
@@ -485,6 +497,7 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
     title: '',
     topic: '',
     keywords: '',
+    secondaryKeywords: '',
     category: '',
     tone: 'informative',
   });
@@ -506,13 +519,13 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
         category: g.category ?? genForm.category,
         tags: Array.isArray(g.tags) ? g.tags.join(', ') : '',
         primaryKeyword: g.primaryKeyword ?? '',
-        secondaryKeywords: '',
+        secondaryKeywords: Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.join(', ') : (genForm.secondaryKeywords || ''),
         metaTitle: g.metaTitle ?? '',
         metaDescription: g.metaDescription ?? '',
         featuredImage: '',
         authorName: g.authorName ?? 'ONES AI Editorial Team',
         isPublished: false,
-        readTimeMinutes: String(g.readTimeMinutes ?? 5),
+        readTimeMinutes: String(g.readTimeMinutes ?? 8),
       };
       onGenerated(form);
     },
@@ -604,7 +617,17 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
                 value={genForm.keywords}
                 onChange={e => setGenForm(f => ({ ...f, keywords: e.target.value }))}
               />
-              <p className="text-xs text-gray-400">Comma-separated keywords to include naturally</p>
+              <p className="text-xs text-gray-400">Primary keyword — appears in title, H1, and meta</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Secondary Keywords <span className="text-gray-400 font-normal">(comma-separated)</span></Label>
+              <Input
+                placeholder="e.g. magnesium glycinate benefits, best magnesium for anxiety, magnesium dosage adults"
+                value={genForm.secondaryKeywords}
+                onChange={e => setGenForm(f => ({ ...f, secondaryKeywords: e.target.value }))}
+              />
+              <p className="text-xs text-gray-400">Used as H2 subheadings — drives long-tail ranking</p>
             </div>
 
             <Button
@@ -1067,6 +1090,413 @@ function EditView({ post, initialForm, onBack, onSaved }: EditViewProps) {
 }
 
 // ──────────────────────────────────────────────────────────────
+// Bulk Generate View
+// ──────────────────────────────────────────────────────────────
+
+interface BulkJob {
+  title: string;
+  status: 'pending' | 'running' | 'done' | 'error';
+  slug?: string;
+  error?: string;
+}
+
+function BulkGenerateView({ onBack }: { onBack: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [titlesText, setTitlesText] = useState('');
+  const [category, setCategory] = useState('Supplements');
+  const [tone, setTone] = useState('informative');
+  const [jobs, setJobs] = useState<BulkJob[]>([]);
+  const [running, setRunning] = useState(false);
+  const [currentIdx, setCurrentIdx] = useState(-1);
+
+  const titles = titlesText
+    .split('\n')
+    .map(t => t.trim())
+    .filter(Boolean);
+
+  const startBatch = async () => {
+    if (!titles.length) return;
+    const queue: BulkJob[] = titles.map(title => ({ title, status: 'pending' }));
+    setJobs(queue);
+    setRunning(true);
+
+    for (let i = 0; i < queue.length; i++) {
+      setCurrentIdx(i);
+      setJobs(prev => prev.map((j, idx) => idx === i ? { ...j, status: 'running' } : j));
+
+      try {
+        const genRes = await apiRequest('POST', '/api/blog/admin/generate', {
+          title: queue[i].title, category, tone,
+        }).then(r => r.json());
+
+        if (genRes.error || !genRes.generated) throw new Error(genRes.error ?? 'Generation failed');
+
+        const g = genRes.generated;
+        const payload = {
+          title: g.title ?? queue[i].title,
+          slug: g.slug ?? slugify(g.title ?? queue[i].title),
+          excerpt: g.excerpt ?? null,
+          content: g.content ?? '',
+          category: g.category ?? category,
+          tags: Array.isArray(g.tags) ? g.tags : [],
+          primaryKeyword: g.primaryKeyword ?? null,
+          secondaryKeywords: Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords : [],
+          metaTitle: g.metaTitle ?? null,
+          metaDescription: g.metaDescription ?? null,
+          featuredImage: null,
+          authorName: 'ONES AI Editorial Team',
+          isPublished: false,
+          wordCount: g.wordCount ?? 0,
+          readTimeMinutes: g.readTimeMinutes ?? 8,
+        };
+
+        const saveRes = await apiRequest('POST', '/api/blog', payload).then(r => r.json());
+        const slug = saveRes.post?.slug ?? payload.slug;
+
+        setJobs(prev => prev.map((j, idx) => idx === i ? { ...j, status: 'done', slug } : j));
+      } catch (err: any) {
+        setJobs(prev => prev.map((j, idx) => idx === i ? { ...j, status: 'error', error: err.message } : j));
+      }
+
+      // Small delay between requests to avoid rate limiting
+      if (i < queue.length - 1) await new Promise(r => setTimeout(r, 1500));
+    }
+
+    setRunning(false);
+    setCurrentIdx(-1);
+    queryClient.invalidateQueries({ queryKey: ['/api/blog/admin/all'] });
+    // Use queue (local loop var) instead of stale jobs state
+    toast({ title: `Batch complete — ${queue.filter(j => j.status === 'done').length} articles saved as drafts` });
+  };
+
+  const done = jobs.filter(j => j.status === 'done').length;
+  const errors = jobs.filter(j => j.status === 'error').length;
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <Button variant="ghost" size="sm" onClick={onBack} className="mb-4" disabled={running}>
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back to Posts
+        </Button>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <Sparkles className="w-6 h-6 text-[#054700]" />
+          Bulk Generate Articles
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Paste one article title per line. Each will be generated by AI and saved as a draft.
+        </p>
+      </div>
+
+      <div className="p-6 max-w-3xl space-y-6">
+        {!running && jobs.length === 0 && (
+          <Card>
+            <CardContent className="p-6 space-y-5">
+              <div className="space-y-2">
+                <Label>Article Titles <span className="text-gray-400 font-normal">(one per line)</span></Label>
+                <Textarea
+                  placeholder={`Vitamin K2 Benefits: Bones, Heart, and Arterial Health\nBerberine vs Metformin: What the Research Shows\nZinc Deficiency: Signs, Symptoms, and the Right Supplement Form\nCollagen Peptides: What the Science Says\nCreatine for Cognitive Performance: Beyond the Gym`}
+                  rows={12}
+                  value={titlesText}
+                  onChange={e => setTitlesText(e.target.value)}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-gray-400">{titles.length} article{titles.length !== 1 ? 's' : ''} queued · ~{titles.length * 30}s estimated</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Default Category</Label>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Tone</Label>
+                  <Select value={tone} onValueChange={setTone}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {TONES.map(t => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Button
+                className="w-full bg-[#054700] hover:bg-[#043d00] text-white gap-2"
+                disabled={titles.length === 0}
+                onClick={startBatch}
+              >
+                <Sparkles className="w-4 h-4" /> Generate {titles.length} Article{titles.length !== 1 ? 's' : ''}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {jobs.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Batch Progress</span>
+                {!running && (
+                  <span className="text-sm font-normal text-gray-500">
+                    {done} done · {errors} errors · {jobs.length - done - errors} remaining
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-gray-100">
+                {jobs.map((job, idx) => (
+                  <div key={idx} className="flex items-center gap-3 px-6 py-3">
+                    <div className="w-5 flex-shrink-0 text-center">
+                      {job.status === 'pending' && <span className="text-gray-300 text-sm">·</span>}
+                      {job.status === 'running' && <Loader2 className="w-4 h-4 animate-spin text-[#054700]" />}
+                      {job.status === 'done' && <span className="text-emerald-600 text-base">✓</span>}
+                      {job.status === 'error' && <span className="text-red-500 text-base">✗</span>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm truncate ${
+                        job.status === 'done' ? 'text-gray-700' :
+                        job.status === 'error' ? 'text-red-600' :
+                        job.status === 'running' ? 'text-[#054700] font-medium' : 'text-gray-400'
+                      }`}>{job.title}</p>
+                      {job.error && <p className="text-xs text-red-400 mt-0.5">{job.error}</p>}
+                    </div>
+                    {job.status === 'done' && job.slug && (
+                      <a href={`/blog/${job.slug}`} target="_blank" rel="noreferrer"
+                        className="text-xs text-emerald-600 hover:underline flex-shrink-0">
+                        Preview
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {!running && jobs.length > 0 && (
+          <Button variant="outline" onClick={() => { setJobs([]); setTitlesText(''); }} className="w-full">
+            Start new batch
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// Auto-Generate Settings View
+// ──────────────────────────────────────────────────────────────
+
+interface AutoGenSettings {
+  enabled: boolean;
+  articlesPerDay: number;
+  autoPublish: boolean;
+  tiers: string[];
+}
+
+const ALL_TIERS = ['pillar', 'system', 'ingredient', 'comparison', 'symptom', 'lab', 'lifestyle'];
+
+function AutoGenSettingsView({ onBack }: { onBack: () => void }) {
+  const { toast } = useToast();
+  const [settings, setSettings] = useState<AutoGenSettings>({
+    enabled: false,
+    articlesPerDay: 20,
+    autoPublish: true,
+    tiers: ALL_TIERS,
+  });
+  const [runLog, setRunLog] = useState<string[]>([]);
+  const [runStats, setRunStats] = useState<{ generated: number; failed: number; skipped: number } | null>(null);
+
+  const { isLoading: loadingSettings, data: remoteSettings } = useQuery<AutoGenSettings>({
+    queryKey: ['/api/blog/admin/auto-gen/settings'],
+    queryFn: () => apiRequest('GET', '/api/blog/admin/auto-gen/settings').then(r => r.json()),
+  });
+
+  useEffect(() => {
+    if (remoteSettings) setSettings(remoteSettings);
+  }, [remoteSettings]);
+
+  const saveMutation = useMutation({
+    mutationFn: (s: AutoGenSettings) =>
+      apiRequest('PATCH', '/api/blog/admin/auto-gen/settings', s).then(r => r.json()),
+    onSuccess: () => toast({ title: 'Settings saved' }),
+    onError: (e: any) => toast({ title: 'Save failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const runMutation = useMutation({
+    mutationFn: (overrides: Partial<AutoGenSettings>) =>
+      apiRequest('POST', '/api/blog/admin/auto-gen/run', overrides).then(r => r.json()),
+    onSuccess: (data) => {
+      // Server responds immediately (202) — run is in background
+      setRunLog([`✓ Job ${data.jobId} started — articles will appear in the blog list as they complete.`]);
+      setRunStats(null);
+      toast({ title: 'Generation started', description: 'Check the blog list in a few minutes.' });
+    },
+    onError: (e: any) => toast({ title: 'Run failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const set = (patch: Partial<AutoGenSettings>) => setSettings(s => ({ ...s, ...patch }));
+  const toggleTier = (tier: string) =>
+    set({ tiers: settings.tiers.includes(tier) ? settings.tiers.filter(t => t !== tier) : [...settings.tiers, tier] });
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back to Posts
+        </Button>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <Settings className="w-6 h-6 text-[#054700]" />
+          Auto-Generate Settings
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Runs daily at 02:00 UTC. Skips topics already published. Publishes automatically if enabled.
+        </p>
+      </div>
+
+      <div className="p-6 max-w-2xl space-y-6">
+        {/* Master toggle */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-gray-900">Enable Daily Auto-Generation</p>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  When ON, the server generates articles each night automatically.
+                  <span className="ml-1 font-medium text-amber-600">Currently {settings.enabled ? 'ON — articles will be generated tonight' : 'OFF — nothing will run'}.</span>
+                </p>
+              </div>
+              <Switch
+                checked={settings.enabled}
+                onCheckedChange={v => set({ enabled: v })}
+                className="data-[state=checked]:bg-[#054700]"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Config */}
+        <Card>
+          <CardHeader><CardTitle>Configuration</CardTitle></CardHeader>
+          <CardContent className="p-6 space-y-5">
+            <div className="space-y-2">
+              <Label>Articles per day <span className="text-gray-400 font-normal">(runs at 02:00 UTC)</span></Label>
+              <Input
+                type="number"
+                min={1}
+                max={200}
+                value={settings.articlesPerDay}
+                onChange={e => set({ articlesPerDay: Number(e.target.value) })}
+                className="w-32"
+              />
+              <p className="text-xs text-gray-400">
+                API cost estimate: ~${(settings.articlesPerDay * 0.30).toFixed(2)}/day · ~${(settings.articlesPerDay * 0.30 * 30).toFixed(0)}/month
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-gray-800">Auto-publish</p>
+                <p className="text-sm text-gray-500">Publish immediately on generation (vs. save as draft for review)</p>
+              </div>
+              <Switch
+                checked={settings.autoPublish}
+                onCheckedChange={v => set({ autoPublish: v })}
+                className="data-[state=checked]:bg-[#054700]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Content tiers to generate</Label>
+              <div className="flex flex-wrap gap-2">
+                {ALL_TIERS.map(tier => (
+                  <button
+                    key={tier}
+                    onClick={() => toggleTier(tier)}
+                    className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                      settings.tiers.includes(tier)
+                        ? 'bg-[#054700] text-white border-[#054700]'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                    }`}
+                  >
+                    {tier}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400">Only selected tiers will be drawn from the topic cluster library</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Save */}
+        <div className="flex gap-3">
+          <Button
+            className="bg-[#054700] hover:bg-[#043d00] text-white gap-2"
+            onClick={() => saveMutation.mutate(settings)}
+            disabled={saveMutation.isPending || loadingSettings}
+          >
+            {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save Settings
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={runMutation.isPending}
+            onClick={() => runMutation.mutate({ articlesPerDay: settings.articlesPerDay, autoPublish: settings.autoPublish, tiers: settings.tiers })}
+          >
+            {runMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            {runMutation.isPending ? 'Starting…' : 'Run Now (test)'}
+          </Button>
+        </div>
+
+        {/* Run log */}
+        {runLog.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                Background Job Started
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="bg-gray-50 rounded p-3">
+                {runLog.map((line, i) => (
+                  <p key={i} className={`text-xs font-mono leading-5 ${
+                    line.startsWith('✗') ? 'text-red-500' :
+                    line.startsWith('✓') ? 'text-emerald-600' : 'text-gray-500'
+                  }`}>{line}</p>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-3">
+                Articles publish as they finish. Refresh the blog list in a few minutes to see them.
+                Server logs show real-time progress.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Info */}
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="p-4">
+            <p className="text-sm text-amber-800">
+              <strong>SEO Note:</strong> Google’s Helpful Content guidelines flag thin AI content farms.
+              Keep <strong>auto-publish OFF</strong> initially and review a sample batch before enabling.
+              500–5,000 high-quality articles outperform 100,000 thin ones for YMYL health searches.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
 // Main Page — orchestrates views
 // ──────────────────────────────────────────────────────────────
 
@@ -1091,6 +1521,14 @@ export default function AdminBlogPage() {
     setView('generate');
   }, []);
 
+  const handleBulk = useCallback(() => {
+    setView('bulk');
+  }, []);
+
+  const handleSettings = useCallback(() => {
+    setView('settings');
+  }, []);
+
   const handleGenerated = useCallback((form: PostForm) => {
     setEditPost(null);
     setGeneratedForm(form);
@@ -1102,6 +1540,14 @@ export default function AdminBlogPage() {
     setEditPost(null);
     setGeneratedForm(undefined);
   }, []);
+
+  if (view === 'settings') {
+    return <AutoGenSettingsView onBack={handleBack} />;
+  }
+
+  if (view === 'bulk') {
+    return <BulkGenerateView onBack={handleBack} />;
+  }
 
   if (view === 'generate') {
     return <GenerateView onBack={handleBack} onGenerated={handleGenerated} />;
@@ -1118,5 +1564,5 @@ export default function AdminBlogPage() {
     );
   }
 
-  return <ListView onEdit={handleEdit} onNew={handleNew} onGenerate={handleGenerate} />;
+  return <ListView onEdit={handleEdit} onNew={handleNew} onGenerate={handleGenerate} onBulk={handleBulk} onSettings={handleSettings} />;
 }

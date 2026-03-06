@@ -978,6 +978,7 @@ export const supportTickets = pgTable("support_tickets", {
   priority: supportTicketPriorityEnum("priority").default('medium').notNull(),
   category: text("category").notNull(),
   assignedTo: text("assigned_to"),
+  adminNotes: text("admin_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at"),
@@ -1670,6 +1671,22 @@ export const blogPosts = pgTable("blog_posts", {
 export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({ id: true, updatedAt: true, viewCount: true });
 export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
 export type BlogPost = typeof blogPosts.$inferSelect;
+
+// ============================================
+// KEYWORD DATA  (populated by scripts/seed-keywords.cjs via DataForSEO)
+// ============================================
+
+export const keywordData = pgTable("keyword_data", {
+  keyword:     varchar("keyword", { length: 500 }).primaryKey(),
+  volume:      integer("volume").notNull().default(0),
+  kd:          integer("kd").notNull().default(0),          // competition_index 0-100
+  cpc:         decimal("cpc", { precision: 8, scale: 2 }).notNull().default('0'),
+  competition: varchar("competition", { length: 20 }),      // LOW / MEDIUM / HIGH
+  source:      varchar("source", { length: 50 }).default('dataforseo'),
+  updatedAt:   timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type KeywordData = typeof keywordData.$inferSelect;
 
 // Membership tier keys for type safety
 export const MEMBERSHIP_TIERS = {

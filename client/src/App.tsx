@@ -55,6 +55,7 @@ import ConversationsPage from "@/pages/admin/ConversationsPage";
 import OrdersManagementPage from "@/pages/admin/OrdersManagementPage";
 import AuditLogsPage from "@/pages/admin/AuditLogsPage";
 import AdminBlogPage from "@/pages/admin/AdminBlogPage";
+import RetailComparisonPricingPage from "@/pages/admin/RetailComparisonPricingPage";
 
 // Import shared/public components
 import SharedFormulaPage from "@/pages/SharedFormulaPage";
@@ -240,6 +241,11 @@ function MainRouter() {
       <Route path="/admin/blog">
         <ProtectedAdminRoute>
           <AdminBlogPage />
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/retail-pricing">
+        <ProtectedAdminRoute>
+          <RetailComparisonPricingPage />
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/support-tickets/:id">

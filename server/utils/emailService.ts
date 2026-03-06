@@ -99,7 +99,7 @@ function getEmailTemplate(notification: EmailNotification): string {
               <p style="margin:0;font-size:12px;color:#9ca3af;">
                 <a href="${getFrontendUrl()}/dashboard/settings?tab=notifications" style="color:#9ca3af;">Manage preferences</a>
                 &nbsp;·&nbsp;
-                <a href="${getFrontendUrl()}" style="color:#9ca3af;">myones.ai</a>
+                <a href="${getFrontendUrl()}" style="color:#9ca3af;">ones.health</a>
               </p>
             </td>
           </tr>

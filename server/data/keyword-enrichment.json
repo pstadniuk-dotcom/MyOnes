@@ -1,0 +1,3522 @@
+{
+  "creatine monohydrate supplement": {
+    "volume": 201000,
+    "kd": 1,
+    "cpc": 3.04
+  },
+  "creatine for cognition": {
+    "volume": 480,
+    "kd": 43,
+    "cpc": 1.05
+  },
+  "creatine loading protocol": {
+    "volume": 70,
+    "kd": 29,
+    "cpc": 0.59
+  },
+  "creatine safety evidence": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "magnesium glycinate supplement": {
+    "volume": 301000,
+    "kd": 5,
+    "cpc": 2.02
+  },
+  "magnesium for sleep": {
+    "volume": 110000,
+    "kd": 100,
+    "cpc": 1.55
+  },
+  "magnesium deficiency symptoms": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "best magnesium for anxiety": {
+    "volume": 1900,
+    "kd": 100,
+    "cpc": 1.92
+  },
+  "collagen peptides supplement": {
+    "volume": 49500,
+    "kd": 8,
+    "cpc": 1.06
+  },
+  "collagen for skin": {
+    "volume": 6600,
+    "kd": 100,
+    "cpc": 2.12
+  },
+  "collagen joints research": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "hydrolysed collagen bioavailability": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "lion's mane mushroom supplement": {
+    "volume": 60500,
+    "kd": 13,
+    "cpc": 3.69
+  },
+  "lion's mane BDNF": {
+    "volume": 40,
+    "kd": 30,
+    "cpc": 0
+  },
+  "lion's mane cognition": {
+    "volume": 140,
+    "kd": 100,
+    "cpc": 1.99
+  },
+  "mushroom nootropic stack": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vitamin D3 K2 supplement": {
+    "volume": 60500,
+    "kd": 15,
+    "cpc": 2.11
+  },
+  "vitamin D deficiency": {
+    "volume": 135000,
+    "kd": 17,
+    "cpc": 0.27
+  },
+  "MK-7 vs MK-4": {
+    "volume": 720,
+    "kd": 25,
+    "cpc": 3.46
+  },
+  "calcium and vitamin D3 K2": {
+    "volume": 10,
+    "kd": 100,
+    "cpc": 2.43
+  },
+  "liver enzyme blood test": {
+    "volume": 33100,
+    "kd": 13,
+    "cpc": 2.39
+  },
+  "ALT AST elevated causes": {
+    "volume": 1000,
+    "kd": 9,
+    "cpc": 0.07
+  },
+  "GGT alcohol marker": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "liver function blood test": {
+    "volume": 33100,
+    "kd": 13,
+    "cpc": 2.39
+  },
+  "how to read blood test results": {
+    "volume": 2900,
+    "kd": 2,
+    "cpc": 0.8
+  },
+  "blood test markers explained": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "CBC interpretation": {
+    "volume": 480,
+    "kd": 1,
+    "cpc": 2.77
+  },
+  "metabolic panel guide": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "probiotic supplement": {
+    "volume": 90500,
+    "kd": 63,
+    "cpc": 3.21
+  },
+  "best probiotic strains": {
+    "volume": 320,
+    "kd": 85,
+    "cpc": 2.72
+  },
+  "Lactobacillus acidophilus": {
+    "volume": 27100,
+    "kd": 90,
+    "cpc": 1.69
+  },
+  "probiotic for gut health": {
+    "volume": 201000,
+    "kd": 11,
+    "cpc": 3.43
+  },
+  "iron supplement": {
+    "volume": 135000,
+    "kd": 100,
+    "cpc": 1.48
+  },
+  "ferritin levels optimal": {
+    "volume": 20,
+    "kd": 3,
+    "cpc": 0
+  },
+  "iron deficiency anaemia": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "iron absorption vitamin C": {
+    "volume": 3600,
+    "kd": 7,
+    "cpc": 1.24
+  },
+  "optimal ferritin levels": {
+    "volume": 1000,
+    "kd": 1,
+    "cpc": 0.08
+  },
+  "ferritin deficiency symptoms": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "ferritin supplement protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "iron stores blood test": {
+    "volume": 50,
+    "kd": 10,
+    "cpc": 3.35
+  },
+  "immune support supplement": {
+    "volume": 22200,
+    "kd": 23,
+    "cpc": 2.73
+  },
+  "vitamin C immune function": {
+    "volume": 880,
+    "kd": 100,
+    "cpc": 0.59
+  },
+  "zinc immunity": {
+    "volume": 110,
+    "kd": 87,
+    "cpc": 0.46
+  },
+  "elderberry immune support": {
+    "volume": 1000,
+    "kd": 100,
+    "cpc": 1.2
+  },
+  "B-complex supplement": {
+    "volume": 18100,
+    "kd": 19,
+    "cpc": 1.35
+  },
+  "methylated B12": {
+    "volume": 27100,
+    "kd": 100,
+    "cpc": 1.84
+  },
+  "methylfolate vs folic acid": {
+    "volume": 5400,
+    "kd": 45,
+    "cpc": 2.19
+  },
+  "B vitamins energy": {
+    "volume": 14800,
+    "kd": 12,
+    "cpc": 1.46
+  },
+  "NAC supplement": {
+    "volume": 90500,
+    "kd": 100,
+    "cpc": 1.94
+  },
+  "NAC glutathione": {
+    "volume": 1900,
+    "kd": 100,
+    "cpc": 1.99
+  },
+  "NAC detoxification": {
+    "volume": 320,
+    "kd": 100,
+    "cpc": 1.31
+  },
+  "NAC respiratory health": {
+    "volume": 10,
+    "kd": 70,
+    "cpc": 1.7
+  },
+  "NMN supplement": {
+    "volume": 74000,
+    "kd": 100,
+    "cpc": 3.13
+  },
+  "NMN vs NR": {
+    "volume": 1300,
+    "kd": 84,
+    "cpc": 2.42
+  },
+  "NAD+ and aging": {
+    "volume": 90,
+    "kd": 95,
+    "cpc": 1.49
+  },
+  "NMN dosage evidence": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "berberine supplement": {
+    "volume": 74000,
+    "kd": 100,
+    "cpc": 2.41
+  },
+  "berberine blood sugar": {
+    "volume": 3600,
+    "kd": 100,
+    "cpc": 2.49
+  },
+  "berberine vs metformin": {
+    "volume": 2400,
+    "kd": 4,
+    "cpc": 3.31
+  },
+  "berberine cholesterol": {
+    "volume": 2400,
+    "kd": 97,
+    "cpc": 2.22
+  },
+  "L-theanine supplement": {
+    "volume": 74000,
+    "kd": 100,
+    "cpc": 2.22
+  },
+  "L-theanine caffeine stack": {
+    "volume": 50,
+    "kd": 50,
+    "cpc": 0.77
+  },
+  "L-theanine sleep": {
+    "volume": 6600,
+    "kd": 100,
+    "cpc": 1.65
+  },
+  "alpha waves L-theanine": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "magnesium malate supplement": {
+    "volume": 12100,
+    "kd": 20,
+    "cpc": 1.76
+  },
+  "magnesium for fibromyalgia": {
+    "volume": 590,
+    "kd": 91,
+    "cpc": 3.37
+  },
+  "malic acid supplement": {
+    "volume": 480,
+    "kd": 100,
+    "cpc": 1.73
+  },
+  "magnesium fatigue": {
+    "volume": 480,
+    "kd": 86,
+    "cpc": 1.21
+  },
+  "berberine blood sugar research": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "metformin alternative supplement": {
+    "volume": 20,
+    "kd": 93,
+    "cpc": 0
+  },
+  "natural metformin": {
+    "volume": 1000,
+    "kd": 95,
+    "cpc": 2.05
+  },
+  "complete blood count interpretation": {
+    "volume": 480,
+    "kd": 1,
+    "cpc": 2.77
+  },
+  "CBC blood test markers": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "haematocrit optimal": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "white blood cell count normal": {
+    "volume": 33100,
+    "kd": 1,
+    "cpc": 1.51
+  },
+  "iodine supplement": {
+    "volume": 40500,
+    "kd": 100,
+    "cpc": 2
+  },
+  "iodine thyroid": {
+    "volume": 590,
+    "kd": 32,
+    "cpc": 2.14
+  },
+  "iodine deficiency symptoms": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "kelp vs potassium iodide": {
+    "volume": 20,
+    "kd": 2,
+    "cpc": 0
+  },
+  "DHEA supplement": {
+    "volume": 40500,
+    "kd": 100,
+    "cpc": 2.49
+  },
+  "DHEA adrenal function": {
+    "volume": 170,
+    "kd": 29,
+    "cpc": 1.74
+  },
+  "DHEA testosterone": {
+    "volume": 1300,
+    "kd": 83,
+    "cpc": 2.82
+  },
+  "DHEA age-related decline": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "hs-CRP blood test": {
+    "volume": 5400,
+    "kd": 16,
+    "cpc": 2.58
+  },
+  "C-reactive protein inflammation": {
+    "volume": 3600,
+    "kd": 3,
+    "cpc": 1.2
+  },
+  "hsCRP cardiovascular risk": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "reduce CRP supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "choline supplement": {
+    "volume": 33100,
+    "kd": 100,
+    "cpc": 2.84
+  },
+  "CDP-choline cognition": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "choline liver health": {
+    "volume": 110,
+    "kd": 100,
+    "cpc": 1.68
+  },
+  "acetylcholine production": {
+    "volume": 260,
+    "kd": 1,
+    "cpc": 2.7
+  },
+  "spirulina supplement": {
+    "volume": 14800,
+    "kd": 46,
+    "cpc": 1.34
+  },
+  "chlorella heavy metal detox": {
+    "volume": 170,
+    "kd": 69,
+    "cpc": 0
+  },
+  "spirulina protein": {
+    "volume": 6600,
+    "kd": 98,
+    "cpc": 0.85
+  },
+  "algae supplement benefits": {
+    "volume": 110,
+    "kd": 100,
+    "cpc": 1.38
+  },
+  "zinc supplement benefits": {
+    "volume": 12100,
+    "kd": 39,
+    "cpc": 0.44
+  },
+  "zinc deficiency symptoms": {
+    "volume": 22200,
+    "kd": 6,
+    "cpc": 0.18
+  },
+  "zinc picolinate vs gluconate": {
+    "volume": 1600,
+    "kd": 13,
+    "cpc": 1.45
+  },
+  "zinc testosterone": {
+    "volume": 3600,
+    "kd": 75,
+    "cpc": 2.69
+  },
+  "vitamin D2 vs D3": {
+    "volume": 9900,
+    "kd": 33,
+    "cpc": 0.19
+  },
+  "cholecalciferol vs ergocalciferol": {
+    "volume": 1900,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vitamin D3 absorption": {
+    "volume": 210,
+    "kd": 27,
+    "cpc": 1.07
+  },
+  "vitamin D supplement form": {
+    "volume": 50,
+    "kd": 71,
+    "cpc": 2.4
+  },
+  "selenium supplement": {
+    "volume": 27100,
+    "kd": 100,
+    "cpc": 1.75
+  },
+  "selenomethionine absorption": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "selenium thyroid health": {
+    "volume": 480,
+    "kd": 89,
+    "cpc": 1.66
+  },
+  "selenium antioxidant": {
+    "volume": 320,
+    "kd": 8,
+    "cpc": 1.34
+  },
+  "GABA supplement": {
+    "volume": 27100,
+    "kd": 100,
+    "cpc": 1.45
+  },
+  "GABA sleep supplement": {
+    "volume": 1900,
+    "kd": 92,
+    "cpc": 2.1
+  },
+  "GABA anxiety relief": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "GABA blood-brain barrier": {
+    "volume": 70,
+    "kd": 0,
+    "cpc": 0
+  },
+  "inositol supplement": {
+    "volume": 27100,
+    "kd": 100,
+    "cpc": 2.17
+  },
+  "myo-inositol PCOS": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "inositol anxiety": {
+    "volume": 590,
+    "kd": 86,
+    "cpc": 1.7
+  },
+  "inositol insulin sensitivity": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "DHEA-S blood test": {
+    "volume": 1900,
+    "kd": 7,
+    "cpc": 3.85
+  },
+  "DHEA adrenal reserve": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "DHEA-S decline with age": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "adrenal function lab markers": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "electrolyte supplement": {
+    "volume": 22200,
+    "kd": 91,
+    "cpc": 2.51
+  },
+  "electrolyte balance": {
+    "volume": 1900,
+    "kd": 50,
+    "cpc": 1.48
+  },
+  "sodium potassium ratio": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "hydration electrolytes": {
+    "volume": 2900,
+    "kd": 100,
+    "cpc": 3.85
+  },
+  "homocysteine blood test": {
+    "volume": 6600,
+    "kd": 28,
+    "cpc": 3.3
+  },
+  "high homocysteine causes": {
+    "volume": 390,
+    "kd": 3,
+    "cpc": 0.04
+  },
+  "B vitamins homocysteine": {
+    "volume": 590,
+    "kd": 9,
+    "cpc": 0.54
+  },
+  "homocysteine heart disease risk": {
+    "volume": 20,
+    "kd": 2,
+    "cpc": 0
+  },
+  "heart health supplements": {
+    "volume": 14800,
+    "kd": 65,
+    "cpc": 2.97
+  },
+  "CoQ10 heart health": {
+    "volume": 210,
+    "kd": 82,
+    "cpc": 1.69
+  },
+  "omega-3 cardiovascular support": {
+    "volume": 20,
+    "kd": 100,
+    "cpc": 0.41
+  },
+  "magnesium heart rhythm": {
+    "volume": 210,
+    "kd": 27,
+    "cpc": 4.45
+  },
+  "boron supplement": {
+    "volume": 22200,
+    "kd": 100,
+    "cpc": 1.74
+  },
+  "boron testosterone": {
+    "volume": 1900,
+    "kd": 98,
+    "cpc": 2.14
+  },
+  "boron bone health": {
+    "volume": 170,
+    "kd": 98,
+    "cpc": 2.94
+  },
+  "boron mineral deficiency": {
+    "volume": 10,
+    "kd": 50,
+    "cpc": 0
+  },
+  "krill oil vs fish oil": {
+    "volume": 12100,
+    "kd": 61,
+    "cpc": 2.25
+  },
+  "krill oil phospholipids": {
+    "volume": 70,
+    "kd": 88,
+    "cpc": 2.49
+  },
+  "omega-3 absorption comparison": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "astaxanthin krill oil": {
+    "volume": 590,
+    "kd": 100,
+    "cpc": 1.84
+  },
+  "fasting insulin blood test": {
+    "volume": 590,
+    "kd": 3,
+    "cpc": 3.05
+  },
+  "insulin resistance lab test": {
+    "volume": 1600,
+    "kd": 2,
+    "cpc": 4.04
+  },
+  "HOMA-IR calculation": {
+    "volume": 320,
+    "kd": 1,
+    "cpc": 0
+  },
+  "optimal fasting insulin level": {
+    "volume": 170,
+    "kd": 0,
+    "cpc": 0
+  },
+  "CoQ10 ubiquinol supplement": {
+    "volume": 3600,
+    "kd": 19,
+    "cpc": 3.4
+  },
+  "ubiquinol vs ubiquinone": {
+    "volume": 4400,
+    "kd": 32,
+    "cpc": 1.58
+  },
+  "CoQ10 statin depletion": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "curcumin supplement": {
+    "volume": 18100,
+    "kd": 100,
+    "cpc": 2.73
+  },
+  "curcumin bioavailability": {
+    "volume": 480,
+    "kd": 100,
+    "cpc": 2.96
+  },
+  "turmeric anti-inflammatory": {
+    "volume": 4400,
+    "kd": 42,
+    "cpc": 1.84
+  },
+  "curcumin vs ibuprofen": {
+    "volume": 30,
+    "kd": 0,
+    "cpc": 0
+  },
+  "perimenopause supplements": {
+    "volume": 18100,
+    "kd": 100,
+    "cpc": 3.84
+  },
+  "menopause supplement protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "black cohosh perimenopause": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "magnesium perimenopause symptoms": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "melatonin supplement": {
+    "volume": 9900,
+    "kd": 57,
+    "cpc": 1.69
+  },
+  "melatonin dosage": {
+    "volume": 27100,
+    "kd": 66,
+    "cpc": 0.49
+  },
+  "melatonin jet lag": {
+    "volume": 260,
+    "kd": 20,
+    "cpc": 0.48
+  },
+  "melatonin safety concerns": {
+    "volume": 20,
+    "kd": 22,
+    "cpc": 0.08
+  },
+  "MTHFR gene test": {
+    "volume": 12100,
+    "kd": 76,
+    "cpc": 5.97
+  },
+  "folate blood test MTHFR": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "methylfolate MTHFR variant": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "homocysteine MTHFR": {
+    "volume": 480,
+    "kd": 3,
+    "cpc": 4.09
+  },
+  "quercetin supplement": {
+    "volume": 14800,
+    "kd": 99,
+    "cpc": 2.41
+  },
+  "quercetin antihistamine": {
+    "volume": 720,
+    "kd": 34,
+    "cpc": 1.14
+  },
+  "quercetin bioavailability": {
+    "volume": 140,
+    "kd": 100,
+    "cpc": 2.76
+  },
+  "quercetin zinc absorption": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "resveratrol supplement": {
+    "volume": 14800,
+    "kd": 100,
+    "cpc": 2.58
+  },
+  "resveratrol sirtuin": {
+    "volume": 50,
+    "kd": 61,
+    "cpc": 2.67
+  },
+  "trans-resveratrol vs cis": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "resveratrol heart health": {
+    "volume": 50,
+    "kd": 20,
+    "cpc": 7.53
+  },
+  "histamine intolerance supplements": {
+    "volume": 6600,
+    "kd": 48,
+    "cpc": 2.05
+  },
+  "DAO enzyme supplement": {
+    "volume": 4400,
+    "kd": 100,
+    "cpc": 1.53
+  },
+  "low histamine diet": {
+    "volume": 49500,
+    "kd": 45,
+    "cpc": 0.33
+  },
+  "quercetin histamine": {
+    "volume": 390,
+    "kd": 87,
+    "cpc": 2.94
+  },
+  "ubiquinone vs ubiquinol": {
+    "volume": 4400,
+    "kd": 32,
+    "cpc": 1.58
+  },
+  "CoQ10 form comparison": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "ubiquinol absorption over 40": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "active form CoQ10": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "glutamine supplement": {
+    "volume": 12100,
+    "kd": 91,
+    "cpc": 1.1
+  },
+  "L-glutamine gut health": {
+    "volume": 1600,
+    "kd": 73,
+    "cpc": 0.95
+  },
+  "glutamine leaky gut": {
+    "volume": 210,
+    "kd": 92,
+    "cpc": 0.64
+  },
+  "glutamine immune support": {
+    "volume": 10,
+    "kd": 57,
+    "cpc": 1.33
+  },
+  "whey vs plant protein": {
+    "volume": 5400,
+    "kd": 42,
+    "cpc": 1.15
+  },
+  "pea protein vs whey": {
+    "volume": 6600,
+    "kd": 33,
+    "cpc": 0.62
+  },
+  "complete protein plant-based": {
+    "volume": 1000,
+    "kd": 37,
+    "cpc": 1.26
+  },
+  "protein supplement comparison": {
+    "volume": 480,
+    "kd": 68,
+    "cpc": 0.88
+  },
+  "hyaluronic acid supplement": {
+    "volume": 12100,
+    "kd": 100,
+    "cpc": 2.05
+  },
+  "oral hyaluronic acid absorption": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "hyaluronic acid joints": {
+    "volume": 720,
+    "kd": 100,
+    "cpc": 2.1
+  },
+  "skin hydration supplement": {
+    "volume": 1300,
+    "kd": 63,
+    "cpc": 2.9
+  },
+  "milk thistle supplement": {
+    "volume": 12100,
+    "kd": 100,
+    "cpc": 2.37
+  },
+  "silymarin liver": {
+    "volume": 140,
+    "kd": 100,
+    "cpc": 2.2
+  },
+  "milk thistle detox": {
+    "volume": 480,
+    "kd": 100,
+    "cpc": 1.83
+  },
+  "silymarin extraction": {
+    "volume": 70,
+    "kd": 100,
+    "cpc": 1.96
+  },
+  "supplements for anxiety": {
+    "volume": 12100,
+    "kd": 100,
+    "cpc": 1.63
+  },
+  "magnesium anxiety": {
+    "volume": 9900,
+    "kd": 95,
+    "cpc": 1.25
+  },
+  "ashwagandha anxiety": {
+    "volume": 18100,
+    "kd": 31,
+    "cpc": 1.3
+  },
+  "L-theanine stress relief": {
+    "volume": 90,
+    "kd": 97,
+    "cpc": 0.68
+  },
+  "MTHFR mutation supplement": {
+    "volume": 1600,
+    "kd": 100,
+    "cpc": 3.45
+  },
+  "methylated folate": {
+    "volume": 8100,
+    "kd": 100,
+    "cpc": 3.84
+  },
+  "5-MTHF vs folic acid": {
+    "volume": 260,
+    "kd": 36,
+    "cpc": 2.28
+  },
+  "alpha-lipoic acid supplement": {
+    "volume": 8100,
+    "kd": 68,
+    "cpc": 2.21
+  },
+  "ALA blood sugar": {
+    "volume": 50,
+    "kd": 58,
+    "cpc": 0.64
+  },
+  "alpha-lipoic acid neuropathy": {
+    "volume": 6600,
+    "kd": 93,
+    "cpc": 2.07
+  },
+  "R-ALA vs S-ALA": {
+    "volume": 20,
+    "kd": 0,
+    "cpc": 0
+  },
+  "maca root supplement": {
+    "volume": 8100,
+    "kd": 81,
+    "cpc": 1.48
+  },
+  "maca libido": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "maca energy": {
+    "volume": 260,
+    "kd": 34,
+    "cpc": 1.19
+  },
+  "maca menopause symptoms": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "liver support supplement": {
+    "volume": 9900,
+    "kd": 100,
+    "cpc": 4.22
+  },
+  "liver detox supplements": {
+    "volume": 8100,
+    "kd": 100,
+    "cpc": 3.53
+  },
+  "NAC liver health": {
+    "volume": 590,
+    "kd": 80,
+    "cpc": 2.43
+  },
+  "milk thistle silymarin": {
+    "volume": 720,
+    "kd": 100,
+    "cpc": 2.09
+  },
+  "magnesium complex supplement": {
+    "volume": 9900,
+    "kd": 100,
+    "cpc": 1.28
+  },
+  "magnesium glycinate": {
+    "volume": 823000,
+    "kd": 100,
+    "cpc": 1.71
+  },
+  "magnesium malate benefits": {
+    "volume": 12100,
+    "kd": 92,
+    "cpc": 1.37
+  },
+  "best form of magnesium": {
+    "volume": 5400,
+    "kd": 95,
+    "cpc": 1.66
+  },
+  "reishi mushroom supplement": {
+    "volume": 8100,
+    "kd": 100,
+    "cpc": 2.95
+  },
+  "reishi immune support": {
+    "volume": 10,
+    "kd": 90,
+    "cpc": 1.84
+  },
+  "beta-glucans reishi": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "adaptogen mushroom": {
+    "volume": 8100,
+    "kd": 100,
+    "cpc": 2.18
+  },
+  "5-HTP supplement": {
+    "volume": 8100,
+    "kd": 100,
+    "cpc": 1.73
+  },
+  "5-HTP serotonin": {
+    "volume": 480,
+    "kd": 91,
+    "cpc": 1.62
+  },
+  "5-HTP depression": {
+    "volume": 480,
+    "kd": 38,
+    "cpc": 3.5
+  },
+  "5-HTP sleep supplement": {
+    "volume": 10,
+    "kd": 100,
+    "cpc": 3.32
+  },
+  "tryptophan supplement": {
+    "volume": 8100,
+    "kd": 100,
+    "cpc": 1.72
+  },
+  "L-tryptophan mood": {
+    "volume": 20,
+    "kd": 56,
+    "cpc": 3.15
+  },
+  "tryptophan melatonin": {
+    "volume": 320,
+    "kd": 77,
+    "cpc": 1.07
+  },
+  "tryptophan vs 5-HTP": {
+    "volume": 320,
+    "kd": 13,
+    "cpc": 0.78
+  },
+  "CoQ10 fertility": {
+    "volume": 8100,
+    "kd": 100,
+    "cpc": 3.91
+  },
+  "CoQ10 egg quality": {
+    "volume": 720,
+    "kd": 96,
+    "cpc": 4.18
+  },
+  "CoQ10 sperm health": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "mitochondria fertility": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements for joint pain": {
+    "volume": 8100,
+    "kd": 100,
+    "cpc": 2.38
+  },
+  "glucosamine joint health": {
+    "volume": 1300,
+    "kd": 21,
+    "cpc": 1.2
+  },
+  "curcumin joint pain": {
+    "volume": 210,
+    "kd": 97,
+    "cpc": 1.89
+  },
+  "omega-3 inflammation joints": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "silica supplement": {
+    "volume": 6600,
+    "kd": 100,
+    "cpc": 1.18
+  },
+  "silica for hair growth": {
+    "volume": 720,
+    "kd": 100,
+    "cpc": 1.54
+  },
+  "horsetail extract silica": {
+    "volume": 170,
+    "kd": 100,
+    "cpc": 0.78
+  },
+  "silica collagen synthesis": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "fenugreek supplement": {
+    "volume": 6600,
+    "kd": 100,
+    "cpc": 1.06
+  },
+  "fenugreek testosterone": {
+    "volume": 1300,
+    "kd": 93,
+    "cpc": 1.58
+  },
+  "fenugreek blood sugar": {
+    "volume": 880,
+    "kd": 18,
+    "cpc": 0.83
+  },
+  "fenugreek breastfeeding": {
+    "volume": 1300,
+    "kd": 95,
+    "cpc": 0.88
+  },
+  "Korean red ginseng supplement": {
+    "volume": 1600,
+    "kd": 25,
+    "cpc": 1.53
+  },
+  "panax ginseng cognitive": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "ginseng energy": {
+    "volume": 1600,
+    "kd": 68,
+    "cpc": 0.43
+  },
+  "ginsenoside mechanism": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "men's health supplements": {
+    "volume": 4400,
+    "kd": 73,
+    "cpc": 5.15
+  },
+  "testosterone support supplements": {
+    "volume": 720,
+    "kd": 100,
+    "cpc": 3.89
+  },
+  "male vitality protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "men's energy stack": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "magnesium glycinate vs citrate": {
+    "volume": 74000,
+    "kd": 43,
+    "cpc": 0.72
+  },
+  "magnesium oxide bioavailability": {
+    "volume": 260,
+    "kd": 2,
+    "cpc": 0.35
+  },
+  "magnesium supplement comparison": {
+    "volume": 140,
+    "kd": 70,
+    "cpc": 1.09
+  },
+  "kidney health supplements": {
+    "volume": 5400,
+    "kd": 100,
+    "cpc": 1.27
+  },
+  "bladder health supplements": {
+    "volume": 880,
+    "kd": 100,
+    "cpc": 2.81
+  },
+  "kidney stone prevention": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "cranberry extract UTI": {
+    "volume": 260,
+    "kd": 83,
+    "cpc": 4.35
+  },
+  "rhodiola rosea supplement": {
+    "volume": 5400,
+    "kd": 100,
+    "cpc": 1.82
+  },
+  "rhodiola for stress": {
+    "volume": 170,
+    "kd": 77,
+    "cpc": 1.3
+  },
+  "rhodiola dosage": {
+    "volume": 880,
+    "kd": 74,
+    "cpc": 0.86
+  },
+  "adaptogen focus energy": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "saw palmetto supplement": {
+    "volume": 5400,
+    "kd": 100,
+    "cpc": 1.91
+  },
+  "saw palmetto DHT": {
+    "volume": 590,
+    "kd": 94,
+    "cpc": 4.05
+  },
+  "saw palmetto prostate": {
+    "volume": 1000,
+    "kd": 93,
+    "cpc": 1.56
+  },
+  "saw palmetto hair loss": {
+    "volume": 8100,
+    "kd": 89,
+    "cpc": 3.28
+  },
+  "ginkgo biloba supplement": {
+    "volume": 5400,
+    "kd": 100,
+    "cpc": 1.53
+  },
+  "ginkgo memory": {
+    "volume": 90,
+    "kd": 86,
+    "cpc": 1.89
+  },
+  "ginkgo blood circulation": {
+    "volume": 480,
+    "kd": 35,
+    "cpc": 1.09
+  },
+  "ginkgo biloba EGb 761": {
+    "volume": 210,
+    "kd": 100,
+    "cpc": 0.78
+  },
+  "brain fog supplements": {
+    "volume": 5400,
+    "kd": 100,
+    "cpc": 2.48
+  },
+  "brain fog causes": {
+    "volume": 12100,
+    "kd": 19,
+    "cpc": 0.95
+  },
+  "inflammation brain fog": {
+    "volume": 140,
+    "kd": 9,
+    "cpc": 1.76
+  },
+  "cognitive clarity supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements for hair loss women": {
+    "volume": 4400,
+    "kd": 86,
+    "cpc": 6.05
+  },
+  "ferritin hair loss": {
+    "volume": 590,
+    "kd": 36,
+    "cpc": 6.35
+  },
+  "thyroid hair loss female": {
+    "volume": 260,
+    "kd": 40,
+    "cpc": 2.91
+  },
+  "biotin vs iron hair loss": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "black seed oil supplement": {
+    "volume": 4400,
+    "kd": 91,
+    "cpc": 1.71
+  },
+  "nigella sativa thymoquinone": {
+    "volume": 10,
+    "kd": 69,
+    "cpc": 0
+  },
+  "black seed oil inflammation": {
+    "volume": 210,
+    "kd": 30,
+    "cpc": 0.42
+  },
+  "black seed oil immune": {
+    "volume": 20,
+    "kd": 32,
+    "cpc": 0
+  },
+  "longevity supplements": {
+    "volume": 4400,
+    "kd": 100,
+    "cpc": 8.03
+  },
+  "anti-ageing supplements": {
+    "volume": 8100,
+    "kd": 85,
+    "cpc": 4.43
+  },
+  "NAD+ longevity": {
+    "volume": 90,
+    "kd": 100,
+    "cpc": 1.28
+  },
+  "healthspan extension": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "thyroid support supplement": {
+    "volume": 4400,
+    "kd": 100,
+    "cpc": 1.95
+  },
+  "selenium thyroid": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "iodine thyroid health": {
+    "volume": 170,
+    "kd": 90,
+    "cpc": 1.71
+  },
+  "T4 to T3 conversion nutrients": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "phosphatidylserine supplement": {
+    "volume": 4400,
+    "kd": 100,
+    "cpc": 2.08
+  },
+  "phosphatidylserine memory": {
+    "volume": 70,
+    "kd": 75,
+    "cpc": 1.5
+  },
+  "phosphatidylserine cortisol": {
+    "volume": 880,
+    "kd": 95,
+    "cpc": 2.19
+  },
+  "brain health phospholipids": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "acetyl-L-carnitine supplement": {
+    "volume": 2400,
+    "kd": 54,
+    "cpc": 1.88
+  },
+  "ALCAR brain health": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "carnitine neuropathy": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "mitochondrial support supplement": {
+    "volume": 1000,
+    "kd": 100,
+    "cpc": 3.51
+  },
+  "beta-glucan supplement": {
+    "volume": 4400,
+    "kd": 100,
+    "cpc": 2.82
+  },
+  "oat beta-glucan cholesterol": {
+    "volume": 10,
+    "kd": 29,
+    "cpc": 0
+  },
+  "beta-glucan immune modulation": {
+    "volume": 10,
+    "kd": 100,
+    "cpc": 0.72
+  },
+  "yeast beta-glucan": {
+    "volume": 210,
+    "kd": 80,
+    "cpc": 2.37
+  },
+  "adrenal support supplement": {
+    "volume": 3600,
+    "kd": 100,
+    "cpc": 2.08
+  },
+  "adrenal fatigue recovery": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "cortisol regulation": {
+    "volume": 480,
+    "kd": 93,
+    "cpc": 2.2
+  },
+  "HPA axis support": {
+    "volume": 30,
+    "kd": 98,
+    "cpc": 1.75
+  },
+  "dandelion root supplement": {
+    "volume": 3600,
+    "kd": 100,
+    "cpc": 1.24
+  },
+  "dandelion liver support": {
+    "volume": 20,
+    "kd": 100,
+    "cpc": 0
+  },
+  "dandelion digestive health": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "natural diuretic herbs": {
+    "volume": 140,
+    "kd": 99,
+    "cpc": 0.97
+  },
+  "supplements for migraines": {
+    "volume": 3600,
+    "kd": 100,
+    "cpc": 2.72
+  },
+  "magnesium migraine prevention": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "riboflavin B2 headache": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "CoQ10 migraine research": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "chromium picolinate supplement": {
+    "volume": 1900,
+    "kd": 68,
+    "cpc": 1.62
+  },
+  "chromium blood sugar": {
+    "volume": 480,
+    "kd": 98,
+    "cpc": 1.28
+  },
+  "chromium insulin sensitivity": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "glucose tolerance factor": {
+    "volume": 40,
+    "kd": 82,
+    "cpc": 1.02
+  },
+  "pregnenolone supplement": {
+    "volume": 2400,
+    "kd": 100,
+    "cpc": 2.6
+  },
+  "pregnenolone memory": {
+    "volume": 30,
+    "kd": 75,
+    "cpc": 1.58
+  },
+  "pregnenolone hormone precursor": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "pregnenolone adrenal": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "pycnogenol supplement": {
+    "volume": 2400,
+    "kd": 100,
+    "cpc": 1.95
+  },
+  "pine bark extract OPC": {
+    "volume": 10,
+    "kd": 100,
+    "cpc": 0
+  },
+  "pycnogenol circulation": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "oligomeric proanthocyanidins": {
+    "volume": 14800,
+    "kd": 12,
+    "cpc": 1.64
+  },
+  "valerian root supplement": {
+    "volume": 2400,
+    "kd": 100,
+    "cpc": 1.49
+  },
+  "valerian sleep": {
+    "volume": 12100,
+    "kd": 100,
+    "cpc": 1.18
+  },
+  "valerian GABA": {
+    "volume": 170,
+    "kd": 90,
+    "cpc": 1.5
+  },
+  "valerian anxiety supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "omega-3 index test": {
+    "volume": 1300,
+    "kd": 54,
+    "cpc": 3.87
+  },
+  "EPA DHA blood test": {
+    "volume": 10,
+    "kd": 16,
+    "cpc": 0
+  },
+  "omega-3 index optimal range": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "omega-3 blood test heart risk": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "lung health supplements": {
+    "volume": 1900,
+    "kd": 100,
+    "cpc": 1.95
+  },
+  "quercetin lung function": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vitamin D immunity lungs": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "tribulus terrestris supplement": {
+    "volume": 1900,
+    "kd": 100,
+    "cpc": 1.94
+  },
+  "tribulus testosterone research": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "tribulus libido": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "tribulus steroidal saponins": {
+    "volume": 10,
+    "kd": 77,
+    "cpc": 0
+  },
+  "supplements for muscle cramps": {
+    "volume": 1900,
+    "kd": 100,
+    "cpc": 1.2
+  },
+  "magnesium muscle cramps": {
+    "volume": 1000,
+    "kd": 92,
+    "cpc": 0.96
+  },
+  "potassium deficiency cramps": {
+    "volume": 70,
+    "kd": 7,
+    "cpc": 0.16
+  },
+  "electrolyte muscle spasms": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements for constipation": {
+    "volume": 1900,
+    "kd": 100,
+    "cpc": 3.06
+  },
+  "magnesium constipation": {
+    "volume": 18100,
+    "kd": 99,
+    "cpc": 1.21
+  },
+  "psyllium husk constipation": {
+    "volume": 14800,
+    "kd": 8,
+    "cpc": 1.21
+  },
+  "gut motility supplement": {
+    "volume": 480,
+    "kd": 100,
+    "cpc": 2.02
+  },
+  "magnesium RBC test": {
+    "volume": 880,
+    "kd": 46,
+    "cpc": 3.04
+  },
+  "RBC magnesium vs serum": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "intracellular magnesium test": {
+    "volume": 40,
+    "kd": 36,
+    "cpc": 3.76
+  },
+  "magnesium deficiency blood test": {
+    "volume": 880,
+    "kd": 9,
+    "cpc": 3.99
+  },
+  "metabolic support supplement": {
+    "volume": 880,
+    "kd": 53,
+    "cpc": 2.82
+  },
+  "thermogenic supplement": {
+    "volume": 1600,
+    "kd": 81,
+    "cpc": 2.18
+  },
+  "fat burning supplements evidence": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "body composition stack": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "holy basil supplement": {
+    "volume": 1600,
+    "kd": 100,
+    "cpc": 1.37
+  },
+  "tulsi cortisol": {
+    "volume": 20,
+    "kd": 36,
+    "cpc": 0.65
+  },
+  "holy basil adaptogen": {
+    "volume": 70,
+    "kd": 53,
+    "cpc": 0.51
+  },
+  "tulsi blood sugar": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vanadium supplement": {
+    "volume": 1600,
+    "kd": 100,
+    "cpc": 0.93
+  },
+  "vanadium glucose": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vanadyl sulphate insulin": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vanadium bone health": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "schisandra supplement": {
+    "volume": 1600,
+    "kd": 100,
+    "cpc": 2.04
+  },
+  "schisandra liver": {
+    "volume": 50,
+    "kd": 85,
+    "cpc": 1.45
+  },
+  "schisandra adaptogen": {
+    "volume": 320,
+    "kd": 100,
+    "cpc": 1.78
+  },
+  "schisandra athletic performance": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "ashwagandha vs rhodiola": {
+    "volume": 480,
+    "kd": 30,
+    "cpc": 1.97
+  },
+  "best adaptogen for stress": {
+    "volume": 70,
+    "kd": 100,
+    "cpc": 2.26
+  },
+  "ashwagandha rhodiola comparison": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "cortisol adaptogen": {
+    "volume": 390,
+    "kd": 96,
+    "cpc": 2.5
+  },
+  "lipid panel interpretation": {
+    "volume": 210,
+    "kd": 13,
+    "cpc": 2.58
+  },
+  "LDL particle size test": {
+    "volume": 320,
+    "kd": 36,
+    "cpc": 2.74
+  },
+  "ApoB cardiovascular risk": {
+    "volume": 20,
+    "kd": 13,
+    "cpc": 4.4
+  },
+  "HDL cholesterol optimal": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "astragalus supplement": {
+    "volume": 1300,
+    "kd": 100,
+    "cpc": 1.31
+  },
+  "astragalus telomere": {
+    "volume": 90,
+    "kd": 80,
+    "cpc": 0.79
+  },
+  "astragalus immune support": {
+    "volume": 90,
+    "kd": 87,
+    "cpc": 0.7
+  },
+  "adaptogen longevity": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "melatonin vs magnesium for sleep": {
+    "volume": 260,
+    "kd": 23,
+    "cpc": 0.41
+  },
+  "best sleep supplement comparison": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "magnesium glycinate sleep": {
+    "volume": 246000,
+    "kd": 16,
+    "cpc": 1.49
+  },
+  "melatonin dosage sleep": {
+    "volume": 1000,
+    "kd": 61,
+    "cpc": 0.49
+  },
+  "passionflower supplement": {
+    "volume": 1000,
+    "kd": 100,
+    "cpc": 1.3
+  },
+  "passionflower anxiety": {
+    "volume": 880,
+    "kd": 97,
+    "cpc": 2.06
+  },
+  "passionflower sleep": {
+    "volume": 880,
+    "kd": 100,
+    "cpc": 1.28
+  },
+  "chrysin passionflower": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements for dry skin": {
+    "volume": 1000,
+    "kd": 100,
+    "cpc": 1.46
+  },
+  "omega-3 skin hydration": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "biotin skin hair": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "collagen skin barrier": {
+    "volume": 10,
+    "kd": 37,
+    "cpc": 0
+  },
+  "postpartum supplements": {
+    "volume": 1000,
+    "kd": 100,
+    "cpc": 8.98
+  },
+  "breastfeeding vitamins": {
+    "volume": 880,
+    "kd": 100,
+    "cpc": 3.7
+  },
+  "postnatal supplement protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "iron postpartum": {
+    "volume": 50,
+    "kd": 97,
+    "cpc": 7.09
+  },
+  "best form of zinc supplement": {
+    "volume": 880,
+    "kd": 97,
+    "cpc": 1.11
+  },
+  "zinc picolinate absorption": {
+    "volume": 20,
+    "kd": 0,
+    "cpc": 0
+  },
+  "zinc bisglycinate immune": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "zinc supplement comparison": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "omega-3 EPA DHA supplement": {
+    "volume": 720,
+    "kd": 100,
+    "cpc": 3.86
+  },
+  "fish oil vs algae oil": {
+    "volume": 170,
+    "kd": 35,
+    "cpc": 1.62
+  },
+  "EPA DHA ratio inflammation": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "omega-3 bioavailability": {
+    "volume": 10,
+    "kd": 37,
+    "cpc": 2.18
+  },
+  "chronic fatigue supplements": {
+    "volume": 720,
+    "kd": 100,
+    "cpc": 2.66
+  },
+  "fatigue root causes": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "adrenal fatigue lab tests": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "iron ferritin fatigue": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vitamin K2 MK-7": {
+    "volume": 590,
+    "kd": 100,
+    "cpc": 2.27
+  },
+  "K2 arterial calcification": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vitamin K2 bones": {
+    "volume": 50,
+    "kd": 100,
+    "cpc": 1.29
+  },
+  "MK-7 dosage": {
+    "volume": 20,
+    "kd": 47,
+    "cpc": 0
+  },
+  "supplements for sugar cravings": {
+    "volume": 590,
+    "kd": 100,
+    "cpc": 2.06
+  },
+  "chromium sugar cravings": {
+    "volume": 140,
+    "kd": 99,
+    "cpc": 1.31
+  },
+  "GABA stress eating": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "serotonin food cravings": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "metabolic health supplements": {
+    "volume": 480,
+    "kd": 99,
+    "cpc": 4.44
+  },
+  "blood sugar regulation supplements": {
+    "volume": 1600,
+    "kd": 98,
+    "cpc": 2.42
+  },
+  "insulin resistance support": {
+    "volume": 10,
+    "kd": 71,
+    "cpc": 17.08
+  },
+  "glucose control stack": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vegan omega-3": {
+    "volume": 3600,
+    "kd": 100,
+    "cpc": 4.19
+  },
+  "DHA algae oil": {
+    "volume": 1300,
+    "kd": 92,
+    "cpc": 2.57
+  },
+  "sustainable omega-3 source": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "collagen vs bone broth": {
+    "volume": 260,
+    "kd": 54,
+    "cpc": 3.67
+  },
+  "hydrolysed collagen absorption": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "bone broth collagen peptides": {
+    "volume": 140,
+    "kd": 87,
+    "cpc": 0.67
+  },
+  "collagen supplement vs food": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "women's hormonal health supplements": {
+    "volume": 210,
+    "kd": 51,
+    "cpc": 6.65
+  },
+  "menopause supplements": {
+    "volume": 18100,
+    "kd": 100,
+    "cpc": 3.62
+  },
+  "perimenopause protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "PCOS supplement stack": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "seasonal depression supplements": {
+    "volume": 390,
+    "kd": 97,
+    "cpc": 1.09
+  },
+  "vitamin D winter depression": {
+    "volume": 40,
+    "kd": 4,
+    "cpc": 1.06
+  },
+  "SAD light therapy supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "serotonin winter mood": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements for mood swings": {
+    "volume": 260,
+    "kd": 100,
+    "cpc": 1.91
+  },
+  "PMS mood supplement": {
+    "volume": 40,
+    "kd": 100,
+    "cpc": 4.24
+  },
+  "serotonin mood support": {
+    "volume": 170,
+    "kd": 100,
+    "cpc": 1.62
+  },
+  "magnesium PMS irritability": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "zinc plasma blood test": {
+    "volume": 30,
+    "kd": 9,
+    "cpc": 0
+  },
+  "zinc copper ratio": {
+    "volume": 590,
+    "kd": 0,
+    "cpc": 0.02
+  },
+  "zinc deficiency test": {
+    "volume": 390,
+    "kd": 27,
+    "cpc": 2.08
+  },
+  "plasma zinc level optimal": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "cognitive performance supplements": {
+    "volume": 70,
+    "kd": 39,
+    "cpc": 5.76
+  },
+  "nootropic stack": {
+    "volume": 390,
+    "kd": 85,
+    "cpc": 2.18
+  },
+  "brain health supplements": {
+    "volume": 18100,
+    "kd": 85,
+    "cpc": 2.61
+  },
+  "memory and focus supplements": {
+    "volume": 1300,
+    "kd": 100,
+    "cpc": 2.17
+  },
+  "pantethine supplement": {
+    "volume": 170,
+    "kd": 100,
+    "cpc": 1.82
+  },
+  "pantothenic acid adrenal": {
+    "volume": 20,
+    "kd": 54,
+    "cpc": 1.05
+  },
+  "B5 cholesterol": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "CoA synthesis pantethine": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "endurance athlete supplements": {
+    "volume": 210,
+    "kd": 100,
+    "cpc": 3.35
+  },
+  "marathon runner supplement protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "iron athlete supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "CoQ10 endurance": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "biohacking guide": {
+    "volume": 30,
+    "kd": 25,
+    "cpc": 4.34
+  },
+  "evidence-based biohacking": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "performance optimisation": {
+    "volume": 1900,
+    "kd": 27,
+    "cpc": 2.47
+  },
+  "longevity protocols": {
+    "volume": 140,
+    "kd": 41,
+    "cpc": 8.08
+  },
+  "eleuthero supplement": {
+    "volume": 90,
+    "kd": 100,
+    "cpc": 1.46
+  },
+  "Siberian ginseng adaptogen": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "eleuthero endurance": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "eleuthero immune function": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "NMN vs NR supplement": {
+    "volume": 50,
+    "kd": 99,
+    "cpc": 3.34
+  },
+  "NAD+ precursor comparison": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "nicotinamide riboside NR": {
+    "volume": 880,
+    "kd": 100,
+    "cpc": 4.62
+  },
+  "NMN bioavailability": {
+    "volume": 30,
+    "kd": 92,
+    "cpc": 1.13
+  },
+  "slow metabolism supplements": {
+    "volume": 70,
+    "kd": 100,
+    "cpc": 1.95
+  },
+  "thyroid metabolism": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "metabolic rate supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "B-vitamins metabolism": {
+    "volume": 2900,
+    "kd": 8,
+    "cpc": 1.64
+  },
+  "supplements for intermittent fasting": {
+    "volume": 50,
+    "kd": 61,
+    "cpc": 2.14
+  },
+  "IF supplement timing": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "fasting electrolytes": {
+    "volume": 6600,
+    "kd": 99,
+    "cpc": 2.01
+  },
+  "NAD+ fasting synergy": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "personalised supplements": {
+    "volume": 10,
+    "kd": 65,
+    "cpc": 4.96
+  },
+  "custom supplement formula": {
+    "volume": 170,
+    "kd": 41,
+    "cpc": 10.82
+  },
+  "blood test supplements": {
+    "volume": 10,
+    "kd": 100,
+    "cpc": 9.48
+  },
+  "personalised nutrition": {
+    "volume": 1600,
+    "kd": 13,
+    "cpc": 9.23
+  },
+  "hormonal health guide": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "hormone optimisation": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "endocrine system support": {
+    "volume": 210,
+    "kd": 100,
+    "cpc": 3.66
+  },
+  "hormonal imbalance treatment": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "sleep optimisation guide": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "best supplements for sleep": {
+    "volume": 6600,
+    "kd": 100,
+    "cpc": 2.82
+  },
+  "how to improve sleep quality": {
+    "volume": 3600,
+    "kd": 54,
+    "cpc": 1.78
+  },
+  "sleep lab markers": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "gut health guide": {
+    "volume": 40,
+    "kd": 84,
+    "cpc": 0.92
+  },
+  "microbiome supplements": {
+    "volume": 720,
+    "kd": 100,
+    "cpc": 4.49
+  },
+  "best probiotics": {
+    "volume": 27100,
+    "kd": 100,
+    "cpc": 4.12
+  },
+  "digestive health protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "energy optimisation supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "chronic fatigue causes": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "best energy supplements": {
+    "volume": 4400,
+    "kd": 100,
+    "cpc": 2.9
+  },
+  "adrenal fatigue protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "endocrine support supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "hormone balance supplement": {
+    "volume": 12100,
+    "kd": 100,
+    "cpc": 3.43
+  },
+  "endocrine system nutrients": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "adaptogen stack": {
+    "volume": 20,
+    "kd": 100,
+    "cpc": 1.4
+  },
+  "ligament support supplement": {
+    "volume": 30,
+    "kd": 100,
+    "cpc": 4.04
+  },
+  "collagen for joints": {
+    "volume": 1900,
+    "kd": 100,
+    "cpc": 2.23
+  },
+  "connective tissue supplement": {
+    "volume": 260,
+    "kd": 99,
+    "cpc": 2.6
+  },
+  "joint repair nutrition": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "ashwagandha KSM-66": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "ashwagandha cortisol": {
+    "volume": 5400,
+    "kd": 62,
+    "cpc": 2.62
+  },
+  "ashwagandha dosage": {
+    "volume": 8100,
+    "kd": 73,
+    "cpc": 0.89
+  },
+  "adaptogen for stress": {
+    "volume": 2900,
+    "kd": 5,
+    "cpc": 4.3
+  },
+  "morinda root supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "noni antioxidant": {
+    "volume": 10,
+    "kd": 89,
+    "cpc": 0
+  },
+  "morinda nitric oxide": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "noni juice supplement": {
+    "volume": 30,
+    "kd": 76,
+    "cpc": 0.41
+  },
+  "mucuna pruriens supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "mucuna L-DOPA": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "mucuna dopamine": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "mucuna testosterone": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "Ones vs Viome supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "Viome review personalized supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "gut microbiome supplement recommendations": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "AI health platform comparison": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "Ones vs Ritual supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "Ritual vitamins review": {
+    "volume": 590,
+    "kd": 100,
+    "cpc": 5.09
+  },
+  "personalised vs generic supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "multivitamin comparison": {
+    "volume": 170,
+    "kd": 53,
+    "cpc": 1.84
+  },
+  "Ones vs Thorne supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "Thorne supplements review": {
+    "volume": 1600,
+    "kd": 100,
+    "cpc": 8.8
+  },
+  "practitioner supplements personalised": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "custom formula vs off-the-shelf": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "personalised supplement brands comparison": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "AI supplement platform": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "blood test supplement service": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplement subscription review": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "curcumin vs ibuprofen inflammation": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "natural anti-inflammatory supplement": {
+    "volume": 1900,
+    "kd": 100,
+    "cpc": 2.07
+  },
+  "curcumin pain relief": {
+    "volume": 170,
+    "kd": 100,
+    "cpc": 1.16
+  },
+  "NSAID alternative natural": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "mushroom supplement comparison": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "lion's mane vs reishi": {
+    "volume": 110,
+    "kd": 23,
+    "cpc": 1.78
+  },
+  "cordyceps energy supplement": {
+    "volume": 10,
+    "kd": 100,
+    "cpc": 0.42
+  },
+  "functional mushroom stack": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "liposomal vitamin C vs standard": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vitamin C bioavailability": {
+    "volume": 210,
+    "kd": 100,
+    "cpc": 3.4
+  },
+  "liposomal supplement absorption": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "high-dose vitamin C form": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "probiotic supplements vs fermented foods": {
+    "volume": 10,
+    "kd": 21,
+    "cpc": 1.02
+  },
+  "probiotic colonisation evidence": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "kefir vs probiotic capsule": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "gut microbiome supplement": {
+    "volume": 590,
+    "kd": 100,
+    "cpc": 4.94
+  },
+  "poor sleep supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "sleep quality supplements": {
+    "volume": 3600,
+    "kd": 5,
+    "cpc": 2.67
+  },
+  "cortisol and sleep": {
+    "volume": 1000,
+    "kd": 30,
+    "cpc": 2.18
+  },
+  "low morning energy supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "cortisol awakening response": {
+    "volume": 1300,
+    "kd": 4,
+    "cpc": 1.24
+  },
+  "adrenal support morning": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "low cortisol morning": {
+    "volume": 90,
+    "kd": 10,
+    "cpc": 5.07
+  },
+  "low libido supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "testosterone and libido": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "maca libido supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "zinc testosterone libido": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "recovery supplements exercise": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "post-workout recovery nutrition": {
+    "volume": 70,
+    "kd": 40,
+    "cpc": 0.05
+  },
+  "collagen exercise recovery": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "magnesium post-exercise": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "immune support supplements frequent illness": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vitamin D immunity": {
+    "volume": 880,
+    "kd": 26,
+    "cpc": 3.06
+  },
+  "zinc immune function": {
+    "volume": 1300,
+    "kd": 88,
+    "cpc": 1.28
+  },
+  "adaptogen immune health": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements for bloating digestion": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "IBS supplement protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "gut health bloating": {
+    "volume": 90,
+    "kd": 100,
+    "cpc": 5.9
+  },
+  "digestive enzymes probiotic": {
+    "volume": 2900,
+    "kd": 100,
+    "cpc": 2.01
+  },
+  "afternoon energy crash supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "blood sugar energy crash": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "berberine afternoon energy": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements for concentration work": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "focus supplement adults": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "lion's mane focus": {
+    "volume": 170,
+    "kd": 100,
+    "cpc": 2.52
+  },
+  "phosphatidylserine concentration": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "night sweats natural remedies": {
+    "volume": 40,
+    "kd": 96,
+    "cpc": 0.99
+  },
+  "menopause night sweats supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "cortisol night sweats": {
+    "volume": 140,
+    "kd": 11,
+    "cpc": 7.86
+  },
+  "sage night sweats": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements for hormonal acne": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "zinc acne supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "inositol PCOS acne": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "blood sugar and acne breakouts": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements for weak nails": {
+    "volume": 40,
+    "kd": 100,
+    "cpc": 1.28
+  },
+  "biotin nail growth": {
+    "volume": 5400,
+    "kd": 20,
+    "cpc": 1.35
+  },
+  "silica nail strength": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "collagen hair nails": {
+    "volume": 170,
+    "kd": 100,
+    "cpc": 1.75
+  },
+  "supplements for memory and recall": {
+    "volume": 10,
+    "kd": 100,
+    "cpc": 0
+  },
+  "choline memory supplement": {
+    "volume": 10,
+    "kd": 100,
+    "cpc": 3.03
+  },
+  "bacopa memory": {
+    "volume": 390,
+    "kd": 61,
+    "cpc": 1.79
+  },
+  "lion's mane neurogenesis": {
+    "volume": 140,
+    "kd": 26,
+    "cpc": 5.88
+  },
+  "exercise intolerance supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "iron exercise performance": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "B12 anaemia exercise": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "oxygen delivery nutrients": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vitamin D blood test optimal range": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "25-OH vitamin D levels": {
+    "volume": 2900,
+    "kd": 6,
+    "cpc": 2.29
+  },
+  "vitamin D deficiency threshold": {
+    "volume": 20,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vitamin D lab test interpretation": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "thyroid blood test interpretation": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "TSH optimal range": {
+    "volume": 320,
+    "kd": 3,
+    "cpc": 0.13
+  },
+  "free T3 T4 blood test": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "thyroid panel comprehensive": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "HbA1c blood test interpretation": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "fasting glucose optimal range": {
+    "volume": 10,
+    "kd": 14,
+    "cpc": 0.06
+  },
+  "pre-diabetic HbA1c": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "blood sugar markers explained": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "cortisol testing methods": {
+    "volume": 10,
+    "kd": 75,
+    "cpc": 2.46
+  },
+  "saliva cortisol test": {
+    "volume": 3600,
+    "kd": 100,
+    "cpc": 3.9
+  },
+  "DUTCH cortisol test": {
+    "volume": 260,
+    "kd": 81,
+    "cpc": 2.44
+  },
+  "adrenal function lab testing": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "testosterone blood test men": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "free testosterone vs total": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "SHBG testosterone binding": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "testosterone lab interpretation": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "oestradiol progesterone blood test": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "female hormone panel": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "oestrogen progesterone ratio": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "hormone blood test women": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vitamin B12 blood test optimal": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "methylmalonic acid B12": {
+    "volume": 720,
+    "kd": 2,
+    "cpc": 2.58
+  },
+  "active B12 holotranscobalamin": {
+    "volume": 10,
+    "kd": 20,
+    "cpc": 0
+  },
+  "B12 deficiency lab test": {
+    "volume": 2400,
+    "kd": 1,
+    "cpc": 2.38
+  },
+  "kidney function blood test": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "eGFR creatinine levels": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "kidney health markers": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "creatinine optimal range": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "testosterone women blood test": {
+    "volume": 10,
+    "kd": 83,
+    "cpc": 2.64
+  },
+  "free testosterone women": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "androgen excess women": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "PCOS testosterone levels": {
+    "volume": 1600,
+    "kd": 1,
+    "cpc": 5.93
+  },
+  "LH FSH blood test": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "LH FSH ratio PCOS": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "FSH menopause marker": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "pituitary hormones fertility": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "cold therapy supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "cold plunge benefits": {
+    "volume": 18100,
+    "kd": 85,
+    "cpc": 1.31
+  },
+  "brown fat supplements cold": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "ice bath recovery protocol": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplement stack for stress": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "executive health protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "high performer supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "cortisol management stack": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vegan supplement stack": {
+    "volume": 10,
+    "kd": 100,
+    "cpc": 0
+  },
+  "vegetarian B12 supplement": {
+    "volume": 60500,
+    "kd": 5,
+    "cpc": 2.7
+  },
+  "vegan omega-3 algae": {
+    "volume": 30,
+    "kd": 100,
+    "cpc": 3.09
+  },
+  "plant-based iron supplement": {
+    "volume": 2400,
+    "kd": 13,
+    "cpc": 1.66
+  },
+  "strength training supplements timing": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "creatine timing strength": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "protein post-workout window": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "magnesium strength training": {
+    "volume": 10,
+    "kd": 60,
+    "cpc": 0
+  },
+  "supplements for shift workers": {
+    "volume": 10,
+    "kd": 100,
+    "cpc": 4.13
+  },
+  "circadian rhythm supplement": {
+    "volume": 170,
+    "kd": 90,
+    "cpc": 1.97
+  },
+  "melatonin shift work": {
+    "volume": 70,
+    "kd": 18,
+    "cpc": 0
+  },
+  "shift worker health protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements by age decade": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements in your 40s": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "ageing nutritional needs": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplement stack over 50": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements for alcohol drinkers": {
+    "volume": 20,
+    "kd": 56,
+    "cpc": 0.61
+  },
+  "alcohol nutrient depletion": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "liver supplements alcohol": {
+    "volume": 30,
+    "kd": 100,
+    "cpc": 1.67
+  },
+  "B-vitamins alcohol metabolism": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "travel supplement protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "jet lag supplement": {
+    "volume": 480,
+    "kd": 100,
+    "cpc": 2.09
+  },
+  "travel immune support": {
+    "volume": 20,
+    "kd": 100,
+    "cpc": 2.96
+  },
+  "melatonin jet lag timing": {
+    "volume": 10,
+    "kd": 0,
+    "cpc": 0
+  },
+  "pregnancy supplements safe": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "prenatal supplement protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "folate pregnancy": {
+    "volume": 12100,
+    "kd": 88,
+    "cpc": 2.45
+  },
+  "DHA pregnancy supplement": {
+    "volume": 3600,
+    "kd": 73,
+    "cpc": 4.04
+  },
+  "caffeine dependence adrenal health": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "caffeine withdrawal supplements": {
+    "volume": 50,
+    "kd": 17,
+    "cpc": 0.96
+  },
+  "adrenal reset protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "energy without caffeine": {
+    "volume": 720,
+    "kd": 98,
+    "cpc": 2
+  },
+  "sleep chronotype supplement timing": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "circadian supplement schedule": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "chronotype melatonin timing": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "sleep type health protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "altitude training supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "altitude iron supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "EPO iron altitude": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "respiratory supplement altitude": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "sauna supplement protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "sauna heat shock proteins": {
+    "volume": 390,
+    "kd": 2,
+    "cpc": 0.26
+  },
+  "electrolytes sauna": {
+    "volume": 10,
+    "kd": 38,
+    "cpc": 0
+  },
+  "infrared sauna supplement stack": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "plant-based athlete supplements": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vegan athlete nutrition": {
+    "volume": 210,
+    "kd": 45,
+    "cpc": 2.8
+  },
+  "creatine vegan athletes": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "iron vegan athlete supplement": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "supplements for over 60": {
+    "volume": 10,
+    "kd": 100,
+    "cpc": 3.6
+  },
+  "elderly supplement needs": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "vitamin B12 absorption elderly": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "calcium vitamin D seniors": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "keto diet supplement protocol": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  },
+  "ketogenic electrolytes": {
+    "volume": 5400,
+    "kd": 100,
+    "cpc": 3.38
+  },
+  "keto magnesium supplement": {
+    "volume": 590,
+    "kd": 8,
+    "cpc": 1.56
+  },
+  "nutrient depletion keto": {
+    "volume": 0,
+    "kd": 0,
+    "cpc": 0
+  }
+}

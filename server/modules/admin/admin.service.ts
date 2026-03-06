@@ -119,7 +119,7 @@ export class AdminService {
         try {
             const user = await adminRepository.getUserById(ticket.userId);
             if (user) {
-                const ticketUrl = `https://myones.ai/support/tickets/${ticketId}`;
+                const ticketUrl = `https://ones.health/support/tickets/${ticketId}`;
                 await sendNotificationEmail({
                     to: user.email,
                     subject: `Response to: ${ticket.subject}`,
@@ -404,8 +404,8 @@ Return ONLY valid JSON.`;
         return [headers.join(','), ...rows].join('\n');
     }
 
-    async exportOrders(startDate?: Date, endDate?: Date) {
-        const orders = await adminRepository.exportOrders(startDate, endDate);
+    async exportOrders(startDate?: Date, endDate?: Date, status?: string) {
+        const orders = await adminRepository.exportOrders(startDate, endDate, status);
         const headers = ['Order ID', 'User Name', 'User Email', 'Status', 'Amount', 'Supply (Days)', 'Placed At', 'Shipped At'];
         const rows = orders.map(o => [
             o.id,
@@ -474,6 +474,51 @@ Return ONLY valid JSON.`;
 
     async listIngredientPricing() {
         return await adminRepository.listIngredientPricing();
+    }
+
+    async testAiConnection(): Promise<{ ok: boolean; provider: string; model: string; sample?: string; error?: string }> {
+        const provider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai') as 'openai' | 'anthropic';
+        const model = aiRuntimeSettings.model || (provider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o');
+
+        try {
+            if (provider === 'openai') {
+                const apiKey = process.env.OPENAI_API_KEY;
+                if (!apiKey) return { ok: false, provider, model, error: 'OPENAI_API_KEY not set' };
+                const openai = new OpenAI({ apiKey });
+                const completion = await openai.chat.completions.create({
+                    model,
+                    messages: [{ role: 'user', content: 'Respond with exactly: OK' }],
+                    max_tokens: 5,
+                });
+                const sample = completion.choices?.[0]?.message?.content?.trim() || '';
+                return { ok: true, provider, model, sample };
+            } else {
+                const apiKey = process.env.ANTHROPIC_API_KEY;
+                if (!apiKey) return { ok: false, provider, model, error: 'ANTHROPIC_API_KEY not set' };
+                const res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': apiKey,
+                        'anthropic-version': '2023-06-01',
+                    },
+                    body: JSON.stringify({
+                        model,
+                        max_tokens: 5,
+                        messages: [{ role: 'user', content: 'Respond with exactly: OK' }],
+                    }),
+                });
+                if (!res.ok) {
+                    const errBody = await res.text();
+                    return { ok: false, provider, model, error: `HTTP ${res.status}: ${errBody.slice(0, 200)}` };
+                }
+                const data = await res.json();
+                const sample = data?.content?.[0]?.text?.trim() || '';
+                return { ok: true, provider, model, sample };
+            }
+        } catch (err: any) {
+            return { ok: false, provider, model, error: err.message || 'Unknown error' };
+        }
     }
 
     async updateIngredientPricing(id: string, updates: {

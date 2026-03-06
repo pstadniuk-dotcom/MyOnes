@@ -188,18 +188,18 @@ For each wearable provider:
 
 #### 5.3 Configure Custom Domain (Optional)
 **Vercel (Frontend):**
-- Add domain: `myones.ai`
+- Add domain: `ones.health`
 - Point DNS: CNAME to `cname.vercel-dns.com`
 
 **Railway (Backend API):**
-- Add domain: `api.myones.ai`
+- Add domain: `api.ones.health`
 - Point DNS: CNAME to Railway's provided CNAME
 
 #### 5.4 Set up CORS (If needed)
 In `server/index.ts`, update CORS to allow your Vercel domain:
 ```typescript
 app.use(cors({
-  origin: ['https://myones.ai', 'https://www.myones.ai'],
+  origin: ['https://ones.health', 'https://www.ones.health'],
   credentials: true
 }));
 ```

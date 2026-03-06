@@ -28,7 +28,7 @@ export default function FAQSection() {
     },
     {
       question: "Are your supplements third-party tested?",
-      answer: "Yes, every batch of supplements is tested by independent laboratories for purity, potency, and contaminants. We follow strict quality standards in our manufacturing process. Certificates of analysis are available upon request — contact support@myones.ai."
+      answer: "Yes, every batch of supplements is tested by independent laboratories for purity, potency, and contaminants. We follow strict quality standards in our manufacturing process. Certificates of analysis are available upon request — contact support@ones.health."
     }
   ];
 

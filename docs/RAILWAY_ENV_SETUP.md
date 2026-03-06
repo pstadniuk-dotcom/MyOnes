@@ -33,7 +33,7 @@ Railway Dashboard → Your Project → Service → Variables tab → Add Variabl
 | Variable | Value |
 |---|---|
 | `SENDGRID_API_KEY` | SendGrid API key (starts with `SG.`) |
-| `SENDGRID_FROM_EMAIL` | `hello@myones.ai` |
+| `SENDGRID_FROM_EMAIL` | `noreply@ones.health` |
 | `SENDGRID_FROM_NAME` | `ONES` |
 
 ---
@@ -44,7 +44,7 @@ These control where email verification links and OAuth redirects point. **Must b
 
 | Variable | Value |
 |---|---|
-| `FRONTEND_URL` | `https://myones.ai` (or Vercel URL if custom domain not yet live) |
+| `FRONTEND_URL` | `https://ones.health` (or Vercel URL if custom domain not yet live) |
 | `APP_URL` | `https://myones-production.up.railway.app` (your Railway backend URL) |
 
 ---

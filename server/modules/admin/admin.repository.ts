@@ -1057,11 +1057,12 @@ export class AdminRepository {
         }
     }
 
-    async exportOrders(startDate?: Date, endDate?: Date): Promise<any[]> {
+    async exportOrders(startDate?: Date, endDate?: Date, status?: string): Promise<any[]> {
         try {
-            let whereConditions = [];
+            let whereConditions: any[] = [];
             if (startDate) whereConditions.push(gte(orders.placedAt, startDate));
             if (endDate) whereConditions.push(lte(orders.placedAt, endDate));
+            if (status && status !== 'all') whereConditions.push(eq(orders.status, status as any));
             const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
             const orderList = await db.select().from(orders).where(whereClause).orderBy(desc(orders.placedAt));
 

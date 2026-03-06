@@ -305,7 +305,7 @@ class DatabaseBillingProvider implements BillingProvider {
 
       // ── Send order confirmation email + in-app notification ──────────
       try {
-        const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+        const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
         const amountDisplay = chargedCents > 0 ? `$${(chargedCents / 100).toFixed(2)}` : '';
 
         if (await notificationsService.shouldSendEmail(userId, 'billing')) {
@@ -436,7 +436,7 @@ class DatabaseBillingProvider implements BillingProvider {
 
     // ── Send subscription cancelled notification ──────────────────────
     try {
-      const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+      const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
 
       if (await notificationsService.shouldSendEmail(user.id, 'billing')) {
         await sendNotificationEmail({
@@ -509,7 +509,7 @@ class DatabaseBillingProvider implements BillingProvider {
       try {
         const user = await usersRepository.getUser(existing.userId);
         if (user) {
-          const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+          const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
 
           if (await notificationsService.shouldSendEmail(user.id, 'billing')) {
             await sendNotificationEmail({

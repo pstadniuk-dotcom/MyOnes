@@ -654,7 +654,7 @@ export function generateFormulaPDF(
         },
         {
           width: 'auto',
-          text: 'myones.ai',
+          text: 'ones.health',
           fontSize: 8,
           color: BRAND_COLORS.gray,
           alignment: 'right',

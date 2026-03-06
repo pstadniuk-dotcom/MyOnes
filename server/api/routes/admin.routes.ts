@@ -52,6 +52,7 @@ router.get('/export/orders', requireAdmin, adminController.exportOrders);
 
 router.get('/ai-settings', requireAdmin, adminController.getAiSettings);
 router.post('/ai-settings', requireAdmin, adminController.updateAiSettings);
+router.post('/ai-settings/test', requireAdmin, adminController.testAiSettings);
 
 router.get('/ingredient-pricing', requireAdmin, adminController.listIngredientPricing);
 router.patch('/ingredient-pricing/:id', requireAdmin, adminController.updateIngredientPricing);

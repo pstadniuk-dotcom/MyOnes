@@ -382,7 +382,8 @@ export class AdminController {
         try {
             const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
             const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
-            const csv = await adminService.exportOrders(startDate, endDate);
+            const status = req.query.status as string | undefined;
+            const csv = await adminService.exportOrders(startDate, endDate, status);
             res.setHeader('Content-Type', 'text/csv');
             res.setHeader('Content-Disposition', `attachment; filename="orders-export-${new Date().toISOString().split('T')[0]}.csv"`);
             res.send(csv);
@@ -410,6 +411,16 @@ export class AdminController {
         } catch (error) {
             logger.error('Error updating AI settings', { error });
             res.status(500).json({ error: 'Failed to update AI settings' });
+        }
+    }
+
+    async testAiSettings(req: Request, res: Response) {
+        try {
+            const result = await adminService.testAiConnection();
+            res.json(result);
+        } catch (error) {
+            logger.error('Error testing AI settings', { error });
+            res.status(500).json({ ok: false, error: 'Failed to test AI connection' });
         }
     }
 

@@ -92,7 +92,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-medium text-[#054700] mb-4">5. Lab Report &amp; File Uploads</h2>
             <p className="text-[#5a6623] leading-relaxed">
-              Lab reports and other files you upload are stored securely using encrypted cloud storage with access controls. Files are accessible only to you and authorized administrators. All file operations are logged in our audit trail. You may request deletion of uploaded files at any time by contacting info@myones.ai.
+              Lab reports and other files you upload are stored securely using encrypted cloud storage with access controls. Files are accessible only to you and authorized administrators. All file operations are logged in our audit trail. You may request deletion of uploaded files at any time by contacting support@ones.health.
             </p>
           </section>
 
@@ -167,7 +167,7 @@ export default function PrivacyPage() {
             </ul>
             <p className="text-[#5a6623] mt-3 leading-relaxed">
               To exercise any of these rights, contact us at{' '}
-              <a href="mailto:info@myones.ai" className="text-[#054700] underline underline-offset-2 hover:text-[#054700]/80">info@myones.ai</a>.
+              <a href="mailto:support@ones.health" className="text-[#054700] underline underline-offset-2 hover:text-[#054700]/80">support@ones.health</a>.
               We will respond within 30 days.
             </p>
           </section>
@@ -191,7 +191,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-medium text-[#054700] mb-4">12. Children's Privacy</h2>
             <p className="text-[#5a6623] leading-relaxed">
-              The Service is not directed to individuals under 18 years of age. We do not knowingly collect personal information from children under 18. If we become aware that we have collected personal information from a child under 18, we will take steps to delete that information promptly. If you believe a child has provided us with personal information, please contact us at info@myones.ai.
+              The Service is not directed to individuals under 18 years of age. We do not knowingly collect personal information from children under 18. If we become aware that we have collected personal information from a child under 18, we will take steps to delete that information promptly. If you believe a child has provided us with personal information, please contact us at support@ones.health.
             </p>
           </section>
 
@@ -224,7 +224,7 @@ export default function PrivacyPage() {
             <h2 className="text-2xl font-medium text-[#054700] mb-4">16. Contact Us</h2>
             <p className="text-[#5a6623] leading-relaxed">
               If you have questions about this Privacy Policy, our data practices, or wish to exercise your privacy rights, please contact us at{' '}
-              <a href="mailto:info@myones.ai" className="text-[#054700] underline underline-offset-2 hover:text-[#054700]/80">info@myones.ai</a>.
+              <a href="mailto:support@ones.health" className="text-[#054700] underline underline-offset-2 hover:text-[#054700]/80">support@ones.health</a>.
             </p>
           </section>
         </div>

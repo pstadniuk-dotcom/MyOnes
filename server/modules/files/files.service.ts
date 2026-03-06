@@ -175,7 +175,7 @@ export class FilesService {
 
                             const labUser = await usersRepository.getUser(userId);
                             if (labUser && await notificationsService.shouldSendEmail(userId, 'consultation')) {
-                                const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+                                const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
                                 await sendNotificationEmail({
                                     to: labUser.email,
                                     subject: 'Your lab results have been analyzed',

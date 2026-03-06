@@ -16,6 +16,7 @@ interface PostSummary {
   readTimeMinutes?: number | null;
   publishedAt: string;
   authorName?: string | null;
+  featuredImage?: string | null;
 }
 
 interface BlogListResponse {
@@ -46,6 +47,49 @@ export default function BlogPage() {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Page-level SEO meta
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = 'Supplement Science & Health Optimization Blog | Ones';
+
+    const setMeta = (sel: string, name: string, content: string) => {
+      let el = document.querySelector(sel) as HTMLMetaElement | null;
+      if (!el) { el = document.createElement('meta'); document.head.appendChild(el); }
+      el.setAttribute(name.includes(':') ? 'property' : 'name', name);
+      el.content = content;
+      return el;
+    };
+    const setLink = (rel: string, href: string) => {
+      let el = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+      if (!el) { el = document.createElement('link'); el.rel = rel; document.head.appendChild(el); }
+      el.href = href;
+      return el;
+    };
+
+    const desc = 'Evidence-based articles on supplements, longevity, lab optimization, and personalized health from the Ones editorial team.';
+    const descEl = setMeta('meta[name="description"]', 'description', desc);
+    // Canonical always points to /blog (not /blog?category=...) to avoid duplicate content
+    const canonicalHref = categoryParam
+      ? `https://ones.health/blog?category=${encodeURIComponent(categoryParam)}`
+      : 'https://ones.health/blog';
+    const canonicalEl = setLink('canonical', canonicalHref);
+    const ogTitle = setMeta('meta[property="og:title"]', 'og:title', categoryParam ? `${categoryParam} Articles | Ones Blog` : 'Supplement Science & Health Blog | Ones');
+    const ogDesc = setMeta('meta[property="og:description"]', 'og:description', desc);
+    const ogUrl = setMeta('meta[property="og:url"]', 'og:url', 'https://ones.health/blog');
+    const ogImage = setMeta('meta[property="og:image"]', 'og:image', 'https://ones.health/og-blog.jpg');
+    const ogType = setMeta('meta[property="og:type"]', 'og:type', 'website');
+    const ogLocale = setMeta('meta[property="og:locale"]', 'og:locale', 'en_US');
+    const twCard = setMeta('meta[name="twitter:card"]', 'twitter:card', 'summary_large_image');
+    const twSite = setMeta('meta[name="twitter:site"]', 'twitter:site', '@ones_health');
+    const twTitle = setMeta('meta[name="twitter:title"]', 'twitter:title', categoryParam ? `${categoryParam} Articles | Ones` : 'Supplement Science & Health Blog | Ones');
+
+    return () => {
+      document.title = prevTitle;
+      [descEl, ogTitle, ogDesc, ogUrl, ogImage, ogType, ogLocale, twCard, twSite, twTitle].forEach(el => el?.remove());
+      canonicalEl?.remove();
+    };
+  }, []);
 
   // Debounce search input
   useEffect(() => {
@@ -160,7 +204,16 @@ export default function BlogPage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {displayPosts.map(post => (
                 <Link key={post.id} href={`/blog/${post.slug}`}>
-                  <div className="h-full bg-[#ede8e2] rounded-2xl p-8 hover:shadow-md transition-shadow cursor-pointer group" data-testid={`card-blog-${post.slug}`}>
+                  <div className="h-full bg-[#ede8e2] rounded-2xl overflow-hidden hover:shadow-md transition-shadow cursor-pointer group" data-testid={`card-blog-${post.slug}`}>
+                    {post.featuredImage && (
+                      <img
+                        src={post.featuredImage}
+                        alt={post.title}
+                        className="w-full h-44 object-cover"
+                        loading="lazy"
+                      />
+                    )}
+                    <div className="p-8">
                     {post.category && (
                       <span className="text-xs font-semibold text-[#D4A574] uppercase tracking-wide mb-3 block">{post.category}</span>
                     )}
@@ -174,6 +227,7 @@ export default function BlogPage() {
                     <span className="inline-flex items-center text-[#054700] text-sm font-medium mt-4 gap-1">
                       Read more <ArrowRight className="w-4 h-4" />
                     </span>
+                    </div>{/* /p-8 */}
                   </div>
                 </Link>
               ))}

@@ -109,7 +109,7 @@ export class AuthService {
         // Send welcome email after verification
         if (user) {
             try {
-                const frontendUrl = process.env.FRONTEND_URL || 'https://myones.ai';
+                const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
                 await sendNotificationEmail({
                     to: user.email,
                     subject: 'Welcome to ONES — let\'s build your formula',
