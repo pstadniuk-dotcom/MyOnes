@@ -507,15 +507,18 @@ export class WearablesService {
 
     async getBiometricData(userId: string, startDate: string, endDate: string, provider?: string) {
         const junctionUserId = await wearablesRepository.getJunctionUserId(userId);
+        console.log('[Wearables:getBiometricData] userId:', userId, 'junctionUserId:', junctionUserId);
         if (!junctionUserId) {
+            console.log('[Wearables:getBiometricData] No junction user ID - returning empty');
             return { data: [] };
         }
 
         const [sleepData, activityData, bodyData] = await Promise.all([
-            getSleepData(junctionUserId, startDate, endDate).catch(() => []),
-            getActivityData(junctionUserId, startDate, endDate).catch(() => []),
-            getBodyData(junctionUserId, startDate, endDate).catch(() => []),
+            getSleepData(junctionUserId, startDate, endDate).catch((e) => { console.error('[Wearables] Sleep fetch error:', e?.message); return []; }),
+            getActivityData(junctionUserId, startDate, endDate).catch((e) => { console.error('[Wearables] Activity fetch error:', e?.message); return []; }),
+            getBodyData(junctionUserId, startDate, endDate).catch((e) => { console.error('[Wearables] Body fetch error:', e?.message); return []; }),
         ]);
+        console.log('[Wearables:getBiometricData] Junction API results - sleep:', sleepData.length, 'activity:', activityData.length, 'body:', bodyData.length);
 
         const dataByDate = new Map<string, any>();
 
@@ -536,6 +539,26 @@ export class WearablesService {
                 lightSleepMinutes: sleep.light ? Math.round(sleep.light / 60) : null,
                 efficiency: sleep.efficiency,
             };
+
+            // Many providers (Oura, Fitbit) report HRV and resting HR in sleep data.
+            // Extract heart metrics from sleep so they're available even without body data.
+            const sleepHrv = sleep.averageHrv || sleep.average_hrv || sleep.hrv?.average;
+            const sleepRestingHR = sleep.hrResting || sleep.hrLowest || sleep.hr_lowest || sleep.heartRate?.min;
+            const sleepAvgHR = sleep.hrAverage || sleep.hr_average;
+            const sleepRespiratoryRate = sleep.respiratoryRate || sleep.respiratory_rate;
+            if (sleepHrv || sleepRestingHR || sleepAvgHR) {
+                if (!entry.heart) {
+                    entry.heart = {};
+                }
+                // Only set if not already populated by body data (body data takes precedence)
+                if (!entry.heart.hrvMs && sleepHrv) entry.heart.hrvMs = sleepHrv;
+                if (!entry.heart.restingRate && sleepRestingHR) entry.heart.restingRate = sleepRestingHR;
+                if (!entry.heart.averageRate && sleepAvgHR) entry.heart.averageRate = sleepAvgHR;
+            }
+            if (sleepRespiratoryRate) {
+                if (!entry.body) entry.body = {};
+                if (!entry.body.respiratoryRate) entry.body.respiratoryRate = sleepRespiratoryRate;
+            }
         });
 
         // Process activity data

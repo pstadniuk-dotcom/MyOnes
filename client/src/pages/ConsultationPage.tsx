@@ -737,6 +737,18 @@ export default function ConsultationPage() {
     }
   }, [messages, scrollToBottom, isTyping]);
 
+  // Scroll to bottom whenever thinking steps are added/updated so the growing card stays fully visible
+  useEffect(() => {
+    if (thinkingSteps.length > 0 && !userHasScrolledUp.current) {
+      requestAnimationFrame(() => {
+        const viewport = scrollViewportRef.current;
+        if (viewport && !userHasScrolledUp.current) {
+          viewport.scrollTop = viewport.scrollHeight;
+        }
+      });
+    }
+  }, [thinkingSteps]);
+
   // Auto-resize textarea
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -1962,7 +1974,7 @@ export default function ConsultationPage() {
             <div className="absolute top-2/3 left-[-30px] w-[300px] h-[300px] rounded-full bg-[#e0ead8]/30 blur-3xl" />
           </div>
           <div
-            className="p-3 sm:p-6 space-y-4 sm:space-y-6 relative"
+            className="p-3 sm:p-6 pb-8 sm:pb-12 space-y-4 sm:space-y-6 relative"
             ref={scrollContainerRef}
           >
             {filteredMessages.map((message, index) => {

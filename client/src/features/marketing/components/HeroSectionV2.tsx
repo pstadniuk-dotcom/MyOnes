@@ -70,7 +70,7 @@ export default function HeroSectionV2() {
       {/* ═══════════════════════════════════════════════════
           LEFT HALF — Copy on cream with pill outlines
           ═══════════════════════════════════════════════════ */}
-      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-8 md:px-16 lg:px-16 xl:px-20 py-10 lg:py-24 overflow-hidden">
+      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-8 md:px-16 lg:px-16 xl:px-20 py-10 lg:py-16 overflow-hidden">
         {/* Decorative pill outlines with faint traveling glow */}
         <svg
           aria-hidden="true"
@@ -148,7 +148,7 @@ export default function HeroSectionV2() {
           </div>
 
           {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[72px] leading-[1.05] tracking-[-0.02em]">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] leading-[1.05] tracking-[-0.02em]">
             <span className="block font-light text-[#054700]">One formula.</span>
             <span className="block font-light text-[#054700]">Built for you.</span>
             <span className="block font-light text-[#5a6623]">Always evolving.</span>
@@ -200,7 +200,7 @@ export default function HeroSectionV2() {
       {/* ═══════════════════════════════════════════════════
           RIGHT HALF — Nature photo + frosted glass chat with video
           ═══════════════════════════════════════════════════ */}
-      <div className="flex relative w-full lg:w-1/2 min-h-[70vh] lg:min-h-screen items-center justify-center">
+      <div className="flex relative w-full lg:w-1/2 min-h-[70vh] lg:min-h-[92vh] items-center justify-center">
         {/* Background video cycle */}
         {heroVideos.map((src, idx) => (
           <video
@@ -250,7 +250,7 @@ export default function HeroSectionV2() {
 
           {/* Video content area — plays inside the chat widget */}
           <div className="bg-[#f8f8f8] rounded-b-[24px] overflow-hidden">
-            <div className="relative h-[340px] sm:h-[420px]">
+            <div className="relative h-[340px] sm:h-[380px]">
               {personas.map((persona, idx) => (
                 <video
                   key={persona.name}

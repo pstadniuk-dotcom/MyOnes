@@ -1,6 +1,7 @@
 import HeaderV2 from "@/features/marketing/components/HeaderV2";
 import HeroSectionV2 from "@/features/marketing/components/HeroSectionV2";
-import InterventionSection from "@/features/marketing/components/InterventionSection";
+import ProblemFlowSection from "@/features/marketing/components/ProblemFlowSection";
+import { OnesDifferenceSection } from "@/features/marketing/components/InterventionSection";
 import CompetitiveComparisonSection from "@/features/marketing/components/CompetitiveComparisonSection";
 import HowItWorksSectionV2 from "@/features/marketing/components/HowItWorksSectionV2";
 import MembershipPricingSection from "@/features/marketing/components/MembershipPricingSection";
@@ -17,7 +18,8 @@ export default function LandingPageV2() {
         <div className="pt-20">
           <HeroSectionV2 />
         </div>
-        <InterventionSection />
+        <ProblemFlowSection />
+        <OnesDifferenceSection />
         <CompetitiveComparisonSection />
         <HowItWorksSectionV2 />
         <MembershipPricingSection />

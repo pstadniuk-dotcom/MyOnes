@@ -1025,7 +1025,7 @@ export default function MyFormulaPage() {
                                 <span className="text-sm font-semibold text-green-600">Free</span>
                               </div>
                               <div className="flex items-center justify-between px-3 py-2 border-t border-dashed">
-                                <span className="text-xs text-muted-foreground">Membership starting next month</span>
+                                <span className="text-xs text-muted-foreground">Membership</span>
                                 <span className="text-sm font-medium text-[#054700]">${membershipMonthlyPrice.toFixed(0)}/mo <span className="text-muted-foreground line-through font-normal">${STANDARD_TIER_PRICE}/mo</span></span>
                               </div>
                             </>
@@ -1058,31 +1058,49 @@ export default function MyFormulaPage() {
                           )}
                         </div>
 
-                        {/* Membership benefits collapsible */}
+                        {/* What's included collapsible */}
                         <Collapsible open={membershipBenefitsOpen} onOpenChange={setMembershipBenefitsOpen}>
                           <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-[#054700] font-medium hover:underline cursor-pointer">
                             What's included
                             {membershipBenefitsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                           </CollapsibleTrigger>
                           <CollapsibleContent className="mt-2">
-                            <ul className="space-y-1.5 text-xs text-muted-foreground">
-                              {[
-                                'Unlimited AI health consultations',
-                                'Lab & wearable data analysis',
-                                'Formula updates as your health evolves',
-                                '15% off every formula order',
-                                'Lab testing at member rates',
-                                'Future platform upgrades included',
-                              ].map((benefit) => (
-                                <li key={benefit} className="flex items-start gap-1.5">
-                                  <CheckCircle className="w-3 h-3 text-[#054700] mt-0.5 flex-shrink-0" />
-                                  {benefit}
-                                </li>
-                              ))}
-                            </ul>
-                            <p className="text-[10px] text-muted-foreground mt-2">
-                              ${membershipMonthlyPrice.toFixed(0)}/mo <span className="line-through">${STANDARD_TIER_PRICE}/mo</span> — founding rate locked for life. Cancel anytime.
-                            </p>
+                            {includeMembershipAtCheckout ? (
+                              <>
+                                <ul className="space-y-1.5 text-xs text-muted-foreground">
+                                  {[
+                                    'Unlimited AI health consultations',
+                                    'Lab & wearable data analysis',
+                                    'Formula updates as your health evolves',
+                                    '15% off every formula order',
+                                    'Lab testing at member rates',
+                                    'Future platform upgrades included',
+                                  ].map((benefit) => (
+                                    <li key={benefit} className="flex items-start gap-1.5">
+                                      <CheckCircle className="w-3 h-3 text-[#054700] mt-0.5 flex-shrink-0" />
+                                      {benefit}
+                                    </li>
+                                  ))}
+                                </ul>
+                                <p className="text-[10px] text-muted-foreground mt-2">
+                                  ${membershipMonthlyPrice.toFixed(0)}/mo <span className="line-through">${STANDARD_TIER_PRICE}/mo</span> — founding rate locked for life. Cancel anytime.
+                                </p>
+                              </>
+                            ) : (
+                              <ul className="space-y-1.5 text-xs text-muted-foreground">
+                                {[
+                                  'Your personalized formula — one-time order',
+                                  'Free shipping on every order',
+                                  'Practitioner-grade ingredients',
+                                  'Exact doses matched to your health profile',
+                                ].map((item) => (
+                                  <li key={item} className="flex items-start gap-1.5">
+                                    <CheckCircle className="w-3 h-3 text-[#054700] mt-0.5 flex-shrink-0" />
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                           </CollapsibleContent>
                         </Collapsible>
 

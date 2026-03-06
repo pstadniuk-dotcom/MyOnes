@@ -1447,9 +1447,16 @@ WRONG: Keep all 4000mg + add more ingredients = exceeds budget ❌
     prompt += `4. Suggest the user track specific metrics to monitor formula effectiveness\n\n`;
   } else {
     prompt += `\n=== ⌚ WEARABLE BIOMETRIC DATA ===\n\n`;
-    prompt += `No wearable device connected. The user has not linked a fitness tracker or health wearable.\n`;
-    prompt += `You may suggest connecting a wearable (Oura, WHOOP, Fitbit, Garmin, Apple Watch, etc.) for more personalized formula recommendations.\n`;
-    prompt += `Do NOT fabricate any biometric data (HRV, sleep scores, step counts, etc.).\n\n`;
+    prompt += `No wearable device connected. The user has not linked a fitness tracker or health wearable.\n\n`;
+    prompt += `**IMPORTANT RULES WHEN NO WEARABLE IS CONNECTED:**\n`;
+    prompt += `❌ Do NOT ask the user to paste, copy, or manually share their wearable data (HRV, sleep scores, steps, etc.)\n`;
+    prompt += `❌ Do NOT ask them to share screenshots or export data from their wearable app\n`;
+    prompt += `❌ Do NOT fabricate any biometric data\n`;
+    prompt += `✅ If the user mentions wearable metrics in conversation, you may use those self-reported values\n`;
+    prompt += `✅ Suggest they connect their wearable device through the Wearables page in the app for automatic data integration\n`;
+    prompt += `✅ Say something like: "I notice you don't have a wearable connected yet. If you link your [Oura/WHOOP/Fitbit/Garmin/Apple Watch] through the Wearables page, I'll automatically have access to your sleep, HRV, recovery, and activity data to make even more personalized recommendations."\n`;
+    prompt += `✅ You can still create excellent formulas based on their health profile, lab data, and stated symptoms\n`;
+    prompt += `✅ If they voluntarily share wearable stats in conversation, use them — but never request raw data dumps\n\n`;
   }
 
   prompt += `

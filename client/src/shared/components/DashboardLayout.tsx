@@ -159,7 +159,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="absolute top-[15%] right-[10%] w-[400px] h-[400px] rounded-full bg-[#5a6623]/14 blur-[90px] animate-blob-5" />
             <div className="absolute bottom-[15%] left-[10%] w-[350px] h-[350px] rounded-full bg-[#8fa370]/15 blur-[80px] animate-blob-6" />
           </div>
-          <div className="relative z-10">
+          <div className="relative z-10 p-4 pt-5">
             {children}
           </div>
         </main>

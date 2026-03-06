@@ -719,7 +719,7 @@ export default function WearablesPage() {
   }
 
   return (
-    <div className="space-y-6 px-1 sm:px-0">
+    <div className="space-y-6">
 
       {/* ── Page Header ── */}
       <div>

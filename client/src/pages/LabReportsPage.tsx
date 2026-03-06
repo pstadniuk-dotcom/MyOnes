@@ -1022,7 +1022,7 @@ export default function LabReportsPage() {
   // ── Render ───────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6 px-1 sm:px-0" data-testid="page-lab-reports">
+    <div className="space-y-6" data-testid="page-lab-reports">
 
       {/* ── Page Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">

@@ -385,12 +385,23 @@ export class ChatService {
         const endDate = new Date().toISOString().split('T')[0];
         const startDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+        console.log('[Chat:getContext] Fetching context for user', userId, 'date range:', startDate, 'to', endDate);
+
         const [healthProfile, labReports, activeFormula, biometricResult] = await Promise.all([
             usersRepository.getHealthProfile(userId).catch(() => null),
             filesRepository.getLabReportsByUser(userId),
             formulasRepository.getCurrentFormulaByUser(userId),
-            wearablesService.getBiometricData(userId, startDate, endDate).catch(() => ({ data: [] }))
+            wearablesService.getBiometricData(userId, startDate, endDate).catch((err) => {
+                console.error('[Chat] Failed to fetch biometric data for user', userId, ':', err?.message || err);
+                return { data: [] };
+            })
         ]);
+
+        console.log('[Chat:getContext] Biometric result:', {
+            dataLength: biometricResult?.data?.length ?? 0,
+            hasData: (biometricResult?.data?.length ?? 0) > 0,
+            sampleDay: biometricResult?.data?.[0] ? JSON.stringify(biometricResult.data[0]).substring(0, 200) : 'none'
+        });
 
         let labDataContext = '';
         if (labReports.length > 0) {
