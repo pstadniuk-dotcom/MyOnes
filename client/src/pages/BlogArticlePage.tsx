@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRoute, Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Clock, Tag, Calendar, ChevronRight, Info, FlaskConical, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Clock, Tag, Calendar, ChevronRight, Info, FlaskConical, ArrowRight, List } from 'lucide-react';
 import { Badge } from '@/shared/components/ui/badge';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import type { BlogPost } from '@shared/schema';
@@ -9,6 +9,136 @@ import type { BlogPost } from '@shared/schema';
 interface BlogPostResponse {
   post: BlogPost;
   related: BlogPost[];
+  validSlugs?: string[];
+}
+
+// ─── Heading extractor for Table of Contents ───────────────────────────────────
+interface TocHeading {
+  id: string;
+  text: string;
+  level: 2 | 3;
+}
+
+function extractHeadings(content: string): TocHeading[] {
+  const headings: TocHeading[] = [];
+  for (const line of content.split('\n')) {
+    const m2 = line.match(/^## (.+)/);
+    const m3 = line.match(/^### (.+)/);
+    if (m2) {
+      const text = m2[1].trim();
+      headings.push({ id: slugify(text), text, level: 2 });
+    } else if (m3) {
+      const text = m3[1].trim();
+      headings.push({ id: slugify(text), text, level: 3 });
+    }
+  }
+  return headings;
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+// ─── Table of Contents component ───────────────────────────────────────────────
+function TableOfContents({ headings }: { headings: TocHeading[] }) {
+  const [isOpen, setIsOpen] = useState(true);
+  const [activeId, setActiveId] = useState<string>('');
+
+  // Track which heading is currently in view via IntersectionObserver
+  useEffect(() => {
+    const ids = headings.map(h => h.id);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveId(entry.target.id);
+          }
+        }
+      },
+      { rootMargin: '-80px 0px -70% 0px', threshold: 0.1 }
+    );
+
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, [headings]);
+
+  if (headings.length < 3) return null; // Don't show for short articles
+
+  return (
+    <nav className="mb-10 rounded-xl border border-gray-200 bg-gray-50/60 overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-gray-100/60 transition-colors"
+      >
+        <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+          <List className="w-4 h-4 text-gray-400" />
+          Table of Contents
+        </span>
+        <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+      </button>
+      {isOpen && (
+        <ol className="px-5 pb-4 space-y-1">
+          {headings.filter(h => h.level === 2).map((heading, idx) => {
+            const subHeadings = headings.filter(
+              (h, hi) => h.level === 3 && hi > headings.indexOf(heading) &&
+                (headings.findIndex((h2, h2i) => h2.level === 2 && h2i > headings.indexOf(heading)) === -1 ||
+                 hi < headings.findIndex((h2, h2i) => h2.level === 2 && h2i > headings.indexOf(heading)))
+            );
+            return (
+              <li key={heading.id}>
+                <a
+                  href={`#${heading.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById(heading.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className={`block py-1.5 text-sm transition-colors ${
+                    activeId === heading.id
+                      ? 'text-emerald-700 font-medium'
+                      : 'text-gray-600 hover:text-emerald-600'
+                  }`}
+                >
+                  <span className="text-gray-300 mr-2 text-xs">{idx + 1}.</span>
+                  {heading.text}
+                </a>
+                {subHeadings.length > 0 && (
+                  <ol className="ml-5 space-y-0.5">
+                    {subHeadings.map(sub => (
+                      <li key={sub.id}>
+                        <a
+                          href={`#${sub.id}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            document.getElementById(sub.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }}
+                          className={`block py-1 text-xs transition-colors ${
+                            activeId === sub.id
+                              ? 'text-emerald-700 font-medium'
+                              : 'text-gray-500 hover:text-emerald-600'
+                          }`}
+                        >
+                          {sub.text}
+                        </a>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </nav>
+  );
 }
 
 // ─── Ingredient awareness: map article tags/category → relevant ONES ingredients ───
@@ -145,7 +275,7 @@ function ArticleSkeleton() {
   );
 }
 
-function renderMarkdown(content: string) {
+function renderMarkdown(content: string, validSlugSet?: Set<string>) {
   const lines = content.split('\n');
   const elements: JSX.Element[] = [];
   let i = 0;
@@ -157,7 +287,17 @@ function renderMarkdown(content: string) {
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/`(.+?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
-      .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-emerald-600 font-medium hover:underline">$1</a>');
+      .replace(/\[(.+?)\]\((.+?)\)/g, (_match, label, href) => {
+        // For internal /blog/ links, strip dead links that point to unpublished slugs
+        if (href.startsWith('/blog/') && validSlugSet && validSlugSet.size > 0) {
+          const slug = href.replace(/^\/blog\//, '');
+          if (!validSlugSet.has(slug)) {
+            // Render as plain text, not a link
+            return `<strong>${label}</strong>`;
+          }
+        }
+        return `<a href="${href}" class="text-emerald-600 font-medium hover:underline">${label}</a>`;
+      });
   };
 
   // Parse a markdown table cell — strip leading/trailing whitespace
@@ -273,14 +413,15 @@ function renderMarkdown(content: string) {
     // ── Headings ────────────────────────────────────────────────────────────
     if (line.startsWith('### ')) {
       flushLists();
-      elements.push(<h3 key={i} className="text-xl font-semibold text-gray-900 mt-8 mb-3">{line.slice(4)}</h3>);
+      const h3Text = line.slice(4);
+      elements.push(<h3 key={i} id={slugify(h3Text)} className="text-xl font-semibold text-gray-900 mt-8 mb-3 scroll-mt-20">{h3Text}</h3>);
     } else if (line.startsWith('## ')) {
       flushLists();
       const headingText = line.slice(3);
       // article-key-takeaways: Speakable schema cssSelector targets this class
       const isKeyTakeaways = /key\s+takeaway/i.test(headingText);
       elements.push(
-        <h2 key={i} className={`text-2xl font-bold text-gray-900 mt-10 mb-4${isKeyTakeaways ? ' article-key-takeaways' : ''}`}>
+        <h2 key={i} id={slugify(headingText)} className={`text-2xl font-bold text-gray-900 mt-10 mb-4 scroll-mt-20${isKeyTakeaways ? ' article-key-takeaways' : ''}`}>
           {headingText}
         </h2>
       );
@@ -527,10 +668,16 @@ export default function BlogArticlePage() {
     );
   }
 
-  const { post, related } = data;
+  const { post, related, validSlugs } = data;
   const publishDate = new Date(post.publishedAt).toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
   });
+
+  // Extract headings for Table of Contents
+  const tocHeadings = useMemo(() => extractHeadings(post.content), [post.content]);
+
+  // Build a set of valid internal slugs for link filtering
+  const validSlugSet = useMemo(() => new Set(validSlugs ?? []), [validSlugs]);
 
   // Extract FAQ items from schemaJson for visible accordion
   const faqItems: Array<{question: string; answer: string}> = (() => {
@@ -617,9 +764,12 @@ export default function BlogArticlePage() {
           </div>
         )}
 
+        {/* Table of Contents */}
+        <TableOfContents headings={tocHeadings} />
+
         {/* Content */}
         <div className="prose-custom">
-          {renderMarkdown(post.content)}
+          {renderMarkdown(post.content, validSlugSet)}
         </div>
 
         {/* FAQ Accordion — rendered from FAQPage schema, boosts featured snippet eligibility */}
@@ -642,25 +792,32 @@ export default function BlogArticlePage() {
           </div>
         )}
 
-        {/* Further Reading — internal links from DB */}
-        {post.internalLinks && post.internalLinks.length > 0 && (
-          <div className="mt-10 p-5 bg-gray-50 rounded-xl border border-gray-100">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Further Reading</p>
-            <ul className="space-y-2">
-              {post.internalLinks.map((href: string) => {
-                const label = href.replace('/blog/', '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                return (
-                  <li key={href}>
-                    <Link href={href} className="flex items-center gap-2 text-sm text-emerald-700 hover:text-emerald-900 hover:underline transition-colors">
-                      <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
-                      {label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
+        {/* Further Reading — internal links from DB, filtered to only published slugs */}
+        {(() => {
+          const filteredLinks = (post.internalLinks ?? []).filter((href: string) => {
+            const slug = href.replace(/^\/blog\//, '');
+            return validSlugSet.size === 0 || validSlugSet.has(slug);
+          });
+          if (filteredLinks.length === 0) return null;
+          return (
+            <div className="mt-10 p-5 bg-gray-50 rounded-xl border border-gray-100">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Further Reading</p>
+              <ul className="space-y-2">
+                {filteredLinks.map((href: string) => {
+                  const label = href.replace('/blog/', '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                  return (
+                    <li key={href}>
+                      <Link href={href} className="flex items-center gap-2 text-sm text-emerald-700 hover:text-emerald-900 hover:underline transition-colors">
+                        <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
+                        {label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })()}
 
         {/* Legal disclaimer — always shown, not dismissible */}
         <div className="mt-10 flex gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">

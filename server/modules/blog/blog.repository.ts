@@ -138,6 +138,15 @@ export const blogRepository = {
     return results.map((r: { category: string | null }) => r.category!).filter(Boolean);
   },
 
+  /** Get all published slugs (for internal link validation) */
+  async getAllPublishedSlugs(): Promise<string[]> {
+    const rows = await db
+      .select({ slug: blogPosts.slug })
+      .from(blogPosts)
+      .where(eq(blogPosts.isPublished, true));
+    return rows.map(r => r.slug);
+  },
+
   /** Check if slug already exists */
   async slugExists(slug: string): Promise<boolean> {
     const [result] = await db

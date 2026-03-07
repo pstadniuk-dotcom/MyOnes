@@ -90,10 +90,13 @@ export async function getPost(req: Request, res: Response) {
     // Background view count increment
     blogRepository.incrementViews(slug).catch(() => {});
 
-    // Related posts
-    const related = await blogRepository.getRelated(slug, post.category, 3);
+    // Related posts + valid slugs for internal link validation
+    const [related, validSlugs] = await Promise.all([
+      blogRepository.getRelated(slug, post.category, 3),
+      blogRepository.getAllPublishedSlugs(),
+    ]);
 
-    return res.json({ post, related });
+    return res.json({ post, related, validSlugs });
   } catch (err: any) {
     console.error('[blog] getPost error:', err);
     return res.status(500).json({ error: 'Failed to load post' });
