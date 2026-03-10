@@ -1,9 +1,12 @@
 import { formulasRepository } from "./formulas.repository";
 import { notificationsService } from "../notifications/notifications.service";
-import { getIngredientDose, isValidIngredient } from "@shared/ingredients";
+import { usersRepository } from "../users/users.repository";
+import { sendNotificationEmail } from "../../utils/emailService";
+import { getIngredientDose, isValidIngredient, findIngredientByName } from "@shared/ingredients";
 import logger from "../../infra/logging/logger";
 import { type Formula, type ReviewSchedule } from "@shared/schema";
 import { manufacturerPricingService } from "./manufacturer-pricing.service";
+import { autoShipService } from "../billing/autoship.service";
 import { FORMULA_LIMITS as CAPSULE_LIMITS, getMaxDosageForCapsules, getMinIngredientCountForCapsules } from "./formula-service";
 
 // Capsule-aware dosage limits derived from formula-service.ts
@@ -11,7 +14,6 @@ import { FORMULA_LIMITS as CAPSULE_LIMITS, getMaxDosageForCapsules, getMinIngred
 // Default (9 caps): 9 × 550mg = 4,950mg
 const FORMULA_LIMITS = {
     ABSOLUTE_MAX_DOSAGE: CAPSULE_LIMITS.CAPSULE_CAPACITY_MG * 12, // 6,600mg — hard ceiling across all tiers
-    DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance (0.9%) for rounding/calculation differences
     MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg
     MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
 } as const;
@@ -176,13 +178,18 @@ export class FormulasService {
         const currentFormula = await formulasRepository.getCurrentFormulaByUser(userId);
         const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
 
-        // Create new formula version with reverted data
+        // Create new formula version with reverted data (preserve all fields)
         const revertedFormula = await formulasRepository.createFormula({
             userId,
             version: nextVersion,
             bases: originalFormula.bases as any,
             additions: originalFormula.additions as any,
             totalMg: originalFormula.totalMg,
+            targetCapsules: originalFormula.targetCapsules,
+            rationale: originalFormula.rationale as any,
+            warnings: originalFormula.warnings as any,
+            disclaimers: originalFormula.disclaimers as any,
+            safetyValidation: originalFormula.safetyValidation as any,
             notes: `Reverted to v${originalFormula.version}: ${reason}`
         });
 
@@ -211,6 +218,9 @@ export class FormulasService {
             logger.error('Failed to create reversion notification:', notifError);
         }
 
+        // Sync auto-ship price if user has an active auto-ship
+        await this.syncAutoShipIfActive(userId, revertedFormula.id, revertedFormula.version);
+
         return {
             formula: revertedFormula,
             message: `Successfully reverted to version ${originalFormula.version}`
@@ -218,11 +228,20 @@ export class FormulasService {
     }
 
     async customizeFormula(userId: string, formulaId: string, addedBases: any[], addedIndividuals: any[]) {
-        // Validate that all added ingredients are valid
+        // Validate that all added ingredients are valid and within dose ranges
         const allAdded = [...(addedBases || []), ...(addedIndividuals || [])];
         for (const item of allAdded) {
             if (!isValidIngredient(item.ingredient)) {
                 throw new Error(`Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.`);
+            }
+            // Validate per-ingredient dose range if amount is specified
+            if (item.amount) {
+                const ingredientInfo = findIngredientByName(item.ingredient);
+                if (ingredientInfo && ingredientInfo.doseRangeMin !== undefined && ingredientInfo.doseRangeMax !== undefined) {
+                    if (item.amount < ingredientInfo.doseRangeMin || item.amount > ingredientInfo.doseRangeMax) {
+                        throw new Error(`${item.ingredient} dose of ${item.amount}mg is outside the allowed range (${ingredientInfo.doseRangeMin}-${ingredientInfo.doseRangeMax}mg).`);
+                    }
+                }
             }
         }
 
@@ -233,12 +252,26 @@ export class FormulasService {
             throw new Error('Formula not found or access denied');
         }
 
+        // Check for duplicate ingredients (don't add something already in the formula)
+        const existingIngredients = new Set([
+            ...((formula.bases as any[]) || []).map((b: any) => (b.ingredient || '').toLowerCase()),
+            ...((formula.additions as any[]) || []).map((a: any) => (a.ingredient || '').toLowerCase()),
+            ...((formula.userCustomizations as any)?.addedBases || []).map((b: any) => (b.ingredient || '').toLowerCase()),
+            ...((formula.userCustomizations as any)?.addedIndividuals || []).map((i: any) => (i.ingredient || '').toLowerCase()),
+        ]);
+        for (const item of allAdded) {
+            if (existingIngredients.has(item.ingredient.toLowerCase())) {
+                throw new Error(`${item.ingredient} is already in this formula. Remove it first if you want to change the dose.`);
+            }
+        }
+
         // Calculate new total mg with customizations
+        // Use user-specified amount, falling back to catalog default only if amount not provided
         let newTotalMg = formula.totalMg;
 
         if (addedBases) {
             for (const base of addedBases) {
-                const dose = getIngredientDose(base.ingredient);
+                const dose = base.amount || getIngredientDose(base.ingredient);
                 if (dose) {
                     newTotalMg += dose;
                 }
@@ -247,7 +280,7 @@ export class FormulasService {
 
         if (addedIndividuals) {
             for (const individual of addedIndividuals) {
-                const dose = getIngredientDose(individual.ingredient);
+                const dose = individual.amount || getIngredientDose(individual.ingredient);
                 if (dose) {
                     newTotalMg += dose;
                 }
@@ -278,20 +311,30 @@ export class FormulasService {
             throw new Error('At least one ingredient is required to create a formula');
         }
 
-        // Validate that all ingredients are valid catalog ingredients
+        // Validate that all ingredients are valid catalog ingredients and within dose ranges
         const allIngredients = [...(bases || []), ...(individuals || [])];
         for (const item of allIngredients) {
             if (!isValidIngredient(item.ingredient)) {
                 throw new Error(`Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.`);
             }
+            // Validate per-ingredient dose range if amount is specified
+            if (item.amount) {
+                const ingredientInfo = findIngredientByName(item.ingredient);
+                if (ingredientInfo && ingredientInfo.doseRangeMin !== undefined && ingredientInfo.doseRangeMax !== undefined) {
+                    if (item.amount < ingredientInfo.doseRangeMin || item.amount > ingredientInfo.doseRangeMax) {
+                        throw new Error(`${item.ingredient} dose of ${item.amount}mg is outside the allowed range (${ingredientInfo.doseRangeMin}-${ingredientInfo.doseRangeMax}mg).`);
+                    }
+                }
+            }
         }
 
         // Calculate total mg
+        // Use user-specified amount, falling back to catalog default only if amount not provided
         let totalMg = 0;
 
         if (bases) {
             for (const base of bases) {
-                const dose = getIngredientDose(base.ingredient);
+                const dose = base.amount || getIngredientDose(base.ingredient);
                 if (dose) {
                     totalMg += dose;
                 }
@@ -300,7 +343,7 @@ export class FormulasService {
 
         if (individuals) {
             for (const individual of individuals) {
-                const dose = getIngredientDose(individual.ingredient);
+                const dose = individual.amount || getIngredientDose(individual.ingredient);
                 if (dose) {
                     totalMg += dose;
                 }
@@ -327,9 +370,9 @@ export class FormulasService {
             throw new Error(`A ${capsuleCount}-capsule formula requires at least ${minIngredients} ingredients. You've added ${allIngredients.length}. Please add ${minIngredients - allIngredients.length} more ingredient${minIngredients - allIngredients.length > 1 ? 's' : ''}.`);
         }
 
-        // Get user's current formula count to determine version number
-        const history = await formulasRepository.getFormulaHistory(userId);
-        const nextVersion = (history?.length || 0) + 1;
+        // Get current formula to determine next version number (consistent with chat + revert paths)
+        const currentFormula = await formulasRepository.getCurrentFormulaByUser(userId);
+        const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
 
         // Create new formula marked as user-created
         const newFormula = await formulasRepository.createFormula({
@@ -352,7 +395,7 @@ export class FormulasService {
             notes: null
         });
 
-        // 📬 Create notification for user-built formula
+        // 📬 Create notification + email for user-built formula
         try {
             await notificationsService.create({
                 userId,
@@ -366,9 +409,35 @@ export class FormulasService {
                     priority: 'medium'
                 }
             });
+
+            const formulaUser = await usersRepository.getUser(userId);
+            if (formulaUser) {
+                const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
+                const ingredientCount = (bases?.length || 0) + (individuals?.length || 0);
+                if (await notificationsService.shouldSendEmail(userId, 'consultation')) {
+                    await sendNotificationEmail({
+                    to: formulaUser.email,
+                    subject: nextVersion === 1
+                        ? 'Your first Ones formula is ready!'
+                        : `Your custom Ones formula has been updated (V${nextVersion})`,
+                    title: nextVersion === 1 ? 'Your Formula Is Ready' : 'Custom Formula Updated',
+                    type: 'formula_update',
+                    content: `
+                        <p>Hi ${formulaUser.name?.split(' ')[0] || 'there'},</p>
+                        <p>You've built a custom formula with <strong>${ingredientCount} ingredients</strong> totalling <strong>${totalMg}mg</strong> across <strong>${capsuleCount} capsules</strong>.</p>
+                        <p>Consider chatting with your AI practitioner to review it for safety and optimization before ordering.</p>
+                    `,
+                    actionUrl: `${frontendUrl}/dashboard/formula`,
+                    actionText: 'View Your Formula',
+                });
+                }
+            }
         } catch (notifError) {
             logger.error('Failed to create formula notification:', notifError);
         }
+
+        // Sync auto-ship price if user has an active auto-ship
+        await this.syncAutoShipIfActive(userId, newFormula.id, newFormula.version);
 
         return newFormula;
     }
@@ -483,10 +552,68 @@ export class FormulasService {
         return await formulasRepository.getReviewSchedule(userId, formulaId);
     }
 
+    /**
+     * Calculate the next review date from subscription renewal or last order.
+     * 
+     * Logic:
+     *  1. If subscription.renewsAt exists → next shipment = renewsAt
+     *  2. Else if user has orders → next shipment = latest order.placedAt + supplyWeeks * 7 days
+     *  3. Else → fall back to formula.createdAt + 56 days
+     * 
+     * Review date = next shipment date - daysBefore
+     * 
+     * For "every_other" (quarterly), the shipment date is doubled.
+     */
+    private async calculateNextReviewDate(
+        userId: string,
+        formula: Formula,
+        frequency: string,
+        daysBefore: number,
+    ): Promise<Date> {
+        const SUPPLY_WEEKS = 8;
+        let nextShipmentDate: Date;
+
+        // 1. Try subscription renewsAt
+        const subscription = await usersRepository.getSubscription(userId);
+        if (subscription?.renewsAt) {
+            nextShipmentDate = new Date(subscription.renewsAt);
+        } else {
+            // 2. Fall back to latest order + supply weeks
+            const orders = await usersRepository.listOrdersByUser(userId);
+            if (orders.length > 0) {
+                const latestOrder = orders[0]; // already sorted desc by placedAt
+                const supplyWeeks = (latestOrder as any).supplyWeeks ?? SUPPLY_WEEKS;
+                nextShipmentDate = new Date(latestOrder.placedAt);
+                nextShipmentDate.setDate(nextShipmentDate.getDate() + supplyWeeks * 7);
+            } else {
+                // 3. No orders — use formula creation date + supply period
+                nextShipmentDate = new Date(formula.createdAt);
+                nextShipmentDate.setDate(nextShipmentDate.getDate() + SUPPLY_WEEKS * 7);
+            }
+        }
+
+        // For "every_other" / quarterly, skip one cycle
+        if (frequency === 'quarterly') {
+            nextShipmentDate.setDate(nextShipmentDate.getDate() + SUPPLY_WEEKS * 7);
+        }
+
+        // Review date = shipment date - daysBefore
+        const nextReviewDate = new Date(nextShipmentDate);
+        nextReviewDate.setDate(nextReviewDate.getDate() - daysBefore);
+
+        // If in the past, advance by one full supply cycle (or two for every_other)
+        const cycleDays = frequency === 'quarterly' ? SUPPLY_WEEKS * 7 * 2 : SUPPLY_WEEKS * 7;
+        while (nextReviewDate < new Date()) {
+            nextReviewDate.setDate(nextReviewDate.getDate() + cycleDays);
+        }
+
+        return nextReviewDate;
+    }
+
     async saveReviewSchedule(userId: string, formulaId: string, data: any) {
         const {
             frequency,
-            daysBefore,
+            daysBefore = 10,
             emailReminders,
             smsReminders,
             calendarIntegration,
@@ -498,33 +625,18 @@ export class FormulasService {
             throw new Error('Formula not found');
         }
 
-        // Validate frequency
+        // Validate frequency — accept both legacy and new values
         if (!['monthly', 'bimonthly', 'quarterly'].includes(frequency)) {
-            throw new Error('Invalid frequency. Must be monthly, bimonthly, or quarterly');
+            throw new Error('Invalid frequency. Must be bimonthly or quarterly');
         }
 
-        // Validate daysBefore
-        if (typeof daysBefore !== 'number' || daysBefore < 1 || daysBefore > 14) {
-            throw new Error('daysBefore must be between 1 and 14');
-        }
+        // Validate daysBefore (now fixed at 10, but accept 1-14 for flexibility)
+        const effectiveDaysBefore = typeof daysBefore === 'number' && daysBefore >= 1 && daysBefore <= 14
+            ? daysBefore
+            : 10;
 
-        // Calculate next review date based on frequency and formula creation date
-        const frequencyDays: Record<string, number> = {
-            monthly: 30,
-            bimonthly: 60,
-            quarterly: 90,
-        };
-
-        const days = frequencyDays[frequency];
-
-        const formulaDate = new Date(formula.createdAt);
-        const nextReviewDate = new Date(formulaDate);
-        nextReviewDate.setDate(nextReviewDate.getDate() + days - daysBefore);
-
-        // If the calculated date is in the past, add another cycle
-        if (nextReviewDate < new Date()) {
-            nextReviewDate.setDate(nextReviewDate.getDate() + days);
-        }
+        // Calculate next review date from subscription/order data
+        const nextReviewDate = await this.calculateNextReviewDate(userId, formula, frequency, effectiveDaysBefore);
 
         // Check if schedule already exists
         const existingSchedule = await formulasRepository.getReviewSchedule(userId, formulaId);
@@ -533,7 +645,7 @@ export class FormulasService {
             // Update existing
             return await formulasRepository.updateReviewSchedule(existingSchedule.id, {
                 frequency,
-                daysBefore,
+                daysBefore: effectiveDaysBefore,
                 nextReviewDate,
                 emailReminders: emailReminders ?? true,
                 smsReminders: smsReminders ?? false,
@@ -546,7 +658,7 @@ export class FormulasService {
                 userId,
                 formulaId,
                 frequency,
-                daysBefore,
+                daysBefore: effectiveDaysBefore,
                 nextReviewDate,
                 lastReviewDate: null,
                 emailReminders: emailReminders ?? true,
@@ -626,9 +738,36 @@ export class FormulasService {
                 userCreated: formula.userCreated,
             },
             user: {
-                name: user?.name || 'ONES User',
+                name: user?.name || 'Ones User',
             }
         };
+    }
+
+    /**
+     * If the user has an active auto-ship, sync the formula price on Stripe.
+     * Called after any formula creation/modification. Non-blocking — failures
+     * are logged but don't break the primary flow.
+     */
+    async syncAutoShipIfActive(userId: string, formulaId: string, formulaVersion: number): Promise<void> {
+        try {
+            const autoShip = await autoShipService.getAutoShip(userId);
+            if (autoShip && autoShip.status === 'active') {
+                await autoShipService.syncFormulaPrice({ userId, formulaId, formulaVersion });
+                logger.info('Auto-ship price synced after formula change', {
+                    userId,
+                    formulaId,
+                    formulaVersion,
+                    autoShipId: autoShip.id,
+                });
+            }
+        } catch (err) {
+            logger.error('Failed to sync auto-ship after formula change — user unaffected', {
+                userId,
+                formulaId,
+                formulaVersion,
+                error: err instanceof Error ? err.message : err,
+            });
+        }
     }
 }
 

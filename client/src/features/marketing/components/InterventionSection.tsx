@@ -1,10 +1,11 @@
-import { Moon, TestTube, Brain, Activity, FileText, HelpCircle, Package } from "lucide-react";
-import bottleImage from "@assets/generated_images/Premium_supplement_bottle_product_2500f07c.png";
+﻿import { useRef } from "react";
+import { Moon, TestTube, HeartPulse, Activity, Leaf, Zap, ArrowRight } from "lucide-react";
+import { motion, useInView } from "framer-motion";
+import { useLocation } from "wouter";
 
 interface IngredientCallout {
   icon: React.ReactNode;
   dataSource: string;
-  insight: string;
   ingredient: string;
   dose: string;
   position: "left" | "right";
@@ -12,233 +13,567 @@ interface IngredientCallout {
 
 const callouts: IngredientCallout[] = [
   {
+    icon: <Leaf className="w-4 h-4" />,
+    dataSource: "Hormonal balance support",
+    ingredient: "Maca",
+    dose: "500mg",
+    position: "left",
+  },
+  {
+    icon: <HeartPulse className="w-4 h-4" />,
+    dataSource: "You mentioned afternoon fatigue",
+    ingredient: "Adrenal Support",
+    dose: "420mg",
+    position: "right",
+  },
+  {
+    icon: <Activity className="w-4 h-4" />,
+    dataSource: "Your labs show suboptimal heart markers",
+    ingredient: "CoEnzyme Q10",
+    dose: "100mg",
+    position: "left",
+  },
+  {
     icon: <Moon className="w-4 h-4" />,
     dataSource: "Your Oura shows poor deep sleep",
-    insight: "Supporting restorative sleep",
     ingredient: "Magnesium",
     dose: "400mg",
+    position: "right",
+  },
+  {
+    icon: <Zap className="w-4 h-4" />,
+    dataSource: "Focus & calm support",
+    ingredient: "L-Theanine",
+    dose: "200mg",
     position: "left",
   },
   {
     icon: <TestTube className="w-4 h-4" />,
     dataSource: "Your bloodwork shows elevated cortisol",
-    insight: "Stress adaptation support",
     ingredient: "Ashwagandha",
-    dose: "600mg",
-    position: "right",
-  },
-  {
-    icon: <Brain className="w-4 h-4" />,
-    dataSource: "You mentioned afternoon fatigue",
-    insight: "Sustained mental clarity",
-    ingredient: "Adrenal Support",
-    dose: "420mg",
-    position: "left",
-  },
-  {
-    icon: <Activity className="w-4 h-4" />,
-    dataSource: "Your labs show suboptimal heart markers",
-    insight: "Cardiovascular support",
-    ingredient: "Heart Support",
-    dose: "689mg",
+    dose: "300mg",
     position: "right",
   },
 ];
 
+const stagger = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.15, delayChildren: 0.2 },
+  },
+};
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
+  },
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.96 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] },
+  },
+};
+
 export default function InterventionSection() {
+  const problemRef = useRef<HTMLElement>(null);
+  const solutionRef = useRef<HTMLElement>(null);
+  const problemInView = useInView(problemRef, { once: true, margin: "-80px" });
+  const solutionInView = useInView(solutionRef, { once: true, margin: "100px" });
+  const [, navigate] = useLocation();
+
   return (
-    <section className="py-24 md:py-32 bg-[#FAF7F2] overflow-hidden">
-      <div className="container mx-auto px-6 max-w-6xl">
-        {/* The Industry Problem */}
-        <div className="max-w-4xl mx-auto text-center mb-20">
-          <span className="text-[#D4A574] font-medium tracking-wider text-sm uppercase">
-            The Problem With Health Data Today
-          </span>
-          <h2 className="mt-4 text-3xl md:text-4xl text-[#1B4332] font-light leading-tight">
-            Blood tests give you biomarkers. Wearables give you metrics.<br />
-            <span className="font-medium">But who gives you a solution?</span>
-          </h2>
-          
-          {/* The typical journey */}
-          <div className="mt-12 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 text-[#2D3436]/60">
-            <div className="flex items-center gap-2">
-              <TestTube className="w-5 h-5" />
-              <span>100+ biomarkers</span>
-            </div>
-            <span className="hidden md:block text-[#2D3436]/30">+</span>
-            <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5" />
-              <span>Sleep, HRV, strain</span>
-            </div>
-            <span className="hidden md:block">→</span>
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              <span>Charts & reports</span>
-            </div>
-            <span className="hidden md:block">→</span>
-            <div className="flex items-center gap-2 text-red-500/70">
-              <HelpCircle className="w-5 h-5" />
-              <span className="italic">Now what?</span>
-            </div>
-          </div>
-          
-          <p className="mt-8 text-lg text-[#2D3436]/70 max-w-2xl mx-auto">
-            You're drowning in data but starving for action. A PDF of biomarkers. A dashboard of sleep scores. 
-            And a list of supplements to research on your own. That's not healthcare. That's homework.
-          </p>
-        </div>
+    <>
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          SECTION 1: THE PROBLEM
+          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      <section ref={problemRef} id="the-problem" className="py-24 md:py-32 bg-white overflow-hidden scroll-mt-24">
+        <div className="container mx-auto px-6 max-w-5xl">
+          <motion.div
+            initial="hidden"
+            animate={problemInView ? "visible" : "hidden"}
+            variants={stagger}
+            className="text-center"
+          >
+            <motion.span
+              variants={fadeUp}
+              className="text-[#5a6623] font-medium tracking-wider text-sm uppercase"
+            >
+              The Problem With Health Data Today
+            </motion.span>
 
-        {/* The ONES Solution */}
-        <div className="max-w-3xl mx-auto text-center mb-16">
-          <div className="inline-flex items-center gap-2 bg-[#1B4332] text-white px-4 py-2 rounded-full mb-6">
-            <Package className="w-4 h-4" />
-            <span className="text-sm font-medium">The ONES Difference</span>
-          </div>
-          <h3 className="text-3xl md:text-4xl text-[#1B4332] font-light leading-tight">
-            We don't recommend supplements.<br />
-            <span className="font-medium">We formulate yours.</span>
-          </h3>
-          <p className="mt-6 text-lg text-[#2D3436]/70 leading-relaxed max-w-2xl mx-auto">
-            Your blood tests, your wearable data, your conversation with our AI—turned into one custom formula that ships to your door.
-          </p>
-        </div>
+            <motion.h2
+              variants={fadeUp}
+              className="mt-4 text-2xl sm:text-3xl md:text-4xl text-[#054700] font-light leading-snug text-balance"
+            >
+              Blood tests give you biomarkers.<span className="hidden sm:inline"><br /></span>{" "}
+              Wearables give you metrics.<span className="hidden sm:inline"><br /></span>{" "}
+              <span className="font-semibold text-[#5a6623]">But who gives you a solution?</span>
+            </motion.h2>
 
-        {/* Bottle with Callouts */}
-        <div className="relative max-w-5xl mx-auto">
-          {/* Mobile Layout */}
-          <div className="md:hidden">
-            {/* Bottle centered on mobile */}
-            <div className="flex justify-center mb-8">
-              <div className="relative w-48">
-                <img
-                  src={bottleImage}
-                  alt="Your Custom ONES Formula"
-                  className="w-full h-auto drop-shadow-2xl"
-                />
-              </div>
-            </div>
-            
-            {/* Callouts stacked on mobile */}
-            <div className="space-y-4">
-              {callouts.map((callout, index) => (
-                <div
-                  key={index}
-                  className="bg-white rounded-xl p-4 shadow-sm border border-[#1B4332]/10"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#1B4332]/10 flex items-center justify-center text-[#1B4332]">
-                      {callout.icon}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-[#D4A574] font-medium">
-                        {callout.dataSource}
-                      </p>
-                      <p className="text-lg font-semibold text-[#1B4332]">
-                        {callout.ingredient}
-                      </p>
-                      <p className="text-sm text-[#2D3436]/60">
-                        {callout.dose}
-                      </p>
-                    </div>
+            {/* The typical journey â€” photo card layout */}
+            {(() => {
+              const tiles = [
+                { src: "/problem section/your labs.png",        label: "Your labs",      sub: "100+ biomarkers",    connector: "+" },
+                { src: "/problem section/wearables.jpg",        label: "Your wearables", sub: "Sleep, HRV, strain", connector: "â†’" },
+                { src: "/problem section/generic advice 2.png", label: "Generic advice", sub: "Charts & reports",   connector: "â†’" },
+                { src: "/problem section/now what.png",         label: "Now what?",      sub: "No clear action",    connector: null },
+              ];
+              return (
+                <motion.div variants={fadeUp} className="mt-14">
+                  {/* Mobile: 2Ã—2 grid, no connectors */}
+                  <div className="grid grid-cols-2 gap-4 sm:hidden">
+                    {tiles.map((tile, i) => (
+                      <div key={i} className="flex flex-col items-center">
+                        <div className="w-full aspect-[3/4] rounded-2xl overflow-hidden shadow-md border border-[#054700]/8">
+                          <img src={tile.src} alt={tile.label} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="mt-3 text-center">
+                          <p className="text-sm font-semibold text-[#054700]">{tile.label}</p>
+                          <p className="text-xs text-[#054700]/50 mt-0.5">{tile.sub}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+
+                  {/* Desktop: flex row with connectors */}
+                  <div className="hidden sm:flex items-center justify-center gap-0">
+                    {tiles.map((tile, i) => (
+                      <>
+                        <div key={`tile-${i}`} className="flex flex-col items-center">
+                          <div className="w-44 aspect-[3/4] rounded-2xl overflow-hidden shadow-md border border-[#054700]/8">
+                            <img src={tile.src} alt={tile.label} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="mt-4 text-center">
+                            <p className="text-sm font-semibold text-[#054700]">{tile.label}</p>
+                            <p className="text-xs text-[#054700]/50 mt-0.5">{tile.sub}</p>
+                          </div>
+                        </div>
+                        {tile.connector && (
+                          <span key={`connector-${i}`} className="text-[#054700]/30 text-xl font-light mx-3 mb-12 flex-shrink-0">
+                            {tile.connector}
+                          </span>
+                        )}
+                      </>
+                    ))}
+                  </div>
+                </motion.div>
+              );
+            })()}
+
+            <motion.div
+              variants={fadeUp}
+              className="mt-10 max-w-2xl mx-auto bg-white/60 border border-[#054700]/8 rounded-2xl px-8 py-6 shadow-sm"
+            >
+              <p className="text-[15px] leading-relaxed text-black/65">
+                You're drowning in data but starving for action. A PDF of biomarkers. A dashboard of sleep scores.
+                And a list of supplements to research on your own. That's not healthcare.{" "}
+                <span className="font-semibold text-[#054700]">That's homework.</span>
+              </p>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          SECTION 2: THE ONES DIFFERENCE
+          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      <section ref={solutionRef} id="the-difference" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
+        <div className="container mx-auto px-6 max-w-7xl">
+          {/* Headline */}
+          <motion.div
+            initial="hidden"
+            animate={solutionInView ? "visible" : "hidden"}
+            variants={stagger}
+            className="max-w-3xl mx-auto text-center mb-16 md:mb-20"
+          >
+            <motion.div
+              variants={fadeUp}
+              className="inline-flex items-center gap-2 bg-[#054700] text-[#ede8e2] px-4 py-2 rounded-full mb-6"
+            >
+              <img src="/ones-logo-icon.svg" alt="" className="w-4 h-4 brightness-0 invert" />
+              <span className="text-sm font-medium">The Ones Difference</span>
+            </motion.div>
+
+            <motion.h3
+              variants={fadeUp}
+              className="text-2xl sm:text-3xl md:text-[2.75rem] text-[#054700] font-light leading-tight text-balance"
+            >
+              We don't recommend supplements.<span className="hidden sm:inline"><br /></span>{" "}
+              <span className="text-[#8a9a2c]">We formulate yours.</span>
+            </motion.h3>
+
+            <motion.p
+              variants={fadeUp}
+              className="mt-6 text-lg text-black/60 leading-relaxed max-w-xl mx-auto"
+            >
+              Your blood tests, your wearable data, your conversation with our AI â€” turned into one custom formula that ships to your door.
+            </motion.p>
+          </motion.div>
+
+          {/* Video + Ingredient Cards */}
+          <motion.div
+            initial="hidden"
+            animate={solutionInView ? "visible" : "hidden"}
+            variants={stagger}
+          >
+            {/* â”€â”€ Mobile Layout â”€â”€ */}
+            <div className="md:hidden">
+              <motion.div variants={scaleIn} className="flex justify-center mb-8">
+                <div className="relative w-full max-w-sm">
+                  <video
+                    src="/capsule-formation.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline                    preload="auto"                    className="relative w-full h-auto rounded-2xl shadow-xl"
+                  />
                 </div>
-              ))}
-            </div>
-          </div>
+              </motion.div>
 
-          {/* Desktop Layout */}
-          <div className="hidden md:grid md:grid-cols-3 items-center gap-8">
-            {/* Left Callouts */}
-            <div className="space-y-8">
-              {callouts
-                .filter((c) => c.position === "left")
-                .map((callout, index) => (
-                  <div
-                    key={index}
-                    className="relative bg-white rounded-xl p-5 shadow-lg border border-[#1B4332]/10 transform hover:scale-105 transition-transform duration-300"
+              <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
+                {callouts.map((callout, i) => (
+                  <motion.div
+                    key={i}
+                    variants={{
+                      hidden: { opacity: 0, y: 12 },
+                      visible: {
+                        opacity: 1, y: 0,
+                        transition: { duration: 0.4, delay: 0.3 + i * 0.08 },
+                      },
+                    }}
+                    className="bg-white/70 backdrop-blur-sm rounded-xl p-3.5 border border-[#5a6623]/30"
                   >
-                    {/* Connector line */}
-                    <div className="absolute right-0 top-1/2 w-8 h-px bg-gradient-to-r from-transparent to-[#D4A574] translate-x-full" />
-                    <div className="absolute right-0 top-1/2 w-2 h-2 rounded-full bg-[#D4A574] translate-x-[calc(100%+2rem)] -translate-y-1/2" />
-                    
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#1B4332]/10 flex items-center justify-center text-[#1B4332]">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-7 h-7 rounded-full bg-[#054700]/[0.07] flex items-center justify-center text-[#054700]">
                         {callout.icon}
                       </div>
-                      <div>
-                        <p className="text-sm text-[#D4A574] font-medium mb-1">
-                          {callout.dataSource}
-                        </p>
-                        <p className="text-lg font-semibold text-[#1B4332]">
-                          {callout.ingredient}
-                        </p>
-                        <p className="text-sm text-[#2D3436]/60">
-                          {callout.dose}
-                        </p>
-                      </div>
+                      <span className="text-[10px] text-[#5a6623] font-medium uppercase tracking-wide leading-tight line-clamp-2">
+                        {callout.dataSource}
+                      </span>
                     </div>
-                  </div>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span className="text-sm font-semibold text-[#054700]">{callout.ingredient}</span>
+                      <span className="text-xs text-[#054700]/35">{callout.dose}</span>
+                    </div>
+                  </motion.div>
                 ))}
-            </div>
-
-            {/* Center Bottle */}
-            <div className="relative flex justify-center">
-              <div className="relative">
-                {/* Glow effect */}
-                <div className="absolute inset-0 bg-[#D4A574]/20 blur-3xl rounded-full scale-75" />
-                <img
-                  src={bottleImage}
-                  alt="Your Custom ONES Formula"
-                  className="relative w-64 h-auto drop-shadow-2xl"
-                />
               </div>
             </div>
 
-            {/* Right Callouts */}
-            <div className="space-y-8">
-              {callouts
-                .filter((c) => c.position === "right")
-                .map((callout, index) => (
-                  <div
-                    key={index}
-                    className="relative bg-white rounded-xl p-5 shadow-lg border border-[#1B4332]/10 transform hover:scale-105 transition-transform duration-300"
-                  >
-                    {/* Connector line */}
-                    <div className="absolute left-0 top-1/2 w-8 h-px bg-gradient-to-l from-transparent to-[#D4A574] -translate-x-full" />
-                    <div className="absolute left-0 top-1/2 w-2 h-2 rounded-full bg-[#D4A574] -translate-x-[calc(100%+2rem)] -translate-y-1/2" />
-                    
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#1B4332]/10 flex items-center justify-center text-[#1B4332]">
-                        {callout.icon}
+            {/* â”€â”€ Desktop Layout: 5-column grid [cards | gap | video | gap | cards] â”€â”€ */}
+            <div className="hidden md:grid md:grid-cols-[1fr_2rem_1.4fr_2rem_1fr] items-center max-w-6xl mx-auto">
+
+              {/* Left Cards (3) */}
+              <div className="flex flex-col justify-center gap-5">
+                {callouts
+                  .filter((c) => c.position === "left")
+                  .map((callout, index) => (
+                    <motion.div
+                      key={index}
+                      variants={{
+                        hidden: { opacity: 0, x: -24 },
+                        visible: {
+                          opacity: 1, x: 0,
+                          transition: { duration: 0.5, delay: 0.4 + index * 0.12, ease: [0.25, 0.46, 0.45, 0.94] },
+                        },
+                      }}
+                      className="bg-white/70 backdrop-blur-sm rounded-xl p-5 border border-[#5a6623]/30 hover:shadow-md transition-shadow duration-300"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#054700]/[0.07] flex items-center justify-center text-[#054700]">
+                          {callout.icon}
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#5a6623] font-medium uppercase tracking-wide mb-1">
+                            {callout.dataSource}
+                          </p>
+                          <p className="text-base font-semibold text-[#054700]">
+                            {callout.ingredient}
+                          </p>
+                          <p className="text-sm text-[#054700]/45">
+                            {callout.dose}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-[#D4A574] font-medium mb-1">
-                          {callout.dataSource}
-                        </p>
-                        <p className="text-lg font-semibold text-[#1B4332]">
-                          {callout.ingredient}
-                        </p>
-                        <p className="text-sm text-[#2D3436]/60">
-                          {callout.dose}
-                        </p>
-                      </div>
-                    </div>
+                    </motion.div>
+                  ))}
+              </div>
+
+              {/* Left connector column */}
+              <div className="flex flex-col justify-center items-center gap-5 h-full">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex-1 flex items-center w-full">
+                    <div className="w-full h-px bg-gradient-to-r from-transparent via-[#5a6623]/30 to-[#5a6623]/50" />
+                    <div className="w-2 h-2 rounded-full bg-[#5a6623] flex-shrink-0" />
                   </div>
                 ))}
-            </div>
-          </div>
-        </div>
+              </div>
 
-        {/* Bottom statement */}
-        <div className="mt-20 text-center max-w-2xl mx-auto">
-          <p className="text-xl md:text-2xl text-[#2D3436] leading-relaxed">
-            Every ingredient selected for <em>your</em> biology. Every dose calibrated to <em>your</em> data.
-          </p>
-          <p className="mt-6 text-2xl md:text-3xl font-medium text-[#1B4332]">
-            One formula. Your formula. Shipped monthly.
-          </p>
+              {/* Center Video */}
+              <motion.div variants={scaleIn} className="relative flex items-center justify-center">
+                <div className="relative w-full">
+                  <video
+                    src="/capsule-formation.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    preload="auto"
+                    className="relative w-full h-auto rounded-2xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.12)]"
+                  />
+                </div>
+              </motion.div>
+
+              {/* Right connector column */}
+              <div className="flex flex-col justify-center items-center gap-5 h-full">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex-1 flex items-center w-full">
+                    <div className="w-2 h-2 rounded-full bg-[#5a6623] flex-shrink-0" />
+                    <div className="w-full h-px bg-gradient-to-r from-[#5a6623]/50 via-[#5a6623]/30 to-transparent" />
+                  </div>
+                ))}
+              </div>
+
+              {/* Right Cards (3) */}
+              <div className="flex flex-col justify-center gap-5">
+                {callouts
+                  .filter((c) => c.position === "right")
+                  .map((callout, index) => (
+                    <motion.div
+                      key={index}
+                      variants={{
+                        hidden: { opacity: 0, x: 24 },
+                        visible: {
+                          opacity: 1, x: 0,
+                          transition: { duration: 0.5, delay: 0.4 + index * 0.12, ease: [0.25, 0.46, 0.45, 0.94] },
+                        },
+                      }}
+                      className="bg-white/70 backdrop-blur-sm rounded-xl p-5 border border-[#5a6623]/30 hover:shadow-md transition-shadow duration-300"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#054700]/[0.07] flex items-center justify-center text-[#054700]">
+                          {callout.icon}
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#5a6623] font-medium uppercase tracking-wide mb-1">
+                            {callout.dataSource}
+                          </p>
+                          <p className="text-base font-semibold text-[#054700]">
+                            {callout.ingredient}
+                          </p>
+                          <p className="text-sm text-[#054700]/45">
+                            {callout.dose}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* CTA */}
+          <motion.div
+            initial="hidden"
+            animate={solutionInView ? "visible" : "hidden"}
+            variants={stagger}
+            className="mt-14 md:mt-20 text-center"
+          >
+            <motion.button
+              variants={fadeUp}
+              onClick={() => navigate("/signup")}
+              className="inline-flex items-center gap-2 bg-[#054700] text-[#ede8e2] px-8 py-4 rounded-full text-base font-medium hover:bg-[#053600] transition-colors duration-300 shadow-lg shadow-[#054700]/20"
+            >
+              Start Your Formula
+              <ArrowRight className="w-4 h-4" />
+            </motion.button>
+          </motion.div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
+  );
+}
+
+export function OnesDifferenceSection() {
+  const solutionRef = useRef<HTMLElement>(null);
+  const solutionInView = useInView(solutionRef, { once: true, margin: "100px" });
+  const [, navigate] = useLocation();
+
+  return (
+      <section ref={solutionRef} id="the-difference" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
+        <div className="container mx-auto px-6 max-w-7xl">
+          {/* Headline */}
+          <motion.div
+            initial="hidden"
+            animate={solutionInView ? "visible" : "hidden"}
+            variants={stagger}
+            className="max-w-3xl mx-auto text-center mb-16 md:mb-20"
+          >
+            <motion.div
+              variants={fadeUp}
+              className="inline-flex items-center gap-2 bg-[#054700] text-[#ede8e2] px-4 py-2 rounded-full mb-6"
+            >
+              <img src="/ones-logo-icon.svg" alt="" className="w-4 h-4 brightness-0 invert" />
+              <span className="text-sm font-medium">The Ones Difference</span>
+            </motion.div>
+
+            <motion.h3
+              variants={fadeUp}
+              className="text-2xl sm:text-3xl md:text-[2.75rem] text-[#054700] font-light leading-tight text-balance"
+            >
+              We don't recommend supplements.<span className="hidden sm:inline"><br /></span>{" "}
+              <span className="text-[#8a9a2c]">We formulate yours.</span>
+            </motion.h3>
+
+            <motion.p
+              variants={fadeUp}
+              className="mt-6 text-lg text-black/60 leading-relaxed max-w-xl mx-auto"
+            >
+              Your blood tests, your wearable data, your conversation with our AI â€” turned into one custom formula that ships to your door.
+            </motion.p>
+          </motion.div>
+
+          {/* Video + Ingredient Cards */}
+          <motion.div
+            initial="hidden"
+            animate={solutionInView ? "visible" : "hidden"}
+            variants={stagger}
+          >
+            {/* â”€â”€ Mobile Layout â”€â”€ */}
+            <div className="md:hidden">
+              <motion.div variants={scaleIn} className="flex justify-center mb-8">
+                <div className="relative w-full max-w-sm">
+                  <video
+                    src="/capsule-formation.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="relative w-full h-auto rounded-2xl shadow-xl"
+                  />
+                </div>
+              </motion.div>
+
+              <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
+                {callouts.map((callout, i) => (
+                  <motion.div
+                    key={i}
+                    variants={{
+                      hidden: { opacity: 0, y: 12 },
+                      visible: {
+                        opacity: 1, y: 0,
+                        transition: { duration: 0.4, delay: 0.3 + i * 0.08 },
+                      },
+                    }}
+                    className="bg-white/70 backdrop-blur-sm rounded-xl p-3.5 border border-[#5a6623]/30"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-7 h-7 rounded-full bg-[#054700]/[0.07] flex items-center justify-center text-[#054700]">
+                        {callout.icon}
+                      </div>
+                      <span className="text-[10px] text-[#5a6623] font-medium uppercase tracking-wide leading-tight line-clamp-2">
+                        {callout.dataSource}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span className="text-sm font-semibold text-[#054700]">{callout.ingredient}</span>
+                      <span className="text-xs text-[#054700]/35">{callout.dose}</span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* â”€â”€ Desktop Layout â”€â”€ */}
+            <div className="hidden md:grid md:grid-cols-[1fr_2rem_1.4fr_2rem_1fr] items-center max-w-6xl mx-auto">
+              <div className="flex flex-col justify-center gap-5">
+                {callouts.filter((c) => c.position === "left").map((callout, index) => (
+                  <motion.div
+                    key={index}
+                    variants={{
+                      hidden: { opacity: 0, x: -24 },
+                      visible: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.4 + index * 0.12, ease: [0.25, 0.46, 0.45, 0.94] } },
+                    }}
+                    className="bg-white/70 backdrop-blur-sm rounded-xl p-5 border border-[#5a6623]/30 hover:shadow-md transition-shadow duration-300"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#054700]/[0.07] flex items-center justify-center text-[#054700]">{callout.icon}</div>
+                      <div>
+                        <p className="text-xs text-[#5a6623] font-medium uppercase tracking-wide mb-1">{callout.dataSource}</p>
+                        <p className="text-base font-semibold text-[#054700]">{callout.ingredient}</p>
+                        <p className="text-sm text-[#054700]/45">{callout.dose}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+              <div className="flex flex-col justify-center items-center gap-5 h-full">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex-1 flex items-center w-full">
+                    <div className="w-full h-px bg-gradient-to-r from-transparent via-[#5a6623]/30 to-[#5a6623]/50" />
+                    <div className="w-2 h-2 rounded-full bg-[#5a6623] flex-shrink-0 mr-3" />
+                  </div>
+                ))}
+              </div>
+              <motion.div variants={scaleIn} className="relative flex items-center justify-center">
+                <video src="/capsule-formation.mp4" autoPlay loop muted playsInline preload="auto" className="relative w-full h-auto rounded-2xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.12)]" />
+              </motion.div>
+              <div className="flex flex-col justify-center items-center gap-5 h-full">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex-1 flex items-center w-full">
+                    <div className="w-2 h-2 rounded-full bg-[#5a6623] flex-shrink-0 ml-3" />
+                    <div className="w-full h-px bg-gradient-to-r from-[#5a6623]/50 via-[#5a6623]/30 to-transparent" />
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col justify-center gap-5">
+                {callouts.filter((c) => c.position === "right").map((callout, index) => (
+                  <motion.div
+                    key={index}
+                    variants={{
+                      hidden: { opacity: 0, x: 24 },
+                      visible: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.4 + index * 0.12, ease: [0.25, 0.46, 0.45, 0.94] } },
+                    }}
+                    className="bg-white/70 backdrop-blur-sm rounded-xl p-5 border border-[#5a6623]/30 hover:shadow-md transition-shadow duration-300"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#054700]/[0.07] flex items-center justify-center text-[#054700]">{callout.icon}</div>
+                      <div>
+                        <p className="text-xs text-[#5a6623] font-medium uppercase tracking-wide mb-1">{callout.dataSource}</p>
+                        <p className="text-base font-semibold text-[#054700]">{callout.ingredient}</p>
+                        <p className="text-sm text-[#054700]/45">{callout.dose}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* CTA */}
+          <motion.div
+            initial="hidden"
+            animate={solutionInView ? "visible" : "hidden"}
+            variants={stagger}
+            className="mt-14 md:mt-20 text-center"
+          >
+            <motion.button
+              variants={fadeUp}
+              onClick={() => navigate("/signup")}
+              className="inline-flex items-center gap-2 bg-[#054700] text-[#ede8e2] px-8 py-4 rounded-full text-base font-medium hover:bg-[#053600] transition-colors duration-300 shadow-lg shadow-[#054700]/20"
+            >
+              Start Your Formula
+              <ArrowRight className="w-4 h-4" />
+            </motion.button>
+          </motion.div>
+        </div>
+      </section>
   );
 }

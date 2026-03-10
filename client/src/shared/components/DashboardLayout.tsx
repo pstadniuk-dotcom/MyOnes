@@ -11,6 +11,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/shared/components/ui/alert-dialog';
 import { NotificationsDropdown } from '@/features/notifications/components/NotificationsDropdown';
 import {
   ChevronDown,
@@ -20,10 +30,13 @@ import {
   Settings,
   User
 } from 'lucide-react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'wouter';
 import { useTimezoneSync } from '@/shared/hooks/use-timezone';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useIdleTimeout } from '@/shared/hooks/use-idle-timeout';
+import { useToast } from '@/shared/hooks/use-toast';
 import { MobileBottomNav, MobileHeader } from '@/shared/components/mobile';
 
 interface DashboardLayoutProps {
@@ -34,6 +47,7 @@ interface DashboardLayoutProps {
 
 function UserDropdown() {
   const { user, logout } = useAuth();
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   if (!user) return null;
 
@@ -44,79 +58,80 @@ function UserDropdown() {
     .toUpperCase();
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="flex items-center gap-2 h-9 px-2 hover:bg-[#1B4332]/5 transition-colors"
+          className="flex items-center gap-2 h-9 px-2 hover:bg-[#054700]/5 transition-colors"
           data-testid="button-user-menu"
         >
-          <Avatar className="h-7 w-7 border border-[#1B4332]/10">
+          <Avatar className="h-7 w-7 border border-[#054700]/10">
             <AvatarImage src="" alt={user.name} />
-            <AvatarFallback className="text-xs bg-[#1B4332] text-white">{userInitials}</AvatarFallback>
+            <AvatarFallback className="text-xs bg-[#054700] text-white">{userInitials}</AvatarFallback>
           </Avatar>
           <div className="hidden sm:flex flex-col items-start">
-            <span className="text-sm font-medium leading-none text-[#1B4332]">{user.name}</span>
-            <span className="text-xs text-[#52796F] leading-none">{user.email}</span>
+            <span className="text-sm font-medium leading-none text-[#054700]">{user.name}</span>
+            <span className="text-xs text-[#5a6623] leading-none">{user.email}</span>
           </div>
-          <ChevronDown className="h-4 w-4 text-[#52796F]" />
+          <ChevronDown className="h-4 w-4 text-[#5a6623]" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-64 bg-[#FAF7F2] border-[#1B4332]/10" align="end" forceMount>
+      <DropdownMenuContent className="w-64 glass-card border-[#054700]/10 shadow-2xl" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-2">
             <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10 border border-[#1B4332]/10">
+              <Avatar className="h-10 w-10 border border-[#054700]/10">
                 <AvatarImage src="" alt={user.name} />
-                <AvatarFallback className="text-sm bg-[#1B4332] text-white">{userInitials}</AvatarFallback>
+                <AvatarFallback className="text-sm bg-[#054700] text-white">{userInitials}</AvatarFallback>
               </Avatar>
               <div className="flex flex-col">
-                <p className="text-sm font-medium leading-none text-[#1B4332]">{user.name}</p>
-                <p className="text-xs leading-none text-[#52796F]">{user.email}</p>
+                <p className="text-sm font-medium leading-none text-[#054700]">{user.name}</p>
+                <p className="text-xs leading-none text-[#5a6623]">{user.email}</p>
               </div>
             </div>
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-[#1B4332]/10" />
+        <DropdownMenuSeparator className="bg-[#054700]/10" />
         <DropdownMenuGroup>
 
-          {/* <DropdownMenuItem asChild className="hover:bg-[#1B4332]/5 focus:bg-[#1B4332]/5 cursor-pointer">
+          {/* <DropdownMenuItem asChild className="hover:bg-[#054700]/5 focus:bg-[#054700]/5 cursor-pointer">
             <Link href="/dashboard/settings?tab=notifications" data-testid="link-notifications">
-              <Bell className="mr-2 h-4 w-4 text-[#52796F]" />
-              <span className="text-[#1B4332]">Notifications</span>
+              <Bell className="mr-2 h-4 w-4 text-[#5a6623]" />
+              <span className="text-[#054700]">Notifications</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild className="hover:bg-[#1B4332]/5 focus:bg-[#1B4332]/5 cursor-pointer">
+          <DropdownMenuItem asChild className="hover:bg-[#054700]/5 focus:bg-[#054700]/5 cursor-pointer">
             <Link href="/dashboard/settings?tab=privacy" data-testid="link-privacy">
-              <Shield className="mr-2 h-4 w-4 text-[#52796F]" />
-              <span className="text-[#1B4332]">Privacy</span>
+              <Shield className="mr-2 h-4 w-4 text-[#5a6623]" />
+              <span className="text-[#054700]">Privacy</span>
             </Link>
           </DropdownMenuItem> */}
-          <DropdownMenuItem asChild className="hover:bg-[#1B4332]/5 focus:bg-[#1B4332]/5 cursor-pointer">
+          <DropdownMenuItem asChild className="hover:bg-[#054700]/5 focus:bg-[#054700]/5 cursor-pointer">
             <Link href="/dashboard/profile" data-testid="link-profile">
-              <User className="mr-2 h-4 w-4 text-[#52796F]" />
-              <span className="text-[#1B4332]">Profile</span>
+              <User className="mr-2 h-4 w-4 text-[#5a6623]" />
+              <span className="text-[#054700]">Profile</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild className="hover:bg-[#1B4332]/5 focus:bg-[#1B4332]/5 cursor-pointer">
+          <DropdownMenuItem asChild className="hover:bg-[#054700]/5 focus:bg-[#054700]/5 cursor-pointer">
             <Link href="/dashboard/settings" data-testid="link-settings">
-              <Settings className="mr-2 h-4 w-4 text-[#52796F]" />
-              <span className="text-[#1B4332]">Settings</span>
+              <Settings className="mr-2 h-4 w-4 text-[#5a6623]" />
+              <span className="text-[#054700]">Settings</span>
             </Link>
           </DropdownMenuItem>
           {user.isAdmin && (
-            <DropdownMenuItem asChild className="hover:bg-[#1B4332]/5 focus:bg-[#1B4332]/5 cursor-pointer">
+            <DropdownMenuItem asChild className="hover:bg-[#054700]/5 focus:bg-[#054700]/5 cursor-pointer">
               <Link href="/admin" data-testid="link-admin-panel">
-                {/* <Settings className="mr-2 h-4 w-4 text-[#52796F]" /> */}
-                <Shield className="mr-2 h-4 w-4 text-[#52796F]" />
-                <span className="text-[#1B4332]">Admin Panel</span>
+                {/* <Settings className="mr-2 h-4 w-4 text-[#5a6623]" /> */}
+                <Shield className="mr-2 h-4 w-4 text-[#5a6623]" />
+                <span className="text-[#054700]">Admin Panel</span>
               </Link>
             </DropdownMenuItem>
           )}
         </DropdownMenuGroup>
-        <DropdownMenuSeparator className="bg-[#1B4332]/10" />
+        <DropdownMenuSeparator className="bg-[#054700]/10" />
         <DropdownMenuItem
-          onClick={logout}
+          onClick={() => setShowSignOutConfirm(true)}
           className="text-red-600 focus:text-red-600 hover:bg-red-50 focus:bg-red-50 cursor-pointer"
           data-testid="button-logout"
         >
@@ -125,12 +140,60 @@ function UserDropdown() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+
+    {/* Sign Out Confirmation Dialog */}
+    <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            You will be signed out of your account. Any unsaved changes will be lost.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={logout}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            Sign Out
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   // Auto-sync user's timezone for SMS reminder scheduling
   useTimezoneSync();
+  const { logout, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+
+  // Idle session timeout — warn at 28 min, logout at 30 min
+  const handleIdleWarning = useCallback(() => {
+    toast({
+      title: 'Session expiring soon',
+      description: 'You will be logged out in 2 minutes due to inactivity. Move your mouse or press a key to stay logged in.',
+      variant: 'destructive',
+    });
+  }, [toast]);
+
+  const handleIdleTimeout = useCallback(() => {
+    toast({
+      title: 'Session expired',
+      description: 'You have been logged out due to inactivity.',
+      variant: 'destructive',
+    });
+    logout();
+  }, [logout, toast]);
+
+  useIdleTimeout({
+    onWarning: handleIdleWarning,
+    onTimeout: handleIdleTimeout,
+    enabled: isAuthenticated,
+  });
 
   // Check if we're on mobile
   const isMobile = useIsMobile();
@@ -144,13 +207,24 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   // Mobile layout: compact header + bottom nav
   if (isMobile) {
     return (
-      <div className="flex flex-col min-h-dvh bg-[#FAF7F2]">
+      <div className="flex flex-col min-h-dvh bg-[#ede8e2]">
         {/* Compact mobile header */}
         <MobileHeader />
 
         {/* Main content - no extra padding, let pages control their own layout */}
-        <main className="flex-1 overflow-auto pb-20">
-          {children}
+        <main className="flex-1 overflow-auto pb-20 bg-gradient-to-br from-[#eef2eb] via-[#ede8e2] to-[#e4e8de] relative">
+          {/* Decorative gradient blobs — fixed so they cover full viewport with no cutoff */}
+          <div className="pointer-events-none fixed inset-0 overflow-hidden z-0" aria-hidden="true">
+            <div className="absolute -top-20 -left-20 w-[500px] h-[500px] rounded-full bg-[#054700]/15 blur-[100px] animate-blob-1" />
+            <div className="absolute top-1/4 right-0 w-[450px] h-[450px] rounded-full bg-[#5a6623]/12 blur-[90px] animate-blob-2" />
+            <div className="absolute top-1/2 left-0 w-[400px] h-[400px] rounded-full bg-[#8fa370]/18 blur-[80px] animate-blob-4" />
+            <div className="absolute bottom-0 left-1/3 w-[550px] h-[550px] rounded-full bg-[#054700]/10 blur-[100px] animate-blob-3" />
+            <div className="absolute top-[15%] right-[10%] w-[400px] h-[400px] rounded-full bg-[#5a6623]/14 blur-[90px] animate-blob-5" />
+            <div className="absolute bottom-[15%] left-[10%] w-[350px] h-[350px] rounded-full bg-[#8fa370]/15 blur-[80px] animate-blob-6" />
+          </div>
+          <div className="relative z-10 p-4 pt-5">
+            {children}
+          </div>
         </main>
 
         {/* Bottom navigation - thumb zone optimized */}
@@ -162,17 +236,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   // Desktop layout: sidebar + header
   return (
     <SidebarProvider defaultOpen={true} style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full bg-[#FAF7F2]">
+      <div className="flex h-screen w-full bg-[#ede8e2]">
         <AppSidebar />
         <SidebarInset>
           <div className="flex flex-col h-full">
             {/* Dashboard Header - V2 Branding */}
             <header
-              className="flex items-center justify-between h-16 px-6 border-b border-[#1B4332]/5 bg-[#FAF7F2]/80 backdrop-blur-md"
+              className="flex items-center justify-between h-16 px-6 border-b border-[#054700]/5 bg-[#ede8e2]/80 backdrop-blur-md"
               data-testid="header-dashboard"
             >
               <div className="flex items-center gap-3">
-                <SidebarTrigger className="text-[#1B4332] hover:bg-[#1B4332]/5" data-testid="button-sidebar-toggle" />
+                <SidebarTrigger className="text-[#054700] hover:bg-[#054700]/5" data-testid="button-sidebar-toggle" />
               </div>
 
               <div className="flex items-center gap-3">
@@ -184,8 +258,19 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </header>
 
             {/* Dashboard Content */}
-            <main className="flex-1 overflow-auto p-6 bg-[#FAF7F2]">
-              {children}
+            <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-[#eef2eb] via-[#ede8e2] to-[#e4e8de] relative">
+              {/* Decorative gradient blobs — fixed so they cover full viewport with no cutoff */}
+              <div className="pointer-events-none fixed inset-0 overflow-hidden z-0" aria-hidden="true">
+                <div className="absolute -top-20 -left-20 w-[500px] h-[500px] rounded-full bg-[#054700]/15 blur-[100px] animate-blob-1" />
+                <div className="absolute top-1/4 right-0 w-[450px] h-[450px] rounded-full bg-[#5a6623]/12 blur-[90px] animate-blob-2" />
+                <div className="absolute top-1/2 left-0 w-[400px] h-[400px] rounded-full bg-[#8fa370]/18 blur-[80px] animate-blob-4" />
+                <div className="absolute bottom-0 left-1/3 w-[550px] h-[550px] rounded-full bg-[#054700]/10 blur-[100px] animate-blob-3" />
+                <div className="absolute top-[15%] right-[10%] w-[400px] h-[400px] rounded-full bg-[#5a6623]/14 blur-[90px] animate-blob-5" />
+                <div className="absolute bottom-[15%] left-[10%] w-[350px] h-[350px] rounded-full bg-[#8fa370]/15 blur-[80px] animate-blob-6" />
+              </div>
+              <div className="relative z-10">
+                {children}
+              </div>
             </main>
           </div>
         </SidebarInset>

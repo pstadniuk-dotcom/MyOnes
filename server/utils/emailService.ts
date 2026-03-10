@@ -4,7 +4,7 @@ import { getFrontendUrl } from './urlHelper';
 // Initialize SendGrid with API key from environment variables
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY?.trim();
 const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL?.trim();
-const SENDGRID_FROM_NAME = (process.env.SENDGRID_FROM_NAME || 'ONES').trim();
+const SENDGRID_FROM_NAME = (process.env.SENDGRID_FROM_NAME || 'Ones').trim();
 
 if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);
@@ -90,7 +90,7 @@ function getEmailTemplate(notification: EmailNotification): string {
           <tr>
             <td style="padding:24px 40px;text-align:center;">
               <img src="${getFrontendUrl()}/ones-logo-light.svg"
-                   alt="ONES"
+                   alt="Ones"
                    width="140"
                    style="display:block;margin:0 auto 10px;height:auto;"
               />
@@ -99,7 +99,7 @@ function getEmailTemplate(notification: EmailNotification): string {
               <p style="margin:0;font-size:12px;color:#9ca3af;">
                 <a href="${getFrontendUrl()}/dashboard/settings?tab=notifications" style="color:#9ca3af;">Manage preferences</a>
                 &nbsp;·&nbsp;
-                <a href="${getFrontendUrl()}" style="color:#9ca3af;">myones.ai</a>
+                <a href="${getFrontendUrl()}" style="color:#9ca3af;">ones.health</a>
               </p>
             </td>
           </tr>
@@ -116,8 +116,6 @@ function getEmailTemplate(notification: EmailNotification): string {
 export async function sendNotificationEmail(notification: EmailNotification): Promise<boolean> {
   try {
     if (!SENDGRID_API_KEY || !SENDGRID_FROM_EMAIL) {
-      console.log('sendgrid api key ', SENDGRID_API_KEY)
-      console.log('sendgrid from email ', SENDGRID_FROM_EMAIL)
       console.error('❌ SendGrid not configured: Missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL environment variables');
       return false;
     }

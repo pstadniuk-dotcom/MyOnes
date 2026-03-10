@@ -24,7 +24,7 @@ export function TrackingPillBar({ prefs }: TrackingPillBarProps) {
   }
 
   return (
-    <p className="text-xs text-[#52796F]">
+    <p className="text-xs text-[#5a6623]">
       Tracking: {labels.join(' · ')}
     </p>
   );

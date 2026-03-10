@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Frosted glass card effect */
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* Light gray frosted glass for user chat bubbles */
+.glass-dark {
+  background: rgba(60, 60, 60, 0.12);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* Hide browser video overlay controls (speed badges, PiP, etc.) */
+video::-webkit-media-controls {
+  display: none !important;
+}
+video::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+
 /* LIGHT MODE - Premium Earthy Green Theme */
 :root {
   --button-outline: rgba(0, 0, 0, .08);
@@ -661,6 +691,55 @@
       outline-offset: 2px;
     }
   }
+
+  /* ============================================
+     DASHBOARD BACKGROUND BLOB ANIMATIONS
+     ============================================ */
+
+  /* Slow organic drifting paths – each blob uses a different one
+     so the overall effect looks alive but never jarring. */
+  @keyframes blob-drift-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25%      { transform: translate(30px, -20px) scale(1.05); }
+    50%      { transform: translate(-15px, 15px) scale(0.97); }
+    75%      { transform: translate(20px, 25px) scale(1.03); }
+  }
+
+  @keyframes blob-drift-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    20%      { transform: translate(-25px, 20px) scale(1.04); }
+    40%      { transform: translate(20px, -10px) scale(0.96); }
+    60%      { transform: translate(-10px, -25px) scale(1.06); }
+    80%      { transform: translate(15px, 15px) scale(0.98); }
+  }
+
+  @keyframes blob-drift-3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33%      { transform: translate(25px, 20px) scale(1.03); }
+    66%      { transform: translate(-20px, -15px) scale(0.95); }
+  }
+
+  @keyframes blob-drift-4 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    30%      { transform: translate(-20px, -30px) scale(1.07); }
+    60%      { transform: translate(30px, 10px) scale(0.94); }
+  }
+
+  @keyframes blob-drift-5 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25%      { transform: translate(15px, 25px) scale(0.96); }
+    50%      { transform: translate(-25px, -10px) scale(1.05); }
+    75%      { transform: translate(10px, -20px) scale(1.02); }
+  }
+
+  /* Utility classes applied to individual blobs */
+  .animate-blob-1 { animation: blob-drift-1 22s ease-in-out infinite; will-change: transform; }
+  .animate-blob-2 { animation: blob-drift-2 26s ease-in-out infinite; will-change: transform; }
+  .animate-blob-3 { animation: blob-drift-3 30s ease-in-out infinite; will-change: transform; }
+  .animate-blob-4 { animation: blob-drift-4 24s ease-in-out infinite; will-change: transform; }
+  .animate-blob-5 { animation: blob-drift-5 28s ease-in-out infinite; will-change: transform; }
+  .animate-blob-6 { animation: blob-drift-1 32s ease-in-out infinite reverse; will-change: transform; }
+  .animate-blob-7 { animation: blob-drift-3 20s ease-in-out infinite reverse; will-change: transform; }
 
   /* Reduce motion for users who prefer it */
   @media (prefers-reduced-motion: reduce) {

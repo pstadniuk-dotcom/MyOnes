@@ -4,8 +4,13 @@ import pg from 'pg';
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-const email = 'pstadniuk@gmail.com';
-const newPassword = 'TempPass123!';
+const email = process.argv[2] || 'pstadniuk@gmail.com';
+const newPassword = process.argv[3];
+
+if (!newPassword) {
+  console.error('Usage: node reset-password.mjs <email> <newPassword>');
+  process.exit(1);
+}
 
 async function resetPassword() {
   try {

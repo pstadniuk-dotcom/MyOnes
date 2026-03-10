@@ -11,8 +11,8 @@ export default function PricingSection() {
   const plans = [
     {
       name: "Starter",
-      duration: "3 months",
-      price: 495,
+      duration: "2 months",
+      price: 330,
       monthlyPrice: 165,
       description: "Perfect for getting started with personalized nutrition",
       features: [
@@ -22,49 +22,32 @@ export default function PricingSection() {
         "Basic ingredient adjustments",
         "Email support"
       ],
-      cta: "Start Your Journey"
+      cta: "Start Your Journey",
+      savings: undefined as string | undefined
     },
     {
-      name: "6 Month Supply",
-      duration: "6 months",
-      price: 875,
-      monthlyPrice: 146,
-      description: "Most popular plan for comprehensive health optimization",
+      name: "2 Month Supply",
+      duration: "2 months",
+      price: 330,
+      monthlyPrice: 165,
+      description: "Your personalized formula, custom-manufactured for you",
       features: [
-        "Everything in Starter",
-        "Advanced blood test analysis",
-        "Bi-weekly formula adjustments",
-        "Priority chat support",
-        "Health coaching calls",
-        "Wearable device integration"
+        "AI health consultation",
+        "Custom supplement formula",
+        "200+ clinical-grade ingredients",
+        "Free shipping",
+        "Formula versioning & updates",
+        "Wearable data integration"
       ],
-      cta: "Optimize My Health",
-      popular: true,
-      savings: "Save $115"
-    },
-    {
-      name: "12 Month Supply",
-      duration: "12 months",
-      price: 1590,
-      monthlyPrice: 133,
-      description: "Best value - Complete health transformation with ongoing optimization",
-      features: [
-        "Everything in Optimize",
-        "Quarterly comprehensive reviews",
-        "Advanced genetic testing",
-        "Dedicated health advisor",
-        "Custom meal planning",
-        "Annual lab work included"
-      ],
-      cta: "Transform My Health",
-      savings: "Save $390"
+      cta: "Start Your Formula",
+      popular: true
     }
   ];
 
   const includedFeatures = [
     "Free shipping nationwide",
     "Custom-made for you",
-    "Third-party tested ingredients",
+    "Clinical-grade ingredients",
     "Made in USA"
   ];
 

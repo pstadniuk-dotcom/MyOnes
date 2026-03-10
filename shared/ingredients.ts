@@ -180,7 +180,7 @@ export const SYSTEM_SUPPORTS: IngredientInfo[] = [
 ];
 
 // ============================================================================
-// INDIVIDUAL INGREDIENTS (37 total) - ADJUSTABLE within dose ranges
+// INDIVIDUAL INGREDIENTS (33 total) - ADJUSTABLE within dose ranges
 // ============================================================================
 
 export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
@@ -869,6 +869,8 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
       },
     ]
   },
+  // NOTE: "Chaga Mix" exists here in SYSTEM_SUPPORT_DETAILS but is NOT in SYSTEM_SUPPORTS.
+  // It cannot be used in formulas. If this is a planned product, add it to SYSTEM_SUPPORTS as well.
   {
     name: 'Chaga Mix',
     doseMg: 3600,
@@ -1725,6 +1727,8 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'ginkgo biloba': 'Ginkgo Biloba Extract 24%',
   'aloe vera powder': 'Aloe Vera',
   'cape aloe': 'Cape Aloe',
+  "cat's claw": 'Cats Claw',
+  'cats claw bark': 'Cats Claw',
   'vitamin e': 'Vitamin E (Mixed Tocopherols)',
   'mixed tocopherols': 'Vitamin E (Mixed Tocopherols)',
   'milk thistle': 'Milk Thistle',
@@ -1736,10 +1740,84 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   // Unit/Qualifier variations
   'magnesium': 'Magnesium',
   'mag': 'Magnesium',
-  'zinc': 'Zinc',
-  'vit d': 'Vitamin D3',
-  'vit b12': 'Vitamin B12',
-  'b12': 'Vitamin B12'
+  // Note: Zinc, Vitamin D3, and Vitamin B12 are sub-ingredients of system supports,
+  // not standalone catalog items. Do not alias them here.
+
+  // Common AI name variations that differ from catalog names
+  'saw palmetto': 'Saw Palmetto Extract',
+  'saw palmetto berry': 'Saw Palmetto Extract',
+  'maca root': 'Maca',
+  'maca root extract': 'Maca',
+  'ashwagandha root': 'Ashwagandha',
+  'ashwagandha extract': 'Ashwagandha',
+  'ashwagandha root extract': 'Ashwagandha',
+  'curcumin extract': 'Curcumin',
+  'curcumin 95%': 'Curcumin',
+  'ginger': 'Ginger Root',
+  'ginger root extract': 'Ginger Root',
+  'broccoli extract': 'Broccoli Concentrate',
+  'broccoli sprout extract': 'Broccoli Concentrate',
+  'broccoli sprout': 'Broccoli Concentrate',
+  'bovine colostrum': 'Colostrum Powder',
+  'colostrum': 'Colostrum Powder',
+  'camu camu berry': 'Camu Camu',
+  'camu camu berry extract': 'Camu Camu',
+  'cape aloe leaf': 'Cape Aloe',
+  'aloe ferox': 'Cape Aloe',
+  'suma': 'Suma Root',
+  'pfaffia paniculata': 'Suma Root',
+  'brazilian ginseng': 'Suma Root',
+
+  // ── System Support aliases (punctuation/formatting variations) ──
+  'beta-max': 'Beta Max',
+  'immune c': 'Immune-C',
+  'immunec': 'Immune-C',
+  'immune-c': 'Immune-C',
+  'kidney bladder support': 'Kidney & Bladder Support',
+  'kidney & bladder': 'Kidney & Bladder Support',
+  'kidney and bladder support': 'Kidney & Bladder Support',
+  'kidney and bladder': 'Kidney & Bladder Support',
+  'mg k': 'MG/K',
+  'mold-rx': 'Mold RX',
+  'moldrx': 'Mold RX',
+  'para-x': 'Para X',
+  'parax': 'Para X',
+
+  // ── Additional individual ingredient aliases ──
+  'blackcurrant': 'Blackcurrant Extract',
+  'black currant': 'Blackcurrant Extract',
+  'black currant extract': 'Blackcurrant Extract',
+  'chaga mushroom': 'Chaga',
+  'chaga mushrooms': 'Chaga',
+  'astragalus root': 'Astragalus',
+  'astragalus root extract': 'Astragalus',
+  'garlic extract': 'Garlic',
+  'garlic bulb': 'Garlic',
+  'garlic powder': 'Garlic',
+  'ginko biloba': 'Ginkgo Biloba Extract 24%',
+  'ginkgo biloba extract': 'Ginkgo Biloba Extract 24%',
+  'trans-resveratrol': 'Resveratrol',
+  'trans resveratrol': 'Resveratrol',
+  'magnesium glycinate': 'Magnesium',
+  'magnesium citrate': 'Magnesium',
+  'magnesium oxide': 'Magnesium',
+  'gamma aminobutyric acid': 'GABA',
+  'gamma-aminobutyric acid': 'GABA',
+  'camu camu extract': 'Camu Camu',
+  "cat's claw bark": 'Cats Claw',
+  'cinnamon bark': 'Cinnamon 20:1',
+  'cinnamon bark extract': 'Cinnamon 20:1',
+  'ceylon cinnamon': 'Cinnamon 20:1',
+  'milk thistle extract': 'Milk Thistle',
+  'milk thistle seed extract': 'Milk Thistle',
+  'ashwagandha ksm-66': 'Ashwagandha',
+  'ashwagandha ksm 66': 'Ashwagandha',
+  'omega 3 fatty acids': 'Omega 3',
+  'omega-3 fatty acids': 'Omega 3',
+  'stinging nettle': 'Stinging Nettle',
+  'nettle root': 'Stinging Nettle',
+  'nettle leaf': 'Stinging Nettle',
+  'saw palmetto extract': 'Saw Palmetto Extract',
 };
 
 // ============================================================================
@@ -1779,6 +1857,10 @@ export function normalizeIngredientName(name: string): string {
     .replace(/\s+\d+%\s*/g, ' ')
     // Remove parenthetical descriptors (e.g., "(soy)", "(powder)", "(bovine)")
     .replace(/\s*\([^)]+\)/g, '')
+    // Remove dosage suffixes (e.g., "1000mg", "500 mg", "600mg")
+    .replace(/\s+\d+\s*mg\b/gi, '')
+    // Remove brand/trademark suffixes (e.g., "KSM-66", "Sensoril")
+    .replace(/\s+KSM[-\s]?66/gi, '')
     // Normalize multiple spaces
     .replace(/\s+/g, ' ')
     .trim();

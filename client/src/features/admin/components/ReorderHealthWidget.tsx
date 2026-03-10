@@ -10,7 +10,6 @@ import {
   Clock, 
   AlertCircle, 
   CheckCircle2, 
-  Mail,
   User
 } from 'lucide-react';
 import { useLocation } from 'wouter';

@@ -15,7 +15,6 @@ interface PendingActionsData {
   openTickets: number;
   pendingOrders: number;
   processingOrders: number;
-  reordersdue: number;
   overdueReorders: number;
 }
 
@@ -80,7 +79,10 @@ export function PendingActionsWidget() {
       count: data.overdueReorders,
       icon: AlertTriangle,
       color: 'bg-red-500',
-      onClick: () => {}, // Scroll to reorder health
+      onClick: () => {
+        const el = document.querySelector('[data-testid="reorder-health-widget"]');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      },
       urgent: data.overdueReorders > 0
     }
   ];

@@ -25,14 +25,31 @@ export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant', 'sys
 export const addressTypeEnum = pgEnum('address_type', ['shipping', 'billing']);
 export const fileTypeEnum = pgEnum('file_type', ['lab_report', 'medical_document', 'prescription', 'other']);
 export const auditActionEnum = pgEnum('audit_action', ['upload', 'view', 'download', 'delete', 'share', 'access_denied']);
-export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing', 'sms_accountability', 'medication_disclosure']);
+export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing', 'sms_accountability', 'medication_disclosure', 'tos_acceptance']);
 export const notificationTypeEnum = pgEnum('notification_type', ['order_update', 'formula_update', 'consultation_reminder', 'system']);
 export const evidenceLevelEnum = pgEnum('evidence_level', ['strong', 'moderate', 'preliminary', 'limited']);
 export const studyTypeEnum = pgEnum('study_type', ['rct', 'meta_analysis', 'systematic_review', 'observational', 'case_study', 'review']);
 export const reviewFrequencyEnum = pgEnum('review_frequency', ['monthly', 'bimonthly', 'quarterly']);
-export const wearableProviderEnum = pgEnum('wearable_provider', ['fitbit', 'oura', 'whoop']);
+export const wearableProviderEnum = pgEnum('wearable_provider', ['fitbit', 'oura', 'whoop', 'garmin', 'apple_health', 'google_fit', 'samsung', 'polar', 'withings', 'eight_sleep', 'strava', 'peloton', 'ultrahuman', 'dexcom', 'freestyle_libre', 'cronometer', 'omron', 'kardia', 'junction']);
 export const wearableConnectionStatusEnum = pgEnum('wearable_connection_status', ['connected', 'disconnected', 'error', 'token_expired']);
+export const autoShipStatusEnum = pgEnum('auto_ship_status', ['active', 'paused', 'cancelled']);
+export const reorderScheduleStatusEnum = pgEnum('reorder_schedule_status', ['active', 'awaiting_review', 'awaiting_approval', 'approved', 'delayed', 'charged', 'skipped', 'cancelled']);
+export const reorderRecommendationStatusEnum = pgEnum('reorder_recommendation_status', ['pending', 'sent', 'approved', 'kept', 'expired', 'error']);
 export const streakTypeEnum = pgEnum('streak_type', ['overall', 'nutrition', 'workout', 'supplements', 'lifestyle']);
+export const adminActionEnum = pgEnum('admin_action', [
+  'user_delete', 'user_suspend', 'user_unsuspend', 'user_admin_grant', 'user_admin_revoke',
+  'order_status_change', 'order_refund',
+  'ticket_status_change', 'ticket_assign', 'ticket_reply',
+  'settings_update', 'settings_reset',
+  'faq_create', 'faq_update', 'faq_delete',
+  'help_article_create', 'help_article_update', 'help_article_delete',
+  'blog_create', 'blog_update', 'blog_delete', 'blog_publish', 'blog_unpublish',
+  'membership_tier_update',
+  'ingredient_pricing_update',
+  'formula_review_trigger',
+  'newsletter_subscriber_toggle',
+]);
+
 // Users table - updated with name, email, phone, password
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -87,13 +104,16 @@ export const users = pgTable("users", {
 
   // Membership System
   membershipTier: text("membership_tier"), // 'founding' | 'early' | 'beta' | 'standard' | null (not a member)
-  membershipPriceCents: integer("membership_price_cents"), // Price locked at signup (e.g., 1900 = $19)
+  membershipPriceCents: integer("membership_price_cents"), // Price locked at signup (e.g., 900 = $9 founding)
   membershipLockedAt: timestamp("membership_locked_at"), // When they locked in their tier
   membershipCancelledAt: timestamp("membership_cancelled_at"), // If they cancelled
   stripeCustomerId: text("stripe_customer_id"), // Stripe customer ID for billing
   stripeSubscriptionId: text("stripe_subscription_id"), // Stripe subscription ID
 
   emailVerified: boolean("email_verified").default(false).notNull(),
+
+  // Terms of Service acceptance tracking
+  tosAcceptedAt: timestamp("tos_accepted_at"),
 
   // Formula auto-optimization: when true, system auto-applies AI-suggested changes before reorder
   // and sends email + SMS notification. Default false = manual review required.
@@ -102,6 +122,13 @@ export const users = pgTable("users", {
   // Dashboard metric preferences: ordered list of metric IDs the user wants visible
   // null = use defaults from shared/metricCatalog.ts
   metricPreferences: json("metric_preferences"),
+
+  // Soft-delete & suspension (admin operations)
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  suspendedAt: timestamp("suspended_at"),
+  suspendedBy: varchar("suspended_by"),
+  suspendedReason: text("suspended_reason"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -176,6 +203,7 @@ export const healthProfiles = pgTable("health_profiles", {
 export const chatSessions = pgTable("chat_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }),
   status: chatStatusEnum("status").default('active').notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -306,6 +334,27 @@ export const subscriptions = pgTable("subscriptions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Auto-ship subscriptions — recurring formula deliveries every 8 weeks
+export const autoShipSubscriptions = pgTable("auto_ship_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  formulaId: varchar("formula_id").references(() => formulas.id, { onDelete: "set null" }),
+  formulaVersion: integer("formula_version").notNull(),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),  // Stripe recurring subscription for formula
+  stripeProductId: varchar("stripe_product_id"),              // Stripe product used for price line item
+  stripePriceId: varchar("stripe_price_id"),                  // Current Stripe price object
+  status: autoShipStatusEnum("status").default('active').notNull(),
+  priceCents: integer("price_cents").notNull(),               // Customer-facing price per shipment
+  manufacturerCostCents: integer("manufacturer_cost_cents"),   // Raw Alive cost
+  supplyWeeks: integer("supply_weeks").default(8).notNull(),
+  nextShipmentDate: timestamp("next_shipment_date"),
+  lastQuoteId: text("last_quote_id"),                         // Most recent Alive quote_id
+  lastQuoteExpiresAt: timestamp("last_quote_expires_at"),
+  memberDiscountApplied: boolean("member_discount_applied").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Orders for supplement deliveries
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -322,9 +371,40 @@ export const orders = pgTable("orders", {
   manufacturerOrderId: text("manufacturer_order_id"), // Alive order reference from /mix-product
   manufacturerOrderStatus: text("manufacturer_order_status"), // Status from Alive (e.g., 'submitted', 'in_production', 'shipped')
   stripeSessionId: text("stripe_session_id"), // Stripe checkout session that created this order
+  autoShipSubscriptionId: varchar("auto_ship_subscription_id"), // Set when order created by auto-ship
   trackingUrl: text("tracking_url"),
   placedAt: timestamp("placed_at").defaultNow().notNull(),
   shippedAt: timestamp("shipped_at"),
+
+  // ── Order-level consent & safety snapshot (legal non-repudiation) ──
+  consentSnapshot: json("consent_snapshot").$type<{
+    /** Which consent types were active at time of purchase */
+    activeConsents: Array<{
+      consentType: string;
+      grantedAt: string;
+      consentVersion: string;
+    }>;
+    /** Safety warnings displayed to user for this formula at purchase */
+    formulaWarnings: Array<{
+      category: string;
+      severity: string;
+      message: string;
+      ingredients?: string[];
+      drugs?: string[];
+    }>;
+    /** When the user acknowledged safety warnings (if applicable) */
+    warningsAcknowledgedAt: string | null;
+    /** Disclaimer version at time of purchase */
+    disclaimerVersion: string;
+    /** Full disclaimer text shown at checkout */
+    disclaimerText: string;
+    /** IP address at time of purchase */
+    ipAddress: string | null;
+    /** User agent at time of purchase */
+    userAgent: string | null;
+    /** Timestamp when this snapshot was captured */
+    capturedAt: string;
+  }>(),
 });
 
 // Ingredient pricing reference for equivalent stack estimates
@@ -410,6 +490,33 @@ export const auditLogs = pgTable("audit_logs", {
   success: boolean("success").notNull(),
   errorMessage: text("error_message"),
   metadata: json("metadata").$type<Record<string, any>>(),
+});
+
+// Admin action audit log — tracks all admin write operations
+export const adminAuditLogs = pgTable("admin_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adminId: varchar("admin_id").notNull().references(() => users.id, { onDelete: "set null" }),
+  action: adminActionEnum("action").notNull(),
+  targetType: text("target_type").notNull(), // 'user', 'order', 'ticket', 'faq', 'blog', etc.
+  targetId: varchar("target_id"), // ID of the affected resource
+  details: json("details").$type<Record<string, any>>(), // Before/after data, reason, etc.
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Authentication audit log — tracks login attempts for security compliance
+export const authAuditLogs = pgTable("auth_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  email: text("email"), // Always captured (even for failed attempts where user doesn't exist)
+  action: text("action").notNull(), // 'login_success', 'login_failed', 'signup', 'google_login', 'facebook_login', 'password_reset', 'logout'
+  provider: text("provider"), // 'email', 'google', 'facebook'
+  success: boolean("success").notNull(),
+  failureReason: text("failure_reason"), // 'invalid_password', 'user_not_found', 'rate_limited', 'account_locked', etc.
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // User consent tracking for HIPAA compliance
@@ -548,6 +655,92 @@ export const reviewSchedules = pgTable("review_schedules", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ── Smart Re-Order: Member reorder cycle tracking ──────────────────────
+// Each active member has ONE active schedule at a time.
+// Tracks the 8-week supply window and controls the nudge → approval → charge flow.
+export const reorderSchedules = pgTable("reorder_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  formulaId: varchar("formula_id").notNull().references(() => formulas.id, { onDelete: "cascade" }),
+  formulaVersion: integer("formula_version").notNull(),
+
+  // Supply window
+  supplyStartDate: timestamp("supply_start_date").notNull(),   // When current supply started (order ship date)
+  supplyEndDate: timestamp("supply_end_date").notNull(),       // Estimated depletion (start + 8 weeks)
+
+  // Lifecycle status
+  status: reorderScheduleStatusEnum("status").default('active').notNull(),
+
+  // Delay tracking ("Delay 2 weeks" — allowed once per cycle)
+  delayedUntil: timestamp("delayed_until"),
+  delayCount: integer("delay_count").default(0).notNull(),     // Max 1 per cycle
+
+  // Charge tracking
+  stripePaymentIntentId: varchar("stripe_payment_intent_id"),  // Set when auto-charge fires
+  chargedAt: timestamp("charged_at"),
+  chargePriceCents: integer("charge_price_cents"),             // Actual amount charged
+  orderId: varchar("order_id").references(() => orders.id, { onDelete: "set null" }),  // Created order
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ── Smart Re-Order: AI recommendation per cycle ────────────────────────
+// Generated ~5 days before reorder. Contains AI analysis of wearable data,
+// recommended formula adjustments, and SMS/email approval tracking.
+export const reorderRecommendations = pgTable("reorder_recommendations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scheduleId: varchar("schedule_id").notNull().references(() => reorderSchedules.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+
+  // AI analysis output
+  analysisJson: json("analysis_json").$type<{
+    /** Summary of 8-week wearable trends (sleep, HRV, recovery, etc.) */
+    trendSummary: string;
+    /** Specific findings the AI identified */
+    findings: Array<{
+      metric: string;       // e.g. "HRV", "Deep Sleep", "Resting HR"
+      trend: 'improving' | 'declining' | 'stable';
+      detail: string;       // Human-readable finding
+    }>;
+    /** Whether AI recommends formula changes */
+    recommendsChanges: boolean;
+    /** If changes recommended, what they are */
+    suggestedChanges?: Array<{
+      action: 'add' | 'remove' | 'increase' | 'decrease';
+      ingredient: string;
+      currentDoseMg?: number;
+      suggestedDoseMg?: number;
+      rationale: string;
+    }>;
+    /** The full prompt + response for auditability */
+    promptHash?: string;
+  }>(),
+
+  // Recommended formula (null if AI says "keep current")
+  recommendedFormulaJson: json("recommended_formula_json"),    // Full formula bases + additions
+  recommendsChanges: boolean("recommends_changes").default(false).notNull(),
+
+  // Notification status
+  status: reorderRecommendationStatusEnum("status").default('pending').notNull(),
+
+  // SMS tracking
+  smsMessageSid: varchar("sms_message_sid"),       // Twilio SID of the nudge SMS
+  smsSentAt: timestamp("sms_sent_at"),
+  smsReplyReceived: varchar("sms_reply_received"), // "APPROVE" | "KEEP" | "DELAY"
+  smsReplyAt: timestamp("sms_reply_at"),
+
+  // Email tracking
+  emailSentAt: timestamp("email_sent_at"),
+  emailId: varchar("email_id"),                    // SendGrid message ID
+
+  // Auto-approve deadline (2 days after SMS sent → auto-approve KEEP)
+  autoApproveAt: timestamp("auto_approve_at"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Insert schemas for each table
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -619,6 +812,11 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   timestamp: true,
 });
 
+export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertUserConsentSchema = createInsertSchema(userConsents).omit({
   id: true,
   grantedAt: true,
@@ -660,6 +858,24 @@ export const insertReviewScheduleSchema = createInsertSchema(reviewSchedules).om
   updatedAt: true,
 });
 
+export const insertAutoShipSubscriptionSchema = createInsertSchema(autoShipSubscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertReorderScheduleSchema = createInsertSchema(reorderSchedules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertReorderRecommendationSchema = createInsertSchema(reorderRecommendations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 
 
 // TypeScript types
@@ -693,6 +909,15 @@ export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
 
+export type InsertAutoShipSubscription = z.infer<typeof insertAutoShipSubscriptionSchema>;
+export type AutoShipSubscription = typeof autoShipSubscriptions.$inferSelect;
+
+export type InsertReorderSchedule = z.infer<typeof insertReorderScheduleSchema>;
+export type ReorderSchedule = typeof reorderSchedules.$inferSelect;
+
+export type InsertReorderRecommendation = z.infer<typeof insertReorderRecommendationSchema>;
+export type ReorderRecommendation = typeof reorderRecommendations.$inferSelect;
+
 export type InsertAddress = z.infer<typeof insertAddressSchema>;
 export type Address = typeof addresses.$inferSelect;
 
@@ -704,6 +929,9 @@ export type FileUpload = typeof fileUploads.$inferSelect;
 
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+export type InsertAdminAuditLog = z.infer<typeof insertAdminAuditLogSchema>;
+export type AdminAuditLog = typeof adminAuditLogs.$inferSelect;
 
 export type InsertUserConsent = z.infer<typeof insertUserConsentSchema>;
 export type UserConsent = typeof userConsents.$inferSelect;
@@ -818,7 +1046,7 @@ export const wearableConnections = pgTable("wearable_connections", {
 export const biometricData = pgTable("biometric_data", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  connectionId: varchar("connection_id").notNull().references(() => wearableConnections.id, { onDelete: "cascade" }),
+  connectionId: varchar("connection_id").references(() => wearableConnections.id, { onDelete: "cascade" }),
   provider: wearableProviderEnum("provider").notNull(),
   dataDate: timestamp("data_date").notNull(), // The day this data represents
 
@@ -885,43 +1113,6 @@ export const biometricTrends = pgTable("biometric_trends", {
   calculatedAt: timestamp("calculated_at").defaultNow().notNull(),
 });
 
-// Reorder recommendations - AI-generated formula adjustments before reorder
-export const reorderRecommendations = pgTable("reorder_recommendations", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  orderId: varchar("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
-  currentFormulaId: varchar("current_formula_id").notNull().references(() => formulas.id),
-
-  // AI analysis results
-  analysisStatus: text("analysis_status").default('pending').notNull(), // pending, analyzing, completed, error
-  biometricSummary: json("biometric_summary").$type<{
-    sleepChange?: string;
-    hrvChange?: string;
-    recoveryChange?: string;
-    activityChange?: string;
-    dataQuality?: string;
-  }>(),
-
-  // Recommended formula changes
-  recommendedFormula: json("recommended_formula").$type<{
-    bases: Array<{ ingredient: string, amount: number, unit: string, purpose?: string }>;
-    additions: Array<{ ingredient: string, amount: number, unit: string, purpose?: string }>;
-    totalMg: number;
-  }>(),
-
-  changeRationale: text("change_rationale"), // AI explanation of why changes were made
-  confidence: integer("confidence"), // 0-100 how confident AI is in recommendations
-
-  // User action tracking
-  userApproved: boolean("user_approved"),
-  userReviewedAt: timestamp("user_reviewed_at"),
-  adminReviewRequired: boolean("admin_review_required").default(false).notNull(),
-  adminReviewedBy: varchar("admin_reviewed_by").references(() => users.id),
-  adminReviewedAt: timestamp("admin_reviewed_at"),
-
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
 // FAQ items table
 export const faqItems = pgTable("faq_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -944,6 +1135,7 @@ export const supportTickets = pgTable("support_tickets", {
   priority: supportTicketPriorityEnum("priority").default('medium').notNull(),
   category: text("category").notNull(),
   assignedTo: text("assigned_to"),
+  adminNotes: text("admin_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at"),
@@ -1063,11 +1255,6 @@ export const insertBiometricTrendSchema = createInsertSchema(biometricTrends).om
   calculatedAt: true,
 });
 
-export const insertReorderRecommendationSchema = createInsertSchema(reorderRecommendations).omit({
-  id: true,
-  createdAt: true,
-});
-
 // Wearable integration types
 export type InsertWearableConnection = z.infer<typeof insertWearableConnectionSchema>;
 export type WearableConnection = typeof wearableConnections.$inferSelect;
@@ -1077,9 +1264,6 @@ export type BiometricData = typeof biometricData.$inferSelect;
 
 export type InsertBiometricTrend = z.infer<typeof insertBiometricTrendSchema>;
 export type BiometricTrend = typeof biometricTrends.$inferSelect;
-
-export type InsertReorderRecommendation = z.infer<typeof insertReorderRecommendationSchema>;
-export type ReorderRecommendation = typeof reorderRecommendations.$inferSelect;
 
 // ============================================================================
 // OPTIMIZE (Wellness Center) - Nutrition, Workout, Lifestyle Plans
@@ -1585,7 +1769,7 @@ export const membershipTiers = pgTable("membership_tiers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tierKey: text("tier_key").notNull().unique(), // 'founding' | 'early' | 'beta' | 'standard'
   name: text("name").notNull(), // Display name: "Founding Member"
-  priceCents: integer("price_cents").notNull(), // Monthly price in cents (1900 = $19)
+  priceCents: integer("price_cents").notNull(), // Monthly price in cents (900 = $9 founding)
   maxCapacity: integer("max_capacity"), // Max spots (100, 500, 2000, null for unlimited)
   currentCount: integer("current_count").default(0).notNull(), // Current members at this tier
   sortOrder: integer("sort_order").default(0).notNull(), // For display ordering
@@ -1603,6 +1787,55 @@ export const insertMembershipTierSchema = createInsertSchema(membershipTiers).om
 
 export type InsertMembershipTier = z.infer<typeof insertMembershipTierSchema>;
 export type MembershipTier = typeof membershipTiers.$inferSelect;
+
+// ============================================
+// BLOG POSTS
+// ============================================
+
+export const blogPosts = pgTable("blog_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  title: varchar("title", { length: 500 }).notNull(),
+  metaTitle: varchar("meta_title", { length: 70 }),
+  metaDescription: varchar("meta_description", { length: 160 }),
+  excerpt: text("excerpt"),
+  content: text("content").notNull(),
+  category: varchar("category", { length: 100 }),
+  tags: text("tags").array(),
+  tier: varchar("tier", { length: 50 }),
+  primaryKeyword: varchar("primary_keyword", { length: 255 }),
+  secondaryKeywords: text("secondary_keywords").array(),
+  wordCount: integer("word_count"),
+  readTimeMinutes: integer("read_time_minutes"),
+  schemaJson: text("schema_json"),
+  internalLinks: text("internal_links").array(),
+  featuredImage: varchar("featured_image", { length: 500 }),
+  isPublished: boolean("is_published").default(true).notNull(),
+  publishedAt: timestamp("published_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  authorName: varchar("author_name", { length: 255 }).default('Ones AI Editorial Team'),
+  viewCount: integer("view_count").default(0),
+});
+
+export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({ id: true, updatedAt: true, viewCount: true });
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+export type BlogPost = typeof blogPosts.$inferSelect;
+
+// ============================================
+// KEYWORD DATA  (populated by scripts/seed-keywords.cjs via DataForSEO)
+// ============================================
+
+export const keywordData = pgTable("keyword_data", {
+  keyword:     varchar("keyword", { length: 500 }).primaryKey(),
+  volume:      integer("volume").notNull().default(0),
+  kd:          integer("kd").notNull().default(0),          // competition_index 0-100
+  cpc:         decimal("cpc", { precision: 8, scale: 2 }).notNull().default('0'),
+  competition: varchar("competition", { length: 20 }),      // LOW / MEDIUM / HIGH
+  source:      varchar("source", { length: 50 }).default('dataforseo'),
+  updatedAt:   timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type KeywordData = typeof keywordData.$inferSelect;
 
 // Membership tier keys for type safety
 export const MEMBERSHIP_TIERS = {
@@ -1629,3 +1862,224 @@ export type MessageFormulaPayload = {
   disclaimers?: string[];
   targetCapsules?: number;
 };
+
+// ============================================
+// LIVE CHAT SYSTEM
+// ============================================
+
+export const liveChatStatusEnum = pgEnum('live_chat_status', ['active', 'waiting', 'closed']);
+export const liveChatSenderEnum = pgEnum('live_chat_sender', ['user', 'admin', 'bot']);
+
+export const liveChatSessions = pgTable("live_chat_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  guestEmail: text("guest_email"),
+  guestName: text("guest_name"),
+  guestToken: varchar("guest_token"), // secure session token for guest auth
+  status: liveChatStatusEnum("status").default('active').notNull(),
+  subject: text("subject"),
+  assignedTo: varchar("assigned_to").references(() => users.id, { onDelete: "set null" }),
+  lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
+  adminLastReadAt: timestamp("admin_last_read_at"),
+  userLastReadAt: timestamp("user_last_read_at"),
+  closedAt: timestamp("closed_at"),
+  closedBy: varchar("closed_by").references(() => users.id, { onDelete: "set null" }),
+  metadata: json("metadata").$type<{
+    userAgent?: string;
+    page?: string;
+    referrer?: string;
+    device?: string;
+    rating?: number;
+    ratingComment?: string;
+    ratedAt?: string;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const liveChatMessages = pgTable("live_chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => liveChatSessions.id, { onDelete: "cascade" }),
+  sender: liveChatSenderEnum("sender").notNull(),
+  senderId: varchar("sender_id").references(() => users.id, { onDelete: "set null" }),
+  content: text("content").notNull(),
+  attachments: json("attachments").$type<Array<{
+    name: string;
+    url: string;
+    type: string; // mime type
+    size: number; // bytes
+  }>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Canned responses for admin quick replies
+export const liveChatCannedResponses = pgTable("live_chat_canned_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shortcut: varchar("shortcut", { length: 50 }).notNull(), // e.g. "/shipping"
+  title: varchar("title", { length: 200 }).notNull(),
+  content: text("content").notNull(),
+  category: varchar("category", { length: 100 }),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  usageCount: integer("usage_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Insert schemas
+export const insertLiveChatSessionSchema = createInsertSchema(liveChatSessions).omit({ id: true, createdAt: true, lastMessageAt: true });
+export const insertLiveChatMessageSchema = createInsertSchema(liveChatMessages).omit({ id: true, createdAt: true });
+export const insertLiveChatCannedResponseSchema = createInsertSchema(liveChatCannedResponses).omit({ id: true, createdAt: true, updatedAt: true, usageCount: true });
+
+// Types
+export type InsertLiveChatSession = z.infer<typeof insertLiveChatSessionSchema>;
+export type LiveChatSession = typeof liveChatSessions.$inferSelect;
+export type InsertLiveChatMessage = z.infer<typeof insertLiveChatMessageSchema>;
+export type LiveChatMessage = typeof liveChatMessages.$inferSelect;
+export type InsertLiveChatCannedResponse = z.infer<typeof insertLiveChatCannedResponseSchema>;
+export type LiveChatCannedResponse = typeof liveChatCannedResponses.$inferSelect;
+
+// ============================================
+// AI USAGE TRACKING
+// ============================================
+
+export const aiUsageLogs = pgTable("ai_usage_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }), // null for anonymous/system calls
+  provider: varchar("provider", { length: 20 }).notNull(), // 'openai' | 'anthropic'
+  model: varchar("model", { length: 100 }).notNull(), // e.g. 'gpt-4o', 'claude-sonnet-4-6'
+  feature: varchar("feature", { length: 50 }).notNull(), // 'chat', 'formula', 'lab_analysis', 'blog', 'live_chat', 'optimize', 'agent'
+  promptTokens: integer("prompt_tokens").default(0).notNull(),
+  completionTokens: integer("completion_tokens").default(0).notNull(),
+  totalTokens: integer("total_tokens").default(0).notNull(),
+  estimatedCostCents: integer("estimated_cost_cents").default(0).notNull(), // Cost in cents (e.g. 12 = $0.12)
+  durationMs: integer("duration_ms"), // How long the API call took
+  sessionId: varchar("session_id"), // Optional chat session ID for correlation
+  metadata: json("metadata").$type<Record<string, any>>(), // Extra context
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAiUsageLogSchema = createInsertSchema(aiUsageLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAiUsageLog = z.infer<typeof insertAiUsageLogSchema>;
+export type AiUsageLog = typeof aiUsageLogs.$inferSelect;
+
+// ── PR Agent / Outreach System ──────────────────────────────────────────────
+
+export const outreachCategoryEnum = pgEnum('outreach_category', ['podcast', 'press']);
+
+export const outreachSubTypeEnum = pgEnum('outreach_sub_type', [
+  // podcast sub-types
+  'interview', 'panel', 'solo_feature',
+  // press sub-types
+  'product_review', 'guest_article', 'founder_feature', 'expert_source',
+]);
+
+export const outreachProspectStatusEnum = pgEnum('outreach_prospect_status', [
+  'new', 'pitched', 'responded', 'booked', 'published', 'rejected', 'cold',
+]);
+
+export const outreachContactMethodEnum = pgEnum('outreach_contact_method', [
+  'email', 'form', 'dm', 'unknown',
+]);
+
+export const outreachPitchStatusEnum = pgEnum('outreach_pitch_status', [
+  'draft', 'pending_review', 'approved', 'sent', 'skipped', 'rejected',
+]);
+
+export const agentRunStatusEnum = pgEnum('agent_run_status', [
+  'running', 'completed', 'failed', 'paused',
+]);
+
+/** Prospects discovered by the PR Agent */
+export const outreachProspects = pgTable("outreach_prospects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  normalizedName: text("normalized_name"),
+  category: outreachCategoryEnum("category").notNull(),
+  subType: outreachSubTypeEnum("sub_type"),
+  url: text("url").notNull(),
+  normalizedUrl: text("normalized_url").unique(),
+  contactEmail: text("contact_email"),
+  contactFormUrl: text("contact_form_url"),
+  hostName: text("host_name"),
+  publicationName: text("publication_name"),
+  audienceEstimate: text("audience_estimate"),
+  relevanceScore: integer("relevance_score"),
+  scoreBreakdown: json("score_breakdown").$type<{
+    topicRelevance: number;
+    audienceSize: number;
+    recency: number;
+    accessibility: number;
+    brandAlignment: number;
+  }>(),
+  topics: json("topics").$type<string[]>(),
+  status: outreachProspectStatusEnum("status").default('new').notNull(),
+  contactMethod: outreachContactMethodEnum("contact_method").default('unknown').notNull(),
+  formFields: json("form_fields").$type<Array<{
+    id: string;
+    label: string;
+    type: string;
+    name: string;
+    required: boolean;
+  }>>(),
+  notes: text("notes"),
+  discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
+  source: varchar("source", { length: 50 }).default('web_search').notNull(),
+});
+
+/** Pitches drafted by the PR Agent, reviewed/approved by human */
+export const outreachPitches = pgTable("outreach_pitches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  prospectId: varchar("prospect_id").notNull().references(() => outreachProspects.id, { onDelete: "cascade" }),
+  category: outreachCategoryEnum("category").notNull(),
+  pitchType: varchar("pitch_type", { length: 30 }).default('initial').notNull(), // initial | follow_up_1 | follow_up_2
+  templateUsed: varchar("template_used", { length: 50 }), // podcast_guest | product_review | guest_article | expert_source | founder_feature
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  formAnswers: json("form_answers").$type<Record<string, string>>(),
+  status: outreachPitchStatusEnum("status").default('draft').notNull(),
+  reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at"),
+  sentAt: timestamp("sent_at"),
+  sentVia: varchar("sent_via", { length: 20 }), // gmail | form_auto | form_manual
+  responseReceived: boolean("response_received").default(false).notNull(),
+  responseAt: timestamp("response_at"),
+  responseSummary: text("response_summary"),
+  followUpDueAt: timestamp("follow_up_due_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** Agent run history for auditing and debugging */
+export const agentRuns = pgTable("agent_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentName: varchar("agent_name", { length: 50 }).notNull(), // 'pr_scan' | 'pr_pitch_batch'
+  status: agentRunStatusEnum("status").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  prospectsFound: integer("prospects_found").default(0).notNull(),
+  pitchesDrafted: integer("pitches_drafted").default(0).notNull(),
+  tokensUsed: integer("tokens_used").default(0).notNull(),
+  costUsd: decimal("cost_usd", { precision: 10, scale: 4 }),
+  errorMessage: text("error_message"),
+  runLog: json("run_log").$type<Array<{
+    timestamp: string;
+    action: string;
+    result: string;
+    details?: any;
+  }>>(),
+});
+
+// Insert schemas
+export const insertOutreachProspectSchema = createInsertSchema(outreachProspects).omit({ id: true, discoveredAt: true });
+export const insertOutreachPitchSchema = createInsertSchema(outreachPitches).omit({ id: true, createdAt: true });
+export const insertAgentRunSchema = createInsertSchema(agentRuns).omit({ id: true, startedAt: true });
+
+// Types
+export type OutreachProspect = typeof outreachProspects.$inferSelect;
+export type InsertOutreachProspect = z.infer<typeof insertOutreachProspectSchema>;
+export type OutreachPitch = typeof outreachPitches.$inferSelect;
+export type InsertOutreachPitch = z.infer<typeof insertOutreachPitchSchema>;
+export type AgentRun = typeof agentRuns.$inferSelect;
+export type InsertAgentRun = z.infer<typeof insertAgentRunSchema>;

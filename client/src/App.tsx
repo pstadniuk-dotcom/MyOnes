@@ -21,6 +21,7 @@ import SciencePage from "@/pages/SciencePage";
 // Import static pages
 import AboutPage from "@/pages/AboutPage";
 import BlogPage from "@/pages/BlogPage";
+import BlogArticlePage from "@/pages/BlogArticlePage";
 import CareersPage from "@/pages/CareersPage";
 import PartnershipsPage from "@/pages/PartnershipsPage";
 import ContactPage from "@/pages/ContactPage";
@@ -52,50 +53,29 @@ import UserDetailPage from "@/pages/admin/UserDetailPage";
 import AdminSupportTicketsPage from "@/pages/admin/AdminSupportTicketsPage";
 import ConversationsPage from "@/pages/admin/ConversationsPage";
 import OrdersManagementPage from "@/pages/admin/OrdersManagementPage";
+import AuditLogsPage from "@/pages/admin/AuditLogsPage";
+import AdminBlogPage from "@/pages/admin/AdminBlogPage";
+import RetailComparisonPricingPage from "@/pages/admin/RetailComparisonPricingPage";
+import MembershipAdminPage from "@/pages/admin/MembershipAdminPage";
+import ContentManagementPage from "@/pages/admin/ContentManagementPage";
+import AdminAnalyticsPage from "@/pages/admin/AdminAnalyticsPage";
+import AISettingsPage from "@/pages/admin/AISettingsPage";
+import ProductCatalogPage from "@/pages/admin/ProductCatalogPage";
+import AdminLiveChatsPage from "@/pages/admin/AdminLiveChatsPage";
+import AdminChatAnalyticsPage from "@/pages/admin/AdminChatAnalyticsPage";
+import AIUsagePage from "@/pages/admin/AIUsagePage";
+import PRAgentPage from "@/pages/admin/PRAgentPage";
+import { AdminLayout } from "@/shared/components/AdminLayout";
 
 // Import shared/public components
 import SharedFormulaPage from "@/pages/SharedFormulaPage";
 import MembershipPage from "@/pages/MembershipPage";
 import CheckoutSuccessPage from "@/pages/CheckoutSuccessPage";
 
-// Import all landing page components
-import Header from "@/features/marketing/components/Header";
-import HeroSection from "@/features/marketing/components/HeroSection";
-import ProblemSection from "@/features/marketing/components/ProblemSection";
-import HowItWorksSection from "@/features/marketing/components/HowItWorksSection";
-import ScienceSection from "@/features/marketing/components/ScienceSection";
-import PersonalizationShowcase from "@/features/marketing/components/PersonalizationShowcase";
-import TestimonialsSection from "@/features/marketing/components/TestimonialsSection";
-import PricingSection from "@/features/marketing/components/PricingSection";
-import FAQSection from "@/features/marketing/components/FAQSection";
-import CTASection from "@/features/marketing/components/CTASection";
-import Footer from "@/features/marketing/components/Footer";
-
 // Import V2 landing page (premium design)
 import LandingPageV2 from "@/pages/LandingPageV2";
 import ScrollToTop from "./shared/components/ScrollToTop";
-
-function LandingPage() {
-  return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main>
-        <HeroSection />
-        <ProblemSection />
-        <HowItWorksSection />
-        <ScienceSection />
-        <div className="py-16">
-          <PersonalizationShowcase />
-        </div>
-        <TestimonialsSection />
-        <PricingSection />
-        <FAQSection />
-        <CTASection />
-      </main>
-      <Footer />
-    </div>
-  );
-}
+import { LiveChatWidget } from "@/features/live-chat/components/LiveChatWidget";
 
 // Main Router
 function MainRouter() {
@@ -112,6 +92,7 @@ function MainRouter() {
       {/* Static Pages */}
       <Route path="/about" component={AboutPage} />
       <Route path="/blog" component={BlogPage} />
+      <Route path="/blog/:slug" component={BlogArticlePage} />
       <Route path="/careers" component={CareersPage} />
       <Route path="/press">{() => { window.location.href = '/contact?type=press'; return null; }}</Route>
       <Route path="/partnerships" component={PartnershipsPage} />
@@ -235,40 +216,138 @@ function MainRouter() {
       {/* Admin Routes */}
       <Route path="/admin">
         <ProtectedAdminRoute>
-          <AdminDashboardPage />
+          <AdminLayout>
+            <AdminDashboardPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/users">
         <ProtectedAdminRoute>
-          <UserManagementPage />
+          <AdminLayout>
+            <UserManagementPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/users/:id">
         <ProtectedAdminRoute>
-          <UserDetailPage />
+          <AdminLayout>
+            <UserDetailPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/support-tickets">
         <ProtectedAdminRoute>
-          <AdminSupportTicketsPage />
+          <AdminLayout>
+            <AdminSupportTicketsPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/conversations">
         <ProtectedAdminRoute>
-          <ConversationsPage />
+          <AdminLayout>
+            <ConversationsPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/orders">
         <ProtectedAdminRoute>
-          <OrdersManagementPage />
+          <AdminLayout>
+            <OrdersManagementPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/audit-logs">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AuditLogsPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/blog">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AdminBlogPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/retail-pricing">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <RetailComparisonPricingPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/support-tickets/:id">
         {(params) => (
           <ProtectedAdminRoute>
-            <AdminSupportTicketsPage ticketId={params.id} />
+            <AdminLayout>
+              <AdminSupportTicketsPage ticketId={params.id} />
+            </AdminLayout>
           </ProtectedAdminRoute>
         )}
+      </Route>
+      <Route path="/admin/membership">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <MembershipAdminPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/content">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <ContentManagementPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/analytics">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AdminAnalyticsPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/products">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <ProductCatalogPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/settings/ai">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AISettingsPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/live-chats">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AdminLiveChatsPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/chat-analytics">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AdminChatAnalyticsPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/ai-usage">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AIUsagePage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/pr-agent">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <PRAgentPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
       </Route>
 
       {/* Membership & Checkout */}
@@ -300,6 +379,7 @@ function App() {
         <Toaster />
         <ScrollToTop />
         <MainRouter />
+        <LiveChatWidget />
       </TooltipProvider>
     </AuthProvider>
   );

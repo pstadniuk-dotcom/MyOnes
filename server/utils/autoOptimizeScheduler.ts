@@ -1,13 +1,18 @@
 /**
- * Auto-Optimize Scheduler
+ * Formula Review Scheduler
  *
  * Runs once per day at 9am UTC.
- * For every user who has a formula:
- *  - Checks formula drift via formulaReviewService.getReviewStatus()
- *  - If needsReview=true AND autoOptimizeFormula=true  → sends "auto_updated" notification
- *  - If needsReview=true AND autoOptimizeFormula=false → sends "manual_review_needed" notification
+ * Checks users whose subscription renews in the next 7 days.
+ * For each:
+ *  - Computes formula drift via formulaReviewService.getReviewStatus()
+ *  - If needsReview = true → sends a single "review recommended" notification
+ *    that includes the number of days until their next renewal
  *
- * Uses an in-memory set to avoid re-notifying the same user within the same week.
+ * Uses the subscriptions.renewsAt column (populated from Stripe's current_period_end)
+ * so notifications are naturally tied to the billing cycle.
+ *
+ * Dedup: each user is notified at most once per renewal cycle via in-memory Set
+ * that resets weekly (or on server restart).
  */
 
 import cron from 'node-cron';
@@ -15,83 +20,100 @@ import { usersRepository } from '../modules/users/users.repository';
 import { formulaReviewService } from '../modules/formulas/formula-review.service';
 import logger from '../infra/logging/logger';
 
-// Track users notified this week to avoid spam
-const notifiedThisWeek = new Set<string>();
+// Track users notified this cycle to avoid duplicate emails
+const notifiedThisCycle = new Set<string>();
 
-function resetWeeklyTracking() {
-    notifiedThisWeek.clear();
-    logger.info('Auto-optimize scheduler: weekly notification tracking reset');
+function resetCycleTracking() {
+    notifiedThisCycle.clear();
+    logger.info('Formula review scheduler: cycle tracking reset');
 }
 
-async function runAutoOptimizeCheck() {
-    logger.info('Auto-optimize scheduler: starting daily check');
-
-    const allUsers = await usersRepository.listAllUsers();
-    let checked = 0;
+/**
+ * Notify users whose renewal is exactly `daysAhead` days away
+ * if they have formula drift.
+ */
+async function checkRenewalCohort(daysAhead: number) {
+    const subs = await usersRepository.getUpcomingRenewals(daysAhead);
     let notified = 0;
+    let skipped = 0;
     let errors = 0;
 
-    for (const user of allUsers) {
-        if (notifiedThisWeek.has(user.id)) continue;
+    for (const sub of subs) {
+        if (notifiedThisCycle.has(sub.userId)) {
+            skipped++;
+            continue;
+        }
 
         try {
-            const status = await formulaReviewService.getReviewStatus(user.id);
+            const status = await formulaReviewService.getReviewStatus(sub.userId);
 
-            if (!status.needsReview) continue;
-
-            // Determine notification mode
-            const mode = status.autoOptimizeEnabled
-                ? 'auto_updated'
-                : 'manual_review_needed';
+            if (!status.needsReview) {
+                skipped++;
+                continue;
+            }
 
             await formulaReviewService.sendReviewNotification(
-                user.id,
-                mode,
+                sub.userId,
                 status.reasons,
+                daysAhead,
             );
 
-            notifiedThisWeek.add(user.id);
+            notifiedThisCycle.add(sub.userId);
             notified++;
 
-            logger.info('Auto-optimize scheduler: notified user', {
-                userId: user.id,
-                mode,
+            logger.info('Formula review scheduler: notified user', {
+                userId: sub.userId,
+                daysUntilRenewal: daysAhead,
                 driftScore: status.driftScore,
                 reasons: status.reasons,
             });
         } catch (err) {
             errors++;
-            logger.error('Auto-optimize scheduler: error processing user', {
-                userId: user.id,
+            logger.error('Formula review scheduler: error processing user', {
+                userId: sub.userId,
+                daysAhead,
                 err,
             });
         }
-
-        checked++;
     }
 
-    logger.info('Auto-optimize scheduler: daily check complete', {
-        usersChecked: checked,
-        usersNotified: notified,
-        errors,
-    });
+    return { checked: subs.length, notified, skipped, errors };
+}
+
+async function runFormulaReviewCheck() {
+    logger.info('Formula review scheduler: starting daily check');
+
+    // Check renewals at 7 days and 3 days out — two touchpoints
+    const [day7, day3] = await Promise.all([
+        checkRenewalCohort(7),
+        checkRenewalCohort(3),
+    ]);
+
+    const summary = {
+        day7,
+        day3,
+        totalNotified: day7.notified + day3.notified,
+    };
+
+    logger.info('Formula review scheduler: daily check complete', summary);
+    return summary;
 }
 
 export function startAutoOptimizeScheduler() {
-    logger.info('Auto-optimize scheduler: starting...');
+    logger.info('Formula review scheduler: starting...');
 
     // Daily at 9am UTC
     cron.schedule('0 9 * * *', async () => {
-        await runAutoOptimizeCheck();
+        await runFormulaReviewCheck();
     });
 
-    // Reset weekly notification tracking every Sunday midnight UTC
+    // Reset cycle tracking every Sunday midnight UTC
     cron.schedule('0 0 * * 0', () => {
-        resetWeeklyTracking();
+        resetCycleTracking();
     });
 
-    logger.info('Auto-optimize scheduler: started — runs daily at 09:00 UTC');
+    logger.info('Formula review scheduler: started — runs daily at 09:00 UTC');
 }
 
 // Export for manual testing / admin triggers
-export { runAutoOptimizeCheck };
+export { runFormulaReviewCheck };

@@ -146,7 +146,7 @@ export default function PersonalizationShowcase() {
   };
 
   return (
-    <div id="personalization" className="w-full bg-[#FAF7F2]">
+    <div id="personalization" className="w-full bg-[#ede8e2]">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative rounded-2xl overflow-hidden">
           {/* Header */}
@@ -198,7 +198,7 @@ export default function PersonalizationShowcase() {
                       <img src="/ones-logo-icon.svg" alt="ONES" className="w-full h-full object-contain" />
                     </div>
                     <div>
-                      <div className="font-semibold text-[#1B4332]">ONES</div>
+                      <div className="font-semibold text-[#054700]">ONES</div>
                       <div className="text-xs text-muted-foreground flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-green-500"></span>
                         Analyzing your profile...

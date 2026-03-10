@@ -18,7 +18,7 @@ const withOnes = [
 
 export default function ProblemSectionV2() {
   return (
-    <section className="py-24 md:py-32 bg-[#1B4332] overflow-hidden">
+    <section className="py-24 md:py-32 bg-[#054700] overflow-hidden">
       <div className="container mx-auto px-6 max-w-6xl">
         {/* Header */}
         <div className="max-w-2xl mx-auto text-center mb-16">
@@ -56,17 +56,17 @@ export default function ProblemSectionV2() {
           </div>
 
           {/* With ONES */}
-          <div className="bg-white rounded-2xl p-8 shadow-2xl">
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 shadow-2xl">
             <div className="text-center mb-8">
-              <h3 className="text-xl font-medium text-[#1B4332] uppercase tracking-wider">
+              <h3 className="text-xl font-medium text-[#054700] uppercase tracking-wider">
                 With ONES
               </h3>
             </div>
             <ul className="space-y-4">
               {withOnes.map((item, index) => (
                 <li key={index} className="flex items-center gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1B4332]/10 flex items-center justify-center">
-                    <Check className="w-4 h-4 text-[#1B4332]" />
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#054700]/10 flex items-center justify-center">
+                    <Check className="w-4 h-4 text-[#054700]" />
                   </div>
                   <span className="text-[#2D3436]">{item}</span>
                 </li>

@@ -97,7 +97,7 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
                     "transition-all h-full relative overflow-hidden bg-white",
                     "mx-auto",
                     day.isRestDay ? "opacity-75 bg-muted/40" : "border border-slate-200 shadow-sm",
-                    isCurrentDay && !isCompleted && "border-2 border-[#1B4332]/60",
+                    isCurrentDay && !isCompleted && "border-2 border-[#054700]/60",
                     isCompleted && !day.isRestDay && "border-2 border-green-500/70 bg-green-50/60"
                   )}
                 >
@@ -197,8 +197,8 @@ export function WorkoutSchedule({ plan, onWorkoutClick, workoutLogs = [] }: Work
               className={cn(
                 "w-2 h-2 rounded-full transition-all",
                 i === activeIndex
-                  ? "bg-[#1B4332] w-4"
-                  : "bg-[#1B4332]/20 hover:bg-[#1B4332]/40"
+                  ? "bg-[#054700] w-4"
+                  : "bg-[#054700]/20 hover:bg-[#054700]/40"
               )}
               aria-label={`Go to day ${i + 1}`}
             />

@@ -248,8 +248,8 @@ npm run test:db
 ## Next Steps After Deployment
 
 1. **Custom Domain** (Optional)
-   - Vercel: Add `myones.ai`
-   - Railway: Add `api.myones.ai`
+   - Vercel: Add `ones.health`
+   - Railway: Add `api.ones.health`
 
 2. **Monitoring**
    - Railway: Check logs and metrics

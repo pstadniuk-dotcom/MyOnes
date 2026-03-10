@@ -8,8 +8,8 @@ export default function CTASection() {
   const trustBadges = [
     {
       icon: Award,
-      title: "Third-party tested",
-      description: "Every batch verified for purity and potency"
+      title: "Clinical-grade ingredients",
+      description: "Premium bioavailable forms, research-backed dosing"
     },
     {
       icon: MapPin,

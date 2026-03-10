@@ -26,12 +26,12 @@ const defaultTiers = [
   {
     tier_key: 'founding',
     name: 'Founding Member',
-    price_cents: 1900, // $19
+    price_cents: 900, // $9
     max_capacity: 250,
     current_count: 0,
     sort_order: 1,
     benefits: JSON.stringify([
-      'Lock in $19/month forever',
+      'Lock in $9/month forever',
       'Unlimited AI consultations',
       'Priority formula adjustments',
       'Founding member badge'
@@ -41,12 +41,12 @@ const defaultTiers = [
   {
     tier_key: 'early',
     name: 'Early Adopter',
-    price_cents: 2900, // $29
-    max_capacity: 1000,
+    price_cents: 1500, // $15
+    max_capacity: 500,
     current_count: 0,
     sort_order: 2,
     benefits: JSON.stringify([
-      'Lock in $29/month forever',
+      'Lock in $15/month forever',
       'Unlimited AI consultations',
       'Priority formula adjustments'
     ]),
@@ -55,12 +55,12 @@ const defaultTiers = [
   {
     tier_key: 'beta',
     name: 'Beta Member',
-    price_cents: 3900, // $39
-    max_capacity: 5000,
+    price_cents: 1900, // $19
+    max_capacity: 2000,
     current_count: 0,
     sort_order: 3,
     benefits: JSON.stringify([
-      'Lock in $39/month forever',
+      'Lock in $19/month forever',
       'Unlimited AI consultations'
     ]),
     is_active: true

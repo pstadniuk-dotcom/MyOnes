@@ -48,7 +48,7 @@ describe('buildGPT4Prompt', () => {
     const context = createTestContext();
     const prompt = buildGPT4Prompt(context);
 
-    expect(prompt).toContain('ONES AI');
+    expect(prompt.toUpperCase()).toContain('ONES AI');
   });
 
   it('should include guidance to be concise', () => {

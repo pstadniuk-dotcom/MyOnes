@@ -51,11 +51,11 @@ export class MembershipService {
             {
                 tierKey: 'founding',
                 name: 'Founding Member',
-                priceCents: 1900,
-                maxCapacity: 100,
+                priceCents: 900,
+                maxCapacity: 250,
                 sortOrder: 1,
                 benefits: [
-                    'Lock in $19/month forever',
+                    'Lock in $9/month forever',
                     'Unlimited AI consultations',
                     'Priority formula adjustments',
                     'Founding member badge'
@@ -65,11 +65,11 @@ export class MembershipService {
             {
                 tierKey: 'early',
                 name: 'Early Adopter',
-                priceCents: 2900,
+                priceCents: 1500,
                 maxCapacity: 500,
                 sortOrder: 2,
                 benefits: [
-                    'Lock in $29/month forever',
+                    'Lock in $15/month forever',
                     'Unlimited AI consultations',
                     'Priority formula adjustments'
                 ],
@@ -78,11 +78,11 @@ export class MembershipService {
             {
                 tierKey: 'beta',
                 name: 'Beta Member',
-                priceCents: 3900,
+                priceCents: 1900,
                 maxCapacity: 2000,
                 sortOrder: 3,
                 benefits: [
-                    'Lock in $39/month forever',
+                    'Lock in $19/month forever',
                     'Unlimited AI consultations'
                 ],
                 isActive: true

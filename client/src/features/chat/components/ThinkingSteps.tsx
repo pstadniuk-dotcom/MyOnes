@@ -29,8 +29,8 @@ export default function ThinkingSteps({ steps, title }: ThinkingStepsProps) {
     <div className="py-1" role="status" aria-live="polite" aria-busy="true">
       {/* Title */}
       {title && (
-        <p className="text-sm font-semibold text-[#1B4332] mb-3 flex items-center gap-2">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#52796F] animate-pulse" />
+        <p className="text-sm font-semibold text-[#054700] mb-3 flex items-center gap-2">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#5a6623] animate-pulse" />
           {title}
         </p>
       )}
@@ -49,9 +49,9 @@ export default function ThinkingSteps({ steps, title }: ThinkingStepsProps) {
               {step.status === 'done' ? (
                 <Check className="h-3.5 w-3.5 text-emerald-600" strokeWidth={3} />
               ) : step.status === 'active' ? (
-                <Loader2 className="h-3.5 w-3.5 text-[#52796F] animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 text-[#5a6623] animate-spin" />
               ) : (
-                <div className="h-3.5 w-3.5 rounded-full border border-[#52796F]/30" />
+                <div className="h-3.5 w-3.5 rounded-full border border-[#5a6623]/30" />
               )}
             </div>
 
@@ -59,15 +59,15 @@ export default function ThinkingSteps({ steps, title }: ThinkingStepsProps) {
             <div className="min-w-0">
               <p className={`text-sm leading-tight ${
                 step.status === 'done'
-                  ? 'text-[#1B4332]'
+                  ? 'text-[#054700]'
                   : step.status === 'active'
-                    ? 'text-[#1B4332] font-medium'
-                    : 'text-[#52796F]'
+                    ? 'text-[#054700] font-medium'
+                    : 'text-[#5a6623]'
               }`}>
                 {step.label}
               </p>
               {step.detail && step.status !== 'waiting' && (
-                <p className="text-xs text-[#52796F]/70 mt-0.5">{step.detail}</p>
+                <p className="text-xs text-[#5a6623]/70 mt-0.5">{step.detail}</p>
               )}
             </div>
           </div>

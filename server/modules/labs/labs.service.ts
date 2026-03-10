@@ -502,20 +502,30 @@ function generateAnalysisSummary(
         } else {
             const lowHDL = findMarker(lipidMarkers, /hdl/, 'low');
             const highTrig = findMarkerAbnormal(lipidMarkers, /triglyceride/);
-            const particles = lipidMarkers.filter(m => /particle|small|pattern|peak size/i.test(m.name) && m.latest.status !== 'normal');
+            const particles = lipidMarkers.filter(m => /particle|small|medium|pattern|peak size/i.test(m.name) && m.latest.status !== 'normal');
+            const highApoB = findMarkerAbnormal(lipidMarkers, /apob|apolipoprotein b/);
+            const highLDLP = findMarkerAbnormal(lipidMarkers, /ldl particle number|ldl.?p\b/);
+            const lowHDLLarge = findMarker(lipidMarkers, /hdl large|large hdl/, 'low');
+            const lowLDLPeak = findMarker(lipidMarkers, /ldl peak size|ldl peak diameter|ldl particle size/, 'low');
             const metSyn = lowHDL && highTrig;
 
             let insight = 'Your cholesterol markers are outside optimal ranges.';
-            if (metSyn) {
+            if (highApoB && highLDLP) {
+                insight = `Elevated ApoB (${val(highApoB)}) combined with high LDL particle number (${val(highLDLP)}) is a high-risk cardiovascular pattern — ApoB counts every atherogenic particle regardless of LDL size, making it the strongest predictor of cardiovascular events.`;
+            } else if (highApoB) {
+                insight = `Elevated ApoB (${val(highApoB)}) indicates a high number of atherogenic particles in circulation. ApoB is a more accurate predictor of cardiovascular risk than LDL-cholesterol alone.`;
+            } else if (metSyn) {
                 insight = 'Low HDL combined with high triglycerides is a hallmark of metabolic syndrome — a pattern that responds well to dietary changes, omega-3 supplementation, and regular exercise.';
-            } else if (particles.length > 0) {
-                insight = 'Advanced particle testing reveals an unfavorable LDL pattern. Small, dense LDL particles are more atherogenic than large buoyant ones — this matters more than total LDL alone.';
+            } else if (particles.length > 0 || lowLDLPeak || lowHDLLarge) {
+                insight = 'Advanced particle testing reveals an unfavorable LDL pattern. Small, dense LDL particles (Pattern B) are more atherogenic than large buoyant ones — this matters more than total LDL alone.';
             }
 
             const actions: FocusAction[] = [];
             actions.push({ type: 'lifestyle', text: 'Reduce refined carbs, sugar, and processed foods' });
             actions.push({ type: 'lifestyle', text: '30 minutes of cardio 5x/week' });
-            actions.push({ type: 'followup', text: 'Request advanced lipid panel + CAC score for a complete cardiovascular risk picture' });
+            if (highApoB || highLDLP) {
+                actions.push({ type: 'followup', text: 'Track ApoB as primary cardiovascular risk marker — target < 90 mg/dL optimal, < 80 mg/dL if high-risk' });
+            }
             actions.push({ type: 'followup', text: 'Retest lipid panel in 3 months' });
 
             const { grade, score } = panelInfo('Lipid Panel');

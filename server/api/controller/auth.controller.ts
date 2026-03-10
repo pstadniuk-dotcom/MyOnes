@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { authService } from '../../modules/auth/auth.service';
 import { logger } from '../../infra/logging/logger';
 import { getClientIP, checkRateLimit } from '../middleware/middleware';
+import { logAuthEvent } from '../../modules/auth/auth-audit';
 
 export class AuthController {
     async signup(req: Request, res: Response) {
@@ -16,7 +17,8 @@ export class AuthController {
                 });
             }
 
-            const { user, token } = await authService.signup(req.body);
+            const clientUserAgent = req.headers['user-agent'] || null;
+            const { user, token } = await authService.signup(req.body, clientIP, clientUserAgent);
 
             logger.info('Signup success', { userId: user.id, duration: `${Date.now() - startTime}ms` });
 
@@ -58,6 +60,7 @@ export class AuthController {
             const { user, token } = await authService.login(req.body);
 
             logger.info('Login success', { userId: user.id });
+            logAuthEvent(req, { userId: user.id, email: user.email, action: 'login_success', provider: 'email', success: true });
 
             res.json({
                 user: {
@@ -73,6 +76,8 @@ export class AuthController {
             });
         } catch (error: any) {
             logger.error('Login error', { error: error.message });
+            const attemptedEmail = req.body?.email || 'unknown';
+            logAuthEvent(req, { email: attemptedEmail, action: 'login_failed', provider: 'email', success: false, failureReason: error.message });
             if (error.name === 'ZodError') {
                 return res.status(400).json({ error: 'Validation failed', details: error.errors });
             }
@@ -88,9 +93,12 @@ export class AuthController {
             const { token: idToken } = req.body;
             if (!idToken) return res.status(400).json({ error: 'Google ID token is required' });
 
-            const { user, token } = await authService.googleLogin(idToken);
+            const clientIP = getClientIP(req);
+            const clientUserAgent = req.headers['user-agent'] || null;
+            const { user, token } = await authService.googleLogin(idToken, clientIP, clientUserAgent);
 
             logger.info('Google login success', { userId: user.id });
+            logAuthEvent(req, { userId: user.id, email: user.email, action: 'google_login', provider: 'google', success: true });
 
             res.json({
                 user: {
@@ -106,6 +114,7 @@ export class AuthController {
             });
         } catch (error: any) {
             logger.error('Google login error', { error: error.message });
+            logAuthEvent(req, { email: 'google-sso', action: 'google_login', provider: 'google', success: false, failureReason: error.message });
             res.status(401).json({ error: error.message });
         }
     }
@@ -115,9 +124,12 @@ export class AuthController {
             const { token: accessToken } = req.body;
             if (!accessToken) return res.status(400).json({ error: 'Facebook access token is required' });
 
-            const { user, token } = await authService.facebookLogin(accessToken);
+            const clientIP = getClientIP(req);
+            const clientUserAgent = req.headers['user-agent'] || null;
+            const { user, token } = await authService.facebookLogin(accessToken, clientIP, clientUserAgent);
 
             logger.info('Facebook login success', { userId: user.id });
+            logAuthEvent(req, { userId: user.id, email: user.email, action: 'facebook_login', provider: 'facebook', success: true });
 
             res.json({
                 user: {
@@ -133,6 +145,7 @@ export class AuthController {
             });
         } catch (error: any) {
             logger.error('Facebook login error', { error: error.message });
+            logAuthEvent(req, { email: 'facebook-sso', action: 'facebook_login', provider: 'facebook', success: false, failureReason: error.message });
             res.status(401).json({ error: error.message });
         }
     }
@@ -160,7 +173,9 @@ export class AuthController {
                     country: user.country,
                     createdAt: user.createdAt.toISOString(),
                     isAdmin: user.isAdmin || false,
-                    emailVerified: user.emailVerified
+                    emailVerified: user.emailVerified,
+                    hasPassword: !!user.password,
+                    isSocialLogin: !!(user.googleId || user.facebookId)
                 }
             });
         } catch (error) {

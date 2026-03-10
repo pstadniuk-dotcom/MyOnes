@@ -1,4 +1,4 @@
-// ONES Logo component - white text logo for use in dark backgrounds
+// Ones Logo component - white text logo for use in dark backgrounds
 export function OnesLogo({ className = "w-6 h-6" }: { className?: string }) {
   return (
     <svg 
@@ -16,7 +16,7 @@ export function OnesLogo({ className = "w-6 h-6" }: { className?: string }) {
         fontSize="20"
         letterSpacing="0.05em"
       >
-        ONES
+        Ones
       </text>
     </svg>
   );
@@ -25,8 +25,8 @@ export function OnesLogo({ className = "w-6 h-6" }: { className?: string }) {
 // Small circular logo badge for chat avatars
 export function OnesLogoBadge({ className = "w-10 h-10" }: { className?: string }) {
   return (
-    <div className={`${className} rounded-full bg-[#1B4332] flex items-center justify-center`}>
-      <span className="text-white font-bold text-xs tracking-wider">ONES</span>
+    <div className={`${className} rounded-full bg-[#054700] flex items-center justify-center`}>
+      <span className="text-white font-bold text-xs tracking-wider">Ones</span>
     </div>
   );
 }

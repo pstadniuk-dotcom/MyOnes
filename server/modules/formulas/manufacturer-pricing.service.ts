@@ -68,6 +68,7 @@ const NAME_ALIASES: Record<string, string> = {
     "curcumin": "turmeric root extract 4:1",
     "turmeric": "turmeric root extract 4:1",
     "ginkgo biloba": "ginko biloba extract 24%",
+    "ginkgo biloba extract 24%": "ginko biloba extract 24%",
     "ginkgo": "ginko biloba extract 24%",
     "vitamin e": "vitamin e (mixed tocopherols)",
     "omega-3": "omega 3",
@@ -113,6 +114,12 @@ function toCanonicalVariants(name: string): string[] {
     variants.add(normalized.replace(/\bimmune-c\b/g, "immune c"));
     variants.add(normalized.replace(/\bashwagandha\b/g, "ashwaganda"));
     variants.add(normalized.replace(/\bblackcurrant\b/g, "black currant"));
+    // Strip extract, percentage, and ratio notations for fuzzy matching
+    variants.add(normalized.replace(/\bextract\b/g, "").replace(/\d+%/g, "").replace(/\d+:\d+/g, "").replace(/\s+/g, " ").trim());
+    // Also try "ginko" spelling variant (manufacturer uses single-g)
+    if (normalized.includes("ginkgo")) {
+        variants.add(normalized.replace(/\bginkgo\b/g, "ginko"));
+    }
 
     return Array.from(variants).filter(Boolean);
 }
@@ -249,8 +256,9 @@ class ManufacturerPricingService {
     }
 
     async quoteFormula(formula: { bases?: FormulaIngredient[] | null; additions?: FormulaIngredient[] | null; targetCapsules?: number }, capsuleCountInput?: number): Promise<QuoteResult> {
-        const capsuleCount = isValidCapsuleCount(Number(capsuleCountInput)) ? Number(capsuleCountInput) as CapsuleCount : 9;
-        const capsuleCountPerDay = Math.max(1, Number(formula.targetCapsules) || capsuleCount);
+        const capsuleCountFromInput = isValidCapsuleCount(Number(capsuleCountInput)) ? Number(capsuleCountInput) as CapsuleCount : undefined;
+        const capsuleCountFromFormula = isValidCapsuleCount(Number(formula.targetCapsules)) ? Number(formula.targetCapsules) as CapsuleCount : undefined;
+        const capsuleCount = capsuleCountFromInput || capsuleCountFromFormula || 9 as CapsuleCount;
         const totalCapsules = capsuleCount * QUOTE_DAYS;
 
         if (!ALIVE_API_KEY) {
@@ -298,7 +306,7 @@ class ManufacturerPricingService {
                     continue;
                 }
                 // item.amount is total daily dose; divide by capsules/day to get per-capsule fill weight
-                const perCapsuleMg = Math.round((item.amount / capsuleCountPerDay) * 1000) / 1000;
+                const perCapsuleMg = Math.round((item.amount / capsuleCount) * 1000) / 1000;
                 payloadIngredients.push({ ingredient_id: ingredientId, weight_in_mg: perCapsuleMg });
             }
 
@@ -359,7 +367,7 @@ class ManufacturerPricingService {
             const total = subtotal;
 
             logger.info('Formula pricing breakdown', {
-                capsuleCountPerDay,
+                capsuleCount,
                 totalCapsules,
                 manufacturerCost: manufacturerTotal,
                 marginMultiplier: MARGIN_MULTIPLIER,

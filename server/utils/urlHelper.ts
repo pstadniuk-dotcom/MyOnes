@@ -5,7 +5,7 @@ import { Request } from 'express';
  * This works for monorepo setups where frontend and backend share the same domain.
  *
  * @param req - Express Request object
- * @returns The base URL (e.g., 'https://myones.ai' or 'http://localhost:5000')
+ * @returns The base URL (e.g., 'https://ones.health' or 'http://localhost:5000')
  */
 export function getBaseUrl(req: Request): string {
   // Try to get from configured environment variable (for backward compatibility)
@@ -56,9 +56,9 @@ export function getFrontendUrl(req?: Request): string {
     return configured.replace(/\/$/, '');
   }
 
-  // In production without explicit config, default to https://myones.ai
+  // In production without explicit config, default to https://ones.health
   if (process.env.NODE_ENV === 'production') {
-    return 'https://myones.ai';
+    return 'https://ones.health';
   }
 
   // Development fallback

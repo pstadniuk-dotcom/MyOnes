@@ -1,4 +1,6 @@
 import "./env";
+import path from "path";
+import fs from "fs";
 import express, { type Request, Response, NextFunction } from "express";
 import fileUpload from "express-fileupload";
 import session from "express-session";
@@ -7,6 +9,10 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startSmsReminderScheduler } from "./utils/smsReminderScheduler";
 import { startAutoOptimizeScheduler } from "./utils/autoOptimizeScheduler";
+import { startBlogGenerationScheduler } from "./utils/blogGenerationScheduler";
+import { startPrAgentScheduler } from "./utils/prAgentScheduler";
+import { startAutoShipScheduler } from "./utils/autoShipScheduler";
+import { startSmartReorderScheduler } from "./utils/smartReorderScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
 
@@ -57,8 +63,8 @@ app.use((req, res, next) => {
 const isProduction = process.env.NODE_ENV === 'production';
 const allowedOriginsList = [
   'https://my-ones.vercel.app',
-  'https://myones.ai',
-  'https://www.myones.ai',
+  'https://ones.health',
+  'https://www.ones.health',
   'https://myones.onrender.com',
   // Local development only
   ...(!isProduction ? ['http://localhost:5000', 'http://localhost:5173', 'http://127.0.0.1:5000', 'http://127.0.0.1:5173'] : [])
@@ -197,7 +203,14 @@ app.use((req, res, next) => {
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } else {
-      serveStatic(app);
+      // Only serve static files if the build directory exists
+      // (skipped when frontend is deployed separately on Vercel)
+      const distPublicPath = path.resolve(import.meta.dirname ?? __dirname, "..", "dist", "public");
+      if (fs.existsSync(distPublicPath)) {
+        serveStatic(app);
+      } else {
+        log("Skipping static file serving (dist/public not found — frontend deployed separately)");
+      }
     }
 
     // ALWAYS serve the app on the port specified in the environment variable PORT
@@ -226,8 +239,20 @@ app.use((req, res, next) => {
       // Start SMS reminder scheduler
       startSmsReminderScheduler();
 
-      // Start auto-optimize formula drift scheduler (daily at 9am UTC)
+      // Start formula review scheduler (checks subscription renewals daily at 9am UTC)
       startAutoOptimizeScheduler();
+
+      // Start auto-ship pre-renewal scheduler (refreshes quotes 10 days before renewal at 8am UTC)
+      startAutoShipScheduler();
+
+      // Start Smart Re-Order scheduler (AI review + auto-approve + charge for members)
+      startSmartReorderScheduler();
+
+      // Start blog auto-generation scheduler (OFF by default — enabled via Admin → Blog Settings)
+      startBlogGenerationScheduler();
+
+      // Start PR Agent scheduler (OFF by default — enabled via Admin → PR Agent Settings)
+      startPrAgentScheduler();
 
       // Note: Wearable data sync is now handled via Junction webhooks
       // No polling schedulers needed - data is pushed to /api/webhooks/junction

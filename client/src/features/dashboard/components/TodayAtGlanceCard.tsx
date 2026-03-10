@@ -187,27 +187,27 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
   });
 
   return (
-    <Card className="bg-gradient-to-br from-[#1B4332]/5 to-[#52796F]/5 border-[#1B4332]/10 hover:border-[#1B4332]/20 transition-all">
+    <Card className="bg-gradient-to-br from-[#054700]/5 to-[#5a6623]/5 border-[#054700]/10 hover:border-[#054700]/20 transition-all">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-[#1B4332] flex items-center gap-2">
+          <CardTitle className="text-lg font-semibold text-[#054700] flex items-center gap-2">
             <GreetingIcon className="h-5 w-5 text-[#D4A574]" />
             Log Actions
           </CardTitle>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#52796F]">
+            <span className="text-xs text-[#5a6623]">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
             </span>
             <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <Settings2 className="h-4 w-4 text-[#52796F]" />
+                  <Settings2 className="h-4 w-4 text-[#5a6623]" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-64" align="end">
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-medium text-[#1B4332] mb-2">Show in Today View</h4>
+                    <h4 className="font-medium text-[#054700] mb-2">Show in Today View</h4>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Checkbox
@@ -281,11 +281,11 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                       min="0"
                       max="200"
                     />
-                    <p className="text-[10px] text-[#52796F] mt-1">Set to 0 to hide hydration tracking</p>
+                    <p className="text-[10px] text-[#5a6623] mt-1">Set to 0 to hide hydration tracking</p>
                   </div>
                   <Button
                     size="sm"
-                    className="w-full bg-[#1B4332] hover:bg-[#143728]"
+                    className="w-full bg-[#054700] hover:bg-[#043d00]"
                     onClick={() => savePrefs.mutate(localPrefs)}
                     disabled={savePrefs.isPending}
                   >
@@ -302,7 +302,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
         {todayPercentage !== undefined && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium text-[#1B4332]">Today's Progress</h4>
+              <h4 className="text-sm font-medium text-[#054700]">Today's Progress</h4>
               <Badge
                 variant="outline"
                 className={cn(
@@ -335,21 +335,21 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
 
         {/* Supplements - Inline dose tracking */}
         {showSupplements && (data.formulaName ? (
-          <div className="p-3 md:p-4 rounded-xl bg-white border border-[#1B4332]/10">
+          <div className="p-3 md:p-4 rounded-xl bg-white border border-[#054700]/10">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className={cn(
                   "p-2.5 md:p-1.5 rounded-lg flex-shrink-0",
-                  allSupplementsTaken ? 'bg-green-100' : 'bg-[#1B4332]/10'
+                  allSupplementsTaken ? 'bg-green-100' : 'bg-[#054700]/10'
                 )}>
                   <Pill className={cn(
                     "h-5 w-5 md:h-4 md:w-4",
-                    allSupplementsTaken ? 'text-green-600' : 'text-[#1B4332]'
+                    allSupplementsTaken ? 'text-green-600' : 'text-[#054700]'
                   )} />
                 </div>
                 <div>
-                  <p className="font-medium text-sm md:text-base text-[#1B4332]">Supplements</p>
-                  <p className="text-xs text-[#52796F]">{capsulesPerDose} capsules per dose</p>
+                  <p className="font-medium text-sm md:text-base text-[#054700]">Supplements</p>
+                  <p className="text-xs text-[#5a6623]">{capsulesPerDose} capsules per dose</p>
                 </div>
               </div>
               {allSupplementsTaken && (
@@ -370,7 +370,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                   "flex-1 flex items-center justify-center gap-1.5 py-3 md:py-2 px-2 rounded-lg text-sm md:text-xs font-medium transition-all touch-feedback",
                   data.supplementMorning
                     ? "bg-green-100 text-green-700 border border-green-200"
-                    : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-[#1B4332]/5 hover:border-[#1B4332]/20"
+                    : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-[#054700]/5 hover:border-[#054700]/20"
                 )}
               >
                 <Sunrise className="h-4 w-4 md:h-3.5 md:w-3.5" />
@@ -386,7 +386,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                   "flex-1 flex items-center justify-center gap-1.5 py-3 md:py-2 px-2 rounded-lg text-sm md:text-xs font-medium transition-all touch-feedback",
                   data.supplementAfternoon
                     ? "bg-green-100 text-green-700 border border-green-200"
-                    : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-[#1B4332]/5 hover:border-[#1B4332]/20"
+                    : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-[#054700]/5 hover:border-[#054700]/20"
                 )}
               >
                 <Sun className="h-4 w-4 md:h-3.5 md:w-3.5" />
@@ -402,7 +402,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                   "flex-1 flex items-center justify-center gap-1.5 py-3 md:py-2 px-2 rounded-lg text-sm md:text-xs font-medium transition-all touch-feedback",
                   data.supplementEvening
                     ? "bg-green-100 text-green-700 border border-green-200"
-                    : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-[#1B4332]/5 hover:border-[#1B4332]/20"
+                    : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-[#054700]/5 hover:border-[#054700]/20"
                 )}
               >
                 <Sunset className="h-4 w-4 md:h-3.5 md:w-3.5" />
@@ -413,24 +413,24 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
           </div>
         ) : (
           <Link href="/dashboard/chat">
-            <div className="flex items-center justify-between p-3 md:p-4 rounded-xl bg-white border border-dashed border-[#1B4332]/20 hover:border-[#1B4332]/40 transition-all cursor-pointer touch-feedback">
+            <div className="flex items-center justify-between p-3 md:p-4 rounded-xl bg-white border border-dashed border-[#054700]/20 hover:border-[#054700]/40 transition-all cursor-pointer touch-feedback">
               <div className="flex items-center gap-2">
-                <div className="p-2.5 md:p-1.5 rounded-lg bg-[#1B4332]/5 flex-shrink-0">
-                  <Pill className="h-5 w-5 md:h-4 md:w-4 text-[#1B4332]/50" />
+                <div className="p-2.5 md:p-1.5 rounded-lg bg-[#054700]/5 flex-shrink-0">
+                  <Pill className="h-5 w-5 md:h-4 md:w-4 text-[#054700]/50" />
                 </div>
                 <div>
-                  <p className="font-medium text-sm md:text-base text-[#1B4332]">No Formula Yet</p>
-                  <p className="text-xs text-[#52796F]">Chat to create your formula</p>
+                  <p className="font-medium text-sm md:text-base text-[#054700]">No Formula Yet</p>
+                  <p className="text-xs text-[#5a6623]">Chat to create your formula</p>
                 </div>
               </div>
-              <ChevronRight className="h-4 w-4 text-[#52796F]" />
+              <ChevronRight className="h-4 w-4 text-[#5a6623]" />
             </div>
           </Link>
         ))}
 
         {/* Today's Workout */}
         {showWorkouts && (
-          <div className="p-3 md:p-4 rounded-xl bg-white border border-[#1B4332]/10">
+          <div className="p-3 md:p-4 rounded-xl bg-white border border-[#054700]/10">
             {/* Mobile: Stack layout / Desktop: Row layout */}
             <div className={isMobile ? "space-y-3" : "flex items-center justify-between"}>
               <Link href="/dashboard/optimize/workout" className={isMobile ? "flex items-center gap-3" : "flex items-center gap-3 flex-1"}>
@@ -449,7 +449,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-sm md:text-base text-[#1B4332] truncate">
+                    <p className="font-medium text-sm md:text-base text-[#054700] truncate">
                       {data.isRestDay
                         ? 'Rest Day'
                         : data.hasWorkoutToday
@@ -464,7 +464,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-[#52796F]">
+                  <p className="text-xs text-[#5a6623]">
                     {data.isRestDay
                       ? 'Taking a recovery day'
                       : data.workoutCompleted
@@ -528,14 +528,14 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
         {/* Today's Meals - Clickable */}
         {showNutrition && (
           <Link href="/dashboard/optimize/nutrition?view=log">
-            <div className="flex items-center justify-between p-3 md:p-4 rounded-xl bg-white border border-[#1B4332]/10 hover:border-[#1B4332]/30 hover:shadow-sm transition-all cursor-pointer group touch-feedback">
+            <div className="flex items-center justify-between p-3 md:p-4 rounded-xl bg-white border border-[#054700]/10 hover:border-[#054700]/30 hover:shadow-sm transition-all cursor-pointer group touch-feedback">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className={`p-2.5 md:p-2 rounded-lg flex-shrink-0 ${mealsLoggedCount > 0 ? 'bg-green-100' : 'bg-[#1B4332]/10'}`}>
-                  <Utensils className={`h-5 w-5 ${mealsLoggedCount > 0 ? 'text-green-600' : 'text-[#1B4332]'}`} />
+                <div className={`p-2.5 md:p-2 rounded-lg flex-shrink-0 ${mealsLoggedCount > 0 ? 'bg-green-100' : 'bg-[#054700]/10'}`}>
+                  <Utensils className={`h-5 w-5 ${mealsLoggedCount > 0 ? 'text-green-600' : 'text-[#054700]'}`} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm md:text-base text-[#1B4332]">Nutrition</p>
-                  <p className="text-xs text-[#52796F] truncate">
+                  <p className="font-medium text-sm md:text-base text-[#054700]">Nutrition</p>
+                  <p className="text-xs text-[#5a6623] truncate">
                     {mealsLoggedCount > 0 ? `${mealsLoggedCount} meal${mealsLoggedCount !== 1 ? 's' : ''} logged today` : 'Track your meals'}
                   </p>
                 </div>
@@ -550,7 +550,7 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-xs border-[#1B4332]/20 text-[#1B4332] group-hover:bg-[#1B4332] group-hover:text-white flex-shrink-0"
+                  className="text-xs border-[#054700]/20 text-[#054700] group-hover:bg-[#054700] group-hover:text-white flex-shrink-0"
                 >
                   <Plus className="h-3 w-3 mr-1" />
                   <span className="hidden sm:inline">Log Meal</span>
@@ -563,15 +563,15 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
 
         {/* Water Intake - With input */}
         {showHydration && (
-          <div className="p-3 md:p-4 rounded-xl bg-white border border-[#1B4332]/10">
+          <div className="p-3 md:p-4 rounded-xl bg-white border border-[#054700]/10">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 md:p-2 rounded-lg flex-shrink-0 ${waterPercentage >= 100 ? 'bg-blue-100' : 'bg-blue-50'}`}>
                   <Droplets className={`h-5 w-5 ${waterPercentage >= 100 ? 'text-blue-600' : 'text-blue-400'}`} />
                 </div>
                 <div>
-                  <p className="font-medium text-sm md:text-base text-[#1B4332]">Hydration</p>
-                  <p className="text-xs text-[#52796F]">{data.waterIntakeOz} / {data.waterGoalOz || hydrationGoal} oz</p>
+                  <p className="font-medium text-sm md:text-base text-[#054700]">Hydration</p>
+                  <p className="text-xs text-[#5a6623]">{data.waterIntakeOz} / {data.waterGoalOz || hydrationGoal} oz</p>
                 </div>
               </div>
               {waterPercentage >= 100 && (
@@ -638,14 +638,14 @@ export function TodayAtGlanceCard({ data, trackingPrefs, todayPercentage, onLogS
 
         {/* Lifestyle - Sleep, Energy, Mood */}
         {showLifestyle && (
-          <div className="p-3 rounded-xl bg-white border border-[#1B4332]/10">
+          <div className="p-3 rounded-xl bg-white border border-[#054700]/10">
             <div className="flex items-center gap-3 mb-3">
               <div className={`p-2 rounded-lg ${(data.sleepQuality && data.energyLevel && data.moodLevel) ? 'bg-amber-100' : 'bg-amber-50'}`}>
                 <Moon className={`h-5 w-5 ${(data.sleepQuality && data.energyLevel && data.moodLevel) ? 'text-amber-600' : 'text-amber-400'}`} />
               </div>
               <div>
-                <p className="font-medium text-sm text-[#1B4332]">Lifestyle Check-in</p>
-                <p className="text-xs text-[#52796F]">How are you feeling today?</p>
+                <p className="font-medium text-sm text-[#054700]">Lifestyle Check-in</p>
+                <p className="text-xs text-[#5a6623]">How are you feeling today?</p>
               </div>
               {data.sleepQuality && data.energyLevel && data.moodLevel && (
                 <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200">
@@ -711,7 +711,7 @@ function LifestyleRating({
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
         <span className="text-sm">{icon}</span>
-        <span className="text-xs text-[#52796F]">{label}</span>
+        <span className="text-xs text-[#5a6623]">{label}</span>
       </div>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((rating) => (
@@ -736,17 +736,17 @@ function LifestyleRating({
 // Empty state for users without optimize setup
 export function TodayAtGlanceEmpty() {
   return (
-    <Card className="bg-gradient-to-br from-[#1B4332]/5 to-[#52796F]/5 border-[#1B4332]/10 border-dashed">
+    <Card className="bg-gradient-to-br from-[#054700]/5 to-[#5a6623]/5 border-[#054700]/10 border-dashed">
       <CardContent className="flex flex-col items-center justify-center py-8 text-center">
-        <div className="p-3 rounded-full bg-[#1B4332]/10 mb-4">
-          <Sparkles className="h-6 w-6 text-[#1B4332]" />
+        <div className="p-3 rounded-full bg-[#054700]/10 mb-4">
+          <Sparkles className="h-6 w-6 text-[#054700]" />
         </div>
-        <h3 className="font-semibold text-[#1B4332] mb-1">Your Daily Dashboard</h3>
-        <p className="text-sm text-[#52796F] max-w-xs mb-4">
+        <h3 className="font-semibold text-[#054700] mb-1">Your Daily Dashboard</h3>
+        <p className="text-sm text-[#5a6623] max-w-xs mb-4">
           Track your supplements, workouts, and meals all in one place. Start by setting up your optimize plans.
         </p>
         <Link href="/dashboard/optimize">
-          <Button className="bg-[#1B4332] hover:bg-[#143728] text-white">
+          <Button className="bg-[#054700] hover:bg-[#043d00] text-white">
             <Sparkles className="h-4 w-4 mr-2" />
             Set Up Optimize
           </Button>

@@ -174,8 +174,8 @@ const STATUS_CONFIG = {
 const TREND_CONFIG = {
   improving: { color: 'text-emerald-600', icon: TrendingUp,   label: 'Improving' },
   worsening: { color: 'text-red-600',     icon: TrendingDown, label: 'Worsening' },
-  stable:    { color: 'text-[#52796F]',   icon: Minus,        label: 'Stable' },
-  new:       { color: 'text-[#52796F]',   icon: Plus,         label: 'New' },
+  stable:    { color: 'text-[#5a6623]',   icon: Minus,        label: 'Stable' },
+  new:       { color: 'text-[#5a6623]',   icon: Plus,         label: 'New' },
 } as const;
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -299,7 +299,7 @@ function ScoreRing({ score, grade, size = 140, strokeWidth = 10 }: {
       {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-3xl font-bold" style={{ color }}>{score}</span>
-        <span className="text-sm font-semibold text-[#1B4332] -mt-0.5">{grade}</span>
+        <span className="text-sm font-semibold text-[#054700] -mt-0.5">{grade}</span>
       </div>
     </div>
   );
@@ -317,7 +317,7 @@ function PanelScoreBar({ panel }: { panel: PanelScore }) {
       <span className="text-sm flex-shrink-0 w-5 text-center">{icon}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium text-[#1B4332] truncate">{panel.category}</span>
+          <span className="text-xs font-medium text-[#054700] truncate">{PANEL_FRIENDLY_NAMES[panel.category] || panel.category}</span>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <span className={`text-xs font-bold ${textColor}`}>{panel.score}</span>
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${panel.score >= 90 ? 'bg-emerald-100 text-emerald-700' : panel.score >= 80 ? 'bg-teal-100 text-teal-700' : panel.score >= 70 ? 'bg-amber-100 text-amber-700' : panel.score >= 60 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>{panel.grade}</span>
@@ -327,7 +327,7 @@ function PanelScoreBar({ panel }: { panel: PanelScore }) {
           <div className={`h-full rounded-full ${color} transition-all duration-700 ease-out`} style={{ width: `${panel.score}%` }} />
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-[#52796F]">{panel.inRange}/{panel.markerCount} in range</span>
+          <span className="text-[10px] text-[#5a6623]">{panel.inRange}/{panel.markerCount} in range</span>
           {panel.critical > 0 && <span className="text-[10px] text-red-600 font-medium">{panel.critical} critical</span>}
         </div>
       </div>
@@ -341,15 +341,15 @@ function SummaryCard({ label, value, icon: Icon, iconBg, iconColor, sub }: {
   label: string; value: number | string; icon: any; iconBg: string; iconColor: string; sub?: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#52796F]/10 p-4 flex flex-col gap-2 shadow-sm">
+    <div className="glass-card rounded-2xl border border-[#5a6623]/10 shadow-2xl shadow-lg shadow-[#054700]/5 p-4 flex flex-col gap-2 shadow-sm">
       <div className="flex items-center justify-between">
         <div className={`h-9 w-9 rounded-full ${iconBg} flex items-center justify-center`}>
           <Icon className={`h-4 w-4 ${iconColor}`} />
         </div>
-        <span className="text-xs font-medium text-[#52796F]">{label}</span>
+        <span className="text-xs font-medium text-[#5a6623]">{label}</span>
       </div>
-      <p className="text-2xl sm:text-3xl font-bold text-[#1B4332] leading-tight">{value}</p>
-      {sub && <p className="text-xs text-[#52796F]">{sub}</p>}
+      <p className="text-2xl sm:text-3xl font-bold text-[#054700] leading-tight">{value}</p>
+      {sub && <p className="text-xs text-[#5a6623]">{sub}</p>}
     </div>
   );
 }
@@ -365,13 +365,13 @@ function FocusAreaCard({ area }: { area: FocusArea }) {
   const followupActions = area.actions.filter(a => a.type === 'followup');
 
   return (
-    <div className="bg-white rounded-2xl border border-[#52796F]/15 shadow-sm overflow-hidden">
+    <div className="glass-card rounded-2xl border border-[#5a6623]/10 shadow-2xl shadow-sm overflow-hidden">
       {/* Header */}
       <div className="px-5 pt-4 pb-3">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2.5">
             <span className="text-xl">{area.emoji}</span>
-            <h3 className="text-base font-bold text-[#1B4332]">{friendlyName}</h3>
+            <h3 className="text-base font-bold text-[#054700]">{friendlyName}</h3>
           </div>
           <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${gradeColor}`}>{area.grade}</span>
         </div>
@@ -381,13 +381,13 @@ function FocusAreaCard({ area }: { area: FocusArea }) {
       </div>
 
       {/* Abnormal markers */}
-      <div className="px-5 py-3 bg-gray-50/50 border-y border-[#52796F]/8">
+      <div className="px-5 py-3 bg-gray-50/50 border-y border-[#5a6623]/8">
         <div className="space-y-2">
           {area.markers.map((m, i) => {
             const isHigh = m.status === 'high' || m.status === 'critical';
             return (
               <div key={i} className="flex items-baseline justify-between gap-2">
-                <span className="text-sm text-[#1B4332] font-medium truncate">{m.name}</span>
+                <span className="text-sm text-[#054700] font-medium truncate">{m.name}</span>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className={`text-sm font-bold ${m.status === 'critical' ? 'text-red-600' : isHigh ? 'text-amber-600' : 'text-blue-600'}`}>
                     {m.value}{m.unit ? ` ${m.unit}` : ''}
@@ -400,14 +400,14 @@ function FocusAreaCard({ area }: { area: FocusArea }) {
             );
           })}
           {area.markers.length > 0 && area.markers[0].refRange && (
-            <p className="text-[11px] text-[#52796F]/70">ref: {area.markers[0].refRange}</p>
+            <p className="text-[11px] text-[#5a6623]/70">ref: {area.markers[0].refRange}</p>
           )}
         </div>
       </div>
 
       {/* Insight */}
       <div className="px-5 py-3">
-        <p className="text-sm text-[#1B4332]/80 leading-relaxed">{area.insight}</p>
+        <p className="text-sm text-[#054700]/80 leading-relaxed">{area.insight}</p>
       </div>
 
       {/* Actions */}
@@ -416,26 +416,26 @@ function FocusAreaCard({ area }: { area: FocusArea }) {
           <div>
             <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-1">🏃 Lifestyle</p>
             {lifestyleActions.map((a, i) => (
-              <p key={i} className="text-sm text-[#1B4332] pl-5 py-0.5 leading-snug">→ {a.text}</p>
+              <p key={i} className="text-sm text-[#054700] pl-5 py-0.5 leading-snug">→ {a.text}</p>
             ))}
           </div>
         )}
         {followupActions.length > 0 && (
           <div>
-            <p className="text-[11px] font-semibold text-[#52796F] uppercase tracking-wide mb-1">📋 Follow-up</p>
+            <p className="text-[11px] font-semibold text-[#5a6623] uppercase tracking-wide mb-1">📋 Follow-up</p>
             {followupActions.map((a, i) => (
-              <p key={i} className="text-sm text-[#1B4332] pl-5 py-0.5 leading-snug">→ {a.text}</p>
+              <p key={i} className="text-sm text-[#054700] pl-5 py-0.5 leading-snug">→ {a.text}</p>
             ))}
           </div>
         )}
         {/* CTA to discuss supplements via AI chat */}
         <a
           href="/chat"
-          className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-[#1B4332]/5 hover:bg-[#1B4332]/10 transition-colors group"
+          className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-[#054700]/5 hover:bg-[#054700]/10 transition-colors group"
         >
           <span className="text-base">💬</span>
-          <span className="text-sm font-medium text-[#1B4332] group-hover:underline">Discuss this with your AI practitioner</span>
-          <span className="ml-auto text-[#52796F] text-xs">→</span>
+          <span className="text-sm font-medium text-[#054700] group-hover:underline">Discuss this with your AI practitioner</span>
+          <span className="ml-auto text-[#5a6623] text-xs">→</span>
         </a>
       </div>
     </div>
@@ -492,19 +492,19 @@ function MarkerInsightPanel({ insight, marker }: { insight?: MarkerInsightData |
       {/* Why It Matters */}
       {insight.whyItMatters && (
         <div>
-          <h5 className="text-[11px] font-semibold text-[#52796F] uppercase tracking-wide mb-1 flex items-center gap-1.5">
+          <h5 className="text-[11px] font-semibold text-[#5a6623] uppercase tracking-wide mb-1 flex items-center gap-1.5">
             <Info className="h-3 w-3" />
             Why It Matters
           </h5>
-          <p className="text-sm text-[#1B4332] leading-relaxed">{insight.whyItMatters}</p>
+          <p className="text-sm text-[#054700] leading-relaxed">{insight.whyItMatters}</p>
         </div>
       )}
 
       {/* Your Result */}
       {insight.yourResult && (
-        <div className="bg-[#FAF7F2] rounded-lg p-3 border border-[#52796F]/10">
-          <h5 className="text-[11px] font-semibold text-[#52796F] uppercase tracking-wide mb-1">Your Result</h5>
-          <p className="text-sm text-[#1B4332] leading-relaxed">{insight.yourResult}</p>
+        <div className="bg-[#ede8e2] rounded-lg p-3 border border-[#5a6623]/10">
+          <h5 className="text-[11px] font-semibold text-[#5a6623] uppercase tracking-wide mb-1">Your Result</h5>
+          <p className="text-sm text-[#054700] leading-relaxed">{insight.yourResult}</p>
         </div>
       )}
 
@@ -519,7 +519,7 @@ function MarkerInsightPanel({ insight, marker }: { insight?: MarkerInsightData |
               </h5>
               <ul className="space-y-1">
                 {insight.foodsToEat.map((food, i) => (
-                  <li key={i} className="text-xs text-[#1B4332] flex items-start gap-1.5">
+                  <li key={i} className="text-xs text-[#054700] flex items-start gap-1.5">
                     <span className="text-emerald-500 mt-0.5">•</span>
                     {food}
                   </li>
@@ -535,7 +535,7 @@ function MarkerInsightPanel({ insight, marker }: { insight?: MarkerInsightData |
               </h5>
               <ul className="space-y-1">
                 {insight.foodsToLimit.map((food, i) => (
-                  <li key={i} className="text-xs text-[#1B4332] flex items-start gap-1.5">
+                  <li key={i} className="text-xs text-[#054700] flex items-start gap-1.5">
                     <span className="text-red-400 mt-0.5">•</span>
                     {food}
                   </li>
@@ -553,18 +553,18 @@ function MarkerInsightPanel({ insight, marker }: { insight?: MarkerInsightData |
             <Dumbbell className="h-3 w-3" />
             Activity & Lifestyle
           </h5>
-          <p className="text-sm text-[#1B4332] leading-relaxed">{insight.activity}</p>
+          <p className="text-sm text-[#054700] leading-relaxed">{insight.activity}</p>
         </div>
       )}
 
       {/* Discuss link */}
       <button
         onClick={handleDiscuss}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-[#1B4332]/5 hover:bg-[#1B4332]/10 transition-colors group cursor-pointer"
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-[#054700]/5 hover:bg-[#054700]/10 transition-colors group cursor-pointer"
       >
-        <MessageCircle className="h-4 w-4 text-[#1B4332]" />
-        <span className="text-sm font-medium text-[#1B4332] group-hover:underline">Discuss with your AI practitioner</span>
-        <span className="ml-auto text-[#52796F] text-xs">→</span>
+        <MessageCircle className="h-4 w-4 text-[#054700]" />
+        <span className="text-sm font-medium text-[#054700] group-hover:underline">Discuss with your AI practitioner</span>
+        <span className="ml-auto text-[#5a6623] text-xs">→</span>
       </button>
     </div>
   );
@@ -712,7 +712,8 @@ export default function LabReportsPage() {
       if (statusFilter !== 'all' && m.latest.status !== statusFilter) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        return m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q);
+        const friendlyCategory = (PANEL_FRIENDLY_NAMES[m.category] || m.category).toLowerCase();
+        return m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q) || friendlyCategory.includes(q);
       }
       return true;
     });
@@ -1021,13 +1022,13 @@ export default function LabReportsPage() {
   // ── Render ───────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6 px-1 sm:px-0" data-testid="page-lab-reports">
+    <div className="space-y-6" data-testid="page-lab-reports">
 
       {/* ── Page Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1B4332]">Lab Reports</h1>
-          <p className="text-sm sm:text-base text-[#52796F] mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#054700]">Lab Reports</h1>
+          <p className="text-sm sm:text-base text-[#5a6623] mt-1">
             Upload blood work and track your biomarkers over time
           </p>
         </div>
@@ -1037,7 +1038,7 @@ export default function LabReportsPage() {
             variant="outline"
             onClick={() => { setEditingFileId(null); setManualEntryText(''); setShowManualEntryDialog(true); }}
             disabled={isUploading}
-            className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
+            className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white"
           >
             <ClipboardPaste className="h-3.5 w-3.5 mr-1.5" />
             <span className="hidden sm:inline">Paste</span>
@@ -1046,7 +1047,7 @@ export default function LabReportsPage() {
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="bg-[#1B4332] hover:bg-[#1B4332]/90"
+            className="bg-[#054700] hover:bg-[#054700]/90"
           >
             {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
             Upload Report
@@ -1093,17 +1094,17 @@ export default function LabReportsPage() {
 
       {/* ── AI Insights ── */}
       {(effectiveLabSummary || hasDashboard) && (
-        <Card className="bg-[#FAF7F2] border-[#52796F]/20 overflow-hidden">
-          <CardHeader className="pb-3 border-b border-[#52796F]/10">
+        <Card className="border-[#5a6623]/10 shadow-2xl overflow-hidden">
+          <CardHeader className="pb-3 border-b border-[#5a6623]/10">
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <CardTitle className="text-[#1B4332] text-lg flex items-center gap-2">
+              <CardTitle className="text-[#054700] text-lg flex items-center gap-2">
                 <img src="/ones-logo-icon.svg" alt="" className="h-5 w-5" />
-                ONES AI Lab Analysis
+                Ones AI Lab Analysis
               </CardTitle>
               <Button
                 size="sm"
                 variant="outline"
-                className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
+                className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white"
                 disabled={!latestReportId || reanalyzeMutation.isPending}
                 onClick={() => latestReportId && reanalyzeMutation.mutate(latestReportId)}
               >
@@ -1115,7 +1116,7 @@ export default function LabReportsPage() {
               </Button>
             </div>
             {labSummary?.labReportDate && (
-              <CardDescription className="text-[#52796F]">
+              <CardDescription className="text-[#5a6623]">
                 Based on report dated {labSummary.labReportDate}
               </CardDescription>
             )}
@@ -1124,25 +1125,25 @@ export default function LabReportsPage() {
 
             {/* ── Health Score Hero ── */}
             {dashboard?.healthScore && dashboard.healthScore.overall > 0 && (
-              <div className="bg-white rounded-2xl border border-[#52796F]/10 p-5 sm:p-6">
+              <div className="glass-card rounded-2xl border border-[#5a6623]/10 shadow-2xl shadow-lg shadow-[#054700]/5 p-5 sm:p-6">
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-8">
                   {/* Score Ring */}
                   <div className="flex flex-col items-center gap-1">
                     <ScoreRing score={dashboard.healthScore.overall} grade={dashboard.healthScore.grade} />
-                    <span className="text-xs font-medium text-[#52796F] mt-1">Lab Health Score</span>
+                    <span className="text-xs font-medium text-[#5a6623] mt-1">Lab Health Score</span>
                   </div>
 
                   {/* Right side — label + panels */}
                   <div className="flex-1 w-full space-y-4">
                     {/* Score headline */}
                     <div>
-                      <h3 className="text-lg font-bold text-[#1B4332]">
+                      <h3 className="text-lg font-bold text-[#054700]">
                         {dashboard.healthScore.label}
                       </h3>
-                      <p className="text-sm text-[#52796F] mt-0.5 flex items-center gap-1.5">
+                      <p className="text-sm text-[#5a6623] mt-0.5 flex items-center gap-1.5">
                         {dashboard.healthScore.momentum === 'improving' && <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />}
                         {dashboard.healthScore.momentum === 'declining' && <TrendingDown className="h-3.5 w-3.5 text-red-600" />}
-                        {dashboard.healthScore.momentum === 'steady' && <Minus className="h-3.5 w-3.5 text-[#52796F]" />}
+                        {dashboard.healthScore.momentum === 'steady' && <Minus className="h-3.5 w-3.5 text-[#5a6623]" />}
                         {dashboard.healthScore.momentumLabel}
                       </p>
                     </div>
@@ -1150,7 +1151,7 @@ export default function LabReportsPage() {
                     {/* Panel breakdown */}
                     {dashboard.healthScore.panels.length > 0 && (
                       <div className="space-y-2.5">
-                        <h4 className="text-xs font-semibold text-[#52796F] uppercase tracking-wide">Panel Breakdown</h4>
+                        <h4 className="text-xs font-semibold text-[#5a6623] uppercase tracking-wide">Panel Breakdown</h4>
                         <div className="grid gap-2.5 sm:grid-cols-2">
                           {dashboard.healthScore.panels.map(panel => (
                             <PanelScoreBar key={panel.category} panel={panel} />
@@ -1168,14 +1169,14 @@ export default function LabReportsPage() {
               <div className="space-y-4">
                 {/* Headline + one-line narrative */}
                 <div>
-                  <h3 className="text-base font-bold text-[#1B4332] mb-1">{dashboard.analysisSummary.headline}</h3>
-                  <p className="text-sm text-[#52796F]">{dashboard.analysisSummary.narrative}</p>
+                  <h3 className="text-base font-bold text-[#054700] mb-1">{dashboard.analysisSummary.headline}</h3>
+                  <p className="text-sm text-[#5a6623]">{dashboard.analysisSummary.narrative}</p>
                 </div>
 
                 {/* Comparison changes — keep if user has multiple reports */}
                 {comparison?.hasMultipleReports && comparison.changes.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-semibold text-[#52796F] uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <h4 className="text-xs font-semibold text-[#5a6623] uppercase tracking-wide mb-2 flex items-center gap-1.5">
                       <ArrowUpRight className="h-3.5 w-3.5" />
                       Changes Since Last Report
                     </h4>
@@ -1184,11 +1185,11 @@ export default function LabReportsPage() {
                         const trendCfg = TREND_CONFIG[change.trend];
                         const TrendIcon = trendCfg.icon;
                         return (
-                          <div key={i} className="flex items-center gap-3 bg-white rounded-lg border border-[#52796F]/10 px-3 py-2">
+                          <div key={i} className="flex items-center gap-3 bg-white rounded-lg border border-[#5a6623]/10 px-3 py-2">
                             <TrendIcon className={`h-4 w-4 flex-shrink-0 ${trendCfg.color}`} />
-                            <span className="text-sm font-medium text-[#1B4332] flex-1">{change.name}</span>
-                            <span className="text-xs text-[#52796F]">{change.from}</span>
-                            <span className="text-xs text-[#52796F]">→</span>
+                            <span className="text-sm font-medium text-[#054700] flex-1">{change.name}</span>
+                            <span className="text-xs text-[#5a6623]">{change.from}</span>
+                            <span className="text-xs text-[#5a6623]">→</span>
                             <span className={`text-xs font-semibold ${trendCfg.color}`}>{change.to}</span>
                             {change.percentChange != null && (
                               <span className={`text-xs ${trendCfg.color}`}>
@@ -1206,7 +1207,7 @@ export default function LabReportsPage() {
 
             {/* Fallback when analysisSummary is not yet computed */}
             {(!dashboard?.analysisSummary || !dashboard.analysisSummary.headline) && effectiveLabSummary && (
-              <p className="text-sm text-[#1B4332] leading-relaxed">{effectiveLabSummary}</p>
+              <p className="text-sm text-[#054700] leading-relaxed">{effectiveLabSummary}</p>
             )}
           </CardContent>
         </Card>
@@ -1217,27 +1218,27 @@ export default function LabReportsPage() {
         <div>
           <button
             onClick={() => setShowAllMarkers(!showAllMarkers)}
-            className="w-full flex items-center justify-between bg-[#FAF7F2] border border-[#52796F]/20 rounded-2xl px-5 py-3.5 hover:bg-[#FAF7F2]/80 transition-colors group"
+            className="w-full flex items-center justify-between bg-[#ede8e2] border border-[#5a6623]/20 rounded-2xl px-5 py-3.5 hover:bg-[#ede8e2]/80 transition-colors group"
           >
             <div className="flex items-center gap-2.5">
-              <Beaker className="h-5 w-5 text-[#1B4332]" />
-              <span className="text-base font-semibold text-[#1B4332]">All Biomarkers</span>
-              <span className="text-xs text-[#52796F] bg-white rounded-full px-2.5 py-0.5 border border-[#52796F]/15">
+              <Beaker className="h-5 w-5 text-[#054700]" />
+              <span className="text-base font-semibold text-[#054700]">All Biomarkers</span>
+              <span className="text-xs text-[#5a6623] bg-white rounded-full px-2.5 py-0.5 border border-[#5a6623]/15">
                 {dashboard.markers.length} markers
               </span>
             </div>
             {showAllMarkers ? (
-              <ChevronUp className="h-5 w-5 text-[#52796F] group-hover:text-[#1B4332] transition-colors" />
+              <ChevronUp className="h-5 w-5 text-[#5a6623] group-hover:text-[#054700] transition-colors" />
             ) : (
-              <ChevronDown className="h-5 w-5 text-[#52796F] group-hover:text-[#1B4332] transition-colors" />
+              <ChevronDown className="h-5 w-5 text-[#5a6623] group-hover:text-[#054700] transition-colors" />
             )}
           </button>
 
           {showAllMarkers && (
-        <Card className="bg-[#FAF7F2] border-[#52796F]/20 overflow-hidden rounded-t-none border-t-0 -mt-1">
-          <CardHeader className="pb-3 border-b border-[#52796F]/10">
+        <Card className="border-[#5a6623]/10 shadow-2xl overflow-hidden rounded-t-none border-t-0 -mt-1">
+          <CardHeader className="pb-3 border-b border-[#5a6623]/10">
             <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-2 text-xs text-[#52796F]">
+              <div className="flex items-center gap-2 text-xs text-[#5a6623]">
                 {filteredMarkers.length} of {dashboard.markers.length} markers shown
               </div>
             </div>
@@ -1246,13 +1247,13 @@ export default function LabReportsPage() {
             <div className="flex flex-wrap gap-2 mt-3">
               {/* Search */}
               <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#52796F]" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#5a6623]" />
                 <input
                   type="text"
                   placeholder="Search markers..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-[#52796F]/20 bg-white text-[#1B4332] placeholder:text-[#52796F]/50 focus:outline-none focus:ring-1 focus:ring-[#1B4332]/30"
+                  className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-[#5a6623]/20 bg-white text-[#054700] placeholder:text-[#5a6623]/50 focus:outline-none focus:ring-1 focus:ring-[#054700]/30"
                 />
               </div>
 
@@ -1260,24 +1261,24 @@ export default function LabReportsPage() {
               <select
                 value={categoryFilter}
                 onChange={e => setCategoryFilter(e.target.value)}
-                className="px-3 py-1.5 text-sm rounded-lg border border-[#52796F]/20 bg-white text-[#1B4332] focus:outline-none focus:ring-1 focus:ring-[#1B4332]/30"
+                className="px-3 py-1.5 text-sm rounded-lg border border-[#5a6623]/20 bg-white text-[#054700] focus:outline-none focus:ring-1 focus:ring-[#054700]/30"
               >
                 <option value="all">All Categories</option>
                 {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                  <option key={cat} value={cat}>{PANEL_FRIENDLY_NAMES[cat] || cat}</option>
                 ))}
               </select>
 
               {/* Status filter */}
-              <div className="flex items-center gap-1 bg-white border border-[#52796F]/20 rounded-lg p-1">
+              <div className="flex items-center gap-1 bg-white border border-[#5a6623]/20 rounded-lg p-1">
                 {(['all', 'normal', 'high', 'low', 'critical'] as const).map(s => (
                   <button
                     key={s}
                     onClick={() => setStatusFilter(s)}
                     className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
                       statusFilter === s
-                        ? 'bg-[#1B4332] text-white shadow-sm'
-                        : 'text-[#52796F] hover:text-[#1B4332]'
+                        ? 'bg-[#054700] text-white shadow-sm'
+                        : 'text-[#5a6623] hover:text-[#054700]'
                     }`}
                   >
                     {s === 'all' ? 'All' : STATUS_CONFIG[s].label}
@@ -1289,7 +1290,7 @@ export default function LabReportsPage() {
 
           <CardContent className="p-0">
             {/* Table header (hidden on mobile) */}
-            <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_80px] gap-2 px-4 sm:px-6 py-2.5 bg-[#FAF7F2] border-b border-[#52796F]/10 text-xs font-semibold text-[#52796F] uppercase tracking-wide">
+            <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_80px] gap-2 px-4 sm:px-6 py-2.5 bg-[#ede8e2] border-b border-[#5a6623]/10 text-xs font-semibold text-[#5a6623] uppercase tracking-wide">
               <span>Marker</span>
               <span>Value</span>
               <span>Reference</span>
@@ -1298,11 +1299,11 @@ export default function LabReportsPage() {
             </div>
 
             {/* Marker rows */}
-            <div className="divide-y divide-[#52796F]/10">
+            <div className="divide-y divide-[#5a6623]/10">
               {filteredMarkers.length === 0 ? (
                 <div className="text-center py-12 px-4">
-                  <Search className="h-8 w-8 mx-auto text-[#52796F]/40 mb-2" />
-                  <p className="text-sm text-[#52796F]">No markers match your filters</p>
+                  <Search className="h-8 w-8 mx-auto text-[#5a6623]/40 mb-2" />
+                  <p className="text-sm text-[#5a6623]">No markers match your filters</p>
                 </div>
               ) : (
                 filteredMarkers.map(marker => {
@@ -1323,23 +1324,23 @@ export default function LabReportsPage() {
                           <div className="flex items-center gap-3 min-w-0">
                             <span className="text-base flex-shrink-0">{CATEGORY_ICONS[marker.category] || '📋'}</span>
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-[#1B4332] truncate">{marker.name}</p>
-                              <p className="text-xs text-[#52796F] truncate">{marker.category}</p>
+                              <p className="text-sm font-medium text-[#054700] truncate">{marker.name}</p>
+                              <p className="text-xs text-[#5a6623] truncate">{PANEL_FRIENDLY_NAMES[marker.category] || marker.category}</p>
                             </div>
                           </div>
 
                           {/* Value */}
                           <div className="flex items-center gap-2">
-                            <span className={`text-sm font-semibold ${marker.latest.status !== 'normal' ? statusCfg.color : 'text-[#1B4332]'}`}>
+                            <span className={`text-sm font-semibold ${marker.latest.status !== 'normal' ? statusCfg.color : 'text-[#054700]'}`}>
                               {marker.latest.rawValue}
                             </span>
                             {marker.latest.unit && (
-                              <span className="text-xs text-[#52796F]">{marker.latest.unit}</span>
+                              <span className="text-xs text-[#5a6623]">{marker.latest.unit}</span>
                             )}
                           </div>
 
                           {/* Reference range */}
-                          <span className="text-xs text-[#52796F]">{marker.latest.referenceRange || '—'}</span>
+                          <span className="text-xs text-[#5a6623]">{marker.latest.referenceRange || '—'}</span>
 
                           {/* Status badge */}
                           <div>
@@ -1364,8 +1365,8 @@ export default function LabReportsPage() {
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="text-base flex-shrink-0">{CATEGORY_ICONS[marker.category] || '📋'}</span>
                               <div className="min-w-0">
-                                <p className="text-sm font-medium text-[#1B4332] truncate">{marker.name}</p>
-                                <p className="text-xs text-[#52796F]">{marker.category}</p>
+                                <p className="text-sm font-medium text-[#054700] truncate">{marker.name}</p>
+                                <p className="text-xs text-[#5a6623]">{PANEL_FRIENDLY_NAMES[marker.category] || marker.category}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
@@ -1373,14 +1374,14 @@ export default function LabReportsPage() {
                                 <span className={`h-1.5 w-1.5 rounded-full ${statusCfg.dot}`} />
                                 {statusCfg.label}
                               </span>
-                              {isExpanded ? <ChevronUp className="h-4 w-4 text-[#52796F]" /> : <ChevronDown className="h-4 w-4 text-[#52796F]" />}
+                              {isExpanded ? <ChevronUp className="h-4 w-4 text-[#5a6623]" /> : <ChevronDown className="h-4 w-4 text-[#5a6623]" />}
                             </div>
                           </div>
                           <div className="flex items-center gap-3 mt-1.5 ml-8">
-                            <span className={`text-sm font-semibold ${marker.latest.status !== 'normal' ? statusCfg.color : 'text-[#1B4332]'}`}>
+                            <span className={`text-sm font-semibold ${marker.latest.status !== 'normal' ? statusCfg.color : 'text-[#054700]'}`}>
                               {marker.latest.rawValue} {marker.latest.unit}
                             </span>
-                            <span className="text-xs text-[#52796F]">{marker.latest.referenceRange || ''}</span>
+                            <span className="text-xs text-[#5a6623]">{marker.latest.referenceRange || ''}</span>
                             <TrendIcon className={`h-3.5 w-3.5 ml-auto ${trendCfg.color}`} />
                           </div>
                         </div>
@@ -1388,12 +1389,12 @@ export default function LabReportsPage() {
 
                       {/* Expanded detail panel */}
                       {isExpanded && (
-                        <div className="bg-white border-t border-[#52796F]/10 px-4 sm:px-6 py-4 space-y-4" onClick={e => e.stopPropagation()}>
+                        <div className="glass-card border-t border-[#5a6623]/10 px-4 sm:px-6 py-4 space-y-4" onClick={e => e.stopPropagation()}>
                           {/* Delta info */}
                           {marker.previous && (
                             <div className="flex items-center gap-4 flex-wrap">
-                              <div className="text-xs text-[#52796F]">
-                                Previous: <span className="font-medium text-[#1B4332]">{marker.previous.rawValue}</span>
+                              <div className="text-xs text-[#5a6623]">
+                                Previous: <span className="font-medium text-[#054700]">{marker.previous.rawValue}</span>
                                 <span className="ml-1">({fmtDate(marker.previous.date)})</span>
                               </div>
                               {marker.delta != null && (
@@ -1423,7 +1424,7 @@ export default function LabReportsPage() {
                           {/* Sparkline + history table */}
                           {marker.history.length >= 2 && (
                             <div>
-                              <h5 className="text-[11px] font-semibold text-[#52796F] uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                              <h5 className="text-[11px] font-semibold text-[#5a6623] uppercase tracking-wide mb-2 flex items-center gap-1.5">
                                 <TrendingUp className="h-3 w-3" />
                                 Trend History
                               </h5>
@@ -1433,9 +1434,9 @@ export default function LabReportsPage() {
                               <div className="space-y-1">
                                 {[...marker.history].reverse().slice(0, 6).map((h, i) => (
                                   <div key={i} className="flex items-center justify-between text-xs">
-                                    <span className="text-[#52796F]">{fmtDate(h.date)}</span>
+                                    <span className="text-[#5a6623]">{fmtDate(h.date)}</span>
                                     <div className="flex items-center gap-2">
-                                      <span className="font-medium text-[#1B4332]">{h.rawValue} {h.unit}</span>
+                                      <span className="font-medium text-[#054700]">{h.rawValue} {h.unit}</span>
                                       <span className={`h-1.5 w-1.5 rounded-full ${STATUS_CONFIG[h.status].dot}`} />
                                     </div>
                                   </div>
@@ -1446,7 +1447,7 @@ export default function LabReportsPage() {
 
                           {/* Single report — prompt to upload more */}
                           {marker.history.length < 2 && (
-                            <p className="text-xs text-[#52796F] italic">Upload another report to see trends for this marker.</p>
+                            <p className="text-xs text-[#5a6623] italic">Upload another report to see trends for this marker.</p>
                           )}
                         </div>
                       )}
@@ -1463,24 +1464,24 @@ export default function LabReportsPage() {
 
       {/* Empty state — only show when no reports exist at all */}
       {!hasDashboard && !dashboardLoading && !labReportsLoading && (!labReports || labReports.length === 0) && (
-        <Card className="border-dashed bg-[#FAF7F2] border-[#52796F]/30">
+        <Card className="border-dashed bg-white border-[#5a6623]/30">
           <CardContent className="flex flex-col items-center justify-center py-12 px-4">
-            <div className="h-14 w-14 rounded-full bg-[#1B4332]/10 flex items-center justify-center mb-4">
-              <Beaker className="h-7 w-7 text-[#1B4332]" />
+            <div className="h-14 w-14 rounded-full bg-[#054700]/10 flex items-center justify-center mb-4">
+              <Beaker className="h-7 w-7 text-[#054700]" />
             </div>
-            <h3 className="text-lg font-semibold mb-2 text-[#1B4332]">No lab data yet</h3>
-            <p className="text-[#52796F] text-center text-sm max-w-md mb-5">
+            <h3 className="text-lg font-semibold mb-2 text-[#054700]">No lab data yet</h3>
+            <p className="text-[#5a6623] text-center text-sm max-w-md mb-5">
               Upload your blood work to see a full breakdown of every biomarker with trends, reference ranges, and AI-powered insights.
             </p>
             <div className="flex gap-3">
-              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="bg-[#1B4332] hover:bg-[#1B4332]/90">
+              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="bg-[#054700] hover:bg-[#054700]/90">
                 {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                 Upload Report
               </Button>
               <Button
                 variant="outline"
                 onClick={() => { setEditingFileId(null); setManualEntryText(''); setShowManualEntryDialog(true); }}
-                className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
+                className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white"
               >
                 <ClipboardPaste className="mr-2 h-4 w-4" />
                 Paste Results
@@ -1492,18 +1493,18 @@ export default function LabReportsPage() {
 
       {/* ── Reports List (collapsible) ── */}
       {labReports && labReports.length > 0 && (
-        <Card className="bg-[#FAF7F2] border-[#52796F]/20">
+        <Card className="border-[#5a6623]/10 shadow-2xl">
           <CardHeader className="pb-2">
             <button
               onClick={() => setShowReports(!showReports)}
               className="flex items-center justify-between w-full text-left"
             >
-              <CardTitle className="text-[#1B4332] text-base flex items-center gap-2">
+              <CardTitle className="text-[#054700] text-base flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Uploaded Reports
-                <span className="text-sm font-normal text-[#52796F]">({labReports.length})</span>
+                <span className="text-sm font-normal text-[#5a6623]">({labReports.length})</span>
               </CardTitle>
-              {showReports ? <ChevronUp className="h-4 w-4 text-[#52796F]" /> : <ChevronDown className="h-4 w-4 text-[#52796F]" />}
+              {showReports ? <ChevronUp className="h-4 w-4 text-[#5a6623]" /> : <ChevronDown className="h-4 w-4 text-[#5a6623]" />}
             </button>
           </CardHeader>
           {showReports && (
@@ -1516,13 +1517,13 @@ export default function LabReportsPage() {
                 const labName = ld?.labName;
 
                 return (
-                  <div key={report.id} className="flex items-center gap-3 bg-white rounded-xl border border-[#52796F]/10 px-4 py-3" data-testid={`report-${report.id}`}>
-                    <div className="h-9 w-9 rounded-full bg-[#1B4332]/10 flex items-center justify-center flex-shrink-0">
-                      <FileText className="h-4 w-4 text-[#1B4332]" />
+                  <div key={report.id} className="flex items-center gap-3 bg-white rounded-xl border border-[#5a6623]/10 px-4 py-3" data-testid={`report-${report.id}`}>
+                    <div className="h-9 w-9 rounded-full bg-[#054700]/10 flex items-center justify-center flex-shrink-0">
+                      <FileText className="h-4 w-4 text-[#054700]" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#1B4332] truncate">{report.originalFileName}</p>
-                      <div className="flex items-center gap-2 text-xs text-[#52796F]">
+                      <p className="text-sm font-medium text-[#054700] truncate">{report.originalFileName}</p>
+                      <div className="flex items-center gap-2 text-xs text-[#5a6623]">
                         <span>{new Date(report.uploadedAt).toLocaleDateString()}</span>
                         {testDate && <span>• Test: {fmtDate(testDate)}</span>}
                         {labName && <span>• {labName}</span>}
@@ -1547,11 +1548,11 @@ export default function LabReportsPage() {
                       )}
 
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleViewFile(report.id)} disabled={loadingFiles.has(report.id)} title="View">
-                        {loadingFiles.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#1B4332]" /> : <Eye className="h-3.5 w-3.5 text-[#1B4332]" />}
+                        {loadingFiles.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#054700]" /> : <Eye className="h-3.5 w-3.5 text-[#054700]" />}
                       </Button>
                       {report.mimeType === 'text/plain' && (
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditReport(report)} disabled={editingFiles.has(report.id)} title="Edit">
-                          {editingFiles.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#1B4332]" /> : <Edit2 className="h-3.5 w-3.5 text-[#1B4332]" />}
+                          {editingFiles.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#054700]" /> : <Edit2 className="h-3.5 w-3.5 text-[#054700]" />}
                         </Button>
                       )}
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setFileToDelete(report.id)} title="Delete">

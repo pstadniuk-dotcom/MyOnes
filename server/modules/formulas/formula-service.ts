@@ -6,9 +6,8 @@ export const FORMULA_LIMITS = {
     CAPSULE_CAPACITY_MG: 550,      // Each capsule holds 550mg
     VALID_CAPSULE_COUNTS: [6, 9, 12] as const, // Allowed capsule counts (6, 9, or 12 - no 15)
     DEFAULT_CAPSULE_COUNT: 9,      // Default if not specified
-    DOSAGE_TOLERANCE: 50,          // Allow 50mg tolerance for rounding differences
     BUDGET_TOLERANCE_PERCENT: 0.025, // Allow 2.5% over capsule budget
-    MIN_BUDGET_UTILIZATION_PERCENT: 0.90, // Require at least 90% budget utilization
+    MIN_BUDGET_UTILIZATION_PERCENT: 1.0, // Require 100% budget utilization — capsules must be fully filled
     MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg
     MIN_INGREDIENT_COUNT: 8,       // Hard minimum ingredient count for ALL capsule tiers
     MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
@@ -271,9 +270,9 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
         { name: 'Resveratrol', minDose: 50, normalDose: 150, unit: 'mg', purpose: 'Provides antioxidant support for endothelial function and healthy aging.' },
         { name: 'Ginkgo Biloba Extract 24%', minDose: 40, normalDose: 120, unit: 'mg', purpose: 'Supports circulation and cognitive function through improved blood flow.' },
         { name: 'Ginger Root', minDose: 75, normalDose: 150, unit: 'mg', purpose: 'Supports digestion, reduces inflammation, and aids metabolic function.' },
-        { name: 'CoEnzyme Q10', minDose: 200, normalDose: 200, unit: 'mg', purpose: 'Supports mitochondrial energy production and cardiovascular health.' },
-        { name: 'Hawthorn Berry', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Traditional cardiovascular support for heart muscle function and blood pressure.' },
-        { name: 'Cinnamon 20:1', minDose: 25, normalDose: 100, unit: 'mg', purpose: 'Supports healthy blood sugar metabolism and insulin sensitivity.' },
+        { name: 'CoEnzyme Q10', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Supports mitochondrial energy production and cardiovascular health.' },
+        { name: 'Hawthorn Berry', minDose: 50, normalDose: 100, unit: 'mg', purpose: 'Traditional cardiovascular support for heart muscle function and blood pressure.' },
+        { name: 'Cinnamon 20:1', minDose: 30, normalDose: 100, unit: 'mg', purpose: 'Supports healthy blood sugar metabolism and insulin sensitivity.' },
         { name: 'Magnesium', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Essential mineral for muscle relaxation, energy production, and nervous system function.' },
     ];
 
@@ -339,20 +338,44 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
         .reduce((sum, ing) => sum + (ing.amount || 0), 0);
 
     if (finalTotal < minTarget) {
-        const headroom = maxWithTolerance - finalTotal;
-        const sortedAdditions = [...(formula.additions || [])].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0));
+        // Target the exact capsule budget (maxDosage), using maxWithTolerance as the hard ceiling
+        const fillTarget = maxDosage;
+        const deficit = fillTarget - finalTotal;
+        if (deficit > 0) {
+            // First boost additions that have room to grow
+            const sortedAdditions = [...(formula.additions || [])].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0));
+            let usedHeadroom = 0;
+            for (const addition of sortedAdditions) {
+                if (usedHeadroom >= deficit) break;
+                const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === addition.ingredient);
+                if (!catalogItem?.doseRangeMax) continue;
+                const currentAmount = addition.amount || 0;
+                const canIncrease = catalogItem.doseRangeMax - currentAmount;
+                if (canIncrease > 0) {
+                    const increase = Math.min(canIncrease, deficit - usedHeadroom);
+                    addition.amount = currentAmount + increase;
+                    usedHeadroom += increase;
+                }
+            }
 
-        let usedHeadroom = 0;
-        for (const addition of sortedAdditions) {
-            if (usedHeadroom >= headroom) break;
-            const catalogItem = INDIVIDUAL_INGREDIENTS.find(i => i.name === addition.ingredient);
-            if (!catalogItem?.doseRangeMax) continue;
-            const currentAmount = addition.amount || 0;
-            const canIncrease = catalogItem.doseRangeMax - currentAmount;
-            if (canIncrease > 0) {
-                const increase = Math.min(canIncrease, headroom - usedHeadroom);
-                addition.amount = currentAmount + increase;
-                usedHeadroom += increase;
+            // If additions alone weren't enough, also boost bases (system supports) by multiplier
+            if (usedHeadroom < deficit) {
+                for (const base of (formula.bases || [])) {
+                    if (usedHeadroom >= deficit) break;
+                    const support = SYSTEM_SUPPORTS.find(s => s.name === base.ingredient);
+                    if (!support) continue;
+                    const baseDose = support.doseMg;
+                    const currentAmount = base.amount || 0;
+                    const currentMultiplier = Math.round(currentAmount / baseDose);
+                    if (currentMultiplier < 3) {
+                        const nextMultiplier = Math.min(3, currentMultiplier + 1);
+                        const increase = (nextMultiplier - currentMultiplier) * baseDose;
+                        if (increase > 0 && usedHeadroom + increase <= deficit + (maxWithTolerance - fillTarget)) {
+                            base.amount = nextMultiplier * baseDose;
+                            usedHeadroom += increase;
+                        }
+                    }
+                }
             }
         }
 
@@ -362,8 +385,8 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
 
     if (finalTotal < minTarget) {
         const existing = new Set<string>([
-            ...(formula.bases || []).map((item: any) => item.ingredient),
-            ...(formula.additions || []).map((item: any) => item.ingredient),
+            ...(formula.bases || []).map((item: any) => item.ingredient.toLowerCase()),
+            ...(formula.additions || []).map((item: any) => item.ingredient.toLowerCase()),
         ]);
 
         const fallbackCandidates = [...INDIVIDUAL_INGREDIENTS]
@@ -376,7 +399,7 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
                     maxAllowed,
                 };
             })
-            .filter((candidate) => !existing.has(candidate.ingredient.name))
+            .filter((candidate) => !existing.has(candidate.ingredient.name.toLowerCase()))
             .sort((a, b) => a.minAllowed - b.minAllowed);
 
         for (const candidate of fallbackCandidates) {
@@ -401,6 +424,37 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
         }
     }
 
+    // Final micro-fill: if still below minTarget by a small amount, proportionally
+    // boost existing ingredients to close the gap (handles rounding edge cases)
+    if (finalTotal < minTarget) {
+        const deficit = minTarget - finalTotal;
+        const boostableIngredients = [...(formula.additions || []), ...(formula.bases || [])]
+            .map((item: any) => {
+                const maxAllowed = getMaxAllowedDoseForIngredient(item.ingredient);
+                const current = item.amount || 0;
+                return { item, headroom: Math.max(0, maxAllowed - current) };
+            })
+            .filter(entry => entry.headroom > 0);
+
+        if (boostableIngredients.length > 0) {
+            const totalHeadroom = boostableIngredients.reduce((s, e) => s + e.headroom, 0);
+            let remainingDeficit = deficit;
+            for (const entry of boostableIngredients) {
+                if (remainingDeficit <= 0) break;
+                const share = Math.min(
+                    entry.headroom,
+                    Math.ceil((entry.headroom / totalHeadroom) * deficit)
+                );
+                const increase = Math.min(share, remainingDeficit);
+                entry.item.amount = (entry.item.amount || 0) + increase;
+                remainingDeficit -= increase;
+            }
+        }
+
+        finalTotal = [...(formula.bases || []), ...(formula.additions || [])]
+            .reduce((sum, ing) => sum + (ing.amount || 0), 0);
+    }
+
     formula.totalMg = finalTotal;
     return { expanded: addedIngredients.length > 0, addedIngredients };
 }
@@ -421,7 +475,7 @@ export function validateFormulaLimits(formula: any): { valid: boolean; errors: s
     }
 
     if (formula.totalMg < minDosage) {
-        errors.push(`Formula under-fills ${targetCapsules}-capsule budget. Minimum required: ${minDosage}mg (90% of ${maxDosage}mg). Attempted: ${formula.totalMg}mg.`);
+        errors.push(`Formula under-fills ${targetCapsules}-capsule budget. Minimum required: ${minDosage}mg (100% of ${maxDosage}mg). Attempted: ${formula.totalMg}mg.`);
     }
 
     const allIngredients = [...(formula.bases || []), ...(formula.additions || [])];
@@ -552,6 +606,38 @@ export function validateAndCorrectIngredientNames(formula: any) {
 
     processList(correctedFormula.bases, 'base');
     processList(correctedFormula.additions, 'addition');
+
+    // Deduplicate: merge any duplicate ingredients (keep highest dose, warn)
+    const deduplicateList = (list: any[], type: 'base' | 'addition') => {
+        const seen = new Map<string, number>(); // name → index
+        for (let i = 0; i < list.length; i++) {
+            const key = list[i].ingredient.toLowerCase();
+            if (seen.has(key)) {
+                const existingIdx = seen.get(key)!;
+                const existingAmount = list[existingIdx].amount || 0;
+                const duplicateAmount = list[i].amount || 0;
+                const mergedAmount = Math.max(existingAmount, duplicateAmount);
+                list[existingIdx] = { ...list[existingIdx], amount: mergedAmount };
+                warnings.push(`Merged duplicate ${type} "${list[i].ingredient}" (kept ${mergedAmount}mg)`);
+                list.splice(i, 1);
+                i--;
+            } else {
+                seen.set(key, i);
+            }
+        }
+    };
+    deduplicateList(correctedFormula.bases, 'base');
+    deduplicateList(correctedFormula.additions, 'addition');
+
+    // Also check for cross-list duplicates (same ingredient in bases AND additions)
+    const baseNames = new Set(correctedFormula.bases.map((b: any) => b.ingredient.toLowerCase()));
+    for (let i = 0; i < correctedFormula.additions.length; i++) {
+        if (baseNames.has(correctedFormula.additions[i].ingredient.toLowerCase())) {
+            warnings.push(`Removed duplicate addition "${correctedFormula.additions[i].ingredient}" (already in bases)`);
+            correctedFormula.additions.splice(i, 1);
+            i--;
+        }
+    }
 
     return {
         success: true, // Always true if it reaches here, since we remove instead of erroring

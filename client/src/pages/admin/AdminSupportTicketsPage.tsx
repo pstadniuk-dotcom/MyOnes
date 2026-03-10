@@ -37,10 +37,10 @@ interface SupportTicket {
   id: string;
   userId: string;
   subject: string;
-  message: string;
+  description: string;
   category: string;
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
   adminNotes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -92,7 +92,7 @@ const statusConfig = {
 
 const priorityConfig = {
   low: { color: 'bg-slate-100 text-slate-600', label: 'Low' },
-  normal: { color: 'bg-blue-100 text-blue-600', label: 'Normal' },
+  medium: { color: 'bg-blue-100 text-blue-600', label: 'Normal' },
   high: { color: 'bg-orange-100 text-orange-600', label: 'High' },
   urgent: { color: 'bg-red-100 text-red-600 animate-pulse', label: 'Urgent' }
 };
@@ -215,8 +215,8 @@ function SupportTicketList() {
         ) : (
           <div className="space-y-3">
             {filteredTickets.map((ticket) => {
-              const status = statusConfig[ticket.status];
-              const priority = priorityConfig[ticket.priority];
+              const status = statusConfig[ticket.status] ?? statusConfig.open;
+              const priority = priorityConfig[ticket.priority] ?? priorityConfig.medium;
               const StatusIcon = status.icon;
 
               return (
@@ -249,7 +249,7 @@ function SupportTicketList() {
 
                       {/* Message Preview */}
                       <p className="text-sm text-slate-500 line-clamp-2">
-                        {ticket.message}
+                        {ticket.description}
                       </p>
 
                       {/* Meta Info */}
@@ -286,7 +286,7 @@ function SupportTicketList() {
 
                             {/* Message Preview */}
                             <p className="text-sm text-slate-500 line-clamp-1 mb-3">
-                              {ticket.message}
+                              {ticket.description}
                             </p>
 
                             {/* Meta Info */}
@@ -390,8 +390,8 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
   }
 
   const { ticket, responses, user } = data;
-  const status = statusConfig[ticket.status];
-  const priority = priorityConfig[ticket.priority];
+  const status = statusConfig[ticket.status] ?? statusConfig.open;
+  const priority = priorityConfig[ticket.priority] ?? priorityConfig.medium;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -451,7 +451,7 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
               </CardHeader>
               <CardContent>
                 <div className="prose prose-sm max-w-none text-slate-700">
-                  <p className="whitespace-pre-wrap">{ticket.message}</p>
+                  <p className="whitespace-pre-wrap">{ticket.description}</p>
                 </div>
               </CardContent>
             </Card>
@@ -584,7 +584,7 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="medium">Normal</SelectItem>
                       <SelectItem value="high">High</SelectItem>
                       <SelectItem value="urgent">Urgent</SelectItem>
                     </SelectContent>

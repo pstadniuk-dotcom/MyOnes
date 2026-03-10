@@ -10,8 +10,8 @@ const sciencePoints = [
   },
   {
     icon: ShieldCheck,
-    title: "Third-Party Tested",
-    description: "Each batch is independently tested for purity, potency, and safety before it reaches you.",
+    title: "Quality Assured",
+    description: "Premium ingredients sourced from trusted suppliers, with rigorous quality control at every step.",
   },
   {
     icon: Microscope,
@@ -31,14 +31,14 @@ export default function ScienceSectionV2() {
       <div className="container mx-auto px-6 max-w-6xl">
         {/* Header */}
         <div className="max-w-2xl mx-auto text-center mb-16">
-          <span className="text-[#D4A574] font-medium tracking-wider text-sm uppercase">
+          <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             The Science
           </span>
-          <h2 className="mt-4 text-4xl md:text-5xl text-[#1B4332] font-light leading-tight">
+          <h2 className="mt-4 text-4xl md:text-5xl text-[#054700] font-light leading-tight">
             Built on research.{" "}
 <span className="font-medium">Backed by data.</span>
           </h2>
-          <p className="mt-6 text-lg text-[#52796F] leading-relaxed">
+          <p className="mt-6 text-lg text-[#054700]/60 leading-relaxed">
             We don't guess. Every formula is rooted in clinical science and personalized to your unique biochemistry.
           </p>
         </div>
@@ -48,17 +48,17 @@ export default function ScienceSectionV2() {
           {sciencePoints.map((point, index) => (
             <div
               key={index}
-              className="group p-8 rounded-2xl bg-[#FAF7F2] hover:bg-[#F5F0E8] transition-colors duration-300"
+              className="group p-8 rounded-2xl bg-white hover:bg-[#f5f2ed] transition-colors duration-300"
             >
               <div className="flex items-start gap-5">
-                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-[#1B4332]/10 flex items-center justify-center group-hover:bg-[#1B4332] transition-colors duration-300">
-                  <point.icon className="w-6 h-6 text-[#1B4332] group-hover:text-white transition-colors duration-300" />
+                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-[#054700]/10 flex items-center justify-center group-hover:bg-[#054700] transition-colors duration-300">
+                  <point.icon className="w-6 h-6 text-[#054700] group-hover:text-white transition-colors duration-300" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-medium text-[#1B4332] mb-2">
+                  <h3 className="text-xl font-medium text-[#054700] mb-2">
                     {point.title}
                   </h3>
-                  <p className="text-[#52796F] leading-relaxed">
+                  <p className="text-[#054700]/60 leading-relaxed">
                     {point.description}
                   </p>
                 </div>
@@ -71,7 +71,7 @@ export default function ScienceSectionV2() {
         <div className="text-center">
           <Link href="/science">
             <Button
-              className="bg-[#1B4332] hover:bg-[#143728] text-white rounded-full px-8 group"
+              className="bg-[#054700] hover:bg-[#053600] text-[#ede8e2] rounded-full px-8 group"
             >
               Learn More About Our Science
               <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />

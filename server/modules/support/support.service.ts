@@ -31,9 +31,9 @@ export class SupportService {
         try {
             const user = await usersRepository.getUser(userId);
             if (user) {
-                const adminActionUrl = 'https://myones.ai/admin';
+                const adminActionUrl = 'https://ones.health/admin';
                 await sendNotificationEmail({
-                    to: 'support@myones.ai',
+                    to: 'support@ones.health',
                     subject: `New Support Ticket: ${ticket.subject}`,
                     title: 'New Support Ticket Received',
                     content: `
@@ -73,9 +73,9 @@ export class SupportService {
         try {
             const user = await usersRepository.getUser(userId);
             if (user) {
-                const adminTicketUrl = `https://myones.ai/admin/support/${ticketId}`;
+                const adminTicketUrl = `https://ones.health/admin/support/${ticketId}`;
                 await sendNotificationEmail({
-                    to: 'support@myones.ai',
+                    to: 'support@ones.health',
                     subject: `New Response on Ticket: ${ticket.subject}`,
                     title: 'New Support Ticket Response',
                     content: `

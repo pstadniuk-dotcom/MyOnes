@@ -111,16 +111,16 @@ export function SupplementTracker({ todayLog, formula }: SupplementTrackerProps)
   const allDosesTaken = dosesTaken === 3;
 
   return (
-    <Card className="border-[#1B4332]/20 bg-gradient-to-br from-[#1B4332]/5 to-emerald-50/30">
+    <Card className="border-[#054700]/20 bg-gradient-to-br from-[#054700]/5 to-emerald-50/30">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-[#1B4332]/10">
-              <Pill className="h-5 w-5 text-[#1B4332]" />
+            <div className="p-2 rounded-lg bg-[#054700]/10">
+              <Pill className="h-5 w-5 text-[#054700]" />
             </div>
             <div>
-              <CardTitle className="text-lg text-[#1B4332]">Daily Supplements</CardTitle>
-              <CardDescription className="text-[#52796F]">
+              <CardTitle className="text-lg text-[#054700]">Daily Supplements</CardTitle>
+              <CardDescription className="text-[#5a6623]">
                 {formula ? `${formula.totalMg}mg total • ${totalCapsules} capsules` : 'No formula active'}
               </CardDescription>
             </div>
@@ -132,7 +132,7 @@ export function SupplementTracker({ todayLog, formula }: SupplementTrackerProps)
                 "text-sm",
                 allDosesTaken
                   ? "bg-green-100 text-green-700 border-green-200"
-                  : "border-[#1B4332]/30 text-[#1B4332]"
+                  : "border-[#054700]/30 text-[#054700]"
               )}
             >
               {dosesTaken}/3 doses
@@ -141,7 +141,7 @@ export function SupplementTracker({ todayLog, formula }: SupplementTrackerProps)
               <HoverCard>
                 <HoverCardTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Info className="h-4 w-4 text-[#52796F]" />
+                    <Info className="h-4 w-4 text-[#5a6623]" />
                   </Button>
                 </HoverCardTrigger>
                 <HoverCardContent className="w-72" align="end">
@@ -187,7 +187,7 @@ export function SupplementTracker({ todayLog, formula }: SupplementTrackerProps)
                   "hover:scale-[1.02] active:scale-[0.98]",
                   isTaken
                     ? "bg-green-50 border-green-300 shadow-sm"
-                    : `${dose.bgColor} ${dose.borderColor} hover:border-[#1B4332]/40`
+                    : `${dose.bgColor} ${dose.borderColor} hover:border-[#054700]/40`
                 )}
               >
                 {isTaken && (
@@ -199,14 +199,14 @@ export function SupplementTracker({ todayLog, formula }: SupplementTrackerProps)
                 <div className="text-center">
                   <p className={cn(
                     "font-semibold text-sm",
-                    isTaken ? "text-green-700" : "text-[#1B4332]"
+                    isTaken ? "text-green-700" : "text-[#054700]"
                   )}>
                     {dose.label}
                   </p>
                   <p className="text-xs text-muted-foreground">{dose.timeHint}</p>
                   <p className={cn(
                     "text-xs mt-1 font-medium",
-                    isTaken ? "text-green-600" : "text-[#52796F]"
+                    isTaken ? "text-green-600" : "text-[#5a6623]"
                   )}>
                     {capsulesPerDose} capsule{capsulesPerDose !== 1 ? 's' : ''}
                   </p>

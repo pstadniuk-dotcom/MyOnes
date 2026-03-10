@@ -63,11 +63,11 @@ export function MobilePageHeader({
     <div className={cn("mb-4", className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-[#1B4332] truncate">
+          <h1 className="text-xl font-bold text-[#054700] truncate">
             {title}
           </h1>
           {subtitle && (
-            <p className="text-sm text-[#52796F] mt-0.5 line-clamp-2">
+            <p className="text-sm text-[#5a6623] mt-0.5 line-clamp-2">
               {subtitle}
             </p>
           )}
@@ -95,7 +95,7 @@ export function MobileSection({ children, title, className }: MobileSectionProps
   return (
     <section className={cn("mb-5", className)}>
       {title && (
-        <h2 className="text-sm font-semibold text-[#52796F] uppercase tracking-wider mb-3">
+        <h2 className="text-sm font-semibold text-[#5a6623] uppercase tracking-wider mb-3">
           {title}
         </h2>
       )}
@@ -122,7 +122,7 @@ export function MobileFullWidthCard({
   return (
     <div
       className={cn(
-        "bg-white rounded-xl border border-[#1B4332]/10 shadow-sm overflow-hidden",
+        "bg-white rounded-xl border border-[#054700]/10 shadow-sm overflow-hidden",
         bleed && "-mx-4 rounded-none border-x-0",
         className
       )}

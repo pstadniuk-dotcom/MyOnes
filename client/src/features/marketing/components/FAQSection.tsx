@@ -20,15 +20,15 @@ export default function FAQSection() {
     },
     {
       question: "How do orders work?",
-      answer: "You purchase a 3-month, 6-month, or 12-month supply of your custom formula. When you're ready to reorder, you'll have a consultation to discuss how you're feeling and any changes in your health or lifestyle. Our AI analyzes this data and may adjust your formula for your next order to optimize your results."
+      answer: "You purchase a 2-month supply of your custom formula. Because every formula is custom-manufactured, a 2-month supply is the minimum that keeps pricing reasonable. When you're ready to reorder, you'll have a consultation to discuss how you're feeling and any changes in your health or lifestyle. Our AI analyzes this data and may adjust your formula for your next order to optimize your results."
     },
     {
       question: "What if I don't see results?",
-      answer: "Health optimization is a journey, and we're committed to finding what works for you. Most people see improvements in energy and sleep within 2-4 weeks. If you're not noticing positive changes, we'll work with you through follow-up consultations to adjust your formula. Since each formula is custom-made specifically for you, we cannot accept returns, but we're dedicated to optimizing your results."
+      answer: "Health optimization is a journey, and we're committed to finding what works for you. Most people notice improvements in energy and sleep within 2-4 weeks. If you're not noticing positive changes, we'll work with you through follow-up consultations to adjust your formula. Since each formula is custom-manufactured specifically for you, we cannot offer refunds or returns — but we're dedicated to optimizing your results with your next order."
     },
     {
-      question: "Are your supplements third-party tested?",
-      answer: "Yes, every batch of supplements is tested by independent laboratories for purity, potency, and contaminants. We manufacture in cGMP-certified facilities following current Good Manufacturing Practices. Certificates of analysis are available upon request — contact support@myones.ai."
+      question: "What makes your ingredients different?",
+      answer: "We use clinical-grade, bioavailable forms of every ingredient — not cheap fillers or synthetic substitutes. Our AI selects from over 200 ingredients based on published research, and each formula is manufactured fresh to order specifically for you."
     }
   ];
 

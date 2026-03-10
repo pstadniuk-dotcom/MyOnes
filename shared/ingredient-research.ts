@@ -52,7 +52,7 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Bonilla DA, et al.',
         findings: 'Ashwagandha supplementation significantly improved VO2 max, strength, and recovery in both trained and untrained individuals.',
         sampleSize: 615,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/34544533/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/33670194/',
         evidenceLevel: 'strong',
         studyType: 'meta_analysis'
       }
@@ -244,13 +244,13 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
     recommendedFor: ['Gut health', 'Immune support', 'After antibiotic use', 'IBS management'],
     studies: [
       {
-        title: 'Probiotics for the Prevention of Antibiotic-Associated Diarrhea',
+        title: 'Probiotics for the prevention of Clostridium difficile-associated diarrhea in adults and children',
         journal: 'Cochrane Database of Systematic Reviews',
         year: 2017,
         authors: 'Goldenberg JZ, et al.',
-        findings: 'Probiotic supplementation significantly reduces antibiotic-associated diarrhea risk by 60%.',
+        findings: 'Probiotic supplementation significantly reduces Clostridium difficile-associated diarrhea risk.',
         sampleSize: 11811,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/29257353/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/23728658/',
         evidenceLevel: 'strong',
         studyType: 'meta_analysis'
       }
@@ -369,7 +369,7 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Yin J, Xing H, Ye J',
         findings: 'Berberine significantly decreased HbA1c, fasting blood glucose, and triglycerides similar to metformin.',
         sampleSize: 116,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/18510590/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/18442638/',
         evidenceLevel: 'strong',
         studyType: 'rct'
       }
@@ -416,7 +416,7 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         year: 2005,
         authors: 'Kim YR',
         findings: 'Chaga extract demonstrated significant immune-enhancing activity and antioxidant properties.',
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/24049587/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/24049493/',
         evidenceLevel: 'moderate',
         studyType: 'review'
       }
@@ -434,11 +434,11 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
     recommendedFor: ['Fatigue', 'Stress management', 'Athletic performance', 'Mental clarity'],
     studies: [
       {
-        title: 'Rhodiola rosea: A Phytomedicinal Overview',
-        journal: 'HerbalGram',
-        year: 2002,
-        authors: 'Brown RP, Gerbarg PL, Ramazanov Z',
-        findings: 'Rhodiola demonstrated significant anti-fatigue effects and improved mental performance under stress.',
+        title: 'A randomized trial of two different doses of a SHR-5 Rhodiola rosea extract versus placebo and control of capacity for mental work',
+        journal: 'Phytomedicine',
+        year: 2003,
+        authors: 'Shevtsov VA, et al.',
+        findings: 'Rhodiola rosea extract demonstrated significant anti-fatigue effects and improved mental performance under stress.',
         pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/12725561/',
         evidenceLevel: 'moderate',
         studyType: 'review'
@@ -535,7 +535,7 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Nieman DC, et al.',
         findings: 'Quercetin supplementation significantly reduced upper respiratory illness following intense exercise.',
         sampleSize: 1002,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/17762356/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/17805089/',
         evidenceLevel: 'strong',
         studyType: 'rct'
       }
@@ -629,7 +629,6 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         year: 2014,
         authors: 'Liu P, et al.',
         findings: 'Astragalus demonstrated significant immunomodulating effects and reduced respiratory infections.',
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/24877671/',
         evidenceLevel: 'moderate',
         studyType: 'review'
       }
@@ -653,7 +652,7 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Tiralongo E, Wee SS, Lea RA',
         findings: 'Elderberry supplementation substantially reduced cold duration and severity in air travelers.',
         sampleSize: 312,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/26923064/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/27023596/',
         evidenceLevel: 'strong',
         studyType: 'rct'
       }
@@ -725,18 +724,17 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Lopes da Silva S, et al.',
         findings: 'Phosphatidylcholine supplementation showed improvements in memory and cognitive function, particularly in older adults.',
         sampleSize: 485,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/26124654/',
         evidenceLevel: 'moderate',
         studyType: 'systematic_review'
       },
       {
-        title: 'Polyenylphosphatidylcholine in alcoholic liver disease',
+        title: 'Polyenylphosphatidylcholine decreases alcohol-induced oxidative stress in the baboon',
         journal: 'Alcoholism: Clinical and Experimental Research',
-        year: 2000,
+        year: 1997,
         authors: 'Lieber CS, et al.',
-        findings: 'Phosphatidylcholine demonstrated hepatoprotective effects and supported liver regeneration in patients with liver disease.',
+        findings: 'Phosphatidylcholine demonstrated hepatoprotective effects and reduced alcohol-induced oxidative stress.',
         sampleSize: 789,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/10924277/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/9113278/',
         evidenceLevel: 'strong',
         studyType: 'rct'
       }
@@ -760,7 +758,7 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Kim S, et al.',
         findings: 'GABA supplementation significantly reduced time to fall asleep and improved sleep quality.',
         sampleSize: 40,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/31062640/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/30707852/',
         evidenceLevel: 'moderate',
         studyType: 'rct'
       },
@@ -771,7 +769,7 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Abdou AM, et al.',
         findings: 'GABA administration showed significant stress-reducing effects and improved relaxation markers.',
         sampleSize: 63,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/17143743/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/16971751/',
         evidenceLevel: 'moderate',
         studyType: 'rct'
       }
@@ -800,9 +798,9 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         studyType: 'rct'
       },
       {
-        title: 'The combination of L-theanine and caffeine improves cognitive performance and increases subjective alertness',
+        title: 'The combined effects of L-theanine and caffeine on cognitive performance and mood',
         journal: 'Nutritional Neuroscience',
-        year: 2010,
+        year: 2008,
         authors: 'Owen GN, et al.',
         findings: 'L-theanine combined with caffeine improved accuracy and speed of attention-switching tasks.',
         sampleSize: 48,
@@ -824,22 +822,22 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
     recommendedFor: ['Antioxidant support', 'Skin health', 'Immune function', 'Heart health'],
     studies: [
       {
-        title: 'Vitamin E in the treatment of cardiovascular disease',
-        journal: 'Journal of the American College of Cardiology',
-        year: 2001,
+        title: 'Vitamin E and heart disease: basic science to clinical intervention trials',
+        journal: 'Free Radical Biology and Medicine',
+        year: 2000,
         authors: 'Pryor WA',
         findings: 'Vitamin E showed protective effects against LDL oxidation and supported cardiovascular function.',
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/11401930/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/10656300/',
         evidenceLevel: 'moderate',
         studyType: 'review'
       },
       {
-        title: 'Vitamin E and skin health',
+        title: 'Vitamin E in human skin: organ-specific physiology and considerations for its use in dermatology',
         journal: 'Molecular Aspects of Medicine',
         year: 2007,
-        authors: 'Thiele JJ, et al.',
+        authors: 'Thiele JJ, Ekanayake-Mudiyanselage S',
         findings: 'Vitamin E protects skin from UV-induced damage and supports skin barrier function.',
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/17950381/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/17719081/',
         evidenceLevel: 'strong',
         studyType: 'review'
       }
@@ -881,12 +879,12 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
     recommendedFor: ['Immune support', 'Antioxidant protection', 'Traditional wellness'],
     studies: [
       {
-        title: 'Graviola: A systematic review on its anticancer properties',
-        journal: 'BMC Complementary and Alternative Medicine',
+        title: 'Anticancer Properties of Graviola (Annona muricata): A Comprehensive Mechanistic Review',
+        journal: 'Oxidative Medicine and Cellular Longevity',
         year: 2018,
         authors: 'Rady I, et al.',
         findings: 'In vitro studies show graviola extracts have cytotoxic effects on cancer cells, though human clinical trials are needed.',
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/30373594/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/30151067/',
         evidenceLevel: 'preliminary',
         studyType: 'systematic_review'
       }
@@ -952,12 +950,12 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
     recommendedFor: ['Eye health', 'Macular support', 'Blue light protection', 'Vision preservation'],
     studies: [
       {
-        title: 'Lutein and zeaxanthin and their potential roles in disease prevention',
-        journal: 'Journal of the American College of Nutrition',
-        year: 2004,
-        authors: 'Krinsky NI, et al.',
+        title: 'Biologic mechanisms of the protective role of lutein and zeaxanthin in the eye',
+        journal: 'Annual Review of Nutrition',
+        year: 2003,
+        authors: 'Krinsky NI, Landrum JT, Bone RA',
         findings: 'Higher lutein intake is associated with reduced risk of age-related macular degeneration and cataracts.',
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/15630208/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/12626691/',
         evidenceLevel: 'strong',
         studyType: 'review'
       }
@@ -981,7 +979,7 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Safarinejad MR',
         findings: 'Stinging nettle significantly improved urinary symptoms and flow rates in men with BPH.',
         sampleSize: 620,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/16093236/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/16635963/',
         evidenceLevel: 'strong',
         studyType: 'rct'
       }
@@ -1004,7 +1002,6 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         year: 2000,
         authors: 'Matsuda H, et al.',
         findings: 'Suma root demonstrated adaptogenic properties and enhanced physical endurance in animal studies.',
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/10767472/',
         evidenceLevel: 'preliminary',
         studyType: 'review'
       }
@@ -1028,7 +1025,6 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Lee ST, et al.',
         findings: 'Korean red ginseng improved cognitive performance and working memory in healthy adults.',
         sampleSize: 51,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/23717135/',
         evidenceLevel: 'moderate',
         studyType: 'rct'
       }
@@ -1052,7 +1048,6 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Liu S, et al.',
         findings: 'InnoSlim supplementation improved glucose tolerance and increased adiponectin levels in overweight subjects.',
         sampleSize: 96,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/27617086/',
         evidenceLevel: 'moderate',
         studyType: 'rct'
       }
@@ -1076,7 +1071,6 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Choudhary M, et al.',
         findings: 'Aloe vera supplementation significantly reduced fasting blood glucose and improved lipid profiles.',
         sampleSize: 72,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/27198099/',
         evidenceLevel: 'moderate',
         studyType: 'rct'
       }
@@ -1100,7 +1094,6 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Cook MD, et al.',
         findings: 'Blackcurrant extract enhanced blood flow and oxygen delivery during exercise.',
         sampleSize: 16,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/24615201/',
         evidenceLevel: 'moderate',
         studyType: 'rct'
       }
@@ -1118,13 +1111,13 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
     recommendedFor: ['Detoxification', 'Cellular health', 'Antioxidant support', 'Hormone metabolism'],
     studies: [
       {
-        title: 'Sulforaphane bioavailability from broccoli sprouts in healthy adults',
-        journal: 'Cancer Epidemiology, Biomarkers & Prevention',
-        year: 2012,
+        title: 'Bioavailability and inter-conversion of sulforaphane and erucin in human subjects consuming broccoli sprouts or broccoli supplement in a cross-over study design',
+        journal: 'Pharmacological Research',
+        year: 2011,
         authors: 'Clarke JD, et al.',
         findings: 'Broccoli sprout extract increased plasma and urinary sulforaphane, activating detoxification pathways.',
         sampleSize: 20,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/22147364/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/21816223/',
         evidenceLevel: 'moderate',
         studyType: 'rct'
       }
@@ -1142,13 +1135,13 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
     recommendedFor: ['Immune support', 'Antioxidant protection', 'Skin health', 'Inflammation'],
     studies: [
       {
-        title: 'Camu camu reduces inflammation markers in healthy adults',
-        journal: 'Journal of Cardiopulmonary Rehabilitation and Prevention',
+        title: 'Tropical fruit camu-camu (Myrciaria dubia) has anti-oxidative and anti-inflammatory properties',
+        journal: 'Journal of Cardiology',
         year: 2008,
         authors: 'Inoue T, et al.',
         findings: 'Camu camu juice significantly reduced oxidative stress and inflammatory markers compared to vitamin C tablets.',
         sampleSize: 20,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/18679449/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/18922386/',
         evidenceLevel: 'moderate',
         studyType: 'rct'
       }
@@ -1166,13 +1159,13 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
     recommendedFor: ['Immune support', 'Joint health', 'Inflammation', 'Antioxidant support'],
     studies: [
       {
-        title: 'Efficacy of Uncaria tomentosa in osteoarthritis',
+        title: 'Efficacy and safety of freeze-dried cat\'s claw in osteoarthritis of the knee',
         journal: 'Inflammation Research',
         year: 2001,
         authors: 'Piscoya J, et al.',
         findings: "Cat's claw extract significantly reduced pain and improved knee function in osteoarthritis patients.",
         sampleSize: 45,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/11518435/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/11603848/',
         evidenceLevel: 'moderate',
         studyType: 'rct'
       }
@@ -1214,13 +1207,13 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
     recommendedFor: ['Immune support', 'Gut health', 'Athletic recovery', 'General wellness'],
     studies: [
       {
-        title: 'Bovine colostrum and exercise performance',
+        title: 'The effects of bovine colostrum supplementation on body composition and exercise performance in active men and women',
         journal: 'Nutrition',
-        year: 2002,
+        year: 2001,
         authors: 'Antonio J, et al.',
         findings: 'Colostrum supplementation improved lean body mass and athletic performance compared to whey protein.',
         sampleSize: 40,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/11985596/',
+        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/11312068/',
         evidenceLevel: 'moderate',
         studyType: 'rct'
       }
@@ -1245,7 +1238,6 @@ const ingredientResearchData: Record<string, IngredientResearch> = {
         authors: 'Sharma A, et al.',
         findings: 'CoQ10 supplementation significantly improved heart function markers and reduced oxidative stress.',
         sampleSize: 60,
-        pubmedUrl: 'https://pubmed.ncbi.nlm.nih.gov/29600714/',
         evidenceLevel: 'strong',
         studyType: 'rct'
       }

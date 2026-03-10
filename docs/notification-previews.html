@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ONES Notification Previews</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #0a0a0a;
+      color: #e5e7eb;
+      padding: 40px 20px;
+    }
+    .page-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .page-header h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    .page-header p {
+      font-size: 15px;
+      color: #9ca3af;
+    }
+    .nav {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+    }
+    .nav a {
+      display: inline-block;
+      padding: 8px 16px;
+      background: #1f2937;
+      color: #d1d5db;
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .nav a:hover { background: #374151; color: #fff; }
+    .nav a.email { border-left: 3px solid #004700; }
+    .nav a.sms { border-left: 3px solid #2563eb; }
+    .nav a.inapp { border-left: 3px solid #f59e0b; }
+
+    .section {
+      max-width: 900px;
+      margin: 0 auto 64px;
+    }
+    .section-label {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    .section-label.email { background: #004700; color: #fff; }
+    .section-label.sms { background: #2563eb; color: #fff; }
+    .section-label.inapp { background: #f59e0b; color: #000; }
+
+    .section h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .section .desc {
+      font-size: 14px;
+      color: #9ca3af;
+      margin-bottom: 24px;
+    }
+    .section .trigger {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 16px;
+    }
+    .trigger code {
+      background: #1f2937;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #a5b4fc;
+    }
+    .section .pref-badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #1e293b;
+      color: #94a3b8;
+      margin-bottom: 16px;
+    }
+
+    /* Email preview frame */
+    .email-frame {
+      background: #f4f4f5;
+      border-radius: 12px;
+      padding: 40px 0;
+      overflow: hidden;
+    }
+    .email-card {
+      max-width: 600px;
+      width: 100%;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .email-header {
+      background-color: #004700;
+      padding: 32px 40px 28px;
+      text-align: center;
+    }
+    .email-header h3 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.01em;
+    }
+    .email-body {
+      padding: 40px 40px 32px;
+      color: #374151;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    .email-body p { margin: 0 0 12px; }
+    .email-body ol { padding-left: 20px; margin: 16px 0; }
+    .email-body ol li { margin-bottom: 8px; }
+    .email-body strong { color: #111827; }
+    .email-cta {
+      text-align: center;
+      margin-top: 32px;
+    }
+    .email-cta a {
+      display: inline-block;
+      background-color: #004700;
+      color: #ffffff;
+      text-decoration: none;
+      padding: 14px 36px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: 0.01em;
+    }
+    .email-cta .link-fallback {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .email-cta .link-fallback a {
+      color: #6b7280;
+      font-size: 12px;
+      background: none;
+      padding: 0;
+      font-weight: 400;
+    }
+    .email-divider {
+      padding: 0 40px;
+    }
+    .email-divider hr {
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin: 0;
+    }
+    .email-footer {
+      padding: 24px 40px;
+      text-align: center;
+    }
+    .email-footer .logo-img {
+      display: block;
+      margin: 0 auto 10px;
+      height: 32px;
+      width: auto;
+    }
+    .email-footer .tagline {
+      margin: 0 0 4px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #111827;
+    }
+    .email-footer .sub {
+      margin: 0 0 16px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .email-footer .links {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .email-footer .links a {
+      color: #9ca3af;
+      text-decoration: none;
+    }
+
+    /* SMS preview */
+    .sms-frame {
+      max-width: 380px;
+      margin: 0 auto;
+    }
+    .sms-device {
+      background: #1c1c1e;
+      border-radius: 24px;
+      padding: 20px 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .sms-status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 8px 12px;
+      font-size: 12px;
+      color: #999;
+    }
+    .sms-contact {
+      text-align: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #333;
+      margin-bottom: 16px;
+    }
+    .sms-contact .name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .sms-contact .number {
+      font-size: 12px;
+      color: #888;
+    }
+    .sms-bubble {
+      background: #2a2a2e;
+      color: #e5e7eb;
+      padding: 12px 16px;
+      border-radius: 18px 18px 18px 4px;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 8px;
+      max-width: 90%;
+    }
+    .sms-time {
+      font-size: 11px;
+      color: #666;
+      margin-top: 4px;
+      margin-bottom: 16px;
+    }
+
+    /* In-app notification preview */
+    .inapp-frame {
+      max-width: 420px;
+      margin: 0 auto;
+    }
+    .inapp-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 8px;
+    }
+    .inapp-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #f0fdf4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .inapp-icon.warn { background: #fef2f2; }
+    .inapp-icon.info { background: #eff6ff; }
+    .inapp-content {
+      flex: 1;
+    }
+    .inapp-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 4px;
+    }
+    .inapp-text {
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+    .inapp-time {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 6px;
+    }
+    .inapp-dot {
+      width: 8px;
+      height: 8px;
+      background: #004700;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 6px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #1f2937;
+      margin: 64px auto;
+      max-width: 200px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <h1>ONES Notification System</h1>
+    <p>All emails, SMS messages, and in-app notifications — full design preview</p>
+  </div>
+
+  <nav class="nav">
+    <a href="#verify-email" class="email">Verify Email</a>
+    <a href="#welcome-email" class="email">Welcome</a>
+    <a href="#formula-created" class="email">Formula Created</a>
+    <a href="#formula-updated" class="email">Formula Updated</a>
+    <a href="#lab-results" class="email">Lab Results</a>
+    <a href="#order-confirmed" class="email">Order Confirmed</a>
+    <a href="#payment-failed" class="email">Payment Failed</a>
+    <a href="#subscription-cancelled" class="email">Sub Cancelled</a>
+    <a href="#password-reset" class="email">Password Reset</a>
+    <a href="#sms-pills" class="sms">SMS: Pills</a>
+    <a href="#sms-renewal" class="sms">SMS: Renewal</a>
+    <a href="#inapp-all" class="inapp">In-App Bell</a>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 1. VERIFY EMAIL                                    -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="verify-email">
+    <span class="section-label email">Email</span>
+    <h2>Verify Your Email</h2>
+    <p class="desc">Sent immediately after user signs up with email/password.</p>
+    <p class="trigger">Trigger: <code>auth.service.ts → sendVerificationEmail()</code></p>
+    <div class="pref-badge">Always sends (transactional)</div>
+
+    <div class="email-frame">
+      <div class="email-card">
+        <div class="email-header"><h3>Verify Your Email</h3></div>
+        <div class="email-body">
+          <p>Hi Pete,</p>
+          <p style="margin:0 0 12px;">Thanks for signing up. Click the button below to verify your email address and activate your account.</p>
+          <div class="email-cta">
+            <a href="#">Verify my email</a>
+            <p class="link-fallback">Or copy this link into your browser:<br>
+              <a href="#">https://ones.health/verify-email?token=abc123...</a>
+            </p>
+          </div>
+        </div>
+        <div class="email-divider"><hr></div>
+        <div class="email-footer">
+          <img class="logo-img" src="../client/public/ones-logo-light.svg" alt="ONES">
+          <p class="tagline">Personalized AI Supplements</p>
+          <p class="sub">Your custom formula, delivered to your door.</p>
+          <p class="links"><a href="#">Manage preferences</a> · <a href="#">ones.health</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 2. WELCOME EMAIL                                   -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="welcome-email">
+    <span class="section-label email">Email</span>
+    <h2>Welcome to ONES</h2>
+    <p class="desc">Sent after user verifies their email address.</p>
+    <p class="trigger">Trigger: <code>auth.service.ts → verifyEmail()</code></p>
+    <div class="pref-badge">Always sends (system/transactional)</div>
+
+    <div class="email-frame">
+      <div class="email-card">
+        <div class="email-header"><h3>Welcome to ONES</h3></div>
+        <div class="email-body">
+          <p>Hi Pete,</p>
+          <p>Your account is verified and ready to go! Here's how to get started:</p>
+          <ol>
+            <li><strong>Chat with your AI practitioner</strong> — answer a few questions about your health goals, lifestyle, and any supplements you're currently taking.</li>
+            <li><strong>Upload blood work</strong> (optional) — if you have recent lab results, upload them for a more precise formula.</li>
+            <li><strong>Connect a wearable</strong> (optional) — sync your Fitbit, Oura, or Whoop to give your AI practitioner real-time insights from your biometric data.</li>
+            <li><strong>Get your personalized formula</strong> — your AI practitioner will design a custom supplement blend just for you.</li>
+          </ol>
+          <p>Your formula is backed by research and tailored to your unique biology. Let's get started!</p>
+          <div class="email-cta">
+            <a href="#">Start Your Consultation</a>
+            <p class="link-fallback">Or copy this link into your browser:<br>
+              <a href="#">https://ones.health/dashboard/chat</a>
+            </p>
+          </div>
+        </div>
+        <div class="email-divider"><hr></div>
+        <div class="email-footer">
+          <img class="logo-img" src="../client/public/ones-logo-light.svg" alt="ONES">
+          <p class="tagline">Personalized AI Supplements</p>
+          <p class="sub">Your custom formula, delivered to your door.</p>
+          <p class="links"><a href="#">Manage preferences</a> · <a href="#">ones.health</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 3. FIRST FORMULA CREATED                           -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="formula-created">
+    <span class="section-label email">Email</span>
+    <h2>First Formula Created</h2>
+    <p class="desc">Sent when the AI practitioner creates the user's first formula (V1).</p>
+    <p class="trigger">Trigger: <code>chat.controller.ts → formulasRepository.createFormula()</code></p>
+    <div class="pref-badge">Respects: emailConsultation preference</div>
+
+    <div class="email-frame">
+      <div class="email-card">
+        <div class="email-header"><h3>Your Formula Is Ready</h3></div>
+        <div class="email-body">
+          <p>Hi Pete,</p>
+          <p>Your AI practitioner has designed your first personalized supplement formula!</p>
+          <p><strong>14 ingredients</strong> totalling <strong>4,280mg</strong> across <strong>9 capsules</strong>.</p>
+          <p>Review your formula, check the ingredient breakdown, and order when you're ready.</p>
+          <div class="email-cta">
+            <a href="#">View Your Formula</a>
+            <p class="link-fallback">Or copy this link into your browser:<br>
+              <a href="#">https://ones.health/dashboard/formula</a>
+            </p>
+          </div>
+        </div>
+        <div class="email-divider"><hr></div>
+        <div class="email-footer">
+          <img class="logo-img" src="../client/public/ones-logo-light.svg" alt="ONES">
+          <p class="tagline">Personalized AI Supplements</p>
+          <p class="sub">Your custom formula, delivered to your door.</p>
+          <p class="links"><a href="#">Manage preferences</a> · <a href="#">ones.health</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 4. FORMULA UPDATED                                 -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="formula-updated">
+    <span class="section-label email">Email</span>
+    <h2>Formula Updated (V2+)</h2>
+    <p class="desc">Sent when the formula is updated to a new version.</p>
+    <p class="trigger">Trigger: <code>chat.controller.ts / formulas.service.ts</code></p>
+    <div class="pref-badge">Respects: emailConsultation preference</div>
+
+    <div class="email-frame">
+      <div class="email-card">
+        <div class="email-header"><h3>Formula Updated</h3></div>
+        <div class="email-body">
+          <p>Hi Pete,</p>
+          <p>Your formula has been updated to version 3.</p>
+          <p><strong>16 ingredients</strong> totalling <strong>4,850mg</strong> across <strong>9 capsules</strong>.</p>
+          <p>Review your formula, check the ingredient breakdown, and order when you're ready.</p>
+          <div class="email-cta">
+            <a href="#">View Your Formula</a>
+            <p class="link-fallback">Or copy this link into your browser:<br>
+              <a href="#">https://ones.health/dashboard/formula</a>
+            </p>
+          </div>
+        </div>
+        <div class="email-divider"><hr></div>
+        <div class="email-footer">
+          <img class="logo-img" src="../client/public/ones-logo-light.svg" alt="ONES">
+          <p class="tagline">Personalized AI Supplements</p>
+          <p class="sub">Your custom formula, delivered to your door.</p>
+          <p class="links"><a href="#">Manage preferences</a> · <a href="#">ones.health</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 5. LAB RESULTS ANALYZED                            -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="lab-results">
+    <span class="section-label email">Email</span>
+    <h2>Lab Results Analyzed</h2>
+    <p class="desc">Sent when uploaded lab report PDF finishes AI analysis. Lab name is <strong>dynamic</strong> — extracted from the PDF by AI (e.g., Quest Diagnostics, LabCorp, Function Health). If no lab name is detected, it simply says "your lab report".</p>
+    <p class="trigger">Trigger: <code>files.service.ts → analyzeLabReport() completes</code></p>
+    <div class="pref-badge">Respects: emailConsultation preference</div>
+
+    <div class="email-frame">
+      <div class="email-card">
+        <div class="email-header"><h3>Lab Results Ready</h3></div>
+        <div class="email-body">
+          <p>Hi Pete,</p>
+          <p>We've finished analyzing your lab report from <em>Quest Diagnostics</em>.</p>
+          <p><strong>47 biomarkers</strong> were extracted and are ready for review.</p>
+          <p>Chat with your AI practitioner to get personalized insights and see how your results might affect your formula.</p>
+          <div class="email-cta">
+            <a href="#">View Lab Results</a>
+            <p class="link-fallback">Or copy this link into your browser:<br>
+              <a href="#">https://ones.health/dashboard/labs</a>
+            </p>
+          </div>
+        </div>
+        <div class="email-divider"><hr></div>
+        <div class="email-footer">
+          <img class="logo-img" src="../client/public/ones-logo-light.svg" alt="ONES">
+          <p class="tagline">Personalized AI Supplements</p>
+          <p class="sub">Your custom formula, delivered to your door.</p>
+          <p class="links"><a href="#">Manage preferences</a> · <a href="#">ones.health</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 6. ORDER CONFIRMED                                 -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="order-confirmed">
+    <span class="section-label email">Email</span>
+    <h2>Order Confirmed</h2>
+    <p class="desc">Sent after Stripe checkout completes and order is created.</p>
+    <p class="trigger">Trigger: <code>billing.service.ts → handleCheckoutCompleted()</code></p>
+    <div class="pref-badge">Respects: emailBilling preference</div>
+
+    <div class="email-frame">
+      <div class="email-card">
+        <div class="email-header"><h3>Order Confirmed</h3></div>
+        <div class="email-body">
+          <p>Hi Pete,</p>
+          <p>Great news — your personalized supplement order has been placed!</p>
+          <p><strong>Total:</strong> $89.00</p>
+          <p><strong>Formula:</strong> V3</p>
+          <p><strong>Supply:</strong> 8 weeks</p>
+          <p>We'll notify you when your formula ships. In the meantime, you can track your order status in your dashboard.</p>
+          <div class="email-cta">
+            <a href="#">View My Order</a>
+            <p class="link-fallback">Or copy this link into your browser:<br>
+              <a href="#">https://ones.health/dashboard/orders</a>
+            </p>
+          </div>
+        </div>
+        <div class="email-divider"><hr></div>
+        <div class="email-footer">
+          <img class="logo-img" src="../client/public/ones-logo-light.svg" alt="ONES">
+          <p class="tagline">Personalized AI Supplements</p>
+          <p class="sub">Your custom formula, delivered to your door.</p>
+          <p class="links"><a href="#">Manage preferences</a> · <a href="#">ones.health</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 7. PAYMENT FAILED                                  -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="payment-failed">
+    <span class="section-label email">Email</span>
+    <h2>Payment Failed</h2>
+    <p class="desc">Sent when Stripe invoice payment fails (subscription goes past_due). CTA links to Orders page which has the Stripe portal for payment method updates.</p>
+    <p class="trigger">Trigger: <code>billing.service.ts → handleInvoicePaymentFailed()</code></p>
+    <div class="pref-badge">Respects: emailBilling preference</div>
+
+    <div class="email-frame">
+      <div class="email-card">
+        <div class="email-header"><h3>Payment Failed</h3></div>
+        <div class="email-body">
+          <p>Hi Pete,</p>
+          <p>We weren't able to process your latest subscription payment. Your subscription is now <strong>past due</strong>.</p>
+          <p>Please update your payment method to avoid any interruption to your supplement deliveries.</p>
+          <div class="email-cta">
+            <a href="#">Update Payment Method</a>
+            <p class="link-fallback">Or copy this link into your browser:<br>
+              <a href="#">https://ones.health/dashboard/orders</a>
+            </p>
+          </div>
+        </div>
+        <div class="email-divider"><hr></div>
+        <div class="email-footer">
+          <img class="logo-img" src="../client/public/ones-logo-light.svg" alt="ONES">
+          <p class="tagline">Personalized AI Supplements</p>
+          <p class="sub">Your custom formula, delivered to your door.</p>
+          <p class="links"><a href="#">Manage preferences</a> · <a href="#">ones.health</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 8. SUBSCRIPTION CANCELLED                          -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="subscription-cancelled">
+    <span class="section-label email">Email</span>
+    <h2>Subscription Cancelled</h2>
+    <p class="desc">Sent when Stripe subscription is deleted/cancelled.</p>
+    <p class="trigger">Trigger: <code>billing.service.ts → handleSubscriptionDeleted()</code></p>
+    <div class="pref-badge">Respects: emailBilling preference</div>
+
+    <div class="email-frame">
+      <div class="email-card">
+        <div class="email-header"><h3>Subscription Cancelled</h3></div>
+        <div class="email-body">
+          <p>Hi Pete,</p>
+          <p>Your ONES subscription has been cancelled. You won't be charged going forward.</p>
+          <p>If you still have supply remaining, keep taking your formula as directed. Your health data and formula history are saved and ready whenever you'd like to come back.</p>
+          <p>We'd love to know what we could do better — feel free to reach out to our support team anytime.</p>
+          <div class="email-cta">
+            <a href="#">Visit Dashboard</a>
+            <p class="link-fallback">Or copy this link into your browser:<br>
+              <a href="#">https://ones.health/dashboard</a>
+            </p>
+          </div>
+        </div>
+        <div class="email-divider"><hr></div>
+        <div class="email-footer">
+          <img class="logo-img" src="../client/public/ones-logo-light.svg" alt="ONES">
+          <p class="tagline">Personalized AI Supplements</p>
+          <p class="sub">Your custom formula, delivered to your door.</p>
+          <p class="links"><a href="#">Manage preferences</a> · <a href="#">ones.health</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 9. PASSWORD RESET                                  -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="password-reset">
+    <span class="section-label email">Email</span>
+    <h2>Password Reset</h2>
+    <p class="desc">Sent when user requests a password reset.</p>
+    <p class="trigger">Trigger: <code>auth.service.ts → requestPasswordReset()</code></p>
+    <div class="pref-badge">Always sends (transactional)</div>
+
+    <div class="email-frame">
+      <div class="email-card">
+        <div class="email-header"><h3>Password Reset Request</h3></div>
+        <div class="email-body">
+          <p>Hi Pete,</p>
+          <p>We received a request to reset your password for your ONES account.</p>
+          <p>Click the button below to reset your password:</p>
+          <div class="email-cta">
+            <a href="#">Reset Password</a>
+            <p class="link-fallback">Or copy this link into your browser:<br>
+              <a href="#">https://ones.health/reset-password?token=abc123...</a>
+            </p>
+          </div>
+        </div>
+        <div class="email-divider"><hr></div>
+        <div class="email-footer">
+          <img class="logo-img" src="../client/public/ones-logo-light.svg" alt="ONES">
+          <p class="tagline">Personalized AI Supplements</p>
+          <p class="sub">Your custom formula, delivered to your door.</p>
+          <p class="links"><a href="#">Manage preferences</a> · <a href="#">ones.health</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 10. SMS: PILL REMINDERS (SPLIT ACROSS MEALS)       -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="sms-pills">
+    <span class="section-label sms">SMS</span>
+    <h2>Daily Pill Reminders</h2>
+    <p class="desc">Capsules are split evenly across active meal reminders. Example: 9 capsules ÷ 3 meals = 3 per meal. Sent at the user's configured breakfast, lunch, and dinner times in their timezone.</p>
+    <p class="trigger">Trigger: <code>smsReminderScheduler.ts → sendReminderSms()</code> (cron every minute)</p>
+    <div class="pref-badge">Requires: sms_accountability consent + dailyRemindersEnabled</div>
+
+    <div class="sms-frame">
+      <div class="sms-device">
+        <div class="sms-status-bar">
+          <span>8:00 AM</span>
+          <span>ONES</span>
+          <span>📶 🔋</span>
+        </div>
+        <div class="sms-contact">
+          <div class="name">ONES</div>
+          <div class="number">+1 (855) 389-0981</div>
+        </div>
+        <div class="sms-bubble">💊 Breakfast time! Take 3 capsules with your meal.</div>
+        <div class="sms-time">8:00 AM · User's breakfast time</div>
+
+        <div style="height: 20px;"></div>
+
+        <div class="sms-bubble">💊 Lunch time! Take 3 capsules with your meal.</div>
+        <div class="sms-time">12:00 PM · User's lunch time</div>
+
+        <div style="height: 20px;"></div>
+
+        <div class="sms-bubble">💊 Dinner time! Take 3 capsules with your meal.</div>
+        <div class="sms-time">6:00 PM · User's dinner time</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 24px; padding: 16px 20px; background: #1f2937; border-radius: 8px; font-size: 13px; color: #9ca3af; max-width: 380px; margin-left: auto; margin-right: auto;">
+      <strong style="color: #d1d5db;">How splitting works:</strong><br>
+      Total capsules from formula's <code>targetCapsules</code> ÷ active meal slots.<br><br>
+      <strong style="color: #d1d5db;">Examples:</strong><br>
+      • 9 caps, 3 meals → 3 per meal<br>
+      • 6 caps, 3 meals → 2 per meal<br>
+      • 12 caps, 2 meals → 6 per meal<br><br>
+      <strong style="color: #d1d5db;">Timing:</strong> Follows user's <code>reminderBreakfast</code>, <code>reminderLunch</code>, <code>reminderDinner</code> settings in their timezone. Empty time = no reminder for that meal.
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 11. SMS: RENEWAL REMINDER                          -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="sms-renewal">
+    <span class="section-label sms">SMS</span>
+    <h2>Subscription Renewal Reminder</h2>
+    <p class="desc">Sent 5 days before subscription renewal date.</p>
+    <p class="trigger">Trigger: <code>smsReminderScheduler.ts → checkAndSendRenewalReminders()</code></p>
+    <div class="pref-badge">Requires: sms_accountability consent</div>
+
+    <div class="sms-frame">
+      <div class="sms-device">
+        <div class="sms-status-bar">
+          <span>10:00 AM</span>
+          <span>ONES</span>
+          <span>📶 🔋</span>
+        </div>
+        <div class="sms-contact">
+          <div class="name">ONES</div>
+          <div class="number">+1 (855) 389-0981</div>
+        </div>
+        <div class="sms-bubble">Hi Pete, your ONES AI supplement subscription renews in 5 days! 🔄<br><br>If you've had any changes in your health, diet, or goals, now is the perfect time to chat with your AI practitioner to update your formula before your next batch ships.<br><br>Reply to this message or log in to update your profile.</div>
+        <div class="sms-time">10:00 AM</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 12. IN-APP NOTIFICATIONS                           -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section" id="inapp-all">
+    <span class="section-label inapp">In-App</span>
+    <h2>Bell Dropdown Notifications</h2>
+    <p class="desc">Shown in the notification bell dropdown and /notifications page. Always created regardless of email/SMS preferences.</p>
+    <p class="trigger">Trigger: <code>notificationsService.create()</code> — stored in <code>notifications</code> table</p>
+
+    <div class="inapp-frame">
+
+      <div class="inapp-card">
+        <div class="inapp-icon">✨</div>
+        <div class="inapp-content">
+          <div class="inapp-title">Formula V1 Created</div>
+          <div class="inapp-text">Your AI practitioner created a personalized formula with 14 ingredients (4,280mg total).</div>
+          <div class="inapp-time">2 minutes ago</div>
+        </div>
+        <div class="inapp-dot"></div>
+      </div>
+
+      <div class="inapp-card">
+        <div class="inapp-icon">📦</div>
+        <div class="inapp-content">
+          <div class="inapp-title">Order Confirmed</div>
+          <div class="inapp-text">Your supplement order (Formula V3) has been placed and is being prepared.</div>
+          <div class="inapp-time">1 hour ago</div>
+        </div>
+        <div class="inapp-dot"></div>
+      </div>
+
+      <div class="inapp-card">
+        <div class="inapp-icon">📄</div>
+        <div class="inapp-content">
+          <div class="inapp-title">Lab Results Analyzed</div>
+          <div class="inapp-text">Your lab report has been analyzed — 47 biomarkers extracted. Chat with your AI practitioner to discuss findings.</div>
+          <div class="inapp-time">3 hours ago</div>
+        </div>
+        <div class="inapp-dot"></div>
+      </div>
+
+      <div class="inapp-card">
+        <div class="inapp-icon">🧪</div>
+        <div class="inapp-content">
+          <div class="inapp-title">Custom Formula V2 Created</div>
+          <div class="inapp-text">You've built a custom formula with 3,600mg of ingredients. Consider having AI review it for optimization.</div>
+          <div class="inapp-time">Yesterday</div>
+        </div>
+      </div>
+
+      <div class="inapp-card">
+        <div class="inapp-icon warn">⚠️</div>
+        <div class="inapp-content">
+          <div class="inapp-title">Payment Failed</div>
+          <div class="inapp-text">Your subscription payment could not be processed. Please update your payment method.</div>
+          <div class="inapp-time">2 days ago</div>
+        </div>
+        <div class="inapp-dot"></div>
+      </div>
+
+      <div class="inapp-card">
+        <div class="inapp-icon info">❌</div>
+        <div class="inapp-content">
+          <div class="inapp-title">Subscription Cancelled</div>
+          <div class="inapp-text">Your subscription has been cancelled. Your formula and health data are saved if you decide to return.</div>
+          <div class="inapp-time">3 days ago</div>
+        </div>
+      </div>
+
+      <div class="inapp-card">
+        <div class="inapp-icon">🔁</div>
+        <div class="inapp-content">
+          <div class="inapp-title">Lab Re-Analysis Complete</div>
+          <div class="inapp-text">Your lab report has been re-analyzed — 47 biomarkers extracted.</div>
+          <div class="inapp-time">5 days ago</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- SUMMARY TABLE                                      -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section">
+    <h2 style="margin-bottom: 24px;">Notification Matrix</h2>
+    <div style="overflow-x: auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:2px solid #374151;">
+            <th style="text-align:left;padding:10px 12px;color:#9ca3af;font-weight:600;">Event</th>
+            <th style="text-align:center;padding:10px 12px;color:#9ca3af;font-weight:600;">📧 Email</th>
+            <th style="text-align:center;padding:10px 12px;color:#9ca3af;font-weight:600;">📱 SMS</th>
+            <th style="text-align:center;padding:10px 12px;color:#9ca3af;font-weight:600;">🔔 In-App</th>
+            <th style="text-align:left;padding:10px 12px;color:#9ca3af;font-weight:600;">Preference</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #1f2937;">
+            <td style="padding:10px 12px;">Verify Email</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="padding:10px 12px;color:#6b7280;">Always</td>
+          </tr>
+          <tr style="border-bottom:1px solid #1f2937;">
+            <td style="padding:10px 12px;">Welcome</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="padding:10px 12px;color:#6b7280;">Always</td>
+          </tr>
+          <tr style="border-bottom:1px solid #1f2937;">
+            <td style="padding:10px 12px;">Password Reset</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="padding:10px 12px;color:#6b7280;">Always</td>
+          </tr>
+          <tr style="border-bottom:1px solid #1f2937;">
+            <td style="padding:10px 12px;">Formula Created/Updated</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="padding:10px 12px;color:#6b7280;">emailConsultation</td>
+          </tr>
+          <tr style="border-bottom:1px solid #1f2937;">
+            <td style="padding:10px 12px;">Lab Results Analyzed</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="padding:10px 12px;color:#6b7280;">emailConsultation</td>
+          </tr>
+          <tr style="border-bottom:1px solid #1f2937;">
+            <td style="padding:10px 12px;">Order Confirmed</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="padding:10px 12px;color:#6b7280;">emailBilling</td>
+          </tr>
+          <tr style="border-bottom:1px solid #1f2937;">
+            <td style="padding:10px 12px;">Payment Failed</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="padding:10px 12px;color:#6b7280;">emailBilling</td>
+          </tr>
+          <tr style="border-bottom:1px solid #1f2937;">
+            <td style="padding:10px 12px;">Subscription Cancelled</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="padding:10px 12px;color:#6b7280;">emailBilling</td>
+          </tr>
+          <tr style="border-bottom:1px solid #1f2937;">
+            <td style="padding:10px 12px;">Daily Pill Reminders (split across meals)</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="padding:10px 12px;color:#6b7280;">sms_accountability + dailyReminders</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px;">Renewal Reminder (5 days before)</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="text-align:center;padding:10px 12px;">✅</td>
+            <td style="text-align:center;padding:10px 12px;">—</td>
+            <td style="padding:10px 12px;color:#6b7280;">sms_accountability</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</body>
+</html>

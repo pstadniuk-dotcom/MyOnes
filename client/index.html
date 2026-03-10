@@ -3,19 +3,98 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Ones - Personalized AI Supplement Platform</title>
-    <meta name="description" content="Discover your perfect supplement formula with AI-powered personalization. Stop guessing with your health - get supplements designed specifically for your biology, goals, and lifestyle." />
+    <title>Ones - Personalized Supplement Platform</title>
+    <meta name="description" content="Stop guessing with your health. Ones builds a bespoke capsule formula from your blood work, wearable data, and health goals — powered by AI." />
     
+    <!-- Preload key videos so they appear instantly on scroll -->
+    <link rel="preload" href="/capsule-formation.mp4" as="video" type="video/mp4" />
+
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/ones-logo-icon.svg" />
     <link rel="apple-touch-icon" href="/ones-logo-icon.svg" />
     
     <!-- Open Graph meta tags -->
-    <meta property="og:title" content="Ones - Personalized AI Supplement Platform" />
-    <meta property="og:description" content="AI-powered personalized supplements that evolve with your health journey. Get a custom formula designed specifically for your biology." />
+    <meta property="og:title" content="Ones - Personalized Supplement Platform" />
+    <meta property="og:description" content="AI-powered personalized supplements built from your blood work and health goals. A fully bespoke capsule formula, not a quiz." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://my-ones.vercel.app" />
+    <meta property="og:url" content="https://ones.health" />
+    <meta property="og:site_name" content="Ones" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@ones_health" />
     
+    <!-- Organization + WebSite schema — static brand entity for AI disambiguation and AISO -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://ones.health/#organization",
+          "name": "Ones",
+          "url": "https://ones.health",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://ones.health/ones-logo-light.svg",
+            "width": 200,
+            "height": 60
+          },
+          "description": "Ones is a personalized supplement platform that builds bespoke capsule formulas driven by your blood work, wearable biometric data, and health goals — powered by AI.",
+          "foundingDate": "2024",
+          "slogan": "Your biology. Your formula.",
+          "knowsAbout": [
+            "Personalized nutrition",
+            "Supplement formulation",
+            "Blood biomarker interpretation",
+            "Functional medicine",
+            "Health optimization",
+            "AI-driven health recommendations"
+          ],
+          "sameAs": [
+            "https://twitter.com/ones_health",
+            "https://www.instagram.com/ones_health",
+            "https://www.linkedin.com/company/ones-health"
+          ],
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "url": "https://ones.health"
+          }
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://ones.health/#website",
+          "url": "https://ones.health",
+          "name": "Ones",
+          "publisher": { "@id": "https://ones.health/#organization" },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://ones.health/blog?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "Person",
+          "@id": "https://ones.health/#author-editorial",
+          "name": "Ones Editorial Team",
+          "url": "https://ones.health/blog",
+          "worksFor": { "@id": "https://ones.health/#organization" },
+          "description": "Evidence-based health content reviewed by functional medicine specialists and nutritional scientists.",
+          "knowsAbout": [
+            "Nutritional biochemistry",
+            "Clinical supplementation",
+            "Biomarker interpretation",
+            "Functional medicine",
+            "Longevity research"
+          ]
+        }
+      ]
+    }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">

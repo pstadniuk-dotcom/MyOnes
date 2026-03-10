@@ -10,7 +10,7 @@ export default function LifestyleBannerV2() {
       />
       
       {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#1B4332]/80 via-[#1B4332]/40 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#054700]/80 via-[#054700]/40 to-transparent" />
       
       {/* Content */}
       <div className="relative h-full flex items-center">

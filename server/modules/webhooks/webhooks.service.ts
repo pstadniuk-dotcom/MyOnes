@@ -2,7 +2,10 @@ import crypto from 'crypto';
 import logger from '../../infra/logging/logger';
 import { usersRepository } from '../users/users.repository';
 import { optimizeRepository } from '../optimize/optimize.repository';
+import { wearablesRepository } from '../wearables/wearables.repository';
 import { sendRawSms } from '../../utils/smsService';
+import { reorderRepository } from '../reorder/reorder.repository';
+import { reorderService } from '../reorder/reorder.service';
 
 export class WebhooksService {
     /**
@@ -18,6 +21,12 @@ export class WebhooksService {
         }
 
         const response = body.trim().toUpperCase();
+
+        // ── Smart Re-Order replies (APPROVE / KEEP / DELAY) ─────────────
+        if (response === 'APPROVE' || response === 'KEEP' || response === 'DELAY') {
+            return this.handleReorderSmsReply(user.id, phoneNumber, response);
+        }
+
         const today = new Date();
 
         let nutritionCompleted = false;
@@ -73,6 +82,52 @@ export class WebhooksService {
             : `✅ Logged! Keep up the great work 🔥`;
 
         await sendRawSms(phoneNumber, confirmMessage);
+    }
+
+    /**
+     * Handle Smart Re-Order SMS replies: APPROVE, KEEP, DELAY
+     */
+    private async handleReorderSmsReply(userId: string, phoneNumber: string, reply: string) {
+        const recommendation = await reorderRepository.getLatestSentRecommendationByUser(userId);
+
+        if (!recommendation) {
+            logger.warn(`[SmartReorder] No pending recommendation for user ${userId}, ignoring ${reply}`);
+            await sendRawSms(phoneNumber, `ONES: We don't have a pending reorder for you right now. Visit your dashboard for details.`);
+            return;
+        }
+
+        switch (reply) {
+            case 'APPROVE': {
+                await reorderService.handleApprove(recommendation);
+                await sendRawSms(phoneNumber,
+                    `✅ Reorder approved! We'll charge your card and ship your formula shortly.`
+                );
+                logger.info(`[SmartReorder] User ${userId} APPROVED reorder for schedule ${recommendation.scheduleId}`);
+                break;
+            }
+            case 'KEEP': {
+                await reorderService.handleKeep(recommendation);
+                await sendRawSms(phoneNumber,
+                    `✅ Got it — keeping your current formula. We'll charge and ship shortly.`
+                );
+                logger.info(`[SmartReorder] User ${userId} chose KEEP for schedule ${recommendation.scheduleId}`);
+                break;
+            }
+            case 'DELAY': {
+                const result = await reorderService.handleDelay(recommendation);
+                if (result.success) {
+                    await sendRawSms(phoneNumber,
+                        `⏸️ ${result.message}`
+                    );
+                } else {
+                    await sendRawSms(phoneNumber,
+                        `${result.message}`
+                    );
+                }
+                logger.info(`[SmartReorder] User ${userId} DELAY result: ${JSON.stringify(result)}`);
+                break;
+            }
+        }
     }
 
     /**
@@ -143,6 +198,14 @@ export class WebhooksService {
             case 'historical.data.activity.created':
             case 'historical.data.body.created':
                 logger.info('Historical data backfill received', { eventType: event.event_type });
+                // Process historical data using the same handlers as daily data
+                if (event.event_type.includes('sleep')) {
+                    await this.handleSleepData(event);
+                } else if (event.event_type.includes('activity')) {
+                    await this.handleActivityData(event);
+                } else if (event.event_type.includes('body')) {
+                    await this.handleBodyData(event);
+                }
                 break;
 
             default:
@@ -155,10 +218,37 @@ export class WebhooksService {
         const user = await this.findUserByJunctionId(junctionUserId);
         if (!user) return;
 
+        const dataDate = data?.calendar_date ? new Date(data.calendar_date) : new Date();
+        const provider = data?.source?.slug || 'junction';
+
         logger.info('Processing sleep data webhook', {
             userId: user.id,
             date: data?.calendar_date,
             score: data?.sleep_score,
+        });
+
+        await wearablesRepository.saveJunctionBiometricData({
+            userId: user.id,
+            provider,
+            dataDate,
+            sleepScore: data?.sleep_score || data?.score || data?.sleep_efficiency || null,
+            sleepHours: data?.duration_total_seconds
+                ? Math.round(data.duration_total_seconds / 60)
+                : (data?.total ? Math.round(data.total / 60) : null),
+            deepSleepMinutes: data?.duration_deep_sleep_seconds
+                ? Math.round(data.duration_deep_sleep_seconds / 60)
+                : (data?.deep ? Math.round(data.deep / 60) : null),
+            remSleepMinutes: data?.duration_rem_sleep_seconds
+                ? Math.round(data.duration_rem_sleep_seconds / 60)
+                : (data?.rem ? Math.round(data.rem / 60) : null),
+            lightSleepMinutes: data?.duration_light_sleep_seconds
+                ? Math.round(data.duration_light_sleep_seconds / 60)
+                : (data?.light ? Math.round(data.light / 60) : null),
+            hrvMs: data?.average_hrv || data?.hrv?.avg_hrv || null,
+            restingHeartRate: data?.resting_heart_rate || data?.heart_rate?.resting_hr || null,
+            respiratoryRate: data?.respiratory_rate || null,
+            readinessScore: data?.readiness_score || null,
+            rawData: data,
         });
     }
 
@@ -167,10 +257,27 @@ export class WebhooksService {
         const user = await this.findUserByJunctionId(junctionUserId);
         if (!user) return;
 
+        const dataDate = data?.calendar_date ? new Date(data.calendar_date) : new Date();
+        const provider = data?.source?.slug || 'junction';
+
         logger.info('Processing activity data webhook', {
             userId: user.id,
             date: data?.calendar_date,
             steps: data?.steps,
+        });
+
+        await wearablesRepository.saveJunctionBiometricData({
+            userId: user.id,
+            provider,
+            dataDate,
+            steps: data?.steps || null,
+            caloriesBurned: data?.calories_active || data?.calories_total || null,
+            activeMinutes: data?.active_duration_seconds
+                ? Math.round(data.active_duration_seconds / 60)
+                : (data?.active_minutes || null),
+            averageHeartRate: data?.heart_rate?.avg_hr || null,
+            maxHeartRate: data?.heart_rate?.max_hr || null,
+            rawData: data,
         });
     }
 
@@ -179,10 +286,28 @@ export class WebhooksService {
         const user = await this.findUserByJunctionId(junctionUserId);
         if (!user) return;
 
+        const dataDate = data?.calendar_date ? new Date(data.calendar_date) : new Date();
+        const provider = data?.source?.slug || 'junction';
+
         logger.info('Processing body data webhook', {
             userId: user.id,
             date: data?.calendar_date,
             hrv: data?.hrv?.avg_hrv,
+        });
+
+        await wearablesRepository.saveJunctionBiometricData({
+            userId: user.id,
+            provider,
+            dataDate,
+            hrvMs: data?.hrv?.avg_hrv || data?.hrv_avg || null,
+            restingHeartRate: data?.heart_rate?.resting_hr || data?.resting_heart_rate || null,
+            averageHeartRate: data?.heart_rate?.avg_hr || null,
+            maxHeartRate: data?.heart_rate?.max_hr || null,
+            spo2Percentage: data?.oxygen_saturation ? Math.round(data.oxygen_saturation) : null,
+            skinTempCelsius: data?.temperature ? Math.round(data.temperature * 10) : null,
+            respiratoryRate: data?.respiratory_rate ? Math.round(data.respiratory_rate) : null,
+            recoveryScore: data?.recovery_score || null,
+            rawData: data,
         });
     }
 
@@ -191,10 +316,26 @@ export class WebhooksService {
         const user = await this.findUserByJunctionId(junctionUserId);
         if (!user) return;
 
+        const dataDate = data?.calendar_date
+            ? new Date(data.calendar_date)
+            : (data?.timestamp ? new Date(data.timestamp) : new Date());
+        const provider = data?.source?.slug || 'junction';
+
         logger.info('Processing workout data webhook', {
             userId: user.id,
             date: data?.calendar_date,
-            sport: data?.sport?.name,
+            sport: data?.sport?.name || data?.sport_name,
+        });
+
+        await wearablesRepository.saveJunctionBiometricData({
+            userId: user.id,
+            provider,
+            dataDate,
+            caloriesBurned: data?.calories || null,
+            averageHeartRate: data?.average_hr || data?.heart_rate?.avg_hr || null,
+            maxHeartRate: data?.max_hr || data?.heart_rate?.max_hr || null,
+            activeMinutes: data?.duration_seconds ? Math.round(data.duration_seconds / 60) : null,
+            rawData: data,
         });
     }
 
@@ -223,8 +364,7 @@ export class WebhooksService {
 
     private async findUserByJunctionId(junctionUserId: string) {
         try {
-            const users = await usersRepository.listAllUsers();
-            return users.find((u: any) => u.junctionUserId === junctionUserId) || null;
+            return await wearablesRepository.getUserByJunctionId(junctionUserId);
         } catch (error) {
             logger.error('Error finding user by Junction ID:', error);
             return null;

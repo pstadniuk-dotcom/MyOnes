@@ -51,14 +51,14 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#FAF7F2] to-white p-4">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#ede8e2] to-white p-4">
           <Card className="max-w-lg w-full shadow-lg border-red-200">
             <CardHeader className="text-center pb-2">
               <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
                 <AlertTriangle className="w-8 h-8 text-red-600" />
               </div>
-              <CardTitle className="text-2xl text-[#1B4332]">Something went wrong</CardTitle>
-              <CardDescription className="text-[#52796F]">
+              <CardTitle className="text-2xl text-[#054700]">Something went wrong</CardTitle>
+              <CardDescription className="text-[#5a6623]">
                 We're sorry, but something unexpected happened. Please try again.
               </CardDescription>
             </CardHeader>
@@ -84,7 +84,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button 
                   onClick={this.handleRetry}
-                  className="flex-1 bg-[#1B4332] hover:bg-[#1B4332]/90"
+                  className="flex-1 bg-[#054700] hover:bg-[#054700]/90"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Try Again
@@ -92,16 +92,16 @@ export class ErrorBoundary extends Component<Props, State> {
                 <Button 
                   onClick={this.handleGoHome}
                   variant="outline"
-                  className="flex-1 border-[#1B4332] text-[#1B4332]"
+                  className="flex-1 border-[#054700] text-[#054700]"
                 >
                   <Home className="w-4 h-4 mr-2" />
                   Go Home
                 </Button>
               </div>
               
-              <p className="text-center text-sm text-[#52796F]">
+              <p className="text-center text-sm text-[#5a6623]">
                 If this problem persists, please{' '}
-                <a href="/dashboard/support" className="text-[#1B4332] underline hover:no-underline">
+                <a href="/dashboard/support" className="text-[#054700] underline hover:no-underline">
                   contact support
                 </a>
               </p>

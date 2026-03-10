@@ -13,7 +13,7 @@ import {
   Send, Upload, User, AlertTriangle, CheckCircle, Sparkles, FileText,
   History, Download, Search, Plus, RotateCcw, Copy, Share2, Mic,
   Loader2, FlaskConical, Clock, ArrowUp, Settings2, Zap,
-  Shield, Trash2, Calendar, Eye, EyeOff, X, ChevronDown, ChevronUp, ArrowRight
+  Shield, Trash2, Calendar, Eye, EyeOff, X, ChevronDown, ChevronUp, ArrowRight, Pencil, Check, Watch
 } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -232,6 +232,8 @@ export default function ConsultationPage() {
   const [selectedFormula, setSelectedFormula] = useState<any>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   // Inline capsule selection state (tracks which message has active selection)
   const [selectingCapsuleMessageId, setSelectingCapsuleMessageId] = useState<string | null>(null);
@@ -386,6 +388,15 @@ export default function ConsultationPage() {
     }
   });
 
+  // Query wearable connections to show status indicator in chat header
+  const { data: wearableConnections = [] } = useQuery<Array<{ id: string; provider: string; status: string }>>({
+    queryKey: ['/api/wearables/connections'],
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const hasConnectedWearable = wearableConnections.some(c => c.status === 'connected');
+
   // Persist current session ID to localStorage whenever it changes
   useEffect(() => {
     if (currentSessionId) {
@@ -402,12 +413,21 @@ export default function ConsultationPage() {
 
       const params = new URLSearchParams(search);
       const startNew = params.get('new') === 'true';
+      const formulaReviewContext = params.get('context') === 'formula-review';
 
-      if (startNew && messages.length === 0) {
-        // If query param requests new session, force it
+      if ((startNew || formulaReviewContext) && messages.length === 0) {
+        // If query param requests new session or formula review, force new session
         handleNewSession();
-        // Clear the query param to avoid sticking (optional but good UI)
+        // Clear the query param to avoid sticking
         window.history.replaceState({}, '', window.location.pathname);
+
+        // Formula review context: auto-inject a review prompt
+        if (formulaReviewContext) {
+          setPendingLabMessage(
+            'I\'d like to review my current formula. My dashboard is showing that my formula may need an update based on recent health data changes. Can you look at what\'s changed and recommend any adjustments?'
+          );
+          return;
+        }
 
         // Check for lab marker discussion message (from Labs page "Discuss" link)
         const labMarkerMessage = localStorage.getItem('labMarkerDiscuss');
@@ -716,6 +736,18 @@ export default function ConsultationPage() {
       }
     }
   }, [messages, scrollToBottom, isTyping]);
+
+  // Scroll to bottom whenever thinking steps are added/updated so the growing card stays fully visible
+  useEffect(() => {
+    if (thinkingSteps.length > 0 && !userHasScrolledUp.current) {
+      requestAnimationFrame(() => {
+        const viewport = scrollViewportRef.current;
+        if (viewport && !userHasScrolledUp.current) {
+          viewport.scrollTop = viewport.scrollHeight;
+        }
+      });
+    }
+  }, [thinkingSteps]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -1231,6 +1263,31 @@ export default function ConsultationPage() {
     setSessionToDelete(sessionId);
   }, []);
 
+  // Handle rename session
+  const handleStartRename = useCallback((sessionId: string, currentTitle: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setRenamingSessionId(sessionId);
+    setRenameValue(currentTitle);
+  }, []);
+
+  const handleConfirmRename = useCallback(async (sessionId: string) => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed.length === 0) {
+      setRenamingSessionId(null);
+      return;
+    }
+    try {
+      await apiRequest('PATCH', `/api/chat/consultations/${sessionId}/rename`, { title: trimmed });
+      // Update local state
+      setSessionHistory(prev => prev.map(s => s.id === sessionId ? { ...s, title: trimmed } : s));
+      queryClient.invalidateQueries({ queryKey: ['/api/chat/consultations/history', user?.id] });
+      toast({ title: 'Renamed', description: 'Consultation renamed successfully.' });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to rename consultation.', variant: 'destructive' });
+    }
+    setRenamingSessionId(null);
+  }, [renameValue, queryClient, user?.id, toast]);
+
   // Confirm delete session
   const confirmDeleteSession = useCallback(() => {
     if (sessionToDelete) {
@@ -1591,9 +1648,38 @@ export default function ConsultationPage() {
 
                 if (data.type === 'connected') {
                   console.log('💊 Connected to SSE');
+                  // Initialize thinking steps for formula creation
+                  setThinkingSteps([
+                    { id: 'review_data', label: 'Reviewing your health profile', status: 'done', detail: '' },
+                    { id: 'understand_query', label: 'Selecting optimal ingredients', status: 'active', detail: '' },
+                    { id: 'build_context', label: 'Calculating dosages', status: 'waiting', detail: '' },
+                    { id: 'generate', label: 'Creating your formula', status: 'waiting', detail: '' },
+                  ]);
+                  setThinkingMessage('thinking');
+                } else if (data.type === 'thinking_step') {
+                  // Progressive step updates from server
+                  setThinkingSteps(prev => prev.map(s => {
+                    if (s.id === data.step) {
+                      return { ...s, status: data.status, detail: data.detail || s.detail };
+                    }
+                    if (data.status === 'done') {
+                      const doneIdx = prev.findIndex(p => p.id === data.step);
+                      const thisIdx = prev.findIndex(p => p.id === s.id);
+                      if (thisIdx === doneIdx + 1 && s.status === 'waiting') {
+                        return { ...s, status: 'active' };
+                      }
+                    }
+                    return s;
+                  }));
                 } else if (data.type === 'thinking') {
                   console.log('💊 AI thinking:', data.message);
                   setThinkingMessage(data.message);
+                } else if (data.type === 'processing') {
+                  console.log('⚙️ Formula processing:', data.message);
+                  setThinkingMessage(data.message || 'Creating your formula...');
+                  setThinkingSteps(prev => prev.map(s =>
+                    s.id === 'generate' ? { ...s, label: 'Creating your formula', detail: data.message, status: 'active' } : s
+                  ));
                 } else if (data.type === 'chunk') {
                   // Accumulate and show cleaned content in real-time
                   accumulatedContent += data.content;
@@ -1694,7 +1780,7 @@ export default function ConsultationPage() {
 
   return (
     // <div className="flex h-full min-h-[calc(100dvh-8rem)] md:min-h-dvh md:max-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
-    <div className="rounded-lg overflow-clip flex h-full min-h-0 bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
+    <div className="rounded-lg overflow-hidden flex flex-row h-[calc(100vh-7.5rem)]" data-testid="page-consultation">
       {/* History Sidebar - Hidden on mobile, shown on desktop */}
       {showHistory && (
         <div className="hidden md:flex w-80 border-r bg-background/80 backdrop-blur-sm flex-col">
@@ -1725,17 +1811,51 @@ export default function ConsultationPage() {
                     <div className="flex flex-col gap-2">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate pr-2">{session.title}</p>
+                          {renamingSessionId === session.id ? (
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="text"
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleConfirmRename(session.id);
+                                  if (e.key === 'Escape') setRenamingSessionId(null);
+                                }}
+                                className="text-sm font-medium w-full bg-white/60 border border-[#054700]/20 rounded px-1.5 py-0.5 outline-none focus:border-[#054700]/40"
+                                autoFocus
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => { e.stopPropagation(); handleConfirmRename(session.id); }}
+                                className="h-6 w-6 p-0 text-[#054700] hover:bg-[#054700]/10 flex-shrink-0"
+                              >
+                                <Check className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <p className="text-sm font-medium truncate pr-2">{session.title}</p>
+                          )}
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleDeleteSession(session.id, e)}
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
-                          data-testid={`button-delete-session-${session.id}`}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => handleStartRename(session.id, session.title, e)}
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#054700]/10 text-[#5a6623]"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => handleDeleteSession(session.id, e)}
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive"
+                            data-testid={`button-delete-session-${session.id}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
 
                       <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
@@ -1776,30 +1896,35 @@ export default function ConsultationPage() {
       )}
 
       {/* Main Chat Interface */}
-      <div className="flex-1 flex flex-col">
-        {/* Modern Gradient Header */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 border-b backdrop-blur-sm">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-secondary/5 opacity-50"></div>
-          <div className="relative p-4 md:p-4">
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Clean Branded Header */}
+        <div className="glass-card border-b border-[#054700]/10 flex-shrink-0">
+          <div className="p-4 md:p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-lg md:text-2xl font-bold flex items-center gap-2" data-testid="text-consultation-title">
-                  <span className="hidden sm:inline">Ones AI Consultation</span>
-                  <span className="sm:hidden">AI Consultation</span>
-                  <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    <span className="hidden sm:inline">AI-Powered</span>
-                    <span className="sm:hidden">AI</span>
-                  </Badge>
-                </h1>
-                <div className="flex items-center gap-2">
-                  <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">Your personalized supplement consultant</p>
-                  {isConnected && (
-                    <Badge variant="outline" className="text-xs text-green-600 border-green-200 bg-green-50">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
-                      Connected
-                    </Badge>
-                  )}
+              <div className="flex items-center gap-3">
+                <img src="/ones-logo-icon.svg" alt="Ones" className="h-8 w-8" />
+                <div>
+                  <h1 className="text-lg md:text-xl font-semibold text-[#054700] flex items-center gap-2" data-testid="text-consultation-title">
+                    <span className="hidden sm:inline">Ones AI Consultation</span>
+                    <span className="sm:hidden">AI Consultation</span>
+                  </h1>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs md:text-sm text-[#5a6623] hidden sm:block">Your personalized supplement consultant</p>
+                    {isConnected && (
+                      <div className="flex items-center gap-1 text-xs text-[#054700]">
+                        <div className="w-1.5 h-1.5 bg-[#054700] rounded-full animate-pulse" />
+                        <span className="hidden sm:inline">Live</span>
+                      </div>
+                    )}
+                    {hasConnectedWearable && (
+                      <Link href="/wearables">
+                        <div className="flex items-center gap-1 text-xs text-[#054700]/70 hover:text-[#054700] transition-colors cursor-pointer" title="Wearable data active — click to manage">
+                          <Watch className="w-3 h-3" />
+                          <span className="hidden sm:inline">Wearable</span>
+                        </div>
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1867,11 +1992,18 @@ export default function ConsultationPage() {
 
         {/* Messages Area */}
         <ScrollArea
-          className="flex-1"
+          className="flex-1 relative"
           data-testid="container-chat-messages"
         >
+          {/* Gradient blobs so frosted bubbles have content to blur */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+            <div className="absolute top-10 -left-10 w-[400px] h-[400px] rounded-full bg-[#c5d4b5]/20 blur-3xl" />
+            <div className="absolute top-1/3 right-[-50px] w-[350px] h-[350px] rounded-full bg-[#054700]/8 blur-3xl" />
+            <div className="absolute bottom-10 left-1/4 w-[450px] h-[450px] rounded-full bg-[#d5e3cc]/25 blur-3xl" />
+            <div className="absolute top-2/3 left-[-30px] w-[300px] h-[300px] rounded-full bg-[#e0ead8]/30 blur-3xl" />
+          </div>
           <div
-            className="p-3 sm:p-6 space-y-4 sm:space-y-6"
+            className="p-3 sm:p-6 pb-8 sm:pb-12 space-y-4 sm:space-y-6 relative"
             ref={scrollContainerRef}
           >
             {filteredMessages.map((message, index) => {
@@ -1899,8 +2031,8 @@ export default function ConsultationPage() {
                 >
                   <div
                     className={`group max-w-[95%] sm:max-w-[85%] rounded-2xl p-3 sm:p-5 space-y-3 overflow-hidden ${message.sender === 'user'
-                      ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-lg'
-                      : 'bg-background/80 backdrop-blur-sm text-foreground border shadow-md'
+                      ? 'glass-dark text-[#054700] shadow-md'
+                      : 'glass-card text-foreground shadow-md'
                       } ${message.sender === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
                   >
                     <div>
@@ -1909,22 +2041,22 @@ export default function ConsultationPage() {
                         {message.sender === 'ai' && (
                           <img
                             src="/ones-logo-icon.svg"
-                            alt="ONES"
+                            alt="Ones"
                             className={`h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0 ${message.id === activeStreamingMessageId ? 'animate-spin' : ''}`}
                           />
                         )}
                         {message.sender === 'user' && (
-                          <Avatar className="h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0 ring-2 ring-white/30 dark:ring-white/20">
-                            <AvatarFallback className="bg-white/30 dark:bg-white/20 text-white dark:text-white">
+                          <Avatar className="h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0 ring-2 ring-[#054700]/20">
+                            <AvatarFallback className="bg-[#054700]/15 text-[#054700]">
                               <User className="w-4 h-4" />
                             </AvatarFallback>
                           </Avatar>
                         )}
                         <div className="flex items-center gap-2">
-                          <span className={`text-xs font-medium ${message.sender === 'user' ? 'text-white/90 dark:text-white/90' : 'text-muted-foreground'}`}>
+                          <span className={`text-xs font-medium ${message.sender === 'user' ? 'text-[#054700]' : 'text-muted-foreground'}`}>
                             {message.sender === 'user' ? 'You' : 'Ones AI'}
                           </span>
-                          <span className={`text-xs ${message.sender === 'user' ? 'text-white/60 dark:text-white/60' : 'text-muted-foreground/70'}`}>
+                          <span className={`text-xs ${message.sender === 'user' ? 'text-[#5a6623]' : 'text-muted-foreground/70'}`}>
                             {message.timestamp && !isNaN(new Date(message.timestamp).getTime())
                               ? new Date(message.timestamp).toLocaleTimeString()
                               : 'Just now'}
@@ -1958,7 +2090,7 @@ export default function ConsultationPage() {
                             <ThinkingSteps steps={thinkingSteps} />
                           ) : (
                             <div className="text-sm text-muted-foreground italic flex items-center gap-1.5">
-                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#52796F] animate-pulse" />
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#5a6623] animate-pulse" />
                               {thinkingMessage || 'Thinking...'}
                             </div>
                           )
@@ -2114,7 +2246,7 @@ export default function ConsultationPage() {
 
 
         {/* Modern Input Area */}
-        <div className="border-t bg-background/95 backdrop-blur-sm safe-bottom">
+        <div className="border-t glass-card safe-bottom flex-shrink-0">
           <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
             {/* Uploaded Files Preview */}
             {uploadedFiles.length > 0 && (
@@ -2159,7 +2291,7 @@ export default function ConsultationPage() {
                 placeholder="Ask about supplements, health goals..."
                 className="w-full min-h-[48px] max-h-[120px] resize-none text-base"
                 rows={1}
-                disabled={isTyping}
+                disabled={isTyping || isUploading}
                 data-testid="input-consultation-message"
               />
 

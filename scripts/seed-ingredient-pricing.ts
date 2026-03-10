@@ -8,7 +8,7 @@ function key(name: string): string {
 
 const seedRows = [
   // === Individual Ingredients (all 32 from catalog) ===
-  { ingredientName: 'Aloe Vera Powder', typicalCapsuleMg: 500, typicalBottleCapsules: 100, typicalRetailPriceCents: 1699 },
+  { ingredientName: 'Aloe Vera Powder', typicalCapsuleMg: 500, typicalBottleCapsules: 100, typicalRetailPriceCents: 1899 },
   { ingredientName: 'Ashwagandha', typicalCapsuleMg: 600, typicalBottleCapsules: 60, typicalRetailPriceCents: 2299 },
   { ingredientName: 'Astragalus', typicalCapsuleMg: 500, typicalBottleCapsules: 120, typicalRetailPriceCents: 1899 },
   { ingredientName: 'Blackcurrant Extract', typicalCapsuleMg: 300, typicalBottleCapsules: 60, typicalRetailPriceCents: 2499 },
@@ -16,9 +16,9 @@ const seedRows = [
   { ingredientName: 'Camu Camu', typicalCapsuleMg: 500, typicalBottleCapsules: 60, typicalRetailPriceCents: 1899 },
   { ingredientName: 'Cats Claw', typicalCapsuleMg: 500, typicalBottleCapsules: 100, typicalRetailPriceCents: 1499 },
   { ingredientName: 'Chaga', typicalCapsuleMg: 500, typicalBottleCapsules: 60, typicalRetailPriceCents: 2699 },
-  { ingredientName: 'Curcumin', typicalCapsuleMg: 500, typicalBottleCapsules: 60, typicalRetailPriceCents: 3199 },
+  { ingredientName: 'Curcumin', typicalCapsuleMg: 500, typicalBottleCapsules: 60, typicalRetailPriceCents: 3999 },
   { ingredientName: 'Cinnamon 20:1', typicalCapsuleMg: 500, typicalBottleCapsules: 120, typicalRetailPriceCents: 1399 },
-  { ingredientName: 'CoEnzyme Q10', typicalCapsuleMg: 100, typicalBottleCapsules: 60, typicalRetailPriceCents: 3499 },
+  { ingredientName: 'CoEnzyme Q10', typicalCapsuleMg: 100, typicalBottleCapsules: 60, typicalRetailPriceCents: 4499 },
   { ingredientName: 'Colostrum Powder', typicalCapsuleMg: 500, typicalBottleCapsules: 60, typicalRetailPriceCents: 3299 },
   { ingredientName: 'GABA', typicalCapsuleMg: 750, typicalBottleCapsules: 60, typicalRetailPriceCents: 1699 },
   { ingredientName: 'Garlic', typicalCapsuleMg: 500, typicalBottleCapsules: 120, typicalRetailPriceCents: 1299 },
@@ -32,14 +32,14 @@ const seedRows = [
   { ingredientName: 'Maca', typicalCapsuleMg: 500, typicalBottleCapsules: 90, typicalRetailPriceCents: 1899 },
   { ingredientName: 'Magnesium', typicalCapsuleMg: 120, typicalBottleCapsules: 120, typicalRetailPriceCents: 2699 },
   { ingredientName: 'Red Ginseng', typicalCapsuleMg: 500, typicalBottleCapsules: 60, typicalRetailPriceCents: 2899 },
-  { ingredientName: 'Resveratrol', typicalCapsuleMg: 250, typicalBottleCapsules: 60, typicalRetailPriceCents: 2999 },
-  { ingredientName: 'Omega-3', typicalCapsuleMg: 1000, typicalBottleCapsules: 90, typicalRetailPriceCents: 3299 },
-  { ingredientName: 'Phosphatidylcholine', typicalCapsuleMg: 450, typicalBottleCapsules: 60, typicalRetailPriceCents: 2999 },
+  { ingredientName: 'Resveratrol', typicalCapsuleMg: 250, typicalBottleCapsules: 60, typicalRetailPriceCents: 3499 },
+  { ingredientName: 'Omega-3', typicalCapsuleMg: 500, typicalBottleCapsules: 90, typicalRetailPriceCents: 3999 },
+  { ingredientName: 'Phosphatidylcholine', typicalCapsuleMg: 450, typicalBottleCapsules: 60, typicalRetailPriceCents: 3499 },
   { ingredientName: 'Quercetin', typicalCapsuleMg: 500, typicalBottleCapsules: 60, typicalRetailPriceCents: 2499 },
   { ingredientName: 'Saw Palmetto Extract', typicalCapsuleMg: 320, typicalBottleCapsules: 90, typicalRetailPriceCents: 1799 },
   { ingredientName: 'Stinging Nettle', typicalCapsuleMg: 500, typicalBottleCapsules: 90, typicalRetailPriceCents: 1499 },
   { ingredientName: 'Suma Root', typicalCapsuleMg: 500, typicalBottleCapsules: 60, typicalRetailPriceCents: 1999 },
-  { ingredientName: 'Vitamin E', typicalCapsuleMg: 400, typicalBottleCapsules: 90, typicalRetailPriceCents: 1899 },
+  { ingredientName: 'Vitamin E', typicalCapsuleMg: 400, typicalBottleCapsules: 90, typicalRetailPriceCents: 2199 },
 
   // === System Supports (proprietary blends - priced as equivalent multi-ingredient stacks) ===
   { ingredientName: 'Adrenal Support', typicalCapsuleMg: 420, typicalBottleCapsules: 60, typicalRetailPriceCents: 3499 },
@@ -62,9 +62,9 @@ const seedRows = [
   { ingredientName: 'Thyroid Support', typicalCapsuleMg: 449, typicalBottleCapsules: 60, typicalRetailPriceCents: 3499 },
 
   // === Legacy aliases (names that may appear in older formulas) ===
-  { ingredientName: 'CoQ10', typicalCapsuleMg: 100, typicalBottleCapsules: 60, typicalRetailPriceCents: 3499 },
+  { ingredientName: 'CoQ10', typicalCapsuleMg: 100, typicalBottleCapsules: 60, typicalRetailPriceCents: 4499 },
   { ingredientName: 'Magnesium Glycinate', typicalCapsuleMg: 120, typicalBottleCapsules: 120, typicalRetailPriceCents: 2699 },
-  { ingredientName: 'Omega-3 Fish Oil', typicalCapsuleMg: 1000, typicalBottleCapsules: 90, typicalRetailPriceCents: 3299 },
+  { ingredientName: 'Omega-3 Fish Oil', typicalCapsuleMg: 500, typicalBottleCapsules: 90, typicalRetailPriceCents: 3999 },
   { ingredientName: 'Vitamin D3', typicalCapsuleMg: 125, typicalBottleCapsules: 120, typicalRetailPriceCents: 1499 },
   { ingredientName: 'Vitamin K2', typicalCapsuleMg: 1, typicalBottleCapsules: 120, typicalRetailPriceCents: 2499 },
   { ingredientName: 'Alpha GPC', typicalCapsuleMg: 300, typicalBottleCapsules: 60, typicalRetailPriceCents: 3699 },
@@ -78,6 +78,20 @@ const seedRows = [
   { ingredientName: 'Methyl Folate', typicalCapsuleMg: 1, typicalBottleCapsules: 90, typicalRetailPriceCents: 1899 },
   { ingredientName: 'Methylcobalamin', typicalCapsuleMg: 1, typicalBottleCapsules: 90, typicalRetailPriceCents: 1799 },
   { ingredientName: 'Rhodiola Rosea', typicalCapsuleMg: 300, typicalBottleCapsules: 60, typicalRetailPriceCents: 2499 },
+
+  // === Catalog ingredients added later ===
+  { ingredientName: 'Milk Thistle', typicalCapsuleMg: 175, typicalBottleCapsules: 120, typicalRetailPriceCents: 2499 },
+  { ingredientName: 'Calcium', typicalCapsuleMg: 500, typicalBottleCapsules: 120, typicalRetailPriceCents: 1699 },
+  { ingredientName: 'Vitamin C', typicalCapsuleMg: 500, typicalBottleCapsules: 180, typicalRetailPriceCents: 1999 },
+  { ingredientName: 'Cape Aloe', typicalCapsuleMg: 500, typicalBottleCapsules: 100, typicalRetailPriceCents: 1899 },
+
+  // === Additional aliases for ingredient name variations in formulas ===
+  { ingredientName: 'Aloe Vera', typicalCapsuleMg: 500, typicalBottleCapsules: 100, typicalRetailPriceCents: 1899 },
+  { ingredientName: 'Vitamin E (Mixed Tocopherols)', typicalCapsuleMg: 400, typicalBottleCapsules: 90, typicalRetailPriceCents: 2199 },
+  { ingredientName: 'Omega 3', typicalCapsuleMg: 500, typicalBottleCapsules: 90, typicalRetailPriceCents: 3999 },
+  { ingredientName: "Cat's Claw", typicalCapsuleMg: 500, typicalBottleCapsules: 100, typicalRetailPriceCents: 1499 },
+  { ingredientName: 'Zinc', typicalCapsuleMg: 30, typicalBottleCapsules: 120, typicalRetailPriceCents: 1399 },
+  { ingredientName: 'Vitamin B12', typicalCapsuleMg: 1, typicalBottleCapsules: 90, typicalRetailPriceCents: 1799 },
 ].map((row) => ({
   ingredientKey: key(row.ingredientName),
   ingredientName: row.ingredientName,

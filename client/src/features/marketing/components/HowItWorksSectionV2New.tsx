@@ -29,7 +29,7 @@ const steps = [
 
 export default function HowItWorksSectionV2New() {
   return (
-    <section className="py-24 md:py-32 bg-[#1B4332]">
+    <section className="py-24 md:py-32 bg-[#054700]">
       <div className="container mx-auto px-6 max-w-6xl">
         <div className="max-w-2xl mx-auto text-center mb-16">
           <span className="text-[#D4A574] font-medium tracking-wider text-sm uppercase">

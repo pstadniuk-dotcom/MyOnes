@@ -78,6 +78,7 @@
     "express-session": "^1.18.1",
     "framer-motion": "^11.13.1",
     "google-auth-library": "^10.5.0",
+    "googleapis": "^171.4.0",
     "jsonrepair": "^3.13.1",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.453.0",
@@ -130,5 +131,8 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
+  },
+  "engines": {
+    "node": ">=20.19.0"
   }
 }

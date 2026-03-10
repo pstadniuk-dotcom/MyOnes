@@ -6,8 +6,9 @@
  *  - New lab reports uploaded after the formula was created
  *  - Wearable trend drift (HRV, sleep, steps declining)
  *
- * Returns a structured review status. When autoOptimizeFormula = true,
- * the scheduler can call this and trigger AI re-optimization + notification.
+ * Returns a structured review status. The scheduler checks users
+ * approaching their subscription renewal date and sends a single
+ * "review recommended" notification when drift is detected.
  */
 
 import { usersRepository } from '../users/users.repository';
@@ -33,7 +34,6 @@ const STEPS_DECLINE_THRESHOLD = 0.15;   // 15% decline triggers review
 
 export interface FormulaReviewStatus {
     needsReview: boolean;
-    autoOptimizeEnabled: boolean;
     reasons: string[];
     driftScore: number;          // 0-100  (> 40 = review recommended)
     formulaAgeDays: number | null;
@@ -46,7 +46,7 @@ export interface FormulaReviewStatus {
     lastChecked: string;
 }
 
-function trendDirection(values: (number | null)[]): 'declining' | 'stable' | 'improving' | null {
+function trendDirection(values: (number | null)[], threshold = 0.05): 'declining' | 'stable' | 'improving' | null {
     const valid = values.filter((v): v is number => v !== null);
     if (valid.length < 4) return null;
     const half = Math.floor(valid.length / 2);
@@ -54,8 +54,8 @@ function trendDirection(values: (number | null)[]): 'declining' | 'stable' | 'im
     const recent = valid.slice(-half).reduce((a, b) => a + b, 0) / half;
     if (earlier === 0) return null;
     const change = (recent - earlier) / earlier;
-    if (change <= -0.05) return 'declining';
-    if (change >= 0.05) return 'improving';
+    if (change <= -threshold) return 'declining';
+    if (change >= threshold) return 'improving';
     return 'stable';
 }
 
@@ -71,12 +71,9 @@ export class FormulaReviewService {
             filesRepository.listLabAnalysesByUser(userId).catch((): LabAnalysis[] => []),
         ]);
 
-        const autoOptimizeEnabled = user?.autoOptimizeFormula ?? false;
-
         if (!formula) {
             return {
                 needsReview: false,
-                autoOptimizeEnabled,
                 reasons: [],
                 driftScore: 0,
                 formulaAgeDays: null,
@@ -86,10 +83,10 @@ export class FormulaReviewService {
             };
         }
 
-        // 2. Formula age
-        const formulaUpdatedAt = formula.createdAt;
-        const formulaAgeDays = formulaUpdatedAt
-            ? Math.floor((Date.now() - new Date(formulaUpdatedAt).getTime()) / (1000 * 60 * 60 * 24))
+        // 2. Formula age (use createdAt — each version is a new row)
+        const formulaDate = formula.createdAt;
+        const formulaAgeDays = formulaDate
+            ? Math.floor((Date.now() - new Date(formulaDate).getTime()) / (1000 * 60 * 60 * 24))
             : null;
 
         if (formulaAgeDays !== null && formulaAgeDays >= FORMULA_REVIEW_DAYS) {
@@ -98,8 +95,8 @@ export class FormulaReviewService {
         }
 
         // 3. New lab report since formula was last updated
-        const newLabSinceFormula = formulaUpdatedAt
-            ? labAnalyses.some((l: LabAnalysis) => l.processedAt && new Date(l.processedAt) > new Date(formulaUpdatedAt))
+        const newLabSinceFormula = formulaDate
+            ? labAnalyses.some((l: LabAnalysis) => l.processedAt && new Date(l.processedAt) > new Date(formulaDate))
             : false;
 
         if (newLabSinceFormula) {
@@ -134,9 +131,9 @@ export class FormulaReviewService {
                     .sort((a: any, b: any) => (a.calendar_date || a.date || '').localeCompare(b.calendar_date || b.date || ''))
                     .map((a: any) => a.steps ?? null);
 
-                wearableDrift.sleep = trendDirection(sleepMinutes);
-                wearableDrift.hrv = trendDirection(hrvValues);
-                wearableDrift.steps = trendDirection(stepsValues);
+                wearableDrift.sleep = trendDirection(sleepMinutes, SLEEP_DECLINE_THRESHOLD);
+                wearableDrift.hrv = trendDirection(hrvValues, HRV_DECLINE_THRESHOLD);
+                wearableDrift.steps = trendDirection(stepsValues, STEPS_DECLINE_THRESHOLD);
 
                 if (wearableDrift.hrv === 'declining') {
                     reasons.push('HRV trending down over the last 4 weeks');
@@ -159,7 +156,6 @@ export class FormulaReviewService {
 
         return {
             needsReview,
-            autoOptimizeEnabled,
             reasons,
             driftScore: Math.min(100, driftScore),
             formulaAgeDays,
@@ -170,15 +166,14 @@ export class FormulaReviewService {
     }
 
     /**
-     * Send formula review notifications (email + SMS if phone available).
-     * Called by the scheduler when autoOptimizeFormula = false and review is needed,
-     * or when the system auto-applies a formula update.
+     * Send formula review notification (email + SMS if phone available).
+     * Called by the scheduler when a user's subscription renewal is approaching
+     * and their formula drift score indicates a review is recommended.
      */
     async sendReviewNotification(
         userId: string,
-        mode: 'manual_review_needed' | 'auto_updated',
         reasons: string[],
-        formulaName?: string,
+        daysUntilRenewal?: number,
     ): Promise<void> {
         const user = await usersRepository.getUser(userId);
         if (!user) return;
@@ -186,67 +181,38 @@ export class FormulaReviewService {
         const frontendUrl = getFrontendUrl();
         const reviewUrl = `${frontendUrl}/dashboard`;
 
-        if (mode === 'auto_updated') {
-            // Email
-            await sendNotificationEmail({
-                to: user.email,
-                subject: 'Your ONES formula has been updated',
-                title: 'Formula Updated',
-                content: `
-                    <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
-                    <p>Your personalized formula${formulaName ? ` <strong>${formulaName}</strong>` : ''} has been automatically updated based on your latest health data.</p>
-                    <p><strong>What triggered the update:</strong></p>
-                    <ul>${reasons.map(r => `<li>${r}</li>`).join('')}</ul>
-                    <p>Your next shipment will include the updated formula. You can review the changes and approve or roll back at any time.</p>
-                    <p style="margin-top:16px;font-size:13px;color:#6b7280;">
-                      To turn off automatic updates, visit Settings → Formula Preferences.
-                    </p>
-                `,
-                actionUrl: reviewUrl,
-                actionText: 'Review Changes',
-                type: 'formula_update',
-            });
+        const renewalNote = daysUntilRenewal !== undefined
+            ? `<p>Your next subscription renewal is in <strong>${daysUntilRenewal} day${daysUntilRenewal === 1 ? '' : 's'}</strong> — now is a great time to make sure your formula is up to date.</p>`
+            : '';
 
-            // SMS
-            if (user.phone) {
-                if (await consentsRepository.getUserConsent(user.id, 'sms_accountability')) {
-                    await sendNotificationSms({
-                        to: user.phone,
-                        message: `Your formula has been updated based on your latest health data. Review before your next shipment: ${reviewUrl}`,
-                        type: 'formula_update',
-                    });
-                }
-            }
-        } else {
-            // Manual review needed
-            await sendNotificationEmail({
-                to: user.email,
-                subject: 'Your ONES formula may need a review',
-                title: 'Formula Review Recommended',
-                content: `
-                    <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
-                    <p>Based on changes in your health data, we recommend reviewing your personalized formula.</p>
-                    <p><strong>What we noticed:</strong></p>
-                    <ul>${reasons.map(r => `<li>${r}</li>`).join('')}</ul>
-                    <p>Log in to review your Health Pulse data, upload any new blood tests, and approve any updates before your next order.</p>
-                `,
-                actionUrl: reviewUrl,
-                actionText: 'Review Your Formula',
-                type: 'formula_update',
-            });
+        await sendNotificationEmail({
+            to: user.email,
+            subject: 'Your Ones formula may need a review',
+            title: 'Formula Review Recommended',
+            content: `
+                <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
+                <p>Based on changes in your health data, we recommend reviewing your personalized formula.</p>
+                <p><strong>What we noticed:</strong></p>
+                <ul>${reasons.map(r => `<li>${r}</li>`).join('')}</ul>
+                ${renewalNote}
+                <p>Log in to review your Health Pulse data, upload any new blood tests, and chat with your AI practitioner to fine-tune your formula.</p>
+            `,
+            actionUrl: reviewUrl,
+            actionText: 'Review Your Formula',
+            type: 'formula_update',
+        });
 
-            if (user.phone) {
-                if (await consentsRepository.getUserConsent(user.id, 'sms_accountability')) {
-                    await sendNotificationSms({
-                        to: user.phone,
-                        message: `Your health data suggests your formula may need updating. Log in to review: ${reviewUrl}`,
-                        type: 'formula_update',
-                    });
-                }
+        if (user.phone) {
+            if (await consentsRepository.getUserConsent(user.id, 'sms_accountability')) {
+                await sendNotificationSms({
+                    to: user.phone,
+                    message: `Your health data suggests your Ones formula may need updating${daysUntilRenewal ? ` — your next renewal is in ${daysUntilRenewal} days` : ''}. Review: ${reviewUrl}`,
+                    type: 'formula_update',
+                });
             }
         }
 
-        logger.info('Formula review notification sent', { userId, mode, reasons });
+        logger.info('Formula review notification sent', { userId, reasons, daysUntilRenewal });
     }
 }
 

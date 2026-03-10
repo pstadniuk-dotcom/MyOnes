@@ -50,7 +50,7 @@ export function generateFormulaPDF(
           width: '*',
           stack: [
             {
-              text: 'ONES',
+              text: 'Ones',
               style: 'logo',
               color: BRAND_COLORS.primary,
               fontSize: 32,
@@ -548,11 +548,11 @@ export function generateFormulaPDF(
         },
         {
           text: [
-            'By using this formula, you acknowledge that ONES provides educational and informational services only. ',
+            'By using this formula, you acknowledge that Ones provides educational and informational services only. ',
             'The effectiveness and safety of supplements can vary based on individual health conditions, medications, and biochemistry. ',
             'Always inform your healthcare provider about all supplements you are taking.\n\n',
             { text: 'Quality Assurance: ', bold: true },
-            'All ingredients in ONES formulas are third-party tested for purity and potency. However, dietary supplements are not FDA-approved to diagnose, treat, cure, or prevent any disease.',
+            'All ingredients in Ones formulas are sourced from trusted suppliers and undergo rigorous quality control. However, dietary supplements are not FDA-approved to diagnose, treat, cure, or prevent any disease.',
           ],
           fontSize: 8,
           color: '#5D4037',
@@ -639,7 +639,7 @@ export function generateFormulaPDF(
           width: '*',
           stack: [
             {
-              text: 'ONES',
+              text: 'Ones',
               fontSize: 10,
               bold: true,
               color: BRAND_COLORS.primary,
@@ -654,7 +654,7 @@ export function generateFormulaPDF(
         },
         {
           width: 'auto',
-          text: 'myones.ai',
+          text: 'ones.health',
           fontSize: 8,
           color: BRAND_COLORS.gray,
           alignment: 'right',

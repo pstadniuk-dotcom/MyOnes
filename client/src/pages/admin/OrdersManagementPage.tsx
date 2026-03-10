@@ -155,24 +155,18 @@ export default function OrdersManagementPage() {
   const totalPages = Math.ceil((data?.total || 0) / limit);
 
   return (
-    <div className="p-8" data-testid="page-orders-management">
+    <div data-testid="page-orders-management">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" onClick={() => setLocation('/admin')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-                <Package className="h-8 w-8" />
-                Order Management
-              </h1>
-              <p className="text-muted-foreground">
-                View and manage all orders (90-day supply cycles)
-              </p>
-            </div>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Order Management
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              View and manage all orders (90-day supply cycles)
+            </p>
           </div>
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
@@ -277,7 +271,7 @@ export default function OrdersManagementPage() {
                             </Select>
                           </TableCell>
                           <TableCell>
-                            {order.amountCents ? `$${(order.amountCents / 100).toFixed(0)}` : '-'}
+                            {order.amountCents ? `$${(order.amountCents / 100).toFixed(2)}` : '-'}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
