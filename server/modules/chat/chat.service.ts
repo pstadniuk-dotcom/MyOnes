@@ -247,8 +247,23 @@ export class ChatService {
 
         for await (const event of stream) {
             if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-                yield { type: 'text', content: event.delta.text };
+                yield { type: 'text' as const, content: event.delta.text };
             }
+        }
+
+        // Yield usage info from the final message
+        try {
+            const finalMsg = await stream.finalMessage();
+            if (finalMsg.usage) {
+                yield {
+                    type: 'usage' as const,
+                    content: '',
+                    inputTokens: finalMsg.usage.input_tokens,
+                    outputTokens: finalMsg.usage.output_tokens,
+                };
+            }
+        } catch {
+            // Usage extraction is best-effort
         }
     }
 

@@ -18,6 +18,7 @@ import type { SafetyWarning } from '@shared/safety-types';
 import { recommendDailyProtocolCapsules } from '../../modules/chat/protocol-recommendation';
 import OpenAI from 'openai';
 import logger from '../../infra/logging/logger';
+import { logAiUsage, estimateTokenCount } from '../../modules/ai-usage/ai-usage.service';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -199,6 +200,9 @@ export class ChatController {
 
             let fullResponse = '';
             let chunkCount = 0;
+            const aiCallStart = Date.now();
+            let promptTokensActual = 0;
+            let completionTokensActual = 0;
 
             if (aiProvider === 'anthropic') {
                 const systemPrompt = fullSystemPrompt;
@@ -208,6 +212,9 @@ export class ChatController {
                         fullResponse += chunk.content;
                         chunkCount++;
                         sendSSE({ type: 'chunk', content: chunk.content, sessionId: chatSession.id, chunkIndex: chunkCount });
+                    } else if (chunk.type === 'usage') {
+                        promptTokensActual = (chunk as any).inputTokens || 0;
+                        completionTokensActual = (chunk as any).outputTokens || 0;
                     }
                 }
             } else {
@@ -215,6 +222,7 @@ export class ChatController {
                     model: model,
                     messages: conversationHistory,
                     stream: true,
+                    stream_options: { include_usage: true },
                     max_completion_tokens: 4096,
                     temperature: 0.7
                 });
@@ -226,8 +234,27 @@ export class ChatController {
                         chunkCount++;
                         sendSSE({ type: 'chunk', content, sessionId: chatSession.id, chunkIndex: chunkCount });
                     }
+                    // Capture usage from the final chunk (OpenAI sends it in the last event)
+                    if (chunk.usage) {
+                        promptTokensActual = chunk.usage.prompt_tokens || 0;
+                        completionTokensActual = chunk.usage.completion_tokens || 0;
+                    }
                 }
             }
+
+            // Log AI usage (non-blocking)
+            const aiCallDuration = Date.now() - aiCallStart;
+            const promptInput = conversationHistory.map(m => m.content || '').join(' ');
+            logAiUsage({
+                userId,
+                provider: aiProvider,
+                model,
+                feature: 'chat',
+                promptTokens: promptTokensActual || estimateTokenCount(promptInput),
+                completionTokens: completionTokensActual || estimateTokenCount(fullResponse),
+                durationMs: aiCallDuration,
+                sessionId: chatSession.id,
+            });
 
             // Extraction logic...
             let validatedFormula: any = null;

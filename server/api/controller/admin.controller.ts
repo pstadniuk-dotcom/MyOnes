@@ -894,6 +894,33 @@ export class AdminController {
             res.status(500).json({ error: 'Failed to fetch product catalog' });
         }
     }
+
+    // ── AI USAGE TRACKING ───────────────────────────────────────────────────
+
+    async getAiUsageSummary(req: Request, res: Response) {
+        try {
+            const days = parseInt(req.query.days as string) || 30;
+            const { getUsageSummary } = await import('../../modules/ai-usage/ai-usage.service');
+            const summary = await getUsageSummary(days);
+            res.json(summary);
+        } catch (error) {
+            logger.error('Error fetching AI usage summary', { error });
+            res.status(500).json({ error: 'Failed to fetch AI usage data' });
+        }
+    }
+
+    async getAiUsageByUser(req: Request, res: Response) {
+        try {
+            const userId = req.params.id;
+            const days = parseInt(req.query.days as string) || 30;
+            const { getUserUsageDetails } = await import('../../modules/ai-usage/ai-usage.service');
+            const details = await getUserUsageDetails(userId, days);
+            res.json(details);
+        } catch (error) {
+            logger.error('Error fetching user AI usage', { error });
+            res.status(500).json({ error: 'Failed to fetch user AI usage' });
+        }
+    }
 }
 
 export const adminController = new AdminController();

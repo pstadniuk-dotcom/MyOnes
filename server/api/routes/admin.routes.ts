@@ -85,6 +85,10 @@ router.patch('/ingredient-pricing/:id', requireAdmin, adminController.updateIngr
 // Product Catalog
 router.get('/products/catalog', requireAdmin, adminController.getProductCatalog);
 
+// AI Usage Tracking
+router.get('/ai-usage', requireAdmin, adminController.getAiUsageSummary);
+router.get('/ai-usage/user/:id', requireAdmin, adminController.getAiUsageByUser);
+
 // Audit & Compliance
 router.get('/audit-logs', requireAdmin, adminController.listAuditLogs);
 router.get('/audit-logs/admin', requireAdmin, adminController.listAdminAuditLogs);

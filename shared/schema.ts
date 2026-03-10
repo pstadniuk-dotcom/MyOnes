@@ -1923,6 +1923,34 @@ export type LiveChatMessage = typeof liveChatMessages.$inferSelect;
 export type InsertLiveChatCannedResponse = z.infer<typeof insertLiveChatCannedResponseSchema>;
 export type LiveChatCannedResponse = typeof liveChatCannedResponses.$inferSelect;
 
+// ============================================
+// AI USAGE TRACKING
+// ============================================
+
+export const aiUsageLogs = pgTable("ai_usage_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }), // null for anonymous/system calls
+  provider: varchar("provider", { length: 20 }).notNull(), // 'openai' | 'anthropic'
+  model: varchar("model", { length: 100 }).notNull(), // e.g. 'gpt-4o', 'claude-sonnet-4-6'
+  feature: varchar("feature", { length: 50 }).notNull(), // 'chat', 'formula', 'lab_analysis', 'blog', 'live_chat', 'optimize', 'agent'
+  promptTokens: integer("prompt_tokens").default(0).notNull(),
+  completionTokens: integer("completion_tokens").default(0).notNull(),
+  totalTokens: integer("total_tokens").default(0).notNull(),
+  estimatedCostCents: integer("estimated_cost_cents").default(0).notNull(), // Cost in cents (e.g. 12 = $0.12)
+  durationMs: integer("duration_ms"), // How long the API call took
+  sessionId: varchar("session_id"), // Optional chat session ID for correlation
+  metadata: json("metadata").$type<Record<string, any>>(), // Extra context
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAiUsageLogSchema = createInsertSchema(aiUsageLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAiUsageLog = z.infer<typeof insertAiUsageLogSchema>;
+export type AiUsageLog = typeof aiUsageLogs.$inferSelect;
+
 // ── PR Agent / Outreach System ──────────────────────────────────────────────
 
 export const outreachCategoryEnum = pgEnum('outreach_category', ['podcast', 'press']);

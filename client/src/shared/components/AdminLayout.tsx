@@ -82,6 +82,7 @@ const navSections: { label?: string; items: NavItem[] }[] = [
     label: 'Intelligence',
     items: [
       { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+      { label: 'AI Usage & Costs', href: '/admin/ai-usage', icon: DollarSign },
       { label: 'Conversations', href: '/admin/conversations', icon: MessageSquare },
       { label: 'PR Agent', href: '/admin/pr-agent', icon: Megaphone },
     ],
