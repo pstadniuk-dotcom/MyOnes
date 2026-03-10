@@ -731,7 +731,7 @@ export default function ProfilePage() {
                       value={healthData.weightLbs}
                       onChange={(e) => setHealthData({ ...healthData, weightLbs: e.target.value })}
                       placeholder="Enter weight in lbs"
-                      min="40"
+                      min="0"
                       max="500"
                       data-testid="input-weight"
                     />

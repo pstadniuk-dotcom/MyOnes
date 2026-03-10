@@ -3,16 +3,10 @@ import { Request } from 'express';
 import { usersRepository } from '../users/users.repository';
 import { membershipRepository } from '../membership/membership.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
-import { consentsRepository } from '../consents/consents.repository';
 import { manufacturerPricingService } from '../formulas/manufacturer-pricing.service';
-import { notificationsService } from '../notifications/notifications.service';
-import { sendNotificationEmail } from '../../utils/emailService';
 import { db } from '../../infra/db/db';
-import { ingredientPricing } from '@shared/schema';
-import { normalizeIngredientName } from '@shared/ingredients';
+import { ingredientPricing, users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
-import { autoShipService } from './autoship.service';
-import { autoShipRepository } from './autoship.repository';
 import logger from '../../infra/logging/logger';
 import { getBaseUrl } from '../../utils/urlHelper';
 
@@ -61,8 +55,13 @@ export interface BillingProvider {
     expiresAt: string;
   }>;
   cancelSubscription(_userId: string, _subscriptionId: string): Promise<{
-    cancelledAt: string;
+    cancelledAt?: string;
+    expiresAt?: string;
     status: 'cancelled';
+  }>;
+  resumeSubscription(_userId: string, _subscriptionId: string): Promise<{
+    resumedAt: string;
+    status: 'active';
   }>;
   handleStripeWebhook(_signature: string | undefined, _rawBody: Buffer): Promise<void>;
 }
@@ -94,6 +93,18 @@ class DatabaseBillingProvider implements BillingProvider {
     if (status === 'past_due' || status === 'unpaid' || status === 'incomplete' || status === 'incomplete_expired') return 'past_due';
     if (status === 'paused') return 'paused';
     return 'cancelled';
+  }
+
+  /**
+   * In Stripe SDK v18+, `current_period_end` lives on SubscriptionItem,
+   * not on Subscription directly. Extract it from the first item.
+   */
+  private getCurrentPeriodEnd(sub: Stripe.Subscription): Date | null {
+    const item = sub.items?.data?.[0];
+    if (item && typeof item.current_period_end === 'number') {
+      return new Date(item.current_period_end * 1000);
+    }
+    return null;
   }
 
   private normalizeIngredientKey(name: string): string {
@@ -160,14 +171,18 @@ class DatabaseBillingProvider implements BillingProvider {
       if (stripeSubscriptionId) {
         const stripe = this.getStripeClient();
         const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-        const periodEnd = stripeSub.items?.data?.[0]?.current_period_end ?? null;
+        const currentPeriodEnd = this.getCurrentPeriodEnd(stripeSub);
+        const pausedUntil =
+          typeof stripeSub.pause_collection?.resumes_at === 'number'
+            ? new Date(stripeSub.pause_collection.resumes_at * 1000)
+            : null;
         await this.upsertInternalSubscription(userId, {
           plan,
           status: this.mapStripeStatus(stripeSub.status),
           stripeCustomerId,
           stripeSubscriptionId,
-          renewsAt: periodEnd ? new Date(periodEnd * 1000) : null,
-          pausedUntil: stripeSub.pause_collection?.resumes_at ? new Date(stripeSub.pause_collection.resumes_at * 1000) : null,
+          renewsAt: currentPeriodEnd,
+          pausedUntil,
         });
       }
 
@@ -201,7 +216,7 @@ class DatabaseBillingProvider implements BillingProvider {
         return;
       }
 
-      const chargedCents = Number(metadata.formulaChargedCents || metadata.formulaPriceCents || 0);
+      const formulaCents = Number(metadata.formulaChargedCents || metadata.formulaPriceCents || 0);
       const mfrCostCents = Number(metadata.manufacturerCostCents || 0);
       let quoteId = metadata.manufacturerQuoteId || null;
       let quoteExpiresAt = metadata.manufacturerQuoteExpiresAt
@@ -243,51 +258,18 @@ class DatabaseBillingProvider implements BillingProvider {
         }
       }
 
-      // ── Build order-level consent & safety snapshot ──────────────────
-      let consentSnapshot: any = null;
-      try {
-        const formula = await formulasRepository.getFormula(formulaId);
-        const userConsents = await consentsRepository.getUserConsents(userId);
-        const activeConsents: Array<{ consentType: string; grantedAt: string; consentVersion: string }> = userConsents
-          .filter(c => c.granted && !c.revokedAt)
-          .map(c => ({
-            consentType: c.consentType,
-            grantedAt: c.grantedAt.toISOString(),
-            consentVersion: c.consentVersion,
-          }));
-
-        const safetyValidation = (formula as any)?.safetyValidation;
-        const formulaWarnings = safetyValidation?.warnings || [];
-
-        consentSnapshot = {
-          activeConsents,
-          formulaWarnings,
-          warningsAcknowledgedAt: formula?.warningsAcknowledgedAt
-            ? formula.warningsAcknowledgedAt.toISOString()
-            : null,
-          disclaimerVersion: (formula as any)?.disclaimerVersion || '1.0',
-          disclaimerText: 'These statements have not been evaluated by the Food and Drug Administration. This product is not intended to diagnose, treat, cure, or prevent any disease. Consult your healthcare provider before starting any supplement regimen. By placing this order, you confirm you have reviewed all safety warnings and accept full responsibility for your supplementation choices.',
-          ipAddress: null, // Stripe webhook context — no direct user IP available
-          userAgent: null,
-          capturedAt: new Date().toISOString(),
-        };
-      } catch (snapErr) {
-        logger.warn('Failed to build order consent snapshot', { userId, formulaId, error: snapErr });
-      }
-
-      // Create order record
+      // Create order record - use session total to capture both formula and membership
       const order = await usersRepository.createOrder({
         userId,
         formulaId,
         formulaVersion,
         status: 'processing',
-        amountCents: chargedCents,
+        amountCents: session.amount_total ?? formulaCents,
         manufacturerCostCents: mfrCostCents,
         supplyWeeks: 8,
         manufacturerQuoteId: quoteId,
         manufacturerQuoteExpiresAt: quoteExpiresAt,
         stripeSessionId: session.id,
-        ...(consentSnapshot ? { consentSnapshot } : {}),
       });
 
       logger.info('Order created from Stripe checkout', {
@@ -295,57 +277,15 @@ class DatabaseBillingProvider implements BillingProvider {
         userId,
         formulaId,
         formulaVersion,
-        chargedCents,
+        chargedCents: formulaCents,
         mfrCostCents,
         quoteId,
-        hasConsentSnapshot: !!consentSnapshot,
       });
 
       // Update user's last order date
       await usersRepository.updateUser(userId, {
         lastOrderDate: new Date(),
       });
-
-      // ── Send order confirmation email + in-app notification ──────────
-      try {
-        const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
-        const amountDisplay = chargedCents > 0 ? `$${(chargedCents / 100).toFixed(2)}` : '';
-
-        if (await notificationsService.shouldSendEmail(userId, 'billing')) {
-          await sendNotificationEmail({
-            to: user.email,
-            subject: 'Your Ones order is confirmed!',
-            title: 'Order Confirmed',
-            type: 'order_update',
-            content: `
-              <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
-              <p>Great news — your personalized supplement order has been placed! 🎉</p>
-              ${amountDisplay ? `<p><strong>Total:</strong> ${amountDisplay}</p>` : ''}
-              <p><strong>Formula:</strong> V${formulaVersion}</p>
-              <p><strong>Supply:</strong> 8 weeks</p>
-              <p>We'll notify you when your formula ships. In the meantime, you can track your order status in your dashboard.</p>
-            `,
-            actionUrl: `${frontendUrl}/dashboard/orders`,
-            actionText: 'View My Order',
-          });
-        }
-
-        await notificationsService.create({
-          userId,
-          type: 'order_update',
-          title: 'Order Confirmed',
-          content: `Your supplement order (Formula V${formulaVersion}) has been placed and is being prepared.`,
-          orderId: order.id,
-          formulaId,
-          metadata: {
-            actionUrl: '/dashboard/orders',
-            icon: 'package',
-            priority: 'medium',
-          },
-        });
-      } catch (notifErr) {
-        logger.warn('Failed to send order confirmation notification', { userId, orderId: order.id, error: notifErr });
-      }
 
       // Place production order with Alive if we have a quote
       if (quoteId) {
@@ -375,32 +315,6 @@ class DatabaseBillingProvider implements BillingProvider {
           formulaId,
         });
       }
-
-      // ── Create auto-ship subscription for recurring formula deliveries ──
-      // Only create auto-ship if the user opted in at checkout
-      if (metadata.enableAutoShip !== '1') {
-        logger.info('Auto-ship not enabled for this order — skipping', { userId, formulaId });
-      } else try {
-        const memberDiscountApplied = metadata.memberDiscountApplied === '1';
-        await autoShipService.createAutoShip({
-          userId,
-          formulaId,
-          formulaVersion,
-          priceCents: chargedCents,
-          manufacturerCostCents: mfrCostCents,
-          memberDiscountApplied,
-          quoteId: quoteId || undefined,
-          quoteExpiresAt: quoteExpiresAt ? quoteExpiresAt.toISOString() : undefined,
-        });
-        logger.info('Auto-ship created after first formula order', { userId, formulaId });
-      } catch (autoShipErr) {
-        // Non-blocking: auto-ship failure shouldn't break the order
-        logger.error('Failed to create auto-ship after checkout', {
-          userId,
-          formulaId,
-          error: autoShipErr instanceof Error ? autoShipErr.message : autoShipErr,
-        });
-      }
     }
   }
 
@@ -409,23 +323,6 @@ class DatabaseBillingProvider implements BillingProvider {
     const stripeSubscriptionId = sub.id;
     const stripeCustomerId = typeof sub.customer === 'string' ? sub.customer : null;
 
-    // ── Check if this is an auto-ship subscription ──────────────────────
-    const autoShip = await autoShipRepository.getByStripeSubscriptionId(stripeSubscriptionId);
-    if (autoShip) {
-      const periodEnd = sub.items?.data?.[0]?.current_period_end ?? null;
-      const updates: any = {};
-      if (periodEnd) updates.nextShipmentDate = new Date(periodEnd * 1000);
-      if (sub.status === 'canceled' || sub.status === 'unpaid') updates.status = 'cancelled';
-      else if (sub.pause_collection) updates.status = 'paused';
-      else if (sub.status === 'active' || sub.status === 'trialing') updates.status = 'active';
-      if (Object.keys(updates).length > 0) {
-        await autoShipRepository.update(autoShip.id, updates);
-        logger.info('Auto-ship subscription updated via Stripe webhook', { autoShipId: autoShip.id, updates });
-      }
-      return;
-    }
-
-    // ── Membership subscription ──────────────────────────────────────────
     let user = await usersRepository.getUserByStripeSubscriptionId(stripeSubscriptionId);
     if (!user && stripeCustomerId) {
       user = await usersRepository.getUserByStripeCustomerId(stripeCustomerId);
@@ -441,13 +338,12 @@ class DatabaseBillingProvider implements BillingProvider {
     });
 
     const plan = this.resolvePlan(sub.metadata?.plan).plan;
-    const periodEnd = sub.items?.data?.[0]?.current_period_end ?? null;
     await this.upsertInternalSubscription(user.id, {
       plan,
       status: this.mapStripeStatus(sub.status),
       stripeCustomerId,
       stripeSubscriptionId,
-      renewsAt: periodEnd ? new Date(periodEnd * 1000) : null,
+      renewsAt: this.getCurrentPeriodEnd(sub),
       pausedUntil: sub.pause_collection?.resumes_at ? new Date(sub.pause_collection.resumes_at * 1000) : null,
     });
   }
@@ -457,18 +353,6 @@ class DatabaseBillingProvider implements BillingProvider {
     const stripeSubscriptionId = sub.id;
     const stripeCustomerId = typeof sub.customer === 'string' ? sub.customer : null;
 
-    // ── Check if this is an auto-ship subscription ──────────────────────
-    const autoShip = await autoShipRepository.getByStripeSubscriptionId(stripeSubscriptionId);
-    if (autoShip) {
-      await autoShipRepository.update(autoShip.id, {
-        status: 'cancelled' as any,
-        nextShipmentDate: null,
-      });
-      logger.info('Auto-ship subscription deleted via Stripe webhook', { autoShipId: autoShip.id });
-      return;
-    }
-
-    // ── Membership subscription ──────────────────────────────────────────
     let user = await usersRepository.getUserByStripeSubscriptionId(stripeSubscriptionId);
     if (!user && stripeCustomerId) {
       user = await usersRepository.getUserByStripeCustomerId(stripeCustomerId);
@@ -491,251 +375,90 @@ class DatabaseBillingProvider implements BillingProvider {
     if (user.membershipTier && !user.membershipCancelledAt) {
       await membershipRepository.cancelUserMembership(user.id);
     }
-
-    // ── Send subscription cancelled notification ──────────────────────
-    try {
-      const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
-
-      if (await notificationsService.shouldSendEmail(user.id, 'billing')) {
-        await sendNotificationEmail({
-          to: user.email,
-          subject: 'Your Ones subscription has been cancelled',
-          title: 'Subscription Cancelled',
-          type: 'order_update',
-          content: `
-            <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
-            <p>Your Ones subscription has been cancelled. You won't be charged going forward.</p>
-            <p>If you still have supply remaining, keep taking your formula as directed. Your health data and formula history are saved and ready whenever you'd like to come back.</p>
-            <p>We'd love to know what we could do better — feel free to reach out to our support team anytime.</p>
-          `,
-          actionUrl: `${frontendUrl}/dashboard`,
-          actionText: 'Visit Dashboard',
-        });
-      }
-
-      await notificationsService.create({
-        userId: user.id,
-        type: 'order_update',
-        title: 'Subscription Cancelled',
-        content: 'Your subscription has been cancelled. Your formula and health data are saved if you decide to return.',
-        metadata: {
-          actionUrl: '/dashboard/orders',
-          icon: 'x-circle',
-          priority: 'medium',
-        },
-      });
-    } catch (notifErr) {
-      logger.warn('Failed to send subscription cancelled notification', { userId: user.id, error: notifErr });
-    }
   }
 
-  /**
-   * Handle a paid invoice — currently only marks subscription active.
-   *
-   * ────────────────────────────────────────────────────────────────
-   * AUTO-SHIP TODO (Phase 2)
-   * ────────────────────────────────────────────────────────────────
-   * When auto-ship is implemented, this handler should:
-   *
-   * 1. Resolve the user's current active formula via
-   *    formulasRepository.getCurrentFormulaByUser(userId).
-   *
-   * 2. Fetch the latest manufacturer quote for that formula.
-   *    If the formula changed since the subscription was created,
-   *    a NEW quote must be obtained (Alive /get-quote) and the
-   *    Stripe subscription-item price updated BEFORE the invoice
-   *    finalises. The new manufacturerQuoteId must be stored on
-   *    the resulting order so fulfilment uses the correct quote.
-   *
-   * 3. Create the order:
-   *    await usersRepository.createOrder({
-   *      userId,
-   *      formulaId: activeFormula.id,
-   *      formulaVersion: activeFormula.version,
-   *      manufacturerQuoteId: latestQuote.id,   // ← critical
-   *      manufacturerCostCents: latestQuote.costCents,
-   *      amountCents: chargedAmount,
-   *      supplyWeeks: 8,
-   *      status: 'processing',
-   *    });
-   *
-   * 4. Advance the user's review schedule nextReviewDate forward
-   *    by one supply cycle.
-   *
-   * 5. Trigger fulfilment (Alive /mix-product) with the new quote.
-   *
-   * Key concern:  If the formula changed, the quote changes, and
-   * therefore the price changes. The user must be notified of the
-   * new price *before* the invoice finalises. Use Stripe's
-   * `invoice.upcoming` webhook or a pre-renewal check (10 days
-   * out) to recalculate and update the subscription item price.
-   * ────────────────────────────────────────────────────────────────
-   */
   private async handleInvoicePaid(event: Stripe.Event) {
     const invoice = event.data.object as Stripe.Invoice;
-    const subscriptionRef = invoice.parent?.subscription_details?.subscription;
-    const stripeSubscriptionId = typeof subscriptionRef === 'string'
-      ? subscriptionRef
-      : subscriptionRef?.id || null;
+    const stripeSubscriptionId = typeof (invoice as any).subscription === 'string'
+      ? (invoice as any).subscription
+      : (invoice as any).subscription?.id || null;
+
     if (!stripeSubscriptionId) {
       return;
     }
 
-    // ── Check if this is an auto-ship invoice ──────────────────────────
-    const autoShip = await autoShipRepository.getByStripeSubscriptionId(stripeSubscriptionId);
-    if (autoShip) {
-      // billing_reason distinguishes invoice types:
-      //   'subscription_create' → first invoice at subscription creation (no-op: order already placed via checkout)
-      //   'subscription_cycle'  → recurring renewal (trial end + every 8 weeks after)
-      const billingReason = (invoice as any).billing_reason;
-      if (billingReason === 'subscription_create') {
-        logger.info('Auto-ship subscription_create invoice — skipping (order placed via checkout)', {
-          autoShipId: autoShip.id,
-          stripeSubscriptionId,
-          billingReason,
-        });
-      }
+    const stripe = this.getStripeClient();
+    const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
 
-      // Real renewal (includes trial-to-active transition and recurring charges)
-      if (billingReason === 'subscription_cycle') {
-        const invoiceAmountCents = invoice.amount_paid ?? 0;
-        logger.info('Auto-ship renewal invoice paid', {
-          autoShipId: autoShip.id,
-          stripeSubscriptionId,
-          amountCents: invoiceAmountCents,
-          billingReason,
-        });
-        await autoShipService.processAutoShipRenewal(stripeSubscriptionId, invoiceAmountCents);
-      }
-
-      return; // Don't fall through to membership logic
-    }
-
-    // ── Membership subscription: mark active ──────────────────────────
     const existing = await usersRepository.getSubscriptionByStripeSubscriptionId(stripeSubscriptionId);
     if (existing) {
       await usersRepository.updateSubscriptionByStripeSubscriptionId(stripeSubscriptionId, {
         status: 'active',
+        renewsAt: this.getCurrentPeriodEnd(sub),
       });
     }
   }
 
   private async handleInvoicePaymentFailed(event: Stripe.Event) {
     const invoice = event.data.object as Stripe.Invoice;
-    const subscriptionRef = invoice.parent?.subscription_details?.subscription;
-    const stripeSubscriptionId = typeof subscriptionRef === 'string'
-      ? subscriptionRef
-      : subscriptionRef?.id || null;
+    const stripeSubscriptionId = typeof (invoice as any).subscription === 'string'
+      ? (invoice as any).subscription
+      : (invoice as any).subscription?.id || null;
+
     if (!stripeSubscriptionId) {
       return;
     }
 
-    // ── Check if this is an auto-ship invoice ──────────────────────────
-    const autoShip = await autoShipRepository.getByStripeSubscriptionId(stripeSubscriptionId);
-    if (autoShip) {
-      logger.warn('Auto-ship payment failed', { autoShipId: autoShip.id, stripeSubscriptionId });
-      // Pause auto-ship on payment failure
-      await autoShipRepository.update(autoShip.id, { status: 'paused' as any });
-
-      try {
-        const user = await usersRepository.getUser(autoShip.userId);
-        if (user) {
-          const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
-
-          if (await notificationsService.shouldSendEmail(user.id, 'billing')) {
-            await sendNotificationEmail({
-              to: user.email,
-              subject: 'Action needed: Auto-ship payment failed',
-              title: 'Auto-Ship Payment Failed',
-              type: 'order_update',
-              content: `
-                <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
-                <p>We couldn't process your auto-ship payment. Your auto-ship has been paused.</p>
-                <p>Please update your payment method and resume auto-ship from your dashboard.</p>
-              `,
-              actionUrl: `${frontendUrl}/dashboard/formula`,
-              actionText: 'Update Payment Method',
-            });
-          }
-
-          await notificationsService.create({
-            userId: user.id,
-            type: 'order_update',
-            title: 'Auto-Ship Payment Failed',
-            content: 'Your auto-ship payment failed and has been paused. Please update your payment method.',
-            metadata: { actionUrl: '/dashboard/formula', icon: 'alert-circle', priority: 'high' },
-          });
-        }
-      } catch (notifErr) {
-        logger.warn('Failed to send auto-ship payment failed notification', { autoShipId: autoShip.id, error: notifErr });
-      }
-
-      return; // Don't fall through to membership logic
-    }
-
-    // ── Membership subscription: mark past_due ──────────────────────────
     const existing = await usersRepository.getSubscriptionByStripeSubscriptionId(stripeSubscriptionId);
     if (existing) {
       await usersRepository.updateSubscriptionByStripeSubscriptionId(stripeSubscriptionId, {
         status: 'past_due',
       });
-
-      // ── Send payment failed notification ──────────────────────────────
-      try {
-        const user = await usersRepository.getUser(existing.userId);
-        if (user) {
-          const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
-
-          if (await notificationsService.shouldSendEmail(user.id, 'billing')) {
-            await sendNotificationEmail({
-              to: user.email,
-              subject: 'Action needed: Payment failed for your Ones subscription',
-              title: 'Payment Failed',
-              type: 'order_update',
-              content: `
-                <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
-                <p>We weren't able to process your latest subscription payment. Your subscription is now <strong>past due</strong>.</p>
-                <p>Please update your payment method to avoid any interruption to your supplement deliveries.</p>
-              `,
-              actionUrl: `${frontendUrl}/dashboard/orders`,
-              actionText: 'Update Payment Method',
-            });
-          }
-
-          await notificationsService.create({
-            userId: user.id,
-            type: 'order_update',
-            title: 'Payment Failed',
-            content: 'Your subscription payment could not be processed. Please update your payment method.',
-            metadata: {
-              actionUrl: '/dashboard/orders',
-              icon: 'alert-circle',
-              priority: 'high',
-            },
-          });
-        }
-      } catch (notifErr) {
-        logger.warn('Failed to send payment failed notification', { stripeSubscriptionId, error: notifErr });
-      }
     }
   }
 
   async listBillingHistory(userId: string): Promise<BillingHistoryItem[]> {
     const orders = await usersRepository.listOrdersByUser(userId);
+    const stripe = this.getStripeClient();
 
-    return orders.map((order) => ({
-      id: order.id,
-      date: order.placedAt,
-      description: `Supplement Order - Formula v${order.formulaVersion}`,
-      amountCents: typeof order.amountCents === 'number' ? order.amountCents : null,
-      currency: 'USD',
-      status: order.status === 'delivered'
-        ? 'paid'
-        : order.status === 'cancelled'
+    return Promise.all(orders.map(async (order) => {
+      let amountCents = typeof order.amountCents === 'number' ? order.amountCents : null;
+      let description = `Supplement Order - Formula v${order.formulaVersion}`;
+
+      // Sync with Stripe session for accuracy (especially for historical records)
+      if (order.stripeSessionId) {
+        try {
+          const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
+          if (session.amount_total !== null) {
+            amountCents = session.amount_total;
+            // Lazy sync: update DB if it's different and not null
+            if (order.amountCents !== amountCents) {
+              await usersRepository.updateOrder(order.id, { amountCents });
+            }
+          }
+
+          if (session.metadata?.includeMembership === '1') {
+            description += ' + Membership';
+          }
+        } catch (error) {
+          logger.error('Error syncing order amount with Stripe', { orderId: order.id, error });
+        }
+      }
+
+      return {
+        id: order.id,
+        date: order.placedAt,
+        description,
+        amountCents,
+        currency: 'USD',
+        status: order.status === 'cancelled'
           ? 'failed'
-          : 'pending',
-      invoiceId: order.id,
-      invoiceUrl: `/api/billing/invoices/${order.id}`,
+          : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered')
+            ? 'paid'
+            : 'pending',
+        invoiceId: order.id,
+        invoiceUrl: `/api/billing/invoices/${order.id}`,
+      };
     }));
   }
 
@@ -745,26 +468,67 @@ class DatabaseBillingProvider implements BillingProvider {
       return null;
     }
 
+    let totalCents = typeof order.amountCents === 'number' ? order.amountCents : null;
+    let lineItems = [
+      {
+        label: `Custom Formula v${order.formulaVersion}`,
+        formulaVersion: order.formulaVersion,
+        supplyMonths: order.supplyMonths ?? null,
+        amountCents: totalCents,
+      },
+    ];
+
+    if (order.stripeSessionId) {
+      try {
+        const stripe = this.getStripeClient();
+        const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
+
+        if (session.amount_total !== null) {
+          totalCents = session.amount_total;
+        }
+
+        const fbCents = session.metadata?.formulaChargedCents ? parseInt(session.metadata.formulaChargedCents) : null;
+        const mbCents = session.metadata?.membershipPriceCents ? parseInt(session.metadata.membershipPriceCents) : null;
+        const includeMembership = session.metadata?.includeMembership === '1';
+        const tierKey = session.metadata?.membershipTier;
+
+        if (includeMembership && mbCents) {
+          const tierName = tierKey ? (tierKey.charAt(0).toUpperCase() + tierKey.slice(1)) : 'Founding';
+          lineItems = [
+            {
+              label: `Custom Formula v${order.formulaVersion}`,
+              formulaVersion: order.formulaVersion,
+              supplyMonths: order.supplyMonths ?? null,
+              amountCents: fbCents ?? (totalCents ? totalCents - mbCents : null),
+            },
+            {
+              label: `${tierName} Member Subscription`,
+              formulaVersion: 0,
+              supplyMonths: 1,
+              amountCents: mbCents,
+            },
+          ];
+        } else if (lineItems[0]) {
+          lineItems[0].amountCents = totalCents;
+        }
+      } catch (error) {
+        logger.error('Error fetching Stripe session in getInvoice', { orderId: order.id, error });
+      }
+    }
+
     return {
       id: order.id,
       userId,
       orderId: order.id,
-      amountCents: typeof order.amountCents === 'number' ? order.amountCents : null,
+      amountCents: totalCents,
       currency: 'USD',
-      status: order.status === 'delivered'
-        ? 'paid'
-        : order.status === 'cancelled'
-          ? 'failed'
+      status: order.status === 'cancelled'
+        ? 'failed'
+        : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered')
+          ? 'paid'
           : 'pending',
       issuedAt: order.placedAt,
-      lineItems: [
-        {
-          label: `Custom Formula v${order.formulaVersion}`,
-          formulaVersion: order.formulaVersion,
-          supplyMonths: order.supplyMonths ?? null,
-          amountCents: typeof order.amountCents === 'number' ? order.amountCents : null,
-        },
-      ],
+      lineItems,
     };
   }
 
@@ -786,12 +550,10 @@ class DatabaseBillingProvider implements BillingProvider {
 
     const doseByIngredient = new Map<string, { name: string; doseMg: number }>();
     const addIngredient = (name: unknown, amount: unknown) => {
-      const rawName = String(name || '').trim();
+      const ingredientName = String(name || '').trim();
       const doseMg = Number(amount || 0);
-      if (!rawName || !Number.isFinite(doseMg) || doseMg <= 0) return;
+      if (!ingredientName || !Number.isFinite(doseMg) || doseMg <= 0) return;
 
-      // Resolve aliases (e.g. "Cat's Claw" → "Cats Claw") before key normalization
-      const ingredientName = normalizeIngredientName(rawName);
       const key = this.normalizeIngredientKey(ingredientName);
       const existing = doseByIngredient.get(key);
       if (existing) {
@@ -877,7 +639,6 @@ class DatabaseBillingProvider implements BillingProvider {
     const frontendUrl = req ? getBaseUrl(req) : (process.env.FRONTEND_URL || 'http://localhost:5000').replace(/\/$/, '');
 
     const includeMembership = payload?.includeMembership !== false;
-    const enableAutoShip = payload?.enableAutoShip === true;
     const formulaId = typeof payload?.formulaId === 'string' ? payload.formulaId : undefined;
     const { plan, intervalCount } = this.resolvePlan(payload?.plan);
 
@@ -990,7 +751,6 @@ class DatabaseBillingProvider implements BillingProvider {
       if (applyMemberDiscount) {
         metadata.memberDiscountApplied = '1';
       }
-      metadata.enableAutoShip = enableAutoShip ? '1' : '0';
     }
 
     if (availableTier) {
@@ -1001,14 +761,6 @@ class DatabaseBillingProvider implements BillingProvider {
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
 
     if (formula) {
-      // Build formula description for Stripe checkout page
-      let formulaDescription: string | undefined;
-      if (includeMembership || applyMemberDiscount) {
-        formulaDescription = 'Smart Re-Order: AI-reviewed & auto-charged every ~8 weeks';
-      } else if (enableAutoShip) {
-        formulaDescription = 'Auto-ships every 8 weeks';
-      }
-
       lineItems.push({
         price_data: {
           currency: 'usd',
@@ -1017,7 +769,6 @@ class DatabaseBillingProvider implements BillingProvider {
             name: applyMemberDiscount
               ? `Personalized Formula v${formula.version} (Member Price)`
               : `Personalized Formula v${formula.version}`,
-            ...(formulaDescription ? { description: formulaDescription } : {}),
           },
         },
         quantity: 1,
@@ -1049,8 +800,8 @@ class DatabaseBillingProvider implements BillingProvider {
       metadata,
       subscription_data: includeMembership
         ? {
-            metadata,
-          }
+          metadata,
+        }
         : undefined,
       line_items: lineItems,
       client_reference_id: user.id,
@@ -1068,7 +819,7 @@ class DatabaseBillingProvider implements BillingProvider {
     };
   }
 
-  async cancelSubscription(userId: string, subscriptionId: string): Promise<{ cancelledAt: string; status: 'cancelled' }> {
+  async cancelSubscription(userId: string, subscriptionId: string): Promise<{ cancelledAt?: string; expiresAt?: string; status: 'cancelled' }> {
     const stripe = this.getStripeClient();
     const user = await usersRepository.getUser(userId);
     if (!user) {
@@ -1080,14 +831,19 @@ class DatabaseBillingProvider implements BillingProvider {
       throw new Error('SUBSCRIPTION_NOT_FOUND');
     }
 
-    await stripe.subscriptions.cancel(stripeSubscriptionId);
+    // Use cancel_at_period_end: true instead of immediate cancellation
+    const stripeSub = await stripe.subscriptions.update(stripeSubscriptionId, {
+      cancel_at_period_end: true
+    });
+
+    const expiresAt = this.getCurrentPeriodEnd(stripeSub);
 
     await this.upsertInternalSubscription(userId, {
       plan: 'monthly',
       status: 'cancelled',
       stripeCustomerId: user.stripeCustomerId,
       stripeSubscriptionId,
-      renewsAt: null,
+      renewsAt: expiresAt,
       pausedUntil: null,
     });
 
@@ -1097,7 +853,49 @@ class DatabaseBillingProvider implements BillingProvider {
 
     return {
       cancelledAt: new Date().toISOString(),
+      expiresAt: expiresAt?.toISOString(),
       status: 'cancelled',
+    };
+  }
+
+  async resumeSubscription(userId: string, subscriptionId: string): Promise<{ resumedAt: string; status: 'active' }> {
+    const stripe = this.getStripeClient();
+    const user = await usersRepository.getUser(userId);
+    if (!user) {
+      throw new Error('USER_NOT_FOUND');
+    }
+
+    const stripeSubscriptionId = user.stripeSubscriptionId || subscriptionId;
+    if (!stripeSubscriptionId) {
+      throw new Error('SUBSCRIPTION_NOT_FOUND');
+    }
+
+    // Re-active in Stripe by unsetting cancel_at_period_end
+    const stripeSub = await stripe.subscriptions.update(stripeSubscriptionId, {
+      cancel_at_period_end: false
+    });
+
+    const renewsAt = this.getCurrentPeriodEnd(stripeSub);
+
+    await this.upsertInternalSubscription(userId, {
+      plan: 'monthly',
+      status: 'active',
+      stripeCustomerId: user.stripeCustomerId,
+      stripeSubscriptionId,
+      renewsAt,
+      pausedUntil: null,
+    });
+
+    // Also reactivate membership if it was cancelled
+    if (user.membershipTier && user.membershipCancelledAt) {
+      await db.update(users)
+        .set({ membershipCancelledAt: null })
+        .where(eq(users.id, userId));
+    }
+
+    return {
+      resumedAt: new Date().toISOString(),
+      status: 'active',
     };
   }
 
@@ -1136,7 +934,7 @@ class DatabaseBillingProvider implements BillingProvider {
 }
 
 export class BillingService {
-  constructor(private readonly provider: BillingProvider = new DatabaseBillingProvider()) {}
+  constructor(private readonly provider: BillingProvider = new DatabaseBillingProvider()) { }
 
   async listBillingHistory(userId: string) {
     return this.provider.listBillingHistory(userId);
@@ -1156,6 +954,10 @@ export class BillingService {
 
   async cancelSubscription(userId: string, subscriptionId: string) {
     return this.provider.cancelSubscription(userId, subscriptionId);
+  }
+
+  async resumeSubscription(userId: string, subscriptionId: string) {
+    return this.provider.resumeSubscription(userId, subscriptionId);
   }
 
   async handleStripeWebhook(signature: string | undefined, rawBody: Buffer) {

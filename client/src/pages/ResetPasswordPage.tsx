@@ -6,7 +6,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/components/ui/form';
 import { Input } from '@/shared/components/ui/input';
-import { Loader2, ArrowLeft, Lock, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, Lock, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest } from '@/shared/lib/api';
@@ -25,6 +25,8 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -185,12 +187,29 @@ export default function ResetPasswordPage() {
                     <FormItem>
                       <FormLabel>New Password</FormLabel>
                       <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="Enter new password"
-                          autoComplete="new-password"
-                          {...field}
-                        />
+                        <div className="relative">
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Enter new password"
+                            autoComplete="new-password"
+                            {...field}
+                            className="pr-10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="!absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -204,12 +223,29 @@ export default function ResetPasswordPage() {
                     <FormItem>
                       <FormLabel>Confirm Password</FormLabel>
                       <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="Confirm new password"
-                          autoComplete="new-password"
-                          {...field}
-                        />
+                        <div className="relative">
+                          <Input
+                            type={showConfirmPassword ? "text" : "password"}
+                            placeholder="Confirm new password"
+                            autoComplete="new-password"
+                            {...field}
+                            className="pr-10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="!absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

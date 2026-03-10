@@ -15,12 +15,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/shared/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/components/ui/dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest, queryClient } from '@/shared/lib/queryClient';
-import { Link } from 'wouter';
-import type { Order, Subscription, PaymentMethodRef } from '@shared/schema';
+import type { Order, Subscription as BaseSubscription, PaymentMethodRef } from '@shared/schema';
+
+// Extend Subscription type with membership details returned from the backend
+interface Subscription extends BaseSubscription {
+  membershipTier?: string | null;
+  membershipPriceCents?: number | null;
+}
 import {
   Package,
   CreditCard,
@@ -34,17 +46,37 @@ import {
   ExternalLink,
   Download,
   Pause,
-  Play
+  Play,
+  RotateCcw,
+  FileText,
+  Loader2
 } from 'lucide-react';
 
-// Types for billing history
 interface BillingRecord {
   id: string;
   date: string;
   description: string;
-  amount: number;
-  status: 'paid' | 'pending' | 'failed';
-  invoiceUrl?: string;
+  amountCents: number | null;
+  currency: string;
+  status: 'paid' | 'pending' | 'failed' | 'refunded';
+  invoiceId: string;
+  invoiceUrl: string;
+}
+
+interface BillingInvoice {
+  id: string;
+  userId: string;
+  orderId: string;
+  amountCents: number | null;
+  currency: string;
+  status: 'paid' | 'pending' | 'failed' | 'refunded';
+  issuedAt: string;
+  lineItems: Array<{
+    label: string;
+    formulaVersion: number;
+    supplyMonths: number | null;
+    amountCents: number | null;
+  }>;
 }
 
 const getStatusIcon = (status: string) => {
@@ -78,9 +110,11 @@ interface ReviewStatus {
   needsReview: boolean;
   reasons: string[];
   driftScore: number;
+  autoOptimizeEnabled: boolean;
 }
 
 function PreReorderReviewGate() {
+  const qc = useQueryClient();
   const { data: status } = useQuery<ReviewStatus>({
     queryKey: ['/api/formulas/review-status'],
     queryFn: () => apiRequest('GET', '/api/formulas/review-status').then((r: Response) => r.json()),
@@ -108,12 +142,12 @@ function PreReorderReviewGate() {
             </ul>
           )}
         </div>
-        <Link
+        <a
           href="/dashboard/chat?context=formula-review"
           className="shrink-0 text-xs font-medium text-amber-700 underline underline-offset-2 hover:text-amber-900"
         >
           Review now
-        </Link>
+        </a>
       </div>
     </div>
   );
@@ -122,6 +156,9 @@ function PreReorderReviewGate() {
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState('subscription');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<BillingInvoice | null>(null);
+  const [isFetchingInvoice, setIsFetchingInvoice] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -163,6 +200,41 @@ export default function OrdersPage() {
         description: error.message || 'Failed to update subscription',
         variant: 'destructive'
       });
+    }
+  });
+
+  const resumeSubscriptionMutation = useMutation({
+    mutationFn: (subscriptionId: string) =>
+      apiRequest('POST', `/api/billing/subscriptions/${subscriptionId}/resume`).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/subscription'] });
+      toast({
+        title: 'Subscription resumed',
+        description: 'Your subscription has been successfully reactivated.'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error resuming subscription',
+        description: error.message || 'Failed to resume subscription',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const cancelSubscriptionActionMutation = useMutation({
+    mutationFn: (subscriptionId: string) =>
+      apiRequest('POST', `/api/billing/subscriptions/${subscriptionId}/cancel`).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/subscription'] });
+      toast({
+        title: 'Subscription cancelled',
+        description: 'Your subscription has been set to cancel at the end of the period.'
+      });
+    },
+    onError: (error: any) => {
+      // Fallback to internal update if billing API fails (e.g. stripe not configured)
+      updateSubscriptionMutation.mutate({ status: 'cancelled' });
     }
   });
 
@@ -258,12 +330,42 @@ export default function OrdersPage() {
   };
 
   const confirmCancelSubscription = () => {
-    updateSubscriptionMutation.mutate({ status: 'cancelled' });
+    if (subscription?.stripeSubscriptionId) {
+      cancelSubscriptionActionMutation.mutate(subscription.stripeSubscriptionId);
+    } else {
+      updateSubscriptionMutation.mutate({ status: 'cancelled' });
+    }
     setShowCancelDialog(false);
+  };
+
+  const handleResumeSubscription = () => {
+    if (subscription?.stripeSubscriptionId) {
+      resumeSubscriptionMutation.mutate(subscription.stripeSubscriptionId);
+    } else {
+      updateSubscriptionMutation.mutate({ status: 'active' });
+    }
   };
 
   const handleRemovePaymentMethod = (paymentMethodId: string) => {
     deletePaymentMethodMutation.mutate(paymentMethodId);
+  };
+
+  const handleViewInvoice = async (record: BillingRecord) => {
+    setIsFetchingInvoice(record.id);
+    try {
+      const response = await apiRequest('GET', record.invoiceUrl);
+      const invoiceData = await response.json();
+      setSelectedInvoice(invoiceData);
+      setShowInvoiceDialog(true);
+    } catch (error: any) {
+      toast({
+        title: "Error fetching invoice",
+        description: error.message || "Could not retrieve invoice details.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFetchingInvoice(null);
+    }
   };
 
   return (
@@ -298,79 +400,92 @@ export default function OrdersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#054700]" data-testid="text-orders-title">
+          <h1 className="text-3xl font-bold tracking-tight text-[#1B4332]" data-testid="text-orders-title">
             Orders & Billing
           </h1>
-          <p className="text-[#5a6623]">
+          <p className="text-[#52796F]">
             Manage your subscription, view orders, and update payment methods
           </p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 bg-white/60 backdrop-blur-sm">
-          <TabsTrigger value="subscription" data-testid="tab-subscription" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Subscription</TabsTrigger>
-          <TabsTrigger value="orders" data-testid="tab-orders" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Order History</TabsTrigger>
-          <TabsTrigger value="billing" data-testid="tab-billing" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Billing</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 bg-[#FAF7F2]">
+          <TabsTrigger value="subscription" data-testid="tab-subscription" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">Subscription</TabsTrigger>
+          <TabsTrigger value="orders" data-testid="tab-orders" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">Order History</TabsTrigger>
+          <TabsTrigger value="billing" data-testid="tab-billing" className="data-[state=active]:bg-[#1B4332] data-[state=active]:text-white">Billing</TabsTrigger>
         </TabsList>
 
         <TabsContent value="subscription" className="space-y-6">
           {/* Current Subscription */}
-          <Card data-testid="section-subscription-overview" className="border-[#5a6623]/10 shadow-2xl">
+          <Card data-testid="section-subscription-overview" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2 text-[#054700]">
+                  <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                     <Package className="w-5 h-5" />
                     {subscription?.plan || 'No Subscription'}
                   </CardTitle>
-                  <CardDescription className="text-[#5a6623]">
+                  <CardDescription className="text-[#52796F]">
                     {subscription && (
-                      <>Next billing: {subscription.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}</>
+                      <>
+                        {subscription.status === 'cancelled' ? 'Expires on: ' : 'Next billing: '}
+                        {subscription.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
+                      </>
                     )}
                   </CardDescription>
                 </div>
-                <Badge className={subscription?.status === 'active' ? 'bg-[#054700] text-white' : 'bg-[#5a6623]/20 text-[#5a6623]'}>
+                <Badge className={subscription?.status === 'active' ? 'bg-[#1B4332] text-white' : 'bg-[#52796F]/20 text-[#52796F]'}>
                   {subscription?.status || 'inactive'}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-4 md:grid-cols-3">
-                <Card className="border-[#054700]/10 shadow-2xl">
+                <Card className="bg-white border-[#1B4332]/10">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="w-4 h-4 text-[#5a6623]" />
-                      <span className="text-sm font-medium text-[#5a6623]">Monthly Price</span>
+                      <DollarSign className="w-4 h-4 text-[#52796F]" />
+                      <span className="text-sm font-medium text-[#52796F]">Monthly Price</span>
                     </div>
-                    <div className="text-2xl font-bold text-[#054700]">${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}</div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-[#5a6623]/10 shadow-2xl">
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Calendar className="w-4 h-4 text-[#5a6623]" />
-                      <span className="text-sm font-medium text-[#5a6623]">Next Billing</span>
-                    </div>
-                    <div className="text-lg font-semibold text-[#054700]">
-                      {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
+                    <div className="text-2xl font-bold text-[#1B4332]">
+                      {subscription?.membershipPriceCents ? (
+                        `$${(subscription.membershipPriceCents / 100).toFixed(2)}`
+                      ) : orders && orders.length > 0 && orders[0].amountCents ? (
+                        `$${(orders[0].amountCents / 100).toFixed(2)}`
+                      ) : (
+                        `$${(subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00')}`
+                      )}
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="border-[#D4A574]/10">
+                <Card className="bg-white border-[#52796F]/10">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Package className="w-4 h-4 text-[#5a6623]" />
-                      <span className="text-sm font-medium text-[#5a6623]">Formula Version</span>
+                      <Calendar className="w-4 h-4 text-[#52796F]" />
+                      <span className="text-sm font-medium text-[#52796F]">Next Billing</span>
                     </div>
-                    <div className="text-lg font-semibold text-[#D4A574]">Current</div>
+                    <div className="text-lg font-semibold text-[#1B4332]">
+                      {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : (orders?.[0]?.placedAt ? new Date(new Date(orders[0].placedAt).getTime() + 8 * 7 * 24 * 60 * 60 * 1000).toLocaleDateString() : 'N/A')}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white border-[#D4A574]/10">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Package className="w-4 h-4 text-[#52796F]" />
+                      <span className="text-sm font-medium text-[#52796F]">Formula Version</span>
+                    </div>
+                    <div className="text-lg font-semibold text-[#D4A574]">
+                      v{orders?.[0]?.formulaVersion || (subscription ? '1' : 'N/A')}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
 
-              <Separator className="bg-[#5a6623]/20" />
+              <Separator className="bg-[#52796F]/20" />
 
               <div className="flex gap-3">
                 <Button
@@ -378,32 +493,48 @@ export default function OrdersPage() {
                   data-testid="button-pause-subscription"
                   onClick={handlePauseSubscription}
                   disabled={updateSubscriptionMutation.isPending || subscription?.status !== 'active'}
-                  className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white"
+                  className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
                 >
                   <Pause className="w-4 h-4 mr-2" />
                   Pause Subscription
                 </Button>
-                <Button variant="outline" data-testid="button-change-plan" className="border-[#5a6623] text-[#5a6623] hover:bg-[#5a6623] hover:text-white">
+
+                {(subscription?.status === 'cancelled' || subscription?.status === 'paused') && (
+                  <Button
+                    variant="outline"
+                    data-testid="button-resume-subscription"
+                    onClick={handleResumeSubscription}
+                    disabled={resumeSubscriptionMutation.isPending}
+                    className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white"
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Resume Subscription
+                  </Button>
+                )}
+
+                <Button variant="outline" data-testid="button-change-plan" className="border-[#52796F] text-[#52796F] hover:bg-[#52796F] hover:text-white">
                   Change Plan
                 </Button>
-                <Button
-                  variant="destructive"
-                  data-testid="button-cancel-subscription"
-                  onClick={handleCancelSubscription}
-                  // disabled={updateSubscriptionMutation.isPending}
-                  disabled={true}
-                >
-                  Cancel Subscription
-                </Button>
+
+                {subscription?.status === 'active' && (
+                  <Button
+                    variant="destructive"
+                    data-testid="button-cancel-subscription"
+                    onClick={handleCancelSubscription}
+                    disabled={updateSubscriptionMutation.isPending}
+                  >
+                    Cancel Subscription
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Upcoming Delivery - only show when user has an active subscription */}
           {subscription?.status === 'active' && (
-            <Card data-testid="section-upcoming-delivery" className="border-[#5a6623]/10 shadow-2xl">
+            <Card data-testid="section-upcoming-delivery" className="bg-[#FAF7F2] border-[#52796F]/20">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-[#054700]">
+                <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                   <Truck className="w-5 h-5" />
                   Upcoming Delivery
                 </CardTitle>
@@ -412,11 +543,11 @@ export default function OrdersPage() {
                 <PreReorderReviewGate />
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-[#054700]">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
-                    <p className="text-sm text-[#5a6623]">
+                    <p className="font-medium text-[#1B4332]">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
+                    <p className="text-sm text-[#52796F]">
                       Expected delivery: {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
                     </p>
-                    <p className="text-sm text-[#5a6623]">
+                    <p className="text-sm text-[#52796F]">
                       Current Formula • ${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}
                     </p>
                   </div>
@@ -430,13 +561,13 @@ export default function OrdersPage() {
         </TabsContent>
 
         <TabsContent value="orders" className="space-y-6">
-          <Card data-testid="section-order-history" className="border-[#5a6623]/10 shadow-2xl">
+          <Card data-testid="section-order-history" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-[#054700]">
+              <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                 <Package className="w-5 h-5" />
                 Order History
               </CardTitle>
-              <CardDescription className="text-[#5a6623]">
+              <CardDescription className="text-[#52796F]">
                 View all your past supplement orders and deliveries
               </CardDescription>
             </CardHeader>
@@ -444,54 +575,53 @@ export default function OrdersPage() {
               <div className="space-y-4">
                 {!orders || orders.length === 0 ? (
                   <div className="text-center py-8">
-                    <Package className="w-12 h-12 text-[#5a6623] mx-auto mb-4" />
-                    <p className="text-[#5a6623]">No orders found</p>
+                    <Package className="w-12 h-12 text-[#52796F] mx-auto mb-4" />
+                    <p className="text-[#52796F]">No orders found</p>
                   </div>
                 ) : (
                   orders.map((order) => (
-                    <Card key={order.id} className="border-l-4 border-l-[#054700] bg-white" data-testid={`order-${order.id}`}>
-                      <CardContent className="pt-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
-                              {getStatusIcon(order.status)}
-                              <span className="font-medium text-[#054700]">{order.id}</span>
+                    <Card key={order.id} className="border-[#52796F]/10 bg-white shadow-none" data-testid={`order-${order.id}`}>
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row justify-between gap-4">
+                          <div className="space-y-4 flex-1">
+                            <div className="flex items-center justify-between sm:justify-start gap-4">
+                              <span className="font-bold text-[#1B4332]">Order #{order.id.slice(0, 8).toUpperCase()}</span>
+                              <Badge className={`${getStatusColor(order.status)} border-none capitalize`}>
+                                {order.status}
+                              </Badge>
                             </div>
-                            <Badge className={getStatusColor(order.status)}>
-                              {order.status}
-                            </Badge>
+
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <p className="text-[#52796F]">Placed</p>
+                                <p className="font-medium text-[#1B4332]">{new Date(order.placedAt).toLocaleDateString()}</p>
+                              </div>
+                              <div>
+                                <p className="text-[#52796F]">Total</p>
+                                <p className="font-medium text-[#1B4332]">${order.amountCents ? (order.amountCents / 100).toFixed(2) : '0.00'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[#52796F]">Formula</p>
+                                <p className="font-medium text-[#1B4332]">Version v{order.formulaVersion}</p>
+                              </div>
+                              <div>
+                                <p className="text-[#52796F]">Supply</p>
+                                <p className="font-medium text-[#1B4332]">{order.supplyWeeks || 8} weeks</p>
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-medium text-[#054700]">$89.99</div>
-                            <div className="text-sm text-[#5a6623]">
-                              Formula v{order.formulaVersion}
-                            </div>
+
+                          <div className="flex items-center sm:items-end justify-between sm:justify-start sm:self-center">
+                            {order.status === 'shipped' && order.trackingUrl && (
+                              <Button variant="outline" size="sm" asChild className="border-[#1B4332] text-[#1B4332] hover:bg-[#1B4332] hover:text-white">
+                                <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink className="w-4 h-4 mr-2" />
+                                  Track
+                                </a>
+                              </Button>
+                            )}
                           </div>
                         </div>
-
-                        <div className="grid gap-4 md:grid-cols-3 text-sm">
-                          <div>
-                            <span className="text-[#5a6623]">Placed:</span>
-                            <div className="text-[#054700]">{new Date(order.placedAt).toLocaleDateString()}</div>
-                          </div>
-                          {order.shippedAt && (
-                            <div>
-                              <span className="text-[#5a6623]">Shipped:</span>
-                              <div className="text-[#054700]">{new Date(order.shippedAt).toLocaleDateString()}</div>
-                            </div>
-                          )}
-                        </div>
-
-                        {order.status === 'shipped' && order.trackingUrl && (
-                          <div className="mt-4 pt-4 border-t border-[#5a6623]/20">
-                            <Button variant="outline" size="sm" asChild data-testid={`button-track-${order.id}`} className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white">
-                              <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer">
-                                <ExternalLink className="w-4 h-4 mr-2" />
-                                Track Package
-                              </a>
-                            </Button>
-                          </div>
-                        )}
                       </CardContent>
                     </Card>
                   ))
@@ -503,19 +633,19 @@ export default function OrdersPage() {
 
         <TabsContent value="billing" className="space-y-6">
           {/* Payment Methods */}
-          <Card data-testid="section-payment-methods" className="border-[#5a6623]/10 shadow-2xl">
+          <Card data-testid="section-payment-methods" className="bg-[#FAF7F2] border-[#52796F]/20">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2 text-[#054700]">
+                  <CardTitle className="flex items-center gap-2 text-[#1B4332]">
                     <CreditCard className="w-5 h-5" />
                     Payment Methods
                   </CardTitle>
-                  <CardDescription className="text-[#5a6623]">
+                  <CardDescription className="text-[#52796F]">
                     Manage your saved payment methods
                   </CardDescription>
                 </div>
-                <Button data-testid="button-add-payment-method" className="bg-[#054700] hover:bg-[#054700]/90 text-white">
+                <Button data-testid="button-add-payment-method" className="bg-[#1B4332] hover:bg-[#1B4332]/90 text-white">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Method
                 </Button>
@@ -525,25 +655,25 @@ export default function OrdersPage() {
               <div className="space-y-3">
                 {!paymentMethods || paymentMethods.length === 0 ? (
                   <div className="text-center py-8">
-                    <CreditCard className="w-12 h-12 text-[#5a6623] mx-auto mb-4" />
-                    <p className="text-[#5a6623]">No payment methods found</p>
-                    <p className="text-sm text-[#5a6623] mt-2">Add a payment method to get started</p>
+                    <CreditCard className="w-12 h-12 text-[#52796F] mx-auto mb-4" />
+                    <p className="text-[#52796F]">No payment methods found</p>
+                    <p className="text-sm text-[#52796F] mt-2">Add a payment method to get started</p>
                   </div>
                 ) : (
                   paymentMethods.map((method) => (
-                    <div key={method.id} className="flex items-center justify-between p-4 border border-[#5a6623]/20 rounded-lg bg-white" data-testid={`payment-method-${method.id}`}>
+                    <div key={method.id} className="flex items-center justify-between p-4 border border-[#52796F]/20 rounded-lg bg-white" data-testid={`payment-method-${method.id}`}>
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-6 bg-[#054700]/10 rounded flex items-center justify-center">
-                          <CreditCard className="w-4 h-4 text-[#054700]" />
+                        <div className="w-10 h-6 bg-[#1B4332]/10 rounded flex items-center justify-center">
+                          <CreditCard className="w-4 h-4 text-[#1B4332]" />
                         </div>
                         <div>
-                          <div className="font-medium text-[#054700]">
+                          <div className="font-medium text-[#1B4332]">
                             {method.brand?.toUpperCase()} ****{method.last4}
                           </div>
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="border-[#5a6623] text-[#5a6623]">Edit</Button>
+                        <Button variant="outline" size="sm" className="border-[#52796F] text-[#52796F]">Edit</Button>
                         <Button
                           variant="destructive"
                           size="sm"
@@ -561,59 +691,175 @@ export default function OrdersPage() {
           </Card>
 
           {/* Billing History */}
-          <Card data-testid="section-billing-history" className="border-[#5a6623]/10 shadow-2xl">
-            <CardHeader>
+          <Card data-testid="section-billing-history" className="bg-[#FAF7F2] border-[#52796F]/20 overflow-hidden">
+            <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-[#054700]">Billing History</CardTitle>
-                  <CardDescription className="text-[#5a6623]">
-                    Download invoices and view payment history
+                  <CardTitle className="text-[#1B4332] text-xl">Billing History</CardTitle>
+                  <CardDescription className="text-[#52796F]">
+                    Download invoices and view your complete payment history
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {!billingHistory || billingHistory.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Calendar className="w-12 h-12 text-[#5a6623] mx-auto mb-4" />
-                    <p className="text-[#5a6623]">No billing history found</p>
-                    <p className="text-sm text-[#5a6623] mt-2">Your payment history will appear here</p>
-                  </div>
-                ) : (
-                  billingHistory.map((record) => (
-                    <div key={record.id} className="flex items-center justify-between p-4 border border-[#5a6623]/20 rounded-lg bg-white">
-                      <div className="flex items-center gap-3">
-                        {record.status === 'paid' ? (
-                          <CheckCircle className="w-5 h-5 text-[#054700]" />
-                        ) : record.status === 'pending' ? (
-                          <Clock className="w-5 h-5 text-[#D4A574]" />
-                        ) : (
-                          <AlertCircle className="w-5 h-5 text-red-600" />
-                        )}
-                        <div>
-                          <div className="font-medium text-[#054700]">{record.description}</div>
-                          <div className="text-sm text-[#5a6623]">
-                            {record.status === 'paid' ? 'Paid' : record.status === 'pending' ? 'Pending' : 'Failed'} on {new Date(record.date).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-medium text-[#054700]">${record.amount.toFixed(2)}</span>
-                        {record.invoiceUrl && record.status === 'paid' && (
-                          <Button variant="outline" size="sm" data-testid="button-download-invoice" className="border-[#054700] text-[#054700]">
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
+            <CardContent className="p-0">
+              <div className="min-w-full inline-block align-middle">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-[#52796F]/10">
+                    <thead>
+                      <tr className="bg-[#52796F]/5">
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-[#52796F] uppercase tracking-wider">Date</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-[#52796F] uppercase tracking-wider">Description</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-[#52796F] uppercase tracking-wider">Amount</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-[#52796F] uppercase tracking-wider">Status</th>
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-semibold text-[#52796F] uppercase tracking-wider">Invoice</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-[#52796F]/10">
+                      {!billingHistory || billingHistory.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center">
+                            <Calendar className="w-12 h-12 text-[#52796F]/30 mx-auto mb-4" />
+                            <p className="text-[#52796F] font-medium">No billing history found</p>
+                            <p className="text-sm text-[#52796F]/70 mt-1">Your payment history will appear here once you make a purchase.</p>
+                          </td>
+                        </tr>
+                      ) : (
+                        billingHistory.map((record) => (
+                          <tr key={record.id} className="hover:bg-[#FAF7F2]/50 transition-colors group">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[#52796F]">
+                              {new Date(record.date).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-[#1B4332]">{record.description}</div>
+                              <div className="text-xs text-[#52796F]">ID: {record.id.slice(0, 8).toUpperCase()}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm font-bold text-[#1B4332]">
+                                {record.amountCents ? `$${(record.amountCents / 100).toFixed(2)}` : '—'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Badge
+                                variant="outline"
+                                className={`
+                                  capitalize px-2 py-0.5 text-[10px] font-bold border-none
+                                  ${record.status === 'paid' ? 'bg-green-50 text-green-700' :
+                                    record.status === 'pending' ? 'bg-amber-50 text-amber-700' :
+                                      record.status === 'refunded' ? 'bg-blue-50 text-blue-700' :
+                                        'bg-red-50 text-red-700'}
+                                `}
+                              >
+                                <span className="flex items-center gap-1">
+                                  {record.status === 'paid' && <CheckCircle className="w-3 h-3" />}
+                                  {record.status === 'pending' && <Clock className="w-3 h-3" />}
+                                  {record.status === 'refunded' && <RotateCcw className="w-3 h-3" />}
+                                  {record.status === 'failed' && <AlertCircle className="w-3 h-3" />}
+                                  {record.status}
+                                </span>
+                              </Badge>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleViewInvoice(record)}
+                                disabled={isFetchingInvoice === record.id}
+                                className="h-8 w-8 p-0 text-[#1B4332] hover:bg-[#1B4332] hover:text-white rounded-full opacity-40 group-hover:opacity-100 transition-opacity"
+                                title="View/Download Invoice"
+                              >
+                                {isFetchingInvoice === record.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Download className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Invoice Details Dialog */}
+      <Dialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog}>
+        <DialogContent className="max-w-md bg-[#FAF7F2] border-[#52796F]/20">
+          <DialogHeader>
+            <DialogTitle className="text-[#1B4332] flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Invoice Details
+            </DialogTitle>
+            <DialogDescription className="text-[#52796F]">
+              Invoice for Order #{selectedInvoice?.orderId.slice(0, 8).toUpperCase()}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedInvoice && (
+            <div className="space-y-6 pt-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h4 className="text-sm font-semibold text-[#52796F] uppercase tracking-wider">Date Issued</h4>
+                  <p className="text-[#1B4332]">{new Date(selectedInvoice.issuedAt).toLocaleDateString(undefined, { dateStyle: 'long' })}</p>
+                </div>
+                <div className="text-right">
+                  <h4 className="text-sm font-semibold text-[#52796F] uppercase tracking-wider">Status</h4>
+                  <Badge variant="outline" className={`border-none capitalize ${selectedInvoice.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {selectedInvoice.status}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="border-t border-[#52796F]/10 pt-4">
+                <h4 className="text-sm font-semibold text-[#52796F] uppercase tracking-wider mb-3">Line Items</h4>
+                <div className="space-y-3">
+                  {selectedInvoice.lineItems.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-sm">
+                      <div className="text-[#1B4332]">
+                        <p className="font-medium">{item.label}</p>
+                        {item.formulaVersion > 0 && (
+                          <p className="text-xs text-[#52796F]">
+                            Formula v{item.formulaVersion} • {item.supplyMonths || 2} month supply
+                          </p>
+                        )}
+                      </div>
+                      <p className="font-bold text-[#1B4332]">${item.amountCents ? (item.amountCents / 100).toFixed(2) : '0.00'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t border-[#52796F]/10 pt-4 flex justify-between items-center">
+                <p className="text-lg font-bold text-[#1B4332]">Total Amount</p>
+                <p className="text-2xl font-black text-[#1B4332]">
+                  ${selectedInvoice.amountCents ? (selectedInvoice.amountCents / 100).toFixed(2) : '0.00'}
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  className="flex-1 bg-[#1B4332] hover:bg-[#1B4332]/90 text-white"
+                  onClick={() => window.print()}
+                >
+                  Print PDF
+                </Button>
+                <Button variant="outline" className="flex-1 border-[#52796F] text-[#52796F]" onClick={() => setShowInvoiceDialog(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -123,7 +123,16 @@ export class UsersService {
 
     // Subscription operations
     async getSubscription(userId: string) {
-        return await usersRepository.getSubscription(userId);
+        const subscription = await usersRepository.getSubscription(userId);
+        const user = await usersRepository.getUser(userId);
+
+        if (!subscription) return undefined;
+
+        return {
+            ...subscription,
+            membershipTier: user?.membershipTier,
+            membershipPriceCents: user?.membershipPriceCents
+        };
     }
 
     async updateSubscription(userId: string, updates: {
