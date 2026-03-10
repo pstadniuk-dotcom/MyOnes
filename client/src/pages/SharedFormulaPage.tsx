@@ -268,7 +268,7 @@ export default function SharedFormulaPage() {
                   healthcare professional before making any changes to your supplement regimen or health routine.
                 </p>
                 <p className="pt-2 text-center">
-                  © {new Date().getFullYear()} ONES - Personalized AI Supplement Platform
+                  © {new Date().getFullYear()} Ones - Personalized AI Supplement Platform
                 </p>
               </div>
             </CardContent>

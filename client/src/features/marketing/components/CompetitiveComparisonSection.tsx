@@ -26,7 +26,7 @@ const supplementsTab: TabData = {
   tagline: "One-size-fits-all vs. made for you",
   competitors: [
     {
-      name: "ONES",
+      name: "Ones",
       features: {
         personalizedToBloodwork: true,
         aiHealthAnalysis: true,
@@ -104,7 +104,7 @@ const bloodTestingTab: TabData = {
   tagline: "Data without intervention vs. action",
   competitors: [
     {
-      name: "ONES",
+      name: "Ones",
       features: {
         comprehensivePanels: true,
         aiAnalysis: true,
@@ -201,7 +201,7 @@ export default function CompetitiveComparisonSection() {
           </span>
           <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl text-[#054700] font-light leading-tight text-balance">
             The only platform that goes from{" "}
-            <span className="font-medium">data to done</span>
+            <span className="text-[#8a9a2c]">data to done</span>
           </h2>
           <p className="mt-6 text-lg text-[#054700]/60 leading-relaxed">
             Everyone else stops at recommendations. We deliver the actual intervention.
@@ -291,7 +291,7 @@ export default function CompetitiveComparisonSection() {
           {/* ONES Card - Featured */}
           <div className="bg-[#054700] rounded-2xl p-6 text-[#ede8e2]">
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-semibold">ONES</h3>
+              <h3 className="text-xl font-semibold">Ones</h3>
               <span className="bg-white/20 px-3 py-1 rounded-full text-xs">
                 You are here
               </span>

@@ -4,6 +4,8 @@ import { usersRepository } from '../users/users.repository';
 import { optimizeRepository } from '../optimize/optimize.repository';
 import { wearablesRepository } from '../wearables/wearables.repository';
 import { sendRawSms } from '../../utils/smsService';
+import { reorderRepository } from '../reorder/reorder.repository';
+import { reorderService } from '../reorder/reorder.service';
 
 export class WebhooksService {
     /**
@@ -19,6 +21,12 @@ export class WebhooksService {
         }
 
         const response = body.trim().toUpperCase();
+
+        // ── Smart Re-Order replies (APPROVE / KEEP / DELAY) ─────────────
+        if (response === 'APPROVE' || response === 'KEEP' || response === 'DELAY') {
+            return this.handleReorderSmsReply(user.id, phoneNumber, response);
+        }
+
         const today = new Date();
 
         let nutritionCompleted = false;
@@ -74,6 +82,52 @@ export class WebhooksService {
             : `✅ Logged! Keep up the great work 🔥`;
 
         await sendRawSms(phoneNumber, confirmMessage);
+    }
+
+    /**
+     * Handle Smart Re-Order SMS replies: APPROVE, KEEP, DELAY
+     */
+    private async handleReorderSmsReply(userId: string, phoneNumber: string, reply: string) {
+        const recommendation = await reorderRepository.getLatestSentRecommendationByUser(userId);
+
+        if (!recommendation) {
+            logger.warn(`[SmartReorder] No pending recommendation for user ${userId}, ignoring ${reply}`);
+            await sendRawSms(phoneNumber, `ONES: We don't have a pending reorder for you right now. Visit your dashboard for details.`);
+            return;
+        }
+
+        switch (reply) {
+            case 'APPROVE': {
+                await reorderService.handleApprove(recommendation);
+                await sendRawSms(phoneNumber,
+                    `✅ Reorder approved! We'll charge your card and ship your formula shortly.`
+                );
+                logger.info(`[SmartReorder] User ${userId} APPROVED reorder for schedule ${recommendation.scheduleId}`);
+                break;
+            }
+            case 'KEEP': {
+                await reorderService.handleKeep(recommendation);
+                await sendRawSms(phoneNumber,
+                    `✅ Got it — keeping your current formula. We'll charge and ship shortly.`
+                );
+                logger.info(`[SmartReorder] User ${userId} chose KEEP for schedule ${recommendation.scheduleId}`);
+                break;
+            }
+            case 'DELAY': {
+                const result = await reorderService.handleDelay(recommendation);
+                if (result.success) {
+                    await sendRawSms(phoneNumber,
+                        `⏸️ ${result.message}`
+                    );
+                } else {
+                    await sendRawSms(phoneNumber,
+                        `${result.message}`
+                    );
+                }
+                logger.info(`[SmartReorder] User ${userId} DELAY result: ${JSON.stringify(result)}`);
+                break;
+            }
+        }
     }
 
     /**

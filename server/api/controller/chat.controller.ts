@@ -78,6 +78,23 @@ export class ChatController {
                 return res.status(400).json({ error: 'Valid message is required' });
             }
 
+            // ── SECURITY: Message length limit (prevent cost inflation & context overflow)
+            const MAX_MESSAGE_LENGTH = 10000;
+            if (message.length > MAX_MESSAGE_LENGTH) {
+                return res.status(400).json({
+                    error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters allowed.`
+                });
+            }
+
+            // ── SECURITY: Per-user rate limiting (prevents abuse from users with multiple IPs)
+            const userRateLimit = checkRateLimit(`user:${userId}`, 15, 10 * 60 * 1000);
+            if (!userRateLimit.allowed) {
+                return res.status(429).json({
+                    error: 'You\'re sending messages too quickly. Please wait a moment.',
+                    retryAfter: Math.ceil((userRateLimit.resetTime - Date.now()) / 1000)
+                });
+            }
+
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache, no-transform');
             res.setHeader('Connection', 'keep-alive');
@@ -105,6 +122,13 @@ export class ChatController {
             });
 
             const { healthProfile, labDataContext, activeFormula, biometricDataContext } = await chatService.getContext(userId);
+
+            // --- Membership status for AI gating ---
+            const currentUser = await usersRepository.getUser(userId);
+            const isActiveMember = !!(currentUser?.membershipTier && !currentUser?.membershipCancelledAt);
+            // Check if user has ever placed an order (first consultation is always free/full-power)
+            const userOrders = await usersRepository.listOrdersByUser(userId);
+            const hasOrderedFormula = userOrders.length > 0;
 
             // --- Stepped thinking progress ---
             const contextParts: string[] = [];
@@ -140,7 +164,9 @@ export class ChatController {
                 biometricDataContext: biometricDataContext || undefined,
                 recentMessages: previousMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
                 queryIntent,
-                currentUserMessage: message
+                currentUserMessage: message,
+                isActiveMember,
+                hasOrderedFormula,
             };
 
             const fullSystemPrompt = buildO1MiniPrompt(promptContext);
@@ -156,10 +182,19 @@ export class ChatController {
                 status: 'active',
                 detail: 'Generating response'
             });
+            // ── SECURITY: Sanitize user message before sending to AI
+            // Strip code fences that could confuse downstream formula/health-data extraction
+            // Strip control characters and null bytes
+            const sanitizedMessage = message
+                .replace(/```[\s\S]*?```/g, '[code block removed]')  // Remove code fence blocks
+                .replace(/`{3,}/g, '')                                // Remove orphan triple backticks
+                .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control chars (keep \n, \r, \t)
+                .trim();
+
             const conversationHistory: any[] = [
                 { role: 'system', content: fullSystemPrompt },
                 ...promptContext.recentMessages!,
-                { role: 'user', content: message }
+                { role: 'user', content: sanitizedMessage }
             ];
 
             let fullResponse = '';
@@ -198,8 +233,15 @@ export class ChatController {
             let validatedFormula: any = null;
             let savedFormula: any = null;
 
-            const jsonMatch = fullResponse.match(/```json\s*([\s\S]*?)\s*```/);
+            const jsonMatch = fullResponse.match(/```json\s*([\s\S]*?)\s*```/i);
             if (jsonMatch) {
+                // ── HARD MEMBERSHIP GATE (safety net) ──────────────────────
+                // Even if the AI produces a formula JSON, non-members who already
+                // purchased once should NOT get a new formula saved.
+                if (!isActiveMember && hasOrderedFormula) {
+                    sendSSE({ type: 'info', message: 'Formula optimization requires an active ONES membership.' });
+                    // Skip formula processing entirely — let the text response stand
+                } else {
                 sendSSE({ type: 'processing', message: 'Formula detected! Validating recommendations...' });
                 try {
                     const jsonData = JSON.parse(jsonMatch[1]);
@@ -218,7 +260,8 @@ export class ChatController {
                     validatedFormula.totalMg = calcResult.calculatedTotalMg;
 
                     const targetCaps = validatedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
-                    const maxWithTolerance = getMaxDosageForCapsules(targetCaps) + FORMULA_LIMITS.DOSAGE_TOLERANCE;
+                    const baseBudget = getMaxDosageForCapsules(targetCaps);
+                    const maxWithTolerance = Math.floor(baseBudget * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
                     if (validatedFormula.totalMg > maxWithTolerance) {
                         sendSSE({ type: 'info', message: 'Note: Formula was slightly over budget and has been auto-trimmed.' });
                     }
@@ -370,8 +413,8 @@ export class ChatController {
                                 await sendNotificationEmail({
                                 to: formulaUser.email,
                                 subject: nextVersion === 1
-                                  ? 'Your first ONES formula is ready!'
-                                  : `Your ONES formula has been updated (V${nextVersion})`,
+                                  ? 'Your first Ones formula is ready!'
+                                  : `Your Ones formula has been updated (V${nextVersion})`,
                                 title: nextVersion === 1 ? 'Your Formula Is Ready' : 'Formula Updated',
                                 type: 'formula_update',
                                 content: `
@@ -400,6 +443,14 @@ export class ChatController {
                               informational: safetyResult.warnings.filter(w => w.severity === 'informational').length,
                             },
                           });
+
+                          // Sync auto-ship price if user has an active auto-ship
+                          try {
+                            const { formulasService } = await import('../../modules/formulas/formulas.service');
+                            await formulasService.syncAutoShipIfActive(userId, savedFormula.id, nextVersion);
+                          } catch (autoShipErr) {
+                            logger.warn('Auto-ship sync failed after AI formula creation', { userId, error: autoShipErr });
+                          }
 
                           // Send safety warnings to client via SSE for real-time display
                           if (safetyResult.warnings.length > 0) {
@@ -444,6 +495,7 @@ export class ChatController {
                     sendSSE({ type: 'formula_error', error: errorMessage });
                     fullResponse += `\n\n⚠️ **Formula Error**: ${errorMessage}`;
                 }
+                } // end else (membership gate)
             } else {
                 // If no JSON match, check if AI claimed to create a formula
                 const responseLC = fullResponse.toLowerCase();
@@ -525,14 +577,150 @@ export class ChatController {
             if (healthDataMatch) {
                 try {
                     const healthData = JSON.parse(healthDataMatch[1]);
-                    await usersRepository.updateHealthProfile(userId, healthData);
-                    healthDataUpdated = true;
-                    logger.info('Health profile automatically updated from AI conversation');
+
+                    // ── SECURITY: Validate health-data fields before writing to DB
+                    // Only allow known safe fields; prevent arbitrary data injection
+                    const ALLOWED_HEALTH_FIELDS = new Set([
+                        'age', 'sex', 'weightLbs', 'heightCm',
+                        'bloodPressureSystolic', 'bloodPressureDiastolic', 'restingHeartRate',
+                        'sleepHoursPerNight', 'exerciseDaysPerWeek', 'stressLevel',
+                        'smokingStatus', 'alcoholDrinksPerWeek',
+                        'conditions', 'medications', 'allergies', 'healthGoals'
+                    ]);
+
+                    const validatedHealthData: Record<string, any> = {};
+                    for (const [key, value] of Object.entries(healthData)) {
+                        if (!ALLOWED_HEALTH_FIELDS.has(key)) {
+                            logger.warn(`Health-data block contained disallowed field: ${key}`, { userId });
+                            continue;
+                        }
+                        validatedHealthData[key] = value;
+                    }
+
+                    // ── SECURITY: Prevent clearing safety-critical fields via AI
+                    // Empty arrays for medications/allergies/conditions could bypass safety checks
+                    const SAFETY_ARRAY_FIELDS = ['medications', 'allergies', 'conditions'] as const;
+                    for (const field of SAFETY_ARRAY_FIELDS) {
+                        if (field in validatedHealthData) {
+                            const val = validatedHealthData[field];
+                            if (Array.isArray(val) && val.length === 0) {
+                                // Don't allow AI to clear safety-critical fields — only UI can do that
+                                delete validatedHealthData[field];
+                                logger.warn(`Blocked AI from clearing safety field: ${field}`, { userId });
+                            } else if (Array.isArray(val)) {
+                                // Validate array items are strings and not absurdly long
+                                validatedHealthData[field] = val
+                                    .filter((item: unknown) => typeof item === 'string' && item.length <= 200)
+                                    .slice(0, 50); // Cap at 50 items max
+                            }
+                        }
+                    }
+
+                    // Validate numeric fields are reasonable
+                    const NUMERIC_BOUNDS: Record<string, { min: number; max: number }> = {
+                        age: { min: 1, max: 120 },
+                        weightLbs: { min: 50, max: 800 },
+                        heightCm: { min: 60, max: 275 },
+                        bloodPressureSystolic: { min: 60, max: 300 },
+                        bloodPressureDiastolic: { min: 30, max: 200 },
+                        restingHeartRate: { min: 25, max: 220 },
+                        sleepHoursPerNight: { min: 0, max: 24 },
+                        exerciseDaysPerWeek: { min: 0, max: 7 },
+                        stressLevel: { min: 1, max: 10 },
+                        alcoholDrinksPerWeek: { min: 0, max: 100 },
+                    };
+                    for (const [field, bounds] of Object.entries(NUMERIC_BOUNDS)) {
+                        if (field in validatedHealthData) {
+                            const num = Number(validatedHealthData[field]);
+                            if (!Number.isFinite(num) || num < bounds.min || num > bounds.max) {
+                                delete validatedHealthData[field];
+                                logger.warn(`Health-data numeric field out of bounds: ${field}=${validatedHealthData[field]}`, { userId });
+                            } else {
+                                validatedHealthData[field] = Math.round(num);
+                            }
+                        }
+                    }
+
+                    if (Object.keys(validatedHealthData).length > 0) {
+                        await usersRepository.updateHealthProfile(userId, validatedHealthData);
+                        healthDataUpdated = true;
+                        logger.info('Health profile automatically updated from AI conversation', {
+                            userId,
+                            fieldsUpdated: Object.keys(validatedHealthData)
+                        });
+                    }
 
                     // Remove the health-data block from fullResponse before saving
                     fullResponse = fullResponse.replace(/```health-data\s*{[\s\S]*?}\s*```\s*/g, '').trim();
                 } catch (err) {
                     logger.error('Health data update error', err);
+                }
+            }
+
+            // ── FALLBACK: AI claimed it sent capsule options but didn't include the block ──
+            // When the AI text says "select your preferred capsule count" (or similar)
+            // but no capsule-recommendation code block was found, generate one server-side.
+            if (!capsuleRecommendation) {
+                const responseLC = fullResponse.toLowerCase();
+                const claimsSentCapsuleOptions = (
+                    // AI explicitly says it sent options
+                    responseLC.includes('sent you personalized options') ||
+                    responseLC.includes("i've sent you personalized") ||
+                    responseLC.includes("here are your options") ||
+                    // AI tells user to select capsules (many variations)
+                    responseLC.includes('select your preferred') ||
+                    responseLC.includes('select your capsule count') ||
+                    responseLC.includes('select your capsule') ||
+                    responseLC.includes('choose your capsule count') ||
+                    responseLC.includes('choose your capsule') ||
+                    responseLC.includes('pick your capsule') ||
+                    // AI says to go ahead and select/choose
+                    /(?:select|choose|pick).{0,20}capsule/i.test(fullResponse) ||
+                    // AI says "when you're ready" to build formula (implies selector should be shown)
+                    (responseLC.includes('capsule count') && responseLC.includes('ready')) ||
+                    (responseLC.includes('capsule count') && responseLC.includes('go ahead'))
+                );
+
+                if (claimsSentCapsuleOptions) {
+                    try {
+                        const protocolDecision = recommendDailyProtocolCapsules(
+                            labDataContext,
+                            healthProfile as any
+                        );
+
+                        capsuleRecommendation = {
+                            recommendedCapsules: protocolDecision.recommendedCapsules,
+                            reasoning: protocolDecision.summary,
+                            priorities: protocolDecision.signals.slice(0, 6),
+                        };
+
+                        const encodedDecision = encodeURIComponent(JSON.stringify({
+                            recommendedCapsules: protocolDecision.recommendedCapsules,
+                            summary: protocolDecision.summary,
+                            signals: protocolDecision.signals,
+                            confidence: protocolDecision.confidence,
+                        }));
+                        capsuleDecisionTokenForPersistence = `[[CAPSULE_DECISION:${encodedDecision}]]`;
+
+                        const parsedRec = Number(capsuleRecommendation.recommendedCapsules);
+                        if (parsedRec === 6 || parsedRec === 9 || parsedRec === 12) {
+                            capsuleRecommendationForPersistence = parsedRec as 6 | 9 | 12;
+                        }
+
+                        sendSSE({
+                            type: 'capsule_recommendation',
+                            data: capsuleRecommendation,
+                            sessionId: chatSession.id
+                        });
+
+                        logger.info('Capsule recommendation generated via server-side fallback (AI claimed to send but omitted block)', {
+                            userId,
+                            recommendedCapsules: protocolDecision.recommendedCapsules,
+                            confidence: protocolDecision.confidence,
+                        });
+                    } catch (fallbackErr) {
+                        logger.error('Capsule recommendation fallback failed', fallbackErr);
+                    }
                 }
             }
 

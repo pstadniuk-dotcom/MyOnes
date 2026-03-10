@@ -1,7 +1,11 @@
 import { Request, Response } from 'express';
 import { adminService } from '../../modules/admin/admin.service';
 import { systemRepository } from '../../modules/system/system.repository';
+import { supportRepository } from '../../modules/support/support.repository';
+import { logAdminAction, listAdminAuditLogs } from '../../modules/admin/admin-audit';
 import { logger } from '../../infra/logging/logger';
+import { manufacturerPricingService } from '../../modules/formulas/manufacturer-pricing.service';
+import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, ALL_INGREDIENTS, SYSTEM_SUPPORT_DETAILS } from '@shared/ingredients';
 
 export class AdminController {
     async getStats(req: Request, res: Response) {
@@ -43,7 +47,37 @@ export class AdminController {
             const offset = parseInt(req.query.offset as string) || 0;
             const filter = (req.query.filter as string) || 'all';
 
-            const result = await adminService.searchUsers(query, limit, offset, filter);
+            // Parse advanced filters from query params
+            const advancedFilters: {
+                hasDevices?: boolean;
+                deviceProviders?: string[];
+                hasLabResults?: boolean;
+                hasOrders?: boolean;
+                minOrders?: number;
+                maxOrders?: number;
+            } = {};
+
+            if (req.query.hasDevices !== undefined) {
+                advancedFilters.hasDevices = req.query.hasDevices === 'true';
+            }
+            if (req.query.deviceProviders) {
+                advancedFilters.deviceProviders = (req.query.deviceProviders as string).split(',').filter(Boolean);
+            }
+            if (req.query.hasLabResults !== undefined) {
+                advancedFilters.hasLabResults = req.query.hasLabResults === 'true';
+            }
+            if (req.query.hasOrders !== undefined) {
+                advancedFilters.hasOrders = req.query.hasOrders === 'true';
+            }
+            if (req.query.minOrders) {
+                advancedFilters.minOrders = parseInt(req.query.minOrders as string);
+            }
+            if (req.query.maxOrders) {
+                advancedFilters.maxOrders = parseInt(req.query.maxOrders as string);
+            }
+
+            const hasAdvanced = Object.keys(advancedFilters).length > 0;
+            const result = await adminService.searchUsers(query, limit, offset, filter, hasAdvanced ? advancedFilters : undefined);
             res.json(result);
         } catch (error) {
             logger.error('Error searching users', { error });
@@ -80,7 +114,8 @@ export class AdminController {
     async deleteUser(req: Request, res: Response) {
         try {
             await adminService.deleteUser(req.params.id, (req as any).userId);
-            res.json({ success: true, message: 'User deleted successfully' });
+            await logAdminAction(req, 'user_delete', 'user', req.params.id, { softDelete: true });
+            res.json({ success: true, message: 'User has been deactivated (soft-deleted)' });
         } catch (error: any) {
             logger.error('Error deleting user', { error, userId: req.params.id });
             if (error.message === 'User not found') return res.status(404).json({ error: error.message });
@@ -96,6 +131,7 @@ export class AdminController {
             }
 
             const updatedUser = await adminService.updateUserAdminStatus(req.params.id, (req as any).userId, isAdmin);
+            await logAdminAction(req, isAdmin ? 'user_admin_grant' : 'user_admin_revoke', 'user', req.params.id, { isAdmin });
             res.json(updatedUser);
         } catch (error: any) {
             logger.error('Error updating admin status', { error, userId: req.params.id });
@@ -128,6 +164,16 @@ export class AdminController {
         }
     }
 
+    async getNotificationCounts(_req: Request, res: Response) {
+        try {
+            const counts = await adminService.getNotificationCounts();
+            res.json(counts);
+        } catch (error) {
+            logger.error('Error fetching notification counts', { error });
+            res.status(500).json({ error: 'Failed to fetch notification counts' });
+        }
+    }
+
     async getSupportTicketDetails(req: Request, res: Response) {
         try {
             const details = await adminService.getSupportTicketDetails(req.params.id);
@@ -155,6 +201,7 @@ export class AdminController {
             if (!ticket) {
                 return res.status(404).json({ error: 'Support ticket not found' });
             }
+            await logAdminAction(req, 'ticket_status_change', 'ticket', req.params.id, updates);
             res.json(ticket);
         } catch (error) {
             logger.error('Error updating support ticket', { error });
@@ -323,6 +370,7 @@ export class AdminController {
             if (!order) {
                 return res.status(404).json({ error: 'Order not found' });
             }
+            await logAdminAction(req, 'order_status_change', 'order', req.params.id, { status, trackingUrl });
             res.json(order);
         } catch (error) {
             logger.error('Error updating order status', { error });
@@ -541,6 +589,309 @@ export class AdminController {
         } catch (error) {
             logger.error('Error fetching consents', { error });
             res.status(500).json({ error: 'Failed to fetch consents' });
+        }
+    }
+
+    // ── User Suspend/Unsuspend ──────────────────────────────────────────
+
+    async suspendUser(req: Request, res: Response) {
+        try {
+            const { reason } = req.body;
+            const user = await adminService.suspendUser(req.params.id, (req as any).userId, reason);
+            await logAdminAction(req, 'user_suspend', 'user', req.params.id, { reason });
+            res.json(user);
+        } catch (error: any) {
+            logger.error('Error suspending user', { error, userId: req.params.id });
+            if (error.message === 'User not found') return res.status(404).json({ error: error.message });
+            res.status(400).json({ error: error.message || 'Failed to suspend user' });
+        }
+    }
+
+    async unsuspendUser(req: Request, res: Response) {
+        try {
+            const user = await adminService.unsuspendUser(req.params.id, (req as any).userId);
+            await logAdminAction(req, 'user_unsuspend', 'user', req.params.id);
+            res.json(user);
+        } catch (error: any) {
+            logger.error('Error unsuspending user', { error, userId: req.params.id });
+            if (error.message === 'User not found') return res.status(404).json({ error: error.message });
+            res.status(400).json({ error: error.message || 'Failed to unsuspend user' });
+        }
+    }
+
+    // ── FAQ Management ──────────────────────────────────────────────────
+
+    async listFaqItems(req: Request, res: Response) {
+        try {
+            const category = req.query.category as string | undefined;
+            // Admin sees all FAQ items including unpublished
+            const items = await supportRepository.listFaqItems(category);
+            res.json(items);
+        } catch (error) {
+            logger.error('Error fetching FAQ items', { error });
+            res.status(500).json({ error: 'Failed to fetch FAQ items' });
+        }
+    }
+
+    async createFaqItem(req: Request, res: Response) {
+        try {
+            const { category, question, answer, isPublished, displayOrder } = req.body;
+            if (!category || !question || !answer) {
+                return res.status(400).json({ error: 'category, question, and answer are required' });
+            }
+            const item = await supportRepository.createFaqItem({
+                category, question, answer,
+                isPublished: isPublished ?? true,
+                displayOrder: displayOrder ?? 0,
+            });
+            await logAdminAction(req, 'faq_create', 'faq', item.id, { category, question: question.slice(0, 100) });
+            res.json(item);
+        } catch (error) {
+            logger.error('Error creating FAQ item', { error });
+            res.status(500).json({ error: 'Failed to create FAQ item' });
+        }
+    }
+
+    async updateFaqItem(req: Request, res: Response) {
+        try {
+            const { category, question, answer, isPublished, displayOrder } = req.body;
+            const updates: Record<string, any> = {};
+            if (category !== undefined) updates.category = category;
+            if (question !== undefined) updates.question = question;
+            if (answer !== undefined) updates.answer = answer;
+            if (isPublished !== undefined) updates.isPublished = isPublished;
+            if (displayOrder !== undefined) updates.displayOrder = displayOrder;
+
+            const item = await supportRepository.updateFaqItem(req.params.id, updates);
+            if (!item) return res.status(404).json({ error: 'FAQ item not found' });
+            await logAdminAction(req, 'faq_update', 'faq', req.params.id, updates);
+            res.json(item);
+        } catch (error) {
+            logger.error('Error updating FAQ item', { error });
+            res.status(500).json({ error: 'Failed to update FAQ item' });
+        }
+    }
+
+    async deleteFaqItem(req: Request, res: Response) {
+        try {
+            const deleted = await supportRepository.deleteFaqItem(req.params.id);
+            if (!deleted) return res.status(404).json({ error: 'FAQ item not found' });
+            await logAdminAction(req, 'faq_delete', 'faq', req.params.id);
+            res.json({ success: true });
+        } catch (error) {
+            logger.error('Error deleting FAQ item', { error });
+            res.status(500).json({ error: 'Failed to delete FAQ item' });
+        }
+    }
+
+    // ── Help Article Management ─────────────────────────────────────────
+
+    async listHelpArticles(req: Request, res: Response) {
+        try {
+            const category = req.query.category as string | undefined;
+            const articles = await supportRepository.listHelpArticles(category);
+            res.json(articles);
+        } catch (error) {
+            logger.error('Error fetching help articles', { error });
+            res.status(500).json({ error: 'Failed to fetch help articles' });
+        }
+    }
+
+    async createHelpArticle(req: Request, res: Response) {
+        try {
+            const { category, title, content, isPublished, displayOrder } = req.body;
+            if (!category || !title || !content) {
+                return res.status(400).json({ error: 'category, title, and content are required' });
+            }
+            const article = await supportRepository.createHelpArticle({
+                category, title, content,
+                isPublished: isPublished ?? true,
+                displayOrder: displayOrder ?? 0,
+            });
+            await logAdminAction(req, 'help_article_create', 'help_article', article.id, { category, title: title.slice(0, 100) });
+            res.json(article);
+        } catch (error) {
+            logger.error('Error creating help article', { error });
+            res.status(500).json({ error: 'Failed to create help article' });
+        }
+    }
+
+    async updateHelpArticle(req: Request, res: Response) {
+        try {
+            const { category, title, content, isPublished, displayOrder } = req.body;
+            const updates: Record<string, any> = {};
+            if (category !== undefined) updates.category = category;
+            if (title !== undefined) updates.title = title;
+            if (content !== undefined) updates.content = content;
+            if (isPublished !== undefined) updates.isPublished = isPublished;
+            if (displayOrder !== undefined) updates.displayOrder = displayOrder;
+
+            const article = await supportRepository.updateHelpArticle(req.params.id, updates);
+            if (!article) return res.status(404).json({ error: 'Help article not found' });
+            await logAdminAction(req, 'help_article_update', 'help_article', req.params.id, updates);
+            res.json(article);
+        } catch (error) {
+            logger.error('Error updating help article', { error });
+            res.status(500).json({ error: 'Failed to update help article' });
+        }
+    }
+
+    async deleteHelpArticle(req: Request, res: Response) {
+        try {
+            const deleted = await supportRepository.deleteHelpArticle(req.params.id);
+            if (!deleted) return res.status(404).json({ error: 'Help article not found' });
+            await logAdminAction(req, 'help_article_delete', 'help_article', req.params.id);
+            res.json({ success: true });
+        } catch (error) {
+            logger.error('Error deleting help article', { error });
+            res.status(500).json({ error: 'Failed to delete help article' });
+        }
+    }
+
+    // ── Newsletter Subscribers ──────────────────────────────────────────
+
+    async listNewsletterSubscribers(req: Request, res: Response) {
+        try {
+            const { newsletterSubscribers } = await import('@shared/schema');
+            const { db } = await import('../../infra/db/db');
+            const { desc, count } = await import('drizzle-orm');
+
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 50;
+            const offset = (page - 1) * limit;
+
+            const [countResult] = await db.select({ count: count() }).from(newsletterSubscribers);
+            const subscribers = await db.select().from(newsletterSubscribers)
+                .orderBy(desc(newsletterSubscribers.subscribedAt))
+                .limit(limit).offset(offset);
+
+            res.json({ data: subscribers, total: Number(countResult?.count || 0), page, limit });
+        } catch (error) {
+            logger.error('Error fetching newsletter subscribers', { error });
+            res.status(500).json({ error: 'Failed to fetch newsletter subscribers' });
+        }
+    }
+
+    async toggleNewsletterSubscriber(req: Request, res: Response) {
+        try {
+            const { newsletterSubscribers } = await import('@shared/schema');
+            const { db } = await import('../../infra/db/db');
+            const { eq } = await import('drizzle-orm');
+
+            const { isActive } = req.body;
+            if (typeof isActive !== 'boolean') {
+                return res.status(400).json({ error: 'isActive must be a boolean' });
+            }
+
+            const [updated] = await db.update(newsletterSubscribers)
+                .set({ isActive })
+                .where(eq(newsletterSubscribers.id, req.params.id))
+                .returning();
+
+            if (!updated) return res.status(404).json({ error: 'Subscriber not found' });
+            await logAdminAction(req, 'newsletter_subscriber_toggle', 'newsletter', req.params.id, { isActive });
+            res.json(updated);
+        } catch (error) {
+            logger.error('Error toggling newsletter subscriber', { error });
+            res.status(500).json({ error: 'Failed to toggle subscriber' });
+        }
+    }
+
+    // ── Admin Audit Logs ────────────────────────────────────────────────
+
+    async listAdminAuditLogs(req: Request, res: Response) {
+        try {
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 50;
+            const adminId = req.query.adminId as string | undefined;
+            const action = req.query.action as string | undefined;
+            const targetType = req.query.targetType as string | undefined;
+
+            const result = await listAdminAuditLogs({ page, limit, adminId, action, targetType });
+            res.json({ data: result.data, total: result.total, page, limit });
+        } catch (error) {
+            logger.error('Error fetching admin audit logs', { error });
+            res.status(500).json({ error: 'Failed to fetch admin audit logs' });
+        }
+    }
+
+    // ── Ticket Assignment ───────────────────────────────────────────────
+
+    async assignSupportTicket(req: Request, res: Response) {
+        try {
+            const { assignedTo } = req.body;
+            const ticket = await adminService.updateSupportTicket(req.params.id, { assignedTo: assignedTo || null });
+            if (!ticket) return res.status(404).json({ error: 'Support ticket not found' });
+            await logAdminAction(req, 'ticket_assign', 'ticket', req.params.id, { assignedTo });
+            res.json(ticket);
+        } catch (error) {
+            logger.error('Error assigning support ticket', { error });
+            res.status(500).json({ error: 'Failed to assign support ticket' });
+        }
+    }
+
+    // ── Product Catalog (ingredients + manufacturer status) ─────────────
+
+    async getProductCatalog(req: Request, res: Response) {
+        try {
+            // Build our catalog with system supports detail
+            const systemSupports = SYSTEM_SUPPORTS.map(ing => {
+                const details = SYSTEM_SUPPORT_DETAILS.find(
+                    d => d.name.toLowerCase() === ing.name.toLowerCase()
+                );
+                return {
+                    name: ing.name,
+                    category: 'system_support' as const,
+                    doseMg: ing.doseMg,
+                    doseRangeMin: ing.doseRangeMin,
+                    doseRangeMax: ing.doseRangeMax,
+                    description: ing.description,
+                    systemSupported: details?.systemSupported || null,
+                    activeIngredients: details?.activeIngredients || [],
+                    suggestedDosage: details?.suggestedDosage || null,
+                };
+            });
+
+            const individualIngredients = INDIVIDUAL_INGREDIENTS.map(ing => ({
+                name: ing.name,
+                category: 'individual' as const,
+                doseMg: ing.doseMg,
+                doseRangeMin: ing.doseRangeMin,
+                doseRangeMax: ing.doseRangeMax,
+                type: ing.type || null,
+                description: ing.description || ing.suggestedUse || null,
+                benefits: ing.benefits || [],
+            }));
+
+            // Try to get manufacturer mapping status
+            let manufacturerMapping: any = null;
+            try {
+                const allNames = ALL_INGREDIENTS.map(i => i.name);
+                manufacturerMapping = await manufacturerPricingService.auditCatalogMappings(allNames);
+            } catch (e: any) {
+                logger.warn('Failed to fetch manufacturer catalog mappings', { error: e?.message });
+            }
+
+            res.json({
+                systemSupports,
+                individualIngredients,
+                totals: {
+                    systemSupports: systemSupports.length,
+                    individualIngredients: individualIngredients.length,
+                    total: systemSupports.length + individualIngredients.length,
+                },
+                manufacturer: manufacturerMapping ? {
+                    available: manufacturerMapping.available,
+                    mappedCount: manufacturerMapping.mappedCount,
+                    unmappedCount: manufacturerMapping.unmappedCount,
+                    coveragePercent: manufacturerMapping.coveragePercent,
+                    mapped: manufacturerMapping.mapped,
+                    unmapped: manufacturerMapping.unmapped,
+                } : null,
+            });
+        } catch (error) {
+            logger.error('Error fetching product catalog', { error });
+            res.status(500).json({ error: 'Failed to fetch product catalog' });
         }
     }
 }

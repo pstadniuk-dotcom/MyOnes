@@ -9,7 +9,10 @@ import { notificationsService } from '../notifications/notifications.service';
 import { sendNotificationEmail } from '../../utils/emailService';
 import { db } from '../../infra/db/db';
 import { ingredientPricing } from '@shared/schema';
+import { normalizeIngredientName } from '@shared/ingredients';
 import { eq } from 'drizzle-orm';
+import { autoShipService } from './autoship.service';
+import { autoShipRepository } from './autoship.repository';
 import logger from '../../infra/logging/logger';
 import { getBaseUrl } from '../../utils/urlHelper';
 
@@ -311,7 +314,7 @@ class DatabaseBillingProvider implements BillingProvider {
         if (await notificationsService.shouldSendEmail(userId, 'billing')) {
           await sendNotificationEmail({
             to: user.email,
-            subject: 'Your ONES order is confirmed!',
+            subject: 'Your Ones order is confirmed!',
             title: 'Order Confirmed',
             type: 'order_update',
             content: `
@@ -372,6 +375,32 @@ class DatabaseBillingProvider implements BillingProvider {
           formulaId,
         });
       }
+
+      // ── Create auto-ship subscription for recurring formula deliveries ──
+      // Only create auto-ship if the user opted in at checkout
+      if (metadata.enableAutoShip !== '1') {
+        logger.info('Auto-ship not enabled for this order — skipping', { userId, formulaId });
+      } else try {
+        const memberDiscountApplied = metadata.memberDiscountApplied === '1';
+        await autoShipService.createAutoShip({
+          userId,
+          formulaId,
+          formulaVersion,
+          priceCents: chargedCents,
+          manufacturerCostCents: mfrCostCents,
+          memberDiscountApplied,
+          quoteId: quoteId || undefined,
+          quoteExpiresAt: quoteExpiresAt ? quoteExpiresAt.toISOString() : undefined,
+        });
+        logger.info('Auto-ship created after first formula order', { userId, formulaId });
+      } catch (autoShipErr) {
+        // Non-blocking: auto-ship failure shouldn't break the order
+        logger.error('Failed to create auto-ship after checkout', {
+          userId,
+          formulaId,
+          error: autoShipErr instanceof Error ? autoShipErr.message : autoShipErr,
+        });
+      }
     }
   }
 
@@ -380,6 +409,23 @@ class DatabaseBillingProvider implements BillingProvider {
     const stripeSubscriptionId = sub.id;
     const stripeCustomerId = typeof sub.customer === 'string' ? sub.customer : null;
 
+    // ── Check if this is an auto-ship subscription ──────────────────────
+    const autoShip = await autoShipRepository.getByStripeSubscriptionId(stripeSubscriptionId);
+    if (autoShip) {
+      const periodEnd = sub.items?.data?.[0]?.current_period_end ?? null;
+      const updates: any = {};
+      if (periodEnd) updates.nextShipmentDate = new Date(periodEnd * 1000);
+      if (sub.status === 'canceled' || sub.status === 'unpaid') updates.status = 'cancelled';
+      else if (sub.pause_collection) updates.status = 'paused';
+      else if (sub.status === 'active' || sub.status === 'trialing') updates.status = 'active';
+      if (Object.keys(updates).length > 0) {
+        await autoShipRepository.update(autoShip.id, updates);
+        logger.info('Auto-ship subscription updated via Stripe webhook', { autoShipId: autoShip.id, updates });
+      }
+      return;
+    }
+
+    // ── Membership subscription ──────────────────────────────────────────
     let user = await usersRepository.getUserByStripeSubscriptionId(stripeSubscriptionId);
     if (!user && stripeCustomerId) {
       user = await usersRepository.getUserByStripeCustomerId(stripeCustomerId);
@@ -411,6 +457,18 @@ class DatabaseBillingProvider implements BillingProvider {
     const stripeSubscriptionId = sub.id;
     const stripeCustomerId = typeof sub.customer === 'string' ? sub.customer : null;
 
+    // ── Check if this is an auto-ship subscription ──────────────────────
+    const autoShip = await autoShipRepository.getByStripeSubscriptionId(stripeSubscriptionId);
+    if (autoShip) {
+      await autoShipRepository.update(autoShip.id, {
+        status: 'cancelled' as any,
+        nextShipmentDate: null,
+      });
+      logger.info('Auto-ship subscription deleted via Stripe webhook', { autoShipId: autoShip.id });
+      return;
+    }
+
+    // ── Membership subscription ──────────────────────────────────────────
     let user = await usersRepository.getUserByStripeSubscriptionId(stripeSubscriptionId);
     if (!user && stripeCustomerId) {
       user = await usersRepository.getUserByStripeCustomerId(stripeCustomerId);
@@ -441,12 +499,12 @@ class DatabaseBillingProvider implements BillingProvider {
       if (await notificationsService.shouldSendEmail(user.id, 'billing')) {
         await sendNotificationEmail({
           to: user.email,
-          subject: 'Your ONES subscription has been cancelled',
+          subject: 'Your Ones subscription has been cancelled',
           title: 'Subscription Cancelled',
           type: 'order_update',
           content: `
             <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
-            <p>Your ONES subscription has been cancelled. You won't be charged going forward.</p>
+            <p>Your Ones subscription has been cancelled. You won't be charged going forward.</p>
             <p>If you still have supply remaining, keep taking your formula as directed. Your health data and formula history are saved and ready whenever you'd like to come back.</p>
             <p>We'd love to know what we could do better — feel free to reach out to our support team anytime.</p>
           `,
@@ -471,6 +529,48 @@ class DatabaseBillingProvider implements BillingProvider {
     }
   }
 
+  /**
+   * Handle a paid invoice — currently only marks subscription active.
+   *
+   * ────────────────────────────────────────────────────────────────
+   * AUTO-SHIP TODO (Phase 2)
+   * ────────────────────────────────────────────────────────────────
+   * When auto-ship is implemented, this handler should:
+   *
+   * 1. Resolve the user's current active formula via
+   *    formulasRepository.getCurrentFormulaByUser(userId).
+   *
+   * 2. Fetch the latest manufacturer quote for that formula.
+   *    If the formula changed since the subscription was created,
+   *    a NEW quote must be obtained (Alive /get-quote) and the
+   *    Stripe subscription-item price updated BEFORE the invoice
+   *    finalises. The new manufacturerQuoteId must be stored on
+   *    the resulting order so fulfilment uses the correct quote.
+   *
+   * 3. Create the order:
+   *    await usersRepository.createOrder({
+   *      userId,
+   *      formulaId: activeFormula.id,
+   *      formulaVersion: activeFormula.version,
+   *      manufacturerQuoteId: latestQuote.id,   // ← critical
+   *      manufacturerCostCents: latestQuote.costCents,
+   *      amountCents: chargedAmount,
+   *      supplyWeeks: 8,
+   *      status: 'processing',
+   *    });
+   *
+   * 4. Advance the user's review schedule nextReviewDate forward
+   *    by one supply cycle.
+   *
+   * 5. Trigger fulfilment (Alive /mix-product) with the new quote.
+   *
+   * Key concern:  If the formula changed, the quote changes, and
+   * therefore the price changes. The user must be notified of the
+   * new price *before* the invoice finalises. Use Stripe's
+   * `invoice.upcoming` webhook or a pre-renewal check (10 days
+   * out) to recalculate and update the subscription item price.
+   * ────────────────────────────────────────────────────────────────
+   */
   private async handleInvoicePaid(event: Stripe.Event) {
     const invoice = event.data.object as Stripe.Invoice;
     const subscriptionRef = invoice.parent?.subscription_details?.subscription;
@@ -481,6 +581,37 @@ class DatabaseBillingProvider implements BillingProvider {
       return;
     }
 
+    // ── Check if this is an auto-ship invoice ──────────────────────────
+    const autoShip = await autoShipRepository.getByStripeSubscriptionId(stripeSubscriptionId);
+    if (autoShip) {
+      // billing_reason distinguishes invoice types:
+      //   'subscription_create' → first invoice at subscription creation (no-op: order already placed via checkout)
+      //   'subscription_cycle'  → recurring renewal (trial end + every 8 weeks after)
+      const billingReason = (invoice as any).billing_reason;
+      if (billingReason === 'subscription_create') {
+        logger.info('Auto-ship subscription_create invoice — skipping (order placed via checkout)', {
+          autoShipId: autoShip.id,
+          stripeSubscriptionId,
+          billingReason,
+        });
+      }
+
+      // Real renewal (includes trial-to-active transition and recurring charges)
+      if (billingReason === 'subscription_cycle') {
+        const invoiceAmountCents = invoice.amount_paid ?? 0;
+        logger.info('Auto-ship renewal invoice paid', {
+          autoShipId: autoShip.id,
+          stripeSubscriptionId,
+          amountCents: invoiceAmountCents,
+          billingReason,
+        });
+        await autoShipService.processAutoShipRenewal(stripeSubscriptionId, invoiceAmountCents);
+      }
+
+      return; // Don't fall through to membership logic
+    }
+
+    // ── Membership subscription: mark active ──────────────────────────
     const existing = await usersRepository.getSubscriptionByStripeSubscriptionId(stripeSubscriptionId);
     if (existing) {
       await usersRepository.updateSubscriptionByStripeSubscriptionId(stripeSubscriptionId, {
@@ -499,6 +630,50 @@ class DatabaseBillingProvider implements BillingProvider {
       return;
     }
 
+    // ── Check if this is an auto-ship invoice ──────────────────────────
+    const autoShip = await autoShipRepository.getByStripeSubscriptionId(stripeSubscriptionId);
+    if (autoShip) {
+      logger.warn('Auto-ship payment failed', { autoShipId: autoShip.id, stripeSubscriptionId });
+      // Pause auto-ship on payment failure
+      await autoShipRepository.update(autoShip.id, { status: 'paused' as any });
+
+      try {
+        const user = await usersRepository.getUser(autoShip.userId);
+        if (user) {
+          const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
+
+          if (await notificationsService.shouldSendEmail(user.id, 'billing')) {
+            await sendNotificationEmail({
+              to: user.email,
+              subject: 'Action needed: Auto-ship payment failed',
+              title: 'Auto-Ship Payment Failed',
+              type: 'order_update',
+              content: `
+                <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
+                <p>We couldn't process your auto-ship payment. Your auto-ship has been paused.</p>
+                <p>Please update your payment method and resume auto-ship from your dashboard.</p>
+              `,
+              actionUrl: `${frontendUrl}/dashboard/formula`,
+              actionText: 'Update Payment Method',
+            });
+          }
+
+          await notificationsService.create({
+            userId: user.id,
+            type: 'order_update',
+            title: 'Auto-Ship Payment Failed',
+            content: 'Your auto-ship payment failed and has been paused. Please update your payment method.',
+            metadata: { actionUrl: '/dashboard/formula', icon: 'alert-circle', priority: 'high' },
+          });
+        }
+      } catch (notifErr) {
+        logger.warn('Failed to send auto-ship payment failed notification', { autoShipId: autoShip.id, error: notifErr });
+      }
+
+      return; // Don't fall through to membership logic
+    }
+
+    // ── Membership subscription: mark past_due ──────────────────────────
     const existing = await usersRepository.getSubscriptionByStripeSubscriptionId(stripeSubscriptionId);
     if (existing) {
       await usersRepository.updateSubscriptionByStripeSubscriptionId(stripeSubscriptionId, {
@@ -514,7 +689,7 @@ class DatabaseBillingProvider implements BillingProvider {
           if (await notificationsService.shouldSendEmail(user.id, 'billing')) {
             await sendNotificationEmail({
               to: user.email,
-              subject: 'Action needed: Payment failed for your ONES subscription',
+              subject: 'Action needed: Payment failed for your Ones subscription',
               title: 'Payment Failed',
               type: 'order_update',
               content: `
@@ -611,10 +786,12 @@ class DatabaseBillingProvider implements BillingProvider {
 
     const doseByIngredient = new Map<string, { name: string; doseMg: number }>();
     const addIngredient = (name: unknown, amount: unknown) => {
-      const ingredientName = String(name || '').trim();
+      const rawName = String(name || '').trim();
       const doseMg = Number(amount || 0);
-      if (!ingredientName || !Number.isFinite(doseMg) || doseMg <= 0) return;
+      if (!rawName || !Number.isFinite(doseMg) || doseMg <= 0) return;
 
+      // Resolve aliases (e.g. "Cat's Claw" → "Cats Claw") before key normalization
+      const ingredientName = normalizeIngredientName(rawName);
       const key = this.normalizeIngredientKey(ingredientName);
       const existing = doseByIngredient.get(key);
       if (existing) {
@@ -700,6 +877,7 @@ class DatabaseBillingProvider implements BillingProvider {
     const frontendUrl = req ? getBaseUrl(req) : (process.env.FRONTEND_URL || 'http://localhost:5000').replace(/\/$/, '');
 
     const includeMembership = payload?.includeMembership !== false;
+    const enableAutoShip = payload?.enableAutoShip === true;
     const formulaId = typeof payload?.formulaId === 'string' ? payload.formulaId : undefined;
     const { plan, intervalCount } = this.resolvePlan(payload?.plan);
 
@@ -812,6 +990,7 @@ class DatabaseBillingProvider implements BillingProvider {
       if (applyMemberDiscount) {
         metadata.memberDiscountApplied = '1';
       }
+      metadata.enableAutoShip = enableAutoShip ? '1' : '0';
     }
 
     if (availableTier) {
@@ -822,6 +1001,14 @@ class DatabaseBillingProvider implements BillingProvider {
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
 
     if (formula) {
+      // Build formula description for Stripe checkout page
+      let formulaDescription: string | undefined;
+      if (includeMembership || applyMemberDiscount) {
+        formulaDescription = 'Smart Re-Order: AI-reviewed & auto-charged every ~8 weeks';
+      } else if (enableAutoShip) {
+        formulaDescription = 'Auto-ships every 8 weeks';
+      }
+
       lineItems.push({
         price_data: {
           currency: 'usd',
@@ -830,6 +1017,7 @@ class DatabaseBillingProvider implements BillingProvider {
             name: applyMemberDiscount
               ? `Personalized Formula v${formula.version} (Member Price)`
               : `Personalized Formula v${formula.version}`,
+            ...(formulaDescription ? { description: formulaDescription } : {}),
           },
         },
         quantity: 1,

@@ -34,7 +34,7 @@ export default function ReturnsPage() {
               <li><strong className="text-[#054700]">Personalized formulation</strong> - Created from your specific biomarkers and health conditions</li>
               <li><strong className="text-[#054700]">Made to order</strong> - Production begins immediately after order confirmation</li>
               <li><strong className="text-[#054700]">Cannot be resold</strong> - Your formula is designed for you and cannot be used by others</li>
-              <li><strong className="text-[#054700]">Third-party tested</strong> - Each batch is quality controlled and safety verified</li>
+              <li><strong className="text-[#054700]">Quality controlled</strong> - Each batch is quality verified for your safety</li>
             </ul>
             <p className="text-[#5a6623] mt-4">
               This custom approach ensures you get the most effective, personalized supplement possible, but it also means we cannot accept returns or offer refunds on manufactured orders.
@@ -49,7 +49,7 @@ export default function ReturnsPage() {
             <ul className="list-disc pl-6 space-y-2 text-[#5a6623]">
               <li>Your personalized formula and all ingredients</li>
               <li>Total daily dosage and capsule count</li>
-              <li>Supply duration (3, 6, or 12 months)</li>
+              <li>Supply duration</li>
               <li>Shipping address accuracy</li>
               <li>Any potential interactions with current medications</li>
             </ul>
@@ -98,22 +98,17 @@ export default function ReturnsPage() {
               <li>Place a new order with your refined formula when ready</li>
             </ul>
             <p className="text-[#5a6623] mt-4">
-              We recommend ordering a 3-month supply initially so you can assess how the formula works for you before committing to a larger supply.
+              We recommend starting with a 2-month supply so you can assess how the formula works for you.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-light text-[#054700] mb-4">One-Time Purchases, Not Subscriptions</h2>
             <p className="text-[#5a6623] mb-4">
-              All Ones orders are one-time purchases:
+              All Ones supplement orders are one-time purchases — a 2-month supply per order. There are no recurring charges or automatic shipments.
             </p>
-            <ul className="list-disc pl-6 space-y-2 text-[#5a6623]">
-              <li><strong className="text-[#054700]">3-Month Supply</strong> - Single payment, delivered once</li>
-              <li><strong className="text-[#054700]">6-Month Supply</strong> - Single payment, delivered once</li>
-              <li><strong className="text-[#054700]">12-Month Supply</strong> - Single payment, delivered once</li>
-            </ul>
             <p className="text-[#5a6623] mt-4">
-              There are no recurring charges or automatic shipments. When you're ready for your next supply, simply place a new order with your updated health profile.
+              When you're ready for your next supply, simply place a new order with your updated health profile.
             </p>
           </section>
 
@@ -127,7 +122,7 @@ export default function ReturnsPage() {
               <li>Potential interactions with medications</li>
               <li>Expected results and timeline</li>
               <li>Choosing the right supply duration</li>
-              <li>Our third-party testing and quality standards</li>
+              <li>Our quality standards</li>
             </ul>
           </section>
         </div>

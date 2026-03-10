@@ -8,6 +8,9 @@ import { setupVite, serveStatic, log } from "./vite";
 import { startSmsReminderScheduler } from "./utils/smsReminderScheduler";
 import { startAutoOptimizeScheduler } from "./utils/autoOptimizeScheduler";
 import { startBlogGenerationScheduler } from "./utils/blogGenerationScheduler";
+import { startPrAgentScheduler } from "./utils/prAgentScheduler";
+import { startAutoShipScheduler } from "./utils/autoShipScheduler";
+import { startSmartReorderScheduler } from "./utils/smartReorderScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
 
@@ -230,8 +233,17 @@ app.use((req, res, next) => {
       // Start formula review scheduler (checks subscription renewals daily at 9am UTC)
       startAutoOptimizeScheduler();
 
+      // Start auto-ship pre-renewal scheduler (refreshes quotes 10 days before renewal at 8am UTC)
+      startAutoShipScheduler();
+
+      // Start Smart Re-Order scheduler (AI review + auto-approve + charge for members)
+      startSmartReorderScheduler();
+
       // Start blog auto-generation scheduler (OFF by default — enabled via Admin → Blog Settings)
       startBlogGenerationScheduler();
+
+      // Start PR Agent scheduler (OFF by default — enabled via Admin → PR Agent Settings)
+      startPrAgentScheduler();
 
       // Note: Wearable data sync is now handled via Junction webhooks
       // No polling schedulers needed - data is pushed to /api/webhooks/junction

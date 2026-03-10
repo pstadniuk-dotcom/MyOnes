@@ -21,8 +21,11 @@ import {
   dashboardRoutes,
   systemRoutes,
   billingRoutes,
+  reorderRoutes,
   labsRoutes,
-  blogRoutes
+  blogRoutes,
+  liveChatRoutes,
+  agentRoutes
 } from "./api/routes";
 import { initializeAiSettings } from "./infra/ai/ai-config";
 import logger from "./infra/logging/logger";
@@ -85,8 +88,13 @@ export async function registerRoutes(app: Express, rateLimiters?: { authLimiter?
   app.use('/api/optimize', optimizeRoutes);
   app.use('/api/membership', membershipRoutes);
   app.use('/api/billing', billingRoutes);
+  app.use('/api/reorder', reorderRoutes);
   app.use('/api/labs', labsRoutes);
   app.use('/api/blog', blogRoutes);
+  app.use('/api/live-chat', liveChatRoutes);
+
+  // PR Agent (admin-only)
+  app.use('/api/agent', agentRoutes);
 
   // AI & Communication
   app.use('/api/chat', chatRoutes);
@@ -199,7 +207,7 @@ The Ones Health Library covers:
 
 ## AI and Data Practices
 
-- All lab data is handled under HIPAA-compliant protocols
+- All lab data is handled with encryption and privacy-first security practices
 - AI formula recommendations are advisory and do not constitute medical diagnosis
 - Formulas are reviewed for clinical dose appropriateness before production
 `);

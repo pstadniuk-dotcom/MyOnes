@@ -10,8 +10,8 @@ const sciencePoints = [
   },
   {
     icon: ShieldCheck,
-    title: "Third-Party Tested",
-    description: "Each batch is independently tested for purity, potency, and safety before it reaches you.",
+    title: "Quality Assured",
+    description: "Premium ingredients sourced from trusted suppliers, with rigorous quality control at every step.",
   },
   {
     icon: Microscope,

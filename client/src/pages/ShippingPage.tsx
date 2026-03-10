@@ -95,15 +95,14 @@ export default function ShippingPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-light text-[#054700] mb-4">Subscription Deliveries</h2>
+            <h2 className="text-2xl font-light text-[#054700] mb-4">Reordering</h2>
             <p className="text-[#5a6623] mb-4">
-              If you have a monthly subscription:
+              Supplement orders are a 2-month supply. When you're ready for your next order:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-[#5a6623]">
-              <li>Automatic shipments processed on the same day each month</li>
-              <li>Receive reminder email 3 days before shipment</li>
-              <li>Skip or reschedule deliveries anytime through your account</li>
-              <li>Update shipping address before your next billing date</li>
+              <li>Start a new AI consultation to review and optimize your formula</li>
+              <li>Place a new order when you're ready — no automatic charges</li>
+              <li>Update shipping address in your account settings before ordering</li>
             </ul>
           </section>
 
@@ -133,7 +132,7 @@ export default function ShippingPage() {
             </p>
             <p className="text-[#5a6623] mt-4">
               <strong className="text-[#054700]">Email:</strong> support@ones.health<br />
-              <strong className="text-[#054700]">Phone:</strong> 1-800-ONES-HELP<br />
+              <strong className="text-[#054700]">Phone:</strong> 341-444-3914<br />
               <strong className="text-[#054700]">Hours:</strong> Monday-Friday, 9am-6pm PST
             </p>
           </section>

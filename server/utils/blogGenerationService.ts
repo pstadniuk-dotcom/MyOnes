@@ -7,6 +7,7 @@
 
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
+import { jsonrepair } from 'jsonrepair';
 
 export interface GenerateArticleInput {
   title: string;
@@ -32,6 +33,104 @@ export interface GeneratedArticle {
   authorName: string;
   internalLinks: string[];
   schemaJson: string | null;
+  featuredImage: string | null;
+}
+
+/**
+ * Build an Unsplash image URL for a blog article based on its keyword.
+ * Uses curated Unsplash photo IDs mapped to health/supplement topics.
+ * Returns a 1200×630 image (OG-ready dimensions) via Unsplash CDN.
+ *
+ * All photos are from Unsplash's free license (no API key required for hotlinking
+ * via images.unsplash.com with ixid params).
+ */
+export function buildFeaturedImageUrl(keyword: string): string {
+  // Curated Unsplash photo IDs by health/supplement topic
+  // Each entry: [photoId, photographer] — all verified free-to-use
+  const topicPhotos: Array<{ terms: string[]; photos: string[] }> = [
+    { terms: ['vitamin', 'multivitamin'],
+      photos: ['photo-1584308666744-24d5c474f2ae', 'photo-1556228578-0d85b1a4d571', 'photo-1631549916768-4ab6fec8c5d5'] },
+    { terms: ['magnesium', 'mineral'],
+      photos: ['photo-1505576399279-0d754c0fda8b', 'photo-1498837167922-ddd27525d352'] },
+    { terms: ['ashwagandha', 'adaptogen', 'rhodiola', 'herbal'],
+      photos: ['photo-1515377905703-c4788e51af15', 'photo-1471193945509-9ad0617afabf'] },
+    { terms: ['omega', 'fish oil', 'epa', 'dha'],
+      photos: ['photo-1544551763-46a013bb70d5', 'photo-1615141982883-c7ad0e69fd62'] },
+    { terms: ['iron', 'ferritin', 'anemia'],
+      photos: ['photo-1490645935967-10de6ba17061', 'photo-1512621776951-a57141f2eefd'] },
+    { terms: ['sleep', 'melatonin', 'insomnia'],
+      photos: ['photo-1541781774459-bb2af2f05b55', 'photo-1531353826977-0941b4779a1c'] },
+    { terms: ['stress', 'cortisol', 'anxiety', 'calm'],
+      photos: ['photo-1506126613408-eca07ce68773', 'photo-1545205597-3d9d02c29597'] },
+    { terms: ['energy', 'fatigue', 'mitochondri'],
+      photos: ['photo-1571019614242-c5c5dee9f50e', 'photo-1552674605-db6ffd4facb5'] },
+    { terms: ['thyroid', 'hashimoto', 'iodine'],
+      photos: ['photo-1579684385127-1ef15d508118', 'photo-1532938911079-1b06ac7ceec7'] },
+    { terms: ['gut', 'probiotic', 'microbiome', 'digestiv'],
+      photos: ['photo-1498837167922-ddd27525d352', 'photo-1505576399279-0d754c0fda8b'] },
+    { terms: ['immune', 'immunity', 'cold', 'flu'],
+      photos: ['photo-1584308666744-24d5c474f2ae', 'photo-1576091160550-2173dba999ef'] },
+    { terms: ['heart', 'cardiovascular', 'cholesterol', 'blood pressure'],
+      photos: ['photo-1559757175-5700dde675bc', 'photo-1505576399279-0d754c0fda8b'] },
+    { terms: ['brain', 'cognitive', 'focus', 'memory', 'nootropic'],
+      photos: ['photo-1559757148-5c350d0d3c56', 'photo-1617791160505-6f00504e3519'] },
+    { terms: ['liver', 'detox'],
+      photos: ['photo-1512621776951-a57141f2eefd', 'photo-1490645935967-10de6ba17061'] },
+    { terms: ['muscle', 'protein', 'creatine', 'exercise'],
+      photos: ['photo-1534438327276-14e5300c3a48', 'photo-1571019614242-c5c5dee9f50e'] },
+    { terms: ['bone', 'calcium', 'osteo'],
+      photos: ['photo-1571019614242-c5c5dee9f50e', 'photo-1505576399279-0d754c0fda8b'] },
+    { terms: ['skin', 'collagen', 'beauty'],
+      photos: ['photo-1596755389378-c31d21fd1273', 'photo-1570172619644-dfd03ed5d881'] },
+    { terms: ['hair', 'biotin'],
+      photos: ['photo-1522337360788-8b13dee7a37e', 'photo-1596755389378-c31d21fd1273'] },
+    { terms: ['weight', 'metaboli', 'fat loss'],
+      photos: ['photo-1490645935967-10de6ba17061', 'photo-1552674605-db6ffd4facb5'] },
+    { terms: ['inflammation', 'anti-inflammatory', 'turmeric', 'curcumin'],
+      photos: ['photo-1615485500704-8e990f9900f7', 'photo-1505576399279-0d754c0fda8b'] },
+    { terms: ['coq10', 'ubiquinol'],
+      photos: ['photo-1584308666744-24d5c474f2ae', 'photo-1576091160550-2173dba999ef'] },
+    { terms: ['nmn', 'nad', 'longevity', 'aging', 'anti-aging'],
+      photos: ['photo-1532938911079-1b06ac7ceec7', 'photo-1579684385127-1ef15d508118'] },
+    { terms: ['selenium', 'zinc'],
+      photos: ['photo-1505576399279-0d754c0fda8b', 'photo-1584308666744-24d5c474f2ae'] },
+    { terms: ['theanine', 'caffeine', 'green tea', 'tea'],
+      photos: ['photo-1556679343-c7306c1976bc', 'photo-1544787219-7f47ccb76574'] },
+    { terms: ['lab', 'blood test', 'biomarker'],
+      photos: ['photo-1579684385127-1ef15d508118', 'photo-1532938911079-1b06ac7ceec7'] },
+    { terms: ['wearable', 'biometric', 'tracking'],
+      photos: ['photo-1576091160399-112ba8d25d1d', 'photo-1510017803350-71a7781e76b7'] },
+  ];
+
+  // Default pool for generic health/supplement articles
+  const defaultPhotos = [
+    'photo-1505751172876-fa1923c5c528', // medical/health
+    'photo-1584308666744-24d5c474f2ae', // supplements
+    'photo-1576091160550-2173dba999ef', // wellness
+    'photo-1556228578-0d85b1a4d571',   // vitamins
+    'photo-1505576399279-0d754c0fda8b', // healthy lifestyle
+  ];
+
+  const lowerKw = keyword.toLowerCase();
+  let matchedPhotos = defaultPhotos;
+
+  for (const topic of topicPhotos) {
+    if (topic.terms.some(t => lowerKw.includes(t))) {
+      matchedPhotos = topic.photos;
+      break;
+    }
+  }
+
+  // Pick a deterministic photo based on the keyword hash so the same keyword
+  // always gets the same image, but different keywords get different images
+  let hash = 0;
+  for (let i = 0; i < keyword.length; i++) {
+    hash = ((hash << 5) - hash + keyword.charCodeAt(i)) | 0;
+  }
+  const idx = Math.abs(hash) % matchedPhotos.length;
+  const photoId = matchedPhotos[idx];
+
+  return `https://images.unsplash.com/${photoId}?w=1200&h=630&fit=crop&q=80&auto=format`;
 }
 
 const SYSTEM_PROMPT = `You are a senior health & supplement content strategist for Ones — a personalized supplement platform that builds custom capsule formulas from a user's lab results, wearable data, and health goals.
@@ -58,7 +157,7 @@ Writing standards:
 - Use ordered (numbered) lists for protocols; unordered for features/options
 - EEAT signals: cite author expertise implicitly through specificity, cite real study details (sample size, duration, effect size where known)
 - Within the article body, naturally embed 3–5 internal links using keyword-rich anchor text in standard markdown format: [descriptive keyword anchor text](/blog/relevant-slug). These must appear inline within sentences, not in a list. Use realistic slug paths based on supplement or health topic names (e.g. [clinical evidence for ashwagandha](/blog/ashwagandha-benefits-dosage-evidence), [optimal magnesium glycinate dosage](/blog/magnesium-glycinate-benefits-sleep), [vitamin D3 and K2 synergy](/blog/vitamin-d3-k2-optimal-levels-dosage), [omega-3 EPA DHA ratio guide](/blog/omega-3-fish-oil-benefits-epa-dha-ratio)). Never link to the article you are writing. Use anchor text that reads naturally in the sentence — never "click here" or bare URLs.
-- When comparing ONES AI to competitors, only reference active companies: Viome (gut microbiome testing + AI recs), Thorne (practitioner-grade), Ritual (subscription multis), Function Health (lab testing). Do NOT mention Care/Of — they shut down in 2023.`;
+- When comparing Ones AI to competitors, only reference active companies: Viome (gut microbiome testing + AI recs), Thorne (practitioner-grade), Ritual (subscription multis), Function Health (lab testing). Do NOT mention Care/Of — they shut down in 2023.`;
 
 export async function generateArticle(input: GenerateArticleInput): Promise<GeneratedArticle> {
   const { title, category = 'Health & Wellness', tone = 'informative', primaryKeyword, secondaryKeywords = [] } = input;
@@ -129,7 +228,20 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('AI returned unexpected format');
 
-  const g = JSON.parse(jsonMatch[0]);
+  let g: any;
+  try {
+    g = JSON.parse(jsonMatch[0]);
+  } catch (parseErr: any) {
+    // AI often produces unescaped quotes, trailing commas, or broken unicode in long articles.
+    // Use jsonrepair for robust recovery before giving up.
+    try {
+      const repaired = jsonrepair(jsonMatch[0]);
+      g = JSON.parse(repaired);
+      console.warn('[blog-gen] JSON repaired successfully via jsonrepair after initial parse failure');
+    } catch {
+      throw new Error(`${parseErr.message}`);
+    }
+  }
 
   g.wordCount = g.content
     ? g.content.split(/\s+/).filter(Boolean).length
@@ -152,11 +264,11 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
     g.metaTitle = `${primaryKeyword ?? title} | Ones`;
   }
 
-  // ── Meta description validation (SERP display window: 145-165 chars) ────────
+  // ── Meta description validation (DB column is varchar(160)) ─────────────────
   if (g.metaDescription) {
     if (g.metaDescription.startsWith('STRICT:')) g.metaDescription = '';
-    if (g.metaDescription.length > 165) {
-      g.metaDescription = g.metaDescription.slice(0, 162).trimEnd() + '...';
+    if (g.metaDescription.length > 160) {
+      g.metaDescription = g.metaDescription.slice(0, 157).trimEnd() + '...';
     }
     if (g.metaDescription.length < 100) {
       console.warn(`[blog-gen] metaDescription too short (${g.metaDescription.length} chars) for: "${g.metaTitle}"`);
@@ -208,6 +320,9 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
 
   combinedSchema = JSON.stringify(schemas);
 
+  // Build a featured image URL from the primary keyword
+  const featuredImage = buildFeaturedImageUrl(g.primaryKeyword ?? primaryKeyword ?? title);
+
   return {
     title:            g.title            ?? title,
     slug:             g.slug             ?? slugify(g.title ?? title),
@@ -224,6 +339,7 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
     authorName:       'Ones Editorial Team',
     internalLinks:    Array.isArray(g.internalLinks) ? g.internalLinks : [],
     schemaJson:       combinedSchema,
+    featuredImage,
   };
 }
 

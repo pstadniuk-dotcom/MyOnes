@@ -26,7 +26,7 @@ export default function PricingSectionV2() {
 <span className="font-medium">Everything included.</span>
           </h2>
           <p className="mt-6 text-lg text-[#5a6623]">
-            Your personalized formula, delivered every 3 months.
+            Your personalized formula, delivered every 2 months.
           </p>
         </div>
 
@@ -44,7 +44,7 @@ export default function PricingSectionV2() {
             {/* Card Header */}
             <div className="bg-[#054700] px-8 py-10 text-center">
               <h3 className="text-white/70 text-sm font-medium tracking-wider uppercase mb-4">
-                3-Month Supply
+                2-Month Supply
               </h3>
               <div className="flex items-baseline justify-center gap-2">
                 <span className="text-white/60 text-lg">Starting at</span>
@@ -54,7 +54,7 @@ export default function PricingSectionV2() {
                 <span className="text-white/60">/month*</span>
               </div>
               <p className="mt-4 text-white/70 text-sm">
-                $297 billed every 3 months
+                Billed as a 2-month supply
               </p>
             </div>
 
@@ -86,7 +86,7 @@ export default function PricingSectionV2() {
 
               {/* Asterisk explanation */}
               <p className="mt-4 text-center text-xs text-[#5a6623]/70">
-                *Price varies based on your personalized formula. 3-month minimum commitment.
+                *Price varies based on your personalized formula. 2-month supply per order.
               </p>
             </div>
           </div>
@@ -96,7 +96,7 @@ export default function PricingSectionV2() {
         <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm text-[#5a6623]">
           <div className="flex items-center gap-2">
             <Check className="w-4 h-4 text-[#054700]" />
-            <span>Third-Party Tested</span>
+            <span>Clinical-Grade Ingredients</span>
           </div>
           <div className="flex items-center gap-2">
             <Check className="w-4 h-4 text-[#054700]" />

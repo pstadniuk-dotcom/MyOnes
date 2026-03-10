@@ -34,7 +34,7 @@ export default function RefundsPage() {
               <li><strong className="text-[#054700]">Personalized to your health data</strong> - Created based on your specific biomarkers, health conditions, and goals</li>
               <li><strong className="text-[#054700]">Made to order</strong> - Manufactured specifically for you after your order is confirmed</li>
               <li><strong className="text-[#054700]">Cannot be resold</strong> - Your custom formula cannot be sold to another customer</li>
-              <li><strong className="text-[#054700]">Quality controlled</strong> - Each batch is third-party tested and quality verified for your safety</li>
+              <li><strong className="text-[#054700]">Quality controlled</strong> - Each batch is quality verified for your safety</li>
             </ul>
             <p className="text-[#5a6623] mt-4">
               This ensures you receive the highest quality, most personalized supplement possible, but it also means we cannot accept returns or offer refunds on custom orders.
@@ -49,7 +49,7 @@ export default function RefundsPage() {
             <ul className="list-disc pl-6 space-y-2 text-[#5a6623]">
               <li>Review your personalized formula carefully</li>
               <li>Verify your shipping address is correct</li>
-              <li>Confirm your supply duration (3, 6, or 12 months)</li>
+              <li>Confirm your supply duration</li>
               <li>Ask our support team any questions before ordering</li>
             </ul>
             <p className="text-[#5a6623] mt-4">
@@ -89,13 +89,8 @@ export default function RefundsPage() {
           <section>
             <h2 className="text-2xl font-light text-[#054700] mb-4">Supply Duration</h2>
             <p className="text-[#5a6623] mb-4">
-              Ones offers 3-month, 6-month, and 12-month supplies. These are one-time purchases, not subscriptions:
+              Ones supplements are ordered as a 2-month supply. This is because every formula is custom-manufactured fresh for you — a 2-month supply is what makes the unit economics work and keeps pricing reasonable. Two months also gives enough time for ingredients to produce measurable results before optimizing your next batch.
             </p>
-            <ul className="list-disc pl-6 space-y-2 text-[#5a6623]">
-              <li><strong className="text-[#054700]">3-Month Supply</strong> - Single payment, delivered once</li>
-              <li><strong className="text-[#054700]">6-Month Supply</strong> - Single payment, delivered once</li>
-              <li><strong className="text-[#054700]">12-Month Supply</strong> - Single payment, delivered once</li>
-            </ul>
             <p className="text-[#5a6623] mt-4">
               There are no recurring charges or automatic renewals. When you're ready for your next supply, simply create a new order with your updated health profile.
             </p>
@@ -111,7 +106,7 @@ export default function RefundsPage() {
               <li>Expected timeline for results</li>
               <li>Interactions with medications or other supplements</li>
               <li>Choosing the right supply duration for your needs</li>
-              <li>Ingredient sourcing and third-party testing</li>
+              <li>Ingredient sourcing and quality</li>
             </ul>
           </section>
         </div>

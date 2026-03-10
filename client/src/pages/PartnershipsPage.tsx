@@ -35,7 +35,7 @@ export default function PartnershipsPage() {
               </div>
               <h2 className="text-2xl font-light text-[#054700] mb-4">Creator Partnerships</h2>
               <p className="text-[#5a6623] mb-6">
-                Are you a health and wellness influencer, fitness coach, or content creator? Partner with ONES to offer your audience truly personalized supplementation.
+                Are you a health and wellness influencer, fitness coach, or content creator? Partner with Ones to offer your audience truly personalized supplementation.
               </p>
               <ul className="space-y-3 text-[#5a6623]">
                 <li className="flex items-start gap-3">
@@ -84,7 +84,7 @@ export default function PartnershipsPage() {
       {/* Why Partner */}
       <section className="py-20">
         <div className="container mx-auto px-6 max-w-4xl">
-          <h2 className="text-3xl font-light text-[#054700] mb-8 text-center">Why Partner With ONES?</h2>
+          <h2 className="text-3xl font-light text-[#054700] mb-8 text-center">Why Partner With Ones?</h2>
           <div className="grid sm:grid-cols-3 gap-6">
             <div className="text-center">
               <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
@@ -101,7 +101,7 @@ export default function PartnershipsPage() {
               </div>
               <h3 className="font-medium text-[#054700] mb-2">Science-Backed</h3>
               <p className="text-sm text-[#5a6623]">
-                Third-party tested and formulated based on peer-reviewed research.
+                Formulated based on peer-reviewed research with clinical-grade ingredients.
               </p>
             </div>
             <div className="text-center">

@@ -96,7 +96,7 @@ export function GroceryListModal({ open, onOpenChange }: GroceryListModalProps) 
       return acc;
     }, {} as Record<string, GroceryItem[]>);
 
-    let text = "🛒 ONES Grocery List\n";
+    let text = "🛒 Ones Grocery List\n";
     Object.entries(groupedForShare).forEach(([category, items]) => {
       text += `\n${category}:\n`;
       items.forEach(item => {
@@ -107,7 +107,7 @@ export function GroceryListModal({ open, onOpenChange }: GroceryListModalProps) 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'ONES Grocery List',
+          title: 'Ones Grocery List',
           text: text,
         });
       } catch (err) {

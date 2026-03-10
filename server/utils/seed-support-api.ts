@@ -360,17 +360,11 @@ You'll see the exact price before checkout with no surprises. Pricing is transpa
 
 SUPPLY OPTIONS
 
-Choose from three supply lengths:
-
-1-month supply at standard pricing
-3-month supply saves 10%
-6-month supply saves 15% plus free shipping
-
-Longer supplies offer better value and ensure you don't run out.
+All supplement orders are a 2-month supply. Because every formula is custom-manufactured fresh for you, a 2-month supply is what makes the unit economics work and keeps pricing reasonable. Two months also gives enough time for ingredients to produce measurable results before optimizing your next batch.
 
 NO SUBSCRIPTIONS
 
-Ones AI is NOT a subscription service. We never auto-charge you or send unexpected shipments.
+Ones is NOT a subscription service for supplements. We never auto-charge you or send unexpected shipments.
 
 When you're running low, simply log in and place a new order. You decide when and what to buy.
 
@@ -382,11 +376,11 @@ Your payment information is encrypted and never stored on our servers.
 
 DISCOUNTS AND PROMOTIONS
 
-Watch for promotional offers via email. We occasionally offer discounts on larger supply orders or for new customers.
+Watch for promotional offers via email. We occasionally offer discounts for new customers.
 
 WHAT'S INCLUDED IN THE PRICE
 
-Your formula price includes all ingredients, custom manufacturing, quality testing, and packaging. Shipping is free on 6-month supplies or standard rates apply for smaller orders.
+Your formula price includes all ingredients, custom manufacturing, quality testing, and packaging. Free shipping on all orders.
 
 PRICE CHANGES
 
@@ -774,19 +768,19 @@ const faqData = [
   {
     category: 'Billing & Subscription',
     question: 'Is this a subscription service? Will I be charged automatically?',
-    answer: 'No, Ones AI is NOT a subscription service. You make one-time purchases for 1, 3, or 6-month supplies. We NEVER auto-charge you. When you\'re running low, simply log in and place a new order. You control exactly when and what you buy.',
+    answer: 'No, Ones is NOT a subscription service for supplements. You make a one-time purchase for a 2-month supply. We NEVER auto-charge you. When you\'re running low, simply log in and place a new order. You control exactly when and what you buy.',
     displayOrder: 1
   },
   {
     category: 'Billing & Subscription',
     question: 'Can I get a refund if I don\'t like my formula?',
-    answer: 'Custom formulas are made-to-order specifically for you and cannot be resold, so we generally cannot offer refunds for change of mind. However, we DO provide full refunds for: manufacturing defects, shipping errors, or damaged products. If your formula isn\'t working well, the AI can adjust it - we\'re committed to getting your formula right.',
+    answer: 'Custom formulas are made-to-order specifically for you and cannot be resold, so we do not offer refunds once your order has been placed and production has begun. However, we DO provide replacements at no cost for: manufacturing defects, shipping errors, or damaged products. Contact us within 7 days of delivery. If your formula isn\'t working well, the AI can adjust it for your next order — we\'re committed to getting your formula right.',
     displayOrder: 2
   },
   {
     category: 'Billing & Subscription',
     question: 'How much do custom formulas cost?',
-    answer: 'Pricing depends on your specific formula ingredients and total amount. Some ingredients cost more than others. You\'ll see the exact price before checkout. Supply options: 1-month (standard pricing), 3-month (save 10%), 6-month (save 15% + free shipping). There are no hidden fees.',
+    answer: 'Pricing depends on your specific formula ingredients and total amount. Some ingredients cost more than others. You\'ll see the exact price before checkout. All supplement orders are a 2-month supply. Free shipping on every order. There are no hidden fees.',
     displayOrder: 3
   },
   {

@@ -9,6 +9,8 @@ import { manufacturerPricingService } from '../formulas/manufacturer-pricing.ser
 import { usersRepository } from '../users/users.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
 
+const VALID_ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
+
 export class AdminService {
     async getStats() {
         return await adminRepository.getAdminStats();
@@ -22,8 +24,21 @@ export class AdminService {
         return await adminRepository.getRevenueData(days);
     }
 
-    async searchUsers(query: string, limit: number, offset: number, filter: string) {
-        const result = await adminRepository.searchUsers(query, limit, offset, filter);
+    async searchUsers(
+        query: string,
+        limit: number,
+        offset: number,
+        filter: string,
+        advancedFilters?: {
+            hasDevices?: boolean;
+            deviceProviders?: string[];
+            hasLabResults?: boolean;
+            hasOrders?: boolean;
+            minOrders?: number;
+            maxOrders?: number;
+        }
+    ) {
+        const result = await adminRepository.searchUsers(query, limit, offset, filter, advancedFilters);
         // Sanitize users to remove sensitive fields
         const sanitizedUsers = result.users.map(({ password, ...user }: any) => user);
         return {
@@ -60,7 +75,41 @@ export class AdminService {
             throw new Error('Cannot delete admin accounts');
         }
 
-        return await adminRepository.deleteUser(userId);
+        // Soft-delete: set deletedAt timestamp instead of hard DELETE
+        return await adminRepository.updateUser(userId, {
+            deletedAt: new Date(),
+            deletedBy: adminId,
+        });
+    }
+
+    async suspendUser(userId: string, adminId: string, reason?: string) {
+        const user = await adminRepository.getUserById(userId);
+        if (!user) throw new Error('User not found');
+        if (user.id === adminId) throw new Error('Cannot suspend yourself');
+        if (user.isAdmin) throw new Error('Cannot suspend admin accounts');
+
+        const updated = await adminRepository.updateUser(userId, {
+            suspendedAt: new Date(),
+            suspendedBy: adminId,
+            suspendedReason: reason || null,
+        });
+        if (!updated) throw new Error('Failed to suspend user');
+        const { password, ...sanitized } = updated as any;
+        return sanitized;
+    }
+
+    async unsuspendUser(userId: string, adminId: string) {
+        const user = await adminRepository.getUserById(userId);
+        if (!user) throw new Error('User not found');
+
+        const updated = await adminRepository.updateUser(userId, {
+            suspendedAt: null,
+            suspendedBy: null,
+            suspendedReason: null,
+        });
+        if (!updated) throw new Error('Failed to unsuspend user');
+        const { password, ...sanitized } = updated as any;
+        return sanitized;
     }
 
     async updateUserAdminStatus(userId: string, adminId: string, isAdmin: boolean) {
@@ -84,6 +133,15 @@ export class AdminService {
 
     async listSupportTickets(status: string, limit: number, offset: number) {
         return await adminRepository.listAllSupportTickets(status, limit, offset);
+    }
+
+    async getNotificationCounts() {
+        const supportCounts = await adminRepository.getOpenSupportTicketCount();
+        return {
+            supportTickets: supportCounts.open + supportCounts.inProgress,
+            openTickets: supportCounts.open,
+            inProgressTickets: supportCounts.inProgress,
+        };
     }
 
     async getSupportTicketDetails(ticketId: string) {
@@ -199,7 +257,7 @@ export class AdminService {
         const messageTexts = userMessages.map(m => m.content).join('\n---\n');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-        const analysisPrompt = `You are analyzing user conversations from ONES AI, a personalized supplement platform. 
+        const analysisPrompt = `You are analyzing user conversations from Ones AI, a personalized supplement platform. 
 Users chat with an AI health practitioner to create custom supplement formulas.
 
 Analyze these ${userMessages.length} user messages from the past ${days} days and provide product insights.
@@ -320,7 +378,31 @@ Return ONLY valid JSON.`;
     }
 
     async updateOrderStatus(orderId: string, status: string, trackingUrl?: string) {
-        return await adminRepository.updateOrderStatus(orderId, status, trackingUrl);
+        if (!VALID_ORDER_STATUSES.includes(status as any)) {
+            throw new Error(`Invalid order status "${status}". Must be one of: ${VALID_ORDER_STATUSES.join(', ')}`);
+        }
+        const order = await adminRepository.updateOrderStatus(orderId, status, trackingUrl);
+
+        // Start Smart Re-Order cycle for members when order ships
+        if (order && status === 'shipped' && order.formulaId) {
+            try {
+                const user = await usersRepository.getUser(order.userId);
+                if (user?.membershipTier && !user.membershipCancelledAt) {
+                    const { reorderService } = await import('../reorder/reorder.service');
+                    await reorderService.createScheduleForOrder(
+                        order.userId,
+                        order.formulaId,
+                        order.formulaVersion,
+                        order.shippedAt ?? new Date(),
+                    );
+                    logger.info(`[SmartReorder] Created schedule for member ${order.userId}, order ${orderId}`);
+                }
+            } catch (err) {
+                logger.error(`[SmartReorder] Failed to create schedule for order ${orderId}:`, err);
+            }
+        }
+
+        return order;
     }
 
     async retryManufacturerOrder(orderId: string): Promise<{ success: boolean; manufacturerOrderId?: string; error?: string }> {

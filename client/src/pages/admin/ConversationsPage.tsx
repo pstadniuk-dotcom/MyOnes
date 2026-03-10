@@ -1,11 +1,10 @@
-import { useState } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import {
   MessageSquare,
   Search,
   RefreshCw,
-  ChevronRight,
   User,
   Bot,
   Lightbulb,
@@ -15,7 +14,19 @@ import {
   XCircle,
   Sparkles,
   Calendar,
-  ArrowLeft
+  Filter,
+  ArrowUpDown,
+  ExternalLink,
+  FlaskConical,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  BarChart3,
+  Target,
+  Zap,
+  ThumbsUp,
+  ThumbsDown,
+  Minus,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -28,8 +39,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest } from '@/shared/lib/queryClient';
 import { cn } from '@/shared/lib/utils';
+import { useLocation } from 'wouter';
 
-// Types
 interface ConversationPreview {
   sessionId: string;
   status: string;
@@ -75,24 +86,23 @@ interface ConversationStats {
   averageMessagesPerConversation: number;
 }
 
-export default function ConversationsPage() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+// ---- Browse Tab (much stronger) ----
+function BrowseTab() {
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
-  const [insightDays, setInsightDays] = useState('30');
-  const [activeTab, setActiveTab] = useState('insights');
+  const [sortBy, setSortBy] = useState<'recent' | 'messages' | 'oldest'>('recent');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
 
-  // Fetch conversation list
-  const { data: conversationsData, isLoading: conversationsLoading } = useQuery({
+  const { data: conversationsData, isLoading } = useQuery({
     queryKey: ['/api/admin/conversations'],
     queryFn: async () => {
-      const res = await apiRequest('GET', '/api/admin/conversations?limit=100');
+      const res = await apiRequest('GET', '/api/admin/conversations?limit=200');
       return res.json() as Promise<{ conversations: ConversationPreview[]; total: number }>;
     }
   });
 
-  // Fetch selected conversation details
   const { data: conversationDetails, isLoading: detailsLoading } = useQuery({
     queryKey: ['/api/admin/conversations', selectedConversation],
     queryFn: async () => {
@@ -103,7 +113,167 @@ export default function ConversationsPage() {
     enabled: !!selectedConversation
   });
 
-  // Fetch latest insights
+  const filtered = useMemo(() => {
+    let list = conversationsData?.conversations || [];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(c =>
+        c.user.name.toLowerCase().includes(q) ||
+        c.user.email.toLowerCase().includes(q) ||
+        c.preview.toLowerCase().includes(q) ||
+        c.sessionId.toLowerCase().includes(q)
+      );
+    }
+    if (statusFilter !== 'all') {
+      list = list.filter(c => c.status === statusFilter);
+    }
+    if (sortBy === 'recent') list = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    if (sortBy === 'oldest') list = [...list].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    if (sortBy === 'messages') list = [...list].sort((a, b) => b.messageCount - a.messageCount);
+    return list;
+  }, [conversationsData, searchQuery, sortBy, statusFilter]);
+
+  const toggleMessage = (id: string) => {
+    setExpandedMessages(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6">
+      {/* Left: Conversation List */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input placeholder="Search name, email, content..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 h-9" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[120px] h-8 text-xs">
+              <Filter className="h-3 w-3 mr-1" /><SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+            <SelectTrigger className="w-[130px] h-8 text-xs">
+              <ArrowUpDown className="h-3 w-3 mr-1" /><SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="recent">Most Recent</SelectItem>
+              <SelectItem value="oldest">Oldest First</SelectItem>
+              <SelectItem value="messages">Most Messages</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-gray-400 ml-auto">{filtered.length} results</span>
+        </div>
+
+        <Card className="overflow-hidden">
+          <ScrollArea className="h-[620px]">
+            {isLoading ? (
+              <div className="p-4 space-y-3">{Array.from({length:6}).map((_,i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
+            ) : filtered.length === 0 ? (
+              <div className="p-8 text-center text-gray-400"><MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-40" /><p className="text-sm">No conversations match</p></div>
+            ) : (
+              <div className="divide-y">
+                {filtered.map(conv => (
+                  <button key={conv.sessionId} onClick={() => setSelectedConversation(conv.sessionId)} className={cn('w-full p-3 text-left hover:bg-gray-50 transition-colors', selectedConversation === conv.sessionId && 'bg-[#054700]/5 border-l-2 border-l-[#054700]')}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate text-gray-900">{conv.user.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{conv.user.email}</p>
+                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">{conv.preview}</p>
+                      </div>
+                      <div className="text-right shrink-0 space-y-1">
+                        <Badge variant={conv.status === 'active' ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">{conv.messageCount} msgs</Badge>
+                        <p className="text-[10px] text-gray-400">{formatDistanceToNow(new Date(conv.createdAt), { addSuffix: true })}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </Card>
+      </div>
+
+      {/* Right: Conversation Detail */}
+      <Card className="overflow-hidden">
+        {!selectedConversation ? (
+          <div className="h-[700px] flex items-center justify-center text-gray-400">
+            <div className="text-center"><MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-30" /><p className="text-sm">Select a conversation to view</p></div>
+          </div>
+        ) : detailsLoading ? (
+          <div className="p-6 space-y-4">{Array.from({length:4}).map((_,i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
+        ) : conversationDetails ? (
+          <>
+            <div className="border-b px-5 py-3 bg-gray-50/80 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-gray-900">{conversationDetails.user.name}</p>
+                  <Badge variant={conversationDetails.session.status === 'active' ? 'default' : 'secondary'} className="text-[10px]">{conversationDetails.session.status}</Badge>
+                </div>
+                <p className="text-xs text-gray-500">{conversationDetails.user.email}</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{format(new Date(conversationDetails.session.createdAt), 'MMM d, yyyy h:mm a')} · {conversationDetails.messages.length} messages</p>
+              </div>
+              <Button variant="outline" size="sm" className="text-xs" onClick={() => setLocation('/admin/users/' + conversationDetails.user.id)}>
+                <ExternalLink className="h-3 w-3 mr-1" /> View User
+              </Button>
+            </div>
+            <ScrollArea className="h-[640px]">
+              <div className="p-4 space-y-3">
+                {conversationDetails.messages.map(message => {
+                  const isUser = message.role === 'user';
+                  const isExpanded = expandedMessages.has(message.id);
+                  const isLong = message.content.length > 400;
+                  return (
+                    <div key={message.id} className={cn('flex gap-3', isUser ? 'flex-row' : 'flex-row')}>
+                      <div className={cn('shrink-0 h-7 w-7 rounded-full flex items-center justify-center mt-0.5', isUser ? 'bg-[#054700] text-white' : 'bg-gray-200 text-gray-600')}>
+                        {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-gray-700">{isUser ? 'User' : 'AI'}</span>
+                          {message.model && <Badge variant="outline" className="text-[10px] px-1 py-0">{message.model}</Badge>}
+                          <span className="text-[10px] text-gray-400">{format(new Date(message.createdAt), 'h:mm a')}</span>
+                        </div>
+                        <div className={cn('text-sm text-gray-700 whitespace-pre-wrap rounded-lg p-3', isUser ? 'bg-[#054700]/5' : 'bg-gray-50')}>
+                          {isLong && !isExpanded ? message.content.slice(0, 400) + '...' : message.content}
+                        </div>
+                        {isLong && (
+                          <button onClick={() => toggleMessage(message.id)} className="text-xs text-[#054700] hover:underline mt-1 flex items-center gap-1">
+                            {isExpanded ? <><ChevronUp className="h-3 w-3" /> Show less</> : <><ChevronDown className="h-3 w-3" /> Show more</>}
+                          </button>
+                        )}
+                        {message.formula && (
+                          <Badge className="mt-2 bg-green-100 text-green-800 border-green-200"><FlaskConical className="h-3 w-3 mr-1" /> Formula Generated</Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          </>
+        ) : null}
+      </Card>
+    </div>
+  );
+}
+
+// ---- Insights Tab (much more detailed) ----
+function InsightsTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [insightDays, setInsightDays] = useState('30');
+
   const { data: insightsData, isLoading: insightsLoading } = useQuery({
     queryKey: ['/api/admin/conversations/insights/latest'],
     queryFn: async () => {
@@ -112,479 +282,243 @@ export default function ConversationsPage() {
     }
   });
 
-  // Fetch conversation stats
   const { data: statsData } = useQuery({
     queryKey: ['/api/admin/conversations/stats', insightDays],
     queryFn: async () => {
-      const res = await apiRequest('GET', `/api/admin/conversations/stats?days=${insightDays}`);
+      const res = await apiRequest('GET', '/api/admin/conversations/stats?days=' + insightDays);
       return res.json() as Promise<ConversationStats>;
     }
   });
 
-  // Generate insights mutation
   const generateInsights = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/admin/conversations/insights/generate', {
-        days: parseInt(insightDays)
-      });
+      const res = await apiRequest('POST', '/api/admin/conversations/insights/generate', { days: parseInt(insightDays) });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/conversations/insights/latest'] });
-      toast({
-        title: 'Insights Generated',
-        description: 'AI has analyzed your conversations and generated new insights.'
-      });
+      toast({ title: 'Insights Generated', description: 'AI analyzed your conversations.' });
     },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: 'Failed to generate insights. Please try again.',
-        variant: 'destructive'
-      });
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to generate insights.', variant: 'destructive' });
     }
   });
 
-  // Filter conversations by search
-  const filteredConversations = conversationsData?.conversations.filter(conv =>
-    conv.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.preview.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const insights = insightsData?.insights;
+  const sentiment = insights?.sentimentOverview;
+  const totalSentiment = sentiment ? sentiment.positive + sentiment.neutral + sentiment.negative : 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <MessageSquare className="h-6 w-6" />
-                Conversation Intelligence
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                Analyze user conversations to discover product insights
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Select value={insightDays} onValueChange={setInsightDays}>
-                <SelectTrigger className="w-[140px]">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="14">Last 14 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="60">Last 60 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                onClick={() => generateInsights.mutate()}
-                disabled={generateInsights.isPending}
-              >
-                {generateInsights.isPending ? (
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-2" />
-                )}
-                Generate Insights
-              </Button>
-            </div>
-          </div>
+    <div className="space-y-6">
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Select value={insightDays} onValueChange={setInsightDays}>
+            <SelectTrigger className="w-[140px] h-9"><Calendar className="h-4 w-4 mr-2" /><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="14">Last 14 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="60">Last 60 days</SelectItem>
+              <SelectItem value="90">Last 90 days</SelectItem>
+            </SelectContent>
+          </Select>
+          {insights && (
+            <p className="text-xs text-gray-400">Last generated {formatDistanceToNow(new Date(insights.generatedAt), { addSuffix: true })}</p>
+          )}
         </div>
+        <Button onClick={() => generateInsights.mutate()} disabled={generateInsights.isPending} size="sm">
+          {generateInsights.isPending ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+          Generate Insights
+        </Button>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
-        {/* Stats Cards */}
-        {statsData && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Conversations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{statsData.totalConversations}</div>
-                <p className="text-xs text-muted-foreground">in the last {insightDays} days</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">User Messages</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{statsData.totalUserMessages}</div>
-                <p className="text-xs text-muted-foreground">questions and requests</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Avg. Messages/Conversation</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{statsData.averageMessagesPerConversation}</div>
-                <p className="text-xs text-muted-foreground">engagement depth</p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+      {/* Stats cards */}
+      {statsData && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card><CardContent className="pt-4 pb-3"><p className="text-xs text-gray-500 mb-1">Conversations</p><p className="text-2xl font-semibold">{statsData.totalConversations}</p><p className="text-[11px] text-gray-400">in last {insightDays}d</p></CardContent></Card>
+          <Card><CardContent className="pt-4 pb-3"><p className="text-xs text-gray-500 mb-1">User Messages</p><p className="text-2xl font-semibold">{statsData.totalUserMessages}</p><p className="text-[11px] text-gray-400">questions & requests</p></CardContent></Card>
+          <Card><CardContent className="pt-4 pb-3"><p className="text-xs text-gray-500 mb-1">Avg Depth</p><p className="text-2xl font-semibold">{statsData.averageMessagesPerConversation}</p><p className="text-[11px] text-gray-400">msgs / conversation</p></CardContent></Card>
+          <Card><CardContent className="pt-4 pb-3"><p className="text-xs text-gray-500 mb-1">Sentiment</p>{sentiment ? (
+            <div className="flex items-center gap-3 mt-1">
+              <div className="flex items-center gap-1"><ThumbsUp className="h-3.5 w-3.5 text-green-500" /><span className="text-sm font-medium">{sentiment.positive}%</span></div>
+              <div className="flex items-center gap-1"><Minus className="h-3.5 w-3.5 text-gray-400" /><span className="text-sm font-medium">{sentiment.neutral}%</span></div>
+              <div className="flex items-center gap-1"><ThumbsDown className="h-3.5 w-3.5 text-red-500" /><span className="text-sm font-medium">{sentiment.negative}%</span></div>
+            </div>
+          ) : <p className="text-sm text-gray-400">No data</p>}</CardContent></Card>
+        </div>
+      )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="insights" className="flex items-center gap-2">
-              <Lightbulb className="h-4 w-4" />
-              AI Insights
-            </TabsTrigger>
-            <TabsTrigger value="browse" className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Browse Conversations
-            </TabsTrigger>
-          </TabsList>
+      {insightsLoading ? (
+        <div className="space-y-4"><Skeleton className="h-40 w-full" /><Skeleton className="h-64 w-full" /></div>
+      ) : !insightsData?.hasInsights ? (
+        <Card><CardContent className="py-12 text-center"><Lightbulb className="h-12 w-12 mx-auto text-gray-300 mb-4" /><h3 className="text-lg font-medium mb-2">No Insights Yet</h3><p className="text-gray-500 mb-4 text-sm">Click Generate Insights to have AI analyze conversations and surface business-driving intelligence.</p></CardContent></Card>
+      ) : (
+        <>
+          {/* Executive Summary */}
+          <Card className="border-[#054700]/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2"><TrendingUp className="h-4 w-4 text-[#054700]" /> Executive Summary</CardTitle>
+              <CardDescription className="text-xs">Based on {insights!.messageCount} messages ({format(new Date(insights!.dateRange.start), 'MMM d')} - {format(new Date(insights!.dateRange.end), 'MMM d, yyyy')})</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-700 leading-relaxed">{insights!.summary}</p>
+              {insights!.topThemes && insights!.topThemes.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">{insights!.topThemes.map((t, i) => <Badge key={i} variant="secondary" className="text-xs">{t}</Badge>)}</div>
+              )}
+              {/* Sentiment bar */}
+              {sentiment && totalSentiment > 0 && (
+                <div className="mt-4">
+                  <p className="text-xs text-gray-500 mb-2">Sentiment Distribution</p>
+                  <div className="flex h-3 rounded-full overflow-hidden bg-gray-100">
+                    <div className="bg-green-500 transition-all" style={{ width: sentiment.positive + '%' }} />
+                    <div className="bg-yellow-400 transition-all" style={{ width: sentiment.neutral + '%' }} />
+                    <div className="bg-red-500 transition-all" style={{ width: sentiment.negative + '%' }} />
+                  </div>
+                  <div className="flex justify-between mt-1 text-[10px] text-gray-400">
+                    <span>Positive {sentiment.positive}%</span><span>Neutral {sentiment.neutral}%</span><span>Negative {sentiment.negative}%</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-          {/* Insights Tab */}
-          <TabsContent value="insights">
-            {insightsLoading ? (
-              <div className="space-y-4">
-                <Skeleton className="h-32 w-full" />
-                <Skeleton className="h-64 w-full" />
-              </div>
-            ) : !insightsData?.hasInsights ? (
+          {/* Actionable Insights - most important for driving decisions */}
+          {insights!.actionableInsights && insights!.actionableInsights.length > 0 && (
+            <Card className="border-yellow-200 bg-yellow-50/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2"><Zap className="h-4 w-4 text-yellow-600" /> Actionable Recommendations</CardTitle>
+                <CardDescription className="text-xs">AI-generated recommendations to drive business decisions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {insights!.actionableInsights.map((insight, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-yellow-100">
+                      <div className="shrink-0 h-6 w-6 rounded-full bg-yellow-100 flex items-center justify-center mt-0.5"><span className="text-xs font-bold text-yellow-700">{i + 1}</span></div>
+                      <p className="text-sm text-gray-700">{insight}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Ingredient Requests */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2"><FlaskConical className="h-4 w-4" /> Ingredient Demand</CardTitle>
+                <CardDescription className="text-xs">What users are asking for — signals product gaps</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {insights!.ingredientRequests.length === 0 ? (
+                  <p className="text-sm text-gray-400">No ingredient requests detected.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {insights!.ingredientRequests.slice(0, 12).map((req, i) => (
+                      <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Badge variant={req.available ? 'default' : 'destructive'} className="text-[10px] px-1.5 py-0 shrink-0">{req.available ? 'In catalog' : 'Missing'}</Badge>
+                          <span className="text-sm font-medium truncate">{req.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-[#054700] rounded-full" style={{ width: Math.min(100, (req.count / Math.max(1, insights!.ingredientRequests[0]?.count || 1)) * 100) + '%' }} /></div>
+                          <span className="text-xs text-gray-500 w-8 text-right">{req.count}x</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Feature Requests */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4" /> Feature Requests</CardTitle>
+                <CardDescription className="text-xs">Product improvements users want — prioritize roadmap</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {insights!.featureRequests.length === 0 ? (
+                  <p className="text-sm text-gray-400">No feature requests detected.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {insights!.featureRequests.slice(0, 10).map((req, i) => (
+                      <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{req.feature}</p>
+                          <Badge variant="outline" className="text-[10px] mt-0.5">{req.category}</Badge>
+                        </div>
+                        <span className="text-xs text-gray-500 shrink-0">{req.count}x</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Common Questions */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Common Questions</CardTitle>
+                <CardDescription className="text-xs">FAQ opportunities — automate or create content for these</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {insights!.commonQuestions.length === 0 ? (
+                  <p className="text-sm text-gray-400">No patterns detected.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {insights!.commonQuestions.slice(0, 8).map((q, i) => (
+                      <div key={i} className="flex items-start justify-between gap-3 py-1.5 border-b border-gray-100 last:border-0">
+                        <p className="text-sm text-gray-700">{q.question}</p>
+                        <Badge variant="secondary" className="shrink-0 text-[10px]">{q.count}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Raw AI Analysis */}
+            {insights!.rawAnalysis && (
               <Card>
-                <CardContent className="py-12 text-center">
-                  <Lightbulb className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Insights Yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Click "Generate Insights" to have AI analyze your user conversations
-                    and discover product insights.
-                  </p>
-                  <Button onClick={() => generateInsights.mutate()} disabled={generateInsights.isPending}>
-                    {generateInsights.isPending ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 mr-2" />
-                    )}
-                    Generate Insights
-                  </Button>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Full AI Analysis</CardTitle>
+                  <CardDescription className="text-xs">Complete raw analysis from AI — scroll for details</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[300px]">
+                    <div className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">{insights!.rawAnalysis}</div>
+                  </ScrollArea>
                 </CardContent>
               </Card>
-            ) : (
-              <div className="space-y-6">
-                {/* Summary Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5" />
-                      Executive Summary
-                    </CardTitle>
-                    <CardDescription>
-                      Based on {insightsData.insights!.messageCount} messages from{' '}
-                      {format(new Date(insightsData.insights!.dateRange.start), 'MMM d')} -{' '}
-                      {format(new Date(insightsData.insights!.dateRange.end), 'MMM d, yyyy')}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-lg">{insightsData.insights!.summary}</p>
-
-                    {/* Sentiment Overview */}
-                    <div className="mt-4 flex items-center gap-6">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span className="text-sm">{insightsData.insights!.sentimentOverview.positive}% Positive</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-yellow-500" />
-                        <span className="text-sm">{insightsData.insights!.sentimentOverview.neutral}% Neutral</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <XCircle className="h-4 w-4 text-red-500" />
-                        <span className="text-sm">{insightsData.insights!.sentimentOverview.negative}% Negative</span>
-                      </div>
-                    </div>
-
-                    {/* Top Themes */}
-                    {insightsData.insights!.topThemes && insightsData.insights!.topThemes.length > 0 && (
-                      <div className="mt-4">
-                        <p className="text-sm font-medium mb-2">Top Themes:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {insightsData.insights!.topThemes.map((theme, i) => (
-                            <Badge key={i} variant="secondary">{theme}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Ingredient Requests */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Ingredient Requests</CardTitle>
-                      <CardDescription>What users are asking for</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {insightsData.insights!.ingredientRequests.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No specific ingredient requests detected.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {insightsData.insights!.ingredientRequests.slice(0, 10).map((req, i) => (
-                            <div key={i} className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Badge variant={req.available ? 'default' : 'destructive'} className="text-xs">
-                                  {req.available ? 'Available' : 'Missing'}
-                                </Badge>
-                                <span className="font-medium">{req.name}</span>
-                              </div>
-                              <span className="text-sm text-muted-foreground">{req.count} requests</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Feature Requests */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Feature Requests</CardTitle>
-                      <CardDescription>Product improvements users want</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {insightsData.insights!.featureRequests.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No feature requests detected.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {insightsData.insights!.featureRequests.slice(0, 10).map((req, i) => (
-                            <div key={i} className="flex items-center justify-between">
-                              <div>
-                                <p className="font-medium">{req.feature}</p>
-                                <Badge variant="outline" className="text-xs mt-1">{req.category}</Badge>
-                              </div>
-                              <span className="text-sm text-muted-foreground">{req.count}x</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Common Questions */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Common Questions</CardTitle>
-                      <CardDescription>Frequently asked questions</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {insightsData.insights!.commonQuestions.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No common questions detected.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {insightsData.insights!.commonQuestions.slice(0, 8).map((q, i) => (
-                            <div key={i} className="flex items-start justify-between gap-4">
-                              <p className="text-sm">{q.question}</p>
-                              <Badge variant="secondary" className="shrink-0">{q.count}</Badge>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Actionable Insights */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Actionable Insights</CardTitle>
-                      <CardDescription>Recommendations for product improvement</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {!insightsData.insights!.actionableInsights || insightsData.insights!.actionableInsights.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No specific recommendations at this time.</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {insightsData.insights!.actionableInsights.map((insight, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm">
-                              <Lightbulb className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
-                              <span>{insight}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Generated timestamp */}
-                <p className="text-xs text-muted-foreground text-center">
-                  Insights generated {format(new Date(insightsData.insights!.generatedAt), 'MMM d, yyyy \'at\' h:mm a')}
-                </p>
-              </div>
             )}
-          </TabsContent>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
-          {/* Browse Conversations Tab */}
-          <TabsContent value="browse">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Conversation List */}
-              <div className="lg:col-span-1">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Conversations</CardTitle>
-                    <div className="relative mt-2">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search by user or content..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <ScrollArea className="h-[600px]">
-                      {conversationsLoading ? (
-                        <div className="p-4 space-y-3">
-                          {[...Array(5)].map((_, i) => (
-                            <Skeleton key={i} className="h-20 w-full" />
-                          ))}
-                        </div>
-                      ) : filteredConversations.length === 0 ? (
-                        <div className="p-8 text-center text-muted-foreground">
-                          <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                          <p>No conversations found</p>
-                        </div>
-                      ) : (
-                        <div className="divide-y">
-                          {filteredConversations.map((conv) => (
-                            <button
-                              key={conv.sessionId}
-                              onClick={() => setSelectedConversation(conv.sessionId)}
-                              className={cn(
-                                'w-full p-4 text-left hover:bg-muted/50 transition-colors',
-                                selectedConversation === conv.sessionId && 'bg-muted'
-                              )}
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-medium truncate">{conv.user.name}</p>
-                                  <p className="text-xs text-muted-foreground truncate">{conv.user.email}</p>
-                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                    {conv.preview}
-                                  </p>
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <Badge variant={conv.status === 'active' ? 'default' : 'secondary'} className="text-xs">
-                                    {conv.messageCount} msgs
-                                  </Badge>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {format(new Date(conv.createdAt), 'MMM d')}
-                                  </p>
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-              </div>
+// ---- Main Page ----
+export default function ConversationsPage() {
+  const [activeTab, setActiveTab] = useState('insights');
 
-              {/* Conversation Detail */}
-              <div className="lg:col-span-2">
-                <Card className="h-full">
-                  {!selectedConversation ? (
-                    <CardContent className="h-[650px] flex items-center justify-center">
-                      <div className="text-center text-muted-foreground">
-                        <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>Select a conversation to view details</p>
-                      </div>
-                    </CardContent>
-                  ) : detailsLoading ? (
-                    <CardContent className="p-6">
-                      <div className="space-y-4">
-                        {[...Array(5)].map((_, i) => (
-                          <Skeleton key={i} className="h-16 w-full" />
-                        ))}
-                      </div>
-                    </CardContent>
-                  ) : conversationDetails ? (
-                    <>
-                      <CardHeader className="border-b">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-base">{conversationDetails.user.name}</CardTitle>
-                            <CardDescription>{conversationDetails.user.email}</CardDescription>
-                          </div>
-                          <div className="text-right">
-                            <Badge variant={conversationDetails.session.status === 'active' ? 'default' : 'secondary'}>
-                              {conversationDetails.session.status}
-                            </Badge>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {format(new Date(conversationDetails.session.createdAt), 'MMM d, yyyy h:mm a')}
-                            </p>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <ScrollArea className="h-[550px]">
-                          <div className="p-4 space-y-4">
-                            {conversationDetails.messages.map((message) => (
-                              <div
-                                key={message.id}
-                                className={cn(
-                                  'flex gap-3',
-                                  message.role === 'user' ? 'flex-row' : 'flex-row-reverse'
-                                )}
-                              >
-                                <div className={cn(
-                                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-                                  message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
-                                )}>
-                                  {message.role === 'user' ? (
-                                    <User className="h-4 w-4" />
-                                  ) : (
-                                    <Bot className="h-4 w-4" />
-                                  )}
-                                </div>
-                                <div className={cn(
-                                  'flex-1 rounded-lg p-3',
-                                  message.role === 'user' ? 'bg-primary/10' : 'bg-muted'
-                                )}>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-xs font-medium">
-                                      {message.role === 'user' ? 'User' : 'AI Assistant'}
-                                    </span>
-                                    {message.model && (
-                                      <Badge variant="outline" className="text-xs">
-                                        {message.model}
-                                      </Badge>
-                                    )}
-                                    <span className="text-xs text-muted-foreground">
-                                      {format(new Date(message.createdAt), 'h:mm a')}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                                  {message.formula && (
-                                    <Badge variant="secondary" className="mt-2">
-                                      Formula Generated
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      </CardContent>
-                    </>
-                  ) : null}
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2"><MessageSquare className="h-5 w-5" /> Conversation Intelligence</h1>
+        <p className="text-sm text-gray-500 mt-1">Analyze conversations to surface product insights and business intelligence</p>
       </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="insights" className="flex items-center gap-2"><Lightbulb className="h-4 w-4" /> AI Insights</TabsTrigger>
+          <TabsTrigger value="browse" className="flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Browse Conversations</TabsTrigger>
+        </TabsList>
+        <TabsContent value="insights" className="mt-4"><InsightsTab /></TabsContent>
+        <TabsContent value="browse" className="mt-4"><BrowseTab /></TabsContent>
+      </Tabs>
     </div>
   );
 }

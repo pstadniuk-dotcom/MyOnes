@@ -78,7 +78,7 @@ export class AuthService {
         try {
             await sendNotificationEmail({
                 to: user.email,
-                subject: 'Verify your ONES account',
+                subject: 'Verify your Ones account',
                 type: 'system',
                 title: 'Confirm your email',
                 content: `
@@ -112,8 +112,8 @@ export class AuthService {
                 const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
                 await sendNotificationEmail({
                     to: user.email,
-                    subject: 'Welcome to ONES — let\'s build your formula',
-                    title: 'Welcome to ONES',
+                    subject: 'Welcome to Ones — let\'s build your formula',
+                    title: 'Welcome to Ones',
                     type: 'system',
                     content: `
                         <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
@@ -354,12 +354,12 @@ export class AuthService {
         try {
             await sendNotificationEmail({
                 to: user.email,
-                subject: 'Reset Your ONES Password',
+                subject: 'Reset Your Ones Password',
                 type: 'system',
                 title: 'Password Reset Request',
                 content: `
                     <p>Hi ${user.name},</p>
-                    <p>We received a request to reset your password for your ONES account.</p>
+                    <p>We received a request to reset your password for your Ones account.</p>
                     <p>Click the button below to reset your password:</p>
                 `,
                 actionUrl: resetUrl,

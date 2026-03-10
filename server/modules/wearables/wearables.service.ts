@@ -386,6 +386,36 @@ export class WearablesService {
         return Boolean(provider?.connectedAt || provider?.lastSyncAt || provider?.lastSyncedAt);
     }
 
+    /**
+     * Determine the connection status for a provider, distinguishing between
+     * truly disconnected providers and ones in an error state (e.g. token revoked).
+     */
+    private getProviderConnectionStatus(provider: any): 'connected' | 'disconnected' | 'error' {
+        const status = String(provider?.status || '').toLowerCase();
+
+        // Explicit error state from Junction (e.g. token_refresh_failed)
+        if (status === 'error') {
+            return 'error';
+        }
+
+        if (this.isProviderConnected(provider)) {
+            return 'connected';
+        }
+
+        return 'disconnected';
+    }
+
+    /**
+     * Extract a human-readable error message from a Junction provider object.
+     */
+    private getProviderErrorMessage(provider: any): string | null {
+        const errorDetails = provider?.errorDetails || provider?.error_details;
+        if (errorDetails) {
+            return String(errorDetails.errorMessage || errorDetails.error_message || '');
+        }
+        return null;
+    }
+
     private getProviderSlug(provider: any): string {
         return String(provider?.slug || provider?.provider || provider?.name || '')
             .toLowerCase()
@@ -411,9 +441,10 @@ export class WearablesService {
             userId,
             provider: PROVIDER_MAP[this.getProviderSlug(p)] || this.getProviderSlug(p),
             providerName: this.getProviderDisplayName(p),
-            status: this.isProviderConnected(p) ? 'connected' : 'disconnected',
-            connectedAt: p.connectedAt || new Date().toISOString(),
+            status: this.getProviderConnectionStatus(p),
+            connectedAt: p.connectedAt || p.createdOn || new Date().toISOString(),
             lastSyncedAt: p.lastSyncAt || null,
+            errorMessage: this.getProviderErrorMessage(p),
             source: 'junction',
         }));
     }
@@ -1495,7 +1526,7 @@ export class WearablesService {
             return parts.join(' | ');
         }).join('\n');
 
-        const systemPrompt = `You are a concise health analyst for the ONES supplement platform. You receive pre-computed health signals (recent vs baseline) and write a brief, insightful narrative that connects the dots.
+        const systemPrompt = `You are a concise health analyst for the Ones supplement platform. You receive pre-computed health signals (recent vs baseline) and write a brief, insightful narrative that connects the dots.
 
 DATA TIER: ${tierLabels[tier]}
 
@@ -1505,7 +1536,7 @@ RULES:
 - Do NOT recommend supplements or products.
 - If the tier is "snapshot", note that trends will become available with more data.
 - Be encouraging but honest. Lead with strengths, then address concerns.
-${formulaContext ? `- The user takes a custom ONES supplement with: ${formulaContext}. Write one sentence noting how their formula relates to the data (e.g., "Your Magnesium Glycinate may be contributing to your strong deep sleep numbers"). If there is no clear connection, write null for formulaNote.` : '- The user has no active formula. Set formulaNote to null.'}
+${formulaContext ? `- The user takes a custom Ones supplement with: ${formulaContext}. Write one sentence noting how their formula relates to the data (e.g., "Your Magnesium Glycinate may be contributing to your strong deep sleep numbers"). If there is no clear connection, write null for formulaNote.` : '- The user has no active formula. Set formulaNote to null.'}
 
 Return ONLY valid JSON:
 {

@@ -151,7 +151,7 @@ export default function HeroSectionV2() {
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] leading-[1.05] tracking-[-0.02em]">
             <span className="block font-light text-[#054700]">One formula.</span>
             <span className="block font-light text-[#054700]">Built for you.</span>
-            <span className="block font-light text-[#5a6623]">Always evolving.</span>
+            <span className="block font-light text-[#8a9a2c]">Always evolving.</span>
           </h1>
 
           {/* Subhead */}
@@ -223,12 +223,21 @@ export default function HeroSectionV2() {
         {/* Frosted glass chat widget */}
         <div className="relative z-10 w-full max-w-[380px] mx-auto px-4 sm:px-0 sm:max-w-[420px] backdrop-blur-[24px] bg-[rgba(32,40,31,0.36)] rounded-[32px] p-2 shadow-2xl">
           {/* Widget header */}
-          <div className="flex items-center justify-center gap-4 px-6 py-5">
-            <img src="/Ones%20AI%20transparent.png" alt="Ones AI" className="h-[27px]" />
-            <div className="w-px h-6 bg-white/30" />
-            <p className="text-white/80 text-sm font-light leading-tight">
-              Your health<br />consultant
-            </p>
+          <div className="relative py-5">
+            {/* Separator line aligned to center of widget (tab divider) */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-px h-8 bg-white/30" />
+            <div className="flex">
+              {/* Logo — right-aligned to just before center */}
+              <div className="flex-1 flex items-center justify-end pr-4">
+                <img src="/Ones%20Logo%20Home%20Screen.png" alt="Ones AI" className="h-[27px]" />
+              </div>
+              {/* Text — left-aligned just after center */}
+              <div className="flex-1 flex items-center pl-4">
+                <p className="text-white/80 text-sm font-light leading-tight">
+                  Your health<br />consultant
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Tab bar */}

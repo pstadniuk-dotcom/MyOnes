@@ -50,7 +50,7 @@ export default function HowItWorksSectionV2() {
           </span>
           <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl text-[#054700] font-light leading-tight text-balance">
             How your membership{" "}
-            <span className="font-medium">works</span>
+            <span className="text-[#8a9a2c]">works</span>
           </h2>
           <p className="mt-6 text-lg leading-relaxed text-[#054700]/60">
             Your health changes. Your plan changes with it.

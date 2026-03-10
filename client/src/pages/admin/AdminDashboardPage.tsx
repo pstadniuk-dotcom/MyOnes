@@ -1,58 +1,28 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+﻿import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Badge } from '@/shared/components/ui/badge';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useLocation } from 'wouter';
 import {
   Users,
   DollarSign,
-  Activity,
   Package,
   TrendingUp,
-  UserCheck,
+  TrendingDown,
   Clock,
-  MessageSquare,
   Download,
-  FileText,
-  RefreshCw,
-  Loader2,
-  Calendar,
+  AlertCircle,
+  ArrowRight,
+  ShoppingCart,
+  BarChart3,
 } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { useEffect, useMemo, useState } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { Button } from '@/shared/components/ui/button';
-import { Label } from '@/shared/components/ui/label';
-import { Input } from '@/shared/components/ui/input';
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue
-} from '@/shared/components/ui/select';
-import { Settings2, ArrowRight } from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/shared/components/ui/table';
-import { Switch } from '@/shared/components/ui/switch';
-
-// Import new admin components
-import { ConversionFunnel } from '@/features/admin/components/ConversionFunnel';
-import { CohortRetentionChart } from '@/features/admin/components/CohortRetentionChart';
-import { ReorderHealthWidget } from '@/features/admin/components/ReorderHealthWidget';
-import { PendingActionsWidget } from '@/features/admin/components/PendingActionsWidget';
-import { ActivityFeed } from '@/features/admin/components/ActivityFeed';
-import { FormulaInsightsWidget } from '@/features/admin/components/FormulaInsightsWidget';
 import { apiRequest } from '@/shared/lib/queryClient';
 
-// Types for API responses
 interface DashboardStats {
   totalUsers: number;
   totalPaidUsers: number;
@@ -60,12 +30,6 @@ interface DashboardStats {
   totalOrders: number;
   totalFormulas: number;
   totalRevenue: number;
-}
-
-interface GrowthDataPoint {
-  date: string;
-  users: number;
-  paidUsers: number;
 }
 
 interface RevenueDataPoint {
@@ -84,758 +48,207 @@ interface TodaysOrder {
   formula?: { totalMg: number; bases: Array<{ ingredient: string; amount: number }> };
 }
 
-// Stat Card Component
-function StatCard({
+interface PendingActions {
+  openTickets: number;
+  pendingOrders: number;
+  processingOrders: number;
+  overdueReorders: number;
+}
+
+function MetricCard({
   title,
   value,
-  description,
   icon: Icon,
-  trend
+  onClick,
 }: {
   title: string;
-  value: string | number;
-  description: string;
-  icon: typeof Users;
-  trend?: string;
+  value: string;
+  icon?: React.ElementType;
+  onClick?: () => void;
 }) {
   return (
     <Card
-      data-testid={`stat-card-${title.toLowerCase().replace(/\s/g, '-')}`}
-      className="hover-elevate"
+      className={onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}
+      onClick={onClick}
     >
-      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">
-          {title}
-        </CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold" data-testid={`stat-value-${title.toLowerCase().replace(/\s/g, '-')}`}>
-          {value}
+      <CardContent className="pt-5 pb-4 px-5">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-medium text-gray-500">{title}</p>
+          {Icon && <Icon className="h-4 w-4 text-gray-400" />}
         </div>
-        <p className="text-xs text-muted-foreground">
-          {description}
-        </p>
-        {trend && (
-          <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
-            <TrendingUp className="h-3 w-3" />
-            <span>{trend}</span>
-          </div>
-        )}
+        <p className="text-2xl font-semibold text-gray-900">{value}</p>
       </CardContent>
     </Card>
   );
 }
 
-// Loading Skeleton
-function DashboardSkeleton() {
-  return (
-    <div className="space-y-8">
-      <div>
-        <Skeleton className="h-8 w-64 mb-2" />
-        <Skeleton className="h-4 w-96" />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="space-y-0 pb-2">
-              <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-16 mb-2" />
-              <Skeleton className="h-3 w-32" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-80 w-full" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-80 w-full" />
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// ── Formula Review Scheduler Test Trigger ──────────────────────────────────
-function FormulaReviewTrigger() {
-  const { toast } = useToast();
-  const [result, setResult] = useState<any>(null);
-
-  const triggerMutation = useMutation({
-    mutationFn: () =>
-      apiRequest('POST', '/api/admin/formula-review/trigger').then(r => r.json()),
-    onSuccess: (data) => {
-      setResult(data.results ?? data);
-      toast({ title: 'Formula review check complete' });
-    },
-    onError: (err: any) => {
-      toast({ title: err.message || 'Trigger failed', variant: 'destructive' });
-    },
-  });
-
-  return (
-    <Card className="border-amber-200">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Calendar className="h-4 w-4 text-amber-600" />
-          Formula Review Scheduler
-        </CardTitle>
-        <CardDescription>
-          Manually trigger the daily formula review check. Normally runs at 9am UTC — notifies users with formula drift
-          whose subscription renews in 7 or 3 days.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center gap-4 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-2"
-            disabled={triggerMutation.isPending}
-            onClick={() => triggerMutation.mutate()}
-          >
-            {triggerMutation.isPending ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Running...</>
-            ) : (
-              <><RefreshCw className="w-3.5 h-3.5" /> Trigger Now</>
-            )}
-          </Button>
-          {result && (
-            <div className="text-sm text-gray-600 bg-gray-50 rounded-md px-3 py-2 font-mono">
-              7-day: checked {result.day7?.checked ?? 0}, notified {result.day7?.notified ?? 0} &nbsp;|&nbsp;
-              3-day: checked {result.day3?.checked ?? 0}, notified {result.day3?.notified ?? 0} &nbsp;|&nbsp;
-              <strong>Total notified: {result.totalNotified ?? 0}</strong>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
+function OrderStatusBadge({ status }: { status: string }) {
+  const config: Record<string, { label: string; className: string }> = {
+    pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+    processing: { label: 'Processing', className: 'bg-blue-100 text-blue-800 border-blue-200' },
+    submitted: { label: 'Submitted', className: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+    shipped: { label: 'Shipped', className: 'bg-purple-100 text-purple-800 border-purple-200' },
+    delivered: { label: 'Delivered', className: 'bg-green-100 text-green-800 border-green-200' },
+    cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800 border-red-200' },
+  };
+  const c = config[status] || { label: status, className: 'bg-gray-100 text-gray-800' };
+  return <Badge variant="outline" className={c.className}>{c.label}</Badge>;
 }
 
 export default function AdminDashboardPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const queryClient = useQueryClient();
+  const [dateRange] = useState('30');
 
-  // Fetch dashboard stats
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<DashboardStats>({
     queryKey: ['/api/admin/stats'],
   });
 
-  // Fetch user growth data
-  const { data: growthData, isLoading: growthLoading, error: growthError } = useQuery<GrowthDataPoint[]>({
-    queryKey: ['/api/admin/analytics/growth?days=30'],
+  const { data: revenueData, isLoading: revenueLoading } = useQuery<RevenueDataPoint[]>({
+    queryKey: [`/api/admin/analytics/revenue?days=${dateRange}`],
   });
 
-  // Fetch revenue data
-  const { data: revenueData, isLoading: revenueLoading, error: revenueError } = useQuery<RevenueDataPoint[]>({
-    queryKey: ['/api/admin/analytics/revenue?days=30'],
-  });
-
-  // Fetch today's orders
   const { data: todaysOrders } = useQuery<TodaysOrder[]>({
     queryKey: ['/api/admin/orders/today'],
   });
 
-  // Show error toast if any query fails
+  const { data: pendingActions } = useQuery<PendingActions>({
+    queryKey: ['/api/admin/analytics/pending-actions'],
+  });
+
   useEffect(() => {
-    if (statsError || growthError || revenueError) {
+    if (statsError) {
       toast({
-        title: "Error loading dashboard data",
-        description: (statsError || growthError || revenueError)?.message || "Please try again later.",
+        title: "Error loading dashboard",
+        description: statsError?.message || "Please try again.",
         variant: "destructive"
       });
     }
-  }, [statsError, growthError, revenueError, toast]);
+  }, [statsError, toast]);
 
-  const isLoading = statsLoading || growthLoading || revenueLoading;
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD',
+      minimumFractionDigits: 0, maximumFractionDigits: 0,
+    }).format(amount);
 
-  if (isLoading) {
+  if (statsLoading || revenueLoading) {
     return (
-      <div className="p-8">
-        <DashboardSkeleton />
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
+        </div>
+        <Skeleton className="h-80" />
       </div>
     );
   }
 
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  const totalPending = (pendingActions?.openTickets ?? 0) +
+    (pendingActions?.pendingOrders ?? 0) + (pendingActions?.processingOrders ?? 0);
 
   return (
-    <div className="p-8" data-testid="page-admin-dashboard">
-      <div className="space-y-8">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight" data-testid="heading-admin-dashboard">
-              Admin Dashboard
-            </h1>
-            <p className="text-muted-foreground">
-              Overview of platform metrics and user activity (90-day order cycles)
-            </p>
+    <div className="space-y-6" data-testid="page-admin-dashboard">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-gray-900">
+          Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, let's get started.
+        </h1>
+        <Button variant="outline" size="sm" onClick={() => window.open('/api/admin/export/users', '_blank')}>
+          <Download className="h-4 w-4 mr-1.5" /> Export
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard title="Total Users" value={String(stats?.totalUsers ?? 0)} icon={Users} onClick={() => setLocation('/admin/users')} />
+        <MetricCard title="Total Revenue" value={formatCurrency(stats?.totalRevenue ?? 0)} icon={DollarSign} />
+        <MetricCard title="Total Orders" value={String(stats?.totalOrders ?? 0)} icon={Package} onClick={() => setLocation('/admin/orders')} />
+        <MetricCard title="Active Formulas" value={String(stats?.totalFormulas ?? 0)} icon={BarChart3} />
+      </div>
+
+      {totalPending > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {(pendingActions?.pendingOrders ?? 0) > 0 && (
+            <button onClick={() => setLocation('/admin/orders')} className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-2 rounded-lg text-sm hover:bg-yellow-100 transition-colors">
+              <AlertCircle className="h-4 w-4" /> {pendingActions!.pendingOrders} orders to fulfill
+            </button>
+          )}
+          {(pendingActions?.openTickets ?? 0) > 0 && (
+            <button onClick={() => setLocation('/admin/support-tickets')} className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2 rounded-lg text-sm hover:bg-blue-100 transition-colors">
+              <AlertCircle className="h-4 w-4" /> {pendingActions!.openTickets} open tickets
+            </button>
+          )}
+          {(pendingActions?.overdueReorders ?? 0) > 0 && (
+            <button onClick={() => setLocation('/admin/users?filter=active')} className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-800 px-4 py-2 rounded-lg text-sm hover:bg-red-100 transition-colors">
+              <AlertCircle className="h-4 w-4" /> {pendingActions!.overdueReorders} overdue reorders
+            </button>
+          )}
+        </div>
+      )}
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-medium">Total sales over time</CardTitle>
+          <CardDescription>Last {dateRange} days</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={revenueData || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
+                <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(v) => `$${v}`} />
+                <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px' }} labelFormatter={(v) => new Date(v).toLocaleDateString()} formatter={(value: number) => [`$${value}`, 'Revenue']} />
+                <Line type="monotone" dataKey="revenue" stroke="#054700" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#054700' }} />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => window.open('/api/admin/export/users', '_blank')}>
-              <Download className="h-4 w-4 mr-2" />
-              Export Users
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base font-medium">Today's Orders</CardTitle>
+              <Badge variant="secondary" className="text-xs">{todaysOrders?.length ?? 0}</Badge>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setLocation('/admin/orders')} className="text-[#054700]">
+              View all <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
-            <Button variant="outline" onClick={() => setLocation('/dashboard')} data-testid="button-go-to-dashboard">
-              Go to Dashboard
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
           </div>
-        </div>
-
-        {/* Pending Actions - Most Important */}
-        <PendingActionsWidget />
-
-        {/* AI Settings */}
-        <AISettingsCard onChanged={() => {
-          queryClient.invalidateQueries({ queryKey: ['/api/admin/ai-settings'] });
-        }} />
-
-        {/* Quick Links */}
-        <div className="grid gap-4 md:grid-cols-6">
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setLocation('/admin/users')}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                User Management
-              </CardTitle>
-              <CardDescription>
-                View and manage all users
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setLocation('/admin/orders')}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Order Management
-              </CardTitle>
-              <CardDescription>
-                View &amp; update orders
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setLocation('/admin/conversations')}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Conversations
-              </CardTitle>
-              <CardDescription>
-                Browse chats &amp; insights
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setLocation('/admin/support-tickets')}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Support Tickets
-              </CardTitle>
-              <CardDescription>
-                Manage support requests
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setLocation('/admin')}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Analytics
-              </CardTitle>
-              <CardDescription>
-                Platform analytics
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setLocation('/admin/audit-logs')}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Audit Logs
-              </CardTitle>
-              <CardDescription>
-                Compliance &amp; safety logs
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow border-[#054700]/20"
-            onClick={() => setLocation('/admin/blog')}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-[#054700]">
-                <FileText className="h-5 w-5" />
-                Blog
-              </CardTitle>
-              <CardDescription>
-                Articles, AI generation &amp; editing
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setLocation('/admin/retail-pricing')}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Retail Pricing
-              </CardTitle>
-              <CardDescription>
-                Equivalent stack cost estimates
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-
-        {/* Conversion Funnel */}
-        <ConversionFunnel />
-
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="section-stats-cards">
-          <div
-            className="cursor-pointer transition-all"
-            onClick={() => setLocation('/admin/users?filter=all')}
-          >
-            <StatCard
-              title="Total Users"
-              value={stats?.totalUsers || 0}
-              description="Click to view all users"
-              icon={Users}
-            />
-          </div>
-          <div
-            className="cursor-pointer transition-all"
-            onClick={() => setLocation('/admin/users?filter=paid')}
-          >
-            <StatCard
-              title="Paid Users"
-              value={stats?.totalPaidUsers || 0}
-              description="Click to view paid users"
-              icon={UserCheck}
-            />
-          </div>
-          <div
-            className="cursor-pointer transition-all"
-            onClick={() => setLocation('/admin/users?filter=active')}
-          >
-            <StatCard
-              title="Active Users"
-              value={stats?.activeUsers || 0}
-              description="Click to view active users"
-              icon={Activity}
-            />
-          </div>
-          <StatCard
-            title="Total Orders"
-            value={stats?.totalOrders || 0}
-            description="All time orders"
-            icon={Package}
-          />
-          <StatCard
-            title="Total Formulas"
-            value={stats?.totalFormulas || 0}
-            description="Custom formulas created"
-            icon={Activity}
-          />
-          <StatCard
-            title="Total Revenue"
-            value={formatCurrency(stats?.totalRevenue || 0)}
-            description="All time revenue"
-            icon={DollarSign}
-          />
-        </div>
-
-        {/* Today's Orders */}
-        {todaysOrders && todaysOrders.length > 0 && (
-          <Card data-testid="card-todays-orders">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Today's Orders
-              </CardTitle>
-              <CardDescription>
-                Orders placed today ({format(new Date(), 'MMMM dd, yyyy')})
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {todaysOrders.map((order) => (
-                  <Card key={order.id} className="hover-elevate cursor-pointer" onClick={() => setLocation(`/admin/users/${order.user.id}`)}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex-1">
-                          <p className="font-medium" data-testid={`text-order-user-${order.id}`}>{order.user.name}</p>
-                          <p className="text-sm text-muted-foreground">{order.user.email}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(order.placedAt), 'h:mm a')}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          {order.amountCents && (
-                            <p className="font-bold font-mono">${(order.amountCents / 100).toFixed(2)}</p>
-                          )}
-                          {order.supplyMonths && (
-                            <p className="text-sm text-muted-foreground">{order.supplyMonths} month{order.supplyMonths !== 1 ? 's' : ''}</p>
-                          )}
-                          <Badge variant={order.status === 'pending' ? 'secondary' : 'default'} className="mt-1">
-                            {order.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+        </CardHeader>
+        <CardContent className="p-0">
+          {!todaysOrders || todaysOrders.length === 0 ? (
+            <div className="py-8 text-center text-gray-500 text-sm">
+              <ShoppingCart className="h-8 w-8 mx-auto mb-2 text-gray-300" /> No orders today yet
+            </div>
+          ) : (
+            <div className="divide-y">
+              <div className="grid grid-cols-[1fr_120px_100px_100px_100px] gap-4 px-5 py-2 text-xs font-medium text-gray-500 bg-gray-50/80">
+                <span>Customer</span><span>Time</span><span>Total</span><span>Supply</span><span>Status</span>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              {todaysOrders.slice(0, 10).map((order) => (
+                <div key={order.id} className="grid grid-cols-[1fr_120px_100px_100px_100px] gap-4 px-5 py-3 hover:bg-gray-50 cursor-pointer items-center" onClick={() => setLocation(`/admin/users/${order.user.id}`)}>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{order.user.name}</p>
+                    <p className="text-xs text-gray-500">{order.user.email}</p>
+                  </div>
+                  <span className="text-sm text-gray-600">{format(new Date(order.placedAt), 'h:mm a')}</span>
+                  <span className="text-sm font-medium text-gray-900">{order.amountCents ? `$${(order.amountCents / 100).toFixed(2)}` : '\u2014'}</span>
+                  <span className="text-sm text-gray-600">{order.supplyMonths ? `${order.supplyMonths} mo` : '\u2014'}</span>
+                  <OrderStatusBadge status={order.status} />
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Charts */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* User Growth Chart */}
-          <Card data-testid="chart-user-growth">
-            <CardHeader>
-              <CardTitle>User Growth</CardTitle>
-              <CardDescription>
-                New users over the last 30 days
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={growthData || []}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis
-                      dataKey="date"
-                      className="text-xs"
-                      tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    />
-                    <YAxis className="text-xs" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                      labelFormatter={(value) => new Date(value).toLocaleDateString()}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="users"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      name="Total Users"
-                      dot={{ fill: 'hsl(var(--primary))' }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="paidUsers"
-                      stroke="hsl(var(--chart-2))"
-                      strokeWidth={2}
-                      name="Paid Users"
-                      dot={{ fill: 'hsl(var(--chart-2))' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Daily Orders Chart */}
-          <Card data-testid="chart-daily-orders">
-            <CardHeader>
-              <CardTitle>Daily Orders</CardTitle>
-              <CardDescription>
-                Orders placed over the last 30 days
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueData || []}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis
-                      dataKey="date"
-                      className="text-xs"
-                      tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    />
-                    <YAxis className="text-xs" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                      labelFormatter={(value) => new Date(value).toLocaleDateString()}
-                    />
-                    <Legend />
-                    <Bar
-                      dataKey="orders"
-                      fill="hsl(var(--primary))"
-                      radius={[4, 4, 0, 0]}
-                      name="Orders"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Reorder Health & Activity Feed Side by Side */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <ReorderHealthWidget />
-          <ActivityFeed />
-        </div>
-
-        {/* Cohort Retention & Formula Insights */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <CohortRetentionChart />
-          <FormulaInsightsWidget />
-        </div>
-
-        {/* Formula Review Scheduler — Test Trigger */}
-        <FormulaReviewTrigger />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <MetricCard title="Paid Users" value={String(stats?.totalPaidUsers ?? 0)} icon={Users} onClick={() => setLocation('/admin/users?filter=paid')} />
+        <MetricCard title="Active Users" value={String(stats?.activeUsers ?? 0)} icon={Users} onClick={() => setLocation('/admin/users?filter=active')} />
+        <MetricCard title="Formulas Created" value={String(stats?.totalFormulas ?? 0)} icon={BarChart3} />
       </div>
     </div>
-  );
-}
-
-// ---- AI Settings Card ----
-function AISettingsCard({ onChanged }: { onChanged?: () => void }) {
-  const { toast } = useToast();
-  const { data: aiSettings, isLoading } = useQuery<{
-    provider: 'openai' | 'anthropic';
-    model: string;
-    source: 'override' | 'env';
-    updatedAt: string | null;
-  }>({
-    queryKey: ['/api/admin/ai-settings'],
-  });
-
-  const [provider, setProvider] = useState<'openai' | 'anthropic'>(aiSettings?.provider || 'openai');
-  const [model, setModel] = useState<string>(aiSettings?.model || '');
-
-  const MODEL_OPTIONS: Record<'openai' | 'anthropic', { value: string; label: string }[]> = {
-    openai: [
-      { value: 'gpt-5.2', label: 'GPT-5.2 (latest) 🔥' },
-      { value: 'gpt-5.2-pro', label: 'GPT-5.2 Pro' },
-      { value: 'gpt-5', label: 'GPT-5' },
-      { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
-      { value: 'gpt-5-nano', label: 'GPT-5 Nano (fastest)' },
-      { value: 'gpt-4.1', label: 'GPT-4.1' },
-      { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
-      { value: 'gpt-4o', label: 'GPT-4o' },
-      { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-      { value: 'o3', label: 'o3 (reasoning)' },
-      { value: 'o3-mini', label: 'o3 Mini' },
-      { value: 'o4-mini', label: 'o4 Mini' },
-    ],
-    anthropic: [
-      { value: 'claude-opus-4-6', label: 'Claude Opus 4.6 (most intelligent) 🔥' },
-      { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (fast + smart)' },
-      { value: 'claude-haiku-4-6', label: 'Claude Haiku 4.6 (fastest)' },
-      { value: 'claude-opus-4-5', label: 'Claude Opus 4.5' },
-      { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
-      { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
-      { value: 'claude-opus-4-1', label: 'Claude Opus 4.1 (legacy)' },
-    ],
-  };
-
-  useEffect(() => {
-    if (aiSettings) {
-      setProvider(aiSettings.provider);
-      setModel(aiSettings.model || '');
-    }
-  }, [aiSettings]);
-
-  // When provider changes, set a sensible default model for that provider
-  useEffect(() => {
-    const options = MODEL_OPTIONS[provider];
-    if (!options.find(o => o.value === model)) {
-      setModel(options[0]?.value || '');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider]);
-
-  const mutation = useMutation({
-    mutationFn: async (body: any) => {
-      const res = await apiRequest('POST', '/api/admin/ai-settings', body);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: 'AI settings updated' });
-      onChanged?.();
-    },
-    onError: (e: any) => {
-      toast({ title: 'Failed to update AI settings', description: e?.message || 'Please try again', variant: 'destructive' });
-    }
-  });
-
-  const testMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/admin/ai-settings/test');
-      const text = await res.text();
-      let data: any = null;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        // Return structured info so UI can show better diagnostics
-        return { _raw: text, _status: res.status, ok: false } as any;
-      }
-      return data as { ok: boolean; provider: string; model: string; sample?: string; error?: string };
-    },
-    onSuccess: (data: any) => {
-      if (data && typeof data.ok === 'boolean') {
-        if (data.ok) {
-          toast({ title: 'AI test succeeded', description: `Using ${data.provider} / ${data.model}` });
-        } else {
-          toast({ title: 'AI test failed', description: data.error || 'Unknown error', variant: 'destructive' });
-        }
-      } else {
-        const snippet = (data?._raw || '').slice(0, 160) || '(empty body)';
-        const status = data?._status ? `HTTP ${data._status}` : 'Unknown status';
-        toast({ title: 'AI test response was not JSON', description: `${status}: ${snippet}`, variant: 'destructive' });
-      }
-    },
-    onError: (e: any) => {
-      toast({ title: 'AI test failed', description: e?.message || 'Unknown error', variant: 'destructive' });
-    }
-  });
-
-  const handleSave = () => {
-    mutation.mutate({ provider, model });
-  };
-
-  const handleReset = () => {
-    mutation.mutate({ reset: true });
-  };
-
-  return (
-    <Card data-testid="card-ai-settings">
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <CardTitle className="flex items-center gap-2">
-            <Settings2 className="h-5 w-5" />
-            AI Settings
-          </CardTitle>
-          <CardDescription>
-            Control which AI provider and model power consultations (override environment defaults).
-          </CardDescription>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 rounded-full border px-3 py-1 text-xs">
-            <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
-            <span>
-              Active: {aiSettings?.provider || 'openai'} / {aiSettings?.model || 'gpt-4o'}
-            </span>
-          </div>
-          <Badge variant={aiSettings?.source === 'override' ? 'default' : 'secondary'}>
-            Source: {aiSettings?.source || 'env'}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-3">
-            <Skeleton className="h-9" />
-            <Skeleton className="h-9" />
-            <div className="flex items-center gap-2 justify-end">
-              <Skeleton className="h-9 w-24" />
-              <Skeleton className="h-9 w-24" />
-            </div>
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-3 items-end">
-            <div className="space-y-1">
-              <Label>Provider</Label>
-              <Select value={provider} onValueChange={(v: 'openai' | 'anthropic') => setProvider(v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Model</Label>
-              <Select value={model} onValueChange={(v) => setModel(v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder={provider === 'anthropic' ? 'Select Claude model' : 'Select GPT model'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODEL_OPTIONS[provider].map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2 justify-end">
-              <Button variant="outline" onClick={handleReset} disabled={mutation.isPending} data-testid="button-reset-ai-settings">Reset to Defaults</Button>
-              <Button variant="outline" onClick={() => testMutation.mutate()} disabled={testMutation.isPending} data-testid="button-test-ai-settings">Test Provider</Button>
-              <Button onClick={handleSave} disabled={mutation.isPending} data-testid="button-save-ai-settings">Save Changes</Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }

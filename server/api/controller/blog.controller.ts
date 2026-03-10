@@ -3,6 +3,7 @@ import { blogRepository } from '../../modules/blog/blog.repository';
 import { insertBlogPostSchema } from '../../../shared/schema';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
+import { buildFeaturedImageUrl } from '../../utils/blogGenerationService';
 import {
   getBlogAutoGenSettings,
   saveBlogAutoGenSettings,
@@ -311,9 +312,9 @@ export async function adminAiRevise(req: Request, res: Response) {
     const post = await blogRepository.getById(req.params.id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
-    const systemPrompt = `You are a professional health & supplement content editor for ONES AI, a personalized supplement platform. You help improve blog articles so they are accurate, authoritative, SEO-optimized, and aligned with the ONES brand.
+    const systemPrompt = `You are a professional health & supplement content editor for Ones AI, a personalized supplement platform. You help improve blog articles so they are accurate, authoritative, SEO-optimized, and aligned with the Ones brand.
 
-ONES brand guidelines:
+Ones brand guidelines:
 - Evidence-based and science-forward but approachable
 - Never make unsubstantiated medical claims
 - Recommend consulting a healthcare provider for medical decisions
@@ -396,7 +397,7 @@ Writing standards:
 - Use ordered (numbered) lists for protocols; unordered for features/options
 - EEAT signals: cite author expertise implicitly through specificity, cite real study details (sample size, duration, effect size where known)
 - Within the article body, naturally embed 3–5 internal links using keyword-rich anchor text in standard markdown format: [descriptive keyword anchor text](/blog/relevant-slug). These must appear inline within sentences, not in a list. Use realistic slug paths based on supplement or health topic names (e.g. [clinical evidence for ashwagandha](/blog/ashwagandha-benefits-dosage-evidence), [optimal magnesium glycinate dosage](/blog/magnesium-glycinate-benefits-sleep), [vitamin D3 and K2 synergy](/blog/vitamin-d3-k2-optimal-levels-dosage), [omega-3 EPA DHA ratio guide](/blog/omega-3-fish-oil-benefits-epa-dha-ratio)). Never link to the article you are writing. Use anchor text that reads naturally in the sentence — never "click here" or bare URLs.
-- When comparing ONES AI to competitors, only reference active companies: Viome (gut microbiome testing + AI recs), Thorne (practitioner-grade), Ritual (subscription multis), Function Health (lab testing). Do NOT mention Care/Of — they shut down in 2023.`;
+- When comparing Ones AI to competitors, only reference active companies: Viome (gut microbiome testing + AI recs), Thorne (practitioner-grade), Ritual (subscription multis), Function Health (lab testing). Do NOT mention Care/Of — they shut down in 2023.`;
 
     const skwList = secondaryKeywords || keywords || '';
     const isHowTo = /^how\s+(to|i\s)|\d+\s+ways?\s+to|step[- ]by[- ]step/i.test(title || topic || '');
@@ -532,6 +533,13 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
     }
 
     generated.schemaJson = JSON.stringify(combinedSchemas);
+
+    // Generate featured image from keyword
+    if (!generated.featuredImage) {
+      generated.featuredImage = buildFeaturedImageUrl(
+        generated.primaryKeyword ?? keywords ?? title ?? topic
+      );
+    }
 
     return res.json({ generated });
   } catch (err: any) {

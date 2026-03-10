@@ -28,7 +28,7 @@ const fallbackTiers = [
 const pricingFactors = [
   { icon: Scale, title: "Daily Milligrams", description: "More total milligrams means more raw material and more capsules per day." },
   { icon: Layers, title: "Ingredient Count", description: "More active ingredients requires additional manufacturing complexity." },
-  { icon: ShieldCheck, title: "Premium Ingredients", description: "Third-party tested for purity and potency. No fillers, no additives, no artificial ingredients." },
+  { icon: ShieldCheck, title: "Premium Ingredients", description: "Clinical-grade bioavailable forms for maximum absorption. No fillers, no additives, no artificial ingredients." },
   { icon: Package, title: "Replaces 5–10 Bottles", description: "One custom formula replaces 5–10 individual supplement bottles. Simpler, cheaper, and more effective." },
   { icon: Beaker, title: "Made-to-Order", description: "Your formula is manufactured fresh when you order — not pulled from a warehouse shelf." },
 ];
@@ -105,7 +105,7 @@ export default function MembershipPricingSection() {
           </span>
           <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl text-[#054700] font-light leading-tight text-balance">
             One membership.{" "}
-            <span className="font-medium">Everything you need.</span>
+            <span className="text-[#8a9a2c]">Everything you need.</span>
           </h2>
           <p className="mt-6 text-lg text-[#054700]/60 leading-relaxed">
             Lock in your rate forever. AI consultations, formula optimization, and member pricing on supplements and labs.

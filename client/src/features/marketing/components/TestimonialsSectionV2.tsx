@@ -97,7 +97,7 @@ export default function TestimonialsSectionV2() {
           </span>
           <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl text-[#054700] font-light leading-tight text-balance">
             Real people.{" "}
-<span className="font-medium">Real results.</span>
+<span className="text-[#8a9a2c]">Real results.</span>
           </h2>
           <p className="mt-6 text-lg text-[#054700]/60 leading-relaxed">
             With AI technology, we're bringing personalized supplement formulation directly to you—not just through select medical practitioners. What was once available only in high-end clinics is now accessible to everyone.

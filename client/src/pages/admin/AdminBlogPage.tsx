@@ -162,7 +162,7 @@ const emptyForm = (): PostForm => ({
   metaTitle: '',
   metaDescription: '',
   featuredImage: '',
-  authorName: 'ONES AI Editorial Team',
+  authorName: 'Ones AI Editorial Team',
   isPublished: false,
   readTimeMinutes: '5',
 });
@@ -180,7 +180,7 @@ function postToForm(p: BlogPost): PostForm {
     metaTitle: p.metaTitle ?? '',
     metaDescription: p.metaDescription ?? '',
     featuredImage: p.featuredImage ?? '',
-    authorName: p.authorName ?? 'ONES AI Editorial Team',
+    authorName: p.authorName ?? 'Ones AI Editorial Team',
     isPublished: p.isPublished,
     readTimeMinutes: String(p.readTimeMinutes ?? 5),
   };
@@ -202,7 +202,7 @@ function formToPayload(f: PostForm) {
     metaTitle: f.metaTitle.trim() || null,
     metaDescription: f.metaDescription.trim() || null,
     featuredImage: f.featuredImage.trim() || null,
-    authorName: f.authorName.trim() || 'ONES AI Editorial Team',
+    authorName: f.authorName.trim() || 'Ones AI Editorial Team',
     isPublished: f.isPublished,
     wordCount: wc,
     readTimeMinutes: parseInt(f.readTimeMinutes) || estimateReadTime(wc),
@@ -268,11 +268,7 @@ function ListView({ onEdit, onNew, onGenerate, onBulk, onSettings }: ListViewPro
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center gap-3 mb-4">
-          <Button variant="ghost" size="sm" onClick={() => setLocation('/admin')}>
-            <ArrowLeft className="w-4 h-4 mr-1" /> Admin Panel
-          </Button>
-        </div>
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -523,7 +519,7 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
         metaTitle: g.metaTitle ?? '',
         metaDescription: g.metaDescription ?? '',
         featuredImage: '',
-        authorName: g.authorName ?? 'ONES AI Editorial Team',
+        authorName: g.authorName ?? 'Ones AI Editorial Team',
         isPublished: false,
         readTimeMinutes: String(g.readTimeMinutes ?? 8),
       };
@@ -565,7 +561,7 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
             <div className="space-y-2">
               <Label>Additional Context / Topic Notes</Label>
               <Textarea
-                placeholder="e.g. Focus on magnesium glycinate vs other forms, include dosing info, mention that ONES AI incorporates magnesium in personalized formulas"
+                placeholder="e.g. Focus on magnesium glycinate vs other forms, include dosing info, mention that Ones AI incorporates magnesium in personalized formulas"
                 rows={3}
                 value={genForm.topic}
                 onChange={e => setGenForm(f => ({ ...f, topic: e.target.value }))}
@@ -1145,7 +1141,7 @@ function BulkGenerateView({ onBack }: { onBack: () => void }) {
           metaTitle: g.metaTitle ?? null,
           metaDescription: g.metaDescription ?? null,
           featuredImage: null,
-          authorName: 'ONES AI Editorial Team',
+          authorName: 'Ones AI Editorial Team',
           isPublished: false,
           wordCount: g.wordCount ?? 0,
           readTimeMinutes: g.readTimeMinutes ?? 8,

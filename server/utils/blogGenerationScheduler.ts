@@ -222,7 +222,7 @@ export async function runDailyBlogGeneration(overrideSettings?: Partial<BlogAuto
         readTimeMinutes:   article.readTimeMinutes,
         internalLinks:     article.internalLinks,
         schemaJson:        article.schemaJson ?? undefined,
-        featuredImage:     undefined,
+        featuredImage:     article.featuredImage ?? undefined,
       });
 
       generated++;

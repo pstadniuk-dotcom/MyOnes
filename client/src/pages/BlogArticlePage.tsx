@@ -215,14 +215,14 @@ function IngredientCTA({ post }: { post: BlogPost }) {
         <FlaskConical className="w-5 h-5 text-emerald-300 flex-shrink-0" />
         <div>
           <p className="text-white font-semibold text-base">These ingredients can go in your formula</p>
-          <p className="text-emerald-200 text-sm mt-0.5">ONES AI builds a personalized capsule stack from your labs, goals, and health profile.</p>
+          <p className="text-emerald-200 text-sm mt-0.5">Ones AI builds a personalized capsule stack from your labs, goals, and health profile.</p>
         </div>
       </div>
 
       {/* Ingredient chips */}
       {ingredients.length > 0 && (
         <div className="bg-white px-6 py-5 border-b border-gray-100">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Relevant ingredients in the ONES catalog</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Relevant ingredients in the Ones catalog</p>
           <div className="space-y-3">
             {ingredients.map((ing, idx) => (
               <div key={idx} className="flex items-start gap-3">
@@ -287,6 +287,10 @@ function renderMarkdown(content: string, validSlugSet?: Set<string>) {
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/`(.+?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
+      // Handle markdown images: ![alt text](url) — must come BEFORE link handling
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, src) => {
+        return `<img src="${src}" alt="${alt}" class="w-full rounded-xl my-6 object-cover max-h-96" loading="lazy" />`;
+      })
       .replace(/\[(.+?)\]\((.+?)\)/g, (_match, label, href) => {
         // For internal /blog/ links, strip dead links that point to unpublished slugs
         if (href.startsWith('/blog/') && validSlugSet && validSlugSet.size > 0) {
@@ -442,6 +446,26 @@ function renderMarkdown(content: string, validSlugSet?: Set<string>) {
     // ── Blank line ───────────────────────────────────────────────────────────
     } else if (line.trim() === '') {
       flushLists();
+
+    // ── Standalone image line: ![alt](url) ───────────────────────────────────
+    } else if (/^!\[([^\]]*)\]\(([^)]+)\)\s*$/.test(line.trim())) {
+      flushLists();
+      const imgMatch = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)\s*$/);
+      if (imgMatch) {
+        elements.push(
+          <figure key={i} className="my-8">
+            <img
+              src={imgMatch[2]}
+              alt={imgMatch[1]}
+              className="w-full rounded-xl object-cover max-h-96"
+              loading="lazy"
+            />
+            {imgMatch[1] && (
+              <figcaption className="mt-2 text-center text-sm text-gray-500">{imgMatch[1]}</figcaption>
+            )}
+          </figure>
+        );
+      }
 
     // ── Paragraph ────────────────────────────────────────────────────────────
     } else if (line.trim()) {
@@ -654,6 +678,10 @@ export default function BlogArticlePage() {
     };
   }, [data?.post]);
 
+  // Hooks must be called unconditionally (before early returns)
+  const tocHeadings = useMemo(() => data?.post ? extractHeadings(data.post.content) : [], [data?.post?.content]);
+  const validSlugSet = useMemo(() => new Set(data?.validSlugs ?? []), [data?.validSlugs]);
+
   if (isLoading) return <ArticleSkeleton />;
 
   if (isError || !data?.post) {
@@ -672,12 +700,6 @@ export default function BlogArticlePage() {
   const publishDate = new Date(post.publishedAt).toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
   });
-
-  // Extract headings for Table of Contents
-  const tocHeadings = useMemo(() => extractHeadings(post.content), [post.content]);
-
-  // Build a set of valid internal slugs for link filtering
-  const validSlugSet = useMemo(() => new Set(validSlugs ?? []), [validSlugs]);
 
   // Extract FAQ items from schemaJson for visible accordion
   const faqItems: Array<{question: string; answer: string}> = (() => {

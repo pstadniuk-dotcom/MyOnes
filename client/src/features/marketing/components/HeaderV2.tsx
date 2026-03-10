@@ -91,7 +91,7 @@ export default function HeaderV2() {
                 </Link>
                 <Link href="/signup">
                   <Button className="bg-[#054700] hover:bg-[#053600] text-[#ede8e2] rounded-full px-6">
-                    Join ONES
+                    Join Ones
                   </Button>
                 </Link>
               </>
@@ -171,7 +171,7 @@ export default function HeaderV2() {
                   </Link>
                   <Link href="/signup">
                     <Button className="w-full bg-[#054700] hover:bg-[#053600] text-[#ede8e2] rounded-full">
-                      Join ONES
+                      Join Ones
                     </Button>
                   </Link>
                 </>

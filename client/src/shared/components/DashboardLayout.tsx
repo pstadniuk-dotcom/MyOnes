@@ -11,6 +11,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/shared/components/ui/alert-dialog';
 import { NotificationsDropdown } from '@/features/notifications/components/NotificationsDropdown';
 import {
   ChevronDown,
@@ -20,10 +30,13 @@ import {
   Settings,
   User
 } from 'lucide-react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'wouter';
 import { useTimezoneSync } from '@/shared/hooks/use-timezone';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useIdleTimeout } from '@/shared/hooks/use-idle-timeout';
+import { useToast } from '@/shared/hooks/use-toast';
 import { MobileBottomNav, MobileHeader } from '@/shared/components/mobile';
 
 interface DashboardLayoutProps {
@@ -34,6 +47,7 @@ interface DashboardLayoutProps {
 
 function UserDropdown() {
   const { user, logout } = useAuth();
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   if (!user) return null;
 
@@ -44,6 +58,7 @@ function UserDropdown() {
     .toUpperCase();
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -116,7 +131,7 @@ function UserDropdown() {
         </DropdownMenuGroup>
         <DropdownMenuSeparator className="bg-[#054700]/10" />
         <DropdownMenuItem
-          onClick={logout}
+          onClick={() => setShowSignOutConfirm(true)}
           className="text-red-600 focus:text-red-600 hover:bg-red-50 focus:bg-red-50 cursor-pointer"
           data-testid="button-logout"
         >
@@ -125,12 +140,60 @@ function UserDropdown() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+
+    {/* Sign Out Confirmation Dialog */}
+    <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            You will be signed out of your account. Any unsaved changes will be lost.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={logout}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            Sign Out
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   // Auto-sync user's timezone for SMS reminder scheduling
   useTimezoneSync();
+  const { logout, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+
+  // Idle session timeout — warn at 28 min, logout at 30 min
+  const handleIdleWarning = useCallback(() => {
+    toast({
+      title: 'Session expiring soon',
+      description: 'You will be logged out in 2 minutes due to inactivity. Move your mouse or press a key to stay logged in.',
+      variant: 'destructive',
+    });
+  }, [toast]);
+
+  const handleIdleTimeout = useCallback(() => {
+    toast({
+      title: 'Session expired',
+      description: 'You have been logged out due to inactivity.',
+      variant: 'destructive',
+    });
+    logout();
+  }, [logout, toast]);
+
+  useIdleTimeout({
+    onWarning: handleIdleWarning,
+    onTimeout: handleIdleTimeout,
+    enabled: isAuthenticated,
+  });
 
   // Check if we're on mobile
   const isMobile = useIsMobile();

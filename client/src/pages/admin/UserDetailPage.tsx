@@ -35,7 +35,12 @@ import {
   Heart,
   Pill,
   AlertCircle,
-  Trash2
+  Trash2,
+  Watch,
+  FileText,
+  Wifi,
+  WifiOff,
+  CheckCircle2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { UserAdminNotes } from '@/features/admin/components/UserAdminNotes';
@@ -95,11 +100,33 @@ interface ChatSession {
   messageCount: number;
 }
 
+interface WearableDevice {
+  provider: string;
+  status: string;
+  connectedAt: string | null;
+  lastSyncAt: string | null;
+}
+
+interface FileUploadSummary {
+  id: string;
+  type: string;
+  originalFileName: string;
+  uploadedAt: string;
+  labReportData?: {
+    testDate?: string;
+    testType?: string;
+    labName?: string;
+    analysisStatus?: string;
+  } | null;
+}
+
 interface UserTimeline {
   healthProfile: HealthProfile | null;
   formulas: Formula[];
   orders: Order[];
   chatSessions: ChatSession[];
+  wearableDevices: WearableDevice[];
+  fileUploads: FileUploadSummary[];
 }
 
 // Loading Skeleton
@@ -235,9 +262,12 @@ export default function UserDetailPage() {
   const formulas = timeline?.formulas || [];
   const orders = timeline?.orders || [];
   const chatSessions = timeline?.chatSessions || [];
+  const wearableDevices = timeline?.wearableDevices || [];
+  const fileUploads = timeline?.fileUploads || [];
+  const labReports = fileUploads.filter(f => f.type === 'lab_report');
 
   return (
-    <div className="p-8" data-testid="page-user-detail">
+    <div data-testid="page-user-detail">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
@@ -501,6 +531,99 @@ export default function UserDetailPage() {
                 <p className="text-sm text-muted-foreground" data-testid="text-no-health-profile">
                   No health profile data available
                 </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Connected Devices & Lab Reports */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Connected Devices */}
+          <Card data-testid="card-connected-devices">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Watch className="h-5 w-5" />
+                Connected Devices
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {wearableDevices.length > 0 ? (
+                <div className="space-y-3">
+                  {wearableDevices.map((device, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {device.status === 'connected' ? (
+                          <Wifi className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <WifiOff className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span className="text-sm font-medium capitalize">{device.provider}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={device.status === 'connected' ? 'default' : device.status === 'error' || device.status === 'token_expired' ? 'destructive' : 'secondary'}
+                          className="text-xs"
+                        >
+                          {device.status === 'token_expired' ? 'expired' : device.status}
+                        </Badge>
+                        {device.lastSyncAt && (
+                          <span className="text-xs text-muted-foreground">
+                            Synced {format(new Date(device.lastSyncAt), 'MMM dd')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No devices connected</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Lab Reports */}
+          <Card data-testid="card-lab-reports">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Lab Reports
+                {labReports.length > 0 && (
+                  <Badge variant="default" className="ml-auto">
+                    {labReports.length} uploaded
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {labReports.length > 0 ? (
+                <div className="space-y-3">
+                  {labReports.map((report) => (
+                    <div key={report.id} className="flex items-start justify-between gap-2 text-sm">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">
+                            {report.labReportData?.testType || report.originalFileName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {report.labReportData?.labName && `${report.labReportData.labName} · `}
+                            {format(new Date(report.uploadedAt), 'MMM dd, yyyy')}
+                          </p>
+                        </div>
+                      </div>
+                      {report.labReportData?.analysisStatus && (
+                        <Badge
+                          variant={report.labReportData.analysisStatus === 'completed' ? 'default' : 'secondary'}
+                          className="text-xs flex-shrink-0"
+                        >
+                          {report.labReportData.analysisStatus}
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No lab reports uploaded</p>
               )}
             </CardContent>
           </Card>

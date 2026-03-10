@@ -71,7 +71,7 @@ function PhonePromptBanner({ userPhone }: { userPhone: string | null | undefined
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-[#054700]">Add your phone for supplement reminders</p>
-        <p className="text-xs text-[#5a6623] mt-0.5">Get daily SMS reminders to take your ONES formula on schedule.</p>
+        <p className="text-xs text-[#5a6623] mt-0.5">Get daily SMS reminders to take your Ones formula on schedule.</p>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <Input
@@ -297,7 +297,7 @@ export default function HomePage() {
             <div className="space-y-4">
               <div>
                 <h2 className="text-2xl font-semibold text-[#054700] mb-2">
-                  Welcome to ONES AI
+                  Welcome to Ones AI
                 </h2>
                 <p className="text-[#5a6623]">
                   Let's create your personalized supplement formula. First, tell us about yourself so our AI can make the best recommendations.
@@ -484,7 +484,7 @@ export default function HomePage() {
               {/* Action Buttons */}
               <div className="flex gap-2 pt-2">
                 <Button size="sm" asChild className="flex-1 bg-[#054700] hover:bg-[#043d00] text-white rounded-full" data-testid="button-order-now">
-                  <Link href="/dashboard/orders">
+                  <Link href="/dashboard/formula">
                     <Package className="w-4 h-4 mr-2" />
                     Order Now
                   </Link>

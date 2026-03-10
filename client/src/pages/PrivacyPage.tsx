@@ -38,6 +38,7 @@ export default function PrivacyPage() {
               <li>Dietary preferences, supplement history, and symptom logs</li>
               <li>Payment and shipping information (processed by our payment provider; we do not store full card numbers)</li>
               <li>Messages and conversations with our AI health assistant</li>
+              <li>Messages exchanged with our support team via live chat, including any files shared during those conversations</li>
             </ul>
 
             <h3 className="text-xl font-medium text-[#054700] mb-3 mt-6">Wearable Device Data</h3>

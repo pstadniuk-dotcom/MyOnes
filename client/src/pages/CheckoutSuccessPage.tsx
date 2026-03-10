@@ -32,7 +32,7 @@ export default function CheckoutSuccessPage() {
 
         {/* Heading */}
         <h1 className="text-3xl font-light text-[#054700] mb-3">
-          Welcome to <span className="font-medium">ONES AI</span>
+          Welcome to <span className="font-medium">Ones AI</span>
         </h1>
         <p className="text-[#5a6623] leading-relaxed">
           {includesMembership

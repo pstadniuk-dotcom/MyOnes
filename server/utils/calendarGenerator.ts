@@ -9,10 +9,12 @@ export function generateReviewCalendarEvent(schedule: ReviewSchedule, userName: 
   const reviewDate = new Date(schedule.nextReviewDate);
   
   // Calculate frequency for RRULE
+  // bimonthly = "every order" (~8 weeks ≈ 2 months)
+  // quarterly = "every other order" (~16 weeks ≈ 4 months)
   const frequencyMap = {
     monthly: { freq: 'MONTHLY', interval: 1 },
     bimonthly: { freq: 'MONTHLY', interval: 2 },
-    quarterly: { freq: 'MONTHLY', interval: 3 },
+    quarterly: { freq: 'MONTHLY', interval: 4 },
   };
   
   const { freq, interval } = frequencyMap[schedule.frequency];
@@ -37,10 +39,10 @@ export function generateReviewCalendarEvent(schedule: ReviewSchedule, userName: 
   const icsLines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//ONES//Formula Review//EN',
+    'PRODID:-//Ones//Formula Review//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:ONES Formula Reviews',
+    'X-WR-CALNAME:Ones Formula Reviews',
     'X-WR-TIMEZONE:America/New_York',
     'BEGIN:VEVENT',
     `UID:${uid}`,
@@ -48,7 +50,7 @@ export function generateReviewCalendarEvent(schedule: ReviewSchedule, userName: 
     `DTSTART:${formatDate(reviewDate)}`,
     `DTEND:${formatDate(endDate)}`,
     `RRULE:FREQ=${freq};INTERVAL=${interval}`,
-    'SUMMARY:ONES Formula Review',
+    'SUMMARY:Ones Formula Review',
     'DESCRIPTION:Time to review your personalized supplement formula!\\n\\n' +
       'During this review:\\n' +
       '- Share any health changes or new symptoms\\n' +
@@ -64,12 +66,12 @@ export function generateReviewCalendarEvent(schedule: ReviewSchedule, userName: 
     // Add reminders
     'BEGIN:VALARM',
     'ACTION:DISPLAY',
-    'DESCRIPTION:Your ONES formula review is tomorrow!',
+    'DESCRIPTION:Your Ones formula review is tomorrow!',
     `TRIGGER:-P${reminder1Day}`,
     'END:VALARM',
     'BEGIN:VALARM',
     'ACTION:DISPLAY',
-    'DESCRIPTION:Your ONES formula review is in 3 days',
+    'DESCRIPTION:Your Ones formula review is in 3 days',
     `TRIGGER:-P${reminder3Days}`,
     'END:VALARM',
     'END:VEVENT',

@@ -107,20 +107,9 @@ export default function RetailComparisonPricingPage() {
     );
   };
 
-  const formatDollars = (cents: number) => `$${(Math.max(0, cents || 0) / 100).toFixed(2)}`;
-
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => setLocation('/admin')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </div>
-        </div>
+    <div className="space-y-6">
+
 
         <div className="flex items-start gap-3">
           <DollarSign className="h-8 w-8 text-muted-foreground mt-1" />
@@ -139,7 +128,7 @@ export default function RetailComparisonPricingPage() {
             <CardTitle>Ingredient Pricing Assumptions</CardTitle>
             <CardDescription>
               These values power the "equivalent retail stack" estimate — showing users how much they'd
-              pay buying each ingredient separately vs. their ONES formula.
+              pay buying each ingredient separately vs. their Ones formula.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -161,7 +150,7 @@ export default function RetailComparisonPricingPage() {
                     <TableHead>Key</TableHead>
                     <TableHead>Capsule mg</TableHead>
                     <TableHead>Bottle caps</TableHead>
-                    <TableHead>Retail (cents)</TableHead>
+                    <TableHead>Retail Price</TableHead>
                     <TableHead>Active</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
@@ -200,19 +189,18 @@ export default function RetailComparisonPricingPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <div className="space-y-1">
+                          <div className="relative w-28">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                             <Input
                               type="number"
-                              min={1}
-                              value={draft.typicalRetailPriceCents}
+                              min={0.01}
+                              step={0.01}
+                              value={((draft.typicalRetailPriceCents || 0) / 100).toFixed(2)}
                               onChange={(e) =>
-                                updateDraft(row.id, 'typicalRetailPriceCents', Number(e.target.value) || 0)
+                                updateDraft(row.id, 'typicalRetailPriceCents', Math.round(Number(e.target.value) * 100))
                               }
-                              className="w-28"
+                              className="w-28 pl-7"
                             />
-                            <p className="text-xs text-muted-foreground">
-                              {formatDollars(draft.typicalRetailPriceCents)}
-                            </p>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -238,7 +226,6 @@ export default function RetailComparisonPricingPage() {
             )}
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

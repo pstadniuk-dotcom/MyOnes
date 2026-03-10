@@ -4,7 +4,7 @@ import { getFrontendUrl } from './urlHelper';
 // Initialize SendGrid with API key from environment variables
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY?.trim();
 const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL?.trim();
-const SENDGRID_FROM_NAME = (process.env.SENDGRID_FROM_NAME || 'ONES').trim();
+const SENDGRID_FROM_NAME = (process.env.SENDGRID_FROM_NAME || 'Ones').trim();
 
 if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);
@@ -90,7 +90,7 @@ function getEmailTemplate(notification: EmailNotification): string {
           <tr>
             <td style="padding:24px 40px;text-align:center;">
               <img src="${getFrontendUrl()}/ones-logo-light.svg"
-                   alt="ONES"
+                   alt="Ones"
                    width="140"
                    style="display:block;margin:0 auto 10px;height:auto;"
               />

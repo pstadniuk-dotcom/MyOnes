@@ -56,6 +56,15 @@ import OrdersManagementPage from "@/pages/admin/OrdersManagementPage";
 import AuditLogsPage from "@/pages/admin/AuditLogsPage";
 import AdminBlogPage from "@/pages/admin/AdminBlogPage";
 import RetailComparisonPricingPage from "@/pages/admin/RetailComparisonPricingPage";
+import MembershipAdminPage from "@/pages/admin/MembershipAdminPage";
+import ContentManagementPage from "@/pages/admin/ContentManagementPage";
+import AdminAnalyticsPage from "@/pages/admin/AdminAnalyticsPage";
+import AISettingsPage from "@/pages/admin/AISettingsPage";
+import ProductCatalogPage from "@/pages/admin/ProductCatalogPage";
+import AdminLiveChatsPage from "@/pages/admin/AdminLiveChatsPage";
+import AdminChatAnalyticsPage from "@/pages/admin/AdminChatAnalyticsPage";
+import PRAgentPage from "@/pages/admin/PRAgentPage";
+import { AdminLayout } from "@/shared/components/AdminLayout";
 
 // Import shared/public components
 import SharedFormulaPage from "@/pages/SharedFormulaPage";
@@ -65,6 +74,7 @@ import CheckoutSuccessPage from "@/pages/CheckoutSuccessPage";
 // Import V2 landing page (premium design)
 import LandingPageV2 from "@/pages/LandingPageV2";
 import ScrollToTop from "./shared/components/ScrollToTop";
+import { LiveChatWidget } from "@/features/live-chat/components/LiveChatWidget";
 
 // Main Router
 function MainRouter() {
@@ -205,55 +215,131 @@ function MainRouter() {
       {/* Admin Routes */}
       <Route path="/admin">
         <ProtectedAdminRoute>
-          <AdminDashboardPage />
+          <AdminLayout>
+            <AdminDashboardPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/users">
         <ProtectedAdminRoute>
-          <UserManagementPage />
+          <AdminLayout>
+            <UserManagementPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/users/:id">
         <ProtectedAdminRoute>
-          <UserDetailPage />
+          <AdminLayout>
+            <UserDetailPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/support-tickets">
         <ProtectedAdminRoute>
-          <AdminSupportTicketsPage />
+          <AdminLayout>
+            <AdminSupportTicketsPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/conversations">
         <ProtectedAdminRoute>
-          <ConversationsPage />
+          <AdminLayout>
+            <ConversationsPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/orders">
         <ProtectedAdminRoute>
-          <OrdersManagementPage />
+          <AdminLayout>
+            <OrdersManagementPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/audit-logs">
         <ProtectedAdminRoute>
-          <AuditLogsPage />
+          <AdminLayout>
+            <AuditLogsPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/blog">
         <ProtectedAdminRoute>
-          <AdminBlogPage />
+          <AdminLayout>
+            <AdminBlogPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/retail-pricing">
         <ProtectedAdminRoute>
-          <RetailComparisonPricingPage />
+          <AdminLayout>
+            <RetailComparisonPricingPage />
+          </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/support-tickets/:id">
         {(params) => (
           <ProtectedAdminRoute>
-            <AdminSupportTicketsPage ticketId={params.id} />
+            <AdminLayout>
+              <AdminSupportTicketsPage ticketId={params.id} />
+            </AdminLayout>
           </ProtectedAdminRoute>
         )}
+      </Route>
+      <Route path="/admin/membership">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <MembershipAdminPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/content">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <ContentManagementPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/analytics">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AdminAnalyticsPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/products">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <ProductCatalogPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/settings/ai">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AISettingsPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/live-chats">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AdminLiveChatsPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/chat-analytics">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AdminChatAnalyticsPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/pr-agent">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <PRAgentPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
       </Route>
 
       {/* Membership & Checkout */}
@@ -285,6 +371,7 @@ function App() {
         <Toaster />
         <ScrollToTop />
         <MainRouter />
+        <LiveChatWidget />
       </TooltipProvider>
     </AuthProvider>
   );

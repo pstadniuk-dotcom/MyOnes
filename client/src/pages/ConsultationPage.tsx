@@ -1648,9 +1648,38 @@ export default function ConsultationPage() {
 
                 if (data.type === 'connected') {
                   console.log('💊 Connected to SSE');
+                  // Initialize thinking steps for formula creation
+                  setThinkingSteps([
+                    { id: 'review_data', label: 'Reviewing your health profile', status: 'done', detail: '' },
+                    { id: 'understand_query', label: 'Selecting optimal ingredients', status: 'active', detail: '' },
+                    { id: 'build_context', label: 'Calculating dosages', status: 'waiting', detail: '' },
+                    { id: 'generate', label: 'Creating your formula', status: 'waiting', detail: '' },
+                  ]);
+                  setThinkingMessage('thinking');
+                } else if (data.type === 'thinking_step') {
+                  // Progressive step updates from server
+                  setThinkingSteps(prev => prev.map(s => {
+                    if (s.id === data.step) {
+                      return { ...s, status: data.status, detail: data.detail || s.detail };
+                    }
+                    if (data.status === 'done') {
+                      const doneIdx = prev.findIndex(p => p.id === data.step);
+                      const thisIdx = prev.findIndex(p => p.id === s.id);
+                      if (thisIdx === doneIdx + 1 && s.status === 'waiting') {
+                        return { ...s, status: 'active' };
+                      }
+                    }
+                    return s;
+                  }));
                 } else if (data.type === 'thinking') {
                   console.log('💊 AI thinking:', data.message);
                   setThinkingMessage(data.message);
+                } else if (data.type === 'processing') {
+                  console.log('⚙️ Formula processing:', data.message);
+                  setThinkingMessage(data.message || 'Creating your formula...');
+                  setThinkingSteps(prev => prev.map(s =>
+                    s.id === 'generate' ? { ...s, label: 'Creating your formula', detail: data.message, status: 'active' } : s
+                  ));
                 } else if (data.type === 'chunk') {
                   // Accumulate and show cleaned content in real-time
                   accumulatedContent += data.content;
@@ -1873,7 +1902,7 @@ export default function ConsultationPage() {
           <div className="p-4 md:p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <img src="/ones-logo-icon.svg" alt="ONES" className="h-8 w-8" />
+                <img src="/ones-logo-icon.svg" alt="Ones" className="h-8 w-8" />
                 <div>
                   <h1 className="text-lg md:text-xl font-semibold text-[#054700] flex items-center gap-2" data-testid="text-consultation-title">
                     <span className="hidden sm:inline">Ones AI Consultation</span>
@@ -2012,7 +2041,7 @@ export default function ConsultationPage() {
                         {message.sender === 'ai' && (
                           <img
                             src="/ones-logo-icon.svg"
-                            alt="ONES"
+                            alt="Ones"
                             className={`h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0 ${message.id === activeStreamingMessageId ? 'animate-spin' : ''}`}
                           />
                         )}
@@ -2262,7 +2291,7 @@ export default function ConsultationPage() {
                 placeholder="Ask about supplements, health goals..."
                 className="w-full min-h-[48px] max-h-[120px] resize-none text-base"
                 rows={1}
-                disabled={isTyping}
+                disabled={isTyping || isUploading}
                 data-testid="input-consultation-message"
               />
 

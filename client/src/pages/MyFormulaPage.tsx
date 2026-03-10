@@ -20,7 +20,7 @@ import {
   Clock, ArrowRight, ArrowLeft, GitBranch, Star, Zap,
   Heart, Brain, Activity, Target, Plus, Minus, RotateCcw,
   ExternalLink, Copy, Users, Lightbulb, BookOpen, Award,
-  Package, AlertCircle, Pencil, Sparkles, ShieldCheck
+  Package, AlertCircle, Pencil, Sparkles, ShieldCheck, Repeat
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +32,8 @@ import { FormulaCustomizationDialog } from '@/features/formulas/components/Formu
 import { CustomFormulaBuilderDialog } from '@/features/formulas/components/CustomFormulaBuilderDialog';
 import { ResearchCitationCard, ResearchSummaryDialog } from '@/features/marketing/components/ResearchCitationCard';
 import { ReviewScheduleCard } from '@/features/dashboard/components/ReviewScheduleCard';
+import { AutoShipCard } from '@/features/dashboard/components/AutoShipCard';
+import { SmartReorderCard } from '@/components/SmartReorderCard';
 import { calculateDosage, VALID_CAPSULE_COUNTS, type CapsuleCount } from '@/shared/lib/utils';
 import type { ResearchCitation } from '@shared/schema';
 import { generateFormulaPDF, type FormulaForPDF } from '@shared/pdf-generator';
@@ -63,6 +65,7 @@ interface Formula {
   warnings?: string[];
   disclaimers?: string[];
   notes?: string;
+  chatSessionId?: string;
   createdAt: Date;
   archivedAt?: Date | null;
   changes?: {
@@ -173,6 +176,7 @@ export default function MyFormulaPage() {
   const [expandedFormulaId, setExpandedFormulaId] = useState<string | null>(null);
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
   const [includeMembershipAtCheckout, setIncludeMembershipAtCheckout] = useState(true);
+  const [enableAutoShip, setEnableAutoShip] = useState(true);
   const [membershipBenefitsOpen, setMembershipBenefitsOpen] = useState(false);
   const [formulaDetailsOpen, setFormulaDetailsOpen] = useState(false);
   const [smsOptInAtFirstPurchase, setSmsOptInAtFirstPurchase] = useState(true);
@@ -357,7 +361,7 @@ export default function MyFormulaPage() {
         await apiRequest('POST', '/api/consents/grant', {
           consentType: 'sms_accountability',
           consentVersion: '1.0',
-          consentText: 'I agree to receive recurring SMS accountability and supplement reminders from ONES. Msg frequency varies. Msg and data rates may apply. Reply STOP to opt out, HELP for help.',
+          consentText: 'I agree to receive recurring SMS accountability and supplement reminders from Ones. Msg frequency varies. Msg and data rates may apply. Reply STOP to opt out, HELP for help.',
         });
       }
 
@@ -419,6 +423,7 @@ export default function MyFormulaPage() {
       const response = await apiRequest('POST', '/api/billing/checkout/session', {
         formulaId: selectedFormula.id,
         includeMembership: membershipUpsellAvailable ? includeMembershipAtCheckout : false,
+        enableAutoShip,
         plan: 'monthly',
       });
 
@@ -615,15 +620,31 @@ export default function MyFormulaPage() {
       setSmsOptInAtFirstPurchase(true);
       setMedDisclosureAcknowledged(false);
       setIncludeMembershipAtCheckout(true);
+      setEnableAutoShip(true);
       return;
     }
 
     if (hasActiveMembership) {
       setIncludeMembershipAtCheckout(false);
+      // Active members use Smart Re-Order (server-side) — don't create a Stripe auto-ship subscription
+      setEnableAutoShip(false);
     } else {
       setIncludeMembershipAtCheckout(true);
+      // Non-members who add membership at checkout also get Smart Re-Order
+      // enableAutoShip will be dynamically controlled: false if adding membership, true otherwise
+      setEnableAutoShip(true);
     }
   }, [showOrderConfirmation, hasActiveMembership]);
+
+  // When user toggles membership on/off at checkout, sync enableAutoShip accordingly:
+  // Members / users adding membership → Smart Re-Order (enableAutoShip=false, no Stripe sub)
+  // Non-members without membership → classic auto-refill toggle available
+  useEffect(() => {
+    if (!showOrderConfirmation) return;
+    if (hasActiveMembership || (includeMembershipAtCheckout && membershipUpsellAvailable)) {
+      setEnableAutoShip(false);
+    }
+  }, [includeMembershipAtCheckout, hasActiveMembership, membershipUpsellAvailable, showOrderConfirmation]);
 
   // Update column count based on window width for masonry layout
   useEffect(() => {
@@ -918,7 +939,7 @@ export default function MyFormulaPage() {
         {/* Actions Tab */}
         <TabsContent value="actions" className="space-y-6">
           {selectedFormula && (
-            <ActionsSection formula={selectedFormula} onOrderClick={() => setShowOrderConfirmation(true)} />
+            <ActionsSection formula={selectedFormula} onOrderClick={() => setShowOrderConfirmation(true)} hasActiveMembership={hasActiveMembership} />
           )}
         </TabsContent>
       </Tabs>
@@ -1011,7 +1032,7 @@ export default function MyFormulaPage() {
                               <div className="flex items-center justify-between p-3 bg-[#054700]/5">
                                 <div>
                                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">8-week supply</p>
-                                  <p className="text-[10px] text-muted-foreground mt-0.5">Auto-refills every 8 weeks</p>
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">Smart Re-Order with AI review</p>
                                 </div>
                                 <div className="text-right flex items-baseline gap-2">
                                   <span className="text-2xl font-bold text-[#054700]">${discountedFormulaPrice.toFixed(2)}</span>
@@ -1034,7 +1055,7 @@ export default function MyFormulaPage() {
                               <div className="flex items-center justify-between p-3">
                                 <div>
                                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">8-week supply</p>
-                                  <p className="text-[10px] text-muted-foreground mt-0.5">Auto-refills every 8 weeks</p>
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">{enableAutoShip ? 'Auto-refills every 8 weeks' : 'One-time order'}</p>
                                 </div>
                                 <span className="text-2xl font-bold">${oneTimeFormulaPrice.toFixed(2)}</span>
                               </div>
@@ -1192,7 +1213,7 @@ export default function MyFormulaPage() {
                             <div className="flex items-center justify-between p-3">
                               <div>
                                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">8-week supply</p>
-                                <p className="text-[10px] text-muted-foreground mt-0.5">Auto-refills every 8 weeks</p>
+                                <p className="text-[10px] text-muted-foreground mt-0.5">{hasActiveMembership ? 'Smart Re-Order with AI review' : enableAutoShip ? 'Auto-refills every 8 weeks' : 'One-time order'}</p>
                               </div>
                               <div className="text-right">
                                 {hasActiveMembership ? (
@@ -1228,6 +1249,46 @@ export default function MyFormulaPage() {
                     </Card>
                   )}
 
+                  {/* Auto-Ship / Smart Re-Order Section */}
+                  {(hasActiveMembership || (includeMembershipAtCheckout && membershipUpsellAvailable)) ? (
+                    /* Members (or users adding membership at checkout) get Smart Re-Order — no toggle needed */
+                    <div className="flex items-start gap-3 rounded-lg border border-[#054700]/20 bg-[#054700]/5 p-3">
+                      <div className="mt-0.5 w-4 h-4 rounded-full bg-[#054700] flex items-center justify-center shrink-0">
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                      <div className="flex-1">
+                        <span className="text-sm font-medium flex items-center gap-1.5">
+                          <Repeat className="w-3.5 h-3.5 text-[#054700]" />
+                          Smart Re-Order with AI Review
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Before your next reorder, your AI practitioner analyzes 8 weeks of wearable &amp; health data and recommends adjustments. You approve via text before we ship.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Non-members see the classic auto-refill toggle */
+                    <div className="flex items-start gap-3 rounded-lg border p-3">
+                      <Checkbox
+                        id="auto-ship-toggle"
+                        checked={enableAutoShip}
+                        onCheckedChange={(checked) => setEnableAutoShip(checked === true)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <label htmlFor="auto-ship-toggle" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                          <Repeat className="w-3.5 h-3.5 text-muted-foreground" />
+                          Auto-refill every 8 weeks
+                        </label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {enableAutoShip
+                            ? 'Same formula ships automatically so you never run out. Pause, skip, or cancel anytime.'
+                            : 'One-time order — you can enable auto-ship later from your dashboard.'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* ONES vs. Buying Separately — Conversion Section */}
                   {isLoadingEquivalentStack ? (
                     <Card>
@@ -1256,12 +1317,18 @@ export default function MyFormulaPage() {
                     const bottleCount = equivalentStackData.supplementsCount ?? 0;
                     const isMemberPricing = (includeMembershipAtCheckout && membershipUpsellAvailable) || hasActiveMembership;
 
+                    // Don't render the comparison when ONES costs more than retail
+                    // (can happen with very small/low-dose formulas) — avoid showing unfavorable optics
+                    if (retailCost <= 0 || onesMonthly <= 0 || onesMonthly >= retailCost) {
+                      return null;
+                    }
+
                     return (
                       <div className="rounded-xl overflow-hidden border border-[#054700]/15 shadow-sm">
                         {/* Header */}
                         <div className="bg-[#054700] px-5 py-3.5 flex items-center justify-between">
                           <div className="flex items-center gap-2.5">
-                            <img src="/ones-logo-icon.svg" alt="ONES" className="w-5 h-5 brightness-0 invert" />
+                            <img src="/ones-logo-icon.svg" alt="Ones" className="w-5 h-5 brightness-0 invert" />
                             <span className="text-white font-semibold text-sm">Your formula vs. buying separately</span>
                           </div>
                           {savingsMonthly !== null && savingsMonthly > 0 && (
@@ -1275,7 +1342,7 @@ export default function MyFormulaPage() {
                         <div className="grid grid-cols-2">
                           {/* Buying separately — left column */}
                           <div className="p-5 bg-stone-50 border-r border-stone-200">
-                            <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-widest mb-4">Without ONES</div>
+                            <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-widest mb-4">Without Ones</div>
 
                             <div className="space-y-4">
                               <div className="flex items-baseline gap-1.5">
@@ -1308,7 +1375,7 @@ export default function MyFormulaPage() {
                           <div className="p-5 bg-[#f8faf9]">
                             <div className="flex items-center gap-1.5 mb-4">
                               <img src="/ones-logo-icon.svg" alt="" className="w-3.5 h-3.5" />
-                              <span className="text-[11px] font-semibold text-[#054700] uppercase tracking-widest">ONES</span>
+                              <span className="text-[11px] font-semibold text-[#054700] uppercase tracking-widest">Ones</span>
                             </div>
 
                             <div className="space-y-4">
@@ -1516,7 +1583,7 @@ export default function MyFormulaPage() {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-[#054700]">
-                          {hasSmsAccountabilityConsent ? 'ONES Accountability AI enabled' : 'Want an AI accountability partner?'}
+                          {hasSmsAccountabilityConsent ? 'Ones Accountability AI enabled' : 'Want an AI accountability partner?'}
                         </p>
                         <p className="text-xs text-[#5a6623]">We'll text you daily reminders to take your supplements and check in on how you're feeling.</p>
                       </div>
@@ -2038,7 +2105,35 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
         </Collapsible>
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {/* Select Button */}
+          <Button
+            size="sm"
+            variant={isSelected ? "secondary" : "outline"}
+            className={isSelected ? "bg-green-100 text-green-800 hover:bg-green-200 border-green-300" : ""}
+            onClick={onSelect}
+            data-testid={`button-select-formula-${formula.version}`}
+            disabled={isSelected}
+          >
+            <CheckCircle className="w-4 h-4 mr-2" />
+            {isSelected ? 'Selected' : 'Select'}
+          </Button>
+
+          {/* Edit in Chat Button */}
+          {formula.chatSessionId && (
+            <Button
+              size="sm"
+              variant="outline"
+              asChild
+              data-testid={`button-edit-formula-${formula.version}`}
+            >
+              <Link href={`/dashboard/consultation?session_id=${formula.chatSessionId}`}>
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Edit
+              </Link>
+            </Button>
+          )}
+
           {/* Order Button */}
           <Button
             size="sm"
@@ -2049,8 +2144,6 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
             <ShoppingCart className="w-4 h-4 mr-2" />
             Order
           </Button>
-
-          {/* Customize Button — hidden for now */}
 
           {/* Archive Button */}
           <AlertDialog>
@@ -3078,7 +3171,7 @@ function FormulaComparison({ comparison }: { comparison: FormulaComparison }) {
 }
 
 // Actions Section Component
-function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderClick: () => void }) {
+function ActionsSection({ formula, onOrderClick, hasActiveMembership }: { formula: Formula; onOrderClick: () => void; hasActiveMembership: boolean }) {
   const { toast } = useToast();
   const { user } = useAuth();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -3110,7 +3203,7 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
       console.log('Generating PDF with formula:', pdfFormula);
 
       const docDefinition = generateFormulaPDF(pdfFormula, {
-        userName: user?.name || user?.email || 'ONES User',
+        userName: user?.name || user?.email || 'Ones User',
         userEmail: user?.email || '',
       });
 
@@ -3118,7 +3211,7 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
 
       const fileName = formula.name
         ? `${formula.name.replace(/[^a-z0-9]/gi, '_')}_v${formula.version}.pdf`
-        : `ONES_Formula_v${formula.version}.pdf`;
+        : `Ones_Formula_v${formula.version}.pdf`;
 
       pdfMake.createPdf(docDefinition).download(fileName);
 
@@ -3207,6 +3300,12 @@ function ActionsSection({ formula, onOrderClick }: { formula: Formula; onOrderCl
             </div>
           </CardContent>
         </Card>
+
+        {/* Auto-Ship */}
+        <AutoShipCard />
+
+        {/* Smart Re-Order (members only) */}
+        {hasActiveMembership && <SmartReorderCard />}
 
         {/* Review Schedule */}
         <ReviewScheduleCard formulaId={formula.id} />

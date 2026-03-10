@@ -1099,7 +1099,7 @@ export default function LabReportsPage() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <CardTitle className="text-[#054700] text-lg flex items-center gap-2">
                 <img src="/ones-logo-icon.svg" alt="" className="h-5 w-5" />
-                ONES AI Lab Analysis
+                Ones AI Lab Analysis
               </CardTitle>
               <Button
                 size="sm"

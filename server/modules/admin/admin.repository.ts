@@ -155,7 +155,20 @@ export class AdminRepository {
         }
     }
 
-    async searchUsers(query: string, limit: number, offset: number, filter: string = 'all'): Promise<{ users: User[]; total: number }> {
+    async searchUsers(
+        query: string,
+        limit: number,
+        offset: number,
+        filter: string = 'all',
+        advancedFilters?: {
+            hasDevices?: boolean;
+            deviceProviders?: string[];
+            hasLabResults?: boolean;
+            hasOrders?: boolean;
+            minOrders?: number;
+            maxOrders?: number;
+        }
+    ): Promise<{ users: User[]; total: number }> {
         try {
             const searchPattern = `%${query}%`;
             const searchCondition = or(
@@ -164,22 +177,126 @@ export class AdminRepository {
                 ilike(users.phone, searchPattern)
             );
 
-            let whereClause = searchCondition;
+            // Collect user ID sets for each filter, then intersect
+            let candidateIds: string[] | null = null; // null = no restriction
 
+            // Basic filter: paid / active
             if (filter === 'paid') {
                 const paidUserIds = await db.selectDistinct({ userId: orders.userId }).from(orders);
                 const paidIds = paidUserIds.map(p => p.userId);
-                if (paidIds.length === 0) {
-                    return { users: [], total: 0 };
-                }
-                whereClause = and(searchCondition, inArray(users.id, paidIds));
+                if (paidIds.length === 0) return { users: [], total: 0 };
+                candidateIds = paidIds;
             } else if (filter === 'active') {
                 const activeUserIds = await db.selectDistinct({ userId: formulas.userId }).from(formulas);
                 const activeIds = activeUserIds.map(a => a.userId);
-                if (activeIds.length === 0) {
-                    return { users: [], total: 0 };
+                if (activeIds.length === 0) return { users: [], total: 0 };
+                candidateIds = activeIds;
+            }
+
+            // Helper to intersect ID sets
+            const intersect = (existing: string[] | null, incoming: string[]): string[] => {
+                if (existing === null) return incoming;
+                const set = new Set(incoming);
+                return existing.filter(id => set.has(id));
+            };
+
+            // Advanced: has devices connected
+            if (advancedFilters?.hasDevices === true) {
+                const connected = await db.selectDistinct({ userId: wearableConnections.userId })
+                    .from(wearableConnections)
+                    .where(eq(wearableConnections.status, 'connected'));
+                const ids = connected.map(r => r.userId);
+                if (ids.length === 0) return { users: [], total: 0 };
+                candidateIds = intersect(candidateIds, ids);
+                if (candidateIds.length === 0) return { users: [], total: 0 };
+            } else if (advancedFilters?.hasDevices === false) {
+                // Users with NO connected devices
+                const connected = await db.selectDistinct({ userId: wearableConnections.userId })
+                    .from(wearableConnections)
+                    .where(eq(wearableConnections.status, 'connected'));
+                const connectedSet = new Set(connected.map(r => r.userId));
+                const allUsers = await db.select({ id: users.id }).from(users);
+                const noDeviceIds = allUsers.map(u => u.id).filter(id => !connectedSet.has(id));
+                if (noDeviceIds.length === 0) return { users: [], total: 0 };
+                candidateIds = intersect(candidateIds, noDeviceIds);
+                if (candidateIds.length === 0) return { users: [], total: 0 };
+            }
+
+            // Advanced: specific device providers
+            if (advancedFilters?.deviceProviders && advancedFilters.deviceProviders.length > 0) {
+                const withProviders = await db.selectDistinct({ userId: wearableConnections.userId })
+                    .from(wearableConnections)
+                    .where(and(
+                        inArray(wearableConnections.provider, advancedFilters.deviceProviders as any),
+                        eq(wearableConnections.status, 'connected')
+                    ));
+                const ids = withProviders.map(r => r.userId);
+                if (ids.length === 0) return { users: [], total: 0 };
+                candidateIds = intersect(candidateIds, ids);
+                if (candidateIds.length === 0) return { users: [], total: 0 };
+            }
+
+            // Advanced: has lab results
+            if (advancedFilters?.hasLabResults === true) {
+                const withLabs = await db.selectDistinct({ userId: fileUploads.userId })
+                    .from(fileUploads)
+                    .where(eq(fileUploads.type, 'lab_report'));
+                const ids = withLabs.map(r => r.userId);
+                if (ids.length === 0) return { users: [], total: 0 };
+                candidateIds = intersect(candidateIds, ids);
+                if (candidateIds.length === 0) return { users: [], total: 0 };
+            } else if (advancedFilters?.hasLabResults === false) {
+                const withLabs = await db.selectDistinct({ userId: fileUploads.userId })
+                    .from(fileUploads)
+                    .where(eq(fileUploads.type, 'lab_report'));
+                const labSet = new Set(withLabs.map(r => r.userId));
+                const allUsers = await db.select({ id: users.id }).from(users);
+                const noLabIds = allUsers.map(u => u.id).filter(id => !labSet.has(id));
+                if (noLabIds.length === 0) return { users: [], total: 0 };
+                candidateIds = intersect(candidateIds, noLabIds);
+                if (candidateIds.length === 0) return { users: [], total: 0 };
+            }
+
+            // Advanced: has orders
+            if (advancedFilters?.hasOrders === true) {
+                const withOrders = await db.selectDistinct({ userId: orders.userId }).from(orders);
+                const ids = withOrders.map(r => r.userId);
+                if (ids.length === 0) return { users: [], total: 0 };
+                candidateIds = intersect(candidateIds, ids);
+                if (candidateIds.length === 0) return { users: [], total: 0 };
+            } else if (advancedFilters?.hasOrders === false) {
+                const withOrders = await db.selectDistinct({ userId: orders.userId }).from(orders);
+                const orderSet = new Set(withOrders.map(r => r.userId));
+                const allUsers = await db.select({ id: users.id }).from(users);
+                const noOrderIds = allUsers.map(u => u.id).filter(id => !orderSet.has(id));
+                if (noOrderIds.length === 0) return { users: [], total: 0 };
+                candidateIds = intersect(candidateIds, noOrderIds);
+                if (candidateIds.length === 0) return { users: [], total: 0 };
+            }
+
+            // Advanced: min/max orders
+            if (advancedFilters?.minOrders !== undefined || advancedFilters?.maxOrders !== undefined) {
+                const orderCounts = await db
+                    .select({ userId: orders.userId, cnt: count() })
+                    .from(orders)
+                    .groupBy(orders.userId);
+                let filtered = orderCounts;
+                if (advancedFilters.minOrders !== undefined) {
+                    filtered = filtered.filter(r => Number(r.cnt) >= advancedFilters.minOrders!);
                 }
-                whereClause = and(searchCondition, inArray(users.id, activeIds));
+                if (advancedFilters.maxOrders !== undefined) {
+                    filtered = filtered.filter(r => Number(r.cnt) <= advancedFilters.maxOrders!);
+                }
+                const ids = filtered.map(r => r.userId);
+                if (ids.length === 0) return { users: [], total: 0 };
+                candidateIds = intersect(candidateIds, ids);
+                if (candidateIds.length === 0) return { users: [], total: 0 };
+            }
+
+            // Build final where clause
+            let whereClause = searchCondition;
+            if (candidateIds !== null) {
+                whereClause = and(searchCondition, inArray(users.id, candidateIds));
             }
 
             const userQuery = db
@@ -257,6 +374,7 @@ export class AdminRepository {
         orders: Array<Order & { formula?: Formula }>;
         chatSessions: ChatSession[];
         fileUploads: FileUpload[];
+        wearableDevices: Array<{ provider: string; status: string; connectedAt: Date | null; lastSyncAt: Date | null }>;
     }> {
         try {
             const [user] = await db.select().from(users).where(eq(users.id, userId));
@@ -269,6 +387,12 @@ export class AdminRepository {
             const userOrders = await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.placedAt));
             const userChatSessions = await db.select().from(chatSessions).where(eq(chatSessions.userId, userId)).orderBy(desc(chatSessions.createdAt));
             const userFileUploads = await db.select().from(fileUploads).where(eq(fileUploads.userId, userId)).orderBy(desc(fileUploads.uploadedAt));
+            const userWearables = await db.select({
+                provider: wearableConnections.provider,
+                status: wearableConnections.status,
+                connectedAt: wearableConnections.connectedAt,
+                lastSyncAt: wearableConnections.lastSyncAt,
+            }).from(wearableConnections).where(eq(wearableConnections.userId, userId));
 
             const enrichedOrders = await Promise.all(
                 userOrders.map(async (order) => {
@@ -291,7 +415,8 @@ export class AdminRepository {
                 formulas: userFormulas,
                 orders: enrichedOrders,
                 chatSessions: userChatSessions,
-                fileUploads: userFileUploads
+                fileUploads: userFileUploads,
+                wearableDevices: userWearables
             };
         } catch (error) {
             console.error('Error getting user timeline:', error);
@@ -378,6 +503,26 @@ export class AdminRepository {
         } catch (error) {
             console.error('Error updating support ticket:', error);
             return undefined;
+        }
+    }
+
+    async getOpenSupportTicketCount(): Promise<{ open: number; inProgress: number }> {
+        try {
+            const [openCount] = await db
+                .select({ count: count() })
+                .from(supportTickets)
+                .where(eq(supportTickets.status, 'open'));
+            const [inProgressCount] = await db
+                .select({ count: count() })
+                .from(supportTickets)
+                .where(eq(supportTickets.status, 'in_progress'));
+            return {
+                open: Number(openCount?.count || 0),
+                inProgress: Number(inProgressCount?.count || 0),
+            };
+        } catch (error) {
+            console.error('Error getting open support ticket count:', error);
+            return { open: 0, inProgress: 0 };
         }
     }
 

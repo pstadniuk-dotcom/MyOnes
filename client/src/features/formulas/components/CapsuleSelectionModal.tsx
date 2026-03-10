@@ -136,7 +136,7 @@ export function CapsuleSelectionModal({
         <div className="bg-gradient-to-r from-[#054700]/10 to-[#5a6623]/10 rounded-lg p-4">
           <h4 className="font-semibold text-[#054700] mb-3 flex items-center gap-2">
             <Sparkles className="w-4 h-4" />
-            Why ONES vs. Buying Separately
+            Why Ones vs. Buying Separately
           </h4>
 
           {amazonComparison && savings && savings > 0 && (

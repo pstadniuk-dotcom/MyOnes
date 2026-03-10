@@ -16,11 +16,11 @@ const faqs = [
   },
   {
     question: "Will my membership rate ever increase?",
-    answer: "No. Your membership rate is locked forever from the day you become a paying member. If you join as a Founding Member at $19 per month, that's your rate for life."
+    answer: "No. Your membership rate is locked forever from the day you become a paying member. If you join as a Founding Member at $9 per month, that's your rate for life — even as the price increases for new members."
   },
   {
-    question: "How is ONES different from other personalized vitamins?",
-    answer: "Most personalized vitamin companies use a simple quiz to recommend from a preset menu of formulas. ONES uses AI to analyze your actual lab results and wearable data, then builds a truly custom formula. And we continuously update your recommendations as your health data changes."
+    question: "How is Ones different from other personalized vitamins?",
+    answer: "Most personalized vitamin companies use a simple quiz to recommend from a preset menu of formulas. Ones uses AI to analyze your actual lab results and wearable data, then builds a truly custom formula. And we continuously update your recommendations as your health data changes."
   },
   {
     question: "Do I have to buy supplements as a member?",
@@ -28,7 +28,7 @@ const faqs = [
   },
   {
     question: "How do the lab tests work?",
-    answer: "We partner with certified diagnostic labs to offer the same comprehensive tests as premium health platforms, but at near cost pricing. You order through your dashboard, visit a local lab or use an at home kit, and results sync directly to your ONES profile for AI analysis. Lab testing is always optional but helps us give you better recommendations."
+    answer: "We partner with certified diagnostic labs to offer the same comprehensive tests as premium health platforms, but at near cost pricing. You order through your dashboard, visit a local lab or use an at home kit, and results sync directly to your Ones profile for AI analysis. Lab testing is always optional but helps us give you better recommendations."
   },
   {
     question: "What if I'm taking medications?",
@@ -49,7 +49,7 @@ export default function FAQSectionV2() {
           </span>
           <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl text-[#054700] font-light leading-tight text-balance">
             Frequently Asked{" "}
-            <span className="font-medium">Questions</span>
+            <span className="">Questions</span>
           </h2>
           <p className="mt-6 text-lg text-[#054700]/60 max-w-2xl mx-auto">
             Get answers to common questions about our personalized supplement approach.

@@ -507,7 +507,8 @@ export default function ProfilePage() {
                     id="email"
                     type="email"
                     value={profile.email}
-                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                    readOnly
+                    className="bg-muted cursor-not-allowed"
                     data-testid="input-email"
                   />
                 </div>
@@ -660,6 +661,8 @@ export default function ProfilePage() {
                       value={healthData.age}
                       onChange={(e) => setHealthData({ ...healthData, age: e.target.value })}
                       placeholder="Enter your age"
+                      min="1"
+                      max="120"
                       data-testid="input-age"
                     />
                   )}
@@ -728,6 +731,8 @@ export default function ProfilePage() {
                       value={healthData.weightLbs}
                       onChange={(e) => setHealthData({ ...healthData, weightLbs: e.target.value })}
                       placeholder="Enter weight in lbs"
+                      min="40"
+                      max="500"
                       data-testid="input-weight"
                     />
                   )}
@@ -749,7 +754,8 @@ export default function ProfilePage() {
                     type="number"
                     value={healthData.bloodPressureSystolic}
                     onChange={(e) => setHealthData({ ...healthData, bloodPressureSystolic: e.target.value })}
-                    min="0"
+                    min="70"
+                    max="200"
                     placeholder="e.g. 120"
                     data-testid="input-bp-systolic"
                   />
@@ -761,7 +767,8 @@ export default function ProfilePage() {
                     type="number"
                     value={healthData.bloodPressureDiastolic}
                     onChange={(e) => setHealthData({ ...healthData, bloodPressureDiastolic: e.target.value })}
-                    min="0"
+                    min="40"
+                    max="130"
                     placeholder="e.g. 80"
                     data-testid="input-bp-diastolic"
                   />
@@ -773,7 +780,8 @@ export default function ProfilePage() {
                     type="number"
                     value={healthData.restingHeartRate}
                     onChange={(e) => setHealthData({ ...healthData, restingHeartRate: e.target.value })}
-                    min="0"
+                    min="30"
+                    max="220"
                     placeholder="e.g. 70"
                     data-testid="input-heart-rate"
                   />
@@ -796,6 +804,7 @@ export default function ProfilePage() {
                     value={healthData.sleepHoursPerNight}
                     onChange={(e) => setHealthData({ ...healthData, sleepHoursPerNight: e.target.value })}
                     min="0"
+                    max="24"
                     placeholder="e.g. 7"
                     data-testid="input-sleep"
                   />
@@ -858,6 +867,7 @@ export default function ProfilePage() {
                     onChange={(e) => setHealthData({ ...healthData, alcoholDrinksPerWeek: e.target.value })}
                     placeholder="e.g. 2"
                     min="0"
+                    max="50"
                     data-testid="input-alcohol"
                   />
                 </div>
@@ -967,7 +977,7 @@ export default function ProfilePage() {
                               className="mt-0.5"
                             />
                             <Label htmlFor="medication-disclosure" className="text-xs text-amber-800 leading-snug cursor-pointer font-normal">
-                              I confirm the medication list above is complete and accurate. I understand that ONES AI uses this information to flag potential supplement–drug interactions. I will update this list if my medications change.
+                              I confirm the medication list above is complete and accurate. I understand that Ones AI uses this information to flag potential supplement–drug interactions. I will update this list if my medications change.
                             </Label>
                           </div>
                         )}
@@ -1024,6 +1034,35 @@ export default function ProfilePage() {
                 <Button
                   onClick={async () => {
                     try {
+                      // Validate numeric ranges before saving
+                      const validationRules: { field: string; label: string; min: number; max: number; value: string }[] = [
+                        { field: 'age', label: 'Age', min: 1, max: 120, value: healthData.age },
+                        { field: 'heightFeet', label: 'Height (feet)', min: 3, max: 8, value: healthData.heightFeet },
+                        { field: 'heightInches', label: 'Height (inches)', min: 0, max: 11, value: healthData.heightInches },
+                        { field: 'weightLbs', label: 'Weight', min: 40, max: 500, value: healthData.weightLbs },
+                        { field: 'bloodPressureSystolic', label: 'Blood Pressure (Systolic)', min: 70, max: 200, value: healthData.bloodPressureSystolic },
+                        { field: 'bloodPressureDiastolic', label: 'Blood Pressure (Diastolic)', min: 40, max: 130, value: healthData.bloodPressureDiastolic },
+                        { field: 'restingHeartRate', label: 'Resting Heart Rate', min: 30, max: 220, value: healthData.restingHeartRate },
+                        { field: 'sleepHoursPerNight', label: 'Sleep Hours', min: 0, max: 24, value: healthData.sleepHoursPerNight },
+                        { field: 'exerciseDaysPerWeek', label: 'Exercise Days', min: 0, max: 7, value: healthData.exerciseDaysPerWeek },
+                        { field: 'stressLevel', label: 'Stress Level', min: 1, max: 10, value: healthData.stressLevel },
+                        { field: 'alcoholDrinksPerWeek', label: 'Alcohol (drinks/week)', min: 0, max: 50, value: healthData.alcoholDrinksPerWeek },
+                      ];
+
+                      for (const rule of validationRules) {
+                        if (rule.value) {
+                          const num = parseInt(rule.value);
+                          if (isNaN(num) || num < rule.min || num > rule.max) {
+                            toast({
+                              title: 'Invalid value',
+                              description: `${rule.label} must be between ${rule.min} and ${rule.max}.`,
+                              variant: 'destructive',
+                            });
+                            return;
+                          }
+                        }
+                      }
+
                       // Handle pending inputs
                       const currentConditions = [...healthData.conditions];
                       if (conditionInput.trim() && !currentConditions.includes(conditionInput.trim())) {

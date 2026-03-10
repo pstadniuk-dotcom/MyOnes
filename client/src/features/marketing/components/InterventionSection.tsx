@@ -1,4 +1,4 @@
-import { useRef } from "react";
+﻿import { useRef } from "react";
 import { Moon, TestTube, HeartPulse, Activity, Leaf, Zap, ArrowRight } from "lucide-react";
 import { motion, useInView } from "framer-motion";
 import { useLocation } from "wouter";
@@ -73,11 +73,11 @@ const fadeUp = {
 };
 
 const scaleIn = {
-  hidden: { opacity: 0, scale: 0.92 },
+  hidden: { opacity: 0, scale: 0.96 },
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] },
+    transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] },
   },
 };
 
@@ -85,14 +85,14 @@ export default function InterventionSection() {
   const problemRef = useRef<HTMLElement>(null);
   const solutionRef = useRef<HTMLElement>(null);
   const problemInView = useInView(problemRef, { once: true, margin: "-80px" });
-  const solutionInView = useInView(solutionRef, { once: true, margin: "-80px" });
+  const solutionInView = useInView(solutionRef, { once: true, margin: "100px" });
   const [, navigate] = useLocation();
 
   return (
     <>
-      {/* ═══════════════════════════════════════════════════
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           SECTION 1: THE PROBLEM
-          ═══════════════════════════════════════════════════ */}
+          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       <section ref={problemRef} id="the-problem" className="py-24 md:py-32 bg-white overflow-hidden scroll-mt-24">
         <div className="container mx-auto px-6 max-w-5xl">
           <motion.div
@@ -117,17 +117,17 @@ export default function InterventionSection() {
               <span className="font-semibold text-[#5a6623]">But who gives you a solution?</span>
             </motion.h2>
 
-            {/* The typical journey — photo card layout */}
+            {/* The typical journey â€” photo card layout */}
             {(() => {
               const tiles = [
                 { src: "/problem section/your labs.png",        label: "Your labs",      sub: "100+ biomarkers",    connector: "+" },
-                { src: "/problem section/wearables.jpg",        label: "Your wearables", sub: "Sleep, HRV, strain", connector: "→" },
-                { src: "/problem section/generic advice 2.png", label: "Generic advice", sub: "Charts & reports",   connector: "→" },
+                { src: "/problem section/wearables.jpg",        label: "Your wearables", sub: "Sleep, HRV, strain", connector: "â†’" },
+                { src: "/problem section/generic advice 2.png", label: "Generic advice", sub: "Charts & reports",   connector: "â†’" },
                 { src: "/problem section/now what.png",         label: "Now what?",      sub: "No clear action",    connector: null },
               ];
               return (
                 <motion.div variants={fadeUp} className="mt-14">
-                  {/* Mobile: 2×2 grid, no connectors */}
+                  {/* Mobile: 2Ã—2 grid, no connectors */}
                   <div className="grid grid-cols-2 gap-4 sm:hidden">
                     {tiles.map((tile, i) => (
                       <div key={i} className="flex flex-col items-center">
@@ -181,9 +181,9 @@ export default function InterventionSection() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           SECTION 2: THE ONES DIFFERENCE
-          ═══════════════════════════════════════════════════ */}
+          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       <section ref={solutionRef} id="the-difference" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
         <div className="container mx-auto px-6 max-w-7xl">
           {/* Headline */}
@@ -198,7 +198,7 @@ export default function InterventionSection() {
               className="inline-flex items-center gap-2 bg-[#054700] text-[#ede8e2] px-4 py-2 rounded-full mb-6"
             >
               <img src="/ones-logo-icon.svg" alt="" className="w-4 h-4 brightness-0 invert" />
-              <span className="text-sm font-medium">The ONES Difference</span>
+              <span className="text-sm font-medium">The Ones Difference</span>
             </motion.div>
 
             <motion.h3
@@ -206,14 +206,14 @@ export default function InterventionSection() {
               className="text-2xl sm:text-3xl md:text-[2.75rem] text-[#054700] font-light leading-tight text-balance"
             >
               We don't recommend supplements.<span className="hidden sm:inline"><br /></span>{" "}
-              <span className="font-semibold">We formulate yours.</span>
+              <span className="text-[#8a9a2c]">We formulate yours.</span>
             </motion.h3>
 
             <motion.p
               variants={fadeUp}
               className="mt-6 text-lg text-black/60 leading-relaxed max-w-xl mx-auto"
             >
-              Your blood tests, your wearable data, your conversation with our AI — turned into one custom formula that ships to your door.
+              Your blood tests, your wearable data, your conversation with our AI â€” turned into one custom formula that ships to your door.
             </motion.p>
           </motion.div>
 
@@ -223,7 +223,7 @@ export default function InterventionSection() {
             animate={solutionInView ? "visible" : "hidden"}
             variants={stagger}
           >
-            {/* ── Mobile Layout ── */}
+            {/* â”€â”€ Mobile Layout â”€â”€ */}
             <div className="md:hidden">
               <motion.div variants={scaleIn} className="flex justify-center mb-8">
                 <div className="relative w-full max-w-sm">
@@ -232,8 +232,7 @@ export default function InterventionSection() {
                     autoPlay
                     loop
                     muted
-                    playsInline
-                    className="relative w-full h-auto rounded-2xl shadow-xl"
+                    playsInline                    preload="auto"                    className="relative w-full h-auto rounded-2xl shadow-xl"
                   />
                 </div>
               </motion.div>
@@ -268,7 +267,7 @@ export default function InterventionSection() {
               </div>
             </div>
 
-            {/* ── Desktop Layout: 5-column grid [cards | gap | video | gap | cards] ── */}
+            {/* â”€â”€ Desktop Layout: 5-column grid [cards | gap | video | gap | cards] â”€â”€ */}
             <div className="hidden md:grid md:grid-cols-[1fr_2rem_1.4fr_2rem_1fr] items-center max-w-6xl mx-auto">
 
               {/* Left Cards (3) */}
@@ -326,6 +325,7 @@ export default function InterventionSection() {
                     loop
                     muted
                     playsInline
+                    preload="auto"
                     className="relative w-full h-auto rounded-2xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.12)]"
                   />
                 </div>
@@ -403,7 +403,7 @@ export default function InterventionSection() {
 
 export function OnesDifferenceSection() {
   const solutionRef = useRef<HTMLElement>(null);
-  const solutionInView = useInView(solutionRef, { once: true, margin: "-80px" });
+  const solutionInView = useInView(solutionRef, { once: true, margin: "100px" });
   const [, navigate] = useLocation();
 
   return (
@@ -421,7 +421,7 @@ export function OnesDifferenceSection() {
               className="inline-flex items-center gap-2 bg-[#054700] text-[#ede8e2] px-4 py-2 rounded-full mb-6"
             >
               <img src="/ones-logo-icon.svg" alt="" className="w-4 h-4 brightness-0 invert" />
-              <span className="text-sm font-medium">The ONES Difference</span>
+              <span className="text-sm font-medium">The Ones Difference</span>
             </motion.div>
 
             <motion.h3
@@ -429,14 +429,14 @@ export function OnesDifferenceSection() {
               className="text-2xl sm:text-3xl md:text-[2.75rem] text-[#054700] font-light leading-tight text-balance"
             >
               We don't recommend supplements.<span className="hidden sm:inline"><br /></span>{" "}
-              <span className="font-semibold">We formulate yours.</span>
+              <span className="text-[#8a9a2c]">We formulate yours.</span>
             </motion.h3>
 
             <motion.p
               variants={fadeUp}
               className="mt-6 text-lg text-black/60 leading-relaxed max-w-xl mx-auto"
             >
-              Your blood tests, your wearable data, your conversation with our AI — turned into one custom formula that ships to your door.
+              Your blood tests, your wearable data, your conversation with our AI â€” turned into one custom formula that ships to your door.
             </motion.p>
           </motion.div>
 
@@ -446,7 +446,7 @@ export function OnesDifferenceSection() {
             animate={solutionInView ? "visible" : "hidden"}
             variants={stagger}
           >
-            {/* ── Mobile Layout ── */}
+            {/* â”€â”€ Mobile Layout â”€â”€ */}
             <div className="md:hidden">
               <motion.div variants={scaleIn} className="flex justify-center mb-8">
                 <div className="relative w-full max-w-sm">
@@ -491,7 +491,7 @@ export function OnesDifferenceSection() {
               </div>
             </div>
 
-            {/* ── Desktop Layout ── */}
+            {/* â”€â”€ Desktop Layout â”€â”€ */}
             <div className="hidden md:grid md:grid-cols-[1fr_2rem_1.4fr_2rem_1fr] items-center max-w-6xl mx-auto">
               <div className="flex flex-col justify-center gap-5">
                 {callouts.filter((c) => c.position === "left").map((callout, index) => (
@@ -523,7 +523,7 @@ export function OnesDifferenceSection() {
                 ))}
               </div>
               <motion.div variants={scaleIn} className="relative flex items-center justify-center">
-                <video src="/capsule-formation.mp4" autoPlay loop muted playsInline className="relative w-full h-auto rounded-2xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.12)]" />
+                <video src="/capsule-formation.mp4" autoPlay loop muted playsInline preload="auto" className="relative w-full h-auto rounded-2xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.12)]" />
               </motion.div>
               <div className="flex flex-col justify-center items-center gap-5 h-full">
                 {[0, 1, 2].map((i) => (

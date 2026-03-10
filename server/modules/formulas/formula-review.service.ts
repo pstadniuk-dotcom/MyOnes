@@ -187,7 +187,7 @@ export class FormulaReviewService {
 
         await sendNotificationEmail({
             to: user.email,
-            subject: 'Your ONES formula may need a review',
+            subject: 'Your Ones formula may need a review',
             title: 'Formula Review Recommended',
             content: `
                 <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
@@ -206,7 +206,7 @@ export class FormulaReviewService {
             if (await consentsRepository.getUserConsent(user.id, 'sms_accountability')) {
                 await sendNotificationSms({
                     to: user.phone,
-                    message: `Your health data suggests your ONES formula may need updating${daysUntilRenewal ? ` — your next renewal is in ${daysUntilRenewal} days` : ''}. Review: ${reviewUrl}`,
+                    message: `Your health data suggests your Ones formula may need updating${daysUntilRenewal ? ` — your next renewal is in ${daysUntilRenewal} days` : ''}. Review: ${reviewUrl}`,
                     type: 'formula_update',
                 });
             }

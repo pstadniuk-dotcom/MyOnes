@@ -13,6 +13,8 @@ interface User {
   createdAt: string;
   isAdmin: boolean;
   emailVerified: boolean;
+  hasPassword?: boolean;
+  isSocialLogin?: boolean;
 }
 
 interface AuthContextType {
@@ -173,7 +175,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.setItem('user', JSON.stringify(data.user));
 
       toast({
-        title: "Welcome to ONES!",
+        title: "Welcome to Ones!",
         description: "Your account has been created. Please check your email to verify your account.",
         variant: "default"
       });
@@ -435,6 +437,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       localStorage.removeItem('consultation_draft');
+      localStorage.removeItem('consultation_current_session');
 
       toast({
         title: "Logged Out",

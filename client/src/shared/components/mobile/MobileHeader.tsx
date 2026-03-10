@@ -12,7 +12,7 @@ export function MobileHeader() {
       <div className="flex items-center justify-between h-14 px-4">
         {/* Logo - left aligned */}
         <Link href="/dashboard" className="flex items-center">
-          <img src="/ones-logo-light.svg" alt="ONES" className="h-6" />
+          <img src="/ones-logo-light.svg" alt="Ones" className="h-6" />
         </Link>
         
         {/* Right side actions */}

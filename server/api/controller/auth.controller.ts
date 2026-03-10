@@ -165,7 +165,9 @@ export class AuthController {
                     country: user.country,
                     createdAt: user.createdAt.toISOString(),
                     isAdmin: user.isAdmin || false,
-                    emailVerified: user.emailVerified
+                    emailVerified: user.emailVerified,
+                    hasPassword: !!user.password,
+                    isSocialLogin: !!(user.googleId || user.facebookId)
                 }
             });
         } catch (error) {

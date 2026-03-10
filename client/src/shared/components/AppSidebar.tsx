@@ -117,7 +117,7 @@ export function AppSidebar() {
     <Sidebar data-testid="sidebar-main" className="border-r border-[#054700]/10 bg-[#ede8e2]/80 backdrop-blur-md">
       <SidebarHeader className="!flex-row h-16 items-center px-6 border-b border-[#054700]/10">
         <Link href="/" className="flex items-center">
-          <img src="/ones-logo-light.svg" alt="ONES" className="h-7" />
+          <img src="/ones-logo-light.svg" alt="Ones" className="h-7" />
         </Link>
       </SidebarHeader>
       <SidebarContent className="px-3 py-4">
@@ -219,7 +219,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-4 border-t border-[#054700]/10">
         <p className="text-[#5a6623] text-xs text-center">
-          © 2026 ONES AI
+          © 2026 Ones
         </p>
       </SidebarFooter>
     </Sidebar>
