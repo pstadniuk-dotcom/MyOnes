@@ -40,7 +40,11 @@ import {
   FileText,
   Wifi,
   WifiOff,
-  CheckCircle2
+  CheckCircle2,
+  DollarSign,
+  TrendingUp,
+  Clock,
+  Eye
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { UserAdminNotes } from '@/features/admin/components/UserAdminNotes';
@@ -129,6 +133,46 @@ interface UserTimeline {
   fileUploads: FileUploadSummary[];
 }
 
+interface AiUsageData {
+  totalCostCents: number;
+  totalTokens: number;
+  totalCalls: number;
+  bySession: Array<{
+    sessionId: string;
+    sessionTitle: string | null;
+    sessionCreatedAt: string | null;
+    sessionStatus: string | null;
+    totalCostCents: number;
+    totalTokens: number;
+    callCount: number;
+    firstCall: string;
+    lastCall: string;
+  }>;
+  byFeature: Array<{
+    feature: string;
+    totalCostCents: number;
+    totalTokens: number;
+    callCount: number;
+  }>;
+  dailyCosts: Array<{
+    date: string;
+    totalCostCents: number;
+    callCount: number;
+  }>;
+}
+
+function formatCostCents(cents: number): string {
+  if (cents === 0) return '$0.00';
+  if (cents < 100) return `${cents}\u00a2`;
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function getCostBadgeVariant(cents: number): 'default' | 'secondary' | 'destructive' | 'outline' {
+  if (cents >= 500) return 'destructive';
+  if (cents >= 200) return 'default';
+  return 'secondary';
+}
+
 // Loading Skeleton
 function UserDetailSkeleton() {
   return (
@@ -164,6 +208,25 @@ export default function UserDetailPage() {
   const { data: timeline, isLoading: timelineLoading, error: timelineError } = useQuery<UserTimeline>({
     queryKey: ['/api/admin/users', userId, 'timeline'],
     enabled: !!userId,
+  });
+
+  // Fetch AI usage data for this user
+  const { data: aiUsage, isLoading: aiUsageLoading } = useQuery<AiUsageData>({
+    queryKey: ['/api/admin/ai-usage/user', userId],
+    enabled: !!userId,
+  });
+
+  // State for viewing a specific conversation
+  const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
+
+  // Fetch conversation messages when viewing a session
+  const { data: conversationDetail } = useQuery<{
+    session: any;
+    user: any;
+    messages: Array<{ id: string; role: string; content: string; createdAt: string }>;
+  }>({
+    queryKey: ['/api/admin/conversations', viewingSessionId],
+    enabled: !!viewingSessionId,
   });
 
   // Delete user mutation
@@ -640,12 +703,12 @@ export default function UserDetailPage() {
               User Activity
             </CardTitle>
             <CardDescription>
-              View user's formulas, orders, and chat sessions
+              View user's formulas, orders, chat sessions, and AI costs
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="formulas" data-testid="tabs-user-activity">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="formulas" data-testid="tab-formulas">
                   <FlaskConical className="h-4 w-4 mr-2" />
                   Formulas ({formulas.length})
@@ -656,7 +719,11 @@ export default function UserDetailPage() {
                 </TabsTrigger>
                 <TabsTrigger value="chats" data-testid="tab-chats">
                   <MessageSquare className="h-4 w-4 mr-2" />
-                  Chat Sessions ({chatSessions.length})
+                  Chats ({chatSessions.length})
+                </TabsTrigger>
+                <TabsTrigger value="ai-usage" data-testid="tab-ai-usage">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  AI Costs
                 </TabsTrigger>
               </TabsList>
 
@@ -833,6 +900,184 @@ export default function UserDetailPage() {
                       </CardContent>
                     </Card>
                   ))
+                )}
+              </TabsContent>
+
+              {/* AI Usage Tab */}
+              <TabsContent value="ai-usage" className="space-y-4 mt-4">
+                {aiUsageLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-20" />
+                    <Skeleton className="h-40" />
+                  </div>
+                ) : !aiUsage || aiUsage.totalCalls === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8" data-testid="text-no-ai-usage">
+                    No AI usage recorded yet
+                  </p>
+                ) : (
+                  <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-lg border p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Total Cost</p>
+                        <p className="text-lg font-bold text-primary" data-testid="ai-total-cost">
+                          {formatCostCents(aiUsage.totalCostCents)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center">
+                        <p className="text-xs text-muted-foreground">API Calls</p>
+                        <p className="text-lg font-bold" data-testid="ai-total-calls">
+                          {aiUsage.totalCalls}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Tokens Used</p>
+                        <p className="text-lg font-bold" data-testid="ai-total-tokens">
+                          {aiUsage.totalTokens >= 1_000_000
+                            ? `${(aiUsage.totalTokens / 1_000_000).toFixed(1)}M`
+                            : aiUsage.totalTokens >= 1_000
+                              ? `${(aiUsage.totalTokens / 1_000).toFixed(1)}K`
+                              : aiUsage.totalTokens}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Feature Breakdown */}
+                    {aiUsage.byFeature.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Cost by Feature</h4>
+                        <div className="space-y-1">
+                          {aiUsage.byFeature.map((f) => (
+                            <div key={f.feature} className="flex items-center justify-between text-sm py-1.5 px-2 rounded hover:bg-muted/50">
+                              <span className="capitalize">{f.feature.replace(/_/g, ' ')}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-muted-foreground">{f.callCount} calls</span>
+                                <Badge variant={getCostBadgeVariant(f.totalCostCents)}>
+                                  {formatCostCents(f.totalCostCents)}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Per-Session Breakdown — the key section for understanding overuse */}
+                    {aiUsage.bySession.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
+                          <TrendingUp className="h-4 w-4" />
+                          Cost per Conversation (highest first)
+                        </h4>
+                        <div className="space-y-2">
+                          {aiUsage.bySession.map((s) => (
+                            <Card key={s.sessionId} className="overflow-hidden">
+                              <div
+                                className="p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                                onClick={() => setViewingSessionId(
+                                  viewingSessionId === s.sessionId ? null : s.sessionId
+                                )}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium truncate">
+                                        {s.sessionTitle || `Session #${s.sessionId.slice(0, 8)}`}
+                                      </span>
+                                      {s.sessionStatus && (
+                                        <Badge variant={s.sessionStatus === 'active' ? 'default' : 'secondary'} className="text-[10px] px-1.5">
+                                          {s.sessionStatus}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        {s.sessionCreatedAt ? format(new Date(s.sessionCreatedAt), 'MMM dd, yyyy') : format(new Date(s.firstCall), 'MMM dd')}
+                                      </span>
+                                      <span>{s.callCount} AI calls</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant={getCostBadgeVariant(s.totalCostCents)}>
+                                      {formatCostCents(s.totalCostCents)}
+                                    </Badge>
+                                    <Eye className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Expanded: show actual messages */}
+                              {viewingSessionId === s.sessionId && (
+                                <div className="border-t bg-muted/20 px-3 py-2 max-h-80 overflow-y-auto">
+                                  {!conversationDetail ? (
+                                    <div className="space-y-2 py-2">
+                                      <Skeleton className="h-4 w-3/4" />
+                                      <Skeleton className="h-4 w-1/2" />
+                                      <Skeleton className="h-4 w-2/3" />
+                                    </div>
+                                  ) : conversationDetail.messages.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground py-2">No messages found</p>
+                                  ) : (
+                                    <div className="space-y-2 py-1">
+                                      {conversationDetail.messages.map((msg) => (
+                                        <div key={msg.id} className={`text-xs rounded p-2 ${
+                                          msg.role === 'user'
+                                            ? 'bg-blue-50 border-l-2 border-blue-300'
+                                            : msg.role === 'assistant'
+                                              ? 'bg-gray-50 border-l-2 border-gray-300'
+                                              : 'bg-yellow-50 border-l-2 border-yellow-300 italic'
+                                        }`}>
+                                          <div className="flex items-center justify-between mb-1">
+                                            <span className="font-semibold capitalize text-[10px] uppercase tracking-wider">
+                                              {msg.role}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground">
+                                              {format(new Date(msg.createdAt), 'h:mm a')}
+                                            </span>
+                                          </div>
+                                          <p className="whitespace-pre-wrap line-clamp-6">
+                                            {msg.content.length > 500
+                                              ? msg.content.slice(0, 500) + '...'
+                                              : msg.content}
+                                          </p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Daily Trend */}
+                    {aiUsage.dailyCosts.length > 1 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Daily Usage (last 30 days)</h4>
+                        <div className="flex items-end gap-1 h-20">
+                          {aiUsage.dailyCosts.map((d) => {
+                            const maxCost = Math.max(...aiUsage.dailyCosts.map(x => x.totalCostCents), 1);
+                            const height = Math.max(2, (d.totalCostCents / maxCost) * 100);
+                            return (
+                              <div
+                                key={d.date}
+                                className="flex-1 bg-primary/60 rounded-t hover:bg-primary transition-colors"
+                                style={{ height: `${height}%` }}
+                                title={`${d.date}: ${formatCostCents(d.totalCostCents)} (${d.callCount} calls)`}
+                              />
+                            );
+                          })}
+                        </div>
+                        <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                          <span>{aiUsage.dailyCosts[0]?.date}</span>
+                          <span>{aiUsage.dailyCosts[aiUsage.dailyCosts.length - 1]?.date}</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </TabsContent>
             </Tabs>

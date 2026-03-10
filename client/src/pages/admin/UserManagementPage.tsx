@@ -36,7 +36,9 @@ import {
   Users,
   Shield,
   SlidersHorizontal,
-  X
+  X,
+  ArrowUpDown,
+  DollarSign
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -48,6 +50,22 @@ interface User {
   phone: string | null;
   createdAt: string;
   isAdmin: boolean;
+  aiCostCents?: number;
+  aiCallCount?: number;
+}
+
+function formatCost(cents: number): string {
+  if (cents === 0) return '-';
+  if (cents < 100) return `${cents}¢`;
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function getCostColor(cents: number): string {
+  if (cents === 0) return 'text-muted-foreground';
+  if (cents < 50) return 'text-green-600';
+  if (cents < 200) return 'text-yellow-600';
+  if (cents < 500) return 'text-orange-600';
+  return 'text-red-600 font-semibold';
 }
 
 interface UsersResponse {
@@ -134,6 +152,7 @@ export default function UserManagementPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({ ...emptyFilters });
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<'date' | 'aiCost'>('date');
   const limit = 20;
 
   // Get filter from URL query parameter
@@ -153,10 +172,10 @@ export default function UserManagementPage() {
     advancedFilters.maxOrders && advancedFilters.maxOrders !== '',
   ].filter(Boolean).length;
 
-  // Reset to first page when search or filter changes
+  // Reset to first page when search, filter, or sort changes
   useEffect(() => {
     setCurrentPage(0);
-  }, [debouncedSearch, filter, advancedFilters]);
+  }, [debouncedSearch, filter, advancedFilters, sortBy]);
 
   // Build query string for users API
   const buildQueryParams = useCallback(() => {
@@ -165,6 +184,7 @@ export default function UserManagementPage() {
       limit: limit.toString(),
       offset: (currentPage * limit).toString(),
       filter: filter,
+      ...(sortBy === 'aiCost' && { sortBy: 'aiCost' }),
     });
     // Add advanced filters
     if (advancedFilters.hasDevices && advancedFilters.hasDevices !== 'any') {
@@ -186,7 +206,7 @@ export default function UserManagementPage() {
       params.set('maxOrders', advancedFilters.maxOrders);
     }
     return params.toString();
-  }, [debouncedSearch, currentPage, filter, advancedFilters]);
+  }, [debouncedSearch, currentPage, filter, advancedFilters, sortBy]);
 
   const queryParams = buildQueryParams();
 
@@ -290,6 +310,7 @@ export default function UserManagementPage() {
                     )}
                   </Button>
                 </PopoverTrigger>
+
                 <PopoverContent className="w-96 p-0" align="end">
                   <div className="p-4 border-b">
                     <div className="flex items-center justify-between">
@@ -437,6 +458,16 @@ export default function UserManagementPage() {
                   </div>
                 </PopoverContent>
               </Popover>
+              <Button
+                variant={sortBy === 'aiCost' ? 'default' : 'outline'}
+                size="sm"
+                className="gap-2"
+                onClick={() => setSortBy(sortBy === 'aiCost' ? 'date' : 'aiCost')}
+                data-testid="button-sort-ai-cost"
+              >
+                <DollarSign className="h-4 w-4" />
+                {sortBy === 'aiCost' ? 'Sorted by Cost' : 'Sort by AI Cost'}
+              </Button>
             </div>
 
             {/* Active Filter Tags */}
@@ -514,6 +545,16 @@ export default function UserManagementPage() {
                         <TableHead>Email</TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Phone</TableHead>
+                        <TableHead
+                          className="cursor-pointer select-none"
+                          onClick={() => setSortBy(sortBy === 'aiCost' ? 'date' : 'aiCost')}
+                        >
+                          <div className="flex items-center gap-1">
+                            AI Cost
+                            <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
+                            {sortBy === 'aiCost' && <span className="text-xs text-primary">(high→low)</span>}
+                          </div>
+                        </TableHead>
                         <TableHead>Created Date</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
@@ -534,6 +575,18 @@ export default function UserManagementPage() {
                           </TableCell>
                           <TableCell data-testid={`cell-phone-${user.id}`}>
                             {user.phone || '-'}
+                          </TableCell>
+                          <TableCell data-testid={`cell-ai-cost-${user.id}`}>
+                            <div className="flex flex-col">
+                              <span className={getCostColor(user.aiCostCents || 0)}>
+                                {formatCost(user.aiCostCents || 0)}
+                              </span>
+                              {(user.aiCallCount || 0) > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                  {user.aiCallCount} calls
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell data-testid={`cell-created-${user.id}`}>
                             {format(new Date(user.createdAt), 'MMM dd, yyyy')}

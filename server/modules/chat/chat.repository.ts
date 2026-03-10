@@ -1,6 +1,7 @@
 import { db } from '../../infra/db/db';
 import { chatSessions, messages, type ChatSession, type InsertChatSession, type Message, type InsertMessage } from '@shared/schema';
 import { eq, desc } from 'drizzle-orm';
+import { encryptField, decryptField } from '../../infra/security/fieldEncryption';
 
 export class ChatRepository {
     async getChatSession(id: string): Promise<ChatSession | undefined> {
@@ -43,12 +44,31 @@ export class ChatRepository {
     }
 
     async createMessage(insertMessage: any): Promise<Message> {
-        const [message] = await db.insert(messages).values(insertMessage).returning();
-        return message;
+        // Encrypt message content (PHI) before storage
+        const encryptedMessage = {
+            ...insertMessage,
+            content: insertMessage.content ? encryptField(insertMessage.content) : insertMessage.content,
+        };
+        const [message] = await db.insert(messages).values(encryptedMessage).returning();
+        return this.decryptMessage(message);
     }
 
     async listMessagesBySession(sessionId: string): Promise<Message[]> {
-        return await db.select().from(messages).where(eq(messages.sessionId, sessionId)).orderBy(messages.createdAt);
+        const rows = await db.select().from(messages).where(eq(messages.sessionId, sessionId)).orderBy(messages.createdAt);
+        return rows.map(m => this.decryptMessage(m));
+    }
+
+    /**
+     * Decrypt message content. Handles both encrypted and legacy plaintext messages.
+     */
+    private decryptMessage(message: Message): Message {
+        if (!message.content) return message;
+        try {
+            return { ...message, content: decryptField(message.content) };
+        } catch {
+            // Legacy plaintext message — return as-is
+            return message;
+        }
     }
 }
 

@@ -46,6 +46,7 @@ export class AdminController {
             const limit = parseInt(req.query.limit as string) || 20;
             const offset = parseInt(req.query.offset as string) || 0;
             const filter = (req.query.filter as string) || 'all';
+            const sortBy = (req.query.sortBy as string) || undefined;
 
             // Parse advanced filters from query params
             const advancedFilters: {
@@ -77,7 +78,7 @@ export class AdminController {
             }
 
             const hasAdvanced = Object.keys(advancedFilters).length > 0;
-            const result = await adminService.searchUsers(query, limit, offset, filter, hasAdvanced ? advancedFilters : undefined);
+            const result = await adminService.searchUsers(query, limit, offset, filter, hasAdvanced ? advancedFilters : undefined, sortBy);
             res.json(result);
         } catch (error) {
             logger.error('Error searching users', { error });

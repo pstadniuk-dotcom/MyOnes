@@ -12,7 +12,9 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }, // Required for Supabase pooler
+  ssl: process.env.DB_CA_CERT
+    ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT }
+    : { rejectUnauthorized: false }, // Supabase pooler requires this when no CA cert is pinned
   // Connection pool optimizations for production
   max: 10, // Maximum connections in pool
   idleTimeoutMillis: 30000, // Close idle connections after 30s

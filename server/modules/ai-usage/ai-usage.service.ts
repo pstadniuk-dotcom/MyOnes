@@ -235,7 +235,7 @@ export async function getUsageSummary(days: number = 30): Promise<AiUsageSummary
 }
 
 /**
- * Get detailed usage for a specific user
+ * Get detailed usage for a specific user, grouped by chat session
  */
 export async function getUserUsageDetails(userId: string, days: number = 30) {
   const since = new Date();
@@ -261,10 +261,83 @@ export async function getUserUsageDetails(userId: string, days: number = 30) {
       gte(aiUsageLogs.createdAt, since),
     ));
 
+  // Group by session for cost-per-conversation view
+  const bySession = await db.execute(sql`
+    SELECT
+      a.session_id AS "sessionId",
+      cs.title AS "sessionTitle",
+      cs.created_at AS "sessionCreatedAt",
+      cs.status AS "sessionStatus",
+      COALESCE(SUM(a.estimated_cost_cents), 0)::int AS "totalCostCents",
+      COALESCE(SUM(a.total_tokens), 0)::int AS "totalTokens",
+      COUNT(*)::int AS "callCount",
+      MIN(a.created_at) AS "firstCall",
+      MAX(a.created_at) AS "lastCall"
+    FROM ai_usage_logs a
+    LEFT JOIN chat_sessions cs ON a.session_id = cs.id
+    WHERE a.user_id = ${userId}
+      AND a.created_at >= ${since}
+      AND a.session_id IS NOT NULL
+    GROUP BY a.session_id, cs.title, cs.created_at, cs.status
+    ORDER BY SUM(a.estimated_cost_cents) DESC
+  `);
+
+  // By feature breakdown
+  const byFeature = await db.execute(sql`
+    SELECT
+      feature,
+      COALESCE(SUM(estimated_cost_cents), 0)::int AS "totalCostCents",
+      COALESCE(SUM(total_tokens), 0)::int AS "totalTokens",
+      COUNT(*)::int AS "callCount"
+    FROM ai_usage_logs
+    WHERE user_id = ${userId} AND created_at >= ${since}
+    GROUP BY feature
+    ORDER BY SUM(estimated_cost_cents) DESC
+  `);
+
+  // Daily usage trend
+  const dailyCosts = await db.execute(sql`
+    SELECT
+      TO_CHAR(created_at, 'YYYY-MM-DD') AS "date",
+      COALESCE(SUM(estimated_cost_cents), 0)::int AS "totalCostCents",
+      COUNT(*)::int AS "callCount"
+    FROM ai_usage_logs
+    WHERE user_id = ${userId} AND created_at >= ${since}
+    GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')
+    ORDER BY "date" ASC
+  `);
+
   return {
     logs,
     totalCostCents: Number(totals[0]?.totalCostCents) || 0,
     totalTokens: Number(totals[0]?.totalTokens) || 0,
     totalCalls: Number(totals[0]?.totalCalls) || 0,
+    bySession: (bySession.rows || []) as any[],
+    byFeature: (byFeature.rows || []) as any[],
+    dailyCosts: (dailyCosts.rows || []) as any[],
   };
+}
+
+/**
+ * Get AI cost per user for the user management list (lightweight, returns all users with cost > 0)
+ */
+export async function getAllUserCosts(days: number = 30): Promise<Record<string, { costCents: number; calls: number }>> {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  const rows = await db.execute(sql`
+    SELECT
+      user_id AS "userId",
+      COALESCE(SUM(estimated_cost_cents), 0)::int AS "costCents",
+      COUNT(*)::int AS "calls"
+    FROM ai_usage_logs
+    WHERE created_at >= ${since} AND user_id IS NOT NULL
+    GROUP BY user_id
+  `);
+
+  const map: Record<string, { costCents: number; calls: number }> = {};
+  for (const row of (rows.rows || []) as any[]) {
+    map[row.userId] = { costCents: row.costCents, calls: row.calls };
+  }
+  return map;
 }

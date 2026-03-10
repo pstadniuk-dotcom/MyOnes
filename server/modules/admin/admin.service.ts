@@ -36,9 +36,10 @@ export class AdminService {
             hasOrders?: boolean;
             minOrders?: number;
             maxOrders?: number;
-        }
+        },
+        sortBy?: string
     ) {
-        const result = await adminRepository.searchUsers(query, limit, offset, filter, advancedFilters);
+        const result = await adminRepository.searchUsers(query, limit, offset, filter, advancedFilters, sortBy);
         // Sanitize users to remove sensitive fields
         const sanitizedUsers = result.users.map(({ password, ...user }: any) => user);
         return {

@@ -810,7 +810,7 @@ const faqData = [
   {
     category: 'Technical Support',
     question: 'Is my health data safe and private?',
-    answer: 'Yes, absolutely. We use HIPAA-level security standards including 256-bit encryption, SOC 2 certified hosting, and strict access controls. Your health data is NEVER sold to third parties. We only share data when required by law or with your explicit consent (like sharing with your doctor). You can delete your account and all data anytime.',
+    answer: 'Yes — protecting your data is a top priority. We use AES-256-bit encryption for sensitive health fields (conditions, medications, allergies, lab markers), enforce TLS for all data in transit, and maintain strict role-based access controls with full audit logging. Your health data is NEVER sold to third parties. We only share data when required by law or with your explicit consent. You can request deletion of your account and data at any time by contacting support@ones.health. Note: Ones is not HIPAA-certified; we are a wellness platform that follows strong security best practices.',
     displayOrder: 4
   }
 ];

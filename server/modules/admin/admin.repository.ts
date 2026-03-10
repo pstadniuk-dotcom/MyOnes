@@ -13,6 +13,7 @@ import {
     ingredientPricing,
     userAdminNotes,
     wearableConnections,
+    aiUsageLogs,
     type User,
     type Formula,
     type Order,
@@ -26,7 +27,7 @@ import {
     type WearableConnection,
     type IngredientPricing
 } from '@shared/schema';
-import { eq, desc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull } from 'drizzle-orm';
+import { eq, desc, asc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull, sum } from 'drizzle-orm';
 import { decryptToken } from '../../utils/tokenEncryption';
 
 export class AdminRepository {
@@ -167,8 +168,9 @@ export class AdminRepository {
             hasOrders?: boolean;
             minOrders?: number;
             maxOrders?: number;
-        }
-    ): Promise<{ users: User[]; total: number }> {
+        },
+        sortBy?: string
+    ): Promise<{ users: (User & { aiCostCents?: number; aiCallCount?: number })[]; total: number }> {
         try {
             const searchPattern = `%${query}%`;
             const searchCondition = or(
@@ -299,9 +301,73 @@ export class AdminRepository {
                 whereClause = and(searchCondition, inArray(users.id, candidateIds));
             }
 
+            // Sort by AI cost (highest first) or by created date
+            if (sortBy === 'aiCost') {
+                // Use a subquery to get cost per user and sort by it
+                const costSubquery = db
+                    .select({
+                        userId: aiUsageLogs.userId,
+                        totalCost: sql<number>`COALESCE(SUM(${aiUsageLogs.estimatedCostCents}), 0)`.as('total_cost'),
+                        callCount: sql<number>`COUNT(*)`.as('call_count'),
+                    })
+                    .from(aiUsageLogs)
+                    .groupBy(aiUsageLogs.userId)
+                    .as('ai_costs');
+
+                const userQuery = db
+                    .select({
+                        user: users,
+                        aiCostCents: sql<number>`COALESCE(${costSubquery.totalCost}, 0)`,
+                        aiCallCount: sql<number>`COALESCE(${costSubquery.callCount}, 0)`,
+                    })
+                    .from(users)
+                    .leftJoin(costSubquery, eq(users.id, costSubquery.userId))
+                    .where(whereClause)
+                    .orderBy(sql`COALESCE(${costSubquery.totalCost}, 0) DESC`)
+                    .limit(limit)
+                    .offset(offset);
+
+                const countQuery = db
+                    .select({ count: count() })
+                    .from(users)
+                    .where(whereClause);
+
+                const [foundRows, countRows] = await Promise.all([
+                    userQuery,
+                    countQuery
+                ]);
+
+                const enrichedUsers = foundRows.map(row => ({
+                    ...row.user,
+                    aiCostCents: Number(row.aiCostCents) || 0,
+                    aiCallCount: Number(row.aiCallCount) || 0,
+                }));
+
+                return {
+                    users: enrichedUsers,
+                    total: Number(countRows?.[0]?.count || 0)
+                };
+            }
+
+            // Default: sort by created date, still enrich with AI cost
+            const costSubquery = db
+                .select({
+                    userId: aiUsageLogs.userId,
+                    totalCost: sql<number>`COALESCE(SUM(${aiUsageLogs.estimatedCostCents}), 0)`.as('total_cost'),
+                    callCount: sql<number>`COUNT(*)`.as('call_count'),
+                })
+                .from(aiUsageLogs)
+                .groupBy(aiUsageLogs.userId)
+                .as('ai_costs_default');
+
             const userQuery = db
-                .select()
+                .select({
+                    user: users,
+                    aiCostCents: sql<number>`COALESCE(${costSubquery.totalCost}, 0)`,
+                    aiCallCount: sql<number>`COALESCE(${costSubquery.callCount}, 0)`,
+                })
                 .from(users)
+                .leftJoin(costSubquery, eq(users.id, costSubquery.userId))
                 .where(whereClause)
                 .orderBy(desc(users.createdAt))
                 .limit(limit)
@@ -312,13 +378,19 @@ export class AdminRepository {
                 .from(users)
                 .where(whereClause);
 
-            const [foundUsers, countRows] = await Promise.all([
+            const [foundRows, countRows] = await Promise.all([
                 userQuery,
                 countQuery
             ]);
 
+            const enrichedUsers = foundRows.map(row => ({
+                ...row.user,
+                aiCostCents: Number(row.aiCostCents) || 0,
+                aiCallCount: Number(row.aiCallCount) || 0,
+            }));
+
             return {
-                users: foundUsers,
+                users: enrichedUsers,
                 total: Number(countRows?.[0]?.count || 0)
             };
         } catch (error) {

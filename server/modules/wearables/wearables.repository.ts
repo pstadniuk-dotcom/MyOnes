@@ -10,6 +10,7 @@ import {
 } from '@shared/schema';
 import { eq, and, desc, lt, gte, lte } from 'drizzle-orm';
 import { encryptToken, decryptToken } from '../../utils/tokenEncryption';
+import { encryptField, decryptField } from '../../infra/security/fieldEncryption';
 
 export class WearablesRepository {
     async getWearableConnections(userId: string): Promise<WearableConnection[]> {
@@ -252,7 +253,7 @@ export class WearablesRepository {
                 spo2Percentage: data.spo2Percentage,
                 skinTempCelsius: data.skinTempCelsius,
                 respiratoryRate: data.respiratoryRate,
-                rawData: data.rawData || null,
+                rawData: data.rawData ? encryptField(JSON.stringify(data.rawData)) as any : null,
             }).onConflictDoUpdate({
                 target: [biometricData.userId, biometricData.dataDate, biometricData.provider],
                 set: {
@@ -274,7 +275,7 @@ export class WearablesRepository {
                     spo2Percentage: data.spo2Percentage,
                     skinTempCelsius: data.skinTempCelsius,
                     respiratoryRate: data.respiratoryRate,
-                    rawData: data.rawData || null,
+                    rawData: data.rawData ? encryptField(JSON.stringify(data.rawData)) as any : null,
                     syncedAt: new Date(),
                 },
             });
@@ -286,7 +287,7 @@ export class WearablesRepository {
 
     async getBiometricData(userId: string, startDate: Date, endDate: Date): Promise<any[]> {
         try {
-            return await db
+            const rows = await db
                 .select()
                 .from(biometricData)
                 .where(and(
@@ -295,6 +296,17 @@ export class WearablesRepository {
                     lte(biometricData.dataDate, endDate)
                 ))
                 .orderBy(desc(biometricData.dataDate));
+            // Decrypt rawData for each row
+            return rows.map(row => {
+                if (row.rawData && typeof row.rawData === 'string') {
+                    try {
+                        return { ...row, rawData: JSON.parse(decryptField(row.rawData)) };
+                    } catch {
+                        return row; // Legacy unencrypted data
+                    }
+                }
+                return row;
+            });
         } catch (error) {
             console.error('Error getting biometric data:', error);
             return [];
@@ -401,7 +413,7 @@ export class WearablesRepository {
                 spo2Percentage: data.spo2Percentage,
                 skinTempCelsius: data.skinTempCelsius,
                 respiratoryRate: data.respiratoryRate,
-                rawData: data.rawData || null,
+                rawData: data.rawData ? encryptField(JSON.stringify(data.rawData)) as any : null,
             }).onConflictDoUpdate({
                 target: [biometricData.userId, biometricData.dataDate, biometricData.provider],
                 set: {
@@ -423,7 +435,7 @@ export class WearablesRepository {
                     spo2Percentage: data.spo2Percentage ?? undefined,
                     skinTempCelsius: data.skinTempCelsius ?? undefined,
                     respiratoryRate: data.respiratoryRate ?? undefined,
-                    rawData: data.rawData || undefined,
+                    rawData: data.rawData ? encryptField(JSON.stringify(data.rawData)) as any : undefined,
                     syncedAt: new Date(),
                 },
             });

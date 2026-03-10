@@ -245,25 +245,45 @@ export class ChatService {
             temperature: temperature,
         });
 
+        let inputTokens = 0;
+        let outputTokens = 0;
+
         for await (const event of stream) {
             if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
                 yield { type: 'text' as const, content: event.delta.text };
             }
+            // Capture usage from message_start (input tokens) and message_delta (output tokens)
+            if (event.type === 'message_start' && (event as any).message?.usage) {
+                inputTokens = (event as any).message.usage.input_tokens || 0;
+            }
+            if (event.type === 'message_delta' && (event as any).usage) {
+                outputTokens = (event as any).usage.output_tokens || 0;
+            }
         }
 
-        // Yield usage info from the final message
-        try {
-            const finalMsg = await stream.finalMessage();
-            if (finalMsg.usage) {
-                yield {
-                    type: 'usage' as const,
-                    content: '',
-                    inputTokens: finalMsg.usage.input_tokens,
-                    outputTokens: finalMsg.usage.output_tokens,
-                };
+        // Yield usage info collected from stream events
+        if (inputTokens > 0 || outputTokens > 0) {
+            yield {
+                type: 'usage' as const,
+                content: '',
+                inputTokens,
+                outputTokens,
+            };
+        } else {
+            // Fallback: try finalMessage() which accumulates the full response
+            try {
+                const finalMsg = await stream.finalMessage();
+                if (finalMsg.usage) {
+                    yield {
+                        type: 'usage' as const,
+                        content: '',
+                        inputTokens: finalMsg.usage.input_tokens,
+                        outputTokens: finalMsg.usage.output_tokens,
+                    };
+                }
+            } catch {
+                // Usage extraction is best-effort
             }
-        } catch {
-            // Usage extraction is best-effort
         }
     }
 

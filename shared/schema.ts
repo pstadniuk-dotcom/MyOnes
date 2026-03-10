@@ -505,6 +505,20 @@ export const adminAuditLogs = pgTable("admin_audit_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Authentication audit log — tracks login attempts for security compliance
+export const authAuditLogs = pgTable("auth_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  email: text("email"), // Always captured (even for failed attempts where user doesn't exist)
+  action: text("action").notNull(), // 'login_success', 'login_failed', 'signup', 'google_login', 'facebook_login', 'password_reset', 'logout'
+  provider: text("provider"), // 'email', 'google', 'facebook'
+  success: boolean("success").notNull(),
+  failureReason: text("failure_reason"), // 'invalid_password', 'user_not_found', 'rate_limited', 'account_locked', etc.
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // User consent tracking for HIPAA compliance
 export const userConsents = pgTable("user_consents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

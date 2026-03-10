@@ -3,9 +3,13 @@ import pg from 'pg';
 import bcrypt from 'bcrypt';
 const { Pool } = pg;
 
-// PRODUCTION DATABASE
-const dbUrl = 'postgresql://postgres.aytzwtehxtvoejgcixdn:Weshinebright22!@aws-1-us-east-1.pooler.supabase.com:6543/postgres';
-console.log('Using PRODUCTION database');
+// Use DATABASE_URL from environment
+const dbUrl = process.env.DATABASE_URL;
+if (!dbUrl) {
+  console.error('DATABASE_URL environment variable is required');
+  process.exit(1);
+}
+console.log('Using database from DATABASE_URL env var');
 const pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
 
 async function checkUser() {
@@ -42,7 +46,11 @@ async function checkUser() {
         console.log('\n✅ User has password set (length:', user.pwd_len, ')');
         
         // Test password verification
-        const testPassword = 'Weshinebright22!';
+        const testPassword = process.argv[2];
+        if (!testPassword) {
+          console.log('\nPass a password as CLI arg to test: node check-user-login.mjs <password>');
+          return;
+        }
         const isValid = await bcrypt.compare(testPassword, user.password);
         console.log(`\nPassword test with "${testPassword}": ${isValid ? '✅ MATCHES' : '❌ DOES NOT MATCH'}`);
       }
