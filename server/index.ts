@@ -1,4 +1,6 @@
 import "./env";
+import path from "path";
+import fs from "fs";
 import express, { type Request, Response, NextFunction } from "express";
 import fileUpload from "express-fileupload";
 import session from "express-session";
@@ -201,7 +203,14 @@ app.use((req, res, next) => {
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } else {
-      serveStatic(app);
+      // Only serve static files if the build directory exists
+      // (skipped when frontend is deployed separately on Vercel)
+      const distPublicPath = path.resolve(import.meta.dirname ?? __dirname, "..", "dist", "public");
+      if (fs.existsSync(distPublicPath)) {
+        serveStatic(app);
+      } else {
+        log("Skipping static file serving (dist/public not found — frontend deployed separately)");
+      }
     }
 
     // ALWAYS serve the app on the port specified in the environment variable PORT
