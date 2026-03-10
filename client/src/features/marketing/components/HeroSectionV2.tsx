@@ -202,7 +202,7 @@ export default function HeroSectionV2() {
           ═══════════════════════════════════════════════════ */}
       <div className="flex relative w-full lg:w-1/2 min-h-[70vh] lg:min-h-[92vh] items-center justify-center">
         {/* Background video cycle */}
-        {heroVideos.map((src, idx) => (
+        {/* {heroVideos.map((src, idx) => (
           <video
             key={src}
             ref={(el) => { bgVideoRefs.current[idx] = el; }}
@@ -216,7 +216,22 @@ export default function HeroSectionV2() {
               idx === activeBgVideo ? 'opacity-100' : 'opacity-0'
             }`}
           />
-        ))}
+        ))} */}
+
+          <video
+            key={"6d9efde5ac45418c979e43130ecc6e77"}
+            // ref={(el) => { bgVideoRefs.current[0] = el; }}
+            src={"/6d9efde5ac45418c979e43130ecc6e77.mp4"}
+            muted
+            // playsInline
+            autoPlay
+            disablePictureInPicture
+            // controlsList="noplaybackrate nodownload"
+            // onEnded={handleBgVideoEnded}
+            className={`absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-1000`}
+          />
+
+
         {/* Transparent overlay blocks browser video controls + darkens for contrast */}
         <div className="absolute inset-0 bg-black/20 z-[1]" />
 

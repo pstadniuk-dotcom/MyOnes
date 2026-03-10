@@ -31,7 +31,7 @@ export default function HowItWorksSectionV2() {
     >
       {/* Lifestyle video background */}
       <video
-        src="/Hero%20Section/ci8WKa11CT14gg5wbDeTA_bec958a14ba04effbdcea88863093f03.mp4"
+        src="/ci8WKa11CT14gg5wbDeTA_bec958a14ba04effbdcea88863093f03.mp4"
         autoPlay
         loop
         muted
@@ -41,7 +41,7 @@ export default function HowItWorksSectionV2() {
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
       />
       {/* Light overlay to keep text readable */}
-      <div className="absolute inset-0 bg-[#ede8e2]/85 backdrop-blur-[2px] z-[1]" />
+      <div className="absolute inset-0 bg-[#ede8e2]/80 backdrop-blur-[2px] z-[1]" />
 
       <div className="relative z-10 container mx-auto px-6 max-w-6xl">
         <div className="max-w-2xl mx-auto text-center mb-16">
