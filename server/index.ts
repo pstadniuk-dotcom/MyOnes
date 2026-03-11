@@ -29,6 +29,8 @@ process.on('unhandledRejection', (reason) => {
 const app = express();
 // Trust reverse proxy (needed for secure cookies and correct protocol detection in production)
 app.set('trust proxy', 1);
+// Hide Express server identity to prevent targeted attacks
+app.disable('x-powered-by');
 
 // Content Security Policy - Security hardened
 // 'unsafe-eval' only in development (needed for Vite HMR and React dev tools)

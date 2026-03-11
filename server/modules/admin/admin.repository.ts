@@ -29,6 +29,19 @@ import {
 } from '@shared/schema';
 import { eq, desc, asc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull, sum } from 'drizzle-orm';
 import { decryptToken } from '../../utils/tokenEncryption';
+import { decryptField } from '../../infra/security/fieldEncryption';
+
+/**
+ * Decrypt message content with fallback for legacy plaintext messages.
+ * Returns original content if decryption fails (pre-encryption data).
+ */
+function decryptMessageContent(content: string): string {
+    try {
+        return decryptField(content);
+    } catch {
+        return content; // legacy plaintext
+    }
+}
 
 export class AdminRepository {
     async getAdminStats(): Promise<{
@@ -635,7 +648,7 @@ export class AdminRepository {
                 .limit(limit);
 
             return {
-                messages: userMessages,
+                messages: userMessages.map(m => ({ ...m, content: decryptMessageContent(m.content) })),
                 total: Number(totalCount)
             };
         } catch (error) {
@@ -692,7 +705,7 @@ export class AdminRepository {
                     return {
                         session,
                         user: { id: userId, name: userName, email: userEmail },
-                        messages: sessionMessages,
+                        messages: sessionMessages.map(m => ({ ...m, content: decryptMessageContent(m.content) })),
                         messageCount: sessionMessages.length
                     };
                 })
@@ -797,7 +810,7 @@ export class AdminRepository {
                     name: sessionWithUser.userName,
                     email: sessionWithUser.userEmail
                 },
-                messages: sessionMessages
+                messages: sessionMessages.map(m => ({ ...m, content: decryptMessageContent(m.content) }))
             };
         } catch (error) {
             console.error('Error getting conversation details:', error);

@@ -3,11 +3,12 @@ import { liveChatService } from '../../modules/live-chat/live-chat.service';
 import { liveChatEventBus } from '../../modules/live-chat/live-chat.events';
 import logger from '../../infra/logging/logger';
 import { z } from 'zod';
+import { stripHtml } from '../../utils/sanitize';
 
 const sendMessageSchema = z.object({
-  content: z.string().min(1, 'Message cannot be empty').max(5000, 'Message too long'),
+  content: z.string().min(1, 'Message cannot be empty').max(5000, 'Message too long').transform(stripHtml),
   attachments: z.array(z.object({
-    name: z.string(),
+    name: z.string().transform(stripHtml),
     url: z.string().url(),
     type: z.string(),
     size: z.number(),
@@ -15,7 +16,7 @@ const sendMessageSchema = z.object({
 });
 
 const startGuestChatSchema = z.object({
-  name: z.string().min(1).max(100),
+  name: z.string().min(1).max(100).transform(stripHtml).refine(v => v.length >= 1, { message: 'Name cannot be empty' }),
   email: z.string().email(),
 });
 
@@ -93,6 +94,10 @@ export class LiveChatController {
         return res.status(400).json({ error: 'Invalid data', details: validation.error.errors });
       }
       const { name, email } = validation.data;
+      // Defense-in-depth: reject if sanitized name is empty
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: 'Name cannot be empty after sanitization' });
+      }
       const metadata = {
         userAgent: req.headers['user-agent'],
         page: req.query.page as string || undefined,

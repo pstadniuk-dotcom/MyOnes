@@ -14,8 +14,8 @@ router.get('/sessions/:id/stream', requireAuth, liveChatController.streamSession
 router.post('/sessions/:id/typing', requireAuth, liveChatController.userTyping);
 router.post('/sessions/:id/stop-typing', requireAuth, liveChatController.userStopTyping);
 router.post('/sessions/:id/close', requireAuth, liveChatController.closeSession);
-router.post('/sessions/:id/rating', liveChatController.submitRating);
-router.post('/sessions/:id/transcript', liveChatController.sendTranscript);
+router.post('/sessions/:id/rating', requireAuth, liveChatController.submitRating);
+router.post('/sessions/:id/transcript', requireAuth, liveChatController.sendTranscript);
 
 // ─── Public endpoints (no auth) ──────────────────────────────
 router.get('/business-hours', liveChatController.getBusinessHours);

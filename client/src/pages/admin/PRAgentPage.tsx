@@ -46,6 +46,8 @@ import {
   ChevronDown,
   Sparkles,
   Trash2,
+  KeyRound,
+  ShieldCheck,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -821,6 +823,9 @@ function SettingsTab() {
         </CardContent>
       </Card>
 
+      {/* Gmail OAuth Credentials */}
+      <GmailOAuthCard config={config} updateConfigMutation={updateConfigMutation} />
+
       {/* Founder Profile */}
       <Card>
         <CardHeader>
@@ -860,6 +865,200 @@ function SettingsTab() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ── Gmail OAuth Credentials Card ──────────────────────────────────────────────
+
+interface GmailOAuthConfig {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+}
+
+function GmailOAuthCard({
+  config,
+  updateConfigMutation,
+}: {
+  config: PrAgentConfig | undefined;
+  updateConfigMutation: { mutate: (data: Partial<PrAgentConfig>) => void; isPending?: boolean };
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [showSecrets, setShowSecrets] = useState(false);
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [refreshToken, setRefreshToken] = useState('');
+  const [loaded, setLoaded] = useState(false);
+
+  const { data: gmailConfig, isLoading } = useQuery<GmailOAuthConfig & { configured: boolean }>({
+    queryKey: ['/api/agent/gmail-config'],
+    queryFn: () => apiRequest('GET', '/api/agent/gmail-config').then(r => r.json()),
+  });
+
+  // Populate fields once loaded
+  if (gmailConfig && !loaded) {
+    setClientId(gmailConfig.clientId || '');
+    setClientSecret(gmailConfig.clientSecret || '');
+    setRefreshToken(gmailConfig.refreshToken || '');
+    setLoaded(true);
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: (data: GmailOAuthConfig) =>
+      apiRequest('PUT', '/api/agent/gmail-config', data),
+    onSuccess: () => {
+      toast({ title: 'Gmail credentials saved' });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/gmail-config'] });
+    },
+    onError: (err: any) =>
+      toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => apiRequest('DELETE', '/api/agent/gmail-config'),
+    onSuccess: () => {
+      toast({ title: 'Gmail credentials removed' });
+      setClientId('');
+      setClientSecret('');
+      setRefreshToken('');
+      setLoaded(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/gmail-config'] });
+    },
+    onError: (err: any) =>
+      toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const handleSave = () => {
+    if (!clientId.trim() || !clientSecret.trim() || !refreshToken.trim()) {
+      toast({ title: 'All three fields are required', variant: 'destructive' });
+      return;
+    }
+    saveMutation.mutate({ clientId: clientId.trim(), clientSecret: clientSecret.trim(), refreshToken: refreshToken.trim() });
+  };
+
+  const isConfigured = gmailConfig?.configured ?? false;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Mail className="h-4 w-4" />
+          Gmail OAuth Credentials
+        </CardTitle>
+        <CardDescription>
+          Connect a Gmail account to send pitches automatically.
+          {' '}
+          <a
+            href="https://console.cloud.google.com/apis/credentials"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-primary"
+          >
+            Google Cloud Console
+          </a>
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Status indicator */}
+        <div className="flex items-center gap-2 text-sm">
+          {isConfigured ? (
+            <>
+              <ShieldCheck className="h-4 w-4 text-green-600" />
+              <span className="text-green-700 font-medium">Connected</span>
+            </>
+          ) : (
+            <>
+              <KeyRound className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Not configured</span>
+            </>
+          )}
+        </div>
+
+        {/* Gmail Enabled toggle + From address */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={config?.gmailEnabled ?? false}
+              onCheckedChange={(checked) => updateConfigMutation.mutate({ gmailEnabled: checked })}
+            />
+            <Label className="text-xs">Gmail Sending Enabled</Label>
+          </div>
+          <div>
+            <Label className="text-xs">From Address</Label>
+            <Input
+              defaultValue={config?.gmailFrom ?? 'pete@ones.health'}
+              onBlur={(e) => updateConfigMutation.mutate({ gmailFrom: e.target.value })}
+              placeholder="pete@ones.health"
+            />
+          </div>
+        </div>
+
+        {/* Credential fields */}
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Client ID</Label>
+            <Input
+              type={showSecrets ? 'text' : 'password'}
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              placeholder="xxxx.apps.googleusercontent.com"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Client Secret</Label>
+            <Input
+              type={showSecrets ? 'text' : 'password'}
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+              placeholder="GOCSPX-..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Refresh Token</Label>
+            <Input
+              type={showSecrets ? 'text' : 'password'}
+              value={refreshToken}
+              onChange={(e) => setRefreshToken(e.target.value)}
+              placeholder="1//..."
+            />
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-between pt-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowSecrets(!showSecrets)}>
+            <Eye className="h-3.5 w-3.5 mr-1.5" />
+            {showSecrets ? 'Hide' : 'Show'} secrets
+          </Button>
+          <div className="flex gap-2">
+            {isConfigured && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                Remove
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={saveMutation.isPending}
+            >
+              {saveMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Check className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Save Credentials
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -329,6 +329,65 @@ export async function resetProfile(req: Request, res: Response) {
   }
 }
 
+// ── Gmail OAuth Config ───────────────────────────────────────────────────────
+
+const GMAIL_CONFIG_KEY = 'gmail_oauth_config';
+
+export async function getGmailConfig(req: Request, res: Response) {
+  try {
+    const config = await agentRepository.getAgentConfig(GMAIL_CONFIG_KEY);
+    if (!config || !config.clientId) {
+      return res.json({ clientId: '', clientSecret: '', refreshToken: '', configured: false });
+    }
+    // Mask secrets — return last 6 chars only
+    const mask = (s: string) => s ? '•'.repeat(Math.max(0, s.length - 6)) + s.slice(-6) : '';
+    res.json({
+      clientId: mask(config.clientId),
+      clientSecret: mask(config.clientSecret),
+      refreshToken: mask(config.refreshToken),
+      configured: true,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get Gmail config' });
+  }
+}
+
+export async function updateGmailConfig(req: Request, res: Response) {
+  try {
+    const { clientId, clientSecret, refreshToken } = req.body;
+    if (!clientId || !clientSecret || !refreshToken) {
+      return res.status(400).json({ error: 'clientId, clientSecret, and refreshToken are required' });
+    }
+
+    // If values contain mask chars (•), merge with existing — user didn't change that field
+    const existing = await agentRepository.getAgentConfig(GMAIL_CONFIG_KEY) as Record<string, string> | null;
+    const resolve = (newVal: string, field: string) =>
+      newVal.includes('•') && existing?.[field] ? existing[field] : newVal;
+
+    const merged = {
+      clientId: resolve(clientId, 'clientId'),
+      clientSecret: resolve(clientSecret, 'clientSecret'),
+      refreshToken: resolve(refreshToken, 'refreshToken'),
+    };
+
+    await agentRepository.saveAgentConfig(GMAIL_CONFIG_KEY, merged, (req as any).userId);
+    logger.info('[agent-api] Gmail OAuth credentials updated');
+    res.json({ configured: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to save Gmail config' });
+  }
+}
+
+export async function deleteGmailConfig(req: Request, res: Response) {
+  try {
+    await agentRepository.saveAgentConfig(GMAIL_CONFIG_KEY, {}, (req as any).userId);
+    logger.info('[agent-api] Gmail OAuth credentials removed');
+    res.json({ configured: false });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to remove Gmail config' });
+  }
+}
+
 // ── Templates ────────────────────────────────────────────────────────────────
 
 export async function listTemplates(req: Request, res: Response) {

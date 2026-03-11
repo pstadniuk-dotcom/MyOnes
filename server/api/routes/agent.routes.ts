@@ -25,6 +25,9 @@ import {
   getConfig,
   updateConfig,
   resetConfig,
+  getGmailConfig,
+  updateGmailConfig,
+  deleteGmailConfig,
   getProfile,
   updateProfile,
   resetProfile,
@@ -68,6 +71,11 @@ router.get('/runs/:id', getRun);
 router.get('/config', getConfig);
 router.put('/config', updateConfig);
 router.post('/config/reset', resetConfig);
+
+// Gmail OAuth
+router.get('/gmail-config', getGmailConfig);
+router.put('/gmail-config', updateGmailConfig);
+router.delete('/gmail-config', deleteGmailConfig);
 
 // Founder Profile
 router.get('/profile', getProfile);
