@@ -19,12 +19,12 @@ const personas = [
   {
     name: "Alex",
     age: 36,
-    video: "/Ones%20-%20Formulation%20Alex.mp4",
+    video: "/Ones - Formulation Alex.mp4",
   },
   {
     name: "Rachel",
     age: 34,
-    video: "/Ones%20-%20Rachel.mp4",
+    video: "/Ones - Rachel.mp4",
   },
 ];
 
@@ -225,6 +225,7 @@ export default function HeroSectionV2() {
             muted
             // playsInline
             autoPlay
+            loop
             disablePictureInPicture
             // controlsList="noplaybackrate nodownload"
             // onEnded={handleBgVideoEnded}
@@ -263,7 +264,7 @@ export default function HeroSectionV2() {
                 onClick={() => setActiveTab(idx)}
                 className={`flex-1 py-3.5 text-sm font-medium transition-all rounded-t-[16px] ${
                   idx === activeTab
-                    ? 'bg-[#f8f8f8] text-[#2f2f2f]'
+                    ? 'bg-[#f1f1f1] text-[#2f2f2f]'
                     : 'bg-[#f8f8f8]/[0.12] text-white/80 hover:bg-[#f8f8f8]/20 border border-white/25 border-b-0'
                 }`}
               >
@@ -273,7 +274,8 @@ export default function HeroSectionV2() {
           </div>
 
           {/* Video content area — plays inside the chat widget */}
-          <div className="bg-[#f8f8f8] rounded-b-[24px] overflow-hidden">
+          {/* <div className="bg-[#f8f8f8] rounded-b-[24px] overflow-hidden"> */}
+          <div className="bg-[#f1f1f1] rounded-b-[24px] overflow-hidden">
             <div className="relative h-[340px] sm:h-[380px]">
               {personas.map((persona, idx) => (
                 <video
