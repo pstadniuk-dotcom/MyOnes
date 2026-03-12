@@ -3,12 +3,13 @@ import { Button } from '@/shared/components/ui/button';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/shared/components/ui/dialog';
 import { Progress } from '@/shared/components/ui/progress';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Separator } from '@/shared/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/avatar';
+import type { UserConsent } from '@shared/schema';
 import {
   Send, Upload, User, AlertTriangle, CheckCircle, Sparkles, FileText,
   History, Download, Search, Plus, RotateCcw, Copy, Share2, Mic,
@@ -234,6 +235,8 @@ export default function ConsultationPage() {
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [showConsentDialog, setShowConsentDialog] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   // Inline capsule selection state (tracks which message has active selection)
   const [selectingCapsuleMessageId, setSelectingCapsuleMessageId] = useState<string | null>(null);
@@ -396,6 +399,16 @@ export default function ConsultationPage() {
     retry: false,
   });
   const hasConnectedWearable = wearableConnections.some(c => c.status === 'connected');
+
+  const { data: consents, error: consentsError } = useQuery<UserConsent[]>({
+    queryKey: ['/api/consents'],
+    enabled: !!user?.id,
+    retry: 1,
+  });
+
+  const hasLabDataConsent = consentsError ? false : (consents?.some(
+    consent => consent.consentType === 'lab_data_processing' && !consent.revokedAt
+  ) ?? false);
 
   // Persist current session ID to localStorage whenever it changes
   useEffect(() => {
@@ -1083,8 +1096,7 @@ export default function ConsultationPage() {
     fileInputRef.current?.click();
   }, []);
 
-  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
+  const processUploadFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
 
     setIsUploading(true);
@@ -1179,11 +1191,52 @@ export default function ConsultationPage() {
     } finally {
       setIsUploading(false);
       // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [user?.id, toast]);
+
+  const grantConsentMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/consents/grant', {
+        consentType: 'lab_data_processing',
+        granted: true,
+        consentVersion: '1.0',
+        consentText: 'User consents to lab data processing for personalized supplement recommendations'
+      });
+      return await response.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/consents'] });
+      setShowConsentDialog(false);
+      if (pendingFiles.length > 0) {
+        await processUploadFiles(pendingFiles);
+        setPendingFiles([]);
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Consent failed", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    if (hasLabDataConsent) {
+      await processUploadFiles(files);
+      if (event.target) {
+        event.target.value = '';
+      }
+    } else {
+      setPendingFiles(files);
+      setShowConsentDialog(true);
       if (event.target) {
         event.target.value = '';
       }
     }
-  }, [user?.id, toast]);
+  }, [hasLabDataConsent, processUploadFiles]);
 
   // Handle suggested prompt selection
   const handlePromptSelect = useCallback((prompt: SuggestedPrompt) => {
@@ -2405,6 +2458,39 @@ export default function ConsultationPage() {
               Yes, Delete
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Consent Dialog */}
+      <Dialog open={showConsentDialog} onOpenChange={setShowConsentDialog}>
+        <DialogContent data-testid="dialog-consent">
+          <DialogHeader>
+            <DialogTitle>Consent to Process Health Data</DialogTitle>
+            <DialogDescription>
+              To upload and analyze your lab results, we need your consent to process your health information.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm">By providing consent, you agree to allow Ones AI to:</p>
+            <ul className="text-sm space-y-2 ml-4 list-disc">
+              <li>Process and analyze your uploaded lab results</li>
+              <li>Use this data to create personalized supplement recommendations</li>
+              <li>Store your health information securely</li>
+              <li>Use this data to optimize your formula over time</li>
+            </ul>
+            <p className="text-sm text-muted-foreground">
+              Your data is stored with encryption and not shared with third parties. You can revoke this consent at any time from your privacy settings.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowConsentDialog(false); setPendingFiles([]); if (fileInputRef.current) fileInputRef.current.value = ''; }} data-testid="button-consent-cancel">
+              Cancel
+            </Button>
+            <Button onClick={() => grantConsentMutation.mutate()} disabled={grantConsentMutation.isPending} data-testid="button-consent-agree">
+              {grantConsentMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              I Consent
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
