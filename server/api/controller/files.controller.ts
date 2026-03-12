@@ -58,7 +58,9 @@ export class FilesController {
         } catch (error) {
             logger.error('File upload error:', error);
             const message = error instanceof Error ? error.message : 'Failed to upload file';
-            if (message.includes('File too large') || message.includes('Invalid file')) {
+            if (message.includes('Missing required consents')) {
+                res.status(403).json({ error: message });
+            } else if (message.includes('File too large') || message.includes('Invalid file')) {
                 res.status(400).json({ error: message });
             } else {
                 res.status(500).json({ error: 'Failed to upload file', details: message });
