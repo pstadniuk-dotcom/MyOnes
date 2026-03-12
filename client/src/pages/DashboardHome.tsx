@@ -14,7 +14,6 @@ import {
   PlayCircle,
   TrendingUp,
   Bell,
-  Crown,
   X,
 } from 'lucide-react';
 import { Link } from 'wouter';
@@ -185,13 +184,6 @@ export default function HomePage() {
   const { data: dashboardData, isLoading } = useQuery<DashboardData>({
     queryKey: ['/api', 'dashboard'],
   });
-
-  const { data: myMembership } = useQuery<{ hasMembership: boolean; isCancelled?: boolean; tierName?: string; priceCents?: number }>({
-    queryKey: ['/api/membership/me'],
-    enabled: !!user,
-  });
-
-  const hasActiveMembership = !!myMembership?.hasMembership && !myMembership?.isCancelled;
 
   if (isLoading) {
     return <HomeSkeleton />;
@@ -552,29 +544,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Membership CTA — shown to non-members */}
-      {!hasActiveMembership && (
-        <Card className="bg-gradient-to-br from-[#054700] to-[#0a5c00] border-0 text-white overflow-hidden">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
-                <Crown className="w-5 h-5 text-[#D4A574]" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold mb-1 text-white">Become a Member</h3>
-                <p className="text-sm text-white/70 mb-3">
-                  Get 15% off every supplement order, unlimited AI consultations, lab analysis, and lock in your rate forever.
-                </p>
-                <Button asChild size="sm" className="bg-white text-[#054700] hover:bg-white/90 rounded-full font-medium">
-                  <Link href="/membership">
-                    View Membership
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
       {/* Promotional/Info Section - V2 Styled */}
       {!isNewUser && (
