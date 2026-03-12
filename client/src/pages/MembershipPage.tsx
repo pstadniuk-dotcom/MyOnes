@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { Check, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
@@ -17,14 +16,6 @@ interface MembershipTier {
   benefits: string[];
 }
 
-type Plan = 'monthly' | 'quarterly' | 'annual';
-
-const PLAN_OPTIONS: { key: Plan; label: string; discount: number; intervalCount: number }[] = [
-  { key: 'monthly',   label: 'Monthly',   discount: 0,    intervalCount: 1  },
-  { key: 'quarterly', label: 'Quarterly', discount: 0.10, intervalCount: 3  },
-  { key: 'annual',    label: 'Annual',    discount: 0.15, intervalCount: 12 },
-];
-
 const MEMBERSHIP_BENEFITS = [
   'Unlimited AI health consultations',
   'Lab and wearable data analysis',
@@ -34,17 +25,7 @@ const MEMBERSHIP_BENEFITS = [
   'Future platform upgrades included',
 ];
 
-function planPrice(priceCents: number, plan: Plan): { perMonth: number; total: number; label: string } {
-  const opt = PLAN_OPTIONS.find(p => p.key === plan)!;
-  const monthlyBase = priceCents / 100;
-  const total = Math.round(monthlyBase * opt.intervalCount * (1 - opt.discount));
-  const perMonth = Math.round((total / opt.intervalCount) * 100) / 100;
-  const label = plan === 'monthly' ? '/mo' : plan === 'quarterly' ? '/quarter' : '/year';
-  return { perMonth, total, label };
-}
-
 export default function MembershipPage() {
-  const [plan, setPlan] = useState<Plan>('monthly');
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -60,7 +41,7 @@ export default function MembershipPage() {
 
   const checkoutMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/billing/checkout/session', { plan });
+      const res = await apiRequest('POST', '/api/billing/checkout/session', { plan: 'monthly' });
       const data = await res.json();
       return data as { checkoutUrl: string; sessionId: string; expiresAt: string };
     },
@@ -104,7 +85,7 @@ export default function MembershipPage() {
     );
   }
 
-  const { perMonth, total, label } = planPrice(activeTier.priceCents, plan);
+  const monthlyPrice = activeTier.priceCents / 100;
   const spotsRemaining = activeTier.maxCapacity - activeTier.currentCount;
   const tierLabel = activeTier.name.replace(' Member', '').replace(' Adopter', '');
 
@@ -131,35 +112,8 @@ export default function MembershipPage() {
             🎉 {tierLabel} Member
           </div>
           <div className="flex items-baseline justify-center gap-1">
-            <span className="text-5xl font-light text-white">${plan === 'monthly' ? perMonth : `${total}`}</span>
-            <span className="text-white/60">{label}</span>
-          </div>
-          {plan !== 'monthly' && (
-            <p className="mt-2 text-white/60 text-sm">${perMonth}/mo effective</p>
-          )}
-        </div>
-
-        {/* Plan selector */}
-        <div className="px-8 pt-6">
-          <div className="flex rounded-full border border-[#054700]/20 p-1 gap-1">
-            {PLAN_OPTIONS.map(opt => (
-              <button
-                key={opt.key}
-                onClick={() => setPlan(opt.key)}
-                className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
-                  plan === opt.key
-                    ? 'bg-[#054700] text-white'
-                    : 'text-[#5a6623] hover:text-[#054700]'
-                }`}
-              >
-                {opt.label}
-                {opt.discount > 0 && (
-                  <span className={`ml-1 text-xs ${plan === opt.key ? 'text-white/70' : 'text-[#D4A574]'}`}>
-                    −{opt.discount * 100}%
-                  </span>
-                )}
-              </button>
-            ))}
+            <span className="text-5xl font-light text-white">${monthlyPrice}</span>
+            <span className="text-white/60">/mo</span>
           </div>
         </div>
 

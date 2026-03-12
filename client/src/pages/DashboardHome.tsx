@@ -544,6 +544,8 @@ export default function HomePage() {
         </div>
       )}
 
+
+
       {/* Promotional/Info Section - V2 Styled */}
       {!isNewUser && (
         <Card className="bg-gradient-to-br from-[#054700]/10 to-[#5a6623]/5 border-[#054700]/20">

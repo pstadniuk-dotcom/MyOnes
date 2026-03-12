@@ -18,10 +18,10 @@ interface MembershipTier {
 
 // Fallback tiers if API fails
 const fallbackTiers = [
-  { id: 'founding', name: 'Founding', limit: 250, claimed: 0, priceMonthly: 9, priceYearly: 99, active: true },
-  { id: 'early', name: 'Early', limit: 500, claimed: 0, priceMonthly: 15, priceYearly: 149, active: false },
-  { id: 'beta', name: 'Beta', limit: 2000, claimed: 0, priceMonthly: 19, priceYearly: 199, active: false },
-  { id: 'standard', name: 'Standard', limit: null as number | null, claimed: 0, priceMonthly: 29, priceYearly: 299, active: false },
+  { id: 'founding', name: 'Founding', limit: 250, claimed: 0, priceMonthly: 9, active: true },
+  { id: 'early', name: 'Early', limit: 500, claimed: 0, priceMonthly: 15, active: false },
+  { id: 'beta', name: 'Beta', limit: 2000, claimed: 0, priceMonthly: 19, active: false },
+  { id: 'standard', name: 'Standard', limit: null as number | null, claimed: 0, priceMonthly: 29, active: false },
 ];
 
 // Supplement pricing factors
@@ -41,7 +41,6 @@ function transformTiers(apiTiers: MembershipTier[]) {
     limit: tier.maxCapacity >= 999999 ? null : tier.maxCapacity,
     claimed: tier.currentCount,
     priceMonthly: tier.priceCents / 100,
-    priceYearly: Math.round((tier.priceCents / 100) * 10.5), // ~12.5% annual discount
     active: false, // Will be set below
   }));
 }
@@ -215,13 +214,6 @@ export default function MembershipPricingSection() {
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-
-              <div className="mt-5 text-center">
-                <p className="text-sm text-[#054700]/60">
-                  Or pay annually: <span className="font-medium text-[#054700]">${activeTier.priceYearly}/year</span>
-                  <span className="text-[#5a6623]"> (save ${activeTier.priceMonthly * 12 - activeTier.priceYearly})</span>
-                </p>
-              </div>
 
               <div className="mt-5 pt-5 border-t border-[#054700]/10 text-center">
                 <p className="text-xs text-[#054700]/50">
