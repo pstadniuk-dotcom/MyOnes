@@ -60,7 +60,7 @@ export default function ScienceSection() {
     "Tell me about YOUR health",
     "What medications?",
     "Builds YOUR formula",
-    "200+ ingredients to choose from",
+    "150+ ingredients to choose from",
     "Evolves every refill"
   ];
 

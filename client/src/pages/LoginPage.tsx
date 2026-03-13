@@ -44,7 +44,7 @@ export default function LoginPage() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Home
             </Link>
-            <h1 className="text-2xl font-bold">Ones</h1>
+            <img src="/ones-logo-light.svg" alt="Ones" className="h-7" />
           </div>
           <div className="text-center">
             <p className="text-muted-foreground">Welcome back to your health journey</p>

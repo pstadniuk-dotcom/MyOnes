@@ -1,5 +1,5 @@
 /**
- * ONES AI - Blog Article Generation Script
+ * Ones - Blog Article Generation Script
  * 
  * Usage:
  *   node scripts/generate-articles.cjs                    # Seed 10 starter articles (no API cost)
@@ -70,7 +70,7 @@ async function insertPost(client, post) {
       true,
       post.publishedAt ?? new Date(),
       new Date(),
-      'ONES AI Editorial Team',
+      'Ones Editorial Team',
       0,
     ]
   );
@@ -84,7 +84,7 @@ const SEED_ARTICLES = [
   {
     slug: 'personalized-supplements-vs-generic-vitamins',
     title: 'Personalized Supplements vs Generic Vitamins: Why One Size Never Fits All',
-    metaTitle: 'Personalized Supplements vs Generic Vitamins | ONES AI',
+    metaTitle: 'Personalized Supplements vs Generic Vitamins | Ones',
     metaDescription: 'Generic multivitamins often miss what your body actually needs. Discover the science behind personalized supplement formulas and why biomarker-driven nutrition works better.',
     excerpt: 'Generic multivitamins are designed for the "average" person — a statistical abstraction. Here\'s why personalized formulas built around your actual biomarkers deliver measurably better outcomes.',
     category: 'science',
@@ -133,9 +133,9 @@ A 2021 meta-analysis in *Nutrients* found that personalized micronutrient interv
 
 **Problem 4: Missing what you actually need.** If your bloodwork shows optimal B12 but severe vitamin D deficiency, a multivitamin giving you extra B12 while under-dosing D3 is actively unhelpful.
 
-## The ONES AI Approach
+## The Ones Approach
 
-ONES AI builds personalized supplement formulas by integrating:
+Ones builds personalized supplement formulas by integrating:
 
 1. **Lab data** — Uploaded blood panel results, analyzed by AI to identify deficiencies and sub-optimal ranges
 2. **Health questionnaire** — Symptoms, goals, medications, diet, sleep, stress, and exercise patterns
@@ -149,7 +149,7 @@ The result is a single supplement formula — one capsule pack — engineered sp
 If you're ready to move beyond generic supplementation:
 
 1. Get a comprehensive blood panel (your GP can order this, or use a direct-to-consumer service)
-2. Upload your results to ONES AI
+2. Upload your results to Ones
 3. Have a conversation with our AI health practitioner about your goals and symptoms
 4. Receive a custom formula with transparent ingredient rationale
 
@@ -159,7 +159,7 @@ Your health is too specific to settle for average.`,
   {
     slug: 'ashwagandha-benefits-dosage-evidence',
     title: 'Ashwagandha Benefits, Dosage & Evidence: What 50+ Clinical Trials Show',
-    metaTitle: 'Ashwagandha Benefits & Dosage: Clinical Evidence 2024 | ONES AI',
+    metaTitle: 'Ashwagandha Benefits & Dosage: Clinical Evidence 2024 | Ones',
     metaDescription: 'Ashwagandha is one of the most researched adaptogens — but the evidence is more nuanced than the hype. Here\'s what 50+ clinical trials actually show about benefits, optimal dosage, and who it helps most.',
     excerpt: 'Ashwagandha (Withania somnifera) has become one of the world\'s best-selling supplements. But does the evidence match the marketing? Here\'s what the clinical research actually shows.',
     category: 'ingredients',
@@ -251,9 +251,9 @@ Based on clinical evidence, ashwagandha delivers the most significant benefits f
 
 If your lab results show normal cortisol and testosterone, the benefits will be more modest.
 
-## How ONES AI Uses Ashwagandha
+## How Ones Uses Ashwagandha
 
-In ONES AI formulas, ashwagandha is included at 600 mg (KSM-66-equivalent standardized extract) when:
+In Ones formulas, ashwagandha is included at 600 mg (KSM-66-equivalent standardized extract) when:
 
 - Lab markers suggest adrenal or HPA-axis dysregulation
 - Health questionnaire indicates high stress, anxiety, sleep disruption, or exercise performance goals
@@ -265,7 +265,7 @@ We don't include it by default — it's targeted to the people for whom clinical
   {
     slug: 'magnesium-types-benefits-which-form-to-take',
     title: 'The 7 Types of Magnesium: Which Form Should You Actually Take?',
-    metaTitle: 'Magnesium Types Explained: Glycinate, Malate, Oxide & More | ONES AI',
+    metaTitle: 'Magnesium Types Explained: Glycinate, Malate, Oxide & More | Ones',
     metaDescription: 'Magnesium glycinate vs oxide vs malate vs citrate — not all forms are equal. Learn which type of magnesium delivers the best absorption for sleep, anxiety, muscle recovery, and energy.',
     excerpt: 'Magnesium deficiency affects up to 80% of Americans, yet most people take the wrong form. Here\'s a definitive guide to magnesium types, absorption rates, and clinical applications.',
     category: 'ingredients',
@@ -299,7 +299,7 @@ Clinical applications:
 - **Anxiety:** Magnesium modulates GABA receptors and reduces NMDA receptor activation — the same pathways targeted by many anxiolytics
 - **Muscle cramps:** Effective for exercise-induced cramps and RLS (restless leg syndrome)
 
-This is the form ONES AI uses most frequently for general magnesium supplementation.
+This is the form Ones uses most frequently for general magnesium supplementation.
 
 ### 2. Magnesium Malate
 
@@ -388,9 +388,9 @@ Subclinical magnesium deficiency produces symptoms like:
 
 **Testing:** Serum magnesium is poorly sensitive (only ~1% of body magnesium is in the blood). RBC magnesium is a better indicator. A DUTCH Complete or comprehensive micronutrient panel provides the most accurate picture.
 
-## ONES AI's Magnesium Protocol
+## Ones's Magnesium Protocol
 
-ONES AI default magnesium form is bisglycinate at 400 mg/day. We adjust based on:
+Ones default magnesium form is bisglycinate at 400 mg/day. We adjust based on:
 
 - Lab-confirmed deficiency severity
 - Primary symptom cluster (sleep vs fatigue vs cognitive vs cardiovascular)
@@ -401,7 +401,7 @@ ONES AI default magnesium form is bisglycinate at 400 mg/day. We adjust based on
   {
     slug: 'vitamin-d3-k2-optimal-levels-dosage',
     title: 'Vitamin D3 + K2: The Combination Your Bones and Heart Actually Need',
-    metaTitle: 'Vitamin D3 and K2: Why Take Them Together? Benefits & Dosage | ONES AI',
+    metaTitle: 'Vitamin D3 and K2: Why Take Them Together? Benefits & Dosage | Ones',
     metaDescription: 'Vitamin D3 alone may not be enough — and without K2, high-dose D3 supplementation can backfire. Here\'s the science behind D3+K2 synergy for bone density, cardiovascular health, and immune function.',
     excerpt: 'You\'ve heard vitamin D is critical — and it is. But supplementing D3 without K2 is like building a house without the wiring. Here\'s why they work together, and how to dose both correctly.',
     category: 'ingredients',
@@ -473,7 +473,7 @@ Vitamin K2 exists in multiple forms, the two most studied being:
 - Better evidence for cardiovascular protection
 - The preferred form for daily supplementation
 
-**MK-7 at 100-200 mcg/day** is the optimal form for co-supplementation with D3 and is used in ONES AI formulas.
+**MK-7 at 100-200 mcg/day** is the optimal form for co-supplementation with D3 and is used in Ones formulas.
 
 ## Recommended Dosing Protocol
 
@@ -492,7 +492,7 @@ Vitamin K2 exists in multiple forms, the two most studied being:
 
 **Timing:** Both D3 and K2 are fat-soluble — take with your fattiest meal of the day for optimal absorption.
 
-**Magnesium note:** Vitamin D metabolism requires magnesium as a cofactor. If you're supplementing both without adequate magnesium, D3 conversion to its active form (calcitriol) may be impaired. The ONES AI formula approach always considers this triad: D3 + K2 + Mg.
+**Magnesium note:** Vitamin D metabolism requires magnesium as a cofactor. If you're supplementing both without adequate magnesium, D3 conversion to its active form (calcitriol) may be impaired. The Ones formula approach always considers this triad: D3 + K2 + Mg.
 
 ## Who Needs This Combination Most
 
@@ -515,7 +515,7 @@ The D3+K2 combination is particularly critical for:
   {
     slug: 'omega-3-fish-oil-benefits-epa-dha-ratio',
     title: 'Omega-3 Fish Oil: EPA vs DHA, the Right Dose, and Why Quality Matters',
-    metaTitle: 'Omega-3 Benefits: EPA vs DHA Ratio & Dosage Guide | ONES AI',
+    metaTitle: 'Omega-3 Benefits: EPA vs DHA Ratio & Dosage Guide | Ones',
     metaDescription: 'Not all fish oil is equal. Discover the science-backed difference between EPA and DHA, optimal dosage for heart, brain, and inflammation, and how to spot a quality omega-3 supplement.',
     excerpt: 'Omega-3 is one of the most studied supplements in clinical medicine. But the EPA:DHA ratio, dose, and oxidation status of your supplement determines whether you\'re getting benefits or just rancid fish burps.',
     category: 'ingredients',
@@ -601,9 +601,9 @@ Fish oil is one of the most adulterated and oxidized supplements on the market. 
 
 **Source**: Wild-caught small fish (sardines, anchovies, mackerel) have less bioaccumulation of heavy metals than large predatory fish.
 
-## ONES AI's Omega-3 Protocol
+## Ones's Omega-3 Protocol
 
-ONES AI includes high-quality omega-3 at 2g EPA+DHA/day (2:1 EPA:DHA ratio, high-concentration triglyceride form) when:
+Ones includes high-quality omega-3 at 2g EPA+DHA/day (2:1 EPA:DHA ratio, high-concentration triglyceride form) when:
 
 - Inflammatory markers (hs-CRP, homocysteine) are elevated
 - Triglycerides are above optimal
@@ -617,7 +617,7 @@ The dose adjusts upward (to 3-4g) when triglyceride reduction or clinically sign
   {
     slug: 'coq10-ubiquinol-benefits-dosage-heart-energy',
     title: 'CoQ10 vs Ubiquinol: Which Form Works? Energy, Heart Health & Dosage',
-    metaTitle: 'CoQ10 vs Ubiquinol: Benefits, Dosage & Best Form | ONES AI',
+    metaTitle: 'CoQ10 vs Ubiquinol: Benefits, Dosage & Best Form | Ones',
     metaDescription: 'CoQ10 is essential for cellular energy — but are you taking the right form? Discover the clinical difference between CoQ10 and ubiquinol, optimal dosage for heart health, and who benefits most.',
     excerpt: 'CoQ10 is one of the most evidence-backed supplements for heart health and mitochondrial energy production. But the difference between CoQ10 and ubiquinol can make or break its effectiveness.',
     category: 'ingredients',
@@ -709,9 +709,9 @@ CoQ10 is exceptionally well-tolerated. Side effects are rare at standard doses:
 - May reduce warfarin effect (monitor INR if on anticoagulation)
 - No upper tolerable limit established; doses up to 1,200 mg/day have been studied safely
 
-## ONES AI CoQ10 Protocol
+## Ones CoQ10 Protocol
 
-ONES AI includes CoQ10 at 200-300 mg/day (ubiquinol form) when:
+Ones includes CoQ10 at 200-300 mg/day (ubiquinol form) when:
 - Patient is on a statin
 - Age >50 or significant fatigue/energy complaints
 - Cardiovascular risk markers are elevated
@@ -722,7 +722,7 @@ ONES AI includes CoQ10 at 200-300 mg/day (ubiquinol form) when:
   {
     slug: 'adrenal-support-system-cortisol-stress',
     title: 'Adrenal Support: Signs of HPA Axis Dysfunction and How to Address It',
-    metaTitle: 'Adrenal Support & Cortisol Balance: Symptoms & Supplements | ONES AI',
+    metaTitle: 'Adrenal Support & Cortisol Balance: Symptoms & Supplements | Ones',
     metaDescription: 'Adrenal fatigue remains controversial, but HPA axis dysfunction is real. Learn the signs of dysregulated cortisol, which labs to order, and which supplements have clinical evidence for adrenal support.',
     excerpt: 'The term "adrenal fatigue" is controversial, but HPA axis dysregulation is well-documented. Here\'s how to identify it, test for it, and which targeted supplements have evidence behind them.',
     category: 'system-supports',
@@ -816,9 +816,9 @@ B5 is required for synthesis of coenzyme A, which is essential for cortisol and 
 ### Licorice Root — Targeted Use
 Licorice root's active compound (glycyrrhizin) inhibits the enzyme that converts active cortisol to inactive cortisone, effectively increasing cortisol availability. This is only appropriate for those with confirmed low cortisol output (not for elevated cortisol). Use with caution — can raise blood pressure and should not be used long-term without monitoring.
 
-## ONES AI Adrenal Support Formula
+## Ones Adrenal Support Formula
 
-The ONES AI Adrenal Support system includes:
+The Ones Adrenal Support system includes:
 
 - Ashwagandha (KSM-66) — 600 mg: primary HPA axis modulator
 - Rhodiola rosea — 400 mg: fatigue and burnout support
@@ -833,7 +833,7 @@ This formula is activated when health questionnaire and lab data suggest HPA axi
   {
     slug: 'thyroid-support-hashimotos-hypothyroid-supplements',
     title: 'Thyroid Support: Evidence-Based Supplements for Hypothyroid and Hashimoto\'s',
-    metaTitle: 'Thyroid Support Supplements for Hypothyroid & Hashimoto\'s | ONES AI',
+    metaTitle: 'Thyroid Support Supplements for Hypothyroid & Hashimoto\'s | Ones',
     metaDescription: 'Thyroid dysfunction affects 1 in 8 women. Discover which nutrients are clinically supported for thyroid health, what labs to order beyond TSH, and the Hashimoto\'s supplement protocol.',
     excerpt: 'Thyroid dysfunction is one of the most under-tested and under-treated conditions in conventional medicine. Here\'s the nutrient evidence base, the right labs to order, and what actually works.',
     category: 'system-supports',
@@ -916,7 +916,7 @@ Magnesium supports T4-to-T3 conversion and is required for over 300 thyroid-rela
 
 ### Ashwagandha — Pilot Evidence Only
 
-A small 2017 study found 600 mg/day ashwagandha increased T3 and T4 levels in subclinical hypothyroid patients. The mechanism is unclear, and this requires larger trials before strong clinical recommendations can be made. ONES AI includes ashwagandha in thyroid support protocols where HPA axis dysregulation co-exists, not specifically for thyroid hormone production.
+A small 2017 study found 600 mg/day ashwagandha increased T3 and T4 levels in subclinical hypothyroid patients. The mechanism is unclear, and this requires larger trials before strong clinical recommendations can be made. Ones includes ashwagandha in thyroid support protocols where HPA axis dysregulation co-exists, not specifically for thyroid hormone production.
 
 ### Myo-Inositol (With Selenium) — Hashimoto's Specific
 
@@ -929,7 +929,7 @@ A 2013 Italian study found the combination of selenium (83 mcg/day) + myo-inosit
 - **Gluten** — Not universally necessary, but celiac disease and NCGS (non-celiac gluten sensitivity) are significantly associated with Hashimoto's; trial elimination is clinically reasonable for those with positive antibodies
 - **Excess soy** — Isoflavones inhibit TPO activity; avoid consuming large quantities in close proximity to thyroid medication
 
-## ONES AI Thyroid Support Formula
+## Ones Thyroid Support Formula
 
 Activated when labs or symptoms indicate thyroid dysfunction:
 
@@ -944,15 +944,15 @@ Activated when labs or symptoms indicate thyroid dysfunction:
 
   {
     slug: 'ones-ai-vs-ritual-vs-care-of-personalized-vitamins',
-    title: 'ONES AI vs Ritual vs Care/Of: How Personalized Are Personalized Vitamins Actually?',
-    metaTitle: 'ONES AI vs Ritual vs Care/Of Comparison: Which Is More Personalized? | ONES AI',
-    metaDescription: 'We compare the top personalized supplement platforms — ONES AI, Ritual, and Care/Of — on personalization depth, ingredient quality, AI capabilities, and value. The differences are greater than you think.',
-    excerpt: 'The personalized vitamin market has exploded, but "personalized" means very different things. Here\'s a head-to-head comparison of ONES AI, Ritual, and Care/Of — and why the personalization gap matters for outcomes.',
+    title: 'Ones vs Ritual vs Care/Of: How Personalized Are Personalized Vitamins Actually?',
+    metaTitle: 'Ones vs Ritual vs Care/Of Comparison: Which Is More Personalized? | Ones',
+    metaDescription: 'We compare the top personalized supplement platforms — Ones, Ritual, and Care/Of — on personalization depth, ingredient quality, AI capabilities, and value. The differences are greater than you think.',
+    excerpt: 'The personalized vitamin market has exploded, but "personalized" means very different things. Here\'s a head-to-head comparison of Ones, Ritual, and Care/Of — and why the personalization gap matters for outcomes.',
     category: 'comparisons',
-    tags: ['personalized vitamins comparison', 'Ritual vitamins', 'Care/Of supplements', 'ONES AI', 'custom supplements'],
+    tags: ['personalized vitamins comparison', 'Ritual vitamins', 'Care/Of supplements', 'Ones', 'custom supplements'],
     tier: 'comparisons',
     primaryKeyword: 'personalized vitamin supplements comparison',
-    secondaryKeywords: ['ONES AI vs Ritual', 'Care/Of review', 'best personalized vitamin brand', 'custom supplement formula'],
+    secondaryKeywords: ['Ones vs Ritual', 'Care/Of review', 'best personalized vitamin brand', 'custom supplement formula'],
     internalLinks: ['/blog/personalized-supplements-vs-generic-vitamins', '/blog/ashwagandha-benefits-dosage-evidence'],
     content: `## The Personalized Vitamin Boom
 
@@ -998,15 +998,15 @@ However:
 
 **Best for:** People who want a more intelligent recommendation than Random Multivitamin #4 but don't have or want to use lab data.
 
-## ONES AI: Lab-Integrated, AI-Driven Formula Creation
+## Ones: Lab-Integrated, AI-Driven Formula Creation
 
-**What makes ONES AI different:**
+**What makes Ones different:**
 
-**Lab data integration**: ONES AI accepts uploaded blood panel results and uses AI to analyze biomarkers against optimal ranges — not just "normal" lab ranges, which are population-based and often indicate the average of a suboptimal population. If your ferritin is 15 ng/mL (technically "normal" by most labs but functionally low for most women), ONES AI will flag and address it.
+**Lab data integration**: Ones accepts uploaded blood panel results and uses AI to analyze biomarkers against optimal ranges — not just "normal" lab ranges, which are population-based and often indicate the average of a suboptimal population. If your ferritin is 15 ng/mL (technically "normal" by most labs but functionally low for most women), Ones will flag and address it.
 
-**Full intake conversation**: Rather than a static questionnaire, ONES AI uses a conversational AI interface. This allows follow-up questions, clarification, and exploration of symptom patterns that a checkbox questionnaire misses.
+**Full intake conversation**: Rather than a static questionnaire, Ones uses a conversational AI interface. This allows follow-up questions, clarification, and exploration of symptom patterns that a checkbox questionnaire misses.
 
-**Formula construction from 200+ ingredients**: ONES AI doesn't select from pre-built options — it builds a formula from an ingredient catalog of over 200 individual nutrients, each with validated dosing ranges and clinical evidence. The formula is unique to you, down to the dose of each ingredient.
+**Formula construction from 200+ ingredients**: Ones doesn't select from pre-built options — it builds a formula from an ingredient catalog of over 200 individual nutrients, each with validated dosing ranges and clinical evidence. The formula is unique to you, down to the dose of each ingredient.
 
 **Capsule budget awareness**: Formulas are designed to fit within a specific daily capsule count (6, 9, or 12 capsules), with ingredient doses that sum to the capsule capacity. This ensures you receive a formula you'll realistically take.
 
@@ -1020,7 +1020,7 @@ However:
 
 ## Head-to-Head Comparison
 
-| Feature | ONES AI | Ritual | Care/Of |
+| Feature | Ones | Ritual | Care/Of |
 |---------|---------|--------|---------|
 | Lab data integration | ✅ Full | ❌ None | ❌ None |
 | AI-driven formula creation | ✅ Conversational AI | ❌ | ❌ Limited algorithm |
@@ -1037,7 +1037,7 @@ However:
 
 **Choose Care/Of** if you want a more thoughtful recommendation experience without lab data. Good for people new to targeted supplementation who want guidance beyond "take a centrum."
 
-**Choose ONES AI** if you have:
+**Choose Ones** if you have:
 - Specific documented deficiencies or health conditions
 - Blood test results you want analyzed and addressed
 - Complex health goals (hormonal, athletic, neurological, cardiovascular)
@@ -1050,7 +1050,7 @@ The difference isn't brand preference — it's the depth of personalization appr
   {
     slug: 'liver-support-detox-science-milk-thistle-nad',
     title: 'Liver Support: The Science Behind Detox, Milk Thistle, and NAD+ Precursors',
-    metaTitle: 'Liver Health Supplements: Milk Thistle, NAD+, TUDCA & More | ONES AI',
+    metaTitle: 'Liver Health Supplements: Milk Thistle, NAD+, TUDCA & More | Ones',
     metaDescription: 'Your liver performs 500+ functions and is your primary detoxification organ. Discover the clinical evidence for liver support supplements including milk thistle, TUDCA, NAC, and NAD+ precursors.',
     excerpt: '"Detox" is mostly marketing — but liver health is genuine medicine. Here\'s what the evidence shows about milk thistle, TUDCA, NAC, and NAD+ for liver protection and optimization.',
     category: 'system-supports',
@@ -1180,7 +1180,7 @@ Priority populations:
 5. **Chronic exposure to environmental toxins** — Agricultural workers, industrial environments
 6. **Post-viral syndromes** — Viral infections stress liver detoxification capacity
 
-## ONES AI Liver Support Protocol
+## Ones Liver Support Protocol
 
 Activated for relevant lab markers (elevated ALT/AST/GGT) or symptom patterns:
 
@@ -1215,7 +1215,7 @@ const ARTICLE_BRIEFS = {
     { slug: 'sleep-formula-supplements-insomnia', keyword: 'sleep supplements insomnia', title: 'Sleep Formula: The Supplement Stack for Insomnia and Poor Sleep Quality', category: 'system-supports' },
   ],
   comparisons: [
-    { slug: 'ones-ai-vs-thorne-lifeforce', keyword: 'personalized supplement comparison', title: 'ONES AI vs Thorne vs Lifeforce: Which Delivers the Most Personalized Care?', category: 'comparisons' },
+    { slug: 'ones-ai-vs-thorne-lifeforce', keyword: 'personalized supplement comparison', title: 'Ones vs Thorne vs Lifeforce: Which Delivers the Most Personalized Care?', category: 'comparisons' },
     { slug: 'ashwagandha-vs-rhodiola-adaptogen-comparison', keyword: 'ashwagandha vs rhodiola', title: 'Ashwagandha vs Rhodiola: Which Adaptogen Is Right for You?', category: 'comparisons' },
     { slug: 'magnesium-glycinate-vs-malate-vs-threonate', keyword: 'magnesium glycinate vs malate', title: 'Magnesium Glycinate vs Malate vs Threonate: Choosing the Right Form', category: 'comparisons' },
     { slug: 'coq10-vs-ubiquinol-comparison', keyword: 'CoQ10 vs ubiquinol difference', title: 'CoQ10 vs Ubiquinol: How They Differ and Which to Take After 40', category: 'comparisons' },
@@ -1231,11 +1231,11 @@ const ARTICLE_BRIEFS = {
 };
 
 // Standard safe CTA block — appended after every generated article.
-// Uses only verifiable, accurate ONES AI claims.
+// Uses only verifiable, accurate Ones claims.
 const GENERATED_ARTICLE_CTA = `
-## How ONES AI Personalizes Your Formula
+## How Ones Personalizes Your Formula
 
-Every ONES AI formula is built around *your* data — not population averages, generic recommendations, or marketing copy.
+Every Ones formula is built around *your* data — not population averages, generic recommendations, or marketing copy.
 
 When your lab results, health history, and symptom picture suggest a need in the area discussed above, our AI health practitioner will:
 
@@ -1254,7 +1254,7 @@ async function generateWithOpenAI(brief, openaiKey) {
   const { default: OpenAI } = await import('openai');
   const openai = new OpenAI({ apiKey: openaiKey });
 
-  const systemPrompt = `You are an expert clinical health writer for ONES AI, a personalized supplement platform.
+  const systemPrompt = `You are an expert clinical health writer for Ones, a personalized supplement platform.
 Write evidence-based, authoritative health articles that:
 - Are 1,800-2,500 words
 - Use markdown formatting (## headers, **bold**, bullet points)
@@ -1274,9 +1274,9 @@ CITATION REQUIREMENTS — mandatory, not optional:
 
 - CRITICAL: Do NOT write any section about ONES AI's specific protocol, formula, doses, or ingredients.
   The article must end after Safety Considerations, then the References section.
-  A standardized ONES AI CTA will be appended separately after generation.`;
+  A standardized Ones CTA will be appended separately after generation.`;
 
-  const userPrompt = `Write a comprehensive health article for ONES AI about: "${brief.title}"
+  const userPrompt = `Write a comprehensive health article for Ones about: "${brief.title}"
 Primary keyword: "${brief.keyword}"
 Category: ${brief.category}
 
@@ -1311,7 +1311,7 @@ Word count target: 1,800-2,200 words (body, excluding references). End with the 
   });
 
   const rawContent = response.choices[0].message.content ?? '';
-  // Always append the safe, accurate CTA — never rely on the model to write ONES AI claims
+  // Always append the safe, accurate CTA — never rely on the model to write Ones claims
   return rawContent.trimEnd() + '\n' + GENERATED_ARTICLE_CTA;
 }
 
@@ -1371,7 +1371,7 @@ async function main() {
           ...brief,
           content,
           excerpt: content.split('\n').find(l => l.length > 80 && !l.startsWith('#')) ?? '',
-          metaTitle: `${brief.title} | ONES AI`,
+          metaTitle: `${brief.title} | Ones`,
           metaDescription: content.split('\n').find(l => l.length > 80 && !l.startsWith('#') && !l.startsWith('-'))?.substring(0, 155) ?? '',
           wordCount,
           readTimeMinutes: Math.ceil(wordCount / 250),

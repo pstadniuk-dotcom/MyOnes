@@ -162,7 +162,7 @@ const emptyForm = (): PostForm => ({
   metaTitle: '',
   metaDescription: '',
   featuredImage: '',
-  authorName: 'Ones AI Editorial Team',
+  authorName: 'Ones Editorial Team',
   isPublished: false,
   readTimeMinutes: '5',
 });
@@ -180,7 +180,7 @@ function postToForm(p: BlogPost): PostForm {
     metaTitle: p.metaTitle ?? '',
     metaDescription: p.metaDescription ?? '',
     featuredImage: p.featuredImage ?? '',
-    authorName: p.authorName ?? 'Ones AI Editorial Team',
+    authorName: p.authorName ?? 'Ones Editorial Team',
     isPublished: p.isPublished,
     readTimeMinutes: String(p.readTimeMinutes ?? 5),
   };
@@ -202,7 +202,7 @@ function formToPayload(f: PostForm) {
     metaTitle: f.metaTitle.trim() || null,
     metaDescription: f.metaDescription.trim() || null,
     featuredImage: f.featuredImage.trim() || null,
-    authorName: f.authorName.trim() || 'Ones AI Editorial Team',
+    authorName: f.authorName.trim() || 'Ones Editorial Team',
     isPublished: f.isPublished,
     wordCount: wc,
     readTimeMinutes: parseInt(f.readTimeMinutes) || estimateReadTime(wc),
@@ -519,7 +519,7 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
         metaTitle: g.metaTitle ?? '',
         metaDescription: g.metaDescription ?? '',
         featuredImage: '',
-        authorName: g.authorName ?? 'Ones AI Editorial Team',
+        authorName: g.authorName ?? 'Ones Editorial Team',
         isPublished: false,
         readTimeMinutes: String(g.readTimeMinutes ?? 8),
       };
@@ -561,7 +561,7 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
             <div className="space-y-2">
               <Label>Additional Context / Topic Notes</Label>
               <Textarea
-                placeholder="e.g. Focus on magnesium glycinate vs other forms, include dosing info, mention that Ones AI incorporates magnesium in personalized formulas"
+                placeholder="e.g. Focus on magnesium glycinate vs other forms, include dosing info, mention that Ones incorporates magnesium in personalized formulas"
                 rows={3}
                 value={genForm.topic}
                 onChange={e => setGenForm(f => ({ ...f, topic: e.target.value }))}
@@ -1141,7 +1141,7 @@ function BulkGenerateView({ onBack }: { onBack: () => void }) {
           metaTitle: g.metaTitle ?? null,
           metaDescription: g.metaDescription ?? null,
           featuredImage: null,
-          authorName: 'Ones AI Editorial Team',
+          authorName: 'Ones Editorial Team',
           isPublished: false,
           wordCount: g.wordCount ?? 0,
           readTimeMinutes: g.readTimeMinutes ?? 8,

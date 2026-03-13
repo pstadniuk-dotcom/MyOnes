@@ -870,7 +870,7 @@ export default function WearablesPage() {
         </div>
       )}
 
-      {/* ── ONES AI Weekly Brief (connected only, hide when no data) ── */}
+      {/* ── ONES Weekly Brief (connected only, hide when no data) ── */}
       {activeConnections.length > 0 && (briefLoading || weeklyBrief) && (
         <Card className="border-[#5a6623]/10 shadow-2xl overflow-hidden">
           <CardHeader className="pb-1">

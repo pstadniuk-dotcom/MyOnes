@@ -121,6 +121,9 @@ export class FilesService {
             const mimeType = uploadedFile.mimetype;
             const fileName = uploadedFile.name;
 
+            // Record analysis start time
+            await filesRepository.updateFileUpload(fileId, { analysisStartedAt: new Date() } as any);
+
             void (async () => {
                 try {
                     logger.info(`✨ Analyzing lab report in background: ${fileName}`);
@@ -158,6 +161,8 @@ export class FilesService {
                             }
                         });
                         logger.info(`✅ Lab report analysis completed: ${fileName}`);
+                        // Record analysis completion time
+                        await filesRepository.updateFileUpload(fileId, { analysisCompletedAt: new Date() } as any);
                         // Send lab results ready notification
                         try {
                             const markerCount = labDataExtraction.extractedData?.length || 0;
@@ -198,8 +203,9 @@ export class FilesService {
                     logger.error('Lab report background analysis failed:', error);
                     if (fileId) {
                         await filesRepository.updateFileUpload(fileId, {
-                            labReportData: { analysisStatus: 'error' }
-                        });
+                            labReportData: { analysisStatus: 'error' },
+                            analysisCompletedAt: new Date(),
+                        } as any);
                     }
                 }
             })();
@@ -253,8 +259,10 @@ export class FilesService {
         // Trigger Re-analysis in background
         if (fileUpload.type === 'lab_report') {
             await filesRepository.updateFileUpload(fileId, {
-                labReportData: { analysisStatus: 'processing' }
-            });
+                labReportData: { analysisStatus: 'processing' },
+                analysisStartedAt: new Date(),
+                analysisCompletedAt: null,
+            } as any);
 
             void (async () => {
                 try {
@@ -277,12 +285,14 @@ export class FilesService {
                             }
                         });
                         logger.info(`✅ Lab report re-analysis completed: ${uploadedFile.name}`);
+                        await filesRepository.updateFileUpload(fileId, { analysisCompletedAt: new Date() } as any);
                     }
                 } catch (error) {
                     logger.error('Lab report analysis failed during update:', error);
                     await filesRepository.updateFileUpload(fileId, {
-                        labReportData: { analysisStatus: 'error' }
-                    });
+                        labReportData: { analysisStatus: 'error' },
+                        analysisCompletedAt: new Date(),
+                    } as any);
                 }
             })();
         }
@@ -338,8 +348,10 @@ export class FilesService {
             labReportData: {
                 ...((fileUpload.labReportData as any) || {}),
                 analysisStatus: 'processing'
-            }
-        });
+            },
+            analysisStartedAt: new Date(),
+            analysisCompletedAt: null,
+        } as any);
 
         void (async () => {
             try {
@@ -354,8 +366,9 @@ export class FilesService {
                 );
 
                 await filesRepository.updateFileUpload(fileId, {
-                    labReportData: { ...labData, analysisStatus: 'completed', markerInsights }
-                });
+                    labReportData: { ...labData, analysisStatus: 'completed', markerInsights },
+                    analysisCompletedAt: new Date(),
+                } as any);
 
                 // Send lab re-analysis notification
                 try {
@@ -380,8 +393,9 @@ export class FilesService {
                     labReportData: {
                         ...((fileUpload.labReportData as any) || {}),
                         analysisStatus: 'error'
-                    }
-                });
+                    },
+                    analysisCompletedAt: new Date(),
+                } as any);
             }
         })();
 
@@ -400,6 +414,20 @@ export class FilesService {
             throw new Error('Failed to delete file');
         }
         return true;
+    }
+
+    async bulkDeleteFiles(fileIds: string[], userId: string) {
+        const results: { id: string; success: boolean; error?: string }[] = [];
+        for (const fileId of fileIds) {
+            try {
+                await this.deleteFile(fileId, userId);
+                results.push({ id: fileId, success: true });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Unknown error';
+                results.push({ id: fileId, success: false, error: message });
+            }
+        }
+        return results;
     }
 }
 

@@ -6,7 +6,7 @@ const helpArticlesData = [
   {
     category: 'Getting Started',
     title: 'Creating Your Account and Setting Up Your Profile',
-    content: `Welcome to Ones AI! Creating your account takes just a few minutes. The more complete your profile, the better your personalized supplement recommendations will be.
+    content: `Welcome to Ones! Creating your account takes just a few minutes. The more complete your profile, the better your personalized supplement recommendations will be.
 
 CREATING YOUR ACCOUNT
 
@@ -217,7 +217,7 @@ Email support@ones.health for detailed ingredient information or safety question
   {
     category: 'Formula & Health',
     title: 'How to Adjust Your Formula Over Time',
-    content: `Your health needs change over time. Ones AI makes it easy to adjust your formula as your goals, health status, or lab results change.
+    content: `Your health needs change over time. Ones makes it easy to adjust your formula as your goals, health status, or lab results change.
 
 WHEN TO ADJUST YOUR FORMULA
 
@@ -350,7 +350,7 @@ Email support@ones.health to report side effects or ask about ingredient concern
   {
     category: 'Billing & Subscription',
     title: 'Understanding Pricing and Payment Options',
-    content: `Ones AI offers flexible, transparent pricing with no subscriptions or hidden fees. You make one-time purchases and control exactly when you order.
+    content: `Ones offers flexible, transparent pricing with no subscriptions or hidden fees. You make one-time purchases and control exactly when you order.
 
 HOW PRICING WORKS
 
@@ -446,7 +446,7 @@ Email support@ones.health for help tracking your order or delivery questions.`,
   {
     category: 'Billing & Subscription',
     title: 'Refunds, Returns, and Replacements',
-    content: `Ones AI formulas are custom-made specifically for you. Understanding our policies helps set proper expectations.
+    content: `Ones formulas are custom-made specifically for you. Understanding our policies helps set proper expectations.
 
 OUR REFUND POLICY
 
@@ -523,7 +523,7 @@ BROWSER ISSUES
 
 Clear your browser cache and cookies, then restart your browser and try again.
 
-Try a different browser. Chrome, Firefox, Safari, and Edge all work well with Ones AI. Internet Explorer is not supported.
+Try a different browser. Chrome, Firefox, Safari, and Edge all work well with Ones. Internet Explorer is not supported.
 
 TWO-FACTOR AUTHENTICATION
 
@@ -597,7 +597,7 @@ We'll help troubleshoot the issue and may be able to process your labs manually 
   {
     category: 'Technical Support',
     title: 'Browser Compatibility and Requirements',
-    content: `Ones AI works best on modern browsers with up-to-date software. Here's what you need to know.
+    content: `Ones works best on modern browsers with up-to-date software. Here's what you need to know.
 
 RECOMMENDED BROWSERS
 
@@ -616,7 +616,7 @@ MOBILE BROWSERS
 
 Both mobile Chrome and Safari are fully supported on iOS and Android devices.
 
-The Ones AI interface is responsive and works well on phones and tablets.
+The Ones interface is responsive and works well on phones and tablets.
 
 BROWSER FEATURES REQUIRED
 
@@ -636,7 +636,7 @@ Enable automatic browser updates to ensure you always have the latest security p
 
 SCREEN RESOLUTION
 
-Ones AI works on all screen sizes. For the best experience on desktop, use a resolution of at least 1024x768.
+Ones works on all screen sizes. For the best experience on desktop, use a resolution of at least 1024x768.
 
 On mobile devices, both portrait and landscape orientations are supported.
 
@@ -725,13 +725,13 @@ Email support@ones.health for questions about how we handle your data or to exer
 const faqData = [
   {
     category: 'Getting Started',
-    question: 'How does Ones AI create personalized supplement formulas?',
-    answer: 'Ones AI analyzes your health profile, lab results, medications, and health goals using advanced AI algorithms. It reviews scientific research on thousands of ingredients, then creates a custom formula tailored specifically to your needs. The AI considers dosage safety, ingredient interactions, and evidence-based effectiveness to ensure you get exactly what your body needs.',
+    question: 'How does Ones create personalized supplement formulas?',
+    answer: 'Ones analyzes your health profile, lab results, medications, and health goals using advanced AI algorithms. It reviews scientific research on thousands of ingredients, then creates a custom formula tailored specifically to your needs. The AI considers dosage safety, ingredient interactions, and evidence-based effectiveness to ensure you get exactly what your body needs.',
     displayOrder: 1
   },
   {
     category: 'Getting Started',
-    question: 'Do I need to upload lab results to use Ones AI?',
+    question: 'Do I need to upload lab results to use Ones?',
     answer: 'No, lab results are optional but highly recommended. Without labs, the AI creates formulas based on your health profile, symptoms, and goals. With lab results, recommendations become much more precise because the AI can see your exact nutrient levels, biomarkers, and potential deficiencies. Upload labs anytime to improve your formula accuracy.',
     displayOrder: 2
   },
@@ -791,8 +791,8 @@ const faqData = [
   },
   {
     category: 'Technical Support',
-    question: 'What browsers work best with Ones AI?',
-    answer: 'Ones AI works best on: Google Chrome 90+, Mozilla Firefox 88+, Safari 14+, and Microsoft Edge 90+. We recommend keeping your browser updated for the best experience. Mobile browsers (Chrome, Safari on iOS/Android) are fully supported. Internet Explorer is NOT supported.',
+    question: 'What browsers work best with Ones?',
+    answer: 'Ones works best on: Google Chrome 90+, Mozilla Firefox 88+, Safari 14+, and Microsoft Edge 90+. We recommend keeping your browser updated for the best experience. Mobile browsers (Chrome, Safari on iOS/Android) are fully supported. Internet Explorer is NOT supported.',
     displayOrder: 1
   },
   {

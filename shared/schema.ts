@@ -454,6 +454,9 @@ export const fileUploads = pgTable("file_uploads", {
   fileSize: integer("file_size"), // File size in bytes
   mimeType: text("mime_type"),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+  // Analysis timing instrumentation
+  analysisStartedAt: timestamp("analysis_started_at"),
+  analysisCompletedAt: timestamp("analysis_completed_at"),
   // HIPAA compliance fields
   hipaaCompliant: boolean("hipaa_compliant").default(true).notNull(),
   encryptedAtRest: boolean("encrypted_at_rest").default(true).notNull(),
@@ -1813,7 +1816,7 @@ export const blogPosts = pgTable("blog_posts", {
   isPublished: boolean("is_published").default(true).notNull(),
   publishedAt: timestamp("published_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  authorName: varchar("author_name", { length: 255 }).default('Ones AI Editorial Team'),
+  authorName: varchar("author_name", { length: 255 }).default('Ones Editorial Team'),
   viewCount: integer("view_count").default(0),
 });
 

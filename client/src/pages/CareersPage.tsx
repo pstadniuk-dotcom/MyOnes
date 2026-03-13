@@ -62,7 +62,7 @@ export default function CareersPage() {
           <p className="text-lg text-[#5a6623] mb-8 max-w-xl mx-auto">
             We're not actively hiring right now, but we're always interested in hearing from talented people. Feel free to reach out — we'll keep you in mind for future openings.
           </p>
-          <a href="mailto:careers@ones.health">
+          <a href="mailto:support@ones.health">
             <Button variant="outline" className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white" data-testid="button-general-inquiry">
               <Mail className="w-4 h-4 mr-2" />
               Get in Touch

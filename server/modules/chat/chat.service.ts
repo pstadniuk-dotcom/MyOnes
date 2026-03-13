@@ -416,6 +416,33 @@ export class ChatService {
 
     }
 
+    /**
+     * Poll the database until every file in `fileIds` has finished analysis
+     * (status is 'completed' or 'error') or until `timeoutMs` elapses.
+     */
+    async waitForFileAnalysis(fileIds: string[], timeoutMs = 30_000): Promise<void> {
+        if (fileIds.length === 0) return;
+
+        const POLL_INTERVAL = 1500;           // check every 1.5 s
+        const deadline = Date.now() + timeoutMs;
+
+        while (Date.now() < deadline) {
+            const statuses = await Promise.all(
+                fileIds.map(async (id) => {
+                    const file = await filesRepository.getFileUpload(id);
+                    if (!file) return 'completed';           // deleted / not found — skip
+                    const s = String((file.labReportData as any)?.analysisStatus || '').toLowerCase();
+                    return s === 'completed' || s === 'error' ? 'done' : 'pending';
+                })
+            );
+
+            if (statuses.every((s) => s !== 'pending')) return;   // all done
+
+            await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+        }
+        // Timeout reached — proceed with whatever data is available
+    }
+
     async getContext(userId: string) {
         const endDate = new Date().toISOString().split('T')[0];
         const startDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];

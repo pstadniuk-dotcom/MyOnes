@@ -1,5 +1,5 @@
 /**
- * Shared safety types for the ONES AI supplement safety system.
+ * Shared safety types for the Ones supplement safety system.
  * Used by both server-side validation and client-side UI rendering.
  */
 

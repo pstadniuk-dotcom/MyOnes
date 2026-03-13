@@ -27,7 +27,7 @@ export default function HeaderV2() {
       <div className="w-full px-8 md:px-16 lg:px-16 xl:px-20">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link href="/">
+          <Link href="/" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
             <img src="/ones-logo-light.svg" alt="Ones" className="h-7 cursor-pointer" />
           </Link>
 

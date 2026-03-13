@@ -101,7 +101,7 @@ export default function DisclaimerPage() {
           <section>
             <h2 className="text-2xl font-medium text-[#054700] mb-4">Questions or Concerns</h2>
             <p className="text-[#5a6623] leading-relaxed">
-              If you have questions about our products, recommendations, or this medical disclaimer, please contact us at support@ones.health or consult with your healthcare provider.
+              If you have questions about our products, recommendations, or this medical disclaimer, please contact us at <a href="mailto:support@ones.health" className="text-[#054700] underline underline-offset-2 hover:text-[#054700]/80">support@ones.health</a> or consult with your healthcare provider.
             </p>
           </section>
         </div>

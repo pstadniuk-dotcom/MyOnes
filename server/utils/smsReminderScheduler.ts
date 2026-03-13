@@ -243,7 +243,7 @@ async function checkAndSendRenewalReminders() {
 
       await sendRawSms(
         user.phone,
-        `Hi ${user.name}, your ONES AI supplement subscription renews in 5 days! 🔄\n\nIf you've had any changes in your health, diet, or goals, now is the perfect time to chat with your AI practitioner to update your formula before your next batch ships.\n\nReply to this message or log in to update your profile.`
+        `Hi ${user.name}, your Ones supplement subscription renews in 5 days! 🔄\n\nIf you've had any changes in your health, diet, or goals, now is the perfect time to chat with your AI practitioner to update your formula before your next batch ships.\n\nReply to this message or log in to update your profile.`
       );
     }
   } catch (error) {

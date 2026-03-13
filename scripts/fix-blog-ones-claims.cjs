@@ -12,9 +12,9 @@ const { Client } = require('pg');
 
 // ─── Safe replacement CTA ───────────────────────────────────────────────────
 // Uses only accurate, verifiable language — no invented doses or ingredients.
-const SAFE_CTA = `## How ONES AI Personalizes Your Formula
+const SAFE_CTA = `## How Ones Personalizes Your Formula
 
-Every ONES AI formula is built around *your* data — not population averages, generic recommendations, or marketing copy.
+Every Ones formula is built around *your* data — not population averages, generic recommendations, or marketing copy.
 
 When your lab results, health history, and symptom picture suggest a need in the area discussed above, our AI health practitioner will:
 
@@ -58,12 +58,12 @@ function fixContent(content) {
   if (fixed !== before2) changed = true;
 
   // If we removed sections, append the safe CTA at the end (only once)
-  if (changed && !fixed.includes('## How ONES AI Personalizes Your Formula')) {
+  if (changed && !fixed.includes('## How Ones Personalizes Your Formula')) {
     fixed = fixed.trimEnd() + '\n\n' + SAFE_CTA;
   }
 
-  // If the article didn't have any ONES AI sections at all, still add CTA if missing
-  if (!changed && !fixed.includes('## How ONES AI Personalizes Your Formula')) {
+  // If the article didn't have any Ones sections at all, still add CTA if missing
+  if (!changed && !fixed.includes('## How Ones Personalizes Your Formula')) {
     // Only add if it looks like it should have one (long-form article)
     if (fixed.length > 2000) {
       fixed = fixed.trimEnd() + '\n\n' + SAFE_CTA;

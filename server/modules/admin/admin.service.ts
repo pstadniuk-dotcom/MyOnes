@@ -178,7 +178,7 @@ export class AdminService {
         try {
             const user = await adminRepository.getUserById(ticket.userId);
             if (user) {
-                const ticketUrl = `https://ones.health/support/tickets/${ticketId}`;
+                const ticketUrl = `https://ones.health/dashboard/support`;
                 await sendNotificationEmail({
                     to: user.email,
                     subject: `Response to: ${ticket.subject}`,
@@ -258,7 +258,7 @@ export class AdminService {
         const messageTexts = userMessages.map(m => m.content).join('\n---\n');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-        const analysisPrompt = `You are analyzing user conversations from Ones AI, a personalized supplement platform. 
+        const analysisPrompt = `You are analyzing user conversations from Ones, a personalized supplement platform. 
 Users chat with an AI health practitioner to create custom supplement formulas.
 
 Analyze these ${userMessages.length} user messages from the past ${days} days and provide product insights.

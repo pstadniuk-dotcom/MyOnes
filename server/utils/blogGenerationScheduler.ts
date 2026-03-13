@@ -22,6 +22,7 @@
 import cron from 'node-cron';
 import logger from '../infra/logging/logger';
 import { generateArticle } from './blogGenerationService';
+import { generateBlogImage } from './blogImageService';
 import { blogRepository } from '../modules/blog/blog.repository';
 import { TOPIC_CLUSTERS, getUnusedTopics, type TopicCluster } from '../../shared/topic-clusters';
 import { db } from '../infra/db/db';
@@ -224,6 +225,15 @@ export async function runDailyBlogGeneration(overrideSettings?: Partial<BlogAuto
         schemaJson:        article.schemaJson ?? undefined,
         featuredImage:     article.featuredImage ?? undefined,
       });
+
+      // Generate unique AI image after article is saved
+      try {
+        const imgUrl = await generateBlogImage(article.title, article.slug);
+        await blogRepository.update(article.slug, { featuredImage: imgUrl });
+        log(`✓ Image generated for "${article.title}"`);
+      } catch (imgErr: any) {
+        log(`⚠ Image generation failed for "${article.title}": ${imgErr.message}`);
+      }
 
       generated++;
       consecutiveFailures = 0;

@@ -19,7 +19,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-medium text-[#054700] mb-4">1. Agreement to Terms</h2>
             <p className="text-[#5a6623] leading-relaxed">
-              By accessing or using the Ones platform ("Service"), you agree to be bound by these Terms of Service ("Terms") and all applicable laws and regulations. If you do not agree with any of these Terms, you are prohibited from using our Service. These Terms constitute a legally binding agreement between you and Ones AI, Inc. ("Ones," "we," "us," or "our").
+              By accessing or using the Ones platform ("Service"), you agree to be bound by these Terms of Service ("Terms") and all applicable laws and regulations. If you do not agree with any of these Terms, you are prohibited from using our Service. These Terms constitute a legally binding agreement between you and Ones, Inc. ("Ones," "we," "us," or "our").
             </p>
           </section>
 
@@ -33,7 +33,7 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-medium text-[#054700] mb-3">Account Responsibilities</h3>
             <p className="text-[#5a6623] leading-relaxed">
-              You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You must notify us immediately at support@ones.health of any unauthorized use. We are not liable for losses arising from unauthorized account access that is not caused by our negligence.
+              You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You must notify us immediately at <a href="mailto:support@ones.health" className="text-[#054700] underline underline-offset-2 hover:text-[#054700]/80">support@ones.health</a> of any unauthorized use. We are not liable for losses arising from unauthorized account access that is not caused by our negligence.
             </p>
           </section>
 
@@ -105,7 +105,7 @@ export default function TermsPage() {
               <li>Subscriptions renew automatically until you cancel through your account settings or by contacting us</li>
               <li>Cancellation takes effect at the end of the current billing period — no partial-month refunds are issued for the current cycle</li>
               <li>We may change pricing with at least 30 days' advance notice via email; continued use after the effective date constitutes acceptance</li>
-              <li>Refund requests for product issues should be directed to support@ones.health and will be reviewed on a case-by-case basis</li>
+              <li>Refund requests for product issues should be directed to <a href="mailto:support@ones.health" className="text-[#054700] underline underline-offset-2 hover:text-[#054700]/80">support@ones.health</a> and will be reviewed on a case-by-case basis</li>
             </ul>
           </section>
 
@@ -113,7 +113,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-medium text-[#054700] mb-4">8. Intellectual Property</h2>
             <p className="text-[#5a6623] leading-relaxed">
-              All content, features, and functionality of the Service — including our AI algorithms, formulation engine, branding, platform design, text, graphics, and software — are owned by Ones AI, Inc. or its licensors and are protected by copyright, trademark, trade secret, and other intellectual property laws. You may not copy, modify, distribute, sell, or create derivative works based on any part of the Service without our prior written permission.
+              All content, features, and functionality of the Service — including our AI algorithms, formulation engine, branding, platform design, text, graphics, and software — are owned by Ones, Inc. or its licensors and are protected by copyright, trademark, trade secret, and other intellectual property laws. You may not copy, modify, distribute, sell, or create derivative works based on any part of the Service without our prior written permission.
             </p>
           </section>
 
@@ -140,7 +140,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-medium text-[#054700] mb-4">11. Indemnification</h2>
             <p className="text-[#5a6623] leading-relaxed">
-              You agree to indemnify, defend, and hold harmless Ones AI, Inc. and its officers, directors, employees, contractors, and agents from and against any claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys' fees) arising out of or related to: (a) your use of the Service; (b) your violation of these Terms; (c) your violation of any third-party rights; or (d) any health decisions you make based on information obtained through the Service.
+              You agree to indemnify, defend, and hold harmless Ones, Inc. and its officers, directors, employees, contractors, and agents from and against any claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys' fees) arising out of or related to: (a) your use of the Service; (b) your violation of these Terms; (c) your violation of any third-party rights; or (d) any health decisions you make based on information obtained through the Service.
             </p>
           </section>
 

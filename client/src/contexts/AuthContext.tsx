@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, type React
 import { useLocation } from 'wouter';
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest } from '@/shared/lib/api';
-import { SESSION_EXPIRED_EVENT } from '@/shared/lib/queryClient';
+import { SESSION_EXPIRED_EVENT, queryClient } from '@/shared/lib/queryClient';
 import type { AuthResponse, SignupData, LoginData } from '@shared/schema';
 
 interface User {
@@ -54,6 +54,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
 
+    // Clear React Query cache to prevent stale data on next login
+    queryClient.clear();
+
     toast({
       title: "Session Expired",
       description: "Your session has expired. Please log in again.",
@@ -70,6 +73,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
       window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
     };
   }, [handleSessionExpired]);
+
+  // End-of-day auto-logout: log users out at midnight local time
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0); // next midnight
+    const msUntilMidnight = midnight.getTime() - now.getTime();
+
+    const timer = setTimeout(() => {
+      toast({
+        title: "Session Ended",
+        description: "Your daily session has ended. Please log in again.",
+        variant: "default",
+      });
+      logout();
+    }, msUntilMidnight);
+
+    return () => clearTimeout(timer);
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialize authentication state from localStorage
   useEffect(() => {
@@ -174,6 +198,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
+      // Clear any stale cached data from previous sessions
+      queryClient.clear();
+
       toast({
         title: "Welcome to Ones!",
         description: "Your account has been created. Please check your email to verify your account.",
@@ -219,6 +246,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(data.user);
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+
+      // Clear any stale cached data from previous sessions so fresh data is loaded
+      queryClient.clear();
 
       toast({
         title: "Welcome back!",
@@ -270,6 +300,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
+      // Clear any stale cached data from previous sessions so fresh data is loaded
+      queryClient.clear();
+
       toast({
         title: "Welcome back!",
         description: `Logged in with Google as ${data.user.name}`,
@@ -319,6 +352,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(data.user);
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+
+      // Clear any stale cached data from previous sessions so fresh data is loaded
+      queryClient.clear();
 
       toast({
         title: "Welcome back!",
@@ -432,6 +468,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Clear auth state
       setToken(null);
       setUser(null);
+
+      // Clear React Query cache to prevent stale data on next login
+      queryClient.clear();
 
       // Clear localStorage
       localStorage.removeItem('authToken');

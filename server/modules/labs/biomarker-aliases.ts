@@ -186,6 +186,7 @@ const BIOMARKER_ALIASES: Record<string, string> = {
     'bun':                          'BUN',
     'blood urea nitrogen':          'BUN',
     'urea nitrogen':                'BUN',
+    'urea nitrogen bun':            'BUN',
     'urea':                         'BUN',
 
     'creatinine':                   'Creatinine',
@@ -196,6 +197,8 @@ const BIOMARKER_ALIASES: Record<string, string> = {
     'glomerular filtration rate':   'eGFR',
     'gfr estimated':                'eGFR',
     'egfr non afr american':        'eGFR',
+    'egfr if nonafricn am':         'eGFR',
+    'egfr if africn am':            'eGFR',
 
     'sodium':                       'Sodium',
     'na':                           'Sodium',

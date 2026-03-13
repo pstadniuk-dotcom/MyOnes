@@ -190,7 +190,7 @@ export default function AIChat() {
       {/* Chat Header */}
       <div className="p-4 border-b border-card-border">
         <div>
-          <h3 className="font-medium text-sm" data-testid="text-ai-name">Ones AI</h3>
+          <h3 className="font-medium text-sm" data-testid="text-ai-name">Ones</h3>
           <p className="text-xs text-muted-foreground">Your health consultant</p>
         </div>
       </div>

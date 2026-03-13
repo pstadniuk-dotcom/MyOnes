@@ -140,6 +140,25 @@ export class FilesController {
             }
         }
     }
+
+    async bulkDeleteFiles(req: Request, res: Response) {
+        try {
+            const { fileIds } = req.body;
+            if (!Array.isArray(fileIds) || fileIds.length === 0) {
+                return res.status(400).json({ error: 'fileIds must be a non-empty array' });
+            }
+            if (fileIds.length > 50) {
+                return res.status(400).json({ error: 'Cannot delete more than 50 files at once' });
+            }
+            const results = await filesService.bulkDeleteFiles(fileIds, req.userId!);
+            const deleted = results.filter(r => r.success).length;
+            const failed = results.filter(r => !r.success).length;
+            res.json({ success: true, deleted, failed, results });
+        } catch (error) {
+            logger.error('Bulk delete error:', error);
+            res.status(500).json({ error: 'Failed to delete files' });
+        }
+    }
 }
 
 export const filesController = new FilesController();

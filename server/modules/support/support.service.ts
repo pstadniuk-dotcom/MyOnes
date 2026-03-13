@@ -31,7 +31,7 @@ export class SupportService {
         try {
             const user = await usersRepository.getUser(userId);
             if (user) {
-                const adminActionUrl = 'https://ones.health/admin';
+                // Notify support team
                 await sendNotificationEmail({
                     to: 'support@ones.health',
                     subject: `New Support Ticket: ${ticket.subject}`,
@@ -44,11 +44,30 @@ export class SupportService {
                         <strong>Description:</strong> ${ticket.description}<br/>
                         <strong>Ticket ID:</strong> ${ticket.id}
                     `,
-                    actionUrl: adminActionUrl,
-                    actionText: 'Open Admin Dashboard',
+                    actionUrl: `https://ones.health/admin/support-tickets/${ticket.id}`,
+                    actionText: 'View Ticket in Admin',
                     type: 'system'
                 });
-                logger.info(`📧 Support notification email sent for ticket ${ticket.id}`);
+
+                // Send confirmation to user
+                await sendNotificationEmail({
+                    to: user.email,
+                    subject: `Ticket Received: ${ticket.subject}`,
+                    title: 'We Received Your Support Request',
+                    content: `
+                        <p>Hi ${user.name},</p>
+                        <p>We've received your support request and our team will get back to you within 24 hours.</p>
+                        <strong>Subject:</strong> ${ticket.subject}<br/>
+                        <strong>Category:</strong> ${ticket.category}<br/>
+                        <strong>Priority:</strong> ${ticket.priority}<br/>
+                        <strong>Ticket ID:</strong> ${ticket.id}<br/>
+                        <p style="margin-top: 12px;">You can track your ticket and reply to any updates from your Support dashboard.</p>
+                    `,
+                    actionUrl: 'https://ones.health/dashboard/support',
+                    actionText: 'View My Tickets',
+                    type: 'system'
+                });
+                logger.info(`📧 Support notification emails sent for ticket ${ticket.id}`);
             }
         } catch (error) {
             logger.error('Failed to send support notification email:', error);
@@ -73,7 +92,7 @@ export class SupportService {
         try {
             const user = await usersRepository.getUser(userId);
             if (user) {
-                const adminTicketUrl = `https://ones.health/admin/support/${ticketId}`;
+                const adminTicketUrl = `https://ones.health/admin/support-tickets/${ticketId}`;
                 await sendNotificationEmail({
                     to: 'support@ones.health',
                     subject: `New Response on Ticket: ${ticket.subject}`,

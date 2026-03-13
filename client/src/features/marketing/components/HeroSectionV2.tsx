@@ -244,7 +244,9 @@ export default function HeroSectionV2() {
             <div className="flex">
               {/* Logo — right-aligned to just before center */}
               <div className="flex-1 flex items-center justify-end pr-4">
-                <img src="/Ones%20Logo%20Home%20Screen.png" alt="Ones AI" className="h-[27px]" />
+                <Link href="/">
+                  <img src="/Ones%20Logo%20Home%20Screen.png" alt="Ones" className="h-[27px] cursor-pointer" />
+                </Link>
               </div>
               {/* Text — left-aligned just after center */}
               <div className="flex-1 flex items-center pl-4">

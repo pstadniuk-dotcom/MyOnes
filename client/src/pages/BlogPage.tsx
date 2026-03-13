@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'wouter';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Link, useLocation, useSearch } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/shared/components/ui/button';
 import { Calendar, ArrowRight, BookOpen, Search, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -40,9 +40,89 @@ function PostCardSkeleton() {
 
 const PAGE_SIZE = 21;
 
+function CategoryFilterBar({ categories, activeCategory }: { categories: string[]; activeCategory: string }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showLeft, setShowLeft] = useState(false);
+  const [showRight, setShowRight] = useState(false);
+
+  const checkArrows = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setShowLeft(el.scrollLeft > 2);
+    setShowRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    checkArrows();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', checkArrows, { passive: true });
+    window.addEventListener('resize', checkArrows);
+    return () => {
+      el.removeEventListener('scroll', checkArrows);
+      window.removeEventListener('resize', checkArrows);
+    };
+  }, [checkArrows, categories]);
+
+  const scroll = (dir: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir === 'left' ? -160 : 160, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="border-b border-[#c9c3bb] bg-white">
+      <div className="container mx-auto px-6 max-w-6xl relative">
+        {/* Left arrow */}
+        {showLeft && (
+          <button
+            onClick={() => scroll('left')}
+            className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white shadow-md border border-[#c9c3bb] text-[#054700] hover:bg-[#054700]/10 transition-colors"
+            aria-label="Scroll categories left"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        )}
+
+        <div
+          ref={scrollRef}
+          className="flex items-center gap-2 py-3 overflow-x-auto cat-scroll-hide"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          <style>{`.cat-scroll-hide::-webkit-scrollbar { display: none; }`}</style>
+          <Link href="/blog">
+              <span className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${!activeCategory ? 'bg-[#054700] text-white' : 'text-[#054700] hover:bg-[#054700]/10'}`}>
+                All
+              </span>
+            </Link>
+            {categories.map(cat => (
+              <Link key={cat} href={`/blog?category=${encodeURIComponent(cat)}`}>
+                <span className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap capitalize transition-colors cursor-pointer ${activeCategory === cat ? 'bg-[#054700] text-white' : 'text-[#054700] hover:bg-[#054700]/10'}`}>
+                  {cat}
+                </span>
+              </Link>
+            ))}
+        </div>
+
+        {/* Right arrow */}
+        {showRight && (
+          <button
+            onClick={() => scroll('right')}
+            className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white shadow-md border border-[#c9c3bb] text-[#054700] hover:bg-[#054700]/10 transition-colors"
+            aria-label="Scroll categories right"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function BlogPage() {
   const [location] = useLocation();
-  const params = new URLSearchParams(location.split('?')[1] ?? '');
+  const searchString = useSearch();
+  const params = new URLSearchParams(searchString);
   const categoryParam = params.get('category') ?? '';
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
@@ -168,24 +248,7 @@ export default function BlogPage() {
 
       {/* Category filters */}
       {categoriesData && categoriesData.categories.length > 0 && (
-        <div className="border-b border-[#c9c3bb] bg-white">
-          <div className="container mx-auto px-6 max-w-6xl">
-            <div className="flex items-center gap-2 overflow-x-auto py-3 no-scrollbar">
-              <Link href="/blog">
-                <span className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${!categoryParam ? 'bg-[#054700] text-white' : 'text-[#054700] hover:bg-[#054700]/10'}`}>
-                  All
-                </span>
-              </Link>
-              {categoriesData.categories.map(cat => (
-                <Link key={cat} href={`/blog?category=${encodeURIComponent(cat)}`}>
-                  <span className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap capitalize transition-colors cursor-pointer ${categoryParam === cat ? 'bg-[#054700] text-white' : 'text-[#054700] hover:bg-[#054700]/10'}`}>
-                    {cat}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
+        <CategoryFilterBar categories={categoriesData.categories} activeCategory={categoryParam} />
       )}
 
       {/* Posts grid */}

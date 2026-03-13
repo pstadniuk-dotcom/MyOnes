@@ -5,9 +5,9 @@
 require('dotenv').config({ path: 'server/.env' });
 const { Client } = require('pg');
 
-const SAFE_CTA_BLOCK = `## How ONES AI Personalizes Your Formula
+const SAFE_CTA_BLOCK = `## How Ones Personalizes Your Formula
 
-Every ONES AI formula is built around *your* data — not population averages, generic recommendations, or marketing copy.
+Every Ones formula is built around *your* data — not population averages, generic recommendations, or marketing copy.
 
 When your lab results, health history, and symptom picture suggest a need in the area discussed above, our AI health practitioner will:
 
@@ -98,7 +98,7 @@ async function main() {
       }
 
       // Ensure safe CTA is present at end (if not already there after removals)
-      if (!content.includes('## How ONES AI Personalizes Your Formula')) {
+      if (!content.includes('## How Ones Personalizes Your Formula') && !content.includes('## How ONES AI Personalizes Your Formula')) {
         content = content.trimEnd() + '\n\n' + SAFE_CTA_BLOCK;
       }
 

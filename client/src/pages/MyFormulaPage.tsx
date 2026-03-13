@@ -173,13 +173,14 @@ export default function MyFormulaPage() {
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
   const [revertReason, setRevertReason] = useState('');
   const [selectedFormulaId, setSelectedFormulaId] = useState<string | null>(null);
-  const [expandedFormulaId, setExpandedFormulaId] = useState<string | null>(null);
+  const [expandedFormulaIds, setExpandedFormulaIds] = useState<Set<string>>(new Set());
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
   const [includeMembershipAtCheckout, setIncludeMembershipAtCheckout] = useState(true);
   const [enableAutoShip, setEnableAutoShip] = useState(true);
   const [membershipBenefitsOpen, setMembershipBenefitsOpen] = useState(false);
   const [formulaDetailsOpen, setFormulaDetailsOpen] = useState(false);
   const [smsOptInAtFirstPurchase, setSmsOptInAtFirstPurchase] = useState(true);
+  const [checkoutPhone, setCheckoutPhone] = useState('');
   const [medDisclosureAcknowledged, setMedDisclosureAcknowledged] = useState(false);
   const [safetyWarningsAcknowledged, setSafetyWarningsAcknowledged] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
@@ -196,6 +197,13 @@ export default function MyFormulaPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fresh user data from server (AuthContext can be stale after profile edits)
+  const { data: freshUserData } = useQuery<{ user: { phone: string | null } }>({
+    queryKey: ['/api/auth/me'],
+    enabled: !!user?.id,
+  });
+  const userPhone = freshUserData?.user?.phone ?? user?.phone ?? null;
 
   // Queries - using default queryFn pattern with proper typing
   const { data: currentFormulaData, isLoading: isLoadingCurrent, error: currentError } = useQuery<CurrentFormulaResponse>({
@@ -349,8 +357,15 @@ export default function MyFormulaPage() {
         return;
       }
 
-      if (!user?.phone) {
-        throw new Error('Please add a phone number in your profile before enabling SMS accountability reminders.');
+      // If user has no phone on file, save the one entered in the checkout dialog
+      const phoneOnFile = userPhone || checkoutPhone.trim();
+      if (!phoneOnFile) {
+        throw new Error('Please enter a phone number to enable SMS reminders.');
+      }
+
+      if (!userPhone && checkoutPhone.trim()) {
+        await apiRequest('PATCH', '/api/users/me/profile', { phone: checkoutPhone.trim() });
+        queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       }
 
       const alreadyConsented = consentsData?.some(
@@ -397,13 +412,6 @@ export default function MyFormulaPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['/api/consents'] });
       await queryClient.invalidateQueries({ queryKey: ['/api/notifications/preferences'] });
-
-      if (smsOptInAtFirstPurchase) {
-        toast({
-          title: 'SMS accountability reminders enabled',
-          description: 'We\'ll text supplement reminders and check-ins. Reply STOP anytime to opt out.',
-        });
-      }
     },
     onError: (error: any) => {
       toast({
@@ -420,11 +428,16 @@ export default function MyFormulaPage() {
         throw new Error('No formula selected for checkout.');
       }
 
+      const includeMembership = membershipUpsellAvailable ? includeMembershipAtCheckout : false;
+      const smsParam = smsOptInAtFirstPurchase ? '&sms=1' : '';
+      const successUrl = `${window.location.origin}/membership/success?session_id={CHECKOUT_SESSION_ID}&membership=${includeMembership ? '1' : '0'}${smsParam}`;
+
       const response = await apiRequest('POST', '/api/billing/checkout/session', {
         formulaId: selectedFormula.id,
-        includeMembership: membershipUpsellAvailable ? includeMembershipAtCheckout : false,
+        includeMembership,
         enableAutoShip,
         plan: 'monthly',
+        successUrl,
       });
 
       return response.json() as Promise<{ checkoutUrl: string; sessionId: string; expiresAt: string }>;
@@ -844,12 +857,15 @@ export default function MyFormulaPage() {
                         key={formula.id}
                         formula={formula}
                         isSelected={selectedFormulaId === formula.id}
-                        isExpanded={expandedFormulaId === formula.id}
+                        isExpanded={expandedFormulaIds.has(formula.id)}
                         isNewest={formula.id === currentFormula?.id}
                         onSelect={() => setSelectedFormulaId(formula.id)}
-                        onToggleExpand={() => setExpandedFormulaId(
-                          expandedFormulaId === formula.id ? null : formula.id
-                        )}
+                        onToggleExpand={() => setExpandedFormulaIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(formula.id)) next.delete(formula.id);
+                          else next.add(formula.id);
+                          return next;
+                        })}
                         onRename={(id, currentName) => {
                           setRenamingFormulaId(id);
                           setNewFormulaName(currentName || '');
@@ -1601,10 +1617,19 @@ export default function MyFormulaPage() {
                           : 'Yes, text me! Msg frequency varies. Msg & data rates may apply. Reply STOP anytime.'}
                       </label>
                     </div>
-                    {!user?.phone && smsOptInAtFirstPurchase && (
+                    {!userPhone && smsOptInAtFirstPurchase && (
                       <div className="px-4 pb-3">
-                        <p className="text-xs text-muted-foreground">
-                          Add a phone number in your profile to enable SMS reminders.
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="+1 (555) 000-0000"
+                            value={checkoutPhone}
+                            onChange={e => setCheckoutPhone(e.target.value)}
+                            className="h-8 text-sm flex-1"
+                            type="tel"
+                          />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          Your number will be saved to your profile for daily reminders.
                         </p>
                       </div>
                     )}
@@ -1756,7 +1781,7 @@ export default function MyFormulaPage() {
                   // Errors are handled in mutation onError
                 }
               }}
-              disabled={purchaseSmsOptInMutation.isPending || checkoutSessionMutation.isPending || !medDisclosureAcknowledged || (() => {
+              disabled={purchaseSmsOptInMutation.isPending || checkoutSessionMutation.isPending || !medDisclosureAcknowledged || (smsOptInAtFirstPurchase && !userPhone && !checkoutPhone.trim()) || (() => {
                 // Block checkout if formula has serious warnings that haven't been acknowledged
                 if (!selectedFormula) return false;
                 const sv = (selectedFormula as any)?.safetyValidation;
@@ -1967,7 +1992,7 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
             {isLoadingTileQuote
               ? `Pricing: loading...`
               : tileQuote?.available
-                ? `8-week est (${pricingCapsuleCount} caps): $${(tileQuote.total ?? 0).toFixed(2)}`
+                ? `8-week est (${pricingCapsuleCount} caps/day): $${((tileQuote.total ?? 0) * 0.85).toFixed(2)}`
                 : `Pricing unavailable`}
           </button>
         </div>
@@ -3404,7 +3429,7 @@ function FormulaEmptyState() {
           <FlaskConical className="w-16 h-16 text-primary mx-auto mb-6" />
           <h3 className="text-2xl font-semibold mb-3">Start Your Personalized Journey</h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            Begin a conversation with Ones AI to receive your first personalized supplement formula tailored to your unique health profile.
+            Begin a conversation with Ones to receive your first personalized supplement formula tailored to your unique health profile.
           </p>
           <Button asChild size="lg" data-testid="button-start-consultation">
             <Link href="/dashboard/consultation">

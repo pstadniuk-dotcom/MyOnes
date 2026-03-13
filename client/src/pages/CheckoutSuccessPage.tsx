@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { CheckCircle, ArrowRight } from 'lucide-react';
+import { CheckCircle, ArrowRight, MessageSquare } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -10,6 +10,7 @@ export default function CheckoutSuccessPage() {
   const qc = useQueryClient();
   const params = new URLSearchParams(search || '');
   const includesMembership = params.get('membership') === '1';
+  const smsRemindersEnabled = params.get('sms') === '1';
 
   // Invalidate user/auth queries so dashboard picks up new membership status
   useEffect(() => {
@@ -32,7 +33,7 @@ export default function CheckoutSuccessPage() {
 
         {/* Heading */}
         <h1 className="text-3xl font-light text-[#054700] mb-3">
-          Welcome to <span className="font-medium">Ones AI</span>
+          Welcome to <span className="font-medium">Ones</span>
         </h1>
         <p className="text-[#5a6623] leading-relaxed">
           {includesMembership
@@ -60,6 +61,16 @@ export default function CheckoutSuccessPage() {
             ))}
           </ul>
         </div>
+
+        {/* SMS reminders confirmation */}
+        {smsRemindersEnabled && (
+          <div className="mt-4 flex items-center gap-2 bg-[#054700]/5 rounded-xl px-4 py-3 text-left">
+            <MessageSquare className="w-4 h-4 text-[#054700] flex-shrink-0" />
+            <p className="text-sm text-[#054700]">
+              Daily SMS reminders enabled — we'll text you when it's time to take your supplements.
+            </p>
+          </div>
+        )}
 
         <Button
           onClick={() => navigate('/dashboard/chat')}

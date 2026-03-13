@@ -44,11 +44,11 @@ describe('buildGPT4Prompt', () => {
     expect(prompt.length).toBeGreaterThan(100);
   });
 
-  it('should mention ONES AI role', () => {
+  it('should mention Ones role', () => {
     const context = createTestContext();
     const prompt = buildGPT4Prompt(context);
 
-    expect(prompt.toUpperCase()).toContain('ONES AI');
+    expect(prompt.toUpperCase()).toContain('ONES');
   });
 
   it('should include guidance to be concise', () => {

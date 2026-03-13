@@ -119,7 +119,7 @@ export default function ProblemFlowSection() {
   };
 
   return (
-    <section ref={sectionRef} className="bg-white py-20 md:py-28 lg:py-36">
+    <section ref={sectionRef} id="the-problem" className="bg-white py-20 md:py-28 lg:py-36 scroll-mt-20">
       <div className="container mx-auto px-6 max-w-6xl">
 
         {/* ── Eyebrow ── */}

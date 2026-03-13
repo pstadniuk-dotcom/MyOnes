@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { useSearch } from 'wouter';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -28,8 +28,8 @@ const inquiryTypes = [
 ];
 
 export default function ContactPage() {
-  const [location] = useLocation();
-  const searchParams = new URLSearchParams(location.split('?')[1] || '');
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
   const typeFromUrl = searchParams.get('type');
 
   const [formData, setFormData] = useState({

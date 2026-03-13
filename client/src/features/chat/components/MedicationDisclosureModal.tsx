@@ -168,7 +168,7 @@ export default function MedicationDisclosureModal({ open }: MedicationDisclosure
             <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <p>
               Your response is recorded with a timestamp as part of your health record. If you start a new
-              medication in the future, please update your profile. Ones AI uses this information to flag
+              medication in the future, please update your profile. Ones uses this information to flag
               potential supplement–drug interactions in your formula.
             </p>
           </div>

@@ -215,7 +215,7 @@ function IngredientCTA({ post }: { post: BlogPost }) {
         <FlaskConical className="w-5 h-5 text-emerald-300 flex-shrink-0" />
         <div>
           <p className="text-white font-semibold text-base">These ingredients can go in your formula</p>
-          <p className="text-emerald-200 text-sm mt-0.5">Ones AI builds a personalized capsule stack from your labs, goals, and health profile.</p>
+          <p className="text-emerald-200 text-sm mt-0.5">Ones builds a personalized capsule stack from your labs, goals, and health profile.</p>
         </div>
       </div>
 
@@ -245,7 +245,7 @@ function IngredientCTA({ post }: { post: BlogPost }) {
           <p className="text-gray-800 font-medium text-sm">Ready to see what belongs in yours?</p>
           <p className="text-gray-500 text-xs mt-0.5">Takes ~5 minutes. Our AI practitioner reviews your labs and goals.</p>
         </div>
-        <Link href="/consultation">
+        <Link href="/dashboard/consultation">
           <span className="inline-flex items-center gap-2 bg-[#054700] hover:bg-[#043d00] text-white font-medium px-5 py-2.5 rounded-lg transition-colors text-sm whitespace-nowrap cursor-pointer">
             Build my formula <ArrowRight className="w-4 h-4" />
           </span>

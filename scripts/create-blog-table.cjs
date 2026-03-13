@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   is_published BOOLEAN NOT NULL DEFAULT true,
   published_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  author_name VARCHAR(255) DEFAULT 'ONES AI Editorial Team',
+  author_name VARCHAR(255) DEFAULT 'Ones Editorial Team',
   view_count INTEGER DEFAULT 0
 );
 

@@ -13,7 +13,7 @@ import {
   Send, Upload, User, AlertTriangle, CheckCircle, Sparkles, FileText,
   History, Download, Search, Plus, RotateCcw, Copy, Share2, Mic,
   Loader2, FlaskConical, Clock, ArrowUp, Settings2, Zap,
-  Shield, Trash2, Calendar, Eye, EyeOff, X, ChevronDown, ChevronUp, ArrowRight, Pencil, Check, Watch
+  Shield, Trash2, Calendar, Eye, EyeOff, X, ChevronDown, ChevronUp, ArrowRight, Pencil, Check, Watch, ExternalLink
 } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +24,7 @@ import { Link, useSearch } from 'wouter';
 import ThinkingSteps, { type ThinkingStep } from '@/features/chat/components/ThinkingSteps';
 import { InlineCapsuleSelector } from '@/features/formulas/components/InlineCapsuleSelector';
 import { type CapsuleCount } from '@/shared/lib/utils';
+import { exportConsultationAsHTML } from '@/utils/consultationExport';
 
 // Default step definitions for the AI thinking progress
 const INITIAL_THINKING_STEPS: ThinkingStep[] = [
@@ -114,11 +115,19 @@ interface Message {
   capsuleRecommendation?: CapsuleRecommendation;
   selectedCapsules?: CapsuleCount;
   fileAttachment?: {
+    id: string;
     name: string;
     url: string;
     type: 'lab_report' | 'medical_document' | 'prescription' | 'other';
     size: number;
   };
+  fileAttachments?: {
+    id: string;
+    name: string;
+    url: string;
+    type: 'lab_report' | 'medical_document' | 'prescription' | 'other';
+    size: number;
+  }[];
   formula?: {
     bases: { name: string; dose: string; purpose: string }[];
     additions: { name: string; dose: string; purpose: string }[];
@@ -238,6 +247,14 @@ export default function ConsultationPage() {
   // Inline capsule selection state (tracks which message has active selection)
   const [selectingCapsuleMessageId, setSelectingCapsuleMessageId] = useState<string | null>(null);
 
+  // File preview state (for opening uploaded PDFs/images in a popup)
+  const [previewFile, setPreviewFile] = useState<{ id: string; name: string; type: string } | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Track file IDs being analyzed (for polling)
+  const analysisPollingRef = useRef<NodeJS.Timeout | null>(null);
+
   // Draft autosave key
   const DRAFT_KEY = 'consultation_draft';
   // Key for persisting current session across tab navigation
@@ -250,6 +267,7 @@ export default function ConsultationPage() {
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const processedNewParam = useRef(false);
   const userHasScrolledUp = useRef(false);
   const lastScrollTop = useRef(0);
   const isUserScrolling = useRef(false);
@@ -278,7 +296,7 @@ export default function ConsultationPage() {
 
     toast({
       title: "New Consultation Started",
-      description: "Ready to discuss your health goals with Ones AI.",
+      description: "Ready to discuss your health goals with Ones.",
       variant: "default"
     });
   }, [toast, user?.name]);
@@ -406,37 +424,47 @@ export default function ConsultationPage() {
 
   const search = useSearch();
 
+  // Force new session on mount when navigating with ?new=true or forceNewChat flag.
+  // Uses location.search directly (not useSearch) for reliability on first mount,
+  // plus a localStorage flag as a backup in case the query param was lost.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const startNew = params.get('new') === 'true' || !!localStorage.getItem('forceNewChat');
+    const formulaReviewContext = params.get('context') === 'formula-review';
+
+    if (!startNew && !formulaReviewContext) return;
+
+    // Clear all flags immediately so they can't fire twice
+    localStorage.removeItem('forceNewChat');
+    processedNewParam.current = true;
+    handleNewSession();
+
+    // Clear the query param from URL
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (formulaReviewContext) {
+      setPendingLabMessage(
+        'I\'d like to review my current formula. My dashboard is showing that my formula may need an update based on recent health data changes. Can you look at what\'s changed and recommend any adjustments?'
+      );
+      return;
+    }
+
+    // Check for lab marker discussion message (from Labs page "Discuss" link)
+    const labMarkerMessage = localStorage.getItem('labMarkerDiscuss');
+    if (labMarkerMessage) {
+      localStorage.removeItem('labMarkerDiscuss');
+      setPendingLabMessage(labMarkerMessage);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Load history data and restore session (prioritize saved session, fallback to most recent)
   useEffect(() => {
     if (historyData?.sessions) {
       setSessionHistory(historyData.sessions);
 
-      const params = new URLSearchParams(search);
-      const startNew = params.get('new') === 'true';
-      const formulaReviewContext = params.get('context') === 'formula-review';
-
-      if ((startNew || formulaReviewContext) && messages.length === 0) {
-        // If query param requests new session or formula review, force new session
-        handleNewSession();
-        // Clear the query param to avoid sticking
-        window.history.replaceState({}, '', window.location.pathname);
-
-        // Formula review context: auto-inject a review prompt
-        if (formulaReviewContext) {
-          setPendingLabMessage(
-            'I\'d like to review my current formula. My dashboard is showing that my formula may need an update based on recent health data changes. Can you look at what\'s changed and recommend any adjustments?'
-          );
-          return;
-        }
-
-        // Check for lab marker discussion message (from Labs page "Discuss" link)
-        const labMarkerMessage = localStorage.getItem('labMarkerDiscuss');
-        if (labMarkerMessage) {
-          localStorage.removeItem('labMarkerDiscuss');
-          setPendingLabMessage(labMarkerMessage);
-        }
-        return;
-      }
+      // Skip session restore if we just forced a new session via ?new=true / forceNewChat
+      if (processedNewParam.current) return;
 
       // Only restore session on initial load (no messages yet, isNewSession true)
       if (historyData.sessions.length > 0 && messages.length === 0 && isNewSession) {
@@ -545,6 +573,7 @@ export default function ConsultationPage() {
       setIsTyping(true);
       if (!thinkingMessage) {
         setThinkingMessage('Analyzing your health data...');
+        setThinkingSteps([...INITIAL_THINKING_STEPS]);
       }
     } else {
       setIsTyping(false);
@@ -758,10 +787,112 @@ export default function ConsultationPage() {
     }
   }, [inputValue]);
 
+  // Auto-focus chat input when consultation page mounts
+  useEffect(() => {
+    // Small delay to ensure the textarea is rendered
+    const timer = setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Poll for lab analysis completion after file upload
+  const startAnalysisPolling = useCallback((fileIds: string[], fileNames: string[]) => {
+    // Clear any existing polling
+    if (analysisPollingRef.current) {
+      clearInterval(analysisPollingRef.current);
+    }
+
+    // Add system message about analysis starting
+    const analysisMessageId = `analysis-${Date.now()}`;
+    const fileCount = fileNames.length;
+    setMessages(prev => [...prev, {
+      id: analysisMessageId,
+      content: `analyzing:${fileCount} file${fileCount > 1 ? 's' : ''} uploaded — analyzing now…`,
+      sender: 'system',
+      timestamp: new Date()
+    }]);
+
+    let pollCount = 0;
+    const maxPolls = 60; // 5 minutes max (every 5 seconds)
+
+    analysisPollingRef.current = setInterval(async () => {
+      pollCount++;
+      if (pollCount >= maxPolls) {
+        if (analysisPollingRef.current) clearInterval(analysisPollingRef.current);
+        return;
+      }
+
+      try {
+        const response = await fetch(buildApiUrl(`/api/files/user/${user?.id}/lab_report`), {
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          credentials: 'include'
+        });
+
+        if (!response.ok) return;
+
+        const files = await response.json();
+        const uploadedLabFiles = files.filter((f: any) => fileIds.includes(f.id));
+        const allCompleted = uploadedLabFiles.every((f: any) =>
+          f.labReportData?.analysisStatus === 'completed'
+        );
+        const anyError = uploadedLabFiles.some((f: any) =>
+          f.labReportData?.analysisStatus === 'error'
+        );
+
+        if (allCompleted) {
+          if (analysisPollingRef.current) clearInterval(analysisPollingRef.current);
+
+          // Count total biomarkers extracted
+          const totalMarkers = uploadedLabFiles.reduce((sum: number, f: any) => {
+            const extracted = f.labReportData?.extractedData;
+            return sum + (Array.isArray(extracted) ? extracted.length : 0);
+          }, 0);
+
+          // Check if previous labs exist (more files than the ones just uploaded)
+          const previousLabsExist = files.length > uploadedLabFiles.length;
+
+          // Build a rich completion message
+          let completionText = totalMarkers > 0
+            ? `done:${totalMarkers} biomarker${totalMarkers !== 1 ? 's' : ''} extracted and added to your profile`
+            : `done:${fileCount} file${fileCount > 1 ? 's' : ''} analyzed`;
+          if (previousLabsExist && totalMarkers > 0) {
+            completionText += ' — ask me to compare with your previous results';
+          }
+
+          // Update the analysis message to show completion
+          setMessages(prev => prev.map(msg =>
+            msg.id === analysisMessageId
+              ? { ...msg, content: completionText }
+              : msg
+          ));
+
+          // Invalidate queries so context is fresh on next message
+          queryClient.invalidateQueries({ queryKey: ['/api/labs/biomarkers'] });
+        } else if (anyError) {
+          if (analysisPollingRef.current) clearInterval(analysisPollingRef.current);
+
+          setMessages(prev => prev.map(msg =>
+            msg.id === analysisMessageId
+              ? { ...msg, content: `error:Could not analyze ${fileCount > 1 ? 'some files' : 'the file'} — try a clearer image or PDF` }
+              : msg
+          ));
+        }
+      } catch (error) {
+        console.error('Analysis polling error:', error);
+      }
+    }, 5000);
+  }, [user?.id, queryClient]);
+
   // Enhanced message sending with file support
   const handleSendMessage = useCallback(async (messageText?: string, attachedFiles?: UploadedFile[]) => {
-    const currentMessage = messageText || inputValue;
+    let currentMessage = messageText || inputValue;
     if (!currentMessage.trim() && !attachedFiles?.length) return;
+
+    // If files are attached but no text was typed, generate a brief default message
+    if (!currentMessage.trim() && attachedFiles && attachedFiles.length > 0) {
+      currentMessage = `I've uploaded ${attachedFiles.length} file${attachedFiles.length > 1 ? 's' : ''} for review.`;
+    }
 
     // Stop voice recording if active
     if (isRecording && recognitionRef.current) {
@@ -780,11 +911,21 @@ export default function ConsultationPage() {
       timestamp: new Date(),
       sessionId: currentSessionId || undefined,
       fileAttachment: attachedFiles?.[0] ? {
+        id: attachedFiles[0].id,
         name: attachedFiles[0].name,
         url: attachedFiles[0].url,
         type: attachedFiles[0].type as any,
         size: attachedFiles[0].size
-      } : undefined
+      } : undefined,
+      fileAttachments: attachedFiles && attachedFiles.length > 0
+        ? attachedFiles.map(f => ({
+            id: f.id,
+            name: f.name,
+            url: f.url,
+            type: f.type as any,
+            size: f.size
+          }))
+        : undefined
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -793,6 +934,15 @@ export default function ConsultationPage() {
     clearDraft(); // Clear autosaved draft when message is sent
     initialInputRef.current = ''; // Clear voice input reference
     setIsTyping(true);
+
+    // Start analysis polling if files were uploaded
+    if (attachedFiles && attachedFiles.length > 0) {
+      startAnalysisPolling(
+        attachedFiles.map(f => f.id),
+        attachedFiles.map(f => f.name)
+      );
+    }
+
     setUploadedFiles([]);
     resetScrollTracking(); // Force scroll to bottom when user sends a message
 
@@ -804,6 +954,7 @@ export default function ConsultationPage() {
         message: currentMessage,
         sessionId: currentSessionId,
         files: attachedFiles?.map(file => ({
+          id: file.id,
           name: file.name,
           url: file.url,
           type: file.type,
@@ -951,7 +1102,7 @@ export default function ConsultationPage() {
                   const systemMessageId = (Date.now() + Math.random()).toString();
                   setMessages(prev => [...prev, {
                     id: systemMessageId,
-                    content: data.message || "✓ We've updated your health profile based on the information you provided.",
+                    content: `done:${data.message || "Health profile updated with the information you provided"}`,
                     sender: 'system',
                     timestamp: new Date()
                   }]);
@@ -1066,7 +1217,7 @@ export default function ConsultationPage() {
     } finally {
       clearTimeout(timeoutId);
     }
-  }, [inputValue, currentSessionId, toast, user?.id, isRecording]);
+  }, [inputValue, currentSessionId, toast, user?.id, isRecording, startAnalysisPolling]);
 
   // Auto-send pending lab marker discussion message (from Labs page "Discuss with practitioner" link)
   useEffect(() => {
@@ -1161,11 +1312,13 @@ export default function ConsultationPage() {
 
       if (newUploadedFiles.length > 0) {
         setUploadedFiles(prev => [...prev, ...newUploadedFiles]);
-        setInputValue(`I've uploaded my lab results (${newUploadedFiles.map(f => f.name).join(', ')}). Please analyze them and provide insights for optimizing my supplement formula.`);
+
+        // Focus the input so the user can type their own message
+        setTimeout(() => textareaRef.current?.focus(), 100);
 
         toast({
           title: "Files Uploaded Successfully",
-          description: `${newUploadedFiles.length} file(s) ready for analysis. Click send to have Ones AI analyze your results.`,
+          description: `${newUploadedFiles.length} file(s) attached. Type a message and send.`,
           variant: "success"
         });
       }
@@ -1316,10 +1469,10 @@ export default function ConsultationPage() {
   // Share message content
   const handleShareMessage = useCallback(async (content: string, formula?: any) => {
     const shareData = {
-      title: 'Ones AI Consultation',
+      title: 'Ones Consultation',
       text: formula
-        ? `Check out my personalized supplement formula from Ones AI:\n\n${content}\n\nTotal: ${formula.totalMg}mg formula with ${formula.bases.length} system supports and ${formula.additions?.length || 0} additions.`
-        : `Ones AI Health Consultation:\n\n${content}`,
+        ? `Check out my personalized supplement formula from Ones:\n\n${content}\n\nTotal: ${formula.totalMg}mg formula with ${formula.bases.length} system supports and ${formula.additions?.length || 0} additions.`
+        : `Ones Health Consultation:\n\n${content}`,
       url: window.location.origin
     };
 
@@ -1355,35 +1508,25 @@ export default function ConsultationPage() {
     }
   }, [toast]);
 
-  // Export consultation
+  // Export consultation as formatted HTML
   const handleExportConsultation = useCallback(() => {
-    const exportData = {
-      session: currentSessionId,
-      timestamp: new Date().toISOString(),
-      messages: messages.map(msg => ({
+    exportConsultationAsHTML(
+      messages.map(msg => ({
         sender: msg.sender,
         content: msg.content,
-        timestamp: msg.timestamp.toISOString(),
+        timestamp: msg.timestamp,
         formula: msg.formula
-      }))
-    };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `consultation-${currentSessionId || 'current'}-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      })),
+      currentSessionId,
+      user?.name || user?.email
+    );
 
     toast({
       title: "Consultation Exported",
-      description: "Your consultation has been downloaded as JSON.",
+      description: "Your consultation has been opened in a new tab. Use Print to save as PDF.",
       variant: "default"
     });
-  }, [messages, currentSessionId, toast]);
+  }, [messages, currentSessionId, user, toast]);
 
   // Enhanced keyboard handling
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
@@ -1415,6 +1558,61 @@ export default function ConsultationPage() {
   const handleRemoveFile = useCallback((fileId: string) => {
     setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
     setInputValue('');
+  }, []);
+
+  // Open file preview popup — fetches the file from the server and displays in a dialog
+  const handlePreviewFile = useCallback(async (file: { id: string; name: string; type: string }) => {
+    // Clean up previous blob URL
+    if (previewBlobUrl) {
+      URL.revokeObjectURL(previewBlobUrl);
+      setPreviewBlobUrl(null);
+    }
+
+    setPreviewFile(file);
+    setPreviewLoading(true);
+
+    try {
+      const response = await fetch(buildApiUrl(`/api/files/${file.id}/download`), {
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      });
+
+      if (!response.ok) throw new Error('Failed to load file');
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      setPreviewBlobUrl(blobUrl);
+    } catch (error) {
+      console.error('File preview error:', error);
+      toast({
+        title: "Preview Failed",
+        description: "Could not load file preview. Try downloading instead.",
+        variant: "destructive"
+      });
+      setPreviewFile(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [previewBlobUrl, toast]);
+
+  // Close file preview and clean up blob URL
+  const handleClosePreview = useCallback(() => {
+    setPreviewFile(null);
+    if (previewBlobUrl) {
+      URL.revokeObjectURL(previewBlobUrl);
+      setPreviewBlobUrl(null);
+    }
+  }, [previewBlobUrl]);
+
+  // startAnalysisPolling moved above handleSendMessage to avoid temporal dead zone
+
+  // Clean up analysis polling on unmount
+  useEffect(() => {
+    return () => {
+      if (analysisPollingRef.current) {
+        clearInterval(analysisPollingRef.current);
+      }
+    };
   }, []);
 
   // Voice input handling with continuous recording
@@ -1905,7 +2103,7 @@ export default function ConsultationPage() {
                 <img src="/ones-logo-icon.svg" alt="Ones" className="h-8 w-8" />
                 <div>
                   <h1 className="text-lg md:text-xl font-semibold text-[#054700] flex items-center gap-2" data-testid="text-consultation-title">
-                    <span className="hidden sm:inline">Ones AI Consultation</span>
+                    <span className="hidden sm:inline">Ones Consultation</span>
                     <span className="sm:hidden">AI Consultation</span>
                   </h1>
                   <div className="flex items-center gap-2">
@@ -2009,14 +2207,42 @@ export default function ConsultationPage() {
             {filteredMessages.map((message, index) => {
               // System messages render differently
               if (message.sender === 'system') {
+                // Parse structured system messages (format: "status:message")
+                const statusMatch = message.content.match(/^(analyzing|done|error):(.+)$/);
+                const status = statusMatch?.[1] as 'analyzing' | 'done' | 'error' | undefined;
+                const displayText = statusMatch ? statusMatch[2] : message.content;
+
+                const statusConfig = {
+                  analyzing: {
+                    icon: <Loader2 className="h-4 w-4 animate-spin text-primary" />,
+                    bg: 'bg-primary/5 border-primary/15',
+                    text: 'text-primary'
+                  },
+                  done: {
+                    icon: <CheckCircle className="h-4 w-4 text-emerald-600" />,
+                    bg: 'bg-emerald-50 border-emerald-200',
+                    text: 'text-emerald-800'
+                  },
+                  error: {
+                    icon: <AlertTriangle className="h-4 w-4 text-amber-600" />,
+                    bg: 'bg-amber-50 border-amber-200',
+                    text: 'text-amber-800'
+                  }
+                };
+
+                const config = status ? statusConfig[status] : null;
+
                 return (
                   <div
                     key={message.id}
                     className="flex justify-center"
                     data-testid={`message-system-${message.id}`}
                   >
-                    <div className="max-w-md px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium border border-primary/20">
-                      {message.content}
+                    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border ${
+                      config ? `${config.bg} ${config.text}` : 'bg-primary/5 text-primary border-primary/15'
+                    }`}>
+                      {config?.icon}
+                      <span>{displayText}</span>
                     </div>
                   </div>
                 );
@@ -2054,7 +2280,7 @@ export default function ConsultationPage() {
                         )}
                         <div className="flex items-center gap-2">
                           <span className={`text-xs font-medium ${message.sender === 'user' ? 'text-[#054700]' : 'text-muted-foreground'}`}>
-                            {message.sender === 'user' ? 'You' : 'Ones AI'}
+                            {message.sender === 'user' ? 'You' : 'Ones'}
                           </span>
                           <span className={`text-xs ${message.sender === 'user' ? 'text-[#5a6623]' : 'text-muted-foreground/70'}`}>
                             {message.timestamp && !isNaN(new Date(message.timestamp).getTime())
@@ -2118,19 +2344,44 @@ export default function ConsultationPage() {
                           );
                         })()}
 
-                        {/* File Attachment Display */}
-                        {message.fileAttachment && (
-                          <div className="mt-3 p-3 bg-muted/30 rounded border-dashed border">
+                        {/* File Attachment Display — clickable to preview */}
+                        {(message.fileAttachments && message.fileAttachments.length > 0) ? (
+                          <div className="mt-3 space-y-2">
+                            {message.fileAttachments.map((file, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => handlePreviewFile({ id: file.id, name: file.name, type: file.type })}
+                                className="w-full p-3 bg-muted/30 rounded border-dashed border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer text-left group"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <FileText className="w-4 h-4 text-primary" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{file.name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatFileSize(file.size)}
+                                    </p>
+                                  </div>
+                                  <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : message.fileAttachment && (
+                          <button
+                            onClick={() => handlePreviewFile({ id: message.fileAttachment!.id, name: message.fileAttachment!.name, type: message.fileAttachment!.type })}
+                            className="w-full mt-3 p-3 bg-muted/30 rounded border-dashed border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer text-left group"
+                          >
                             <div className="flex items-center gap-2">
                               <FileText className="w-4 h-4 text-primary" />
-                              <div>
-                                <p className="text-sm font-medium">{message.fileAttachment.name}</p>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{message.fileAttachment.name}</p>
                                 <p className="text-xs text-muted-foreground">
                                   {formatFileSize(message.fileAttachment.size)}
                                 </p>
                               </div>
+                              <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                             </div>
-                          </div>
+                          </button>
                         )}
 
                         {/* Enhanced formula visualization with animations */}
@@ -2239,6 +2490,38 @@ export default function ConsultationPage() {
                 </div>
               );
             })}
+            {/* Standalone thinking indicator when returning from navigation mid-response */}
+            {isTyping && !activeStreamingMessageId && (
+              <div className="flex justify-start" data-testid="standalone-thinking-indicator">
+                <div className="group max-w-[95%] sm:max-w-[85%] rounded-2xl p-3 sm:p-5 space-y-3 overflow-hidden glass-card text-foreground shadow-md rounded-tl-sm">
+                  <div>
+                    {/* Header with logo, name — same as normal AI message */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <img
+                        src="/ones-logo-icon.svg"
+                        alt="Ones"
+                        className="h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0 animate-spin"
+                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">Ones</span>
+                      </div>
+                    </div>
+
+                    {/* Thinking steps / fallback */}
+                    <div className="w-full">
+                      {thinkingSteps.length > 0 ? (
+                        <ThinkingSteps steps={thinkingSteps} />
+                      ) : (
+                        <div className="text-sm text-muted-foreground italic flex items-center gap-1.5">
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#5a6623] animate-pulse" />
+                          {thinkingMessage || 'Thinking...'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
@@ -2404,6 +2687,78 @@ export default function ConsultationPage() {
             >
               Yes, Delete
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* File Preview Dialog */}
+      <Dialog open={!!previewFile} onOpenChange={(open) => { if (!open) handleClosePreview(); }}>
+        <DialogContent className="max-w-4xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-4 py-3 border-b flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <FileText className="w-5 h-5 text-primary flex-shrink-0" />
+                <DialogTitle className="text-base font-semibold truncate">
+                  {previewFile?.name || 'File Preview'}
+                </DialogTitle>
+              </div>
+              {previewBlobUrl && (
+                <a
+                  href={previewBlobUrl}
+                  download={previewFile?.name}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors mr-8 flex-shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download
+                </a>
+              )}
+            </div>
+            <DialogDescription className="sr-only">
+              Preview of uploaded file
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden bg-muted/20">
+            {previewLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+                  <p className="text-sm text-muted-foreground">Loading preview...</p>
+                </div>
+              </div>
+            ) : previewBlobUrl ? (
+              previewFile?.type === 'application/pdf' || previewFile?.name?.toLowerCase().endsWith('.pdf') ? (
+                <iframe
+                  src={previewBlobUrl}
+                  className="w-full h-full border-0"
+                  title={`Preview: ${previewFile?.name}`}
+                />
+              ) : previewFile?.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(previewFile?.name || '') ? (
+                <div className="flex items-center justify-center h-full p-4">
+                  <img
+                    src={previewBlobUrl}
+                    alt={previewFile?.name}
+                    className="max-w-full max-h-full object-contain rounded"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center space-y-3">
+                    <FileText className="w-12 h-12 text-muted-foreground mx-auto" />
+                    <p className="text-sm text-muted-foreground">Preview not available for this file type.</p>
+                    {previewBlobUrl && (
+                      <a
+                        href={previewBlobUrl}
+                        download={previewFile?.name}
+                        className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download File
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>

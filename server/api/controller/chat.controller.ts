@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { chatService } from '../../modules/chat/chat.service';
 import { chatRepository } from '../../modules/chat/chat.repository';
 import { usersRepository } from '../../modules/users/users.repository';
+import { filesRepository } from '../../modules/files/files.repository';
+import { filesService } from '../../modules/files/files.service';
 import { formulasRepository } from '../../modules/formulas/formulas.repository';
 import { systemRepository } from '../../modules/system/system.repository';
 import { notificationsService } from '../../modules/notifications/notifications.service';
@@ -21,6 +23,8 @@ import logger from '../../infra/logging/logger';
 import { logAiUsage, estimateTokenCount } from '../../modules/ai-usage/ai-usage.service';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+interface ImageAttachment { base64: string; mimeType: string; fileName: string; }
 
 
 export class ChatController {
@@ -72,8 +76,11 @@ export class ChatController {
                 });
             }
 
-            const { message, sessionId } = req.body;
+            const { message, sessionId, files } = req.body;
             const userId = req.userId!;
+            const attachedFileIds: string[] = Array.isArray(files)
+                ? files.map((f: any) => f.id).filter(Boolean)
+                : [];
 
             if (!message || typeof message !== 'string' || message.trim().length === 0) {
                 return res.status(400).json({ error: 'Valid message is required' });
@@ -121,6 +128,136 @@ export class ChatController {
                 model: null,
                 formula: undefined
             });
+
+            // If user just uploaded files, wait for their background analysis to finish
+            // so the AI can see the extracted biomarkers in this same turn.
+            let uploadedFileSummary = '';
+            const imageAttachments: ImageAttachment[] = [];
+
+            if (attachedFileIds.length > 0) {
+                // ── Determine file types to set appropriate wait time ──
+                // PDFs need OCR + structuring (up to 3 min); images are faster.
+                const fileRecordsPrefetch = await Promise.all(
+                    attachedFileIds.map(id => filesRepository.getFileUpload(id))
+                );
+                const hasPdf = fileRecordsPrefetch.some(f => f?.mimeType === 'application/pdf');
+                const hasImages = fileRecordsPrefetch.some(f => f?.mimeType?.startsWith('image/'));
+                const maxWaitMs = hasPdf ? 180_000 : 30_000; // 3 min for PDFs, 30s for images
+
+                sendSSE({
+                    type: 'thinking_step',
+                    step: 'analyze_files',
+                    status: 'active',
+                    detail: hasPdf ? 'Reading your document…' : `Analyzing ${attachedFileIds.length} file${attachedFileIds.length > 1 ? 's' : ''}…`
+                });
+
+                // ── Smart wait: poll analysis status with live SSE progress ──
+                const POLL_MS = 2000;
+                const deadline = Date.now() + maxWaitMs;
+                let lastProgressDetail = '';
+
+                // For images: download for vision while we wait (non-blocking prep)
+                if (hasImages) {
+                    for (const rec of fileRecordsPrefetch) {
+                        if (!rec || !rec.mimeType?.startsWith('image/')) continue;
+                        try {
+                            const downloaded = await filesService.downloadFile(rec.id, userId);
+                            if (downloaded?.buffer) {
+                                imageAttachments.push({
+                                    base64: downloaded.buffer.toString('base64'),
+                                    mimeType: downloaded.mimeType,
+                                    fileName: rec.originalFileName || 'image'
+                                });
+                            }
+                        } catch (imgErr) {
+                            logger.warn('Failed to download image for vision', { fileId: rec.id, error: (imgErr as Error)?.message });
+                        }
+                    }
+                }
+
+                // Poll until all files are analyzed (or timeout)
+                while (Date.now() < deadline) {
+                    const statuses = await Promise.all(
+                        attachedFileIds.map(async (id) => {
+                            const file = await filesRepository.getFileUpload(id);
+                            if (!file) return { done: true, progress: '' };
+                            const s = String((file.labReportData as any)?.analysisStatus || '').toLowerCase();
+                            const detail = (file.labReportData as any)?.progressDetail
+                                || (file.labReportData as any)?.progressStep
+                                || '';
+                            return { done: s === 'completed' || s === 'error', progress: detail };
+                        })
+                    );
+
+                    if (statuses.every(s => s.done)) break;
+
+                    // Surface real-time progress from the analysis pipeline
+                    const currentProgress = statuses.find(s => s.progress)?.progress || '';
+                    if (currentProgress && currentProgress !== lastProgressDetail) {
+                        lastProgressDetail = currentProgress;
+                        sendSSE({
+                            type: 'thinking_step',
+                            step: 'analyze_files',
+                            status: 'active',
+                            detail: currentProgress
+                        });
+                    }
+
+                    await new Promise(r => setTimeout(r, POLL_MS));
+                }
+
+                // ── Build per-file context for the AI ──
+                const fileSummaries: string[] = [];
+                let analysisStillRunning = false;
+
+                for (const fid of attachedFileIds) {
+                    const file = await filesRepository.getFileUpload(fid);
+                    if (!file) continue;
+
+                    const mime = (file.mimeType || '').toLowerCase();
+                    const isImage = mime.startsWith('image/');
+                    const status = String((file.labReportData as any)?.analysisStatus || 'unknown');
+                    const extracted = (file.labReportData as any)?.extractedData;
+                    const markerCount = Array.isArray(extracted) ? extracted.length : 0;
+
+                    if (status === 'completed' && markerCount > 0) {
+                        const markers = extracted.map((v: any) =>
+                            `  • ${v.testName}: ${v.value} ${v.unit || ''} (${v.status || 'Normal'})`
+                        ).join('\n');
+                        fileSummaries.push(`📄 ${file.originalFileName}: ${markerCount} biomarkers extracted\n${markers}`);
+                    } else if (status === 'processing') {
+                        analysisStillRunning = true;
+                    } else if (!isImage) {
+                        fileSummaries.push(`📄 ${file.originalFileName}: Could not extract structured data from this file.`);
+                    }
+                }
+
+                // Text context for extracted lab data
+                if (fileSummaries.length > 0) {
+                    uploadedFileSummary = `\n\n[SYSTEM: The user uploaded files in this message. Extracted lab data follows:\n${fileSummaries.join('\n\n')}]`;
+                }
+
+                // If analysis is still running (timed out), tell the AI
+                if (analysisStillRunning) {
+                    uploadedFileSummary += '\n\n[SYSTEM: One or more uploaded files are still being analyzed. Acknowledge receipt and let the user know you will have the full results shortly. Do NOT ask them to manually type or re-enter any values.]';
+                }
+
+                // For images: instruct AI to interpret them visually
+                if (imageAttachments.length > 0) {
+                    const imageNote = `\n\n[SYSTEM: The user has attached ${imageAttachments.length} image(s) to this message. Look at each image carefully and determine what it shows — it could be lab results, supplement labels, medication bottles, food logs, symptoms, or anything else. Describe what you see, assess its relevance to their health goals, and incorporate useful information into your recommendations. Do NOT assume all uploads are lab results.]`;
+                    uploadedFileSummary = (uploadedFileSummary || '') + imageNote;
+                }
+
+                // IMPORTANT: Never let the AI ask users to type lab values
+                uploadedFileSummary += '\n\n[SYSTEM: CRITICAL — NEVER ask the user to manually type, re-enter, or dictate lab values or biomarker numbers from their files. All data extraction is automated. If the data is not yet available, tell them it is being processed and you will review it once ready.]';
+
+                sendSSE({
+                    type: 'thinking_step',
+                    step: 'analyze_files',
+                    status: 'done',
+                    detail: analysisStillRunning ? 'Files received — analysis in progress' : `${attachedFileIds.length} file${attachedFileIds.length > 1 ? 's' : ''} analyzed`
+                });
+            }
 
             const { healthProfile, labDataContext, activeFormula, biometricDataContext } = await chatService.getContext(userId);
 
@@ -192,10 +329,50 @@ export class ChatController {
                 .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control chars (keep \n, \r, \t)
                 .trim();
 
+            // Append uploaded-file summary so the AI sees what was just uploaded
+            const userMessageText = uploadedFileSummary
+                ? sanitizedMessage + uploadedFileSummary
+                : sanitizedMessage;
+
+            // Build multimodal user message content if images are attached
+            let userContent: any;
+            if (imageAttachments.length > 0 && aiProvider === 'anthropic') {
+                // Anthropic vision format: array of content blocks
+                const contentBlocks: any[] = [];
+                for (const img of imageAttachments) {
+                    contentBlocks.push({
+                        type: 'image',
+                        source: {
+                            type: 'base64',
+                            media_type: img.mimeType,
+                            data: img.base64
+                        }
+                    });
+                }
+                contentBlocks.push({ type: 'text', text: userMessageText });
+                userContent = contentBlocks;
+            } else if (imageAttachments.length > 0) {
+                // OpenAI vision format: array of content parts
+                const contentParts: any[] = [];
+                for (const img of imageAttachments) {
+                    contentParts.push({
+                        type: 'image_url',
+                        image_url: {
+                            url: `data:${img.mimeType};base64,${img.base64}`,
+                            detail: 'high'
+                        }
+                    });
+                }
+                contentParts.push({ type: 'text', text: userMessageText });
+                userContent = contentParts;
+            } else {
+                userContent = userMessageText;
+            }
+
             const conversationHistory: any[] = [
                 { role: 'system', content: fullSystemPrompt },
                 ...promptContext.recentMessages!,
-                { role: 'user', content: sanitizedMessage }
+                { role: 'user', content: userContent }
             ];
 
             let fullResponse = '';
@@ -414,7 +591,33 @@ export class ChatController {
                               },
                           };
 
-                          savedFormula = await formulasRepository.createFormula(formulaData);
+                          // SAFETY NET: Retry formula save once on transient DB failure
+                          try {
+                            savedFormula = await formulasRepository.createFormula(formulaData);
+                          } catch (firstSaveErr) {
+                            logger.warn('Formula save attempt 1 failed, retrying...', {
+                              userId,
+                              chatSessionId: chatSession.id,
+                              error: firstSaveErr instanceof Error ? firstSaveErr.message : String(firstSaveErr),
+                            });
+                            // Wait briefly then retry once
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            try {
+                              savedFormula = await formulasRepository.createFormula(formulaData);
+                              logger.info('Formula save succeeded on retry', { userId });
+                            } catch (retrySaveErr) {
+                              // Both attempts failed — log full formula data for manual recovery
+                              logger.error('CRITICAL: Formula save failed after retry — formula data lost', {
+                                userId,
+                                chatSessionId: chatSession.id,
+                                formulaData: JSON.stringify(formulaData),
+                                error: retrySaveErr instanceof Error ? retrySaveErr.message : String(retrySaveErr),
+                              });
+                              sendSSE({ type: 'formula_error', error: 'Formula was generated but could not be saved. Our team has been notified and will recover it.' });
+                              // Re-throw so the outer catch handles the response properly
+                              throw retrySaveErr;
+                            }
+                          }
 
                           // Send first-formula-created email + in-app notification
                           try {

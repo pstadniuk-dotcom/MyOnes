@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -19,14 +19,17 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Plus
+  Plus,
+  ArrowLeft,
+  Send,
+  User
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest, queryClient } from '@/shared/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
-import type { FaqItem, SupportTicket, HelpArticle } from '@shared/schema';
+import type { FaqItem, SupportTicket, SupportTicketResponse, HelpArticle } from '@shared/schema';
 
 // Article content renderer with better formatting
 function ArticleContent({ content }: { content: string }) {
@@ -142,7 +145,7 @@ function ArticleContent({ content }: { content: string }) {
 const helpCategoryConfigs = [
   {
     title: 'Getting Started',
-    description: 'Learn the basics of using Ones AI',
+    description: 'Learn the basics of using Ones',
     icon: Book,
     category: 'Getting Started'
   },
@@ -201,6 +204,9 @@ export default function SupportPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<HelpArticle | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [replyMessage, setReplyMessage] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -226,6 +232,40 @@ export default function SupportPage() {
   const { data: ticketsData, isLoading: ticketsLoading } = useQuery<{ tickets: SupportTicket[] }>({
     queryKey: ['/api/support/tickets'],
     enabled: !!user,
+  });
+
+  // Fetch single ticket with responses
+  const { data: ticketDetailData, isLoading: ticketDetailLoading } = useQuery<{ ticket: SupportTicket; responses: SupportTicketResponse[] }>({
+    queryKey: ['/api/support/tickets', selectedTicketId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/support/tickets/${selectedTicketId}`);
+      return res.json();
+    },
+    enabled: !!selectedTicketId && !!user,
+  });
+
+  // Scroll to bottom of messages when they load or change
+  useEffect(() => {
+    if (ticketDetailData?.responses) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [ticketDetailData?.responses]);
+
+  // Reply to ticket mutation
+  const replyMutation = useMutation({
+    mutationFn: async ({ ticketId, message }: { ticketId: string; message: string }) => {
+      const res = await apiRequest('POST', `/api/support/tickets/${ticketId}/responses`, { message });
+      return res.json();
+    },
+    onSuccess: () => {
+      setReplyMessage('');
+      queryClient.invalidateQueries({ queryKey: ['/api/support/tickets', selectedTicketId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/support/tickets'] });
+      toast({ title: 'Reply sent', description: 'Your message has been sent to the support team.' });
+    },
+    onError: () => {
+      toast({ title: 'Error sending reply', description: 'Please try again.', variant: 'destructive' });
+    },
   });
 
   // Create support ticket mutation
@@ -720,7 +760,7 @@ export default function SupportPage() {
                 <CardContent>
                   <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200">
                     <p className="text-sm text-red-800 dark:text-red-300 mb-3">
-                      <strong>Important:</strong> Ones AI provides supplement recommendations, not medical advice.
+                      <strong>Important:</strong> Ones provides supplement recommendations, not medical advice.
                       For medical emergencies, please contact emergency services immediately.
                     </p>
                     <div className="space-y-1 text-sm text-red-700 dark:text-red-400">
@@ -735,74 +775,217 @@ export default function SupportPage() {
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-6">
-          <Card data-testid="section-support-tickets">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>My Support Tickets</CardTitle>
-                  <CardDescription>
-                    Track your support requests and responses
-                  </CardDescription>
-                </div>
-                <Button onClick={() => setActiveTab('contact')} data-testid="button-new-ticket">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Ticket
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {ticketsLoading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="space-y-2">
-                      <Skeleton className="h-6 w-1/2" />
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-4 w-1/4" />
+          {selectedTicketId ? (
+            /* ── Ticket Detail View ── */
+            <Card data-testid="section-ticket-detail">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setSelectedTicketId(null); setReplyMessage(''); }}
+                    data-testid="button-back-tickets"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-1" />
+                    Back
+                  </Button>
+                  {ticketDetailData?.ticket && (
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <CardTitle className="text-lg">{ticketDetailData.ticket.subject}</CardTitle>
+                        <Badge className={getStatusColor(ticketDetailData.ticket.status)}>
+                          {ticketDetailData.ticket.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      <CardDescription className="mt-1">
+                        Ticket #{ticketDetailData.ticket.id.slice(0, 8)} · Created {new Date(ticketDetailData.ticket.createdAt).toLocaleDateString()}
+                        {ticketDetailData.ticket.category && ` · ${ticketDetailData.ticket.category}`}
+                      </CardDescription>
                     </div>
-                  ))}
+                  )}
                 </div>
-              ) : supportTickets.length > 0 ? (
-                <div className="space-y-4">
-                  {supportTickets.map((ticket) => (
-                    <Card key={ticket.id} className="hover-elevate cursor-pointer" data-testid={`ticket-${ticket.id}`}>
-                      <CardContent className="pt-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
-                              {getStatusIcon(ticket.status)}
-                              <span className="font-medium">{ticket.id.slice(0, 8)}...</span>
+              </CardHeader>
+              <CardContent>
+                {ticketDetailLoading ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-3/4" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : ticketDetailData ? (
+                  <div className="space-y-6">
+                    {/* Original message */}
+                    <div className="rounded-lg border bg-muted/30 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                          <span className="font-medium text-sm">You</span>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            {new Date(ticketDetailData.ticket.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap pl-10">{ticketDetailData.ticket.description}</p>
+                    </div>
+
+                    {/* Conversation thread */}
+                    {ticketDetailData.responses.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Conversation</h4>
+                        {ticketDetailData.responses.map((response) => (
+                          <div
+                            key={response.id}
+                            className={`rounded-lg border p-4 ${
+                              response.isStaff
+                                ? 'bg-primary/5 border-primary/20 ml-4'
+                                : 'bg-muted/30 mr-4'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                response.isStaff ? 'bg-primary/20' : 'bg-muted'
+                              }`}>
+                                {response.isStaff
+                                  ? <MessageCircle className="w-4 h-4 text-primary" />
+                                  : <User className="w-4 h-4 text-muted-foreground" />
+                                }
+                              </div>
+                              <div>
+                                <span className="font-medium text-sm">
+                                  {response.isStaff ? 'Ones Support' : 'You'}
+                                </span>
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  {new Date(response.createdAt).toLocaleString()}
+                                </span>
+                              </div>
                             </div>
-                            <Badge className={getStatusColor(ticket.status)}>
-                              {ticket.status.replace('_', ' ')}
-                            </Badge>
+                            <p className="text-sm whitespace-pre-wrap pl-10">{response.message}</p>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {new Date(ticket.createdAt).toLocaleDateString()}
-                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+
+                    {/* Reply form — only show if ticket is not closed/resolved */}
+                    {ticketDetailData.ticket.status !== 'closed' && ticketDetailData.ticket.status !== 'resolved' ? (
+                      <div className="border-t pt-4 space-y-3">
+                        <Label htmlFor="reply-message" className="text-sm font-medium">Reply</Label>
+                        <Textarea
+                          id="reply-message"
+                          placeholder="Type your reply..."
+                          className="min-h-[80px]"
+                          value={replyMessage}
+                          onChange={(e) => setReplyMessage(e.target.value)}
+                          data-testid="textarea-ticket-reply"
+                        />
+                        <div className="flex justify-end">
+                          <Button
+                            onClick={() => replyMutation.mutate({ ticketId: selectedTicketId!, message: replyMessage })}
+                            disabled={!replyMessage.trim() || replyMutation.isPending}
+                            data-testid="button-send-reply"
+                          >
+                            <Send className="w-4 h-4 mr-2" />
+                            {replyMutation.isPending ? 'Sending...' : 'Send Reply'}
+                          </Button>
                         </div>
-                        <h4 className="font-medium mb-2">{ticket.subject}</h4>
-                        <div className="text-sm text-muted-foreground">
-                          Last updated: {new Date(ticket.updatedAt).toLocaleDateString()}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <MessageCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="font-medium mb-2">No support tickets yet</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    When you contact support, your tickets will appear here
-                  </p>
-                  <Button onClick={() => setActiveTab('contact')} data-testid="button-create-first-ticket">
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    Create Your First Ticket
+                      </div>
+                    ) : (
+                      <div className="border-t pt-4">
+                        <p className="text-sm text-muted-foreground text-center">
+                          This ticket has been {ticketDetailData.ticket.status}. To reopen, please create a new ticket.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Ticket not found</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            /* ── Ticket List View ── */
+            <Card data-testid="section-support-tickets">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>My Support Tickets</CardTitle>
+                    <CardDescription>
+                      Track your support requests and responses
+                    </CardDescription>
+                  </div>
+                  <Button onClick={() => setActiveTab('contact')} data-testid="button-new-ticket">
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Ticket
                   </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent>
+                {ticketsLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="space-y-2">
+                        <Skeleton className="h-6 w-1/2" />
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-4 w-1/4" />
+                      </div>
+                    ))}
+                  </div>
+                ) : supportTickets.length > 0 ? (
+                  <div className="space-y-4">
+                    {supportTickets.map((ticket) => (
+                      <Card
+                        key={ticket.id}
+                        className="hover-elevate cursor-pointer transition-shadow hover:shadow-md"
+                        onClick={() => setSelectedTicketId(ticket.id)}
+                        data-testid={`ticket-${ticket.id}`}
+                      >
+                        <CardContent className="pt-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
+                                {getStatusIcon(ticket.status)}
+                                <span className="font-medium">{ticket.id.slice(0, 8)}...</span>
+                              </div>
+                              <Badge className={getStatusColor(ticket.status)}>
+                                {ticket.status.replace('_', ' ')}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">
+                                {new Date(ticket.createdAt).toLocaleDateString()}
+                              </span>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          </div>
+                          <h4 className="font-medium mb-2">{ticket.subject}</h4>
+                          <div className="text-sm text-muted-foreground">
+                            Last updated: {new Date(ticket.updatedAt).toLocaleDateString()}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <MessageCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="font-medium mb-2">No support tickets yet</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      When you contact support, your tickets will appear here
+                    </p>
+                    <Button onClick={() => setActiveTab('contact')} data-testid="button-create-first-ticket">
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Create Your First Ticket
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

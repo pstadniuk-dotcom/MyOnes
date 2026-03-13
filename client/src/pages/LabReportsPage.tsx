@@ -5,6 +5,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
 import { Textarea } from '@/shared/components/ui/textarea';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import {
@@ -12,7 +13,7 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2, Activity,
   Heart, Beaker, ChevronDown, ChevronUp, Filter, Search, RefreshCw,
   Sparkles, Shield, ArrowUpRight, ArrowDownRight,
-  UtensilsCrossed, Dumbbell, Info, MessageCircle, Ban,
+  UtensilsCrossed, Dumbbell, Info, MessageCircle, Ban, ImageIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -357,6 +358,7 @@ function SummaryCard({ label, value, icon: Icon, iconBg, iconColor, sub }: {
 // ── Focus Area Card ────────────────────────────────────────────────────
 
 function FocusAreaCard({ area }: { area: FocusArea }) {
+  const [, navigate] = useLocation();
   const friendlyName = PANEL_FRIENDLY_NAMES[area.panel] || area.panel;
   const gradeColor = area.score >= 80 ? 'bg-teal-100 text-teal-700' : area.score >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700';
   const barColor = area.score >= 80 ? 'bg-teal-500' : area.score >= 60 ? 'bg-amber-500' : 'bg-red-500';
@@ -429,14 +431,20 @@ function FocusAreaCard({ area }: { area: FocusArea }) {
           </div>
         )}
         {/* CTA to discuss supplements via AI chat */}
-        <a
-          href="/chat"
-          className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-[#054700]/5 hover:bg-[#054700]/10 transition-colors group"
+        <button
+          onClick={() => {
+            const markerSummary = area.markers.map(m => `${m.name}: ${m.value}${m.unit ? ' ' + m.unit : ''} (${m.status})`).join(', ');
+            const message = `I'd like to discuss my ${friendlyName} results. My abnormal markers are: ${markerSummary}. What does this mean for my health, and what steps should I take?`;
+            localStorage.setItem('labMarkerDiscuss', message);
+            localStorage.setItem('forceNewChat', Date.now().toString());
+            navigate('/dashboard/chat?new=true');
+          }}
+          className="w-full flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-[#054700]/5 hover:bg-[#054700]/10 transition-colors group cursor-pointer"
         >
           <span className="text-base">💬</span>
           <span className="text-sm font-medium text-[#054700] group-hover:underline">Discuss this with your AI practitioner</span>
           <span className="ml-auto text-[#5a6623] text-xs">→</span>
-        </a>
+        </button>
       </div>
     </div>
   );
@@ -482,6 +490,7 @@ function MarkerInsightPanel({ insight, marker }: { insight?: MarkerInsightData |
     message += ' What does this mean for my health, and what steps should I take?';
 
     localStorage.setItem('labMarkerDiscuss', message);
+    localStorage.setItem('forceNewChat', Date.now().toString());
     navigate('/dashboard/chat?new=true');
   };
 
@@ -644,6 +653,10 @@ export default function LabReportsPage() {
   const [expandedMarker, setExpandedMarker] = useState<string | null>(null);
   const [showReports, setShowReports] = useState(false);
   const [showAllMarkers, setShowAllMarkers] = useState(false);
+  const [reportFilter, setReportFilter] = useState<string>('all');
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   // ── Queries ──────────────────────────────────────────────────────────
 
@@ -707,17 +720,43 @@ export default function LabReportsPage() {
 
   const filteredMarkers = useMemo(() => {
     if (!dashboard?.markers) return [];
-    return dashboard.markers.filter(m => {
-      if (categoryFilter !== 'all' && m.category !== categoryFilter) return false;
-      if (statusFilter !== 'all' && m.latest.status !== statusFilter) return false;
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        const friendlyCategory = (PANEL_FRIENDLY_NAMES[m.category] || m.category).toLowerCase();
-        return m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q) || friendlyCategory.includes(q);
-      }
-      return true;
-    });
-  }, [dashboard?.markers, categoryFilter, statusFilter, searchQuery]);
+    return dashboard.markers
+      .map(m => {
+        // When a specific report is selected, find that report's entry and override display values
+        if (reportFilter !== 'all') {
+          const historyEntry = m.history.find(h => h.reportId === reportFilter);
+          if (!historyEntry) return null; // marker not in this report
+          return {
+            ...m,
+            latest: {
+              ...m.latest,
+              value: historyEntry.value,
+              rawValue: historyEntry.rawValue,
+              unit: historyEntry.unit,
+              status: historyEntry.status,
+              date: historyEntry.date,
+              reportId: historyEntry.reportId,
+            },
+            previous: null,
+            delta: null,
+            deltaAbsolute: null,
+            trend: 'new' as const, // single-report snapshot has no trend
+          };
+        }
+        return m;
+      })
+      .filter((m): m is AggregatedBiomarker => m !== null)
+      .filter(m => {
+        if (categoryFilter !== 'all' && m.category !== categoryFilter) return false;
+        if (statusFilter !== 'all' && m.latest.status !== statusFilter) return false;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const friendlyCategory = (PANEL_FRIENDLY_NAMES[m.category] || m.category).toLowerCase();
+          return m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q) || friendlyCategory.includes(q);
+        }
+        return true;
+      });
+  }, [dashboard?.markers, categoryFilter, statusFilter, searchQuery, reportFilter]);
 
   // ── Mutations ────────────────────────────────────────────────────────
 
@@ -788,6 +827,28 @@ export default function LabReportsPage() {
     },
     onError: (error: Error) => {
       toast({ title: 'Re-analysis failed', description: error.message || 'Could not re-analyze this report.', variant: 'destructive' });
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (fileIds: string[]) => {
+      const response = await apiRequest('POST', '/api/files/bulk-delete', { fileIds });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/labs/biomarkers'] });
+      setSelectedFiles(new Set());
+      setShowBulkDeleteConfirm(false);
+      setIsBulkDeleting(false);
+      const msg = data.failed > 0
+        ? `Deleted ${data.deleted} file${data.deleted !== 1 ? 's' : ''}. ${data.failed} failed.`
+        : `Deleted ${data.deleted} file${data.deleted !== 1 ? 's' : ''} successfully.`;
+      toast({ title: 'Files deleted', description: msg });
+    },
+    onError: (error: Error) => {
+      setIsBulkDeleting(false);
+      toast({ title: 'Delete failed', description: error.message || 'Failed to delete files', variant: 'destructive' });
     },
   });
 
@@ -986,6 +1047,50 @@ export default function LabReportsPage() {
     });
   }, [labReports]);
 
+  // Split reports into lab reports (PDFs / text) vs images
+  const { labDocuments, imageUploads } = useMemo(() => {
+    if (!labReports) return { labDocuments: [], imageUploads: [] };
+    const labs: typeof labReports = [];
+    const images: typeof labReports = [];
+    for (const r of labReports) {
+      const mime = (r.mimeType || '').toLowerCase();
+      if (mime.startsWith('image/')) {
+        images.push(r);
+      } else {
+        labs.push(r);
+      }
+    }
+    return { labDocuments: labs, imageUploads: images };
+  }, [labReports]);
+
+  // File selection helpers
+  const toggleFileSelection = (fileId: string) => {
+    setSelectedFiles(prev => {
+      const next = new Set(prev);
+      if (next.has(fileId)) next.delete(fileId); else next.add(fileId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (files: typeof labReports) => {
+    if (!files) return;
+    const allIds = files.map(f => f.id);
+    const allSelected = allIds.every(id => selectedFiles.has(id));
+    if (allSelected) {
+      setSelectedFiles(prev => {
+        const next = new Set(prev);
+        allIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedFiles(prev => {
+        const next = new Set(prev);
+        allIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  };
+
   // When analysis finishes (processing → completed), refetch biomarkers dashboard
   useEffect(() => {
     const isProcessing = processingReports.length > 0;
@@ -1099,7 +1204,7 @@ export default function LabReportsPage() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <CardTitle className="text-[#054700] text-lg flex items-center gap-2">
                 <img src="/ones-logo-icon.svg" alt="" className="h-5 w-5" />
-                Ones AI Lab Analysis
+                Ones Lab Analysis
               </CardTitle>
               <Button
                 size="sm"
@@ -1164,6 +1269,20 @@ export default function LabReportsPage() {
               </div>
             )}
 
+            {/* ── Summary Stat Cards ── */}
+            {summary && summary.totalMarkers > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <SummaryCard label="Total Markers" value={summary.totalMarkers} icon={Activity} iconBg="bg-[#054700]/10" iconColor="text-[#054700]" sub={`${summary.normal} in range`} />
+                <SummaryCard label="Out of Range" value={summary.high + summary.low + summary.critical} icon={AlertTriangle} iconBg="bg-amber-100" iconColor="text-amber-600" sub={summary.critical > 0 ? `${summary.critical} critical` : undefined} />
+                {comparison?.hasMultipleReports && (
+                  <SummaryCard label="Improving" value={summary.improving} icon={TrendingUp} iconBg="bg-emerald-100" iconColor="text-emerald-600" sub="since last report" />
+                )}
+                {comparison?.hasMultipleReports && (
+                  <SummaryCard label="Worsening" value={summary.worsening} icon={TrendingDown} iconBg="bg-red-100" iconColor="text-red-600" sub="need attention" />
+                )}
+              </div>
+            )}
+
             {/* ── Summary + Changes ── */}
             {dashboard?.analysisSummary && dashboard.analysisSummary.headline && (
               <div className="space-y-4">
@@ -1199,6 +1318,39 @@ export default function LabReportsPage() {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Focus Areas (troubled panels with actions) ── */}
+                {dashboard.analysisSummary.focusAreas && dashboard.analysisSummary.focusAreas.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-[#5a6623] uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Focus Areas
+                    </h4>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {dashboard.analysisSummary.focusAreas.map((area, i) => (
+                        <FocusAreaCard key={i} area={area} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Strengths (clean panels) ── */}
+                {dashboard.analysisSummary.strengths && dashboard.analysisSummary.strengths.length > 0 && (
+                  <div className="bg-emerald-50/60 rounded-xl border border-emerald-200/40 px-4 py-3">
+                    <h4 className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      All Clear
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {dashboard.analysisSummary.strengths.map((panel, i) => (
+                        <span key={i} className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-100/60 rounded-full px-2.5 py-1 border border-emerald-200/50">
+                          <span>{CATEGORY_ICONS[panel] || '✅'}</span>
+                          {PANEL_FRIENDLY_NAMES[panel] || panel}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -1239,7 +1391,18 @@ export default function LabReportsPage() {
           <CardHeader className="pb-3 border-b border-[#5a6623]/10">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-2 text-xs text-[#5a6623]">
-                {filteredMarkers.length} of {dashboard.markers.length} markers shown
+                {filteredMarkers.length} of {reportFilter !== 'all'
+                  ? `${dashboard.markers.filter(m => m.history.some(h => h.reportId === reportFilter)).length} markers in this report`
+                  : `${dashboard.markers.length} markers`
+                } shown
+                {reportFilter !== 'all' && (
+                  <button
+                    onClick={() => setReportFilter('all')}
+                    className="ml-1 text-xs text-[#054700] underline hover:text-[#054700]/70"
+                  >
+                    Show all reports
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1256,6 +1419,24 @@ export default function LabReportsPage() {
                   className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-[#5a6623]/20 bg-white text-[#054700] placeholder:text-[#5a6623]/50 focus:outline-none focus:ring-1 focus:ring-[#054700]/30"
                 />
               </div>
+
+              {/* Report filter */}
+              {dashboard.reports && dashboard.reports.length > 1 && (
+                <select
+                  value={reportFilter}
+                  onChange={e => setReportFilter(e.target.value)}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-[#5a6623]/20 bg-white text-[#054700] focus:outline-none focus:ring-1 focus:ring-[#054700]/30"
+                >
+                  <option value="all">All Reports</option>
+                  {dashboard.reports
+                    .filter(r => r.status === 'completed' && r.markerCount > 0)
+                    .map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.fileName}{r.testDate ? ` (${fmtDate(r.testDate)})` : ''} — {r.markerCount} markers
+                      </option>
+                    ))}
+                </select>
+              )}
 
               {/* Category filter */}
               <select
@@ -1491,81 +1672,230 @@ export default function LabReportsPage() {
         </Card>
       )}
 
-      {/* ── Reports List (collapsible) ── */}
+      {/* ── Uploaded Files (collapsible, split into Lab Reports + Images) ── */}
       {labReports && labReports.length > 0 && (
         <Card className="border-[#5a6623]/10 shadow-2xl">
           <CardHeader className="pb-2">
-            <button
-              onClick={() => setShowReports(!showReports)}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <CardTitle className="text-[#054700] text-base flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Uploaded Reports
-                <span className="text-sm font-normal text-[#5a6623]">({labReports.length})</span>
-              </CardTitle>
-              {showReports ? <ChevronUp className="h-4 w-4 text-[#5a6623]" /> : <ChevronDown className="h-4 w-4 text-[#5a6623]" />}
-            </button>
+            <div className="flex items-center justify-between w-full">
+              <button
+                onClick={() => setShowReports(!showReports)}
+                className="flex items-center gap-2 text-left"
+              >
+                <CardTitle className="text-[#054700] text-base flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Uploaded Files
+                  <span className="text-sm font-normal text-[#5a6623]">({labReports.length})</span>
+                </CardTitle>
+                {showReports ? <ChevronUp className="h-4 w-4 text-[#5a6623]" /> : <ChevronDown className="h-4 w-4 text-[#5a6623]" />}
+              </button>
+              {showReports && selectedFiles.size > 0 && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  disabled={isBulkDeleting}
+                  className="ml-auto"
+                >
+                  {isBulkDeleting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+                  Delete {selectedFiles.size} selected
+                </Button>
+              )}
+            </div>
           </CardHeader>
           {showReports && (
-            <CardContent className="pt-2 space-y-2">
-              {labReports.map(report => {
-                const ld = report.labReportData as any;
-                const markerCount = Array.isArray(ld?.extractedData) ? ld.extractedData.length : 0;
-                const status = ld?.analysisStatus || 'unknown';
-                const testDate = ld?.testDate;
-                const labName = ld?.labName;
-
-                return (
-                  <div key={report.id} className="flex items-center gap-3 bg-white rounded-xl border border-[#5a6623]/10 px-4 py-3" data-testid={`report-${report.id}`}>
-                    <div className="h-9 w-9 rounded-full bg-[#054700]/10 flex items-center justify-center flex-shrink-0">
-                      <FileText className="h-4 w-4 text-[#054700]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#054700] truncate">{report.originalFileName}</p>
-                      <div className="flex items-center gap-2 text-xs text-[#5a6623]">
-                        <span>{new Date(report.uploadedAt).toLocaleDateString()}</span>
-                        {testDate && <span>• Test: {fmtDate(testDate)}</span>}
-                        {labName && <span>• {labName}</span>}
-                        {markerCount > 0 && <span>• {markerCount} markers</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {status === 'processing' || status === 'pending' ? (
-                        <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />Processing
-                        </Badge>
-                      ) : status === 'completed' ? (
-                        <Badge variant="outline" className="text-xs border-emerald-300 text-emerald-700 bg-emerald-50">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />Analyzed
-                        </Badge>
-                      ) : status === 'error' ? (
-                        <Badge variant="outline" className="text-xs border-red-300 text-red-700 bg-red-50">
-                          <AlertTriangle className="h-3 w-3 mr-1" />Error
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">Uploaded</Badge>
-                      )}
-
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleViewFile(report.id)} disabled={loadingFiles.has(report.id)} title="View">
-                        {loadingFiles.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#054700]" /> : <Eye className="h-3.5 w-3.5 text-[#054700]" />}
-                      </Button>
-                      {report.mimeType === 'text/plain' && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditReport(report)} disabled={editingFiles.has(report.id)} title="Edit">
-                          {editingFiles.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#054700]" /> : <Edit2 className="h-3.5 w-3.5 text-[#054700]" />}
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setFileToDelete(report.id)} title="Delete">
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                    </div>
+            <CardContent className="pt-2 space-y-6">
+              {/* ── Lab Reports Section ── */}
+              {labDocuments.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-[#054700] flex items-center gap-2">
+                      <FileText className="h-3.5 w-3.5" />
+                      Lab Reports
+                      <span className="text-xs font-normal text-[#5a6623]">({labDocuments.length})</span>
+                    </h3>
+                    <button
+                      onClick={() => toggleSelectAll(labDocuments)}
+                      className="text-xs text-[#5a6623] hover:text-[#054700] transition-colors"
+                    >
+                      {labDocuments.every(f => selectedFiles.has(f.id)) ? 'Deselect all' : 'Select all'}
+                    </button>
                   </div>
-                );
-              })}
+                  <div className="space-y-2">
+                    {labDocuments.map(report => {
+                      const ld = report.labReportData as any;
+                      const markerCount = Array.isArray(ld?.extractedData) ? ld.extractedData.length : 0;
+                      const status = ld?.analysisStatus || 'unknown';
+                      const testDate = ld?.testDate;
+                      const labName = ld?.labName;
+                      const isSelected = selectedFiles.has(report.id);
+
+                      return (
+                        <div
+                          key={report.id}
+                          className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${isSelected ? 'bg-[#054700]/5 border-[#054700]/20' : 'bg-white border-[#5a6623]/10'}`}
+                          data-testid={`report-${report.id}`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleFileSelection(report.id)}
+                            className="flex-shrink-0"
+                          />
+                          <div className="h-9 w-9 rounded-full bg-[#054700]/10 flex items-center justify-center flex-shrink-0">
+                            <FileText className="h-4 w-4 text-[#054700]" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[#054700] truncate">{report.originalFileName}</p>
+                            <div className="flex items-center gap-2 text-xs text-[#5a6623]">
+                              <span>{new Date(report.uploadedAt).toLocaleDateString()}</span>
+                              {testDate && <span>• Test: {fmtDate(testDate)}</span>}
+                              {labName && <span>• {labName}</span>}
+                              {markerCount > 0 && <span>• {markerCount} markers</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {status === 'processing' || status === 'pending' ? (
+                              <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />Processing
+                              </Badge>
+                            ) : status === 'completed' ? (
+                              <Badge variant="outline" className="text-xs border-emerald-300 text-emerald-700 bg-emerald-50">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />Analyzed
+                              </Badge>
+                            ) : status === 'error' ? (
+                              <Badge variant="outline" className="text-xs border-red-300 text-red-700 bg-red-50">
+                                <AlertTriangle className="h-3 w-3 mr-1" />Error
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">Uploaded</Badge>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleViewFile(report.id)} disabled={loadingFiles.has(report.id)} title="View">
+                              {loadingFiles.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#054700]" /> : <Eye className="h-3.5 w-3.5 text-[#054700]" />}
+                            </Button>
+                            {report.mimeType === 'text/plain' && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditReport(report)} disabled={editingFiles.has(report.id)} title="Edit">
+                                {editingFiles.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#054700]" /> : <Edit2 className="h-3.5 w-3.5 text-[#054700]" />}
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setFileToDelete(report.id)} title="Delete">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Images Section ── */}
+              {imageUploads.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-[#054700] flex items-center gap-2">
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      Images
+                      <span className="text-xs font-normal text-[#5a6623]">({imageUploads.length})</span>
+                    </h3>
+                    <button
+                      onClick={() => toggleSelectAll(imageUploads)}
+                      className="text-xs text-[#5a6623] hover:text-[#054700] transition-colors"
+                    >
+                      {imageUploads.every(f => selectedFiles.has(f.id)) ? 'Deselect all' : 'Select all'}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {imageUploads.map(report => {
+                      const ld = report.labReportData as any;
+                      const markerCount = Array.isArray(ld?.extractedData) ? ld.extractedData.length : 0;
+                      const status = ld?.analysisStatus || 'unknown';
+                      const isSelected = selectedFiles.has(report.id);
+
+                      return (
+                        <div
+                          key={report.id}
+                          className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${isSelected ? 'bg-[#054700]/5 border-[#054700]/20' : 'bg-white border-[#5a6623]/10'}`}
+                          data-testid={`report-${report.id}`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleFileSelection(report.id)}
+                            className="flex-shrink-0"
+                          />
+                          <div className="h-9 w-9 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                            <ImageIcon className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[#054700] truncate">{report.originalFileName}</p>
+                            <div className="flex items-center gap-2 text-xs text-[#5a6623]">
+                              <span>{new Date(report.uploadedAt).toLocaleDateString()}</span>
+                              {markerCount > 0 && <span>• {markerCount} markers extracted</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {status === 'processing' || status === 'pending' ? (
+                              <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />Processing
+                              </Badge>
+                            ) : status === 'completed' ? (
+                              markerCount > 0 ? (
+                                <Badge variant="outline" className="text-xs border-emerald-300 text-emerald-700 bg-emerald-50">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />Analyzed
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs border-gray-300 text-gray-600 bg-gray-50">
+                                  Image
+                                </Badge>
+                              )
+                            ) : status === 'error' ? (
+                              <Badge variant="outline" className="text-xs border-red-300 text-red-700 bg-red-50">
+                                <AlertTriangle className="h-3 w-3 mr-1" />Error
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">Uploaded</Badge>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleViewFile(report.id)} disabled={loadingFiles.has(report.id)} title="View">
+                              {loadingFiles.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#054700]" /> : <Eye className="h-3.5 w-3.5 text-[#054700]" />}
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setFileToDelete(report.id)} title="Delete">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </CardContent>
           )}
         </Card>
       )}
+
+      {/* ── Bulk Delete Confirmation ── */}
+      <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedFiles.size} file{selectedFiles.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the selected files from your account. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setIsBulkDeleting(true);
+                bulkDeleteMutation.mutate(Array.from(selectedFiles));
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isBulkDeleting}
+            >
+              {isBulkDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Yes, Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Consent Dialog ── */}
       <Dialog open={showConsentDialog} onOpenChange={setShowConsentDialog}>
@@ -1577,7 +1907,7 @@ export default function LabReportsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm">By providing consent, you agree to allow Ones AI to:</p>
+            <p className="text-sm">By providing consent, you agree to allow Ones to:</p>
             <ul className="text-sm space-y-2 ml-4 list-disc">
               <li>Process and analyze your uploaded lab results</li>
               <li>Use this data to create personalized supplement recommendations</li>

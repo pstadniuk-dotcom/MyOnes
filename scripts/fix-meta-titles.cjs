@@ -3,7 +3,7 @@ const { Pool } = require('pg');
 const p = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const fixes = [
-  ['ones-ai-vs-ritual-vs-care-of-personalized-vitamins', 'ONES AI vs Ritual vs Care/Of: Which Is More Personalized? | ONES AI'],
+  ['ones-ai-vs-ritual-vs-care-of-personalized-vitamins', 'Ones vs Ritual vs Care/Of: Which Is More Personalized? | Ones'],
 ];
 
 async function run() {

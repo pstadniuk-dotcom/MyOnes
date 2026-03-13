@@ -49,7 +49,8 @@ export class AuthController {
     async login(req: Request, res: Response) {
         try {
             const clientIP = getClientIP(req);
-            const rateLimit = checkRateLimit(`login-${clientIP}`, 5, 15 * 60 * 1000);
+            const isDev = process.env.NODE_ENV !== 'production';
+            const rateLimit = checkRateLimit(`login-${clientIP}`, isDev ? 100 : 5, 15 * 60 * 1000);
             if (!rateLimit.allowed) {
                 return res.status(429).json({
                     error: 'Too many login attempts. Please try again later.',

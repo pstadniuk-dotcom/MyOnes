@@ -2,11 +2,11 @@
 INSERT INTO help_articles (category, title, content, display_order, is_published) VALUES
 ('Getting Started', 'Creating Your Account and Setting Up Your Profile', '# Creating Your Account and Setting Up Your Profile
 
-Welcome to Ones AI! This guide will walk you through creating your account and setting up your health profile for personalized supplement recommendations.
+Welcome to Ones! This guide will walk you through creating your account and setting up your health profile for personalized supplement recommendations.
 
 ## Step 1: Sign Up
 
-1. Visit the Ones AI homepage
+1. Visit the Ones homepage
 2. Click "Get Started" or "Sign Up" in the top right corner
 3. Enter your:
    - Full name
@@ -59,7 +59,7 @@ For the most accurate recommendations, upload your recent blood test results:
 ## Next Steps
 
 Once your profile is complete, you can:
-- Start a consultation with Ones AI
+- Start a consultation with Ones
 - Receive your personalized formula
 - Place your first order
 

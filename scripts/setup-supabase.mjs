@@ -17,7 +17,7 @@ const readline = createInterface({
 
 const question = (prompt) => new Promise((resolve) => readline.question(prompt, resolve));
 
-console.log('\n🚀 ONES AI - Supabase Setup Helper\n');
+console.log('\n🚀 ONES - Supabase Setup Helper\n');
 console.log('This will help you configure your Supabase database.\n');
 
 async function main() {

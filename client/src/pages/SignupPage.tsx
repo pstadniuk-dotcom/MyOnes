@@ -17,7 +17,7 @@ import { SocialAuthButtons } from '@/shared/components/auth/SocialAuthButtons';
 const extendedSignupSchema = signupSchema.extend({
   confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
+  message: "Please confirm your password",
   path: ["confirmPassword"],
 });
 
@@ -60,7 +60,7 @@ export default function SignupPage() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Home
             </Link>
-            <h1 className="text-2xl font-bold">Ones</h1>
+            <img src="/ones-logo-light.svg" alt="Ones" className="h-7" />
           </div>
           <div className="text-center">
             <p className="text-muted-foreground">Start your personalized health journey</p>

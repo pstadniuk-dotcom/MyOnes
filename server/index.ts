@@ -110,10 +110,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Rate limiting configuration
+const isDev = process.env.NODE_ENV !== 'production';
+
 // General API rate limit - prevents abuse and excessive costs
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Limit each IP to 200 requests per 15 minutes
+  max: isDev ? 1000 : 200, // Relaxed in dev, strict in prod
   message: { error: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
@@ -126,7 +128,7 @@ const apiLimiter = rateLimit({
 // Stricter limit for authentication endpoints - prevents brute force
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 attempts per 15 minutes (balanced security vs usability)
+  max: isDev ? 100 : 10, // Relaxed in dev, strict in prod
   message: { error: 'Too many login attempts, please try again later.' },
   skipSuccessfulRequests: true, // Don't count successful logins
   standardHeaders: true,
@@ -136,7 +138,7 @@ const authLimiter = rateLimit({
 // AI chat rate limit - prevents API cost abuse
 const aiLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 50, // 50 AI requests per hour per IP
+  max: isDev ? 200 : 50, // Relaxed in dev, strict in prod
   message: { error: 'Too many AI requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,

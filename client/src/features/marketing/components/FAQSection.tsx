@@ -28,7 +28,7 @@ export default function FAQSection() {
     },
     {
       question: "What makes your ingredients different?",
-      answer: "We use clinical-grade, bioavailable forms of every ingredient — not cheap fillers or synthetic substitutes. Our AI selects from over 200 ingredients based on published research, and each formula is manufactured fresh to order specifically for you."
+      answer: "We use clinical-grade, bioavailable forms of every ingredient — not cheap fillers or synthetic substitutes. Our AI selects from over 150 high-quality, scientifically-backed ingredients based on published research, and each formula is manufactured fresh to order specifically for you."
     }
   ];
 

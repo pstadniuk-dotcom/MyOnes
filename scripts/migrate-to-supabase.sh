@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# ONES AI - Database Migration Helper
+# ONES - Database Migration Helper
 # Migrates data from Neon to Supabase
 
 set -e
 
-echo "🔄 ONES AI - Database Migration Tool"
+echo "🔄 ONES - Database Migration Tool"
 echo "===================================="
 echo ""
 

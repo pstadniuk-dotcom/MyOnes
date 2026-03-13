@@ -1,5 +1,6 @@
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import { SYSTEM_SUPPORT_DETAILS } from './ingredients';
+import { ONES_LOGO_SVG } from './pdf-logo';
 
 export interface FormulaForPDF {
   id: string;
@@ -23,13 +24,14 @@ export interface PDFGeneratorOptions {
 }
 
 const BRAND_COLORS = {
-  primary: '#1B5E20',
-  primaryLight: '#4CAF50',
-  accent: '#C5D5A8',
-  dark: '#0D3B0D',
-  gray: '#666666',
-  lightGray: '#F5F5F5',
+  primary: '#1B4332',
+  primaryLight: '#2D6A4F',
+  accent: '#B7E4C7',
+  dark: '#081C15',
+  gray: '#555555',
+  lightGray: '#F5F7F5',
   white: '#FFFFFF',
+  subtleGreen: '#D8F3DC',
 };
 
 export function generateFormulaPDF(
@@ -44,24 +46,23 @@ export function generateFormulaPDF(
   });
 
   const content: Content[] = [
+    // Logo header
     {
       columns: [
         {
           width: '*',
           stack: [
             {
-              text: 'Ones',
-              style: 'logo',
-              color: BRAND_COLORS.primary,
-              fontSize: 32,
-              bold: true,
-            },
+              svg: ONES_LOGO_SVG,
+              width: 110,
+              margin: [0, 0, 0, 4],
+            } as any,
             {
               text: 'Personalized Supplement Formula',
               style: 'tagline',
               color: BRAND_COLORS.gray,
               fontSize: 10,
-              margin: [0, 2, 0, 0],
+              margin: [0, 0, 0, 0],
             },
           ],
         },
@@ -82,14 +83,16 @@ export function generateFormulaPDF(
               alignment: 'right',
               fontSize: 9,
               color: BRAND_COLORS.gray,
-              margin: [0, 2, 0, 0],
+              margin: [0, 3, 0, 0],
             },
           ],
+          margin: [0, 4, 0, 0],
         },
       ],
-      margin: [0, 0, 0, 25],
+      margin: [0, 0, 0, 20],
     },
 
+    // Brand accent line
     {
       canvas: [
         {
@@ -98,11 +101,11 @@ export function generateFormulaPDF(
           y1: 0,
           x2: 515,
           y2: 0,
-          lineWidth: 2,
+          lineWidth: 3,
           lineColor: BRAND_COLORS.primary,
         },
       ],
-      margin: [0, 0, 0, 20],
+      margin: [0, 0, 0, 25],
     },
 
     {
@@ -206,42 +209,40 @@ export function generateFormulaPDF(
     },
 
     {
-      canvas: [
-        {
-          type: 'rect',
-          x: 0,
-          y: 0,
-          w: 515,
-          h: 60,
-          r: 4,
-          color: BRAND_COLORS.lightGray,
-        },
-      ],
-      margin: [0, 0, 0, 0],
-    },
-    {
-      stack: [
-        {
-          text: '💊  Daily Dosage Instructions',
-          fontSize: 13,
-          bold: true,
-          color: BRAND_COLORS.dark,
-          margin: [0, -50, 0, 8],
-        },
-        {
-          text: `Take ${dosage.perMeal} capsules with each meal (morning, lunch, dinner)`,
-          fontSize: 10,
-          color: BRAND_COLORS.gray,
-          margin: [0, 0, 0, 3],
-        },
-        {
-          text: `Total: ${dosage.total} capsules per day`,
-          fontSize: 10,
-          bold: true,
-          color: BRAND_COLORS.primary,
-        },
-      ],
-      margin: [15, 0, 0, 25],
+      table: {
+        widths: ['*'],
+        body: [
+          [
+            {
+              stack: [
+                {
+                  text: '💊  Daily Dosage Instructions',
+                  fontSize: 13,
+                  bold: true,
+                  color: BRAND_COLORS.dark,
+                  margin: [0, 0, 0, 8],
+                },
+                {
+                  text: `Take ${dosage.perMeal} capsules with each meal (morning, lunch, dinner)`,
+                  fontSize: 10,
+                  color: BRAND_COLORS.gray,
+                  margin: [0, 0, 0, 3],
+                },
+                {
+                  text: `Total: ${dosage.total} capsules per day`,
+                  fontSize: 10,
+                  bold: true,
+                  color: BRAND_COLORS.primary,
+                },
+              ],
+              fillColor: BRAND_COLORS.lightGray,
+              margin: [8, 8, 8, 8],
+            },
+          ],
+        ],
+      },
+      layout: 'noBorders',
+      margin: [0, 0, 0, 25],
     },
 
     {
@@ -447,44 +448,57 @@ export function generateFormulaPDF(
 
   if (formula.warnings && formula.warnings.length > 0) {
     content.push({
-      canvas: [
-        {
-          type: 'rect',
-          x: 0,
-          y: 0,
-          w: 515,
-          h: 60,
-          r: 4,
-          color: '#FFF3E0',
-        },
-      ],
-      margin: [0, 0, 0, 0],
-    });
-
-    content.push({
-      stack: [
-        {
-          text: '⚠️  Important Warnings',
-          fontSize: 12,
-          bold: true,
-          color: '#E65100',
-          margin: [0, -20, 0, 8],
-        },
-        {
-          ul: formula.warnings.map((warning) => ({
-            text: warning,
-            fontSize: 9,
-            color: '#E65100',
-          })),
-          margin: [0, 0, 0, 0],
-        },
-      ],
-      margin: [15, 0, 0, 25],
+      table: {
+        widths: ['*'],
+        body: [
+          [
+            {
+              stack: [
+                {
+                  text: '⚠️  Important Warnings',
+                  fontSize: 12,
+                  bold: true,
+                  color: '#E65100',
+                  margin: [0, 0, 0, 8],
+                },
+                {
+                  ul: formula.warnings.map((warning) => ({
+                    text: warning,
+                    fontSize: 9,
+                    color: '#E65100',
+                  })),
+                  margin: [0, 0, 0, 0],
+                },
+              ],
+              fillColor: '#FFF3E0',
+              margin: [8, 8, 8, 8],
+            },
+          ],
+        ],
+      },
+      layout: 'noBorders',
+      margin: [0, 0, 0, 25],
     });
   }
 
   content.push(
     { text: '', pageBreak: 'before' as const },
+
+    // Accent line at top of second page
+    {
+      canvas: [
+        {
+          type: 'line',
+          x1: 0,
+          y1: 0,
+          x2: 515,
+          y2: 0,
+          lineWidth: 3,
+          lineColor: BRAND_COLORS.primary,
+        },
+      ],
+      margin: [0, 0, 0, 20],
+    },
 
     {
       text: 'Medical Disclaimer',
@@ -495,71 +509,69 @@ export function generateFormulaPDF(
     },
 
     {
-      canvas: [
-        {
-          type: 'rect',
-          x: 0,
-          y: 0,
-          w: 515,
-          h: 200,
-          r: 4,
-          color: '#FFF8E1',
-        },
-      ],
-    },
-
-    {
-      stack: [
-        {
-          text: '⚕️  Professional Medical Advice Required',
-          fontSize: 12,
-          bold: true,
-          color: '#F57C00',
-          margin: [0, -15, 0, 10],
-        },
-        {
-          text: [
-            'This personalized formula is a supplement recommendation generated through AI analysis of your health profile. ',
-            'It is ',
-            { text: 'NOT', bold: true },
-            ' a substitute for professional medical advice, diagnosis, or treatment.\n\n',
-            'Before starting this or any supplement regimen, you ',
-            { text: 'MUST', bold: true },
-            ' consult with a qualified healthcare provider, especially if you:\n',
+      table: {
+        widths: ['*'],
+        body: [
+          [
+            {
+              stack: [
+                {
+                  text: '⚕️  Professional Medical Advice Required',
+                  fontSize: 12,
+                  bold: true,
+                  color: '#F57C00',
+                  margin: [0, 0, 0, 10],
+                },
+                {
+                  text: [
+                    'This personalized formula is a supplement recommendation generated through AI analysis of your health profile. ',
+                    'It is ',
+                    { text: 'NOT', bold: true },
+                    ' a substitute for professional medical advice, diagnosis, or treatment.\n\n',
+                    'Before starting this or any supplement regimen, you ',
+                    { text: 'MUST', bold: true },
+                    ' consult with a qualified healthcare provider, especially if you:\n',
+                  ],
+                  fontSize: 9,
+                  color: '#5D4037',
+                  lineHeight: 1.4,
+                  margin: [0, 0, 0, 8],
+                },
+                {
+                  ul: [
+                    'Have any medical conditions or chronic health issues',
+                    'Are currently taking prescription medications',
+                    'Are pregnant, nursing, or planning to become pregnant',
+                    'Have allergies to any ingredients',
+                    'Are under 18 years of age or over 65',
+                    'Are scheduled for surgery within the next 2 weeks',
+                  ],
+                  fontSize: 9,
+                  color: '#5D4037',
+                  lineHeight: 1.4,
+                  margin: [0, 0, 0, 10],
+                },
+                {
+                  text: [
+                    'By using this formula, you acknowledge that Ones provides educational and informational services only. ',
+                    'The effectiveness and safety of supplements can vary based on individual health conditions, medications, and biochemistry. ',
+                    'Always inform your healthcare provider about all supplements you are taking.\n\n',
+                    { text: 'Quality Assurance: ', bold: true },
+                    'All ingredients in Ones formulas are sourced from trusted suppliers and undergo rigorous quality control. However, dietary supplements are not FDA-approved to diagnose, treat, cure, or prevent any disease.',
+                  ],
+                  fontSize: 8,
+                  color: '#5D4037',
+                  lineHeight: 1.4,
+                },
+              ],
+              fillColor: '#FFF8E1',
+              margin: [10, 10, 10, 10],
+            },
           ],
-          fontSize: 9,
-          color: '#5D4037',
-          lineHeight: 1.4,
-          margin: [0, 0, 0, 8],
-        },
-        {
-          ul: [
-            'Have any medical conditions or chronic health issues',
-            'Are currently taking prescription medications',
-            'Are pregnant, nursing, or planning to become pregnant',
-            'Have allergies to any ingredients',
-            'Are under 18 years of age or over 65',
-            'Are scheduled for surgery within the next 2 weeks',
-          ],
-          fontSize: 9,
-          color: '#5D4037',
-          lineHeight: 1.4,
-          margin: [0, 0, 0, 10],
-        },
-        {
-          text: [
-            'By using this formula, you acknowledge that Ones provides educational and informational services only. ',
-            'The effectiveness and safety of supplements can vary based on individual health conditions, medications, and biochemistry. ',
-            'Always inform your healthcare provider about all supplements you are taking.\n\n',
-            { text: 'Quality Assurance: ', bold: true },
-            'All ingredients in Ones formulas are sourced from trusted suppliers and undergo rigorous quality control. However, dietary supplements are not FDA-approved to diagnose, treat, cure, or prevent any disease.',
-          ],
-          fontSize: 8,
-          color: '#5D4037',
-          lineHeight: 1.4,
-        },
-      ],
-      margin: [15, 0, 15, 15],
+        ],
+      },
+      layout: 'noBorders',
+      margin: [0, 0, 0, 15],
     },
 
     {
@@ -640,7 +652,7 @@ export function generateFormulaPDF(
           stack: [
             {
               text: 'Ones',
-              fontSize: 10,
+              fontSize: 11,
               bold: true,
               color: BRAND_COLORS.primary,
             },
@@ -654,10 +666,22 @@ export function generateFormulaPDF(
         },
         {
           width: 'auto',
-          text: 'ones.health',
-          fontSize: 8,
-          color: BRAND_COLORS.gray,
-          alignment: 'right',
+          stack: [
+            {
+              text: 'ones.health',
+              fontSize: 9,
+              color: BRAND_COLORS.primary,
+              bold: true,
+              alignment: 'right',
+            },
+            {
+              text: 'support@ones.health',
+              fontSize: 8,
+              color: BRAND_COLORS.gray,
+              alignment: 'right',
+              margin: [0, 2, 0, 0],
+            },
+          ],
         },
       ],
     }
@@ -671,10 +695,6 @@ export function generateFormulaPDF(
       fontSize: 10,
     },
     styles: {
-      logo: {
-        fontSize: 32,
-        bold: true,
-      },
       tagline: {
         fontSize: 10,
       },
@@ -701,13 +721,21 @@ export function generateFormulaPDF(
     footer: (currentPage: number, pageCount: number) => ({
       columns: [
         {
+          text: 'ones.health',
+          fontSize: 8,
+          color: BRAND_COLORS.primary,
+          bold: true,
+          margin: [40, 0, 0, 0],
+        },
+        {
           text: `Page ${currentPage} of ${pageCount}`,
-          alignment: 'center',
+          alignment: 'right',
           fontSize: 8,
           color: BRAND_COLORS.gray,
+          margin: [0, 0, 40, 0],
         },
       ],
-      margin: [40, 20],
+      margin: [0, 15],
     }),
   };
 

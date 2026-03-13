@@ -42,7 +42,7 @@ function buildReorderRecommendationPrompt(
 ): string {
   const lines: string[] = [];
 
-  lines.push(`You are ONES AI, an expert supplement practitioner. Your task is to review a member's 8-week wearable biometric data and determine if their current formula should be adjusted before their next shipment.`);
+  lines.push(`You are Ones, an expert supplement practitioner. Your task is to review a member's 8-week wearable biometric data and determine if their current formula should be adjusted before their next shipment.`);
   lines.push('');
   lines.push(`=== MEMBER PROFILE ===`);
   lines.push(`Name: ${user.name || 'Member'}`);

@@ -3,7 +3,6 @@ import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Progress } from '@/shared/components/ui/progress';
 import { Skeleton } from '@/shared/components/ui/skeleton';
-import { Input } from '@/shared/components/ui/input';
 import {
   MessageSquare,
   FlaskConical,
@@ -13,94 +12,16 @@ import {
   Sparkles,
   PlayCircle,
   TrendingUp,
-  Bell,
-  X,
 } from 'lucide-react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { Formula } from '@shared/schema';
 import { calculateDosage, CAPSULE_TIER_INFO, type CapsuleCount } from '@/shared/lib/utils';
 import { useState } from 'react';
 import { ProfileCompletionDialog } from '@/features/auth/components/ProfileCompletionDialog';
 import { HealthPulseCard } from '@/features/dashboard/components/HealthPulseCard';
 import FormulaReviewBanner from '@/features/dashboard/components/FormulaReviewBanner';
-import { apiRequest } from '@/shared/lib/queryClient';
-import { useToast } from '@/shared/hooks/use-toast';
-
-// ── Phone number prompt banner ─────────────────────────────────────────────
-const PHONE_DISMISS_KEY = 'ones_phone_prompt_dismissed';
-
-function PhonePromptBanner({ userPhone }: { userPhone: string | null | undefined }) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [phone, setPhone] = useState('');
-  const [dismissed, setDismissed] = useState(() => {
-    try {
-      const stored = localStorage.getItem(PHONE_DISMISS_KEY);
-      if (!stored) return false;
-      const { until } = JSON.parse(stored);
-      return Date.now() < until;
-    } catch {
-      return false;
-    }
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: () => apiRequest('PATCH', '/api/users/me/profile', { phone: phone.trim() }).then(r => r.json()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
-      toast({ title: 'Phone number saved! You\'ll now receive supplement reminders.' });
-      setDismissed(true);
-    },
-    onError: () => toast({ title: 'Could not save phone number', variant: 'destructive' }),
-  });
-
-  const dismiss = () => {
-    // Dismiss for 7 days
-    localStorage.setItem(PHONE_DISMISS_KEY, JSON.stringify({ until: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
-    setDismissed(true);
-  };
-
-  if (dismissed || userPhone) return null;
-
-  return (
-    <div className="flex items-center gap-3 bg-[#054700]/5 border border-[#054700]/15 rounded-xl px-4 py-3">
-      <div className="flex items-center justify-center w-8 h-8 bg-[#054700]/10 rounded-full flex-shrink-0">
-        <Bell className="w-4 h-4 text-[#054700]" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-[#054700]">Add your phone for supplement reminders</p>
-        <p className="text-xs text-[#5a6623] mt-0.5">Get daily SMS reminders to take your Ones formula on schedule.</p>
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <Input
-          placeholder="+1 (555) 000-0000"
-          value={phone}
-          onChange={e => setPhone(e.target.value)}
-          className="w-40 h-8 text-sm"
-          type="tel"
-          onKeyDown={e => e.key === 'Enter' && phone.trim() && saveMutation.mutate()}
-        />
-        <Button
-          size="sm"
-          className="h-8 bg-[#054700] hover:bg-[#043d00] text-white text-xs px-3 whitespace-nowrap"
-          disabled={!phone.trim() || saveMutation.isPending}
-          onClick={() => saveMutation.mutate()}
-        >
-          {saveMutation.isPending ? '...' : 'Save'}
-        </Button>
-        <button
-          onClick={dismiss}
-          className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-          aria-label="Dismiss"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // Map next actions to their appropriate routes
 function getNextActionRoute(nextAction: string): string {
@@ -180,6 +101,7 @@ export default function HomePage() {
   const { user } = useAuth();
   const userName = user?.name?.split(' ')[0] || 'there';
   const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [, navigate] = useLocation();
 
   const { data: dashboardData, isLoading } = useQuery<DashboardData>({
     queryKey: ['/api', 'dashboard'],
@@ -214,9 +136,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Phone number prompt — only shown to users without a phone on file */}
-      <PhonePromptBanner userPhone={(user as any)?.phone} />
-
       {/* Quick Stats - V2 Styled Cards */}
       <div className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-3">
         {/* Profile Completeness */}
@@ -240,7 +159,7 @@ export default function HomePage() {
         </Card>
 
         {/* Formula Version */}
-        <Card data-testid="card-formula-version" className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all">
+        <Card data-testid="card-formula-version" className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all cursor-pointer" onClick={() => navigate(currentFormula ? '/dashboard/formula' : '/dashboard/chat')}>
           <CardHeader className="space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-[#5a6623]">Current Formula</CardTitle>
           </CardHeader>
@@ -275,7 +194,7 @@ export default function HomePage() {
         </Card>
 
         {/* Consultations */}
-        <Card data-testid="card-consultations" className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all">
+        <Card data-testid="card-consultations" className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all cursor-pointer" onClick={() => navigate('/dashboard/chat')}>
           <CardHeader className="space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-[#5a6623]">Consultations</CardTitle>
           </CardHeader>
@@ -284,7 +203,7 @@ export default function HomePage() {
               {metrics?.consultationsSessions || 0}
             </div>
             <p className="text-xs text-[#5a6623]">
-              AI sessions completed
+              {(metrics?.consultationsSessions || 0) > 0 ? 'Start new session' : 'Start your first consultation'}
             </p>
           </CardContent>
         </Card>
@@ -297,7 +216,7 @@ export default function HomePage() {
             <div className="space-y-4">
               <div>
                 <h2 className="text-2xl font-semibold text-[#054700] mb-2">
-                  Welcome to Ones AI
+                  Welcome to Ones
                 </h2>
                 <p className="text-[#5a6623]">
                   Let's create your personalized supplement formula. First, tell us about yourself so our AI can make the best recommendations.
@@ -401,7 +320,7 @@ export default function HomePage() {
                 </div>
               ) : (
                 <Button asChild className="gap-2 bg-[#054700] hover:bg-[#043d00] text-white rounded-full px-6" data-testid="button-start-consultation">
-                  <Link href="/dashboard/chat?new=true">
+                  <Link href="/dashboard/chat?new=true" onClick={() => localStorage.setItem('forceNewChat', Date.now().toString())}>
                     <PlayCircle className="w-4 h-4" />
                     Start AI Consultation
                   </Link>
@@ -558,7 +477,7 @@ export default function HomePage() {
                   Chat with our AI to refine your supplement blend based on your latest health goals and lab results.
                 </p>
                 <Button asChild size="sm" className="bg-[#054700] hover:bg-[#043d00] text-white rounded-full">
-                  <Link href="/dashboard/chat?new=true">
+                  <Link href="/dashboard/chat?new=true" onClick={() => localStorage.setItem('forceNewChat', Date.now().toString())}>
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Start Chat
                   </Link>

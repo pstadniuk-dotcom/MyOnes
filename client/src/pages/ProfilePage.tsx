@@ -75,7 +75,7 @@ function HealthProfileSkeleton() {
 }
 
 export default function ProfilePage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, refreshUser } = useAuth();
   const { toast } = useToast();
   const [location] = useLocation();
   const searchParams = new URLSearchParams(location.split('?')[1] || '');
@@ -137,13 +137,60 @@ export default function ProfilePage() {
   const [allergyInput, setAllergyInput] = useState('');
   const [medicationDisclosureChecked, setMedicationDisclosureChecked] = useState(false);
 
+  // Enforce min/max on numeric health input fields at the onChange level
+  const handleHealthNumberChange = (field: string, value: string, min: number, max: number) => {
+    // Allow empty (clearing the field)
+    if (value === '') {
+      setHealthData(prev => ({ ...prev, [field]: '' }));
+      return;
+    }
+    // Allow partial typing (e.g. just a minus sign shouldn't be blocked)
+    const num = parseInt(value, 10);
+    if (isNaN(num)) return;
+    // Clamp to max but allow typing below min (validated on save)
+    const clamped = Math.min(num, max);
+    setHealthData(prev => ({ ...prev, [field]: clamped.toString() }));
+  };
+
+  // Format phone number as user types: (555) 123-4567
+  const formatPhoneNumber = (value: string): string => {
+    // Strip everything except digits
+    const digits = value.replace(/\D/g, '');
+    // Remove leading '1' country code if user typed it
+    const cleaned = digits.startsWith('1') && digits.length > 10 ? digits.slice(1) : digits;
+    const len = cleaned.length;
+    if (len === 0) return '';
+    if (len <= 3) return `(${cleaned}`;
+    if (len <= 6) return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+  };
+
+  // Convert display format to E.164 storage format: +15551234567
+  const toE164 = (phone: string): string | null => {
+    const digits = phone.replace(/\D/g, '');
+    const cleaned = digits.startsWith('1') && digits.length === 11 ? digits.slice(1) : digits;
+    if (cleaned.length === 0) return null;
+    if (cleaned.length !== 10) return null;
+    return `+1${cleaned}`;
+  };
+
+  // Format stored E.164 number for display
+  const formatStoredPhone = (phone: string): string => {
+    const digits = phone.replace(/\D/g, '');
+    const cleaned = digits.startsWith('1') && digits.length === 11 ? digits.slice(1) : digits;
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    }
+    return phone; // Return as-is if not a standard format
+  };
+
   // Update form states when data is loaded
   useEffect(() => {
     if (userData?.user) {
       setProfile({
         name: userData.user.name || '',
         email: userData.user.email || '',
-        phone: userData.user.phone || '',
+        phone: userData.user.phone ? formatStoredPhone(userData.user.phone) : '',
         addressLine1: userData.user.addressLine1 || '',
         addressLine2: userData.user.addressLine2 || '',
         city: userData.user.city || '',
@@ -187,24 +234,96 @@ export default function ProfilePage() {
     }
   }, [healthProfile]);
 
+  // Helper: detect which profile fields changed
+  const getChangedProfileFields = (): string[] => {
+    const original = userData?.user;
+    if (!original) return ['profile'];
+    const fieldLabels: Record<string, string> = {
+      name: 'name', email: 'email', phone: 'phone',
+      addressLine1: 'address', addressLine2: 'address',
+      city: 'city', state: 'state', postalCode: 'postal code', country: 'country',
+    };
+    const changed: string[] = [];
+    const seen = new Set<string>();
+    for (const [key, label] of Object.entries(fieldLabels)) {
+      const oldVal = (original as any)[key] || '';
+      const newVal = (profile as any)[key] || '';
+      if (oldVal !== newVal && !seen.has(label)) {
+        changed.push(label);
+        seen.add(label);
+      }
+    }
+    return changed;
+  };
+
+  // Helper: detect which health fields changed
+  const getChangedHealthFields = (newData: Record<string, any>): string[] => {
+    if (!healthProfile) return ['health info'];
+    const fieldLabels: Record<string, string> = {
+      age: 'age', sex: 'sex', weightLbs: 'weight', heightCm: 'height',
+      bloodPressureSystolic: 'blood pressure', bloodPressureDiastolic: 'blood pressure',
+      restingHeartRate: 'resting heart rate', sleepHoursPerNight: 'sleep hours',
+      exerciseDaysPerWeek: 'exercise days', stressLevel: 'stress level',
+      smokingStatus: 'smoking status', alcoholDrinksPerWeek: 'alcohol intake',
+    };
+    const changed: string[] = [];
+    const seen = new Set<string>();
+    for (const [key, label] of Object.entries(fieldLabels)) {
+      const oldVal = (healthProfile as any)[key] ?? null;
+      const newVal = newData[key] ?? null;
+      if (oldVal !== newVal && !seen.has(label)) {
+        changed.push(label);
+        seen.add(label);
+      }
+    }
+    // Check array fields
+    const arraysToCheck = [
+      { key: 'conditions', label: 'conditions' },
+      { key: 'medications', label: 'medications' },
+      { key: 'allergies', label: 'allergies' },
+    ];
+    for (const { key, label } of arraysToCheck) {
+      const oldArr = ((healthProfile as any)[key] || []).sort().join(',');
+      const newArr = (newData[key] || []).sort().join(',');
+      if (oldArr !== newArr) changed.push(label);
+    }
+    return changed;
+  };
+
+  // Helper: format changed fields into a friendly description
+  const formatChangedFields = (fields: string[]): string => {
+    if (fields.length === 0) return 'No changes detected.';
+    const capitalized = fields.map(f => f.charAt(0).toUpperCase() + f.slice(1));
+    if (capitalized.length === 1) return `${capitalized[0]} saved successfully.`;
+    if (capitalized.length === 2) return `${capitalized[0]} and ${capitalized[1]} saved successfully.`;
+    return `${capitalized.slice(0, -1).join(', ')}, and ${capitalized[capitalized.length - 1]} saved successfully.`;
+  };
+
+  // Whether each section has existing saved data
+  const hasExistingProfile = !!(userData?.user?.name || userData?.user?.phone || userData?.user?.addressLine1);
+  const hasExistingHealthProfile = !!(healthProfile?.age || healthProfile?.sex || healthProfile?.weightLbs || healthProfile?.heightCm);
+
   // Mutations for updating data
   const updateHealthProfileMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest('POST', '/api/users/me/health-profile', data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      const changedFields = getChangedHealthFields(variables);
       queryClient.invalidateQueries({ queryKey: ['/api/users/me/health-profile'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
       toast({
-        title: "Health profile updated",
-        description: "Your health score will update based on the new information.",
+        title: hasExistingHealthProfile ? "Health info updated" : "Health info saved",
+        description: changedFields.length > 0
+          ? formatChangedFields(changedFields)
+          : "Your health info has been saved.",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error updating health profile",
-        description: error.message || "Please try again.",
+        title: "Couldn't save health info",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     },
@@ -226,12 +345,13 @@ export default function ProfilePage() {
       return response.json();
     },
     onSuccess: async (data) => {
+      const changedFields = getChangedProfileFields();
       // Update the form with the returned data
       if (data?.user) {
         setProfile({
           name: data.user.name || '',
           email: data.user.email || '',
-          phone: data.user.phone || '',
+          phone: data.user.phone ? formatStoredPhone(data.user.phone) : '',
           addressLine1: data.user.addressLine1 || '',
           addressLine2: data.user.addressLine2 || '',
           city: data.user.city || '',
@@ -241,15 +361,18 @@ export default function ProfilePage() {
         });
       }
       await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      await refreshUser();
       toast({
-        title: "Profile updated",
-        description: "Your profile information has been saved successfully.",
+        title: hasExistingProfile ? "Profile updated" : "Profile saved",
+        description: changedFields.length > 0
+          ? formatChangedFields(changedFields)
+          : "Your profile has been saved.",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error updating profile",
-        description: error.message || "Please try again.",
+        title: "Couldn't save profile",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     },
@@ -261,7 +384,7 @@ export default function ProfilePage() {
       const response = await apiRequest('POST', '/api/consents/grant', {
         consentType: 'lab_data_processing',
         consentVersion: '1.0',
-        consentText: 'I consent to Ones AI processing my lab data and health information to provide personalized supplement recommendations.'
+        consentText: 'I consent to Ones processing my lab data and health information to provide personalized supplement recommendations.'
       });
       return response.json();
     },
@@ -519,8 +642,9 @@ export default function ProfilePage() {
                   id="phone"
                   type="tel"
                   value={profile.phone}
-                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                  placeholder="+1 (555) 123-4567"
+                  onChange={(e) => setProfile({ ...profile, phone: formatPhoneNumber(e.target.value) })}
+                  placeholder="(555) 123-4567"
+                  maxLength={14}
                   data-testid="input-phone"
                 />
               </div>
@@ -601,10 +725,23 @@ export default function ProfilePage() {
                 <Button
                   onClick={async () => {
                     try {
+                      // Validate phone number if provided
+                      if (profile.phone) {
+                        const phoneDigits = profile.phone.replace(/\D/g, '');
+                        const cleanedDigits = phoneDigits.startsWith('1') && phoneDigits.length === 11 ? phoneDigits.slice(1) : phoneDigits;
+                        if (cleanedDigits.length !== 10) {
+                          toast({
+                            title: "Invalid phone number",
+                            description: "Please enter a valid 10-digit US phone number.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                      }
                       await updateUserProfileMutation.mutateAsync({
                         name: profile.name,
                         email: profile.email,
-                        phone: profile.phone || null,
+                        phone: toE164(profile.phone),
                         addressLine1: profile.addressLine1 || null,
                         addressLine2: profile.addressLine2 || null,
                         city: profile.city || null,
@@ -623,7 +760,7 @@ export default function ProfilePage() {
                   {updateUserProfileMutation.isPending && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   )}
-                  Save Changes
+                  {hasExistingProfile ? 'Update Profile' : 'Save Profile'}
                 </Button>
               </div>
             </CardContent>
@@ -659,7 +796,7 @@ export default function ProfilePage() {
                       id="age"
                       type="number"
                       value={healthData.age}
-                      onChange={(e) => setHealthData({ ...healthData, age: e.target.value })}
+                      onChange={(e) => handleHealthNumberChange('age', e.target.value, 1, 120)}
                       placeholder="Enter your age"
                       min="1"
                       max="120"
@@ -691,24 +828,26 @@ export default function ProfilePage() {
                   ) : (
                     <div className="flex gap-2">
                       <div className="flex-1">
+                        <Label htmlFor="height-feet" className="text-xs text-muted-foreground">Feet</Label>
                         <Input
                           id="height-feet"
                           type="number"
                           value={healthData.heightFeet}
-                          onChange={(e) => setHealthData({ ...healthData, heightFeet: e.target.value })}
-                          placeholder="Feet"
+                          onChange={(e) => handleHealthNumberChange('heightFeet', e.target.value, 1, 8)}
+                          placeholder="5"
                           min="3"
                           max="8"
                           data-testid="input-height-feet"
                         />
                       </div>
                       <div className="flex-1">
+                        <Label htmlFor="height-inches" className="text-xs text-muted-foreground">Inches</Label>
                         <Input
                           id="height-inches"
                           type="number"
                           value={healthData.heightInches}
-                          onChange={(e) => setHealthData({ ...healthData, heightInches: e.target.value })}
-                          placeholder="Inches"
+                          onChange={(e) => handleHealthNumberChange('heightInches', e.target.value, 0, 11)}
+                          placeholder="10"
                           min="0"
                           max="11"
                           data-testid="input-height-inches"
@@ -729,7 +868,7 @@ export default function ProfilePage() {
                       id="weight"
                       type="number"
                       value={healthData.weightLbs}
-                      onChange={(e) => setHealthData({ ...healthData, weightLbs: e.target.value })}
+                      onChange={(e) => handleHealthNumberChange('weightLbs', e.target.value, 40, 500)}
                       placeholder="Enter weight in lbs"
                       min="0"
                       max="500"
@@ -753,7 +892,7 @@ export default function ProfilePage() {
                     id="bpSystolic"
                     type="number"
                     value={healthData.bloodPressureSystolic}
-                    onChange={(e) => setHealthData({ ...healthData, bloodPressureSystolic: e.target.value })}
+                    onChange={(e) => handleHealthNumberChange('bloodPressureSystolic', e.target.value, 70, 200)}
                     min="70"
                     max="200"
                     placeholder="e.g. 120"
@@ -766,7 +905,7 @@ export default function ProfilePage() {
                     id="bpDiastolic"
                     type="number"
                     value={healthData.bloodPressureDiastolic}
-                    onChange={(e) => setHealthData({ ...healthData, bloodPressureDiastolic: e.target.value })}
+                    onChange={(e) => handleHealthNumberChange('bloodPressureDiastolic', e.target.value, 40, 130)}
                     min="40"
                     max="130"
                     placeholder="e.g. 80"
@@ -779,7 +918,7 @@ export default function ProfilePage() {
                     id="heartRate"
                     type="number"
                     value={healthData.restingHeartRate}
-                    onChange={(e) => setHealthData({ ...healthData, restingHeartRate: e.target.value })}
+                    onChange={(e) => handleHealthNumberChange('restingHeartRate', e.target.value, 30, 220)}
                     min="30"
                     max="220"
                     placeholder="e.g. 70"
@@ -802,7 +941,7 @@ export default function ProfilePage() {
                     id="sleep"
                     type="number"
                     value={healthData.sleepHoursPerNight}
-                    onChange={(e) => setHealthData({ ...healthData, sleepHoursPerNight: e.target.value })}
+                    onChange={(e) => handleHealthNumberChange('sleepHoursPerNight', e.target.value, 0, 24)}
                     min="0"
                     max="24"
                     placeholder="e.g. 7"
@@ -815,7 +954,7 @@ export default function ProfilePage() {
                     id="exercise"
                     type="number"
                     value={healthData.exerciseDaysPerWeek}
-                    onChange={(e) => setHealthData({ ...healthData, exerciseDaysPerWeek: e.target.value })}
+                    onChange={(e) => handleHealthNumberChange('exerciseDaysPerWeek', e.target.value, 0, 7)}
                     placeholder="e.g. 3"
                     min="0"
                     max="7"
@@ -828,7 +967,7 @@ export default function ProfilePage() {
                     id="stress"
                     type="number"
                     value={healthData.stressLevel}
-                    onChange={(e) => setHealthData({ ...healthData, stressLevel: e.target.value })}
+                    onChange={(e) => handleHealthNumberChange('stressLevel', e.target.value, 1, 10)}
                     placeholder="e.g. 5"
                     min="1"
                     max="10"
@@ -864,7 +1003,7 @@ export default function ProfilePage() {
                     id="alcohol"
                     type="number"
                     value={healthData.alcoholDrinksPerWeek}
-                    onChange={(e) => setHealthData({ ...healthData, alcoholDrinksPerWeek: e.target.value })}
+                    onChange={(e) => handleHealthNumberChange('alcoholDrinksPerWeek', e.target.value, 0, 50)}
                     placeholder="e.g. 2"
                     min="0"
                     max="50"
@@ -977,7 +1116,7 @@ export default function ProfilePage() {
                               className="mt-0.5"
                             />
                             <Label htmlFor="medication-disclosure" className="text-xs text-amber-800 leading-snug cursor-pointer font-normal">
-                              I confirm the medication list above is complete and accurate. I understand that Ones AI uses this information to flag potential supplement–drug interactions. I will update this list if my medications change.
+                              I confirm the medication list above is complete and accurate. I understand that Ones uses this information to flag potential supplement–drug interactions. I will update this list if my medications change.
                             </Label>
                           </div>
                         )}
@@ -1063,6 +1202,37 @@ export default function ProfilePage() {
                         }
                       }
 
+                      // Check that at least some health information has been provided
+                      const hasAnyData =
+                        healthData.age ||
+                        healthData.sex ||
+                        healthData.weightLbs ||
+                        healthData.heightFeet ||
+                        healthData.heightInches ||
+                        healthData.bloodPressureSystolic ||
+                        healthData.bloodPressureDiastolic ||
+                        healthData.restingHeartRate ||
+                        healthData.sleepHoursPerNight ||
+                        healthData.exerciseDaysPerWeek ||
+                        healthData.stressLevel ||
+                        healthData.smokingStatus ||
+                        healthData.alcoholDrinksPerWeek ||
+                        healthData.conditions.length > 0 ||
+                        healthData.medications.length > 0 ||
+                        healthData.allergies.length > 0 ||
+                        conditionInput.trim() ||
+                        medicationInput.trim() ||
+                        allergyInput.trim();
+
+                      if (!hasAnyData) {
+                        toast({
+                          title: "No information provided",
+                          description: "Please fill in at least one field before saving your health profile.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
                       // Handle pending inputs
                       const currentConditions = [...healthData.conditions];
                       if (conditionInput.trim() && !currentConditions.includes(conditionInput.trim())) {
@@ -1130,7 +1300,7 @@ export default function ProfilePage() {
                   {updateHealthProfileMutation.isPending && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   )}
-                  Save Health Profile
+                  {hasExistingHealthProfile ? 'Update Health Info' : 'Save Health Info'}
                 </Button>
               </div>
             </CardContent>
@@ -1149,7 +1319,7 @@ export default function ProfilePage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm">
-              By providing consent, you agree to allow Ones AI to:
+              By providing consent, you agree to allow Ones to:
             </p>
             <ul className="text-sm space-y-2 ml-4 list-disc">
               <li>Process and analyze your uploaded lab results</li>

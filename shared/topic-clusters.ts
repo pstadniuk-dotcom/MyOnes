@@ -1,5 +1,5 @@
 /**
- * ONES AI — Master SEO topic cluster list
+ * ONES — Master SEO topic cluster list
  * 500+ pre-planned article titles organized by tier.
  * Used by the automated daily blog-generation scheduler.
  *

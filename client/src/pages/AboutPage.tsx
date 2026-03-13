@@ -52,7 +52,7 @@ export default function AboutPage() {
               <div className="glass-card rounded-2xl p-6 shadow-sm">
                 <Award className="w-8 h-8 text-[#054700] mb-4" />
                 <h3 className="font-medium text-[#054700] mb-2">Premium Quality</h3>
-                <p className="text-sm text-[#5a6623]">400+ high-quality, scientifically-backed ingredients</p>
+                <p className="text-sm text-[#5a6623]">150+ high-quality, scientifically-backed ingredients</p>
               </div>
               <div className="glass-card rounded-2xl p-6 shadow-sm">
                 <Users className="w-8 h-8 text-[#054700] mb-4" />

@@ -19,7 +19,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-medium text-[#054700] mb-4">1. Introduction</h2>
             <p className="text-[#5a6623] leading-relaxed">
-              At Ones AI, Inc. ("Ones," "we," "us," or "our"), we take your privacy seriously. This Privacy Policy describes how we collect, use, disclose, and safeguard your information when you use our personalized supplement platform and related services (the "Service"). By using the Service, you consent to the practices described in this policy.
+              At Ones, Inc. ("Ones," "we," "us," or "our"), we take your privacy seriously. This Privacy Policy describes how we collect, use, disclose, and safeguard your information when you use our personalized supplement platform and related services (the "Service"). By using the Service, you consent to the practices described in this policy.
             </p>
           </section>
 
@@ -93,7 +93,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-medium text-[#054700] mb-4">5. Lab Report &amp; File Uploads</h2>
             <p className="text-[#5a6623] leading-relaxed">
-              Lab reports and other files you upload are stored securely using encrypted cloud storage with access controls. Files are accessible only to you and authorized administrators. All file operations are logged in our audit trail. You may request deletion of uploaded files at any time by contacting support@ones.health.
+              Lab reports and other files you upload are stored securely using encrypted cloud storage with access controls. Files are accessible only to you and authorized administrators. All file operations are logged in our audit trail. You may request deletion of uploaded files at any time by contacting <a href="mailto:support@ones.health" className="text-[#054700] underline underline-offset-2 hover:text-[#054700]/80">support@ones.health</a>.
             </p>
           </section>
 
@@ -192,7 +192,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-medium text-[#054700] mb-4">12. Children's Privacy</h2>
             <p className="text-[#5a6623] leading-relaxed">
-              The Service is not directed to individuals under 18 years of age. We do not knowingly collect personal information from children under 18. If we become aware that we have collected personal information from a child under 18, we will take steps to delete that information promptly. If you believe a child has provided us with personal information, please contact us at support@ones.health.
+              The Service is not directed to individuals under 18 years of age. We do not knowingly collect personal information from children under 18. If we become aware that we have collected personal information from a child under 18, we will take steps to delete that information promptly. If you believe a child has provided us with personal information, please contact us at <a href="mailto:support@ones.health" className="text-[#054700] underline underline-offset-2 hover:text-[#054700]/80">support@ones.health</a>.
             </p>
           </section>
 
