@@ -16,6 +16,14 @@ export class AdminService {
         return await adminRepository.getAdminStats();
     }
 
+    async getEnhancedStats(days: number) {
+        return await adminRepository.getEnhancedStats(days);
+    }
+
+    async getFinancialMetrics() {
+        return await adminRepository.getFinancialMetrics();
+    }
+
     async getUserGrowth(days: number) {
         return await adminRepository.getUserGrowthData(days);
     }

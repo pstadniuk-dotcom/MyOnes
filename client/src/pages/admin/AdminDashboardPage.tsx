@@ -1,4 +1,4 @@
-﻿import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Badge } from '@/shared/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
@@ -10,26 +10,46 @@ import {
   Package,
   TrendingUp,
   TrendingDown,
-  Clock,
   Download,
   AlertCircle,
   ArrowRight,
   ShoppingCart,
   BarChart3,
+  Repeat,
+  UserMinus,
+  Receipt,
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { Button } from '@/shared/components/ui/button';
-import { apiRequest } from '@/shared/lib/queryClient';
 
-interface DashboardStats {
+interface EnhancedStats {
   totalUsers: number;
-  totalPaidUsers: number;
-  activeUsers: number;
+  totalRevenue: number;
   totalOrders: number;
   totalFormulas: number;
-  totalRevenue: number;
+  trends: {
+    users: { current: number; previous: number; changePercent: number };
+    revenue: { current: number; previous: number; changePercent: number };
+    orders: { current: number; previous: number; changePercent: number };
+    formulas: { current: number; previous: number; changePercent: number };
+  };
+  sparklines: {
+    users: number[];
+    revenue: number[];
+    orders: number[];
+  };
+}
+
+interface FinancialMetrics {
+  mrr: number;
+  arr: number;
+  averageOrderValue: number;
+  ltv: number;
+  totalCustomers: number;
+  churnRate: number;
+  reorderRate: number;
 }
 
 interface RevenueDataPoint {
@@ -55,28 +75,84 @@ interface PendingActions {
   overdueReorders: number;
 }
 
-function MetricCard({
+function MiniSparkline({ data, color = '#054700', height = 32 }: { data: number[]; color?: string; height?: number }) {
+  if (!data || data.length === 0) return null;
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const width = 80;
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((v - min) / range) * (height - 4) - 2;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <svg width={width} height={height} className="flex-shrink-0">
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TrendBadge({ changePercent }: { changePercent: number }) {
+  if (changePercent === 0) return <span className="text-xs text-gray-400">--</span>;
+  const isPositive = changePercent > 0;
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
+      {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      {isPositive ? '+' : ''}{changePercent}%
+    </span>
+  );
+}
+
+function EnhancedMetricCard({
   title,
   value,
   icon: Icon,
+  trend,
+  sparkline,
+  sparkColor,
   onClick,
 }: {
   title: string;
   value: string;
   icon?: React.ElementType;
+  trend?: { current: number; previous: number; changePercent: number };
+  sparkline?: number[];
+  sparkColor?: string;
   onClick?: () => void;
 }) {
   return (
     <Card
-      className={onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}
+      className={`${onClick ? 'cursor-pointer hover:shadow-md transition-all' : ''} overflow-hidden`}
       onClick={onClick}
     >
       <CardContent className="pt-5 pb-4 px-5">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1">
           <p className="text-sm font-medium text-gray-500">{title}</p>
           {Icon && <Icon className="h-4 w-4 text-gray-400" />}
         </div>
-        <p className="text-2xl font-semibold text-gray-900">{value}</p>
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-2xl font-semibold text-gray-900">{value}</p>
+            {trend && (
+              <div className="mt-1">
+                <TrendBadge changePercent={trend.changePercent} />
+                <span className="text-[11px] text-gray-400 ml-1.5">vs prev 30d</span>
+              </div>
+            )}
+          </div>
+          {sparkline && sparkline.length > 0 && (
+            <MiniSparkline data={sparkline} color={sparkColor} />
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -95,13 +171,32 @@ function OrderStatusBadge({ status }: { status: string }) {
   return <Badge variant="outline" className={c.className}>{c.label}</Badge>;
 }
 
+function FinancialCard({ label, value, icon: Icon, description }: { label: string; value: string; icon: React.ElementType; description?: string }) {
+  return (
+    <div className="flex items-start gap-3 p-4 rounded-lg bg-gray-50/60 border border-gray-100">
+      <div className="p-2 rounded-md bg-white border border-gray-200">
+        <Icon className="h-4 w-4 text-gray-500" />
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500">{label}</p>
+        <p className="text-lg font-semibold text-gray-900">{value}</p>
+        {description && <p className="text-[11px] text-gray-400 mt-0.5">{description}</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboardPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [dateRange] = useState('30');
 
-  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<DashboardStats>({
-    queryKey: ['/api/admin/stats'],
+  const { data: enhanced, isLoading: enhancedLoading, error: enhancedError } = useQuery<EnhancedStats>({
+    queryKey: [`/api/admin/stats/enhanced?days=${dateRange}`],
+  });
+
+  const { data: financial, isLoading: financialLoading } = useQuery<FinancialMetrics>({
+    queryKey: ['/api/admin/stats/financial'],
   });
 
   const { data: revenueData, isLoading: revenueLoading } = useQuery<RevenueDataPoint[]>({
@@ -117,14 +212,14 @@ export default function AdminDashboardPage() {
   });
 
   useEffect(() => {
-    if (statsError) {
+    if (enhancedError) {
       toast({
         title: "Error loading dashboard",
-        description: statsError?.message || "Please try again.",
+        description: enhancedError?.message || "Please try again.",
         variant: "destructive"
       });
     }
-  }, [statsError, toast]);
+  }, [enhancedError, toast]);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-US', {
@@ -132,12 +227,14 @@ export default function AdminDashboardPage() {
       minimumFractionDigits: 0, maximumFractionDigits: 0,
     }).format(amount);
 
-  if (statsLoading || revenueLoading) {
+  const isLoading = enhancedLoading || revenueLoading;
+
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-28" />)}
         </div>
         <Skeleton className="h-80" />
       </div>
@@ -158,13 +255,7 @@ export default function AdminDashboardPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard title="Total Users" value={String(stats?.totalUsers ?? 0)} icon={Users} onClick={() => setLocation('/admin/users')} />
-        <MetricCard title="Total Revenue" value={formatCurrency(stats?.totalRevenue ?? 0)} icon={DollarSign} />
-        <MetricCard title="Total Orders" value={String(stats?.totalOrders ?? 0)} icon={Package} onClick={() => setLocation('/admin/orders')} />
-        <MetricCard title="Active Formulas" value={String(stats?.totalFormulas ?? 0)} icon={BarChart3} />
-      </div>
-
+      {/* Alerts Banner */}
       {totalPending > 0 && (
         <div className="flex flex-wrap gap-3">
           {(pendingActions?.pendingOrders ?? 0) > 0 && (
@@ -185,6 +276,64 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {/* KPI Cards with Sparklines */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <EnhancedMetricCard
+          title="Total Users"
+          value={String(enhanced?.totalUsers ?? 0)}
+          icon={Users}
+          trend={enhanced?.trends.users}
+          sparkline={enhanced?.sparklines.users}
+          sparkColor="#054700"
+          onClick={() => setLocation('/admin/users')}
+        />
+        <EnhancedMetricCard
+          title="Total Revenue"
+          value={formatCurrency(enhanced?.totalRevenue ?? 0)}
+          icon={DollarSign}
+          trend={enhanced?.trends.revenue}
+          sparkline={enhanced?.sparklines.revenue}
+          sparkColor="#059669"
+        />
+        <EnhancedMetricCard
+          title="Total Orders"
+          value={String(enhanced?.totalOrders ?? 0)}
+          icon={Package}
+          trend={enhanced?.trends.orders}
+          sparkline={enhanced?.sparklines.orders}
+          sparkColor="#2563eb"
+          onClick={() => setLocation('/admin/orders')}
+        />
+        <EnhancedMetricCard
+          title="Active Formulas"
+          value={String(enhanced?.totalFormulas ?? 0)}
+          icon={BarChart3}
+          trend={enhanced?.trends.formulas}
+        />
+      </div>
+
+      {/* Financial Metrics */}
+      {!financialLoading && financial && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">Financial Overview</CardTitle>
+            <CardDescription>Revenue metrics and customer health</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              <FinancialCard label="MRR" value={formatCurrency(financial.mrr)} icon={DollarSign} description="Monthly recurring" />
+              <FinancialCard label="ARR" value={formatCurrency(financial.arr)} icon={DollarSign} description="Annual projection" />
+              <FinancialCard label="AOV" value={formatCurrency(financial.averageOrderValue)} icon={Receipt} description="Avg order value" />
+              <FinancialCard label="LTV" value={formatCurrency(financial.ltv)} icon={TrendingUp} description="Per customer" />
+              <FinancialCard label="Customers" value={String(financial.totalCustomers)} icon={Users} description="Total paying" />
+              <FinancialCard label="Reorder Rate" value={`${financial.reorderRate}%`} icon={Repeat} description="2+ orders" />
+              <FinancialCard label="Churn Rate" value={`${financial.churnRate}%`} icon={UserMinus} description="60d inactive" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Revenue Chart */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Total sales over time</CardTitle>
@@ -205,6 +354,7 @@ export default function AdminDashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Today's Orders */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -243,12 +393,6 @@ export default function AdminDashboardPage() {
           )}
         </CardContent>
       </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard title="Paid Users" value={String(stats?.totalPaidUsers ?? 0)} icon={Users} onClick={() => setLocation('/admin/users?filter=paid')} />
-        <MetricCard title="Active Users" value={String(stats?.activeUsers ?? 0)} icon={Users} onClick={() => setLocation('/admin/users?filter=active')} />
-        <MetricCard title="Formulas Created" value={String(stats?.totalFormulas ?? 0)} icon={BarChart3} />
-      </div>
     </div>
   );
 }

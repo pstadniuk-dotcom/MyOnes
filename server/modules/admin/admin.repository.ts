@@ -101,6 +101,221 @@ export class AdminRepository {
         }
     }
 
+    async getEnhancedStats(days: number = 30): Promise<{
+        totalUsers: number;
+        totalRevenue: number;
+        totalOrders: number;
+        totalFormulas: number;
+        trends: {
+            users: { current: number; previous: number; changePercent: number };
+            revenue: { current: number; previous: number; changePercent: number };
+            orders: { current: number; previous: number; changePercent: number };
+            formulas: { current: number; previous: number; changePercent: number };
+        };
+        sparklines: {
+            users: number[];
+            revenue: number[];
+            orders: number[];
+        };
+    }> {
+        try {
+            const now = new Date();
+            const currentStart = new Date();
+            currentStart.setDate(now.getDate() - days);
+            const previousStart = new Date();
+            previousStart.setDate(currentStart.getDate() - days);
+
+            // Totals
+            const [userStats] = await db.select({ count: count() }).from(users);
+            const totalUsers = Number(userStats?.count || 0);
+            const [formulaStats] = await db.select({ count: count() }).from(formulas);
+            const totalFormulas = Number(formulaStats?.count || 0);
+            const [orderStats] = await db.select({ count: count() }).from(orders);
+            const totalOrders = Number(orderStats?.count || 0);
+            const [revenueStats] = await db
+                .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+                .from(orders);
+            const totalRevenue = Number(revenueStats?.total || 0) / 100;
+
+            // Current period counts
+            const [currentUsers] = await db.select({ count: count() }).from(users)
+                .where(gte(users.createdAt, currentStart));
+            const [previousUsers] = await db.select({ count: count() }).from(users)
+                .where(and(gte(users.createdAt, previousStart), lt(users.createdAt, currentStart)));
+
+            const [currentOrders] = await db.select({ count: count() }).from(orders)
+                .where(gte(orders.placedAt, currentStart));
+            const [previousOrders] = await db.select({ count: count() }).from(orders)
+                .where(and(gte(orders.placedAt, previousStart), lt(orders.placedAt, currentStart)));
+
+            const [currentRevenue] = await db
+                .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+                .from(orders).where(gte(orders.placedAt, currentStart));
+            const [previousRevenue] = await db
+                .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+                .from(orders).where(and(gte(orders.placedAt, previousStart), lt(orders.placedAt, currentStart)));
+
+            const [currentFormulas] = await db.select({ count: count() }).from(formulas)
+                .where(gte(formulas.createdAt, currentStart));
+            const [previousFormulas] = await db.select({ count: count() }).from(formulas)
+                .where(and(gte(formulas.createdAt, previousStart), lt(formulas.createdAt, currentStart)));
+
+            const calcChange = (curr: number, prev: number) =>
+                prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100);
+
+            const cUsers = Number(currentUsers?.count || 0);
+            const pUsers = Number(previousUsers?.count || 0);
+            const cOrders = Number(currentOrders?.count || 0);
+            const pOrders = Number(previousOrders?.count || 0);
+            const cRevenue = Number(currentRevenue?.total || 0) / 100;
+            const pRevenue = Number(previousRevenue?.total || 0) / 100;
+            const cFormulas = Number(currentFormulas?.count || 0);
+            const pFormulas = Number(previousFormulas?.count || 0);
+
+            // Sparkline data: daily counts for last 7 days
+            const sparklineStart = new Date();
+            sparklineStart.setDate(now.getDate() - 7);
+
+            const dailyUsers = await db
+                .select({ date: sql<string>`DATE(created_at)`, count: count() })
+                .from(users)
+                .where(gte(users.createdAt, sparklineStart))
+                .groupBy(sql`DATE(created_at)`)
+                .orderBy(sql`DATE(created_at)`);
+
+            const dailyOrders = await db
+                .select({ date: sql<string>`DATE(placed_at)`, count: count() })
+                .from(orders)
+                .where(gte(orders.placedAt, sparklineStart))
+                .groupBy(sql`DATE(placed_at)`)
+                .orderBy(sql`DATE(placed_at)`);
+
+            const dailyRevenue = await db
+                .select({ date: sql<string>`DATE(placed_at)`, total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+                .from(orders)
+                .where(gte(orders.placedAt, sparklineStart))
+                .groupBy(sql`DATE(placed_at)`)
+                .orderBy(sql`DATE(placed_at)`);
+
+            // Fill in missing days with 0
+            const fillSparkline = (data: Array<{ date: string; count?: number; total?: number }>, useTotal = false): number[] => {
+                const map = new Map<string, number>();
+                data.forEach(d => map.set(d.date, useTotal ? Number(d.total || 0) / 100 : Number(d.count || 0)));
+                const result: number[] = [];
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(now.getDate() - i);
+                    const key = d.toISOString().split('T')[0];
+                    result.push(map.get(key) || 0);
+                }
+                return result;
+            };
+
+            return {
+                totalUsers,
+                totalRevenue,
+                totalOrders,
+                totalFormulas,
+                trends: {
+                    users: { current: cUsers, previous: pUsers, changePercent: calcChange(cUsers, pUsers) },
+                    revenue: { current: cRevenue, previous: pRevenue, changePercent: calcChange(cRevenue, pRevenue) },
+                    orders: { current: cOrders, previous: pOrders, changePercent: calcChange(cOrders, pOrders) },
+                    formulas: { current: cFormulas, previous: pFormulas, changePercent: calcChange(cFormulas, pFormulas) },
+                },
+                sparklines: {
+                    users: fillSparkline(dailyUsers),
+                    revenue: fillSparkline(dailyRevenue, true),
+                    orders: fillSparkline(dailyOrders),
+                },
+            };
+        } catch (error) {
+            logger.error('Error getting enhanced stats', { error });
+            return {
+                totalUsers: 0, totalRevenue: 0, totalOrders: 0, totalFormulas: 0,
+                trends: {
+                    users: { current: 0, previous: 0, changePercent: 0 },
+                    revenue: { current: 0, previous: 0, changePercent: 0 },
+                    orders: { current: 0, previous: 0, changePercent: 0 },
+                    formulas: { current: 0, previous: 0, changePercent: 0 },
+                },
+                sparklines: { users: [], revenue: [], orders: [] },
+            };
+        }
+    }
+
+    async getFinancialMetrics(): Promise<{
+        mrr: number;
+        arr: number;
+        averageOrderValue: number;
+        ltv: number;
+        totalCustomers: number;
+        churnRate: number;
+        reorderRate: number;
+    }> {
+        try {
+            // Total revenue and orders
+            const [revStats] = await db
+                .select({
+                    totalRevenueCents: sql<number>`COALESCE(SUM(amount_cents), 0)`,
+                    totalOrders: count(),
+                })
+                .from(orders);
+
+            const totalRevenueCents = Number(revStats?.totalRevenueCents || 0);
+            const totalOrders = Number(revStats?.totalOrders || 0);
+            const averageOrderValue = totalOrders > 0 ? totalRevenueCents / totalOrders / 100 : 0;
+
+            // Distinct paying customers
+            const payingCustomers = await db.selectDistinct({ userId: orders.userId }).from(orders);
+            const totalCustomers = payingCustomers.length;
+
+            // LTV = total revenue / total customers
+            const ltv = totalCustomers > 0 ? totalRevenueCents / 100 / totalCustomers : 0;
+
+            // Revenue in last 30 days for MRR approximation
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            const [recentRev] = await db
+                .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+                .from(orders)
+                .where(gte(orders.placedAt, thirtyDaysAgo));
+            const mrr = Number(recentRev?.total || 0) / 100;
+            const arr = mrr * 12;
+
+            // Reorder rate: users with 2+ orders / users with 1+ orders
+            const orderCounts = await db
+                .select({ userId: orders.userId, cnt: count() })
+                .from(orders)
+                .groupBy(orders.userId);
+            const repeatCustomers = orderCounts.filter(c => Number(c.cnt) >= 2).length;
+            const reorderRate = totalCustomers > 0 ? Math.round((repeatCustomers / totalCustomers) * 100) : 0;
+
+            // Churn rate: users who ordered 60+ days ago but not in last 60 days
+            const sixtyDaysAgo = new Date();
+            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+            const recentOrderUsers = await db
+                .selectDistinct({ userId: orders.userId })
+                .from(orders)
+                .where(gte(orders.placedAt, sixtyDaysAgo));
+            const recentSet = new Set(recentOrderUsers.map(r => r.userId));
+            const churned = payingCustomers.filter(c => !recentSet.has(c.userId)).length;
+            const churnRate = totalCustomers > 0 ? Math.round((churned / totalCustomers) * 100) : 0;
+
+            return {
+                mrr: Math.round(mrr * 100) / 100,
+                arr: Math.round(arr * 100) / 100,
+                averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+                ltv: Math.round(ltv * 100) / 100,
+                totalCustomers,
+                churnRate,
+                reorderRate,
+            };
+        } catch (error) {
+            logger.error('Error getting financial metrics', { error });
+            return { mrr: 0, arr: 0, averageOrderValue: 0, ltv: 0, totalCustomers: 0, churnRate: 0, reorderRate: 0 };
+        }
+    }
+
     async getUserGrowthData(days: number): Promise<Array<{ date: string; users: number; paidUsers: number }>> {
         try {
             const startDate = new Date();

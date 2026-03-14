@@ -1,5 +1,6 @@
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
+import { subDays } from 'date-fns';
 import {
   TrendingUp,
   Users,
@@ -15,6 +16,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
+import { DateRangePicker } from '@/shared/components/ui/date-range-picker';
 
 // Import existing analytics widgets
 import { ConversionFunnel } from '@/features/admin/components/ConversionFunnel';
@@ -78,29 +80,41 @@ function MetricCard({
 }
 
 export default function AdminAnalyticsPage() {
+  const [dateRange, setDateRange] = useState({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
+
+  const days = useMemo(() => {
+    return Math.max(1, Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)));
+  }, [dateRange]);
+
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/admin/stats'],
   });
 
   const { data: growthData, isLoading: growthLoading } = useQuery<GrowthDataPoint[]>({
-    queryKey: ['/api/admin/analytics/growth?days=30'],
+    queryKey: [`/api/admin/analytics/growth?days=${days}`],
   });
 
   const { data: revenueData, isLoading: revenueLoading } = useQuery<RevenueDataPoint[]>({
-    queryKey: ['/api/admin/analytics/revenue?days=30'],
+    queryKey: [`/api/admin/analytics/revenue?days=${days}`],
   });
 
   const isLoading = statsLoading || growthLoading || revenueLoading;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" /> Platform Analytics
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Growth trends, conversion funnels, retention cohorts, and formula insights.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" /> Platform Analytics
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Growth trends, conversion funnels, retention cohorts, and formula insights.
+          </p>
+        </div>
+        <DateRangePicker value={dateRange} onChange={setDateRange} />
       </div>
 
       {/* Key Stats */}
@@ -129,7 +143,7 @@ export default function AdminAnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">User Growth</CardTitle>
-            <CardDescription>New users over the last 30 days</CardDescription>
+            <CardDescription>New users over the last {days} days</CardDescription>
           </CardHeader>
           <CardContent>
             {growthLoading ? (
@@ -162,7 +176,7 @@ export default function AdminAnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Daily Orders & Revenue</CardTitle>
-            <CardDescription>Last 30 days</CardDescription>
+            <CardDescription>Last {days} days</CardDescription>
           </CardHeader>
           <CardContent>
             {revenueLoading ? (

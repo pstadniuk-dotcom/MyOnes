@@ -137,10 +137,6 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
-  skip: (req) => {
-    // Skip rate limiting for admin routes (they're already auth protected)
-    return req.path.startsWith('/api/admin');
-  },
 });
 
 // Stricter limit for authentication endpoints - prevents brute force
@@ -162,8 +158,20 @@ const aiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Admin API rate limit - auth-protected but still needs abuse prevention
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isDev ? 1000 : 300, // Higher than general API since admins need more headroom
+  message: { error: 'Too many admin requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Apply general rate limit to all API routes
 app.use('/api/', apiLimiter);
+
+// Apply dedicated rate limit to admin routes
+app.use('/api/admin', adminLimiter);
 
 // Configure session middleware for OAuth state management
 if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {

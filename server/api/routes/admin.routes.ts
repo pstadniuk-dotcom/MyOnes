@@ -8,6 +8,8 @@ const router = Router();
 
 // Dashboard & Analytics
 router.get('/stats', requireAdmin, adminController.getStats);
+router.get('/stats/enhanced', requireAdmin, adminController.getEnhancedStats);
+router.get('/stats/financial', requireAdmin, adminController.getFinancialMetrics);
 router.get('/analytics/growth', requireAdmin, adminController.getGrowthAnalytics);
 router.get('/analytics/revenue', requireAdmin, adminController.getRevenueAnalytics);
 

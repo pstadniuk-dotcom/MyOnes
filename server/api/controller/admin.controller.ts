@@ -19,6 +19,27 @@ export class AdminController {
         }
     }
 
+    async getEnhancedStats(req: Request, res: Response) {
+        try {
+            const days = Math.min(Math.max(parseInt(req.query.days as string) || 30, 1), 365);
+            const stats = await adminService.getEnhancedStats(days);
+            res.json(stats);
+        } catch (error) {
+            logger.error('Error fetching enhanced stats', { error });
+            res.status(500).json({ error: 'Failed to fetch enhanced statistics' });
+        }
+    }
+
+    async getFinancialMetrics(req: Request, res: Response) {
+        try {
+            const metrics = await adminService.getFinancialMetrics();
+            res.json(metrics);
+        } catch (error) {
+            logger.error('Error fetching financial metrics', { error });
+            res.status(500).json({ error: 'Failed to fetch financial metrics' });
+        }
+    }
+
     async getGrowthAnalytics(req: Request, res: Response) {
         try {
             const days = Math.min(Math.max(parseInt(req.query.days as string) || 30, 1), 365);
