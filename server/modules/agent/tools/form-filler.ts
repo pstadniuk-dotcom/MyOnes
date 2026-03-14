@@ -10,10 +10,12 @@
  * 5. Takes screenshots at each stage for review
  * 6. Saves form answers to pitch record for audit trail
  */
+import { type Page, type Frame } from 'playwright';
 import OpenAI from 'openai';
 import { join } from 'path';
 import { mkdirSync, existsSync } from 'fs';
 import logger from '../../../infra/logging/logger';
+import { acquireContext, releaseContext, closeBrowserPool } from './browser-pool';
 import { getFounderProfile, type FounderProfile } from '../founder-context';
 import { agentRepository } from '../agent.repository';
 import type { OutreachProspect, OutreachPitch } from '@shared/schema';
@@ -67,24 +69,9 @@ export interface FormFillResult {
   errors: string[];
 }
 
-let browserInstance: Browser | null = null;
-
-async function getBrowser(): Promise<Browser> {
-  const pw = await getPlaywright();
-  if (!browserInstance || !browserInstance.isConnected()) {
-    browserInstance = await pw.chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-  }
-  return browserInstance;
-}
-
+/** @deprecated Use closeBrowserPool() from browser-pool.ts instead */
 export async function closeBrowser(): Promise<void> {
-  if (browserInstance) {
-    await browserInstance.close();
-    browserInstance = null;
-  }
+  await closeBrowserPool();
 }
 
 const SCREENSHOTS_DIR = join(process.cwd(), 'data', 'form-screenshots');
@@ -100,11 +87,7 @@ export async function detectAndFillForm(
 ): Promise<FormFillResult> {
   const formUrl = prospect.contactFormUrl || prospect.url;
   const profile = await getFounderProfile();
-  const browser = await getBrowser();
-  const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    viewport: { width: 1280, height: 800 },
-  });
+  const context = await acquireContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
 
   const screenshotDir = options.screenshotDir || SCREENSHOTS_DIR;
@@ -254,7 +237,7 @@ export async function detectAndFillForm(
     logger.error(`[form-filler] Error on ${formUrl}: ${err.message}`);
     result.errors.push(err.message);
   } finally {
-    await context.close();
+    await releaseContext(context);
   }
 
   return result;

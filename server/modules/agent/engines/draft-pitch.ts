@@ -10,6 +10,9 @@ import { agentRepository } from '../agent.repository';
 import { getPrAgentConfig } from '../agent-config';
 import { getFounderProfile } from '../founder-context';
 import { getTemplateForProspect, type PitchTemplate } from '../templates/pitch-templates';
+import { getPitchStatsBlock } from '../tools/platform-stats';
+import { scorePitchQuality } from '../tools/pitch-quality';
+import { trackTokens, finalizeRunCost } from '../tools/cost-tracker';
 import type { OutreachProspect, InsertOutreachPitch } from '@shared/schema';
 
 export interface DraftPitchResult {
@@ -34,6 +37,14 @@ export async function draftPitch(
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+  // Fetch live platform stats for dynamic social proof
+  let platformStatsBlock = '';
+  try {
+    platformStatsBlock = await getPitchStatsBlock();
+  } catch {
+    // Platform stats are optional
+  }
+
   const contextBlock = `
 PROSPECT DETAILS:
 - Name: ${prospect.name}
@@ -57,6 +68,8 @@ FOUNDER PROFILE:
 - Unique angles: ${profile.uniqueAngles.slice(0, 3).join('; ')}
 - Credentials: ${profile.credentials.join('; ')}
 - DO NOT MENTION: ${profile.doNotMention.join('; ')}
+
+${platformStatsBlock}
 
 SUBJECT LINE OPTIONS (use these as INSPIRATION but create a UNIQUE, ORIGINAL subject line tailored to this specific prospect — do NOT reuse these verbatim):
 ${template.exampleSubjectLines.map(s => `- ${s}`).join('\n')}
@@ -126,6 +139,11 @@ OUTPUT FORMAT: Return a JSON object with exactly two keys:
       response_format: { type: 'json_object' },
     });
 
+    // Track token usage for cost monitoring
+    if (response.usage) {
+      trackTokens(null, config.model, response.usage.prompt_tokens, response.usage.completion_tokens, 'draft_pitch');
+    }
+
     const content = response.choices[0].message.content || '{}';
     const parsed = JSON.parse(content);
 
@@ -143,10 +161,16 @@ OUTPUT FORMAT: Return a JSON object with exactly two keys:
       status: 'pending_review',
     });
 
+    // Run pitch quality self-evaluation
+    const qualityResult = scorePitchQuality(pitch, prospect);
+    if (qualityResult.recommendation === 'redraft') {
+      logger.warn(`[draft-pitch] Low quality pitch for "${prospect.name}" (score: ${qualityResult.score}/100) — flagged for redraft`);
+    }
+
     // Update prospect status
     await agentRepository.updateProspectStatus(prospect.id, 'pitched');
 
-    logger.info(`[draft-pitch] Drafted pitch for "${prospect.name}" (template: ${template.id})`);
+    logger.info(`[draft-pitch] Drafted pitch for "${prospect.name}" (template: ${template.id}, quality: ${qualityResult.score}/100)`);
 
     return {
       pitchId: pitch.id,
@@ -306,6 +330,13 @@ export async function batchDraftPitches(options: {
 
     // Brief pause between API calls
     await new Promise(r => setTimeout(r, 1000));
+  }
+
+  // Finalize cost tracking for this run
+  try {
+    await finalizeRunCost(runId);
+  } catch {
+    // Cost tracking is best-effort
   }
 
   await agentRepository.updateRun(runId, {

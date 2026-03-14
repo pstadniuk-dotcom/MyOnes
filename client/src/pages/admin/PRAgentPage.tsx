@@ -53,6 +53,12 @@ import {
   MessageSquare,
   Clock,
   UserCheck,
+  BarChart3,
+  Users,
+  TrendingUp,
+  Zap,
+  Globe,
+  MessageCircle,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -117,6 +123,47 @@ interface DashboardData {
   };
   enabled: boolean;
   recentRuns: AgentRun[];
+  funnel?: {
+    discovered: number;
+    pitched: number;
+    sent: number;
+    responded: number;
+    booked: number;
+  };
+  cost?: {
+    totalTokens: number;
+    totalCost: number;
+    byModel: Record<string, { tokens: number; cost: number }>;
+  } | null;
+  budgetAlert?: string | null;
+}
+
+interface AnalyticsData {
+  funnel: {
+    discovered: number;
+    pitched: number;
+    sent: number;
+    responded: number;
+    booked: number;
+    conversionRates: {
+      pitchRate: string;
+      sendRate: string;
+      responseRate: string;
+      bookingRate: string;
+    };
+  };
+  cost: {
+    totalTokens: number;
+    totalCost: number;
+    byModel: Record<string, { tokens: number; cost: number }>;
+  } | null;
+  budgetAlert: string | null;
+  platform: {
+    userCount: number;
+    formulaCount: number;
+    ingredientCount: number;
+    growthRate: string;
+  } | null;
 }
 
 interface PrAgentConfig {
@@ -182,6 +229,10 @@ export default function PRAgentPage() {
           </TabsTrigger>
           <TabsTrigger value="pitches">Pitches</TabsTrigger>
           <TabsTrigger value="runs">Runs</TabsTrigger>
+          <TabsTrigger value="analytics">
+            <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+            Analytics
+          </TabsTrigger>
           <TabsTrigger value="settings">
             <Settings className="h-3.5 w-3.5 mr-1.5" />
             Settings
@@ -202,6 +253,9 @@ export default function PRAgentPage() {
         </TabsContent>
         <TabsContent value="runs">
           <RunsTab />
+        </TabsContent>
+        <TabsContent value="analytics">
+          <AnalyticsTab />
         </TabsContent>
         <TabsContent value="settings">
           <SettingsTab />
@@ -244,6 +298,40 @@ function OverviewTab({ dashboard, isLoading, onNavigate }: { dashboard?: Dashboa
     onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
   });
 
+  const competitorMutation = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/agent/competitor-scan', {}),
+    onSuccess: () => {
+      toast({ title: 'Competitor scan started', description: 'New prospects from competitor coverage will appear soon.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const responsesMutation = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/agent/check-responses', {}).then(r => r.json()),
+    onSuccess: (data: any) => {
+      toast({
+        title: 'Response check complete',
+        description: `Found ${data.responsesFound || 0} new responses.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches'] });
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const followUpMutation = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/agent/process-follow-ups', {}).then(r => r.json()),
+    onSuccess: (data: any) => {
+      toast({
+        title: 'Follow-ups processed',
+        description: `${data.draftsCreated || 0} follow-up drafts created.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches'] });
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
   if (isLoading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
@@ -282,8 +370,58 @@ function OverviewTab({ dashboard, isLoading, onNavigate }: { dashboard?: Dashboa
             {sendAllMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
             Send All Approved
           </Button>
+          <Button variant="outline" onClick={() => competitorMutation.mutate()} disabled={competitorMutation.isPending}>
+            {competitorMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Globe className="h-4 w-4 mr-2" />}
+            Competitor Scan
+          </Button>
+          <Button variant="outline" onClick={() => responsesMutation.mutate()} disabled={responsesMutation.isPending}>
+            {responsesMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-2" />}
+            Check Responses
+          </Button>
+          <Button variant="outline" onClick={() => followUpMutation.mutate()} disabled={followUpMutation.isPending}>
+            {followUpMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Process Follow-Ups
+          </Button>
         </CardContent>
       </Card>
+
+      {/* Budget Alert */}
+      {dashboard?.budgetAlert && (
+        <Card className="border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20">
+          <CardContent className="pt-4 pb-3 flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+            <TrendingUp className="h-4 w-4" />
+            {dashboard.budgetAlert}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Funnel Overview */}
+      {dashboard?.funnel && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Outreach Funnel</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 text-sm">
+              {[
+                { label: 'Discovered', value: dashboard.funnel.discovered },
+                { label: 'Pitched', value: dashboard.funnel.pitched },
+                { label: 'Sent', value: dashboard.funnel.sent },
+                { label: 'Responded', value: dashboard.funnel.responded },
+                { label: 'Booked', value: dashboard.funnel.booked },
+              ].map((step, i) => (
+                <div key={step.label} className="flex items-center gap-2">
+                  {i > 0 && <span className="text-muted-foreground">→</span>}
+                  <div className="text-center">
+                    <div className="text-lg font-semibold">{step.value}</div>
+                    <div className="text-xs text-muted-foreground">{step.label}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent Runs */}
       <Card>
@@ -962,6 +1100,153 @@ function PitchesTab() {
   );
 }
 
+// ── Analytics Tab ─────────────────────────────────────────────────────────────
+
+function AnalyticsTab() {
+  const { toast } = useToast();
+
+  const { data: analytics, isLoading } = useQuery<AnalyticsData>({
+    queryKey: ['/api/agent/analytics'],
+    queryFn: () => apiRequest('GET', '/api/agent/analytics').then(r => r.json()),
+  });
+
+  const summaryMutation = useMutation({
+    mutationFn: () => apiRequest('GET', '/api/agent/weekly-summary').then(r => r.json()),
+  });
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  }
+
+  const funnel = analytics?.funnel;
+  const cost = analytics?.cost;
+
+  return (
+    <div className="space-y-6">
+      {/* Funnel Visualization */}
+      {funnel && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Outreach Funnel</CardTitle>
+            <CardDescription>Conversion rates across the pipeline</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[
+                { label: 'Discovered', value: funnel.discovered, rate: null, color: 'bg-blue-500' },
+                { label: 'Pitched', value: funnel.pitched, rate: funnel.conversionRates.pitchRate, color: 'bg-indigo-500' },
+                { label: 'Sent', value: funnel.sent, rate: funnel.conversionRates.sendRate, color: 'bg-purple-500' },
+                { label: 'Responded', value: funnel.responded, rate: funnel.conversionRates.responseRate, color: 'bg-green-500' },
+                { label: 'Booked', value: funnel.booked, rate: funnel.conversionRates.bookingRate, color: 'bg-emerald-600' },
+              ].map((step) => {
+                const width = funnel.discovered > 0 ? Math.max(5, (step.value / funnel.discovered) * 100) : 5;
+                return (
+                  <div key={step.label} className="flex items-center gap-3">
+                    <div className="w-24 text-sm text-muted-foreground">{step.label}</div>
+                    <div className="flex-1 bg-muted rounded-full h-6 overflow-hidden">
+                      <div className={`${step.color} h-full rounded-full flex items-center justify-end pr-2`} style={{ width: `${width}%`, minWidth: '40px' }}>
+                        <span className="text-xs text-white font-medium">{step.value}</span>
+                      </div>
+                    </div>
+                    {step.rate && (
+                      <div className="w-16 text-sm text-right font-mono">{step.rate}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Cost Tracking */}
+      {cost && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">AI Spend (This Month)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Total Cost</p>
+                <p className="text-2xl font-semibold">${cost.totalCost?.toFixed(2) || '0.00'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Tokens</p>
+                <p className="text-2xl font-semibold">{(cost.totalTokens || 0).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Budget Alert</p>
+                <p className="text-sm">{analytics?.budgetAlert || 'None'}</p>
+              </div>
+            </div>
+            {cost.byModel && Object.keys(cost.byModel).length > 0 && (
+              <div className="mt-4 space-y-1">
+                <p className="text-xs text-muted-foreground mb-2">By Model</p>
+                {Object.entries(cost.byModel).map(([model, data]) => (
+                  <div key={model} className="flex justify-between text-sm">
+                    <span className="font-mono text-xs">{model}</span>
+                    <span>${(data as any).cost?.toFixed(4) || '0'} ({((data as any).tokens || 0).toLocaleString()} tokens)</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Platform Stats */}
+      {analytics?.platform && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Platform Stats (for pitches)</CardTitle>
+            <CardDescription>Live data injected into pitch context</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Users</p>
+                <p className="text-lg font-semibold">{analytics.platform.userCount?.toLocaleString() || 0}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Formulas</p>
+                <p className="text-lg font-semibold">{analytics.platform.formulaCount?.toLocaleString() || 0}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Ingredients</p>
+                <p className="text-lg font-semibold">{analytics.platform.ingredientCount?.toLocaleString() || 0}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Growth</p>
+                <p className="text-lg font-semibold">{analytics.platform.growthRate || 'N/A'}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Weekly Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Weekly Summary</CardTitle>
+          <CardDescription>Generate a PR activity digest</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button variant="outline" onClick={() => summaryMutation.mutate()} disabled={summaryMutation.isPending}>
+            {summaryMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BarChart3 className="h-4 w-4 mr-2" />}
+            Generate Summary
+          </Button>
+          {summaryMutation.data && (
+            <div className="bg-muted p-4 rounded text-sm whitespace-pre-wrap">
+              {typeof summaryMutation.data === 'object' ? JSON.stringify(summaryMutation.data, null, 2) : String(summaryMutation.data)}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ── Runs Tab ──────────────────────────────────────────────────────────────────
 
 function RunsTab() {
@@ -1434,6 +1719,15 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
     onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
   });
 
+  const enrichMutation = useMutation({
+    mutationFn: () => apiRequest('POST', `/api/agent/prospects/${prospect.id}/enrich`, {}).then(r => r.json()),
+    onSuccess: (data: any) => {
+      toast({ title: 'Prospect enriched', description: `Quality score: ${data.enrichmentScore || 'N/A'}` });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
   const archiveMutation = useMutation({
     mutationFn: () => apiRequest('PATCH', `/api/agent/prospects/${prospect.id}`, { status: 'cold' }),
     onSuccess: () => {
@@ -1544,6 +1838,10 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
             </Button>
           )}
           <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button variant="outline" onClick={() => enrichMutation.mutate()} disabled={enrichMutation.isPending}>
+            {enrichMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
+            Enrich
+          </Button>
           {prospect.status === 'new' && (
             <Button onClick={() => draftMutation.mutate()} disabled={draftMutation.isPending}>
               {draftMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}

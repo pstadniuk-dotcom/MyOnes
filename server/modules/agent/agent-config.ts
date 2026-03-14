@@ -3,10 +3,46 @@
  *
  * Reads/writes agent settings from the `app_settings` table
  * (key: 'pr_agent_config'). Admin can tune these from the UI.
+ * Includes Zod validation to prevent invalid config values.
  */
+import { z } from 'zod';
 import { agentRepository } from './agent.repository';
 
 const CONFIG_KEY = 'pr_agent_config';
+
+/** Zod schema for validating PR Agent config updates */
+export const prAgentConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+
+  // Schedule
+  scanCron: z.string().min(1).optional(),
+  pitchCron: z.string().min(1).optional(),
+
+  // Search tuning
+  maxProspectsPerRun: z.number().int().min(1).max(100).optional(),
+  minRelevanceScore: z.number().int().min(0).max(100).optional(),
+  searchQueries: z.object({
+    podcast: z.array(z.string()).optional(),
+    press: z.array(z.string()).optional(),
+  }).optional(),
+
+  // Pitch settings
+  maxPitchesPerRun: z.number().int().min(1).max(50).optional(),
+  followUpDays: z.number().int().min(1).max(90).optional(),
+  maxFollowUps: z.number().int().min(0).max(5).optional(),
+
+  // AI model
+  model: z.string().min(1).optional(),
+  temperature: z.number().min(0).max(2).optional(),
+
+  // Gmail
+  gmailEnabled: z.boolean().optional(),
+  gmailFrom: z.string().email().optional(),
+
+  // Budget
+  monthlyBudgetUsd: z.number().min(0).max(10000).optional(),
+  budgetAlertThreshold: z.number().min(0).max(1).optional(),
+}).strict();
 
 export interface PrAgentConfig {
   enabled: boolean;
@@ -35,6 +71,10 @@ export interface PrAgentConfig {
   // Gmail
   gmailEnabled: boolean;
   gmailFrom: string;
+
+  // Budget tracking
+  monthlyBudgetUsd: number;       // max monthly AI spend
+  budgetAlertThreshold: number;   // 0-1, alert when spend exceeds this fraction
 }
 
 const DEFAULT_CONFIG: PrAgentConfig = {
@@ -71,6 +111,9 @@ const DEFAULT_CONFIG: PrAgentConfig = {
 
   gmailEnabled: false,
   gmailFrom: 'pete@ones.health',
+
+  monthlyBudgetUsd: 500,
+  budgetAlertThreshold: 0.8,
 };
 
 /**
@@ -85,13 +128,16 @@ export async function getPrAgentConfig(): Promise<PrAgentConfig> {
 
 /**
  * Save updated PR agent configuration.
+ * Validates input with Zod before saving.
  */
 export async function savePrAgentConfig(
   config: Partial<PrAgentConfig>,
   updatedBy?: string,
 ): Promise<PrAgentConfig> {
+  // Validate incoming config
+  const validated = prAgentConfigSchema.parse(config);
   const current = await getPrAgentConfig();
-  const merged = { ...current, ...config };
+  const merged = { ...current, ...validated };
   await agentRepository.saveAgentConfig(CONFIG_KEY, merged, updatedBy);
   return merged;
 }

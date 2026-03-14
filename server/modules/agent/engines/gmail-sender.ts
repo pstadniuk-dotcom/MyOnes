@@ -21,7 +21,7 @@ interface GmailConfig {
 }
 
 /**
- * Get Gmail OAuth client
+ * Get Gmail OAuth client (decrypts credentials if encrypted)
  */
 async function getGmailClient(): Promise<ReturnType<typeof google.gmail> | null> {
   const config = await agentRepository.getAgentConfig(GMAIL_CONFIG_KEY);
@@ -30,7 +30,21 @@ async function getGmailClient(): Promise<ReturnType<typeof google.gmail> | null>
     return null;
   }
 
-  const { clientId, clientSecret, refreshToken } = config as GmailConfig;
+  let { clientId, clientSecret, refreshToken } = config as GmailConfig & { encrypted?: boolean };
+
+  // Decrypt credentials if they were encrypted at rest
+  if (config.encrypted) {
+    try {
+      const { decryptField } = await import('../../../infra/security/fieldEncryption');
+      clientId = decryptField(clientId);
+      clientSecret = decryptField(clientSecret);
+      refreshToken = decryptField(refreshToken);
+    } catch (err: any) {
+      logger.error('[gmail] Failed to decrypt OAuth credentials', { error: err.message });
+      return null;
+    }
+  }
+
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
   oauth2Client.setCredentials({ refresh_token: refreshToken });
 

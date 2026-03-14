@@ -2061,6 +2061,16 @@ export const outreachProspects = pgTable("outreach_prospects", {
     required: boolean;
   }>>(),
   notes: text("notes"),
+  enrichmentData: json("enrichment_data").$type<{
+    episodeCount?: number;
+    lastPublishDate?: string;
+    rssFeedUrl?: string;
+    socialLinks?: string[];
+    enrichmentScore?: number;
+    enrichedAt?: string;
+  }>(),
+  lastContactedAt: timestamp("last_contacted_at"),
+  responseClassification: varchar("response_classification", { length: 30 }), // interested | declined | ask_later | forwarded | auto_reply
   discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
   source: varchar("source", { length: 50 }).default('web_search').notNull(),
 });
@@ -2085,7 +2095,10 @@ export const outreachPitches = pgTable("outreach_pitches", {
   responseReceived: boolean("response_received").default(false).notNull(),
   responseAt: timestamp("response_at"),
   responseSummary: text("response_summary"),
+  responseClassification: varchar("response_classification", { length: 30 }), // interested | declined | ask_later | forwarded | auto_reply
   followUpDueAt: timestamp("follow_up_due_at"),
+  qualityScore: integer("quality_score"),
+  qualityFlags: json("quality_flags").$type<string[]>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
