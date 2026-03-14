@@ -195,6 +195,30 @@ The MyOnes platform has significant issues that must be addressed before product
 
 ## PART 4: CLIENT-SIDE ISSUES
 
+### 4.0 Password Change Not Implemented (CRITICAL BUG)
+- **File:** `client/src/pages/SettingsPage.tsx:119-148`
+- **Issue:** Password change form exists and shows a success toast, but **never calls the backend API**. Users believe they changed their password when nothing happened.
+- **Risk:** Users cannot actually change compromised passwords; false sense of security
+- **Fix:** Call `/api/auth/change-password` endpoint with current and new password
+
+### 4.0b Open Redirect Vulnerability
+- **File:** `client/src/components/NotificationsDropdown.tsx:88`
+- **Issue:** `window.location.href = notification.metadata.actionUrl` with no URL validation
+- **Risk:** Attacker-crafted notifications could redirect users to malicious sites
+- **Fix:** Validate URL against allowlist or use wouter navigation for internal routes
+
+### 4.0c Toast Hook Memory Leak
+- **File:** `client/src/hooks/use-toast.ts:174-182`
+- **Issue:** `useEffect` has `[state]` dependency, causing re-subscription on every state change — listeners accumulate
+- **Risk:** Memory leak and performance degradation over time
+- **Fix:** Change dependency to `[]` (empty array)
+
+### 4.0d dangerouslySetInnerHTML in Chart Component
+- **File:** `client/src/components/ui/chart.tsx:81-99`
+- **Issue:** `dangerouslySetInnerHTML` used for CSS injection via template literals from ChartConfig
+- **Risk:** XSS if config source changes to accept user input
+- **Fix:** Use CSS-in-JS library instead
+
 ### 4.1 Protected Route Race Condition
 - **File:** `client/src/components/ProtectedRoute.tsx:18-26`
 - **Issue:** `useEffect` redirect check allows a brief render of protected content before redirect
