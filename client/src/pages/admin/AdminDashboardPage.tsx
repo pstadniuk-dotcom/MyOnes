@@ -18,8 +18,13 @@ import {
   Repeat,
   UserMinus,
   Receipt,
+  Crown,
+  Building2,
+  Globe,
+  MessageSquare,
+  Clock,
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { Button } from '@/shared/components/ui/button';
@@ -211,6 +216,10 @@ export default function AdminDashboardPage() {
     queryKey: ['/api/admin/analytics/pending-actions'],
   });
 
+  const { data: activityFeed } = useQuery<Array<{ type: string; message: string; timestamp: string; metadata?: any }>>({
+    queryKey: ['/api/admin/activity-feed?limit=8'],
+  });
+
   useEffect(() => {
     if (enhancedError) {
       toast({
@@ -342,13 +351,19 @@ export default function AdminDashboardPage() {
         <CardContent>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={revenueData || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
-                <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(v) => `$${v}`} />
-                <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px' }} labelFormatter={(v) => new Date(v).toLocaleDateString()} formatter={(value: number) => [`$${value}`, 'Revenue']} />
-                <Line type="monotone" dataKey="revenue" stroke="#054700" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#054700' }} />
-              </LineChart>
+              <AreaChart data={revenueData || []}>
+                <defs>
+                  <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#054700" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#054700" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(v) => `$${v}`} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' }} labelFormatter={(v) => new Date(v).toLocaleDateString()} formatter={(value: number) => [`$${value}`, 'Revenue']} />
+                <Area type="monotone" dataKey="revenue" stroke="#054700" strokeWidth={2} fill="url(#revenueGradient)" dot={false} activeDot={{ r: 4, fill: '#054700', stroke: 'white', strokeWidth: 2 }} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </CardContent>
@@ -393,6 +408,60 @@ export default function AdminDashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Quick Links + Activity Feed */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Quick Links */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">Quick Links</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-2">
+            {[
+              { label: 'Traffic', icon: Globe, href: '/admin/traffic' },
+              { label: 'Influencers', icon: Crown, href: '/admin/influencers' },
+              { label: 'B2B Prospects', icon: Building2, href: '/admin/b2b' },
+              { label: 'Conversations', icon: MessageSquare, href: '/admin/conversations' },
+            ].map((link) => (
+              <button
+                key={link.href}
+                onClick={() => setLocation(link.href)}
+                className="flex items-center gap-2 p-3 rounded-lg text-sm text-gray-700 hover:bg-[#054700]/5 hover:text-[#054700] transition-colors border border-gray-100"
+              >
+                <link.icon className="h-4 w-4" />
+                {link.label}
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Activity Feed */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">Recent Activity</CardTitle>
+            <CardDescription>Latest events across your platform</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!activityFeed || activityFeed.length === 0 ? (
+              <p className="text-sm text-gray-400 py-4 text-center">No recent activity</p>
+            ) : (
+              <div className="space-y-3">
+                {activityFeed.slice(0, 6).map((item, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="mt-0.5 p-1.5 rounded-full bg-gray-100">
+                      <Clock className="h-3 w-3 text-gray-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700 truncate">{item.message}</p>
+                      <p className="text-xs text-gray-400">{format(new Date(item.timestamp), 'MMM d, h:mm a')}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
