@@ -1,3 +1,4 @@
+import { logger } from '../../infra/logging/logger';
 import { db } from '../../infra/db/db';
 import { users, membershipTiers, type MembershipTier, type InsertMembershipTier, type User } from '@shared/schema';
 import { eq, sql, and, isNull, lt, or } from 'drizzle-orm';
@@ -11,7 +12,7 @@ export class MembershipRepository {
                 .where(eq(membershipTiers.tierKey, tierKey));
             return tier || undefined;
         } catch (error) {
-            console.error('Error getting membership tier:', error);
+            logger.error('Error getting membership tier', { error });
             return undefined;
         }
     }
@@ -23,7 +24,7 @@ export class MembershipRepository {
                 .from(membershipTiers)
                 .orderBy(membershipTiers.sortOrder);
         } catch (error) {
-            console.error('Error getting all membership tiers:', error);
+            logger.error('Error getting all membership tiers', { error });
             return [];
         }
     }
@@ -45,7 +46,7 @@ export class MembershipRepository {
             }
             return undefined;
         } catch (error) {
-            console.error('Error getting available membership tier:', error);
+            logger.error('Error getting available membership tier', { error });
             return undefined;
         }
     }
@@ -74,7 +75,7 @@ export class MembershipRepository {
                 .returning();
             return updated || undefined;
         } catch (error) {
-            console.error('Error updating membership tier:', error);
+            logger.error('Error updating membership tier', { error });
             return undefined;
         }
     }
@@ -105,7 +106,7 @@ export class MembershipRepository {
                 .returning();
             return updated || undefined;
         } catch (error) {
-            console.error('Error incrementing tier count:', error);
+            logger.error('Error incrementing tier count', { error });
             return undefined;
         }
     }
@@ -122,7 +123,7 @@ export class MembershipRepository {
                 .returning();
             return updated || undefined;
         } catch (error) {
-            console.error('Error decrementing tier count:', error);
+            logger.error('Error decrementing tier count', { error });
             return undefined;
         }
     }
@@ -174,10 +175,10 @@ export class MembershipRepository {
             });
         } catch (error: any) {
             if (error?.message === 'TIER_AT_CAPACITY') {
-                console.warn(`Tier ${tierKey} is at capacity, cannot assign user ${userId}`);
+                logger.warn('Tier is at capacity, cannot assign user', { tierKey, userId });
                 return undefined;
             }
-            console.error('Error assigning user membership:', error);
+            logger.error('Error assigning user membership', { error });
             return undefined;
         }
     }
@@ -218,7 +219,7 @@ export class MembershipRepository {
                 return updated || undefined;
             });
         } catch (error) {
-            console.error('Error cancelling user membership:', error);
+            logger.error('Error cancelling user membership', { error });
             return undefined;
         }
     }
@@ -233,7 +234,7 @@ export class MembershipRepository {
                     isNull(users.membershipCancelledAt)
                 ));
         } catch (error) {
-            console.error('Error getting users by membership tier:', error);
+            logger.error('Error getting users by membership tier', { error });
             return [];
         }
     }
@@ -247,7 +248,7 @@ export class MembershipRepository {
                 capacity: tier.maxCapacity || 0 // 0 means unlimited
             }));
         } catch (error) {
-            console.error('Error getting membership stats:', error);
+            logger.error('Error getting membership stats', { error });
             return [];
         }
     }
@@ -279,7 +280,7 @@ export class MembershipRepository {
                 }
             }
         } catch (error) {
-            console.error('Error reconciling tier counts:', error);
+            logger.error('Error reconciling tier counts', { error });
         }
         return corrections;
     }

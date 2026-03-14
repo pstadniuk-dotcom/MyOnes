@@ -8,10 +8,10 @@ const ALIVE_API_KEY = process.env.ALIVE_API_KEY || "";
 
 // ── Production safety: warn if Alive API is pointing at dev URL in production ──
 if (process.env.NODE_ENV === 'production' && ALIVE_API_BASE_URL.includes('dev.aliveinnovations.com')) {
-    console.error('[CRITICAL] ALIVE_API_BASE_URL is pointing at the DEV environment in production! Set ALIVE_API_BASE_URL to the production URL.');
+    logger.error('ALIVE_API_BASE_URL is pointing at the DEV environment in production - set ALIVE_API_BASE_URL to the production URL');
 }
 if (process.env.NODE_ENV === 'production' && !process.env.ALIVE_API_KEY) {
-    console.error('[CRITICAL] ALIVE_API_KEY is not set in production — manufacturer ordering will fail.');
+    logger.error('ALIVE_API_KEY is not set in production - manufacturer ordering will fail');
 }
 const ALIVE_API_HEADER_NAME = process.env.ALIVE_API_HEADER_NAME || "X-API-KEY";
 const ALIVE_API_TIMEOUT_MS = Number(process.env.ALIVE_API_TIMEOUT_MS || 10000);
