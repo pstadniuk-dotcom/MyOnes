@@ -35,6 +35,8 @@ import {
   Megaphone,
   Bot,
   Globe,
+  Crown,
+  Building2,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
@@ -79,6 +81,8 @@ const navSections: { label?: string; items: NavItem[] }[] = [
       },
       { label: 'Membership', href: '/admin/membership', icon: Tag },
       { label: 'PR Agent', href: '/admin/pr-agent', icon: Megaphone },
+      { label: 'Influencer Hub', href: '/admin/influencers', icon: Crown },
+      { label: 'B2B Prospecting', href: '/admin/b2b', icon: Building2 },
     ],
   },
   {

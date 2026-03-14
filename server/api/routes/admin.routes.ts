@@ -135,6 +135,26 @@ router.post('/campaigns', requireAdmin, adminController.createCampaign);
 router.patch('/campaigns/:id', requireAdmin, adminController.updateCampaign);
 router.delete('/campaigns/:id', requireAdmin, adminController.deleteCampaign);
 
+// Influencer Hub
+router.get('/influencers', requireAdmin, adminController.listInfluencers);
+router.get('/influencers/stats', requireAdmin, adminController.getInfluencerStats);
+router.get('/influencers/:id', requireAdmin, adminController.getInfluencer);
+router.post('/influencers', requireAdmin, adminController.createInfluencer);
+router.patch('/influencers/:id', requireAdmin, adminController.updateInfluencer);
+router.delete('/influencers/:id', requireAdmin, adminController.deleteInfluencer);
+router.get('/influencers/:id/content', requireAdmin, adminController.listInfluencerContent);
+router.post('/influencers/:id/content', requireAdmin, adminController.createInfluencerContent);
+
+// B2B Medical Prospecting
+router.get('/b2b/prospects', requireAdmin, adminController.listB2bProspects);
+router.get('/b2b/stats', requireAdmin, adminController.getB2bStats);
+router.get('/b2b/prospects/:id', requireAdmin, adminController.getB2bProspect);
+router.post('/b2b/prospects', requireAdmin, adminController.createB2bProspect);
+router.patch('/b2b/prospects/:id', requireAdmin, adminController.updateB2bProspect);
+router.delete('/b2b/prospects/:id', requireAdmin, adminController.deleteB2bProspect);
+router.get('/b2b/prospects/:id/outreach', requireAdmin, adminController.listB2bOutreach);
+router.post('/b2b/prospects/:id/outreach', requireAdmin, adminController.createB2bOutreach);
+
 // Formula Review Scheduler — manual trigger for testing
 router.post('/formula-review/trigger', requireAdmin, async (req, res) => {
   try {

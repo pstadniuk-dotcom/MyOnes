@@ -1165,6 +1165,180 @@ export class AdminController {
             res.status(500).json({ error: 'Failed to delete campaign' });
         }
     }
+
+    // Influencer Hub
+    async listInfluencers(req: Request, res: Response) {
+        try {
+            const filters: any = {};
+            if (req.query.status) filters.status = req.query.status;
+            if (req.query.platform) filters.platform = req.query.platform;
+            const influencers = await adminService.listInfluencers(filters);
+            res.json(influencers);
+        } catch (error) {
+            logger.error('Error listing influencers', { error });
+            res.status(500).json({ error: 'Failed to list influencers' });
+        }
+    }
+
+    async getInfluencer(req: Request, res: Response) {
+        try {
+            const influencer = await adminService.getInfluencer(req.params.id);
+            if (!influencer) return res.status(404).json({ error: 'Influencer not found' });
+            res.json(influencer);
+        } catch (error) {
+            logger.error('Error fetching influencer', { error });
+            res.status(500).json({ error: 'Failed to fetch influencer' });
+        }
+    }
+
+    async createInfluencer(req: Request, res: Response) {
+        try {
+            const influencer = await adminService.createInfluencer(req.body);
+            res.status(201).json(influencer);
+        } catch (error) {
+            logger.error('Error creating influencer', { error });
+            res.status(500).json({ error: 'Failed to create influencer' });
+        }
+    }
+
+    async updateInfluencer(req: Request, res: Response) {
+        try {
+            const influencer = await adminService.updateInfluencer(req.params.id, req.body);
+            if (!influencer) return res.status(404).json({ error: 'Influencer not found' });
+            res.json(influencer);
+        } catch (error) {
+            logger.error('Error updating influencer', { error });
+            res.status(500).json({ error: 'Failed to update influencer' });
+        }
+    }
+
+    async deleteInfluencer(req: Request, res: Response) {
+        try {
+            const deleted = await adminService.deleteInfluencer(req.params.id);
+            if (!deleted) return res.status(404).json({ error: 'Influencer not found' });
+            res.json({ success: true });
+        } catch (error) {
+            logger.error('Error deleting influencer', { error });
+            res.status(500).json({ error: 'Failed to delete influencer' });
+        }
+    }
+
+    async getInfluencerStats(req: Request, res: Response) {
+        try {
+            const stats = await adminService.getInfluencerStats();
+            res.json(stats);
+        } catch (error) {
+            logger.error('Error fetching influencer stats', { error });
+            res.status(500).json({ error: 'Failed to fetch influencer stats' });
+        }
+    }
+
+    async listInfluencerContent(req: Request, res: Response) {
+        try {
+            const content = await adminService.listInfluencerContent(req.params.id);
+            res.json(content);
+        } catch (error) {
+            logger.error('Error listing influencer content', { error });
+            res.status(500).json({ error: 'Failed to list influencer content' });
+        }
+    }
+
+    async createInfluencerContent(req: Request, res: Response) {
+        try {
+            const content = await adminService.createInfluencerContent(req.body);
+            res.status(201).json(content);
+        } catch (error) {
+            logger.error('Error creating influencer content', { error });
+            res.status(500).json({ error: 'Failed to create influencer content' });
+        }
+    }
+
+    // B2B Medical Prospecting
+    async listB2bProspects(req: Request, res: Response) {
+        try {
+            const filters: any = {};
+            if (req.query.status) filters.status = req.query.status;
+            if (req.query.practiceType) filters.practiceType = req.query.practiceType;
+            const prospects = await adminService.listB2bProspects(filters);
+            res.json(prospects);
+        } catch (error) {
+            logger.error('Error listing B2B prospects', { error });
+            res.status(500).json({ error: 'Failed to list B2B prospects' });
+        }
+    }
+
+    async getB2bProspect(req: Request, res: Response) {
+        try {
+            const prospect = await adminService.getB2bProspect(req.params.id);
+            if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+            res.json(prospect);
+        } catch (error) {
+            logger.error('Error fetching B2B prospect', { error });
+            res.status(500).json({ error: 'Failed to fetch B2B prospect' });
+        }
+    }
+
+    async createB2bProspect(req: Request, res: Response) {
+        try {
+            const prospect = await adminService.createB2bProspect(req.body);
+            res.status(201).json(prospect);
+        } catch (error) {
+            logger.error('Error creating B2B prospect', { error });
+            res.status(500).json({ error: 'Failed to create B2B prospect' });
+        }
+    }
+
+    async updateB2bProspect(req: Request, res: Response) {
+        try {
+            const prospect = await adminService.updateB2bProspect(req.params.id, req.body);
+            if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+            res.json(prospect);
+        } catch (error) {
+            logger.error('Error updating B2B prospect', { error });
+            res.status(500).json({ error: 'Failed to update B2B prospect' });
+        }
+    }
+
+    async deleteB2bProspect(req: Request, res: Response) {
+        try {
+            const deleted = await adminService.deleteB2bProspect(req.params.id);
+            if (!deleted) return res.status(404).json({ error: 'Prospect not found' });
+            res.json({ success: true });
+        } catch (error) {
+            logger.error('Error deleting B2B prospect', { error });
+            res.status(500).json({ error: 'Failed to delete B2B prospect' });
+        }
+    }
+
+    async getB2bStats(req: Request, res: Response) {
+        try {
+            const stats = await adminService.getB2bStats();
+            res.json(stats);
+        } catch (error) {
+            logger.error('Error fetching B2B stats', { error });
+            res.status(500).json({ error: 'Failed to fetch B2B stats' });
+        }
+    }
+
+    async listB2bOutreach(req: Request, res: Response) {
+        try {
+            const outreach = await adminService.listB2bOutreach(req.params.id);
+            res.json(outreach);
+        } catch (error) {
+            logger.error('Error listing B2B outreach', { error });
+            res.status(500).json({ error: 'Failed to list B2B outreach' });
+        }
+    }
+
+    async createB2bOutreach(req: Request, res: Response) {
+        try {
+            const outreach = await adminService.createB2bOutreach(req.body);
+            res.status(201).json(outreach);
+        } catch (error) {
+            logger.error('Error creating B2B outreach', { error });
+            res.status(500).json({ error: 'Failed to create B2B outreach' });
+        }
+    }
 }
 
 export const adminController = new AdminController();

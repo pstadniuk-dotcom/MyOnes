@@ -18,6 +18,10 @@ import {
     aiUsageLogs,
     referralEvents,
     marketingCampaigns,
+    influencers,
+    influencerContent,
+    b2bProspects,
+    b2bOutreach,
     type User,
     type Formula,
     type Order,
@@ -32,7 +36,15 @@ import {
     type WearableConnection,
     type IngredientPricing,
     type MarketingCampaign,
-    type InsertMarketingCampaign
+    type InsertMarketingCampaign,
+    type Influencer,
+    type InsertInfluencer,
+    type InfluencerContent,
+    type InsertInfluencerContent,
+    type B2bProspect,
+    type InsertB2bProspect,
+    type B2bOutreach,
+    type InsertB2bOutreach,
 } from '@shared/schema';
 import { eq, desc, asc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull, sum, not, ne } from 'drizzle-orm';
 import { decryptToken } from '../../utils/tokenEncryption';
@@ -2038,6 +2050,130 @@ export class AdminRepository {
     async deleteMarketingCampaign(id: string): Promise<boolean> {
         const result = await db.delete(marketingCampaigns).where(eq(marketingCampaigns.id, id)).returning();
         return result.length > 0;
+    }
+
+    // ---- Influencer Management ----
+
+    async listInfluencers(status?: string): Promise<Influencer[]> {
+        if (status && status !== 'all') {
+            return await db.select().from(influencers).where(eq(influencers.status, status)).orderBy(desc(influencers.createdAt));
+        }
+        return await db.select().from(influencers).orderBy(desc(influencers.createdAt));
+    }
+
+    async getInfluencer(id: string): Promise<Influencer | undefined> {
+        const [inf] = await db.select().from(influencers).where(eq(influencers.id, id));
+        return inf;
+    }
+
+    async createInfluencer(data: InsertInfluencer): Promise<Influencer> {
+        const [inf] = await db.insert(influencers).values(data).returning();
+        return inf;
+    }
+
+    async updateInfluencer(id: string, updates: Partial<InsertInfluencer>): Promise<Influencer | undefined> {
+        const [inf] = await db.update(influencers).set({ ...updates, updatedAt: new Date() }).where(eq(influencers.id, id)).returning();
+        return inf;
+    }
+
+    async deleteInfluencer(id: string): Promise<boolean> {
+        const result = await db.delete(influencers).where(eq(influencers.id, id)).returning();
+        return result.length > 0;
+    }
+
+    async getInfluencerStats(): Promise<{ total: number; active: number; totalRevenue: number; totalCommissions: number; byPlatform: Array<{ platform: string; count: number }> }> {
+        try {
+            const [total] = await db.select({ count: count() }).from(influencers);
+            const [active] = await db.select({ count: count() }).from(influencers).where(eq(influencers.status, 'active'));
+            const [revenue] = await db.select({
+                revenue: sql<number>`COALESCE(SUM(total_revenue_cents), 0)`,
+                commissions: sql<number>`COALESCE(SUM(total_commission_cents), 0)`,
+            }).from(influencers);
+            const byPlatform = await db.select({ platform: influencers.platform, count: count() }).from(influencers).groupBy(influencers.platform);
+
+            return {
+                total: Number(total?.count || 0),
+                active: Number(active?.count || 0),
+                totalRevenue: Number(revenue?.revenue || 0) / 100,
+                totalCommissions: Number(revenue?.commissions || 0) / 100,
+                byPlatform: byPlatform.map(p => ({ platform: p.platform, count: Number(p.count) })),
+            };
+        } catch (error) {
+            logger.error('Error getting influencer stats', { error });
+            return { total: 0, active: 0, totalRevenue: 0, totalCommissions: 0, byPlatform: [] };
+        }
+    }
+
+    async listInfluencerContent(influencerId: string): Promise<InfluencerContent[]> {
+        return await db.select().from(influencerContent).where(eq(influencerContent.influencerId, influencerId)).orderBy(desc(influencerContent.createdAt));
+    }
+
+    async createInfluencerContent(data: InsertInfluencerContent): Promise<InfluencerContent> {
+        const [content] = await db.insert(influencerContent).values(data).returning();
+        return content;
+    }
+
+    // ---- B2B Medical Prospecting ----
+
+    async listB2bProspects(status?: string, limit = 50, offset = 0): Promise<{ prospects: B2bProspect[]; total: number }> {
+        const conditions = [];
+        if (status && status !== 'all') conditions.push(eq(b2bProspects.status, status));
+
+        const [totalResult] = await db.select({ count: count() }).from(b2bProspects).where(conditions.length > 0 ? and(...conditions) : undefined);
+        const prospects = await db.select().from(b2bProspects)
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(desc(b2bProspects.leadScore))
+            .limit(limit).offset(offset);
+
+        return { prospects, total: Number(totalResult?.count || 0) };
+    }
+
+    async getB2bProspect(id: string): Promise<B2bProspect | undefined> {
+        const [prospect] = await db.select().from(b2bProspects).where(eq(b2bProspects.id, id));
+        return prospect;
+    }
+
+    async createB2bProspect(data: InsertB2bProspect): Promise<B2bProspect> {
+        const [prospect] = await db.insert(b2bProspects).values(data).returning();
+        return prospect;
+    }
+
+    async updateB2bProspect(id: string, updates: Partial<InsertB2bProspect>): Promise<B2bProspect | undefined> {
+        const [prospect] = await db.update(b2bProspects).set({ ...updates, updatedAt: new Date() }).where(eq(b2bProspects.id, id)).returning();
+        return prospect;
+    }
+
+    async deleteB2bProspect(id: string): Promise<boolean> {
+        const result = await db.delete(b2bProspects).where(eq(b2bProspects.id, id)).returning();
+        return result.length > 0;
+    }
+
+    async getB2bStats(): Promise<{ total: number; byStatus: Array<{ status: string; count: number }>; byType: Array<{ type: string; count: number }>; avgLeadScore: number }> {
+        try {
+            const [total] = await db.select({ count: count() }).from(b2bProspects);
+            const byStatus = await db.select({ status: b2bProspects.status, count: count() }).from(b2bProspects).groupBy(b2bProspects.status);
+            const byType = await db.select({ type: b2bProspects.practiceType, count: count() }).from(b2bProspects).groupBy(b2bProspects.practiceType);
+            const [avgScore] = await db.select({ avg: sql<number>`COALESCE(AVG(lead_score), 0)` }).from(b2bProspects);
+
+            return {
+                total: Number(total?.count || 0),
+                byStatus: byStatus.map(s => ({ status: s.status, count: Number(s.count) })),
+                byType: byType.map(t => ({ type: t.type, count: Number(t.count) })),
+                avgLeadScore: Math.round(Number(avgScore?.avg || 0)),
+            };
+        } catch (error) {
+            logger.error('Error getting B2B stats', { error });
+            return { total: 0, byStatus: [], byType: [], avgLeadScore: 0 };
+        }
+    }
+
+    async listB2bOutreach(prospectId: string): Promise<B2bOutreach[]> {
+        return await db.select().from(b2bOutreach).where(eq(b2bOutreach.prospectId, prospectId)).orderBy(desc(b2bOutreach.createdAt));
+    }
+
+    async createB2bOutreach(data: InsertB2bOutreach): Promise<B2bOutreach> {
+        const [outreach] = await db.insert(b2bOutreach).values(data).returning();
+        return outreach;
     }
 }
 

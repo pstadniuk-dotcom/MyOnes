@@ -1046,6 +1046,134 @@ export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaig
 export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSchema>;
 export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
 
+// Influencer Management
+export const influencers = pgTable("influencers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  handle: text("handle"), // @handle
+  platform: text("platform").notNull(), // instagram, tiktok, youtube, podcast, twitter, linkedin
+  followerCount: integer("follower_count"),
+  engagementRate: decimal("engagement_rate", { precision: 5, scale: 2 }), // e.g. 3.50%
+  niche: text("niche"), // fitness, wellness, biohacking, nutrition, longevity
+  email: text("email"),
+  phone: text("phone"),
+  website: text("website"),
+
+  // Partnership details
+  agreementType: text("agreement_type"), // affiliate, ambassador, one_time, gifting
+  commissionPercent: integer("commission_percent"), // e.g. 15
+  promoCode: text("promo_code").unique(),
+  contractStartDate: timestamp("contract_start_date"),
+  contractEndDate: timestamp("contract_end_date"),
+
+  // Tracking
+  status: text("status").default('prospect').notNull(), // prospect, contacted, negotiating, active, paused, churned
+  totalSignups: integer("total_signups").default(0).notNull(),
+  totalOrders: integer("total_orders").default(0).notNull(),
+  totalRevenueCents: integer("total_revenue_cents").default(0).notNull(),
+  totalCommissionCents: integer("total_commission_cents").default(0).notNull(),
+  lastPostDate: timestamp("last_post_date"),
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("influencers_status_idx").on(table.status),
+  index("influencers_platform_idx").on(table.platform),
+  index("influencers_promo_code_idx").on(table.promoCode),
+]);
+
+export const insertInfluencerSchema = createInsertSchema(influencers);
+export type InsertInfluencer = z.infer<typeof insertInfluencerSchema>;
+export type Influencer = typeof influencers.$inferSelect;
+
+// Influencer content tracking
+export const influencerContent = pgTable("influencer_content", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  influencerId: varchar("influencer_id").notNull().references(() => influencers.id, { onDelete: "cascade" }),
+  contentType: text("content_type").notNull(), // post, story, reel, video, podcast_mention, blog
+  platform: text("platform").notNull(),
+  url: text("url"),
+  expectedDate: timestamp("expected_date"),
+  publishedDate: timestamp("published_date"),
+  status: text("status").default('planned').notNull(), // planned, submitted, approved, published, missed
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("influencer_content_influencer_idx").on(table.influencerId),
+]);
+
+export const insertInfluencerContentSchema = createInsertSchema(influencerContent);
+export type InsertInfluencerContent = z.infer<typeof insertInfluencerContentSchema>;
+export type InfluencerContent = typeof influencerContent.$inferSelect;
+
+// B2B Medical Prospecting
+export const b2bProspects = pgTable("b2b_prospects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceName: text("practice_name").notNull(),
+  practiceType: text("practice_type").notNull(), // naturopathic, integrative, functional_medicine, sports_medicine, chiropractic, wellness_clinic, pharmacy
+  specialty: text("specialty"),
+  website: text("website"),
+  phone: text("phone"),
+  email: text("email"),
+
+  // Address
+  addressLine1: text("address_line1"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+
+  // Contacts
+  primaryContactName: text("primary_contact_name"),
+  primaryContactTitle: text("primary_contact_title"),
+  primaryContactEmail: text("primary_contact_email"),
+
+  // Scoring & status
+  leadScore: integer("lead_score").default(0).notNull(), // 0-100
+  status: text("status").default('new').notNull(), // new, contacted, responded, meeting_scheduled, sample_sent, trial, active_partner, churned, rejected
+  source: text("source"), // npi_registry, google_places, manual, referral, inbound
+  providerCount: integer("provider_count"),
+
+  // Tracking
+  contactedAt: timestamp("contacted_at"),
+  lastActivityAt: timestamp("last_activity_at"),
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("b2b_prospects_status_idx").on(table.status),
+  index("b2b_prospects_type_idx").on(table.practiceType),
+  index("b2b_prospects_state_idx").on(table.state),
+  index("b2b_prospects_lead_score_idx").on(table.leadScore),
+]);
+
+export const insertB2bProspectSchema = createInsertSchema(b2bProspects);
+export type InsertB2bProspect = z.infer<typeof insertB2bProspectSchema>;
+export type B2bProspect = typeof b2bProspects.$inferSelect;
+
+// B2B outreach tracking
+export const b2bOutreach = pgTable("b2b_outreach", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  prospectId: varchar("prospect_id").notNull().references(() => b2bProspects.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // email, call, meeting, sample_sent, follow_up
+  subject: text("subject"),
+  body: text("body"),
+  sentAt: timestamp("sent_at"),
+  openedAt: timestamp("opened_at"),
+  repliedAt: timestamp("replied_at"),
+  outcome: text("outcome"), // positive, negative, no_response, meeting_booked
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("b2b_outreach_prospect_idx").on(table.prospectId),
+]);
+
+export const insertB2bOutreachSchema = createInsertSchema(b2bOutreach);
+export type InsertB2bOutreach = z.infer<typeof insertB2bOutreachSchema>;
+export type B2bOutreach = typeof b2bOutreach.$inferSelect;
+
 // Auth-specific schemas
 export const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters long').max(100, 'Name is too long'),

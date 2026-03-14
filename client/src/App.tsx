@@ -67,6 +67,8 @@ import AIUsagePage from "@/pages/admin/AIUsagePage";
 import PRAgentPage from "@/pages/admin/PRAgentPage";
 import AISupportAgentPage from "@/pages/admin/AISupportAgentPage";
 import TrafficSourcesPage from "@/pages/admin/TrafficSourcesPage";
+import InfluencerHubPage from "@/pages/admin/InfluencerHubPage";
+import B2bProspectingPage from "@/pages/admin/B2bProspectingPage";
 import { AdminLayout } from "@/shared/components/AdminLayout";
 
 // Import shared/public components
@@ -362,6 +364,20 @@ function MainRouter() {
         <ProtectedAdminRoute>
           <AdminLayout>
             <AISupportAgentPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/influencers">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <InfluencerHubPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/b2b">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <B2bProspectingPage />
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>

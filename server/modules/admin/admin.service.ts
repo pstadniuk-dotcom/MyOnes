@@ -791,6 +791,72 @@ Return ONLY valid JSON.`;
     async deleteCampaign(id: string) {
         return await adminRepository.deleteMarketingCampaign(id);
     }
+
+    // Influencer Hub
+    async listInfluencers(filters?: { status?: string; platform?: string }) {
+        return await adminRepository.listInfluencers(filters?.status);
+    }
+
+    async getInfluencer(id: string) {
+        return await adminRepository.getInfluencer(id);
+    }
+
+    async createInfluencer(data: any) {
+        return await adminRepository.createInfluencer(data);
+    }
+
+    async updateInfluencer(id: string, updates: any) {
+        return await adminRepository.updateInfluencer(id, updates);
+    }
+
+    async deleteInfluencer(id: string) {
+        return await adminRepository.deleteInfluencer(id);
+    }
+
+    async getInfluencerStats() {
+        return await adminRepository.getInfluencerStats();
+    }
+
+    async listInfluencerContent(influencerId: string) {
+        return await adminRepository.listInfluencerContent(influencerId);
+    }
+
+    async createInfluencerContent(data: any) {
+        return await adminRepository.createInfluencerContent(data);
+    }
+
+    // B2B Medical Prospecting
+    async listB2bProspects(filters?: { status?: string; practiceType?: string }) {
+        return await adminRepository.listB2bProspects(filters?.status);
+    }
+
+    async getB2bProspect(id: string) {
+        return await adminRepository.getB2bProspect(id);
+    }
+
+    async createB2bProspect(data: any) {
+        return await adminRepository.createB2bProspect(data);
+    }
+
+    async updateB2bProspect(id: string, updates: any) {
+        return await adminRepository.updateB2bProspect(id, updates);
+    }
+
+    async deleteB2bProspect(id: string) {
+        return await adminRepository.deleteB2bProspect(id);
+    }
+
+    async getB2bStats() {
+        return await adminRepository.getB2bStats();
+    }
+
+    async listB2bOutreach(prospectId: string) {
+        return await adminRepository.listB2bOutreach(prospectId);
+    }
+
+    async createB2bOutreach(data: any) {
+        return await adminRepository.createB2bOutreach(data);
+    }
 }
 
 export const adminService = new AdminService();
