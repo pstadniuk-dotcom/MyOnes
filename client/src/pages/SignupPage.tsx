@@ -43,7 +43,20 @@ export default function SignupPage() {
     try {
       // Extract signup data without confirmPassword
       const { confirmPassword, ...signupData } = data;
-      await signup(signupData);
+
+      // Capture UTM params and referral from URL
+      const params = new URLSearchParams(window.location.search);
+      const attribution: Record<string, string> = {};
+      if (params.get('utm_source')) attribution.utmSource = params.get('utm_source')!;
+      if (params.get('utm_medium')) attribution.utmMedium = params.get('utm_medium')!;
+      if (params.get('utm_campaign')) attribution.utmCampaign = params.get('utm_campaign')!;
+      if (params.get('utm_content')) attribution.utmContent = params.get('utm_content')!;
+      if (params.get('utm_term')) attribution.utmTerm = params.get('utm_term')!;
+      if (params.get('ref')) attribution.referralCode = params.get('ref')!;
+      attribution.referrer = document.referrer || '';
+      attribution.landingPage = sessionStorage.getItem('landing_page') || window.location.pathname;
+
+      await signup({ ...signupData, ...attribution } as any);
     } catch (error) {
       // Error handling is managed by AuthContext
       console.error('Signup error:', error);

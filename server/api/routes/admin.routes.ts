@@ -124,6 +124,17 @@ router.delete('/help-articles/:id', requireAdmin, adminController.deleteHelpArti
 router.get('/newsletter', requireAdmin, adminController.listNewsletterSubscribers);
 router.patch('/newsletter/:id', requireAdmin, adminController.toggleNewsletterSubscriber);
 
+// Traffic & Attribution Analytics
+router.get('/analytics/traffic-sources', requireAdmin, adminController.getTrafficSources);
+router.get('/analytics/utm-campaigns', requireAdmin, adminController.getUtmCampaigns);
+router.get('/analytics/referrals', requireAdmin, adminController.getReferralStats);
+
+// Marketing Campaigns
+router.get('/campaigns', requireAdmin, adminController.listCampaigns);
+router.post('/campaigns', requireAdmin, adminController.createCampaign);
+router.patch('/campaigns/:id', requireAdmin, adminController.updateCampaign);
+router.delete('/campaigns/:id', requireAdmin, adminController.deleteCampaign);
+
 // Formula Review Scheduler — manual trigger for testing
 router.post('/formula-review/trigger', requireAdmin, async (req, res) => {
   try {

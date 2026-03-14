@@ -16,6 +16,8 @@ import {
     userAdminNotes,
     wearableConnections,
     aiUsageLogs,
+    referralEvents,
+    marketingCampaigns,
     type User,
     type Formula,
     type Order,
@@ -28,7 +30,9 @@ import {
     type HealthProfile,
     type InsertSupportTicketResponse,
     type WearableConnection,
-    type IngredientPricing
+    type IngredientPricing,
+    type MarketingCampaign,
+    type InsertMarketingCampaign
 } from '@shared/schema';
 import { eq, desc, asc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull, sum, not, ne } from 'drizzle-orm';
 import { decryptToken } from '../../utils/tokenEncryption';
@@ -1826,6 +1830,213 @@ export class AdminRepository {
 
     async deleteUser(id: string): Promise<boolean> {
         const result = await db.delete(users).where(eq(users.id, id)).returning();
+        return result.length > 0;
+    }
+
+    // ---- Traffic Source & Attribution Analytics ----
+
+    async getTrafficSourceBreakdown(days?: number): Promise<Array<{ channel: string; count: number; paidCount: number; revenue: number }>> {
+        try {
+            const conditions = [];
+            if (days) {
+                const startDate = new Date();
+                startDate.setDate(startDate.getDate() - days);
+                conditions.push(gte(users.createdAt, startDate));
+            }
+
+            const channelData = await db
+                .select({
+                    channel: sql<string>`COALESCE(${users.signupChannel}, 'direct')`,
+                    count: count(),
+                })
+                .from(users)
+                .where(conditions.length > 0 ? and(...conditions) : undefined)
+                .groupBy(sql`COALESCE(${users.signupChannel}, 'direct')`);
+
+            // Get paid users and revenue per channel
+            const results = [];
+            for (const row of channelData) {
+                const channelUsers = await db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(and(
+                        sql`COALESCE(${users.signupChannel}, 'direct') = ${row.channel}`,
+                        ...(conditions.length > 0 ? conditions : [])
+                    ));
+                const userIds = channelUsers.map(u => u.id);
+
+                let paidCount = 0;
+                let revenue = 0;
+                if (userIds.length > 0) {
+                    const orderData = await db
+                        .select({
+                            paidUsers: sql<number>`COUNT(DISTINCT ${orders.userId})`,
+                            totalRevenue: sql<number>`COALESCE(SUM(${orders.amountCents}), 0)`,
+                        })
+                        .from(orders)
+                        .where(inArray(orders.userId, userIds));
+                    paidCount = Number(orderData[0]?.paidUsers || 0);
+                    revenue = Number(orderData[0]?.totalRevenue || 0) / 100;
+                }
+
+                results.push({
+                    channel: row.channel,
+                    count: Number(row.count),
+                    paidCount,
+                    revenue,
+                });
+            }
+
+            return results.sort((a, b) => b.count - a.count);
+        } catch (error) {
+            logger.error('Error getting traffic source breakdown', { error });
+            return [];
+        }
+    }
+
+    async getUtmCampaignBreakdown(days?: number): Promise<Array<{ campaign: string; source: string; medium: string; signups: number; orders: number; revenue: number }>> {
+        try {
+            const conditions = [isNotNull(users.utmCampaign)];
+            if (days) {
+                const startDate = new Date();
+                startDate.setDate(startDate.getDate() - days);
+                conditions.push(gte(users.createdAt, startDate));
+            }
+
+            const campaigns = await db
+                .select({
+                    campaign: users.utmCampaign,
+                    source: sql<string>`MODE() WITHIN GROUP (ORDER BY ${users.utmSource})`,
+                    medium: sql<string>`MODE() WITHIN GROUP (ORDER BY ${users.utmMedium})`,
+                    signups: count(),
+                })
+                .from(users)
+                .where(and(...conditions))
+                .groupBy(users.utmCampaign)
+                .orderBy(desc(count()));
+
+            const results = [];
+            for (const row of campaigns) {
+                const campaignUsers = await db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(and(eq(users.utmCampaign, row.campaign!), ...(conditions.slice(1))));
+                const userIds = campaignUsers.map(u => u.id);
+
+                let orderCount = 0;
+                let revenue = 0;
+                if (userIds.length > 0) {
+                    const [orderData] = await db
+                        .select({
+                            orders: count(),
+                            totalRevenue: sql<number>`COALESCE(SUM(${orders.amountCents}), 0)`,
+                        })
+                        .from(orders)
+                        .where(inArray(orders.userId, userIds));
+                    orderCount = Number(orderData?.orders || 0);
+                    revenue = Number(orderData?.totalRevenue || 0) / 100;
+                }
+
+                results.push({
+                    campaign: row.campaign || 'unknown',
+                    source: row.source || 'unknown',
+                    medium: row.medium || 'unknown',
+                    signups: Number(row.signups),
+                    orders: orderCount,
+                    revenue,
+                });
+            }
+
+            return results;
+        } catch (error) {
+            logger.error('Error getting UTM campaign breakdown', { error });
+            return [];
+        }
+    }
+
+    async getReferralStats(): Promise<{
+        totalReferrers: number;
+        totalReferred: number;
+        topReferrers: Array<{ userId: string; name: string; email: string; referralCode: string; referralCount: number; revenueGenerated: number }>;
+    }> {
+        try {
+            const referredUsers = await db
+                .select({ count: count() })
+                .from(users)
+                .where(isNotNull(users.referredByUserId));
+            const totalReferred = Number(referredUsers[0]?.count || 0);
+
+            const referrerCounts = await db
+                .select({
+                    userId: users.referredByUserId,
+                    count: count(),
+                })
+                .from(users)
+                .where(isNotNull(users.referredByUserId))
+                .groupBy(users.referredByUserId);
+            const totalReferrers = referrerCounts.length;
+
+            // Top referrers with their details
+            const topReferrers = [];
+            const sorted = referrerCounts.sort((a, b) => Number(b.count) - Number(a.count)).slice(0, 10);
+            for (const r of sorted) {
+                if (!r.userId) continue;
+                const [referrer] = await db.select({ name: users.name, email: users.email, referralCode: users.referralCode }).from(users).where(eq(users.id, r.userId));
+                if (!referrer) continue;
+
+                // Revenue from referred users
+                const referredIds = await db.select({ id: users.id }).from(users).where(eq(users.referredByUserId, r.userId));
+                let revenueGenerated = 0;
+                if (referredIds.length > 0) {
+                    const [rev] = await db.select({ total: sql<number>`COALESCE(SUM(${orders.amountCents}), 0)` })
+                        .from(orders).where(inArray(orders.userId, referredIds.map(u => u.id)));
+                    revenueGenerated = Number(rev?.total || 0) / 100;
+                }
+
+                topReferrers.push({
+                    userId: r.userId,
+                    name: referrer.name,
+                    email: referrer.email,
+                    referralCode: referrer.referralCode || '',
+                    referralCount: Number(r.count),
+                    revenueGenerated,
+                });
+            }
+
+            return { totalReferrers, totalReferred, topReferrers };
+        } catch (error) {
+            logger.error('Error getting referral stats', { error });
+            return { totalReferrers: 0, totalReferred: 0, topReferrers: [] };
+        }
+    }
+
+    // ---- Marketing Campaigns CRUD ----
+
+    async listMarketingCampaigns(): Promise<MarketingCampaign[]> {
+        return await db.select().from(marketingCampaigns).orderBy(desc(marketingCampaigns.createdAt));
+    }
+
+    async getMarketingCampaign(id: string): Promise<MarketingCampaign | undefined> {
+        const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, id));
+        return campaign;
+    }
+
+    async createMarketingCampaign(data: InsertMarketingCampaign): Promise<MarketingCampaign> {
+        const [campaign] = await db.insert(marketingCampaigns).values(data).returning();
+        return campaign;
+    }
+
+    async updateMarketingCampaign(id: string, updates: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign | undefined> {
+        const [campaign] = await db
+            .update(marketingCampaigns)
+            .set({ ...updates, updatedAt: new Date() })
+            .where(eq(marketingCampaigns.id, id))
+            .returning();
+        return campaign;
+    }
+
+    async deleteMarketingCampaign(id: string): Promise<boolean> {
+        const result = await db.delete(marketingCampaigns).where(eq(marketingCampaigns.id, id)).returning();
         return result.length > 0;
     }
 }

@@ -18,6 +18,7 @@ export class AuthController {
             }
 
             const clientUserAgent = req.headers['user-agent'] || null;
+            // Pass full body including optional UTM/referral fields
             const { user, token } = await authService.signup(req.body, clientIP, clientUserAgent);
 
             logger.info('Signup success', { userId: user.id, duration: `${Date.now() - startTime}ms` });

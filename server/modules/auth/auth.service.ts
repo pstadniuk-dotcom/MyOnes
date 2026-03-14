@@ -27,16 +27,66 @@ export class AuthService {
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(validatedData.password, saltRounds);
 
-        // Create user with ToS acceptance timestamp
+        // Compute signup channel from UTM params
+        const utmSource = data.utmSource || null;
+        const utmMedium = data.utmMedium || null;
+        let signupChannel = 'direct';
+        if (data.referralCode) signupChannel = 'referral';
+        else if (utmMedium === 'cpc' || utmMedium === 'ppc' || utmMedium === 'paid') signupChannel = 'paid';
+        else if (utmMedium === 'email') signupChannel = 'email';
+        else if (utmMedium === 'social' || ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin'].includes(utmSource || '')) signupChannel = 'social';
+        else if (utmSource === 'podcast' || utmMedium === 'podcast') signupChannel = 'podcast';
+        else if (utmSource) signupChannel = 'organic';
+        else if (data.referrer && !data.referrer.includes('ones.health')) signupChannel = 'organic';
+
+        // Generate unique referral code for this user
+        const referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+
+        // Resolve referral if a code was provided
+        let referredByUserId: string | null = null;
+        if (data.referralCode) {
+            const referrer = await usersRepository.getUserByReferralCode(data.referralCode);
+            if (referrer) {
+                referredByUserId = referrer.id;
+            }
+        }
+
+        // Create user with ToS acceptance timestamp and attribution data
         const userData: InsertUser = {
             name: validatedData.name,
             email: validatedData.email,
             phone: validatedData.phone || null,
             password: hashedPassword,
             tosAcceptedAt: new Date(),
+            utmSource,
+            utmMedium,
+            utmCampaign: data.utmCampaign || null,
+            utmContent: data.utmContent || null,
+            utmTerm: data.utmTerm || null,
+            referrer: data.referrer || null,
+            landingPage: data.landingPage || null,
+            signupChannel,
+            referralCode,
+            referredByUserId,
         };
 
         const user = await usersRepository.createUser(userData);
+
+        // Record referral event if this user was referred
+        if (referredByUserId && data.referralCode) {
+            try {
+                const { db } = await import('../../infra/db/db');
+                const { referralEvents } = await import('@shared/schema');
+                await db.insert(referralEvents).values({
+                    referrerUserId: referredByUserId,
+                    referredUserId: user.id,
+                    referralCode: data.referralCode,
+                    eventType: 'signup',
+                });
+            } catch (err) {
+                logger.warn('Failed to record referral event', { error: err });
+            }
+        }
 
         // Record Terms of Service & Privacy Policy acceptance as consent record
         try {

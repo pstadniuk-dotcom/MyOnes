@@ -34,6 +34,7 @@ import {
   Bell,
   Megaphone,
   Bot,
+  Globe,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
@@ -84,6 +85,7 @@ const navSections: { label?: string; items: NavItem[] }[] = [
     label: 'Intelligence',
     items: [
       { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+      { label: 'Traffic & Attribution', href: '/admin/traffic', icon: Globe },
       { label: 'AI Usage & Costs', href: '/admin/ai-usage', icon: DollarSign },
       { label: 'Conversations', href: '/admin/conversations', icon: MessageSquare },
     ],

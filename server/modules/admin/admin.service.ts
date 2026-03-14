@@ -761,6 +761,36 @@ Return ONLY valid JSON.`;
     }) {
         return await adminRepository.updateIngredientPricing(id, updates);
     }
+
+    // Traffic & Attribution
+    async getTrafficSources(days?: number) {
+        return await adminRepository.getTrafficSourceBreakdown(days);
+    }
+
+    async getUtmCampaigns(days?: number) {
+        return await adminRepository.getUtmCampaignBreakdown(days);
+    }
+
+    async getReferralStats() {
+        return await adminRepository.getReferralStats();
+    }
+
+    // Marketing Campaigns
+    async listCampaigns() {
+        return await adminRepository.listMarketingCampaigns();
+    }
+
+    async createCampaign(data: any) {
+        return await adminRepository.createMarketingCampaign(data);
+    }
+
+    async updateCampaign(id: string, updates: any) {
+        return await adminRepository.updateMarketingCampaign(id, updates);
+    }
+
+    async deleteCampaign(id: string) {
+        return await adminRepository.deleteMarketingCampaign(id);
+    }
 }
 
 export const adminService = new AdminService();

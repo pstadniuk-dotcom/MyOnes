@@ -126,6 +126,20 @@ export const users = pgTable("users", {
   // null = use defaults from shared/metricCatalog.ts
   metricPreferences: json("metric_preferences"),
 
+  // Attribution & UTM tracking (captured at signup)
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  utmContent: text("utm_content"),
+  utmTerm: text("utm_term"),
+  referrer: text("referrer"), // HTTP referrer at signup
+  landingPage: text("landing_page"), // First page visited
+  signupChannel: text("signup_channel"), // Computed: direct, organic, social, paid, referral, email
+
+  // Referral tracking
+  referralCode: text("referral_code").unique(), // User's own referral code
+  referredByUserId: varchar("referred_by_user_id"), // Who referred them
+
   // Soft-delete & suspension (admin operations)
   deletedAt: timestamp("deleted_at"),
   deletedBy: varchar("deleted_by"),
@@ -139,6 +153,9 @@ export const users = pgTable("users", {
   index("users_phone_idx").on(table.phone),
   index("users_stripe_customer_idx").on(table.stripeCustomerId),
   index("users_created_at_idx").on(table.createdAt),
+  index("users_referral_code_idx").on(table.referralCode),
+  index("users_utm_source_idx").on(table.utmSource),
+  index("users_signup_channel_idx").on(table.signupChannel),
 ]);
 
 // Password reset tokens
@@ -985,6 +1002,49 @@ export type AppSetting = typeof appSettings.$inferSelect;
 // User admin notes types
 export type InsertUserAdminNote = z.infer<typeof insertUserAdminNoteSchema>;
 export type UserAdminNote = typeof userAdminNotes.$inferSelect;
+
+// Referral tracking - tracks referral code usage and rewards
+export const referralEvents = pgTable("referral_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  referrerUserId: varchar("referrer_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  referredUserId: varchar("referred_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  referralCode: text("referral_code").notNull(),
+  eventType: text("event_type").notNull(), // 'signup', 'first_order', 'reorder'
+  rewardType: text("reward_type"), // 'discount', 'credit', 'free_month'
+  rewardAmountCents: integer("reward_amount_cents"),
+  rewardApplied: boolean("reward_applied").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("referral_events_referrer_idx").on(table.referrerUserId),
+  index("referral_events_referred_idx").on(table.referredUserId),
+]);
+
+export const insertReferralEventSchema = createInsertSchema(referralEvents);
+export type InsertReferralEvent = z.infer<typeof insertReferralEventSchema>;
+export type ReferralEvent = typeof referralEvents.$inferSelect;
+
+// Marketing campaigns - tracks campaigns across channels
+export const marketingCampaigns = pgTable("marketing_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  channel: text("channel").notNull(), // 'email', 'social', 'paid', 'content', 'podcast', 'influencer'
+  utmCampaign: text("utm_campaign").unique(), // Maps to utm_campaign param
+  status: text("status").default('draft').notNull(), // 'draft', 'active', 'paused', 'completed'
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  budgetCents: integer("budget_cents"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("marketing_campaigns_status_idx").on(table.status),
+  index("marketing_campaigns_channel_idx").on(table.channel),
+]);
+
+export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaigns);
+export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSchema>;
+export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
 
 // Auth-specific schemas
 export const signupSchema = z.object({

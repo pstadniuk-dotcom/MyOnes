@@ -1089,6 +1089,82 @@ export class AdminController {
             res.status(500).json({ error: 'Failed to fetch user AI usage' });
         }
     }
+
+    // Traffic & Attribution
+    async getTrafficSources(req: Request, res: Response) {
+        try {
+            const days = req.query.days ? Math.min(Math.max(parseInt(req.query.days as string), 1), 365) : undefined;
+            const sources = await adminService.getTrafficSources(days);
+            res.json(sources);
+        } catch (error) {
+            logger.error('Error fetching traffic sources', { error });
+            res.status(500).json({ error: 'Failed to fetch traffic sources' });
+        }
+    }
+
+    async getUtmCampaigns(req: Request, res: Response) {
+        try {
+            const days = req.query.days ? Math.min(Math.max(parseInt(req.query.days as string), 1), 365) : undefined;
+            const campaigns = await adminService.getUtmCampaigns(days);
+            res.json(campaigns);
+        } catch (error) {
+            logger.error('Error fetching UTM campaigns', { error });
+            res.status(500).json({ error: 'Failed to fetch UTM campaigns' });
+        }
+    }
+
+    async getReferralStats(req: Request, res: Response) {
+        try {
+            const stats = await adminService.getReferralStats();
+            res.json(stats);
+        } catch (error) {
+            logger.error('Error fetching referral stats', { error });
+            res.status(500).json({ error: 'Failed to fetch referral stats' });
+        }
+    }
+
+    // Marketing Campaigns
+    async listCampaigns(req: Request, res: Response) {
+        try {
+            const campaigns = await adminService.listCampaigns();
+            res.json(campaigns);
+        } catch (error) {
+            logger.error('Error listing campaigns', { error });
+            res.status(500).json({ error: 'Failed to list campaigns' });
+        }
+    }
+
+    async createCampaign(req: Request, res: Response) {
+        try {
+            const campaign = await adminService.createCampaign({ ...req.body, createdBy: req.userId });
+            res.status(201).json(campaign);
+        } catch (error) {
+            logger.error('Error creating campaign', { error });
+            res.status(500).json({ error: 'Failed to create campaign' });
+        }
+    }
+
+    async updateCampaign(req: Request, res: Response) {
+        try {
+            const campaign = await adminService.updateCampaign(req.params.id, req.body);
+            if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+            res.json(campaign);
+        } catch (error) {
+            logger.error('Error updating campaign', { error });
+            res.status(500).json({ error: 'Failed to update campaign' });
+        }
+    }
+
+    async deleteCampaign(req: Request, res: Response) {
+        try {
+            const deleted = await adminService.deleteCampaign(req.params.id);
+            if (!deleted) return res.status(404).json({ error: 'Campaign not found' });
+            res.json({ success: true });
+        } catch (error) {
+            logger.error('Error deleting campaign', { error });
+            res.status(500).json({ error: 'Failed to delete campaign' });
+        }
+    }
 }
 
 export const adminController = new AdminController();

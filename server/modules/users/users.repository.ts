@@ -51,6 +51,11 @@ export class UsersRepository {
         return user || undefined;
     }
 
+    async getUserByReferralCode(referralCode: string): Promise<User | undefined> {
+        const [user] = await db.select().from(users).where(eq(users.referralCode, referralCode));
+        return user || undefined;
+    }
+
     async listAllUsers(): Promise<User[]> {
         return await db.select().from(users);
     }

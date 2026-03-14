@@ -66,6 +66,7 @@ import AdminChatAnalyticsPage from "@/pages/admin/AdminChatAnalyticsPage";
 import AIUsagePage from "@/pages/admin/AIUsagePage";
 import PRAgentPage from "@/pages/admin/PRAgentPage";
 import AISupportAgentPage from "@/pages/admin/AISupportAgentPage";
+import TrafficSourcesPage from "@/pages/admin/TrafficSourcesPage";
 import { AdminLayout } from "@/shared/components/AdminLayout";
 
 // Import shared/public components
@@ -308,6 +309,13 @@ function MainRouter() {
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
+      <Route path="/admin/traffic">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <TrafficSourcesPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
       <Route path="/admin/products">
         <ProtectedAdminRoute>
           <AdminLayout>
@@ -376,6 +384,11 @@ function MainRouter() {
       <Route component={NotFound} />
     </Switch>
   );
+}
+
+// Capture landing page on first visit for attribution
+if (!sessionStorage.getItem('landing_page')) {
+  sessionStorage.setItem('landing_page', window.location.pathname + window.location.search);
 }
 
 function App() {
