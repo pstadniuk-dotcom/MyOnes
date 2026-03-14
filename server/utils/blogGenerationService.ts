@@ -8,6 +8,7 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { jsonrepair } from 'jsonrepair';
+import { logger } from '../infra/logging/logger';
 
 export interface GenerateArticleInput {
   title: string;
@@ -143,7 +144,7 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
     try {
       const repaired = jsonrepair(jsonMatch[0]);
       g = JSON.parse(repaired);
-      console.warn('[blog-gen] JSON repaired successfully via jsonrepair after initial parse failure');
+      logger.warn('[blog-gen] JSON repaired successfully via jsonrepair after initial parse failure');
     } catch {
       throw new Error(`${parseErr.message}`);
     }
@@ -177,7 +178,7 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
       g.metaDescription = g.metaDescription.slice(0, 157).trimEnd() + '...';
     }
     if (g.metaDescription.length < 100) {
-      console.warn(`[blog-gen] metaDescription too short (${g.metaDescription.length} chars) for: "${g.metaTitle}"`);
+      logger.warn('[blog-gen] metaDescription too short', { length: g.metaDescription.length, metaTitle: g.metaTitle });
     }
   }
 

@@ -1,4 +1,5 @@
 import { db } from '../../infra/db/db';
+import { logger } from '../../infra/logging/logger';
 import {
     users, healthProfiles, subscriptions, orders, addresses, paymentMethodRefs, formulas,
     type User, type InsertUser,
@@ -101,7 +102,7 @@ export class UsersRepository {
                     }
                 }
             } catch (decryptError) {
-                console.error('Error decrypting conditions, using empty array:', decryptError);
+                logger.error('Error decrypting conditions, using empty array', { error: decryptError });
             }
 
             try {
@@ -113,7 +114,7 @@ export class UsersRepository {
                     }
                 }
             } catch (decryptError) {
-                console.error('Error decrypting medications, using empty array:', decryptError);
+                logger.error('Error decrypting medications, using empty array', { error: decryptError });
             }
 
             try {
@@ -125,7 +126,7 @@ export class UsersRepository {
                     }
                 }
             } catch (decryptError) {
-                console.error('Error decrypting allergies, using empty array:', decryptError);
+                logger.error('Error decrypting allergies, using empty array', { error: decryptError });
             }
 
             return {
@@ -135,7 +136,7 @@ export class UsersRepository {
                 allergies
             };
         } catch (error) {
-            console.error('Error getting health profile:', error);
+            logger.error('Error getting health profile', { error });
             return undefined;
         }
     }
@@ -199,7 +200,7 @@ export class UsersRepository {
             Object.entries(encryptedUpdates).filter(([_, v]) => v !== undefined)
         );
 
-        console.log('Updating health profile:', { userId, fieldsToUpdate: Object.keys(cleanUpdates) });
+        logger.info('Updating health profile', { userId, fieldsToUpdate: Object.keys(cleanUpdates) });
 
         const [profile] = await db
             .update(healthProfiles)
@@ -208,7 +209,7 @@ export class UsersRepository {
             .returning();
 
         if (!profile) {
-            console.error('Health profile update returned no result for userId:', userId);
+            logger.error('Health profile update returned no result', { userId });
             return undefined;
         }
 
@@ -401,7 +402,7 @@ export class UsersRepository {
                 .where(eq(newsletterSubscribers.email, normalizedEmail));
             return subscriber || undefined;
         } catch (error) {
-            console.error('Error getting newsletter subscriber:', error);
+            logger.error('Error getting newsletter subscriber', { error });
             return undefined;
         }
     }
@@ -415,7 +416,7 @@ export class UsersRepository {
                 .returning();
             return subscriber;
         } catch (error) {
-            console.error('Error creating newsletter subscriber:', error);
+            logger.error('Error creating newsletter subscriber', { error });
             throw error;
         }
     }
@@ -429,7 +430,7 @@ export class UsersRepository {
                 .where(eq(newsletterSubscribers.email, normalizedEmail));
             return true;
         } catch (error) {
-            console.error('Error reactivating newsletter subscriber:', error);
+            logger.error('Error reactivating newsletter subscriber', { error });
             return false;
         }
     }
@@ -499,7 +500,7 @@ export class UsersRepository {
                 daysUntilDeadline,
             };
         } catch (error) {
-            console.error('Error getting streak rewards:', error);
+            logger.error('Error getting streak rewards', { error });
             return {
                 currentStreak: 0,
                 discountEarned: 0,
@@ -532,9 +533,9 @@ export class UsersRepository {
                 })
                 .where(eq(users.id, userId));
 
-            console.log(`🔥 Streak updated for user ${userId}: ${newStreak} days, ${discount}% discount`);
+            logger.info('Streak updated', { userId, streakDays: newStreak, discountPercent: discount });
         } catch (error) {
-            console.error('Error updating streak progress:', error);
+            logger.error('Error updating streak progress', { error });
         }
     }
 
@@ -564,12 +565,12 @@ export class UsersRepository {
                     })
                     .where(eq(users.id, userId));
 
-                console.log(`💰 Applied ${discountToApply}% streak discount to order ${orderId}`);
+                logger.info('Applied streak discount', { discountPercent: discountToApply, orderId });
             }
 
             return discountToApply;
         } catch (error) {
-            console.error('Error applying streak discount:', error);
+            logger.error('Error applying streak discount', { error });
             return 0;
         }
     }
@@ -596,12 +597,12 @@ export class UsersRepository {
                 .returning();
 
             if (result.length > 0) {
-                console.log(`⚠️ Reset streaks for ${result.length} lapsed users`);
+                logger.warn('Reset streaks for lapsed users', { count: result.length });
             }
 
             return result.length;
         } catch (error) {
-            console.error('Error resetting lapsed streaks:', error);
+            logger.error('Error resetting lapsed streaks', { error });
             return 0;
         }
     }
@@ -643,9 +644,9 @@ export class UsersRepository {
                     sql`${users.streakStatus} IN ('building', 'ready', 'warning')`
                 ));
 
-            console.log('✅ Streak statuses updated');
+            logger.info('Streak statuses updated');
         } catch (error) {
-            console.error('Error updating streak statuses:', error);
+            logger.error('Error updating streak statuses', { error });
         }
     }
 }

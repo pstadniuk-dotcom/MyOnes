@@ -538,18 +538,18 @@ export class WearablesService {
 
     async getBiometricData(userId: string, startDate: string, endDate: string, provider?: string) {
         const junctionUserId = await wearablesRepository.getJunctionUserId(userId);
-        console.log('[Wearables:getBiometricData] userId:', userId, 'junctionUserId:', junctionUserId);
+        logger.debug('[Wearables:getBiometricData] Fetching biometric data', { userId, junctionUserId });
         if (!junctionUserId) {
-            console.log('[Wearables:getBiometricData] No junction user ID - returning empty');
+            logger.debug('[Wearables:getBiometricData] No junction user ID - returning empty');
             return { data: [] };
         }
 
         const [sleepData, activityData, bodyData] = await Promise.all([
-            getSleepData(junctionUserId, startDate, endDate).catch((e) => { console.error('[Wearables] Sleep fetch error:', e?.message); return []; }),
-            getActivityData(junctionUserId, startDate, endDate).catch((e) => { console.error('[Wearables] Activity fetch error:', e?.message); return []; }),
-            getBodyData(junctionUserId, startDate, endDate).catch((e) => { console.error('[Wearables] Body fetch error:', e?.message); return []; }),
+            getSleepData(junctionUserId, startDate, endDate).catch((e) => { logger.error('[Wearables] Sleep fetch error', { error: e?.message }); return []; }),
+            getActivityData(junctionUserId, startDate, endDate).catch((e) => { logger.error('[Wearables] Activity fetch error', { error: e?.message }); return []; }),
+            getBodyData(junctionUserId, startDate, endDate).catch((e) => { logger.error('[Wearables] Body fetch error', { error: e?.message }); return []; }),
         ]);
-        console.log('[Wearables:getBiometricData] Junction API results - sleep:', sleepData.length, 'activity:', activityData.length, 'body:', bodyData.length);
+        logger.debug('[Wearables:getBiometricData] Junction API results', { sleepCount: sleepData.length, activityCount: activityData.length, bodyCount: bodyData.length });
 
         const dataByDate = new Map<string, any>();
 

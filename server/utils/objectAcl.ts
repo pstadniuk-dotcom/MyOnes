@@ -1,4 +1,5 @@
 import { File } from "@google-cloud/storage";
+import { logger } from '../infra/logging/logger';
 
 const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
 const AUDIT_LOG_METADATA_KEY = "custom:auditLog";
@@ -302,7 +303,7 @@ export async function canAccessObject({
       try {
         await appendAuditLogEntry(objectFile, auditEntry);
       } catch (auditError) {
-        console.error("Failed to log audit entry:", auditError);
+        logger.error('Failed to log audit entry', { error: auditError });
         // Don't fail the main operation due to audit logging issues
       }
     }

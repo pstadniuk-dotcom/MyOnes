@@ -2,6 +2,7 @@ import { db } from '../../infra/db/db';
 import { fileUploads, labAnalyses, type FileUpload, type InsertFileUpload, type LabAnalysis, type InsertLabAnalysis } from '@shared/schema';
 import { eq, and, isNull, desc } from 'drizzle-orm';
 import { encryptField, decryptField } from '../../infra/security/fieldEncryption';
+import { logger } from '../../infra/logging/logger';
 
 type DbInsertFileUpload = typeof fileUploads.$inferInsert;
 
@@ -200,7 +201,7 @@ export class FilesRepository {
                     : undefined
             };
         } catch (error) {
-            console.error('Error creating lab analysis:', error);
+            logger.error('Error creating lab analysis', { error });
             throw new Error('Failed to create lab analysis');
         }
     }
@@ -221,7 +222,7 @@ export class FilesRepository {
                     : undefined
             };
         } catch (error) {
-            console.error('Error getting lab analysis:', error);
+            logger.error('Error getting lab analysis', { error });
             return undefined;
         }
     }
@@ -263,7 +264,7 @@ export class FilesRepository {
                     : undefined
             };
         } catch (error) {
-            console.error('Error updating lab analysis:', error);
+            logger.error('Error updating lab analysis', { error });
             return undefined;
         }
     }
@@ -283,7 +284,7 @@ export class FilesRepository {
                     : undefined
             }));
         } catch (error) {
-            console.error('Error listing lab analyses by user:', error);
+            logger.error('Error listing lab analyses by user', { error });
             return [];
         }
     }

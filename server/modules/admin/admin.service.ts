@@ -689,7 +689,7 @@ Return ONLY valid JSON.`;
                 updatedAt: aiRuntimeSettings.updatedAt
             }, userId || null);
         } catch (e) {
-            console.error('Error persisting AI settings:', e);
+            logger.error('Error persisting AI settings', { error: e });
             // Non-fatal; continue with in-memory override
         }
         return { success: true, settings: aiRuntimeSettings }

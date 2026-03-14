@@ -10,7 +10,8 @@ import {
   pgEnum,
   date,
   decimal,
-  uniqueIndex
+  uniqueIndex,
+  index
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -133,7 +134,12 @@ export const users = pgTable("users", {
   suspendedReason: text("suspended_reason"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("users_email_idx").on(table.email),
+  index("users_phone_idx").on(table.phone),
+  index("users_stripe_customer_idx").on(table.stripeCustomerId),
+  index("users_created_at_idx").on(table.createdAt),
+]);
 
 // Password reset tokens
 export const passwordResetTokens = pgTable("password_reset_tokens", {
@@ -208,7 +214,10 @@ export const chatSessions = pgTable("chat_sessions", {
   title: varchar("title", { length: 255 }),
   status: chatStatusEnum("status").default('active').notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("chat_sessions_user_id_idx").on(table.userId),
+  index("chat_sessions_created_at_idx").on(table.createdAt),
+]);
 
 // Messages within chat sessions
 export const messages = pgTable("messages", {
@@ -226,7 +235,9 @@ export const messages = pgTable("messages", {
     disclaimers?: string[];
   }>(), // Formula data if AI created one in this message
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("messages_session_id_idx").on(table.sessionId),
+]);
 
 // Supplement formulas
 export const formulas = pgTable("formulas", {
@@ -274,7 +285,9 @@ export const formulas = pgTable("formulas", {
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"), // Null = active, timestamp = archived
-});
+}, (table) => [
+  index("formulas_user_id_idx").on(table.userId),
+]);
 
 // Formula warning acknowledgments — legal paper trail
 export const formulaWarningAcknowledgments = pgTable("formula_warning_acknowledgments", {
@@ -407,7 +420,12 @@ export const orders = pgTable("orders", {
     /** Timestamp when this snapshot was captured */
     capturedAt: string;
   }>(),
-});
+}, (table) => [
+  index("orders_user_id_idx").on(table.userId),
+  index("orders_status_idx").on(table.status),
+  index("orders_placed_at_idx").on(table.placedAt),
+  index("orders_stripe_session_idx").on(table.stripeSessionId),
+]);
 
 // Ingredient pricing reference for equivalent stack estimates
 export const ingredientPricing = pgTable("ingredient_pricing", {
@@ -480,7 +498,10 @@ export const fileUploads = pgTable("file_uploads", {
   // Soft delete for compliance (never actually delete PHI)
   deletedAt: timestamp("deleted_at"),
   deletedBy: varchar("deleted_by").references(() => users.id),
-});
+}, (table) => [
+  index("file_uploads_user_id_idx").on(table.userId),
+  index("file_uploads_type_idx").on(table.type),
+]);
 
 // HIPAA-compliant audit log for all file operations
 export const auditLogs = pgTable("audit_logs", {
@@ -495,7 +516,11 @@ export const auditLogs = pgTable("audit_logs", {
   success: boolean("success").notNull(),
   errorMessage: text("error_message"),
   metadata: json("metadata").$type<Record<string, any>>(),
-});
+}, (table) => [
+  index("audit_logs_user_id_idx").on(table.userId),
+  index("audit_logs_file_id_idx").on(table.fileId),
+  index("audit_logs_timestamp_idx").on(table.timestamp),
+]);
 
 // Admin action audit log — tracks all admin write operations
 export const adminAuditLogs = pgTable("admin_audit_logs", {
@@ -963,9 +988,9 @@ export type UserAdminNote = typeof userAdminNotes.$inferSelect;
 
 // Auth-specific schemas
 export const signupSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters long'),
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters long'),
+  name: z.string().min(2, 'Name must be at least 2 characters long').max(100, 'Name is too long'),
+  email: z.string().email('Please enter a valid email address').max(254, 'Email is too long').transform(v => v.toLowerCase().trim()),
+  password: z.string().min(8, 'Password must be at least 8 characters long').max(128, 'Password is too long'),
   phone: z.string().optional(),
   acceptedTerms: z.literal(true, {
     errorMap: () => ({ message: 'You must accept the Terms of Service and Privacy Policy' }),
@@ -973,7 +998,7 @@ export const signupSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
+  email: z.string().email('Please enter a valid email address').max(254, 'Email is too long').transform(v => v.toLowerCase().trim()),
   password: z.string().min(1, 'Password is required'),
 });
 

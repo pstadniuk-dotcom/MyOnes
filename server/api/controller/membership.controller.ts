@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { logger } from '../../infra/logging/logger';
 import { membershipService } from '../../modules/membership/membership.service';
 
 export class MembershipController {
@@ -7,7 +8,7 @@ export class MembershipController {
             const tiers = await membershipService.getAllTiers();
             res.json(tiers);
         } catch (error) {
-            console.error('Error fetching membership tiers:', error);
+            logger.error('Error fetching membership tiers', { error });
             res.status(500).json({ error: 'Failed to fetch membership tiers' });
         }
     }
@@ -17,7 +18,7 @@ export class MembershipController {
             const tier = await membershipService.getAvailableTier();
             res.json(tier);
         } catch (error: any) {
-            console.error('Error fetching current membership tier:', error);
+            logger.error('Error fetching current membership tier', { error });
             if (error.message === 'No membership tier currently available') {
                 return res.status(404).json({ error: error.message });
             }
@@ -30,7 +31,7 @@ export class MembershipController {
             const stats = await membershipService.getMembershipStats();
             res.json(stats);
         } catch (error) {
-            console.error('Error fetching membership stats:', error);
+            logger.error('Error fetching membership stats', { error });
             res.status(500).json({ error: 'Failed to fetch membership stats' });
         }
     }
@@ -40,7 +41,7 @@ export class MembershipController {
             const result = await membershipService.createOrUpdateTier(req.body);
             res.json(result);
         } catch (error) {
-            console.error('Error creating/updating membership tier:', error);
+            logger.error('Error creating/updating membership tier', { error });
             res.status(500).json({ error: 'Failed to save membership tier' });
         }
     }
@@ -50,7 +51,7 @@ export class MembershipController {
             const results = await membershipService.seedDefaultTiers();
             res.json({ message: 'Membership tiers seeded', results });
         } catch (error) {
-            console.error('Error seeding membership tiers:', error);
+            logger.error('Error seeding membership tiers', { error });
             res.status(500).json({ error: 'Failed to seed membership tiers' });
         }
     }
@@ -61,7 +62,7 @@ export class MembershipController {
             const users = await membershipService.getUsersByTier(tierKey);
             res.json(users);
         } catch (error) {
-            console.error('Error fetching users by tier:', error);
+            logger.error('Error fetching users by tier', { error });
             res.status(500).json({ error: 'Failed to fetch users' });
         }
     }
@@ -75,7 +76,7 @@ export class MembershipController {
                 membership: result
             });
         } catch (error: any) {
-            console.error('Error joining membership:', error);
+            logger.error('Error joining membership', { error });
             const status = ['User not found', 'No membership tier currently available'].includes(error.message) ? 404 : 400;
             if (error.message === 'Failed to assign membership') {
                 return res.status(500).json({ error: error.message });
@@ -90,7 +91,7 @@ export class MembershipController {
             const membership = await membershipService.getUserMembership(userId);
             res.json(membership);
         } catch (error: any) {
-            console.error('Error fetching user membership:', error);
+            logger.error('Error fetching user membership', { error });
             const status = error.message === 'User not found' ? 404 : 500;
             res.status(status).json({ error: error.message });
         }
@@ -102,7 +103,7 @@ export class MembershipController {
             const updated = await membershipService.cancelMembership(userId);
             res.json({ message: 'Membership cancelled', cancelledAt: updated.membershipCancelledAt });
         } catch (error: any) {
-            console.error('Error cancelling membership:', error);
+            logger.error('Error cancelling membership', { error });
             res.status(400).json({ error: error.message });
         }
     }

@@ -2,6 +2,7 @@ import "./env";
 import path from "path";
 import fs from "fs";
 import express, { type Request, Response, NextFunction } from "express";
+import helmet from "helmet";
 import fileUpload from "express-fileupload";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
@@ -19,11 +20,9 @@ import { logger } from "./infra/logging/logger";
 
 // Catch unhandled errors so the server doesn't silently die
 process.on('uncaughtException', (err) => {
-  console.error('💥 UNCAUGHT EXCEPTION:', err);
   logger.error('Uncaught exception', { error: err.message, stack: err.stack });
 });
 process.on('unhandledRejection', (reason) => {
-  console.error('💥 UNHANDLED REJECTION:', reason);
   logger.error('Unhandled rejection', { reason: String(reason) });
 });
 
@@ -33,7 +32,7 @@ app.set('trust proxy', 1);
 // Hide Express server identity to prevent targeted attacks
 app.disable('x-powered-by');
 
-// Content Security Policy - Security hardened
+// Security headers via helmet — replaces manual header setting
 // 'unsafe-eval' only in development (needed for Vite HMR and React dev tools)
 // 'unsafe-inline' kept for inline styles from UI libraries
 const isDevMode = process.env.NODE_ENV !== 'production';
@@ -51,17 +50,34 @@ const cspDirectives = [
   "form-action 'self'"
 ].join('; ');
 
-app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', cspDirectives);
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  if (process.env.NODE_ENV === 'production') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-  }
-  next();
-});
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:", "https://platform-lookaside.fbsbx.com"],
+      connectSrc: ["'self'", "https://api.openai.com", "https://api.anthropic.com", "https://accounts.google.com/gsi/", "https://www.facebook.com", "https://web.facebook.com", "https://graph.facebook.com", "https://facebook.com", "wss:", "ws:"],
+      frameSrc: ["'self'", "https://www.youtube.com", "https://youtube.com", "https://accounts.google.com/", "https://www.facebook.com", "https://web.facebook.com"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  },
+  // HSTS in production with preload
+  strictTransportSecurity: process.env.NODE_ENV === 'production'
+    ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+    : false,
+  // X-Frame-Options: DENY
+  frameguard: { action: 'deny' },
+  // Referrer-Policy
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  // Hide X-Powered-By (already disabled above, but belt-and-suspenders)
+  hidePoweredBy: true,
+  // X-Content-Type-Options: nosniff — enabled by default
+  // X-XSS-Protection — helmet disables this by default (modern browsers don't need it)
+}));
 
 // CORS middleware - SECURITY: Only allow explicit origins (no wildcard fallback)
 const isProduction = process.env.NODE_ENV === 'production';
@@ -151,11 +167,12 @@ app.use('/api/', apiLimiter);
 
 // Configure session middleware for OAuth state management
 if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
-  console.error('[SECURITY] SESSION_SECRET not set in production — using insecure default. Set SESSION_SECRET env var.');
+  logger.error('FATAL: SESSION_SECRET not set in production. Set SESSION_SECRET env var.');
+  process.exit(1);
 }
 
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'wearable-oauth-secret-change-in-production',
+  secret: process.env.SESSION_SECRET || 'dev-only-session-secret-do-not-use-in-production',
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -192,6 +209,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Health check endpoint (no auth, no rate limit) for load balancers / uptime monitors
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 (async () => {
   try {
     const server = await registerRoutes(app, { authLimiter, aiLimiter });
@@ -200,7 +222,17 @@ app.use((req, res, next) => {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
 
-      res.status(status).json({ message });
+      // Log all server errors
+      if (status >= 500) {
+        logger.error('Unhandled server error', { status, message, stack: err.stack });
+      }
+
+      // Don't leak internal error details in production
+      const safeMessage = (status >= 500 && process.env.NODE_ENV === 'production')
+        ? 'Internal Server Error'
+        : message;
+
+      res.status(status).json({ message: safeMessage });
     });
 
     // importantly only setup vite in development and after
@@ -283,6 +315,23 @@ app.use((req, res, next) => {
     server.on('listening', () => {
       logger.info('Server listening event fired');
     });
+
+    // Graceful shutdown handler
+    const gracefulShutdown = (signal: string) => {
+      logger.info(`Received ${signal}, shutting down gracefully...`);
+      server.close(() => {
+        logger.info('HTTP server closed');
+        process.exit(0);
+      });
+      // Force exit after 10 seconds if connections aren't draining
+      setTimeout(() => {
+        logger.error('Forced shutdown after timeout');
+        process.exit(1);
+      }, 10_000).unref();
+    };
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
   } catch (error) {
     logger.error("FATAL SERVER ERROR", { error });

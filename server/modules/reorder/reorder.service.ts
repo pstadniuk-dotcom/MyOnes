@@ -11,6 +11,7 @@
  */
 
 import OpenAI from 'openai';
+import { logger } from '../../infra/logging/logger';
 import { reorderRepository } from './reorder.repository';
 import { wearableTrendAnalysisService, type WearableTrendAnalysis } from './wearableTrendAnalysis.service';
 import { usersRepository } from '../users/users.repository';
@@ -250,7 +251,7 @@ export const reorderService = {
         aiDecision = parsed;
       }
     } catch (err) {
-      console.error('[ReorderService] AI analysis failed:', err);
+      logger.error('[ReorderService] AI analysis failed', { error: err });
       aiDecision = {
         decision: 'KEEP',
         trendSummary: 'AI analysis temporarily unavailable. Defaulting to current formula.',
@@ -321,7 +322,7 @@ export const reorderService = {
 
           await notificationGate.record(schedule.userId, 'smart_reorder', 'reorder_review', 'sms', gateMeta);
         } catch (err) {
-          console.error('[ReorderService] SMS send failed:', err);
+          logger.error('[ReorderService] SMS send failed', { error: err });
         }
       }
     }
@@ -369,7 +370,7 @@ export const reorderService = {
 
         await notificationGate.record(schedule.userId, 'smart_reorder', 'reorder_review', 'email', gateMeta);
       } catch (err) {
-        console.error('[ReorderService] Email send failed:', err);
+        logger.error('[ReorderService] Email send failed', { error: err });
       }
     }
 
@@ -394,7 +395,7 @@ export const reorderService = {
 
         await notificationGate.record(schedule.userId, 'smart_reorder', 'reorder_review', 'in_app', gateMeta);
       } catch (err) {
-        console.error('[ReorderService] Notification failed:', err);
+        logger.error('[ReorderService] Notification failed', { error: err });
       }
     }
   },
@@ -474,7 +475,7 @@ export const reorderService = {
         await this.handleKeep(rec, true);
         count++;
       } catch (err) {
-        console.error(`[ReorderService] Auto-approve failed for recommendation ${rec.id}:`, err);
+        logger.error('[ReorderService] Auto-approve failed', { recommendationId: rec.id, error: err });
       }
     }
 
@@ -493,7 +494,7 @@ export const reorderService = {
       try {
         const user = await usersRepository.getUser(schedule.userId);
         if (!user?.stripeCustomerId) {
-          console.error(`[ReorderService] No Stripe customer for user ${schedule.userId}`);
+          logger.error('[ReorderService] No Stripe customer for user', { userId: schedule.userId });
           continue;
         }
 
@@ -504,7 +505,7 @@ export const reorderService = {
         const { formulasService } = await import('../formulas/formulas.service');
         const quoteResult = await formulasService.getFormulaQuote(schedule.userId, schedule.formulaId);
         if (!quoteResult.quote.available || !quoteResult.quote.total) {
-          console.error(`[ReorderService] Quote unavailable for formula ${schedule.formulaId}`);
+          logger.error('[ReorderService] Quote unavailable for formula', { formulaId: schedule.formulaId });
           continue;
         }
 
@@ -522,7 +523,7 @@ export const reorderService = {
           || (customer as any).default_source;
 
         if (!defaultPaymentMethod) {
-          console.error(`[ReorderService] No payment method on file for user ${schedule.userId}`);
+          logger.error('[ReorderService] No payment method on file for user', { userId: schedule.userId });
           // TODO: Send "update payment method" email
           continue;
         }
@@ -592,7 +593,7 @@ export const reorderService = {
           } catch { /* non-critical */ }
         }
       } catch (err: any) {
-        console.error(`[ReorderService] Charge failed for schedule ${schedule.id}:`, err?.message || err);
+        logger.error('[ReorderService] Charge failed', { scheduleId: schedule.id, error: err?.message || err });
 
         if (err?.code === 'authentication_required' || err?.code === 'card_declined') {
           // Mark schedule for manual intervention

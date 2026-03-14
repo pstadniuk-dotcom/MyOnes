@@ -1,5 +1,6 @@
 import { eq, desc, and, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import { db } from "../../infra/db/db";
+import { logger } from '../../infra/logging/logger';
 import {
     formulas,
     formulaVersionChanges,
@@ -107,7 +108,7 @@ export class FormulasRepository {
             const [formula] = await db.select().from(formulas).where(eq(formulas.id, id));
             return formula || undefined;
         } catch (error) {
-            console.error('Error getting formula:', error);
+            logger.error('Error getting formula', { error });
             return undefined;
         }
     }
@@ -118,7 +119,7 @@ export class FormulasRepository {
             const [formula] = await db.insert(formulas).values(normalizedFormula as DbInsertFormula).returning();
             return formula;
         } catch (error) {
-            console.error('Error creating formula:', error);
+            logger.error('Error creating formula', { error });
             throw new Error('Failed to create formula');
         }
     }
@@ -133,7 +134,7 @@ export class FormulasRepository {
                 .limit(1);
             return formula || undefined;
         } catch (error) {
-            console.error('Error getting current formula by user:', error);
+            logger.error('Error getting current formula by user', { error });
             return undefined;
         }
     }
@@ -146,7 +147,7 @@ export class FormulasRepository {
                 .where(and(eq(formulas.userId, userId), isNull(formulas.archivedAt)))
                 .orderBy(desc(formulas.createdAt));
         } catch (error) {
-            console.error('Error getting active formulas by user:', error);
+            logger.error('Error getting active formulas by user', { error });
             return [];
         }
     }
@@ -162,7 +163,7 @@ export class FormulasRepository {
                 .where(whereClause)
                 .orderBy(desc(formulas.createdAt));
         } catch (error) {
-            console.error('Error getting formula history:', error);
+            logger.error('Error getting formula history', { error });
             return [];
         }
     }
@@ -175,7 +176,7 @@ export class FormulasRepository {
                 .where(and(eq(formulas.userId, userId), isNotNull(formulas.archivedAt)))
                 .orderBy(desc(formulas.archivedAt));
         } catch (error) {
-            console.error('Error getting archived formulas:', error);
+            logger.error('Error getting archived formulas', { error });
             return [];
         }
     }
@@ -192,7 +193,7 @@ export class FormulasRepository {
             }
             return formula;
         } catch (error) {
-            console.error('Error archiving formula:', error);
+            logger.error('Error archiving formula', { error });
             throw new Error('Failed to archive formula');
         }
     }
@@ -209,7 +210,7 @@ export class FormulasRepository {
             }
             return formula;
         } catch (error) {
-            console.error('Error restoring formula:', error);
+            logger.error('Error restoring formula', { error });
             throw new Error('Failed to restore formula');
         }
     }
@@ -223,7 +224,7 @@ export class FormulasRepository {
                 .limit(1);
             return formula || undefined;
         } catch (error) {
-            console.error('Error getting formula by user and version:', error);
+            logger.error('Error getting formula by user and version', { error });
             return undefined;
         }
     }
@@ -266,7 +267,7 @@ export class FormulasRepository {
 
             return updated;
         } catch (error) {
-            console.error('Error updating formula version:', error);
+            logger.error('Error updating formula version', { error });
             throw new Error('Failed to update formula');
         }
     }
@@ -290,7 +291,7 @@ export class FormulasRepository {
 
             return updated;
         } catch (error) {
-            console.error('Error updating formula customizations:', error);
+            logger.error('Error updating formula customizations', { error });
             throw new Error('Failed to update formula customizations');
         }
     }
@@ -309,7 +310,7 @@ export class FormulasRepository {
 
             return updated;
         } catch (error) {
-            console.error('Error updating formula name:', error);
+            logger.error('Error updating formula name', { error });
             throw new Error('Failed to update formula name');
         }
     }
@@ -334,7 +335,7 @@ export class FormulasRepository {
 
             return updated;
         } catch (error) {
-            console.error('Error updating formula acknowledgment:', error);
+            logger.error('Error updating formula acknowledgment', { error });
             throw new Error('Failed to update formula acknowledgment');
         }
     }
@@ -345,7 +346,7 @@ export class FormulasRepository {
             const [change] = await db.insert(formulaVersionChanges).values(insertChange).returning();
             return change;
         } catch (error) {
-            console.error('Error creating formula version change:', error);
+            logger.error('Error creating formula version change', { error });
             throw new Error('Failed to create formula version change');
         }
     }
@@ -358,7 +359,7 @@ export class FormulasRepository {
                 .where(eq(formulaVersionChanges.formulaId, formulaId))
                 .orderBy(desc(formulaVersionChanges.createdAt));
         } catch (error) {
-            console.error('Error listing formula version changes:', error);
+            logger.error('Error listing formula version changes', { error });
             return [];
         }
     }
@@ -377,7 +378,7 @@ export class FormulasRepository {
                 .limit(1);
             return schedule || undefined;
         } catch (error) {
-            console.error('Error fetching review schedule:', error);
+            logger.error('Error fetching review schedule', { error });
             return undefined;
         }
     }
@@ -387,7 +388,7 @@ export class FormulasRepository {
             const [created] = await db.insert(reviewSchedules).values(schedule).returning();
             return created;
         } catch (error) {
-            console.error('Error creating review schedule:', error);
+            logger.error('Error creating review schedule', { error });
             throw new Error('Failed to create review schedule');
         }
     }
@@ -404,7 +405,7 @@ export class FormulasRepository {
                 .returning();
             return updated || undefined;
         } catch (error) {
-            console.error('Error updating review schedule:', error);
+            logger.error('Error updating review schedule', { error });
             return undefined;
         }
     }
@@ -417,7 +418,7 @@ export class FormulasRepository {
                 .where(eq(reviewSchedules.id, id));
             return (result.rowCount ?? 0) > 0;
         } catch (error) {
-            console.error('Error deleting review schedule:', error);
+            logger.error('Error deleting review schedule', { error });
             return false;
         }
     }
@@ -430,7 +431,7 @@ export class FormulasRepository {
                 .where(eq(reviewSchedules.isActive, true))
                 .orderBy(reviewSchedules.nextReviewDate);
         } catch (error) {
-            console.error('Error fetching active review schedules:', error);
+            logger.error('Error fetching active review schedules', { error });
             return [];
         }
     }
@@ -451,7 +452,7 @@ export class FormulasRepository {
                 ))
                 .orderBy(reviewSchedules.nextReviewDate);
         } catch (error) {
-            console.error('Error fetching upcoming review schedules:', error);
+            logger.error('Error fetching upcoming review schedules', { error });
             return [];
         }
     }
@@ -462,7 +463,7 @@ export class FormulasRepository {
             const [user] = await db.select().from(users).where(eq(users.id, id));
             return user || undefined;
         } catch (error) {
-            console.error('Error getting user:', error);
+            logger.error('Error getting user', { error });
             return undefined;
         }
     }

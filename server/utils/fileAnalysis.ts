@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { ObjectStorageService } from './objectStorage';
+import { logger } from '../infra/logging/logger';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -39,18 +40,29 @@ export interface LabDataExtraction {
 }
 
 /**
- * Detects file type based on MIME type
+ * Validates file type using both MIME type and magic bytes.
+ * Magic bytes provide a second layer of defense against spoofed Content-Type headers.
  */
-export function getFileType(mimeType: string): 'pdf' | 'image' | 'text' | 'unknown' {
-  if (mimeType === 'application/pdf') {
-    return 'pdf';
+export function getFileType(mimeType: string, buffer?: Buffer): 'pdf' | 'image' | 'text' | 'unknown' {
+  // If we have a buffer, verify magic bytes match the claimed MIME type
+  if (buffer && buffer.length >= 4) {
+    const isPdf = buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46; // %PDF
+    const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47; // .PNG
+    const isJpeg = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+    const isGif = buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46; // GIF
+    const isWebp = buffer.length >= 12 && buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 && buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50; // RIFF...WEBP
+
+    if (mimeType === 'application/pdf' && isPdf) return 'pdf';
+    if (mimeType === 'application/pdf' && !isPdf) return 'unknown'; // MIME says PDF but bytes disagree
+    if (mimeType.startsWith('image/') && (isPng || isJpeg || isGif || isWebp)) return 'image';
+    if (mimeType.startsWith('image/') && !(isPng || isJpeg || isGif || isWebp)) return 'unknown'; // MIME says image but bytes disagree
+    if (mimeType === 'text/plain') return 'text'; // text files don't have reliable magic bytes
   }
-  if (mimeType.startsWith('image/')) {
-    return 'image';
-  }
-  if (mimeType === 'text/plain') {
-    return 'text';
-  }
+
+  // Fallback to MIME-only check (backward compatible for callers without buffer)
+  if (mimeType === 'application/pdf') return 'pdf';
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType === 'text/plain') return 'text';
   return 'unknown';
 }
 
@@ -61,7 +73,7 @@ export async function extractTextFromTextFile(buffer: Buffer): Promise<string> {
   try {
     return buffer.toString('utf-8');
   } catch (error) {
-    console.error('Text file reading error:', error);
+    logger.error('Text file reading error', { error });
     throw new Error('Failed to read text file');
   }
 }
@@ -104,7 +116,7 @@ const PDF_CONCURRENCY = 4; // process 4 pages at a time
  */
 export async function extractTextFromPDF(buffer: Buffer, onProgress?: AnalysisProgressCallback): Promise<string> {
   try {
-    console.log('📄 Converting PDF to images...');
+    logger.info('Converting PDF to images');
     const { pdf } = await import('pdf-to-img');
     const document = await pdf(buffer, { scale: 1.5 });
 
@@ -118,7 +130,7 @@ export async function extractTextFromPDF(buffer: Buffer, onProgress?: AnalysisPr
     }
 
     const totalPages = pageImages.length;
-    console.log(`📄 Collected ${totalPages} page(s), OCRing in batches of ${PDF_CONCURRENCY}...`);
+    logger.info(`Collected ${totalPages} page(s), OCRing in batches of ${PDF_CONCURRENCY}`);
     onProgress?.('ocr', `Scanning ${totalPages} pages...`);
 
     // Process pages in parallel batches, freeing image data as we go
@@ -126,7 +138,7 @@ export async function extractTextFromPDF(buffer: Buffer, onProgress?: AnalysisPr
     for (let i = 0; i < totalPages; i += PDF_CONCURRENCY) {
       const batch = pageImages.slice(i, i + PDF_CONCURRENCY);
       const batchNums = batch.map(p => p.pageNum).join(', ');
-      console.log(`📄 Processing pages ${batchNums}...`);
+      logger.debug(`Processing pages ${batchNums}`);
 
       const results = await Promise.allSettled(
         batch.map(p => ocrPage(p.dataUrl, p.pageNum))
@@ -143,7 +155,7 @@ export async function extractTextFromPDF(buffer: Buffer, onProgress?: AnalysisPr
         if (result.status === 'fulfilled' && result.value) {
           extractedTexts[pg - 1] = `--- Page ${pg} ---\n${result.value}`;
         } else if (result.status === 'rejected') {
-          console.warn(`⚠️ Page ${pg} OCR failed: ${result.reason?.message || result.reason}`);
+          logger.warn(`Page ${pg} OCR failed`, { error: result.reason?.message || result.reason });
           extractedTexts[pg - 1] = `--- Page ${pg} ---\n[OCR failed]`;
         }
       }
@@ -153,10 +165,10 @@ export async function extractTextFromPDF(buffer: Buffer, onProgress?: AnalysisPr
     pageImages.length = 0;
 
     const successCount = extractedTexts.filter(t => !t.includes('[OCR failed]') && t).length;
-    console.log(`✅ Successfully extracted text from ${successCount}/${totalPages} PDF page(s)`);
+    logger.info(`Extracted text from ${successCount}/${totalPages} PDF pages`);
     return extractedTexts.filter(Boolean).join('\n\n');
   } catch (error) {
-    console.error('PDF parsing error:', error);
+    logger.error('PDF parsing error', { error });
     throw new Error('Failed to extract text from PDF');
   }
 }
@@ -199,7 +211,7 @@ export async function extractTextFromImage(buffer: Buffer, mimeType: string): Pr
 
     return response.choices[0]?.message?.content || '';
   } catch (error) {
-    console.error('Image OCR error:', error);
+    logger.error('Image OCR error', { error });
     throw new Error('Failed to extract text from image');
   }
 }
@@ -247,7 +259,7 @@ Return ONLY valid JSON without any markdown formatting.`;
   for (let i = 0; i < attempts.length; i++) {
     const { maxTokens, timeout } = attempts[i];
     try {
-      console.log(`🔬 Structuring lab data (attempt ${i + 1}, max_tokens=${maxTokens})...`);
+      logger.info(`Structuring lab data`, { attempt: i + 1, maxTokens });
       const response = await withTimeout(
         openai.chat.completions.create({
           model: 'gpt-4o',
@@ -272,12 +284,12 @@ Return ONLY valid JSON without any markdown formatting.`;
 
       // If truncated, try higher budget on next iteration
       if (finishReason === 'length' && i < attempts.length - 1) {
-        console.warn(`⚠️ Response truncated at ${maxTokens} tokens, retrying with higher limit...`);
+        logger.warn(`Response truncated at ${maxTokens} tokens, retrying with higher limit`);
         continue;
       }
 
       if (finishReason === 'length') {
-        console.warn('⚠️ Response still truncated at maximum budget. Attempting partial parse...');
+        logger.warn('Response still truncated at maximum budget, attempting partial parse');
       }
 
       let structured: any;
@@ -285,7 +297,7 @@ Return ONLY valid JSON without any markdown formatting.`;
         structured = JSON.parse(content);
       } catch (parseErr) {
         // Try to salvage truncated JSON by closing open structures
-        console.warn('JSON parse failed, attempting to salvage truncated response...');
+        logger.warn('JSON parse failed, attempting to salvage truncated response');
         const salvaged = salvageTruncatedJSON(content);
         if (salvaged) {
           structured = salvaged;
@@ -296,21 +308,21 @@ Return ONLY valid JSON without any markdown formatting.`;
 
       // Ensure extractedData is always an array
       if (!Array.isArray(structured.extractedData)) {
-        console.warn('AI returned non-array extractedData, normalizing to empty array');
+        logger.warn('AI returned non-array extractedData, normalizing to empty array');
         structured.extractedData = [];
       }
 
-      console.log(`✅ Structured ${structured.extractedData.length} markers from lab data`);
+      logger.info(`Structured ${structured.extractedData.length} markers from lab data`);
       return {
         ...structured,
         rawText
       };
     } catch (error) {
       if (i < attempts.length - 1) {
-        console.warn(`Attempt ${i + 1} failed, retrying...`, (error as Error).message);
+        logger.warn(`Attempt ${i + 1} failed, retrying`, { error: (error as Error).message });
         continue;
       }
-      console.error('Lab data structuring error:', error);
+      logger.error('Lab data structuring error', { error });
       return { rawText };
     }
   }
@@ -389,8 +401,8 @@ export async function analyzeLabReport(
       throw new Error(`Failed to download file from storage`);
     }
 
-    // Detect file type
-    const fileType = getFileType(mimeType);
+    // Detect file type with magic byte validation
+    const fileType = getFileType(mimeType, fileBuffer);
 
     let extractedText = '';
 
@@ -408,7 +420,7 @@ export async function analyzeLabReport(
     }
 
     // Structure the extracted text into lab data
-    console.log(`📊 OCR text length: ${extractedText.length} chars (~${Math.round(extractedText.length / 4)} tokens). Sending to structuring...`);
+    logger.info('OCR complete', { chars: extractedText.length, estimatedTokens: Math.round(extractedText.length / 4) });
     onProgress?.('structuring', 'Analyzing biomarkers...');
     const labData = await structureLabData(extractedText);
 
@@ -416,7 +428,7 @@ export async function analyzeLabReport(
 
     return labData;
   } catch (error) {
-    console.error('Lab report analysis error:', error);
+    logger.error('Lab report analysis error', { error });
     throw error;
   }
   })(), 5 * 60_000, 'Overall lab report analysis');

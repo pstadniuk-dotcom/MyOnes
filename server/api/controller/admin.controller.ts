@@ -21,7 +21,7 @@ export class AdminController {
 
     async getGrowthAnalytics(req: Request, res: Response) {
         try {
-            const days = parseInt(req.query.days as string) || 30;
+            const days = Math.min(Math.max(parseInt(req.query.days as string) || 30, 1), 365);
             const growthData = await adminService.getUserGrowth(days);
             res.json(growthData);
         } catch (error) {
@@ -32,7 +32,7 @@ export class AdminController {
 
     async getRevenueAnalytics(req: Request, res: Response) {
         try {
-            const days = parseInt(req.query.days as string) || 30;
+            const days = Math.min(Math.max(parseInt(req.query.days as string) || 30, 1), 365);
             const revenueData = await adminService.getRevenueData(days);
             res.json(revenueData);
         } catch (error) {
@@ -44,8 +44,8 @@ export class AdminController {
     async searchUsers(req: Request, res: Response) {
         try {
             const query = (req.query.q as string) || '';
-            const limit = parseInt(req.query.limit as string) || 20;
-            const offset = parseInt(req.query.offset as string) || 0;
+            const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
+            const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
             const filter = (req.query.filter as string) || 'all';
             const sortBy = (req.query.sortBy as string) || undefined;
 
@@ -72,10 +72,12 @@ export class AdminController {
                 advancedFilters.hasOrders = req.query.hasOrders === 'true';
             }
             if (req.query.minOrders) {
-                advancedFilters.minOrders = parseInt(req.query.minOrders as string);
+                const parsed = parseInt(req.query.minOrders as string);
+                advancedFilters.minOrders = Number.isFinite(parsed) ? Math.max(parsed, 0) : undefined;
             }
             if (req.query.maxOrders) {
-                advancedFilters.maxOrders = parseInt(req.query.maxOrders as string);
+                const parsed = parseInt(req.query.maxOrders as string);
+                advancedFilters.maxOrders = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0), 10000) : undefined;
             }
 
             const hasAdvanced = Object.keys(advancedFilters).length > 0;

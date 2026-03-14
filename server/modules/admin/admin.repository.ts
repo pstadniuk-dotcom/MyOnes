@@ -1,3 +1,4 @@
+import { logger } from '../../infra/logging/logger';
 import { db } from '../../infra/db/db';
 import {
     users,
@@ -88,7 +89,7 @@ export class AdminRepository {
                 totalFormulas
             };
         } catch (error) {
-            console.error('Error getting admin stats:', error);
+            logger.error('Error getting admin stats', { error });
             return {
                 totalUsers: 0,
                 totalPaidUsers: 0,
@@ -139,7 +140,7 @@ export class AdminRepository {
                 };
             });
         } catch (error) {
-            console.error('Error getting user growth data:', error);
+            logger.error('Error getting user growth data', { error });
             return [];
         }
     }
@@ -166,7 +167,7 @@ export class AdminRepository {
                 orders: Number(row.orders)
             }));
         } catch (error) {
-            console.error('Error getting revenue data:', error);
+            logger.error('Error getting revenue data', { error });
             return [];
         }
     }
@@ -409,7 +410,7 @@ export class AdminRepository {
                 total: Number(countRows?.[0]?.count || 0)
             };
         } catch (error) {
-            console.error('Error searching users:', error);
+            logger.error('Error searching users', { error });
             return { users: [], total: 0 };
         }
     }
@@ -449,7 +450,7 @@ export class AdminRepository {
 
             return enrichedOrders;
         } catch (error) {
-            console.error('Error getting today\'s orders:', error);
+            logger.error('Error getting today\'s orders', { error });
             return [];
         }
     }
@@ -506,7 +507,7 @@ export class AdminRepository {
                 wearableDevices: userWearables
             };
         } catch (error) {
-            console.error('Error getting user timeline:', error);
+            logger.error('Error getting user timeline', { error });
             throw error;
         }
     }
@@ -600,7 +601,7 @@ export class AdminRepository {
                 total: Number(countResult?.count || 0)
             };
         } catch (error) {
-            console.error('Error listing all support tickets:', error);
+            logger.error('Error listing all support tickets', { error });
             return { tickets: [], total: 0 };
         }
     }
@@ -610,7 +611,7 @@ export class AdminRepository {
             const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, id));
             return ticket || undefined;
         } catch (error) {
-            console.error('Error getting support ticket:', error);
+            logger.error('Error getting support ticket', { error });
             return undefined;
         }
     }
@@ -623,7 +624,7 @@ export class AdminRepository {
                 .where(eq(supportTicketResponses.ticketId, ticketId))
                 .orderBy(supportTicketResponses.createdAt);
         } catch (error) {
-            console.error('Error listing support ticket responses:', error);
+            logger.error('Error listing support ticket responses', { error });
             return [];
         }
     }
@@ -660,7 +661,7 @@ export class AdminRepository {
 
             return created;
         } catch (error) {
-            console.error('Error creating support ticket response:', error);
+            logger.error('Error creating support ticket response', { error });
             throw new Error('Failed to create support ticket response');
         }
     }
@@ -674,7 +675,7 @@ export class AdminRepository {
                 .returning();
             return updated || undefined;
         } catch (error) {
-            console.error('Error updating support ticket:', error);
+            logger.error('Error updating support ticket', { error });
             return undefined;
         }
     }
@@ -720,7 +721,7 @@ export class AdminRepository {
                 inProgress: Number(inProgressCount?.count || 0),
             };
         } catch (error) {
-            console.error('Error getting open support ticket count:', error);
+            logger.error('Error getting open support ticket count', { error });
             return { open: 0, inProgress: 0 };
         }
     }
@@ -943,7 +944,7 @@ export class AdminRepository {
                 total: Number(totalCount)
             };
         } catch (error) {
-            console.error('Error getting user messages:', error);
+            logger.error('Error getting user messages', { error });
             throw new Error('Failed to get user messages');
         }
     }
@@ -1007,7 +1008,7 @@ export class AdminRepository {
                 total: Number(totalCount)
             };
         } catch (error) {
-            console.error('Error getting all conversations:', error);
+            logger.error('Error getting all conversations', { error });
             throw new Error('Failed to get conversations');
         }
     }
@@ -1031,7 +1032,7 @@ export class AdminRepository {
                 }
             };
         } catch (error) {
-            console.error('Error getting conversation insights:', error);
+            logger.error('Error getting conversation insights', { error });
             return null;
         }
     }
@@ -1064,7 +1065,7 @@ export class AdminRepository {
                 set: { value: insightsData, updatedAt: new Date() }
             });
         } catch (error) {
-            console.error('Error saving conversation insights:', error);
+            logger.error('Error saving conversation insights', { error });
             throw new Error('Failed to save conversation insights');
         }
     }
@@ -1104,7 +1105,7 @@ export class AdminRepository {
                 messages: sessionMessages.map(m => ({ ...m, content: decryptMessageContent(m.content) }))
             };
         } catch (error) {
-            console.error('Error getting conversation details:', error);
+            logger.error('Error getting conversation details', { error });
             throw new Error('Failed to get conversation details');
         }
     }
@@ -1159,7 +1160,7 @@ export class AdminRepository {
                 }
             };
         } catch (error) {
-            console.error('Error getting conversion funnel:', error);
+            logger.error('Error getting conversion funnel', { error });
             return { totalSignups: 0, profilesComplete: 0, formulasCreated: 0, firstOrders: 0, reorders: 0, conversionRates: {} };
         }
     }
@@ -1207,7 +1208,7 @@ export class AdminRepository {
 
             return cohorts.reverse();
         } catch (error) {
-            console.error('Error getting cohort retention:', error);
+            logger.error('Error getting cohort retention', { error });
             return [];
         }
     }
@@ -1270,7 +1271,7 @@ export class AdminRepository {
                 }
             };
         } catch (error) {
-            console.error('Error getting reorder health:', error);
+            logger.error('Error getting reorder health', { error });
             return { dueSoon: [], overdue: [], atRisk: [], summary: {} };
         }
     }
@@ -1379,7 +1380,7 @@ export class AdminRepository {
                 totalAvailableIndividuals: allIndividualNames.length
             };
         } catch (error) {
-            console.error('Error getting formula insights:', error);
+            logger.error('Error getting formula insights', { error });
             return {
                 totalFormulas: 0,
                 averageIngredients: 0,
@@ -1410,7 +1411,7 @@ export class AdminRepository {
                 overdueReorders: reorderHealth.summary.overdueCount + reorderHealth.summary.atRiskCount
             };
         } catch (error) {
-            console.error('Error getting pending actions:', error);
+            logger.error('Error getting pending actions', { error });
             return {};
         }
     }
@@ -1444,7 +1445,7 @@ export class AdminRepository {
 
             return activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, limit);
         } catch (error) {
-            console.error('Error getting activity feed:', error);
+            logger.error('Error getting activity feed', { error });
             return [];
         }
     }
@@ -1471,7 +1472,7 @@ export class AdminRepository {
 
             return { orders: enrichedOrders, total: Number(countResult?.count || 0) };
         } catch (error) {
-            console.error('Error getting all orders:', error);
+            logger.error('Error getting all orders', { error });
             return { orders: [], total: 0 };
         }
     }
@@ -1481,7 +1482,7 @@ export class AdminRepository {
             const [order] = await db.update(orders).set({ status: status as any, trackingUrl, shippedAt: status === 'shipped' ? new Date() : undefined }).where(eq(orders.id, id)).returning();
             return order || undefined;
         } catch (error) {
-            console.error('Error updating order status:', error);
+            logger.error('Error updating order status', { error });
             return undefined;
         }
     }
@@ -1493,7 +1494,7 @@ export class AdminRepository {
                 .from(ingredientPricing)
                 .orderBy(ingredientPricing.ingredientName);
         } catch (error) {
-            console.error('Error listing ingredient pricing:', error);
+            logger.error('Error listing ingredient pricing', { error });
             return [];
         }
     }
@@ -1524,7 +1525,7 @@ export class AdminRepository {
 
             return updated || undefined;
         } catch (error) {
-            console.error('Error updating ingredient pricing:', error);
+            logger.error('Error updating ingredient pricing', { error });
             return undefined;
         }
     }
@@ -1537,7 +1538,7 @@ export class AdminRepository {
                 return { ...note, adminName: admin?.name || 'Unknown' };
             }));
         } catch (error) {
-            console.error('Error getting user admin notes:', error);
+            logger.error('Error getting user admin notes', { error });
             return [];
         }
     }
@@ -1548,7 +1549,7 @@ export class AdminRepository {
             const [admin] = await db.select({ name: users.name }).from(users).where(eq(users.id, adminId));
             return { ...note, adminName: admin?.name || 'Unknown' };
         } catch (error) {
-            console.error('Error adding user admin note:', error);
+            logger.error('Error adding user admin note', { error });
             throw new Error('Failed to add admin note');
         }
     }
@@ -1573,7 +1574,7 @@ export class AdminRepository {
                 return { id: user.id, name: user.name, email: user.email, phone: user.phone, createdAt: user.createdAt.toISOString(), hasFormula: !!formulaExists, orderCount: userOrders.length, totalSpent };
             }));
         } catch (error) {
-            console.error('Error exporting users:', error);
+            logger.error('Error exporting users', { error });
             return [];
         }
     }
@@ -1592,7 +1593,7 @@ export class AdminRepository {
                 return { id: order.id, userName: user?.name || 'Unknown', userEmail: user?.email || 'Unknown', status: order.status, amountCents: order.amountCents || 0, supplyMonths: order.supplyMonths, placedAt: order.placedAt.toISOString(), shippedAt: order.shippedAt?.toISOString() || null };
             }));
         } catch (error) {
-            console.error('Error exporting orders:', error);
+            logger.error('Error exporting orders', { error });
             return [];
         }
     }

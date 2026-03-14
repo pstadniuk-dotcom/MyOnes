@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { logger } from '../logging/logger';
 
 /**
  * Field-level encryption service for protecting PHI (Protected Health Information)
@@ -172,7 +173,7 @@ export function testEncryption(): boolean {
     const decrypted = decryptField(encrypted);
     
     if (decrypted !== testData) {
-      console.error('Encryption test failed: decrypted data does not match original');
+      logger.error('Encryption test failed: decrypted data does not match original');
       return false;
     }
     
@@ -180,14 +181,14 @@ export function testEncryption(): boolean {
     // (due to random IV)
     const encrypted2 = encryptField(testData);
     if (encrypted === encrypted2) {
-      console.error('Encryption test failed: random IV not working');
+      logger.error('Encryption test failed: random IV not working');
       return false;
     }
     
-    console.log('✅ Field encryption test passed');
+    logger.info('Field encryption test passed');
     return true;
   } catch (error) {
-    console.error('Encryption test failed:', error);
+    logger.error('Encryption test failed', { error });
     return false;
   }
 }

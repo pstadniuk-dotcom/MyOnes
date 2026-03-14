@@ -1,3 +1,5 @@
+import { logger } from '../logging/logger';
+
 export const aiRuntimeSettings: { provider?: 'openai' | 'anthropic'; model?: string; updatedAt?: string; source?: 'override' | 'env' } = {};
 
 export const ALLOWED_MODELS: Record<'openai' | 'anthropic', string[]> = {
@@ -94,7 +96,7 @@ export async function initializeAiSettings() {
             const allowed = ALLOWED_MODELS[provider] || [];
             if (!allowed.includes(normalized)) {
                 const fallback = allowed[0] || model;
-                console.warn(`⚠️ Persisted model '${model}' not allowed for provider '${provider}'. Falling back to '${fallback}'.`);
+                logger.warn('Persisted model not allowed for provider, falling back', { model, provider, fallback });
                 model = fallback;
             } else {
                 model = normalized;
@@ -103,9 +105,9 @@ export async function initializeAiSettings() {
             aiRuntimeSettings.model = model;
             aiRuntimeSettings.updatedAt = new Date().toISOString();
             aiRuntimeSettings.source = 'override';
-            console.log(`🔧 Loaded persisted AI settings: ${provider} / ${model}`);
+            logger.info('Loaded persisted AI settings', { provider, model });
         }
     } catch (e) {
-        console.warn('⚠️ Failed to load persisted AI settings, using env defaults:', (e as Error)?.message || e);
+        logger.warn('Failed to load persisted AI settings, using env defaults', { error: (e as Error)?.message || e });
     }
 }

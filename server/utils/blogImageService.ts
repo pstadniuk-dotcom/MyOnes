@@ -10,6 +10,7 @@
 
 import OpenAI from 'openai';
 import { fal } from '@fal-ai/client';
+import logger from '../infra/logging/logger';
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -130,7 +131,7 @@ async function downloadImage(url: string): Promise<Buffer> {
  * Returns the permanent public URL.
  */
 export async function generateBlogImage(title: string, slug: string): Promise<string> {
-  console.log(`[blogImage] Generating image for "${title}" …`);
+  logger.info(`[blogImage] Generating image for "${title}" …`);
 
   // 1) Extract visual keywords from the title
   const keywords = await extractVisualKeywords(title);
@@ -166,6 +167,6 @@ export async function generateBlogImage(title: string, slug: string): Promise<st
 
   // 5) Return the permanent public URL
   const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${filename}`;
-  console.log(`[blogImage] ✓ ${publicUrl}`);
+  logger.info(`[blogImage] Uploaded`, { publicUrl });
   return publicUrl;
 }
