@@ -143,7 +143,8 @@ export async function sendApprovedPitches(): Promise<{
     }
 
     if (prospect.contactMethod === 'form') {
-      // Skip form-based prospects — handled by form filler
+      // Skip form-based prospects in batch — they require individual review
+      logger.info(`[gmail-sender] Skipping form-based prospect "${prospect.name}" — use individual send`);
       continue;
     }
 

@@ -73,6 +73,11 @@ class AgentRepository {
     await db.update(outreachProspects).set(data).where(eq(outreachProspects.id, id));
   }
 
+  async deleteProspect(id: string): Promise<void> {
+    // Pitches cascade-delete via FK onDelete: 'cascade'
+    await db.delete(outreachProspects).where(eq(outreachProspects.id, id));
+  }
+
   /**
    * Check for existing prospects by normalized URL or normalized name.
    * Returns sets of both existing normalized URLs and names for comprehensive dedup.
@@ -150,6 +155,17 @@ class AgentRepository {
 
   async updatePitch(id: string, data: Partial<OutreachPitch>): Promise<void> {
     await db.update(outreachPitches).set(data).where(eq(outreachPitches.id, id));
+  }
+
+  async deletePitch(id: string): Promise<void> {
+    await db.delete(outreachPitches).where(eq(outreachPitches.id, id));
+  }
+
+  async markPitchResponded(id: string): Promise<void> {
+    await db.update(outreachPitches).set({
+      responseReceived: true,
+      responseAt: new Date(),
+    }).where(eq(outreachPitches.id, id));
   }
 
   async getPitchesWithProspects(filters: {
@@ -269,7 +285,14 @@ class AgentRepository {
       sentPitches: sentPitches.count,
       responses: responses.count,
       booked: booked.count,
+      followUpsDue: 0, // Populated from getPendingFollowUps().length when needed
     };
+  }
+
+  async getStatsWithFollowUps() {
+    const base = await this.getStats();
+    const followUps = await this.getPendingFollowUps();
+    return { ...base, followUpsDue: followUps.length };
   }
 }
 

@@ -24,11 +24,18 @@ router.post('/users/:id/notes', requireAdmin, adminController.addUserNote);
 
 // Support System
 router.get('/notifications/counts', requireAdmin, adminController.getNotificationCounts);
+router.get('/support-tickets/metrics', requireAdmin, adminController.getSupportTicketMetrics);
+router.get('/support-tickets/filter-options', requireAdmin, adminController.getTicketFilterOptions);
 router.get('/support-tickets', requireAdmin, adminController.listSupportTickets);
 router.get('/support-tickets/:id', requireAdmin, adminController.getSupportTicketDetails);
 router.patch('/support-tickets/:id', requireAdmin, adminController.updateSupportTicket);
 router.patch('/support-tickets/:id/assign', requireAdmin, adminController.assignSupportTicket);
 router.post('/support-tickets/:id/reply', requireAdmin, adminController.replyToSupportTicket);
+router.post('/support-tickets/:id/tags', requireAdmin, adminController.addTicketTag);
+router.delete('/support-tickets/:id/tags', requireAdmin, adminController.removeTicketTag);
+router.post('/support-tickets/bulk-delete', requireAdmin, adminController.bulkDeleteSupportTickets);
+router.post('/support-tickets/bulk-close', requireAdmin, adminController.bulkCloseSupportTickets);
+router.post('/support-tickets/bulk-update', requireAdmin, adminController.bulkUpdateSupportTickets);
 
 // Live Chat (Admin)
 router.get('/live-chats', requireAdmin, liveChatController.adminListSessions);
@@ -36,6 +43,8 @@ router.get('/live-chats/count', requireAdmin, liveChatController.adminGetChatCou
 router.get('/live-chats/stream', requireAdmin, liveChatController.adminStream);
 router.get('/live-chats/admins', requireAdmin, liveChatController.adminListAdmins);
 router.get('/live-chats/analytics', requireAdmin, liveChatController.getAnalytics);
+router.post('/live-chats/bulk-delete', requireAdmin, liveChatController.adminBulkDeleteSessions);
+router.post('/live-chats/bulk-close', requireAdmin, liveChatController.adminBulkCloseSessions);
 router.get('/live-chats/canned-responses', requireAdmin, liveChatController.listCannedResponses);
 router.post('/live-chats/canned-responses', requireAdmin, liveChatController.createCannedResponse);
 router.post('/live-chats/canned-responses/use', requireAdmin, liveChatController.useCannedResponse);
@@ -92,6 +101,7 @@ router.get('/ai-usage/user/:id', requireAdmin, adminController.getAiUsageByUser)
 // Audit & Compliance
 router.get('/audit-logs', requireAdmin, adminController.listAuditLogs);
 router.get('/audit-logs/admin', requireAdmin, adminController.listAdminAuditLogs);
+router.get('/audit-logs/auth', requireAdmin, adminController.listAuthAuditLogs);
 router.get('/safety-logs', requireAdmin, adminController.listSafetyLogs);
 router.get('/warning-acknowledgments', requireAdmin, adminController.listWarningAcknowledgments);
 router.get('/consents', requireAdmin, adminController.listConsents);

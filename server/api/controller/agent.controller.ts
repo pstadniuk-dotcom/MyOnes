@@ -2,6 +2,8 @@
  * Agent Controller — API handlers for PR Agent operations
  */
 import type { Request, Response } from 'express';
+import { existsSync } from 'fs';
+import { resolve, basename } from 'path';
 import { agentRepository } from '../../modules/agent/agent.repository';
 import { getPrAgentConfig, savePrAgentConfig, getDefaultConfig } from '../../modules/agent/agent-config';
 import { getFounderProfile, saveFounderProfile, getDefaultProfile } from '../../modules/agent/founder-context';
@@ -16,7 +18,7 @@ import logger from '../../infra/logging/logger';
 
 export async function getAgentDashboard(req: Request, res: Response) {
   try {
-    const stats = await agentRepository.getStats();
+    const stats = await agentRepository.getStatsWithFollowUps();
     const config = await getPrAgentConfig();
     const recentRuns = await agentRepository.getLatestRuns(undefined, 5);
     res.json({ stats, enabled: config.enabled, recentRuns });
@@ -69,7 +71,19 @@ export async function updateProspect(req: Request, res: Response) {
 
 export async function listPitches(req: Request, res: Response) {
   try {
-    const { category, status, limit, offset } = req.query;
+    const { category, status, limit, offset, prospectId } = req.query;
+    if (prospectId) {
+      // Return pitches for a specific prospect
+      const result = await agentRepository.getPitchesWithProspects({
+        category: category as any,
+        status: status as any,
+        limit: limit ? Number(limit) : 50,
+        offset: offset ? Number(offset) : 0,
+      });
+      // Filter client-side for prospectId (repo already joins)
+      const filtered = result.filter(r => r.pitch.prospectId === prospectId);
+      return res.json(filtered);
+    }
     const result = await agentRepository.getPitchesWithProspects({
       category: category as any,
       status: status as any,
@@ -206,8 +220,50 @@ export async function triggerSendPitch(req: Request, res: Response) {
     const prospect = await agentRepository.getProspectById(pitch.prospectId);
     if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
 
+    // Route form-based prospects to the form filler instead of email
+    if (prospect.contactMethod === 'form') {
+      const formResult = await detectAndFillForm(prospect, pitch, { autoSubmit: true });
+      if (formResult.errors.length > 0 && formResult.fieldsFilled === 0) {
+        return res.status(502).json({
+          success: false,
+          error: `Form fill failed: ${formResult.errors.join('; ')}`,
+          formResult,
+        });
+      }
+      // Update pitch status based on whether form was actually submitted
+      const config = await getPrAgentConfig();
+      if (formResult.submitted) {
+        const updateData: Record<string, any> = {
+          status: 'sent',
+          sentAt: new Date(),
+          sentVia: 'form_auto',
+        };
+        // Only schedule follow-up if the prospect also has an email address
+        // (form-only contacts have no mechanism to receive follow-up emails)
+        if (prospect.contactEmail) {
+          updateData.followUpDueAt = new Date(Date.now() + config.followUpDays * 24 * 60 * 60 * 1000);
+        }
+        await agentRepository.updatePitch(pitch.id, updateData);
+        await agentRepository.updateProspect(prospect.id, { status: 'pitched' });
+      } else if (formResult.fieldsFilled > 0) {
+        // Form was filled but not submitted (CAPTCHA or submit failed)
+        await agentRepository.updatePitch(pitch.id, { sentVia: 'form_manual' });
+      }
+      return res.json({
+        success: true,
+        method: 'form',
+        formResult,
+        message: formResult.submitted
+          ? `Form submitted! ${formResult.fieldsFilled}/${formResult.fieldsDetected} fields filled and form submitted.`
+          : `Filled ${formResult.fieldsFilled}/${formResult.fieldsDetected} fields${formResult.hasCaptcha ? ' — CAPTCHA detected, submit manually at: ' + formResult.url : ' but auto-submit failed. Submit manually.'}`,
+      });
+    }
+
     const result = await sendPitchEmail(pitch, prospect);
-    res.json(result);
+    if (!result.success) {
+      return res.status(502).json({ error: result.error || 'Send failed' });
+    }
+    res.json({ ...result, method: 'email' });
   } catch (err: any) {
     res.status(500).json({ error: `Failed to send pitch: ${err.message}` });
   }
@@ -237,7 +293,8 @@ export async function triggerFormFill(req: Request, res: Response) {
       return res.status(400).json({ error: 'Prospect contact method is not form-based' });
     }
 
-    const result = await detectAndFillForm(prospect, pitch);
+    // triggerFormFill is a preview/test — does NOT auto-submit
+    const result = await detectAndFillForm(prospect, pitch, { autoSubmit: false });
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: `Failed to fill form: ${err.message}` });
@@ -395,5 +452,117 @@ export async function listTemplates(req: Request, res: Response) {
     res.json(ALL_TEMPLATES);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to list templates' });
+  }
+}
+
+// ── Delete Operations ────────────────────────────────────────────────────────
+
+export async function deleteProspect(req: Request, res: Response) {
+  try {
+    const prospect = await agentRepository.getProspectById(req.params.id);
+    if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+    await agentRepository.deleteProspect(req.params.id);
+    logger.info(`[agent-api] Prospect deleted: ${prospect.name}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error('[agent-api] Delete prospect error', { error: err.message });
+    res.status(500).json({ error: 'Failed to delete prospect' });
+  }
+}
+
+export async function deletePitch(req: Request, res: Response) {
+  try {
+    const pitch = await agentRepository.getPitchById(req.params.id);
+    if (!pitch) return res.status(404).json({ error: 'Pitch not found' });
+    await agentRepository.deletePitch(req.params.id);
+    logger.info(`[agent-api] Pitch deleted: ${pitch.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error('[agent-api] Delete pitch error', { error: err.message });
+    res.status(500).json({ error: 'Failed to delete pitch' });
+  }
+}
+
+// ── Follow-Up & Response Tracking ────────────────────────────────────────────
+
+export async function markPitchResponded(req: Request, res: Response) {
+  try {
+    const pitch = await agentRepository.getPitchById(req.params.id);
+    if (!pitch) return res.status(404).json({ error: 'Pitch not found' });
+
+    await agentRepository.markPitchResponded(pitch.id);
+
+    // Also update the prospect status
+    await agentRepository.updateProspectStatus(pitch.prospectId, 'responded');
+
+    logger.info(`[agent-api] Pitch marked as responded: ${pitch.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error('[agent-api] Mark responded error', { error: err.message });
+    res.status(500).json({ error: 'Failed to mark as responded' });
+  }
+}
+
+export async function triggerFollowUp(req: Request, res: Response) {
+  try {
+    const pitch = await agentRepository.getPitchById(req.params.id);
+    if (!pitch) return res.status(404).json({ error: 'Pitch not found' });
+    const prospect = await agentRepository.getProspectById(pitch.prospectId);
+    if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+
+    // Block follow-ups for form-only contacts (no email to send to)
+    if (prospect.contactMethod === 'form' && !prospect.contactEmail) {
+      return res.status(400).json({ error: 'Cannot draft follow-up for form-only contacts — no email address available.' });
+    }
+
+    const result = await draftFollowUp(pitch, prospect);
+    res.json(result);
+  } catch (err: any) {
+    logger.error('[agent-api] Follow-up draft failed', { error: err.message });
+    res.status(500).json({ error: `Failed to draft follow-up: ${err.message}` });
+  }
+}
+
+export async function getPendingFollowUps(req: Request, res: Response) {
+  try {
+    const pending = await agentRepository.getPendingFollowUps();
+    res.json(pending);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get pending follow-ups' });
+  }
+}
+
+// ── Form Screenshots ─────────────────────────────────────────────────────────
+
+export async function getFormScreenshot(req: Request, res: Response) {
+  try {
+    const pitch = await agentRepository.getPitchById(req.params.id);
+    if (!pitch) return res.status(404).json({ error: 'Pitch not found' });
+
+    const type = req.params.type; // 'filled' or 'submitted'
+    const screenshotPath = type === 'submitted'
+      ? (pitch as any).formScreenshotSubmitted
+      : (pitch as any).formScreenshotFilled;
+
+    if (!screenshotPath) {
+      return res.status(404).json({ error: `No ${type} screenshot available` });
+    }
+
+    // Security: ensure the path is within the expected screenshots directory
+    const resolved = resolve(screenshotPath);
+    const screenshotsDir = resolve(process.cwd(), 'data', 'form-screenshots');
+    if (!resolved.startsWith(screenshotsDir)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (!existsSync(resolved)) {
+      return res.status(404).json({ error: 'Screenshot file not found' });
+    }
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `inline; filename="${basename(resolved)}"`);
+    res.sendFile(resolved);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to serve screenshot' });
   }
 }

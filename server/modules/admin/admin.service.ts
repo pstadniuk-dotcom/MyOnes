@@ -132,8 +132,28 @@ export class AdminService {
         return await adminRepository.getTodaysOrders();
     }
 
-    async listSupportTickets(status: string, limit: number, offset: number) {
-        return await adminRepository.listAllSupportTickets(status, limit, offset);
+    // SLA deadlines by priority (in hours)
+    private static SLA_HOURS: Record<string, number> = {
+        urgent: 2,
+        high: 8,
+        medium: 24,
+        low: 72,
+    };
+
+    async listSupportTickets(options: {
+        status?: string;
+        priority?: string;
+        assignedTo?: string;
+        category?: string;
+        search?: string;
+        tag?: string;
+        slaBreached?: boolean;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        limit?: number;
+        offset?: number;
+    }) {
+        return await adminRepository.listAllSupportTickets(options);
     }
 
     async getNotificationCounts() {
@@ -151,16 +171,115 @@ export class AdminService {
 
         const responses = await adminRepository.listSupportTicketResponses(ticketId);
         const user = await adminRepository.getUserById(ticket.userId);
+        const activityLog = await adminRepository.getTicketActivityLog(ticketId);
 
         return {
             ticket,
             responses,
-            user: user ? { id: user.id, name: user.name, email: user.email } : null
+            user: user ? { id: user.id, name: user.name, email: user.email } : null,
+            activityLog,
         };
     }
 
-    async updateSupportTicket(ticketId: string, updates: any) {
-        return await adminRepository.updateSupportTicket(ticketId, updates);
+    async updateSupportTicket(ticketId: string, updates: any, adminId?: string) {
+        const oldTicket = adminId ? await adminRepository.getSupportTicket(ticketId) : null;
+        const result = await adminRepository.updateSupportTicket(ticketId, updates);
+
+        // Log activity for tracked changes
+        if (adminId && oldTicket && result) {
+            if (updates.status && updates.status !== oldTicket.status) {
+                await adminRepository.logTicketActivity({
+                    ticketId,
+                    userId: adminId,
+                    action: 'status_change',
+                    oldValue: oldTicket.status,
+                    newValue: updates.status,
+                });
+            }
+            if (updates.priority && updates.priority !== oldTicket.priority) {
+                await adminRepository.logTicketActivity({
+                    ticketId,
+                    userId: adminId,
+                    action: 'priority_change',
+                    oldValue: oldTicket.priority,
+                    newValue: updates.priority,
+                });
+            }
+            if (updates.assignedTo !== undefined && updates.assignedTo !== oldTicket.assignedTo) {
+                await adminRepository.logTicketActivity({
+                    ticketId,
+                    userId: adminId,
+                    action: 'assignment',
+                    oldValue: oldTicket.assignedTo || 'unassigned',
+                    newValue: updates.assignedTo || 'unassigned',
+                });
+            }
+        }
+
+        return result;
+    }
+
+    async bulkDeleteSupportTickets(ticketIds: string[]) {
+        return await adminRepository.bulkDeleteSupportTickets(ticketIds);
+    }
+
+    async bulkCloseSupportTickets(ticketIds: string[]) {
+        return await adminRepository.bulkCloseSupportTickets(ticketIds);
+    }
+
+    async bulkUpdateSupportTickets(ticketIds: string[], updates: any, adminId?: string) {
+        const count = await adminRepository.bulkUpdateSupportTickets(ticketIds, updates);
+
+        // Log bulk actions
+        if (adminId) {
+            const action = updates.status ? 'bulk_status_change' :
+                           updates.priority ? 'bulk_priority_change' :
+                           updates.assignedTo !== undefined ? 'bulk_assignment' : 'bulk_update';
+            for (const id of ticketIds) {
+                await adminRepository.logTicketActivity({
+                    ticketId: id,
+                    userId: adminId,
+                    action,
+                    newValue: JSON.stringify(updates),
+                });
+            }
+        }
+
+        return count;
+    }
+
+    async addTicketTag(ticketId: string, tag: string, adminId?: string) {
+        const ticket = await adminRepository.getSupportTicket(ticketId);
+        if (!ticket) return null;
+        const currentTags = ticket.tags || [];
+        if (currentTags.includes(tag)) return ticket;
+        const updated = await adminRepository.updateSupportTicket(ticketId, { tags: [...currentTags, tag] } as any);
+        if (adminId) {
+            await adminRepository.logTicketActivity({
+                ticketId, userId: adminId, action: 'tag_add', newValue: tag,
+            });
+        }
+        return updated;
+    }
+
+    async removeTicketTag(ticketId: string, tag: string, adminId?: string) {
+        const ticket = await adminRepository.getSupportTicket(ticketId);
+        if (!ticket) return null;
+        const currentTags = (ticket.tags || []).filter((t: string) => t !== tag);
+        const updated = await adminRepository.updateSupportTicket(ticketId, { tags: currentTags } as any);
+        if (adminId) {
+            await adminRepository.logTicketActivity({
+                ticketId, userId: adminId, action: 'tag_remove', oldValue: tag,
+            });
+        }
+        return updated;
+    }
+
+    calculateSlaDeadline(priority: string, createdAt: Date): Date {
+        const hours = AdminService.SLA_HOURS[priority] || 24;
+        const deadline = new Date(createdAt);
+        deadline.setHours(deadline.getHours() + hours);
+        return deadline;
     }
 
     async replyToSupportTicket(ticketId: string, adminId: string, message: string) {
@@ -172,6 +291,14 @@ export class AdminService {
             userId: adminId,
             message,
             isStaff: true
+        });
+
+        // Log reply activity
+        await adminRepository.logTicketActivity({
+            ticketId,
+            userId: adminId,
+            action: 'reply',
+            metadata: JSON.stringify({ messageLength: message.length }),
         });
 
         // Send email notification to user
@@ -197,6 +324,19 @@ export class AdminService {
         }
 
         return response;
+    }
+
+    async getSupportTicketMetrics(days: number = 30) {
+        return await adminRepository.getSupportTicketMetrics(days);
+    }
+
+    async getTicketFilterOptions() {
+        const [categories, tags, admins] = await Promise.all([
+            adminRepository.getAllTicketCategories(),
+            adminRepository.getAllTicketTags(),
+            adminRepository.getAdminUsers(),
+        ]);
+        return { categories, tags, admins };
     }
 
     async getConversationStats(days: number) {

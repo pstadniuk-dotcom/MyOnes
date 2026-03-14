@@ -3,6 +3,7 @@ import { adminService } from '../../modules/admin/admin.service';
 import { systemRepository } from '../../modules/system/system.repository';
 import { supportRepository } from '../../modules/support/support.repository';
 import { logAdminAction, listAdminAuditLogs } from '../../modules/admin/admin-audit';
+import { listAuthAuditLogs } from '../../modules/auth/auth-audit';
 import { logger } from '../../infra/logging/logger';
 import { manufacturerPricingService } from '../../modules/formulas/manufacturer-pricing.service';
 import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, ALL_INGREDIENTS, SYSTEM_SUPPORT_DETAILS } from '@shared/ingredients';
@@ -89,6 +90,7 @@ export class AdminController {
     async getUserTimeline(req: Request, res: Response) {
         try {
             const timeline = await adminService.getUserTimeline(req.params.id);
+            await logAdminAction(req, 'user_view', 'user', req.params.id, { view: 'timeline' });
             res.json(timeline);
         } catch (error: any) {
             logger.error('Error fetching user timeline', { error, userId: req.params.id });
@@ -105,6 +107,7 @@ export class AdminController {
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
             }
+            await logAdminAction(req, 'user_view', 'user', req.params.id, { view: 'details' });
             res.json(user);
         } catch (error) {
             logger.error('Error fetching user details', { error });
@@ -153,11 +156,19 @@ export class AdminController {
 
     async listSupportTickets(req: Request, res: Response) {
         try {
-            const status = (req.query.status as string) || 'all';
-            const limit = parseInt(req.query.limit as string) || 50;
-            const offset = parseInt(req.query.offset as string) || 0;
-
-            const result = await adminService.listSupportTickets(status, limit, offset);
+            const result = await adminService.listSupportTickets({
+                status: (req.query.status as string) || 'all',
+                priority: req.query.priority as string,
+                assignedTo: req.query.assignedTo as string,
+                category: req.query.category as string,
+                search: req.query.search as string,
+                tag: req.query.tag as string,
+                slaBreached: req.query.slaBreached === 'true' ? true : req.query.slaBreached === 'false' ? false : undefined,
+                sortBy: req.query.sortBy as string,
+                sortOrder: (req.query.sortOrder as 'asc' | 'desc') || 'desc',
+                limit: parseInt(req.query.limit as string) || 50,
+                offset: parseInt(req.query.offset as string) || 0,
+            });
             res.json(result);
         } catch (error) {
             logger.error('Error fetching support tickets', { error });
@@ -190,15 +201,19 @@ export class AdminController {
 
     async updateSupportTicket(req: Request, res: Response) {
         try {
-            const allowedUpdates = ['status', 'priority', 'adminNotes'];
+            const allowedUpdates = ['status', 'priority', 'adminNotes', 'assignedTo', 'category', 'tags'];
             const updates: Record<string, any> = {};
             for (const key of allowedUpdates) {
                 if (req.body[key] !== undefined) {
                     updates[key] = req.body[key];
                 }
             }
+            // Auto-set resolvedAt when resolving/closing
+            if (updates.status === 'resolved' || updates.status === 'closed') {
+                updates.resolvedAt = new Date();
+            }
 
-            const ticket = await adminService.updateSupportTicket(req.params.id, updates);
+            const ticket = await adminService.updateSupportTicket(req.params.id, updates, (req as any).userId);
             if (!ticket) {
                 return res.status(404).json({ error: 'Support ticket not found' });
             }
@@ -218,11 +233,42 @@ export class AdminController {
             }
 
             const response = await adminService.replyToSupportTicket(req.params.id, (req as any).userId, message);
+            await logAdminAction(req, 'ticket_reply', 'ticket', req.params.id, { messageLength: message.length });
             res.json({ response });
         } catch (error: any) {
             logger.error('Error replying to support ticket', { error });
             if (error.message === 'Support ticket not found') return res.status(404).json({ error: error.message });
             res.status(500).json({ error: 'Failed to reply to support ticket' });
+        }
+    }
+
+    async bulkDeleteSupportTickets(req: Request, res: Response) {
+        try {
+            const { ids } = req.body;
+            if (!Array.isArray(ids) || ids.length === 0) {
+                return res.status(400).json({ error: 'ids array is required' });
+            }
+            const count = await adminService.bulkDeleteSupportTickets(ids);
+            await logAdminAction(req, 'bulk_delete_tickets', 'ticket', ids.join(','), { count });
+            res.json({ deleted: count });
+        } catch (error) {
+            logger.error('Error bulk deleting support tickets', { error });
+            res.status(500).json({ error: 'Failed to delete support tickets' });
+        }
+    }
+
+    async bulkCloseSupportTickets(req: Request, res: Response) {
+        try {
+            const { ids } = req.body;
+            if (!Array.isArray(ids) || ids.length === 0) {
+                return res.status(400).json({ error: 'ids array is required' });
+            }
+            const count = await adminService.bulkCloseSupportTickets(ids);
+            await logAdminAction(req, 'bulk_close_tickets', 'ticket', ids.join(','), { count });
+            res.json({ closed: count });
+        } catch (error) {
+            logger.error('Error bulk closing support tickets', { error });
+            res.status(500).json({ error: 'Failed to close support tickets' });
         }
     }
 
@@ -279,6 +325,7 @@ export class AdminController {
             if (!result) {
                 return res.status(404).json({ error: 'Conversation not found' });
             }
+            await logAdminAction(req, 'conversation_view', 'conversation', req.params.sessionId);
             res.json(result);
         } catch (error) {
             logger.error('Error fetching conversation details', { error });
@@ -385,6 +432,7 @@ export class AdminController {
             if (!result.success) {
                 return res.status(result.error === 'Order not found' ? 404 : 400).json({ error: result.error });
             }
+            await logAdminAction(req, 'manufacturer_order_retry', 'order', req.params.id, { manufacturerOrderId: result.manufacturerOrderId });
             res.json({ success: true, manufacturerOrderId: result.manufacturerOrderId });
         } catch (error) {
             logger.error('Error retrying manufacturer order', { error });
@@ -407,6 +455,7 @@ export class AdminController {
             const { content } = req.body;
             const adminId = (req as any).userId;
             const note = await adminService.addUserNote(req.params.id, adminId, content);
+            await logAdminAction(req, 'user_note_add', 'user', req.params.id, { noteId: note.id });
             res.json(note);
         } catch (error) {
             logger.error('Error adding user note', { error });
@@ -418,6 +467,7 @@ export class AdminController {
         try {
             const filter = req.query.filter as string || 'all';
             const csv = await adminService.exportUsers(filter);
+            await logAdminAction(req, 'data_export', 'user', null, { exportType: 'users', filter });
             res.setHeader('Content-Type', 'text/csv');
             res.setHeader('Content-Disposition', `attachment; filename="users-export-${new Date().toISOString().split('T')[0]}.csv"`);
             res.send(csv);
@@ -433,6 +483,7 @@ export class AdminController {
             const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
             const status = req.query.status as string | undefined;
             const csv = await adminService.exportOrders(startDate, endDate, status);
+            await logAdminAction(req, 'data_export', 'order', null, { exportType: 'orders', startDate, endDate, status });
             res.setHeader('Content-Type', 'text/csv');
             res.setHeader('Content-Disposition', `attachment; filename="orders-export-${new Date().toISOString().split('T')[0]}.csv"`);
             res.send(csv);
@@ -456,6 +507,7 @@ export class AdminController {
         try {
             const { provider, model, reset } = req.body;
             const settings = await adminService.updateAiSettings(req.userId!, provider, model, reset);
+            await logAdminAction(req, 'settings_update', 'ai_settings', null, { provider, model, reset: !!reset });
             res.json(settings);
         } catch (error) {
             logger.error('Error updating AI settings', { error });
@@ -524,6 +576,13 @@ export class AdminController {
             if (!updated) {
                 return res.status(404).json({ error: 'Ingredient pricing not found' });
             }
+
+            await logAdminAction(req, 'ingredient_pricing_update', 'ingredient', req.params.id, {
+                ingredientName: ingredientName.trim(),
+                typicalCapsuleMg: Math.round(parsedCapsuleMg),
+                typicalRetailPriceCents: Math.round(parsedRetailPriceCents),
+                isActive,
+            });
 
             res.json(updated);
         } catch (error) {
@@ -816,18 +875,103 @@ export class AdminController {
         }
     }
 
+    async listAuthAuditLogs(req: Request, res: Response) {
+        try {
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 50;
+            const action = req.query.action as string | undefined;
+            const email = req.query.email as string | undefined;
+
+            const result = await listAuthAuditLogs({ page, limit, action, email });
+            res.json({ data: result.data, total: result.total, page, limit });
+        } catch (error) {
+            logger.error('Error fetching auth audit logs', { error });
+            res.status(500).json({ error: 'Failed to fetch auth audit logs' });
+        }
+    }
+
     // ── Ticket Assignment ───────────────────────────────────────────────
 
     async assignSupportTicket(req: Request, res: Response) {
         try {
             const { assignedTo } = req.body;
-            const ticket = await adminService.updateSupportTicket(req.params.id, { assignedTo: assignedTo || null });
+            const ticket = await adminService.updateSupportTicket(req.params.id, { assignedTo: assignedTo || null }, (req as any).userId);
             if (!ticket) return res.status(404).json({ error: 'Support ticket not found' });
             await logAdminAction(req, 'ticket_assign', 'ticket', req.params.id, { assignedTo });
             res.json(ticket);
         } catch (error) {
             logger.error('Error assigning support ticket', { error });
             res.status(500).json({ error: 'Failed to assign support ticket' });
+        }
+    }
+
+    async bulkUpdateSupportTickets(req: Request, res: Response) {
+        try {
+            const { ids, updates } = req.body;
+            if (!Array.isArray(ids) || ids.length === 0) {
+                return res.status(400).json({ error: 'ids array is required' });
+            }
+            const allowedKeys = ['status', 'priority', 'assignedTo', 'category'];
+            const safeUpdates: Record<string, any> = {};
+            for (const key of allowedKeys) {
+                if (updates?.[key] !== undefined) safeUpdates[key] = updates[key];
+            }
+            if (safeUpdates.status === 'resolved' || safeUpdates.status === 'closed') {
+                safeUpdates.resolvedAt = new Date();
+            }
+            const count = await adminService.bulkUpdateSupportTickets(ids, safeUpdates, (req as any).userId);
+            await logAdminAction(req, 'bulk_update_tickets', 'ticket', ids.join(','), { count, updates: safeUpdates });
+            res.json({ updated: count });
+        } catch (error) {
+            logger.error('Error bulk updating support tickets', { error });
+            res.status(500).json({ error: 'Failed to bulk update support tickets' });
+        }
+    }
+
+    async getSupportTicketMetrics(req: Request, res: Response) {
+        try {
+            const days = parseInt(req.query.days as string) || 30;
+            const metrics = await adminService.getSupportTicketMetrics(days);
+            res.json(metrics);
+        } catch (error) {
+            logger.error('Error fetching support ticket metrics', { error });
+            res.status(500).json({ error: 'Failed to fetch support ticket metrics' });
+        }
+    }
+
+    async getTicketFilterOptions(_req: Request, res: Response) {
+        try {
+            const options = await adminService.getTicketFilterOptions();
+            res.json(options);
+        } catch (error) {
+            logger.error('Error fetching ticket filter options', { error });
+            res.status(500).json({ error: 'Failed to fetch ticket filter options' });
+        }
+    }
+
+    async addTicketTag(req: Request, res: Response) {
+        try {
+            const { tag } = req.body;
+            if (!tag || typeof tag !== 'string') return res.status(400).json({ error: 'tag is required' });
+            const ticket = await adminService.addTicketTag(req.params.id, tag.toLowerCase().trim(), (req as any).userId);
+            if (!ticket) return res.status(404).json({ error: 'Support ticket not found' });
+            res.json(ticket);
+        } catch (error) {
+            logger.error('Error adding ticket tag', { error });
+            res.status(500).json({ error: 'Failed to add ticket tag' });
+        }
+    }
+
+    async removeTicketTag(req: Request, res: Response) {
+        try {
+            const { tag } = req.body;
+            if (!tag || typeof tag !== 'string') return res.status(400).json({ error: 'tag is required' });
+            const ticket = await adminService.removeTicketTag(req.params.id, tag, (req as any).userId);
+            if (!ticket) return res.status(404).json({ error: 'Support ticket not found' });
+            res.json(ticket);
+        } catch (error) {
+            logger.error('Error removing ticket tag', { error });
+            res.status(500).json({ error: 'Failed to remove ticket tag' });
         }
     }
 

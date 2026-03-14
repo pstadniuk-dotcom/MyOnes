@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/shared/lib/queryClient';
 import { useToast } from '@/shared/hooks/use-toast';
+import { VoiceInput } from '@/shared/components/VoiceInput';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -10,6 +11,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Switch } from '@/shared/components/ui/switch';
 import { Label } from '@/shared/components/ui/label';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -48,6 +50,9 @@ import {
   Trash2,
   KeyRound,
   ShieldCheck,
+  MessageSquare,
+  Clock,
+  UserCheck,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -79,6 +84,7 @@ interface Pitch {
   templateUsed: string | null;
   subject: string;
   body: string;
+  formAnswers: Record<string, string> | null;
   status: string;
   sentAt: string | null;
   sentVia: string | null;
@@ -107,6 +113,7 @@ interface DashboardData {
     sentPitches: number;
     responses: number;
     booked: number;
+    followUpsDue: number;
   };
   enabled: boolean;
   recentRuns: AgentRun[];
@@ -252,6 +259,7 @@ function OverviewTab({ dashboard, isLoading, onNavigate }: { dashboard?: Dashboa
         <StatCard label="Press" value={stats?.pressProspects ?? 0} icon={<Newspaper className="h-4 w-4 text-muted-foreground" />} onClick={() => onNavigate('press')} />
         <StatCard label="Pending Review" value={stats?.pendingPitches ?? 0} icon={<Edit className="h-4 w-4 text-orange-500" />} onClick={() => onNavigate('pitches')} />
         <StatCard label="Sent" value={stats?.sentPitches ?? 0} icon={<Send className="h-4 w-4 text-blue-500" />} onClick={() => onNavigate('pitches')} />
+        <StatCard label="Follow-ups Due" value={stats?.followUpsDue ?? 0} icon={<Clock className="h-4 w-4 text-orange-500" />} onClick={() => onNavigate('pitches')} />
         <StatCard label="Responses" value={stats?.responses ?? 0} icon={<Mail className="h-4 w-4 text-green-500" />} onClick={() => onNavigate('pitches')} />
         <StatCard label="Booked" value={stats?.booked ?? 0} icon={<Check className="h-4 w-4 text-green-600" />} onClick={() => onNavigate('pitches')} />
       </div>
@@ -320,31 +328,183 @@ function OverviewTab({ dashboard, isLoading, onNavigate }: { dashboard?: Dashboa
 // ── Prospects Tab ─────────────────────────────────────────────────────────────
 
 function ProspectsTab({ category }: { category: 'podcast' | 'press' }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { data, isLoading } = useQuery<{ prospects: Prospect[]; total: number }>({
     queryKey: ['/api/agent/prospects', category],
     queryFn: () => apiRequest('GET', `/api/agent/prospects?category=${category}&limit=100`).then(r => r.json()),
   });
 
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [contactFilter, setContactFilter] = useState<string>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [draftingIds, setDraftingIds] = useState<Set<string>>(new Set());
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest('DELETE', `/api/agent/prospects/${id}`),
+    onSuccess: () => {
+      toast({ title: 'Prospect deleted' });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const draftPitchMutation = useMutation({
+    mutationFn: (prospectId: string) =>
+      apiRequest('POST', `/api/agent/prospects/${prospectId}/draft`, {}).then(r => r.json()),
+  });
+
+  async function batchDraftPitches() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    let succeeded = 0;
+    let failed = 0;
+    setDraftingIds(new Set(ids));
+
+    for (const id of ids) {
+      try {
+        await draftPitchMutation.mutateAsync(id);
+        succeeded++;
+        setDraftingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      } catch {
+        failed++;
+        setDraftingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      }
+    }
+
+    setSelectedIds(new Set());
+    queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
+    toast({
+      title: `Drafted ${succeeded} pitch${succeeded !== 1 ? 'es' : ''}`,
+      description: failed > 0 ? `${failed} failed` : 'Check the Pitches tab to review.',
+      variant: failed > 0 ? 'destructive' : 'default',
+    });
+  }
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
 
-  const prospects = data?.prospects || [];
+  const allProspects = data?.prospects || [];
+  // Filter by search term, status, and contact method
+  const prospects = allProspects.filter(p => {
+    const matchesSearch = !searchTerm || 
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.hostName && p.hostName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (p.contactEmail && p.contactEmail.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (p.topics && p.topics.some(t => t.toLowerCase().includes(searchTerm.toLowerCase())));
+    const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
+    const matchesContact = contactFilter === 'all' || p.contactMethod === contactFilter;
+    return matchesSearch && matchesStatus && matchesContact;
+  });
+
+  const allSelected = prospects.length > 0 && prospects.every(p => selectedIds.has(p.id));
+  const someSelected = prospects.some(p => selectedIds.has(p.id));
+  const isDrafting = draftingIds.size > 0;
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(prospects.map(p => p.id)));
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Count by contact method for filter badges
+  const emailCount = allProspects.filter(p => p.contactMethod === 'email').length;
+  const formCount = allProspects.filter(p => p.contactMethod === 'form').length;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {data?.total ?? 0} {category === 'podcast' ? 'podcast' : 'press'} prospects
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search prospects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 h-8 w-[200px] text-sm"
+            />
+          </div>
+          {/* Status filters */}
+          <div className="flex gap-1">
+            {['all', 'new', 'pitched', 'responded', 'booked', 'manually_contacted', 'cold'].map(s => (
+              <Button
+                key={s}
+                size="sm"
+                variant={statusFilter === s ? 'default' : 'outline'}
+                onClick={() => setStatusFilter(s)}
+                className="text-xs h-7"
+              >
+                {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+              </Button>
+            ))}
+          </div>
+          {/* Contact method filters */}
+          <div className="flex gap-1 border-l pl-2">
+            {[
+              { key: 'all', label: 'All', icon: null, count: allProspects.length },
+              { key: 'email', label: 'Email', icon: <Mail className="h-3 w-3" />, count: emailCount },
+              { key: 'form', label: 'Form', icon: <FileText className="h-3 w-3" />, count: formCount },
+            ].map(f => (
+              <Button
+                key={f.key}
+                size="sm"
+                variant={contactFilter === f.key ? 'secondary' : 'ghost'}
+                onClick={() => setContactFilter(f.key)}
+                className="text-xs h-7 gap-1"
+              >
+                {f.icon}
+                {f.label} ({f.count})
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <Button
+              size="sm"
+              onClick={batchDraftPitches}
+              disabled={isDrafting}
+              className="h-8 gap-1"
+            >
+              {isDrafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Edit className="h-3.5 w-3.5" />}
+              Draft {selectedIds.size} Pitch{selectedIds.size !== 1 ? 'es' : ''}
+            </Button>
+          )}
+          <p className="text-sm text-muted-foreground">
+            {prospects.length} of {allProspects.length} {category === 'podcast' ? 'podcast' : 'press'} prospects
+          </p>
+        </div>
       </div>
 
       {prospects.length > 0 ? (
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all"
+                  className={someSelected && !allSelected ? 'opacity-60' : ''}
+                />
+              </TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Score</TableHead>
               <TableHead>Contact</TableHead>
@@ -355,7 +515,19 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' }) {
           </TableHeader>
           <TableBody>
             {prospects.map(p => (
-              <TableRow key={p.id} className="cursor-pointer" onClick={() => setSelectedProspect(p)}>
+              <TableRow
+                key={p.id}
+                className={`cursor-pointer ${selectedIds.has(p.id) ? 'bg-muted/50' : ''}`}
+                onClick={() => setSelectedProspect(p)}
+              >
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={selectedIds.has(p.id)}
+                    onCheckedChange={() => toggleSelect(p.id)}
+                    aria-label={`Select ${p.name}`}
+                  />
+                  {draftingIds.has(p.id) && <Loader2 className="h-3 w-3 animate-spin inline ml-1" />}
+                </TableCell>
                 <TableCell>
                   <div>
                     <div className="font-medium text-sm">{p.name}</div>
@@ -373,9 +545,39 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' }) {
                   {new Date(p.discoveredAt).toLocaleDateString()}
                 </TableCell>
                 <TableCell>
-                  <a href={p.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                  </a>
+                  <div className="flex items-center gap-1">
+                    <a href={p.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                    </a>
+                    {p.status !== 'manually_contacted' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-emerald-600 h-7 w-7 p-0"
+                        title="Mark as manually reached out"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          apiRequest('PATCH', `/api/agent/prospects/${p.id}`, { status: 'manually_contacted' })
+                            .then(() => {
+                              toast({ title: 'Marked as manually contacted' });
+                              queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
+                              queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
+                            })
+                            .catch((err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }));
+                        }}
+                      >
+                        <UserCheck className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-500 h-7 w-7 p-0"
+                      onClick={(e) => { e.stopPropagation(); if (confirm('Delete this prospect?')) deleteMutation.mutate(p.id); }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -407,6 +609,8 @@ function PitchesTab() {
   const { toast } = useToast();
   const [selectedPitch, setSelectedPitch] = useState<{ pitch: Pitch; prospect: Prospect } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [contactFilter, setContactFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { data, isLoading } = useQuery<{ pitch: Pitch; prospect: Prospect }[]>({
     queryKey: ['/api/agent/pitches'],
@@ -430,10 +634,53 @@ function PitchesTab() {
     },
   });
 
-  const sendMutation = useMutation({
-    mutationFn: (id: string) => apiRequest('POST', `/api/agent/pitches/${id}/send`, {}),
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest('DELETE', `/api/agent/pitches/${id}`),
     onSuccess: () => {
-      toast({ title: 'Pitch sent!' });
+      toast({ title: 'Pitch deleted' });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const respondedMutation = useMutation({
+    mutationFn: (id: string) => apiRequest('POST', `/api/agent/pitches/${id}/responded`, {}),
+    onSuccess: () => {
+      toast({ title: 'Marked as responded', description: 'Follow-up chain stopped.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const followUpMutation = useMutation({
+    mutationFn: (pitchId: string) => apiRequest('POST', `/api/agent/pitches/${pitchId}/follow-up`, {}).then(r => r.json()),
+    onSuccess: () => {
+      toast({ title: 'Follow-up drafted', description: 'Check the review queue.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches'] });
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const resp = await apiRequest('POST', `/api/agent/pitches/${id}/send`, {});
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || 'Send failed');
+      return data;
+    },
+    onSuccess: (data: any) => {
+      if (data.method === 'form') {
+        const submitted = data.formResult?.submitted;
+        toast({
+          title: submitted ? 'Form submitted!' : 'Form filled (not submitted)',
+          description: data.message,
+          ...(submitted ? {} : { variant: 'destructive' as const }),
+        });
+      } else {
+        toast({ title: 'Pitch sent!', description: 'Email delivered successfully.' });
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches'] });
       queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
     },
@@ -463,21 +710,39 @@ function PitchesTab() {
   }
 
   const allPitches = Array.isArray(data) ? data : [];
-  const pitches = statusFilter === 'all'
-    ? allPitches
-    : allPitches.filter(({ pitch }) => pitch.status === statusFilter);
+  const pitches = allPitches.filter(({ pitch, prospect }) => {
+    const matchesStatus = statusFilter === 'all' || pitch.status === statusFilter;
+    const matchesContact = contactFilter === 'all' || prospect.contactMethod === contactFilter;
+    const matchesSearch = !searchTerm ||
+      prospect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pitch.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pitch.pitchType.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStatus && matchesContact && matchesSearch;
+  });
 
   const approvedCount = allPitches.filter(({ pitch }) => pitch.status === 'approved').length;
   const statusCounts = allPitches.reduce((acc, { pitch }) => {
     acc[pitch.status] = (acc[pitch.status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
+  const emailPitchCount = allPitches.filter(({ prospect }) => prospect.contactMethod === 'email').length;
+  const formPitchCount = allPitches.filter(({ prospect }) => prospect.contactMethod === 'form').length;
 
   return (
     <div className="space-y-4">
       {/* Filter bar */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex gap-1.5">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search pitches..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 h-8 w-[200px] text-sm"
+            />
+          </div>
+          <div className="flex gap-1.5">
           {['all', 'pending_review', 'approved', 'sent', 'rejected'].map(s => (
             <Button
               key={s}
@@ -490,6 +755,26 @@ function PitchesTab() {
               {s === 'all' ? ` (${allPitches.length})` : statusCounts[s] ? ` (${statusCounts[s]})` : ''}
             </Button>
           ))}
+          </div>
+          {/* Contact method filters */}
+          <div className="flex gap-1 border-l pl-2">
+            {[
+              { key: 'all', label: 'All', icon: null, count: allPitches.length },
+              { key: 'email', label: 'Email', icon: <Mail className="h-3 w-3" />, count: emailPitchCount },
+              { key: 'form', label: 'Form', icon: <FileText className="h-3 w-3" />, count: formPitchCount },
+            ].map(f => (
+              <Button
+                key={f.key}
+                size="sm"
+                variant={contactFilter === f.key ? 'secondary' : 'ghost'}
+                onClick={() => setContactFilter(f.key)}
+                className="text-xs h-7 gap-1"
+              >
+                {f.icon}
+                {f.label} ({f.count})
+              </Button>
+            ))}
+          </div>
         </div>
         <div className="flex gap-2">
           {approvedCount > 0 && (
@@ -506,6 +791,7 @@ function PitchesTab() {
           <TableHeader>
             <TableRow>
               <TableHead>Prospect</TableHead>
+              <TableHead>Contact</TableHead>
               <TableHead>Subject</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Status</TableHead>
@@ -523,6 +809,9 @@ function PitchesTab() {
                       {pitch.category}
                     </Badge>
                   </div>
+                </TableCell>
+                <TableCell>
+                  <ContactBadge method={prospect.contactMethod} email={prospect.contactEmail} />
                 </TableCell>
                 <TableCell
                   className="max-w-[250px] truncate cursor-pointer hover:text-primary"
@@ -570,13 +859,73 @@ function PitchesTab() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="text-blue-600"
+                        className={prospect.contactMethod === 'form' ? 'text-orange-600' : 'text-blue-600'}
                         onClick={() => sendMutation.mutate(pitch.id)}
                         disabled={sendMutation.isPending}
+                        title={prospect.contactMethod === 'form' ? 'Fill submission form' : 'Send email'}
                       >
-                        <Send className="h-3.5 w-3.5" />
+                        {prospect.contactMethod === 'form'
+                          ? <FileText className="h-3.5 w-3.5" />
+                          : <Send className="h-3.5 w-3.5" />
+                        }
                       </Button>
                     )}
+                    {pitch.status === 'sent' && !pitch.responseReceived && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-green-600"
+                          onClick={() => respondedMutation.mutate(pitch.id)}
+                          disabled={respondedMutation.isPending}
+                          title="Mark as responded"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                        </Button>
+                        {/* Only show follow-up for prospects with email — form-only contacts can't receive follow-ups */}
+                        {prospect?.contactEmail && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-purple-600"
+                            onClick={() => followUpMutation.mutate(pitch.id)}
+                            disabled={followUpMutation.isPending}
+                            title="Draft follow-up email"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </>
+                    )}
+                    {prospect.status !== 'manually_contacted' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-emerald-600"
+                        onClick={() => {
+                          apiRequest('PATCH', `/api/agent/prospects/${prospect.id}`, { status: 'manually_contacted' })
+                            .then(() => {
+                              toast({ title: 'Marked as manually contacted' });
+                              queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches'] });
+                              queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
+                              queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
+                            })
+                            .catch((err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }));
+                        }}
+                        title="Mark prospect as manually reached out"
+                      >
+                        <UserCheck className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-400 hover:text-red-600"
+                      onClick={() => { if (confirm('Delete this pitch?')) deleteMutation.mutate(pitch.id); }}
+                      title="Delete pitch"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -1068,11 +1417,18 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Fetch pitches for this prospect
+  const { data: prospectPitches } = useQuery<{ pitch: Pitch; prospect: Prospect }[]>({
+    queryKey: ['/api/agent/pitches', 'prospect', prospect.id],
+    queryFn: () => apiRequest('GET', `/api/agent/pitches?prospectId=${prospect.id}`).then(r => r.json()),
+  });
+
   const draftMutation = useMutation({
     mutationFn: () => apiRequest('POST', `/api/agent/prospects/${prospect.id}/draft`, {}),
     onSuccess: () => {
       toast({ title: 'Pitch drafted!' });
       queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches', 'prospect', prospect.id] });
       onClose();
     },
     onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
@@ -1141,11 +1497,50 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
               <p className="mt-1 text-xs bg-muted p-2 rounded">{prospect.notes}</p>
             </div>
           )}
+
+          {/* Pitch History */}
+          {prospectPitches && prospectPitches.length > 0 && (
+            <div className="border-t pt-3">
+              <span className="text-muted-foreground text-sm font-medium">Pitch History</span>
+              <div className="mt-2 space-y-2">
+                {prospectPitches.map(({ pitch }) => (
+                  <div key={pitch.id} className="flex items-center justify-between bg-muted/50 p-2 rounded text-xs">
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={pitch.status} />
+                      <span className="font-medium truncate max-w-[200px]">{pitch.subject}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <span>{pitch.pitchType}</span>
+                      <span>{new Date(pitch.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter>
           {prospect.status !== 'cold' && (
             <Button variant="ghost" className="text-muted-foreground mr-auto" onClick={() => archiveMutation.mutate()} disabled={archiveMutation.isPending}>
               <Trash2 className="h-4 w-4 mr-2" /> Archive
+            </Button>
+          )}
+          {prospect.status !== 'manually_contacted' && (
+            <Button
+              variant="outline"
+              className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+              onClick={() => {
+                apiRequest('PATCH', `/api/agent/prospects/${prospect.id}`, { status: 'manually_contacted' })
+                  .then(() => {
+                    toast({ title: 'Marked as manually contacted' });
+                    queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
+                    queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
+                    onClose();
+                  })
+                  .catch((err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }));
+              }}
+            >
+              <UserCheck className="h-4 w-4 mr-2" /> Manually Contacted
             </Button>
           )}
           <Button variant="outline" onClick={onClose}>Close</Button>
@@ -1164,6 +1559,12 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
 function PitchDetailDialog({ pitch, prospect, onClose }: { pitch: Pitch; prospect: Prospect; onClose: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  // Local overrides: after a rewrite the backend already saved, so we just
+  // override what the dialog displays without requiring "Save Changes".
+  const [localPitch, setLocalPitch] = useState<{ subject: string; body: string }>({
+    subject: pitch.subject,
+    body: pitch.body,
+  });
   const [editedSubject, setEditedSubject] = useState(pitch.subject);
   const [editedBody, setEditedBody] = useState(pitch.body);
   const [isEditing, setIsEditing] = useState(false);
@@ -1173,6 +1574,8 @@ function PitchDetailDialog({ pitch, prospect, onClose }: { pitch: Pitch; prospec
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Pitch>) => apiRequest('PATCH', `/api/agent/pitches/${pitch.id}`, data),
     onSuccess: () => {
+      // Sync local display so non-edit view reflects the save
+      setLocalPitch({ subject: editedSubject, body: editedBody });
       toast({ title: 'Pitch updated' });
       queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches'] });
       setIsEditing(false);
@@ -1183,12 +1586,14 @@ function PitchDetailDialog({ pitch, prospect, onClose }: { pitch: Pitch; prospec
     mutationFn: (instructions: string) =>
       apiRequest('POST', `/api/agent/pitches/${pitch.id}/rewrite`, { instructions }).then(r => r.json()),
     onSuccess: (data: { subject: string; body: string }) => {
+      // Backend already saved the rewrite — update local display immediately
+      setLocalPitch({ subject: data.subject, body: data.body });
       setEditedSubject(data.subject);
       setEditedBody(data.body);
-      toast({ title: 'AI rewrite complete', description: 'Review the changes below.' });
+      toast({ title: 'AI rewrite applied', description: 'The updated pitch is saved.' });
       queryClient.invalidateQueries({ queryKey: ['/api/agent/pitches'] });
       setIsAiRewrite(false);
-      setIsEditing(true);
+      setIsEditing(false);
       setRewriteInstructions('');
     },
     onError: (err: any) => toast({ title: 'Rewrite failed', description: err.message, variant: 'destructive' }),
@@ -1227,22 +1632,115 @@ function PitchDetailDialog({ pitch, prospect, onClose }: { pitch: Pitch; prospec
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Prospect Info */}
+          <div className="bg-muted/50 border rounded-lg p-3 space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-medium">{prospect.name}</span>
+              <ContactBadge method={prospect.contactMethod} email={prospect.contactEmail} />
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Website</span>
+              <a href={prospect.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 max-w-[300px] truncate">
+                {prospect.url.replace(/^https?:\/\//, '').replace(/\/$/, '')} <ExternalLink className="h-3 w-3 flex-shrink-0" />
+              </a>
+            </div>
+            {prospect.hostName && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Host</span>
+                <span>{prospect.hostName}</span>
+              </div>
+            )}
+            {prospect.contactEmail && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Email</span>
+                <span>{prospect.contactEmail}</span>
+              </div>
+            )}
+            {prospect.contactFormUrl && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Form URL</span>
+                <a href={prospect.contactFormUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 max-w-[300px] truncate">
+                  {prospect.contactFormUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')} <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                </a>
+              </div>
+            )}
+            {prospect.audienceEstimate && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Audience</span>
+                <span>{prospect.audienceEstimate}</span>
+              </div>
+            )}
+            {prospect.relevanceScore !== null && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Score</span>
+                <ScoreBadge score={prospect.relevanceScore} />
+              </div>
+            )}
+            {prospect.topics && prospect.topics.length > 0 && (
+              <div>
+                <span className="text-muted-foreground">Topics</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {prospect.topics.map((t, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs">{t}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {prospect.notes && (
+              <div>
+                <span className="text-muted-foreground">Notes</span>
+                <p className="mt-1 text-xs bg-muted p-2 rounded">{prospect.notes}</p>
+              </div>
+            )}
+          </div>
+
           <div>
             <Label className="text-xs text-muted-foreground">Subject</Label>
             {isEditing ? (
               <Input value={editedSubject} onChange={(e) => setEditedSubject(e.target.value)} />
             ) : (
-              <p className="font-medium">{pitch.subject}</p>
+              <p className="font-medium">{localPitch.subject}</p>
             )}
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">Body</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Body</Label>
+              {isEditing && (
+                <VoiceInput
+                  onTranscript={(text) => setEditedBody(prev => prev ? prev + ' ' + text : text)}
+                  size="sm"
+                />
+              )}
+            </div>
             {isEditing ? (
               <Textarea value={editedBody} onChange={(e) => setEditedBody(e.target.value)} rows={12} />
             ) : (
-              <div className="bg-muted p-4 rounded text-sm whitespace-pre-wrap">{pitch.body}</div>
+              <div className="bg-muted p-4 rounded text-sm whitespace-pre-wrap">{localPitch.body}</div>
             )}
           </div>
+
+          {/* Form Answers (for form-based prospects) */}
+          {pitch.formAnswers && Object.keys(pitch.formAnswers).length > 0 && (
+            <div>
+              <Label className="text-xs text-muted-foreground mb-2 block">Form Answers (filled by AI)</Label>
+              <div className="bg-orange-50 border border-orange-200 rounded p-3 space-y-1.5">
+                {Object.entries(pitch.formAnswers).map(([label, value]) => (
+                  <div key={label} className="text-sm">
+                    <span className="font-medium text-orange-800">{label}:</span>{' '}
+                    <span className="text-orange-700">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sent Via indicator */}
+          {pitch.sentVia && (
+            <div className="text-xs text-muted-foreground">
+              Sent via: <span className="font-medium">{pitch.sentVia === 'form_auto' ? 'Form (auto-submitted)' : pitch.sentVia === 'form_manual' ? 'Form (manual)' : pitch.sentVia}</span>
+              {pitch.sentAt && <> at {new Date(pitch.sentAt).toLocaleString()}</>}
+            </div>
+          )}
 
           {/* AI Rewrite Section */}
           {isAiRewrite && (
@@ -1251,13 +1749,21 @@ function PitchDetailDialog({ pitch, prospect, onClose }: { pitch: Pitch; prospec
                 <Sparkles className="h-4 w-4" />
                 AI Rewrite
               </div>
-              <Textarea
-                value={rewriteInstructions}
-                onChange={(e) => setRewriteInstructions(e.target.value)}
-                placeholder="Describe what you want changed, e.g. 'make it shorter and more casual' or 'emphasize our AI personalization technology' or 'add a mention of our recent clinical study'"
-                rows={3}
-                className="text-sm"
-              />
+              <div className="relative">
+                <Textarea
+                  value={rewriteInstructions}
+                  onChange={(e) => setRewriteInstructions(e.target.value)}
+                  placeholder="Describe what you want changed, e.g. 'make it shorter and more casual' or 'emphasize our AI personalization technology' — or use the mic button to speak"
+                  rows={3}
+                  className="text-sm pr-10"
+                />
+                <div className="absolute top-2 right-2">
+                  <VoiceInput
+                    onTranscript={(text) => setRewriteInstructions(prev => prev ? prev + ' ' + text : text)}
+                    size="sm"
+                  />
+                </div>
+              </div>
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -1293,7 +1799,7 @@ function PitchDetailDialog({ pitch, prospect, onClose }: { pitch: Pitch; prospec
               <Button variant="outline" onClick={onClose}>Close</Button>
               {pitch.status === 'pending_review' && (
                 <>
-                  <Button variant="outline" onClick={() => setIsEditing(true)}>
+                  <Button variant="outline" onClick={() => { setEditedSubject(localPitch.subject); setEditedBody(localPitch.body); setIsEditing(true); }}>
                     <Edit className="h-4 w-4 mr-2" /> Edit
                   </Button>
                   {!isAiRewrite && (
@@ -1349,6 +1855,7 @@ function StatusBadge({ status }: { status: string }) {
     responded: 'default',
     booked: 'default',
     published: 'default',
+    manually_contacted: 'default',
     cold: 'secondary',
     paused: 'outline',
   };

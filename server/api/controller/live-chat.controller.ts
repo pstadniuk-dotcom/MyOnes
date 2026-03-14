@@ -354,6 +354,36 @@ export class LiveChatController {
     }
   }
 
+  /** POST /api/admin/live-chats/bulk-delete */
+  async adminBulkDeleteSessions(req: Request, res: Response) {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: 'ids array is required' });
+      }
+      const count = await liveChatService.bulkDeleteSessions(ids);
+      res.json({ deleted: count });
+    } catch (error) {
+      logger.error('Error bulk deleting live chat sessions:', error);
+      res.status(500).json({ error: 'Failed to delete chat sessions' });
+    }
+  }
+
+  /** POST /api/admin/live-chats/bulk-close */
+  async adminBulkCloseSessions(req: Request, res: Response) {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: 'ids array is required' });
+      }
+      const count = await liveChatService.bulkCloseSessions(ids, req.userId!);
+      res.json({ closed: count });
+    } catch (error) {
+      logger.error('Error bulk closing live chat sessions:', error);
+      res.status(500).json({ error: 'Failed to close chat sessions' });
+    }
+  }
+
   /** GET /api/admin/live-chats/:id/stream — SSE for admin on a specific session */
   async adminStreamSession(req: Request, res: Response) {
     try {

@@ -8,9 +8,11 @@ import {
   listProspects,
   getProspect,
   updateProspect,
+  deleteProspect,
   listPitches,
   getPitch,
   updatePitch,
+  deletePitch,
   approvePitch,
   rejectPitch,
   aiRewritePitch,
@@ -20,6 +22,9 @@ import {
   triggerSendPitch,
   triggerSendAllApproved,
   triggerFormFill,
+  markPitchResponded,
+  triggerFollowUp,
+  getPendingFollowUps,
   listRuns,
   getRun,
   getConfig,
@@ -46,14 +51,18 @@ router.get('/dashboard', getAgentDashboard);
 router.get('/prospects', listProspects);
 router.get('/prospects/:id', getProspect);
 router.patch('/prospects/:id', updateProspect);
+router.delete('/prospects/:id', deleteProspect);
 
 // Pitches
 router.get('/pitches', listPitches);
 router.get('/pitches/:id', getPitch);
 router.patch('/pitches/:id', updatePitch);
+router.delete('/pitches/:id', deletePitch);
 router.post('/pitches/:id/approve', approvePitch);
 router.post('/pitches/:id/reject', rejectPitch);
 router.post('/pitches/:id/rewrite', aiRewritePitch);
+router.post('/pitches/:id/responded', markPitchResponded);
+router.post('/pitches/:id/follow-up', triggerFollowUp);
 
 // Actions
 router.post('/scan', triggerScan);
@@ -62,6 +71,9 @@ router.post('/prospects/:prospectId/draft', triggerDraftPitch);
 router.post('/pitches/:id/send', triggerSendPitch);
 router.post('/send-approved', triggerSendAllApproved);
 router.post('/pitches/:pitchId/fill-form', triggerFormFill);
+
+// Follow-ups
+router.get('/follow-ups', getPendingFollowUps);
 
 // Runs
 router.get('/runs', listRuns);

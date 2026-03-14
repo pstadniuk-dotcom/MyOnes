@@ -9,8 +9,9 @@ import { Input } from '@/shared/components/ui/input';
 import {
   MessageCircle, Send, X, Clock, User, Mail, ArrowLeft, Circle,
   ArrowRightLeft, Monitor, Smartphone, FileText, Paperclip,
-  Image as ImageIcon, Zap, BarChart3, Plus, Trash2, Hash,
+  Image as ImageIcon, Zap, BarChart3, Plus, Trash2, Hash, CheckSquare, Square,
 } from 'lucide-react';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { cn } from '@/shared/lib/utils';
 import { useToast } from '@/shared/hooks/use-toast';
 
@@ -133,6 +134,10 @@ export default function AdminLiveChatsPage() {
   const [cannedFilter, setCannedFilter] = useState('');
   const [showCannedForm, setShowCannedForm] = useState(false);
   const [cannedForm, setCannedForm] = useState({ shortcut: '', title: '', content: '', category: '' });
+
+  // Multi-select
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
 
   // Audio
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -482,6 +487,39 @@ export default function AdminLiveChatsPage() {
   const totalUnread = sessions.reduce((sum, s) => sum + s.unreadCount, 0);
   const selectedSession = sessions.find(s => s.id === selectedSessionId);
 
+  // ─── Multi-select helpers ──────────────────────────────────────
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sessions.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sessions.map(s => s.id)));
+    }
+  };
+
+  const handleBulkClose = async () => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    if (!window.confirm(`Close ${count} chat session${count > 1 ? 's' : ''}?`)) return;
+    try {
+      await apiRequest('POST', '/api/admin/live-chats/bulk-close', { ids: Array.from(selectedIds) });
+      toast({ title: `${count} chat${count > 1 ? 's' : ''} closed` });
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      refetchSessions();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to close chats', variant: 'destructive' });
+    }
+  };
+
   // ─── Render ────────────────────────────────────────────────────
 
   return (
@@ -494,7 +532,16 @@ export default function AdminLiveChatsPage() {
             {totalUnread > 0 && <span className="text-red-500 font-medium"> · {totalUnread} unread</span>}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <Button
+            variant={selectMode ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}
+            className={selectMode ? 'bg-[#054700] hover:bg-[#054700]/90' : ''}
+          >
+            <CheckSquare className="h-4 w-4 mr-1" />
+            Select
+          </Button>
           {['', 'active', 'waiting', 'closed'].map(f => (
             <Button
               key={f}
@@ -513,7 +560,22 @@ export default function AdminLiveChatsPage() {
         {/* ─── Session List ───────────────────────────── */}
         <Card className="w-[340px] shrink-0 flex flex-col">
           <CardHeader className="py-3 px-4 border-b shrink-0">
-            <CardTitle className="text-sm font-medium text-gray-600">Conversations</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-gray-600">Conversations</CardTitle>
+              {selectMode && sessions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={toggleSelectAll} className="h-6 px-2 text-xs">
+                    {selectedIds.size === sessions.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                  {selectedIds.size > 0 && (
+                    <Button variant="outline" size="sm" onClick={handleBulkClose} className="h-6 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50">
+                      <X className="h-3 w-3 mr-1" />
+                      Close ({selectedIds.size})
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 overflow-y-auto">
             {sessions.length === 0 ? (
@@ -526,13 +588,23 @@ export default function AdminLiveChatsPage() {
                 {sessions.map(s => (
                   <button
                     key={s.id}
-                    onClick={() => selectSession(s.id)}
+                    onClick={() => selectMode ? toggleSelect(s.id) : selectSession(s.id)}
                     className={cn(
                       'w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors',
-                      selectedSessionId === s.id && 'bg-[#054700]/5 border-l-2 border-l-[#054700]'
+                      selectedSessionId === s.id && !selectMode && 'bg-[#054700]/5 border-l-2 border-l-[#054700]',
+                      selectMode && selectedIds.has(s.id) && 'bg-red-50'
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
+                      {selectMode && (
+                        <div className="mt-0.5 shrink-0">
+                          <Checkbox
+                            checked={selectedIds.has(s.id)}
+                            onCheckedChange={() => toggleSelect(s.id)}
+                            className="data-[state=checked]:bg-[#054700] data-[state=checked]:border-[#054700]"
+                          />
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-gray-800 truncate">

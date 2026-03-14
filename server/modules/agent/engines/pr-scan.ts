@@ -157,6 +157,23 @@ export async function runPrScan(options: {
         if (contactEmail) contactMethod = 'email';
         else if (contactFormUrl || scrapeResult?.hasGuestForm) contactMethod = 'form';
 
+        // Skip prospects with no actionable contact method —
+        // no point saving a lead we can't actually reach
+        if (contactMethod === 'unknown') {
+          logger.info(`[pr-scan] Skipping "${result.name}" — no email or submission form found`);
+          continue;
+        }
+
+        // For "form" contacts, ensure we actually found interactive form fields
+        // (not just a guidelines/instructions page with no submission mechanism)
+        if (contactMethod === 'form' && !contactEmail) {
+          const hasRealForm = scrapeResult?.formFields && scrapeResult.formFields.length > 0;
+          if (!hasRealForm) {
+            logger.info(`[pr-scan] Skipping "${result.name}" — form URL found but no actual submission fields detected (likely a guidelines page)`);
+            continue;
+          }
+        }
+
         prospects.push({
           name: result.name,
           normalizedName: normalizeName(result.name),

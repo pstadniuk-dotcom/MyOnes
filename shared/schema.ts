@@ -38,7 +38,8 @@ export const reorderRecommendationStatusEnum = pgEnum('reorder_recommendation_st
 export const streakTypeEnum = pgEnum('streak_type', ['overall', 'nutrition', 'workout', 'supplements', 'lifestyle']);
 export const adminActionEnum = pgEnum('admin_action', [
   'user_delete', 'user_suspend', 'user_unsuspend', 'user_admin_grant', 'user_admin_revoke',
-  'order_status_change', 'order_refund',
+  'user_view', 'user_note_add', 'data_export', 'conversation_view',
+  'order_status_change', 'order_refund', 'manufacturer_order_retry',
   'ticket_status_change', 'ticket_assign', 'ticket_reply',
   'settings_update', 'settings_reset',
   'faq_create', 'faq_update', 'faq_delete',
@@ -48,6 +49,7 @@ export const adminActionEnum = pgEnum('admin_action', [
   'ingredient_pricing_update',
   'formula_review_trigger',
   'newsletter_subscriber_toggle',
+  'bulk_delete_tickets', 'bulk_close_tickets', 'bulk_update_tickets',
 ]);
 
 // Users table - updated with name, email, phone, password
@@ -1128,6 +1130,9 @@ export const faqItems = pgTable("faq_items", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Support ticket source enum
+export const supportTicketSourceEnum = pgEnum('support_ticket_source', ['web', 'email', 'chat', 'api', 'internal']);
+
 // Support tickets table
 export const supportTickets = pgTable("support_tickets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1139,6 +1144,14 @@ export const supportTickets = pgTable("support_tickets", {
   category: text("category").notNull(),
   assignedTo: text("assigned_to"),
   adminNotes: text("admin_notes"),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
+  source: supportTicketSourceEnum("source").default('web').notNull(),
+  firstResponseAt: timestamp("first_response_at"),
+  slaDeadline: timestamp("sla_deadline"),
+  slaBreached: boolean("sla_breached").default(false).notNull(),
+  mergedIntoId: varchar("merged_into_id"),
+  responseCount: integer("response_count").default(0).notNull(),
+  lastActivityAt: timestamp("last_activity_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at"),
@@ -1151,6 +1164,18 @@ export const supportTicketResponses = pgTable("support_ticket_responses", {
   userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
   isStaff: boolean("is_staff").default(false).notNull(),
   message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Support ticket activity log (audit trail)
+export const supportTicketActivityLog = pgTable("support_ticket_activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: varchar("ticket_id").notNull().references(() => supportTickets.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(), // status_change, assignment, priority_change, reply, tag_add, tag_remove, merge, note
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  metadata: text("metadata"), // JSON string for extra context
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1203,6 +1228,11 @@ export const insertSupportTicketResponseSchema = createInsertSchema(supportTicke
   createdAt: true,
 });
 
+export const insertSupportTicketActivityLogSchema = createInsertSchema(supportTicketActivityLog).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertHelpArticleSchema = createInsertSchema(helpArticles).omit({
   id: true,
   createdAt: true,
@@ -1218,6 +1248,9 @@ export type SupportTicket = typeof supportTickets.$inferSelect;
 
 export type InsertSupportTicketResponse = z.infer<typeof insertSupportTicketResponseSchema>;
 export type SupportTicketResponse = typeof supportTicketResponses.$inferSelect;
+
+export type InsertSupportTicketActivityLog = z.infer<typeof insertSupportTicketActivityLogSchema>;
+export type SupportTicketActivityLog = typeof supportTicketActivityLog.$inferSelect;
 
 export type InsertHelpArticle = z.infer<typeof insertHelpArticleSchema>;
 export type HelpArticle = typeof helpArticles.$inferSelect;
@@ -1980,7 +2013,7 @@ export const outreachSubTypeEnum = pgEnum('outreach_sub_type', [
 ]);
 
 export const outreachProspectStatusEnum = pgEnum('outreach_prospect_status', [
-  'new', 'pitched', 'responded', 'booked', 'published', 'rejected', 'cold',
+  'new', 'pitched', 'responded', 'booked', 'published', 'rejected', 'cold', 'manually_contacted',
 ]);
 
 export const outreachContactMethodEnum = pgEnum('outreach_contact_method', [
@@ -2042,6 +2075,8 @@ export const outreachPitches = pgTable("outreach_pitches", {
   subject: text("subject").notNull(),
   body: text("body").notNull(),
   formAnswers: json("form_answers").$type<Record<string, string>>(),
+  formScreenshotFilled: text("form_screenshot_filled"), // path to screenshot of filled form
+  formScreenshotSubmitted: text("form_screenshot_submitted"), // path to screenshot after submit
   status: outreachPitchStatusEnum("status").default('draft').notNull(),
   reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: "set null" }),
   reviewedAt: timestamp("reviewed_at"),
@@ -2086,3 +2121,75 @@ export type OutreachPitch = typeof outreachPitches.$inferSelect;
 export type InsertOutreachPitch = z.infer<typeof insertOutreachPitchSchema>;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type InsertAgentRun = z.infer<typeof insertAgentRunSchema>;
+
+// ─── AI Support Agent (Draft Responses) ──────────────────────────────────────
+
+export const aiSupportDraftStatusEnum = pgEnum('ai_support_draft_status', ['pending', 'approved', 'edited', 'dismissed']);
+export const aiSupportDraftSourceEnum = pgEnum('ai_support_draft_source', ['ticket', 'live_chat']);
+
+export const aiSupportDrafts = pgTable("ai_support_drafts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  /** 'ticket' or 'live_chat' */
+  source: aiSupportDraftSourceEnum("source").notNull(),
+  /** Reference to either supportTickets.id or liveChatSessions.id */
+  sourceId: varchar("source_id").notNull(),
+  /** The user/customer who submitted the ticket or started the chat */
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  /** Summary of the customer's issue, generated by AI */
+  summary: text("summary").notNull(),
+  /** AI-generated draft response ready for admin review */
+  draftResponse: text("draft_response").notNull(),
+  /** Admin-edited version (populated when admin edits before sending) */
+  editedResponse: text("edited_response"),
+  /** pending → approved/edited/dismissed */
+  status: aiSupportDraftStatusEnum("status").default('pending').notNull(),
+  /** Which AI model generated the draft */
+  model: text("model"),
+  /** Admin who reviewed this draft */
+  reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  /** When the admin reviewed/actioned the draft */
+  reviewedAt: timestamp("reviewed_at"),
+  /** Additional context: ticket subject, chat metadata, etc. */
+  metadata: json("metadata").$type<{
+    subject?: string;
+    category?: string;
+    priority?: string;
+    guestEmail?: string;
+    guestName?: string;
+    messageCount?: number;
+    lastCustomerMessage?: string;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Insert schema
+export const insertAiSupportDraftSchema = createInsertSchema(aiSupportDrafts).omit({ id: true, createdAt: true });
+
+// Types
+export type AiSupportDraft = typeof aiSupportDrafts.$inferSelect;
+export type InsertAiSupportDraft = z.infer<typeof insertAiSupportDraftSchema>;
+
+// ─── Notification Log (cross-scheduler dedup) ────────────────────────────────
+
+export const notificationChannelEnum = pgEnum('notification_channel', ['email', 'sms', 'in_app']);
+
+export const notificationLog = pgTable("notification_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** Which scheduler/service sent it: formula_review | smart_reorder | sms_renewal */
+  source: varchar("source", { length: 50 }).notNull(),
+  /** Notification topic for dedup: renewal_nudge | reorder_review | formula_drift */
+  topic: varchar("topic", { length: 50 }).notNull(),
+  /** email | sms | in_app */
+  channel: notificationChannelEnum("channel").notNull(),
+  /** Optional metadata (drift score, days until renewal, etc.) */
+  metadata: json("metadata").$type<Record<string, any>>(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+
+// Insert schema
+export const insertNotificationLogSchema = createInsertSchema(notificationLog).omit({ id: true, sentAt: true });
+
+// Types
+export type NotificationLogEntry = typeof notificationLog.$inferSelect;
+export type InsertNotificationLogEntry = z.infer<typeof insertNotificationLogSchema>;

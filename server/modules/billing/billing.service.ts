@@ -4,6 +4,7 @@ import { usersRepository } from '../users/users.repository';
 import { membershipRepository } from '../membership/membership.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
 import { manufacturerPricingService } from '../formulas/manufacturer-pricing.service';
+import { consentsRepository } from '../consents/consents.repository';
 import { db } from '../../infra/db/db';
 import { ingredientPricing, users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
@@ -653,6 +654,12 @@ class DatabaseBillingProvider implements BillingProvider {
       if (safetyValidation?.requiresAcknowledgment && !formula.warningsAcknowledgedAt) {
         throw new Error('SAFETY_WARNINGS_NOT_ACKNOWLEDGED');
       }
+    }
+
+    // MEDICAL DISCLOSURE GATE: Require medication_disclosure consent before checkout
+    const medDisclosureConsent = await consentsRepository.getUserConsent(userId, 'medication_disclosure');
+    if (!medDisclosureConsent || !medDisclosureConsent.granted) {
+      throw new Error('MEDICAL_DISCLOSURE_NOT_ACKNOWLEDGED');
     }
 
     let formulaAmountCents = 0;

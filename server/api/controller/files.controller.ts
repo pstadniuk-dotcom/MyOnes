@@ -5,7 +5,11 @@ import logger from '../../infra/logging/logger';
 export class FilesController {
     async downloadFile(req: Request, res: Response) {
         try {
-            const result = await filesService.downloadFile(req.params.fileId, req.userId!);
+            const auditInfo = {
+                ipAddress: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+                userAgent: req.headers['user-agent']
+            };
+            const result = await filesService.downloadFile(req.params.fileId, req.userId!, auditInfo);
             res.setHeader('Content-Type', result.mimeType);
             res.setHeader('Content-Disposition', `attachment; filename="${result.originalFileName}"`);
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -128,7 +132,11 @@ export class FilesController {
 
     async deleteFile(req: Request, res: Response) {
         try {
-            await filesService.deleteFile(req.params.fileId, req.userId!);
+            const auditInfo = {
+                ipAddress: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+                userAgent: req.headers['user-agent']
+            };
+            await filesService.deleteFile(req.params.fileId, req.userId!, auditInfo);
             res.json({ success: true, message: 'File deleted successfully' });
         } catch (error) {
             logger.error('File delete error:', error);
@@ -152,7 +160,11 @@ export class FilesController {
             if (fileIds.length > 50) {
                 return res.status(400).json({ error: 'Cannot delete more than 50 files at once' });
             }
-            const results = await filesService.bulkDeleteFiles(fileIds, req.userId!);
+            const auditInfo = {
+                ipAddress: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+                userAgent: req.headers['user-agent']
+            };
+            const results = await filesService.bulkDeleteFiles(fileIds, req.userId!, auditInfo);
             const deleted = results.filter(r => r.success).length;
             const failed = results.filter(r => !r.success).length;
             res.json({ success: true, deleted, failed, results });

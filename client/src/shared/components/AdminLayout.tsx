@@ -33,6 +33,7 @@ import {
   ArrowLeft,
   Bell,
   Megaphone,
+  Bot,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
@@ -76,6 +77,7 @@ const navSections: { label?: string; items: NavItem[] }[] = [
         ],
       },
       { label: 'Membership', href: '/admin/membership', icon: Tag },
+      { label: 'PR Agent', href: '/admin/pr-agent', icon: Megaphone },
     ],
   },
   {
@@ -84,14 +86,13 @@ const navSections: { label?: string; items: NavItem[] }[] = [
       { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
       { label: 'AI Usage & Costs', href: '/admin/ai-usage', icon: DollarSign },
       { label: 'Conversations', href: '/admin/conversations', icon: MessageSquare },
-      { label: 'PR Agent', href: '/admin/pr-agent', icon: Megaphone },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { label: 'Live Chats', href: '/admin/live-chats', icon: MessageSquare },
       { label: 'Support Tickets', href: '/admin/support-tickets', icon: HelpCircle },
+      { label: 'Live Chats', href: '/admin/live-chats', icon: MessageSquare },
       { label: 'Audit & Compliance', href: '/admin/audit-logs', icon: Shield },
       {
         label: 'Settings',

@@ -5,6 +5,7 @@ import {
     orders,
     supportTickets,
     supportTicketResponses,
+    supportTicketActivityLog,
     chatSessions,
     messages,
     fileUploads,
@@ -19,6 +20,7 @@ import {
     type Order,
     type SupportTicket,
     type SupportTicketResponse,
+    type InsertSupportTicketActivityLog,
     type ChatSession,
     type Message,
     type FileUpload,
@@ -27,7 +29,7 @@ import {
     type WearableConnection,
     type IngredientPricing
 } from '@shared/schema';
-import { eq, desc, asc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull, sum } from 'drizzle-orm';
+import { eq, desc, asc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull, sum, not, ne } from 'drizzle-orm';
 import { decryptToken } from '../../utils/tokenEncryption';
 import { decryptField } from '../../infra/security/fieldEncryption';
 
@@ -509,16 +511,75 @@ export class AdminRepository {
         }
     }
 
-    async listAllSupportTickets(status?: string, limit: number = 50, offset: number = 0): Promise<{ tickets: Array<SupportTicket & { userName: string, userEmail: string }>, total: number }> {
+    async listAllSupportTickets(options: {
+        status?: string;
+        priority?: string;
+        assignedTo?: string | 'unassigned';
+        category?: string;
+        search?: string;
+        tag?: string;
+        slaBreached?: boolean;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        limit?: number;
+        offset?: number;
+    } = {}): Promise<{ tickets: Array<SupportTicket & { userName: string, userEmail: string }>, total: number }> {
         try {
-            let whereClause = undefined;
+            const {
+                status, priority, assignedTo, category, search, tag,
+                slaBreached, sortBy = 'createdAt', sortOrder = 'desc',
+                limit = 50, offset = 0
+            } = options;
+
+            const conditions: any[] = [];
             if (status && status !== 'all') {
-                whereClause = eq(supportTickets.status, status as any);
+                conditions.push(eq(supportTickets.status, status as any));
             }
+            if (priority && priority !== 'all') {
+                conditions.push(eq(supportTickets.priority, priority as any));
+            }
+            if (assignedTo === 'unassigned') {
+                conditions.push(sql`${supportTickets.assignedTo} IS NULL`);
+            } else if (assignedTo) {
+                conditions.push(eq(supportTickets.assignedTo, assignedTo));
+            }
+            if (category && category !== 'all') {
+                conditions.push(eq(supportTickets.category, category));
+            }
+            if (search) {
+                conditions.push(
+                    or(
+                        ilike(supportTickets.subject, `%${search}%`),
+                        ilike(supportTickets.description, `%${search}%`),
+                        ilike(users.name, `%${search}%`),
+                        ilike(users.email, `%${search}%`)
+                    )
+                );
+            }
+            if (tag) {
+                conditions.push(sql`${tag} = ANY(${supportTickets.tags})`);
+            }
+            if (slaBreached !== undefined) {
+                conditions.push(eq(supportTickets.slaBreached, slaBreached));
+            }
+
+            const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+            // Sorting
+            const sortColumnMap: Record<string, any> = {
+                createdAt: supportTickets.createdAt,
+                updatedAt: supportTickets.updatedAt,
+                lastActivityAt: supportTickets.lastActivityAt,
+                priority: supportTickets.priority,
+                slaDeadline: supportTickets.slaDeadline,
+            };
+            const sortCol = sortColumnMap[sortBy] || supportTickets.createdAt;
+            const orderFn = sortOrder === 'asc' ? asc : desc;
 
             const [countResult] = await db
                 .select({ count: count() })
                 .from(supportTickets)
+                .innerJoin(users, eq(supportTickets.userId, users.id))
                 .where(whereClause);
 
             const ticketList = await db
@@ -530,7 +591,7 @@ export class AdminRepository {
                 .from(supportTickets)
                 .innerJoin(users, eq(supportTickets.userId, users.id))
                 .where(whereClause)
-                .orderBy(desc(supportTickets.createdAt))
+                .orderBy(orderFn(sortCol))
                 .limit(limit)
                 .offset(offset);
 
@@ -570,6 +631,33 @@ export class AdminRepository {
     async createSupportTicketResponse(response: InsertSupportTicketResponse): Promise<SupportTicketResponse> {
         try {
             const [created] = await db.insert(supportTicketResponses).values(response).returning();
+
+            // Update ticket response count and last activity
+            const updateData: any = {
+                updatedAt: new Date(),
+                lastActivityAt: new Date(),
+                responseCount: sql`${supportTickets.responseCount} + 1`,
+            };
+
+            // Set firstResponseAt if this is staff and it's the first staff response
+            if (response.isStaff) {
+                const existingStaffResponses = await db
+                    .select({ count: count() })
+                    .from(supportTicketResponses)
+                    .where(and(
+                        eq(supportTicketResponses.ticketId, response.ticketId),
+                        eq(supportTicketResponses.isStaff, true),
+                        ne(supportTicketResponses.id, created.id)
+                    ));
+                if (Number(existingStaffResponses[0]?.count || 0) === 0) {
+                    updateData.firstResponseAt = new Date();
+                }
+            }
+
+            await db.update(supportTickets)
+                .set(updateData)
+                .where(eq(supportTickets.id, response.ticketId));
+
             return created;
         } catch (error) {
             console.error('Error creating support ticket response:', error);
@@ -581,7 +669,7 @@ export class AdminRepository {
         try {
             const [updated] = await db
                 .update(supportTickets)
-                .set({ ...updates, updatedAt: new Date() })
+                .set({ ...updates, updatedAt: new Date(), lastActivityAt: new Date() })
                 .where(eq(supportTickets.id, id))
                 .returning();
             return updated || undefined;
@@ -589,6 +677,32 @@ export class AdminRepository {
             console.error('Error updating support ticket:', error);
             return undefined;
         }
+    }
+
+    async bulkDeleteSupportTickets(ticketIds: string[]): Promise<number> {
+        if (ticketIds.length === 0) return 0;
+        const deleted = await db.delete(supportTickets).where(inArray(supportTickets.id, ticketIds)).returning();
+        return deleted.length;
+    }
+
+    async bulkCloseSupportTickets(ticketIds: string[]): Promise<number> {
+        if (ticketIds.length === 0) return 0;
+        const updated = await db
+            .update(supportTickets)
+            .set({ status: 'closed', updatedAt: new Date(), resolvedAt: new Date(), lastActivityAt: new Date() })
+            .where(inArray(supportTickets.id, ticketIds))
+            .returning();
+        return updated.length;
+    }
+
+    async bulkUpdateSupportTickets(ticketIds: string[], updates: Partial<SupportTicket>): Promise<number> {
+        if (ticketIds.length === 0) return 0;
+        const updated = await db
+            .update(supportTickets)
+            .set({ ...updates, updatedAt: new Date(), lastActivityAt: new Date() })
+            .where(inArray(supportTickets.id, ticketIds))
+            .returning();
+        return updated.length;
     }
 
     async getOpenSupportTicketCount(): Promise<{ open: number; inProgress: number }> {
@@ -608,6 +722,183 @@ export class AdminRepository {
         } catch (error) {
             console.error('Error getting open support ticket count:', error);
             return { open: 0, inProgress: 0 };
+        }
+    }
+
+    async getSupportTicketMetrics(days: number = 30): Promise<{
+        totalTickets: number;
+        openTickets: number;
+        inProgressTickets: number;
+        resolvedTickets: number;
+        closedTickets: number;
+        avgFirstResponseMinutes: number | null;
+        avgResolutionMinutes: number | null;
+        slaBreachedCount: number;
+        ticketsByCategory: Array<{ category: string; count: number }>;
+        ticketsByPriority: Array<{ priority: string; count: number }>;
+        ticketsPerDay: Array<{ date: string; count: number }>;
+        topAssignees: Array<{ assignedTo: string; count: number; resolved: number }>;
+    }> {
+        try {
+            const since = new Date();
+            since.setDate(since.getDate() - days);
+
+            const dateFilter = gte(supportTickets.createdAt, since);
+
+            // Total and status counts
+            const [total] = await db.select({ count: count() }).from(supportTickets).where(dateFilter);
+            const [open] = await db.select({ count: count() }).from(supportTickets).where(and(dateFilter, eq(supportTickets.status, 'open')));
+            const [inProg] = await db.select({ count: count() }).from(supportTickets).where(and(dateFilter, eq(supportTickets.status, 'in_progress')));
+            const [resolved] = await db.select({ count: count() }).from(supportTickets).where(and(dateFilter, eq(supportTickets.status, 'resolved')));
+            const [closed] = await db.select({ count: count() }).from(supportTickets).where(and(dateFilter, eq(supportTickets.status, 'closed')));
+
+            // Avg first response time (in minutes)
+            const [avgFrt] = await db
+                .select({
+                    avg: sql<number>`AVG(EXTRACT(EPOCH FROM (${supportTickets.firstResponseAt} - ${supportTickets.createdAt})) / 60)`
+                })
+                .from(supportTickets)
+                .where(and(dateFilter, isNotNull(supportTickets.firstResponseAt)));
+
+            // Avg resolution time (in minutes)
+            const [avgRes] = await db
+                .select({
+                    avg: sql<number>`AVG(EXTRACT(EPOCH FROM (${supportTickets.resolvedAt} - ${supportTickets.createdAt})) / 60)`
+                })
+                .from(supportTickets)
+                .where(and(dateFilter, isNotNull(supportTickets.resolvedAt)));
+
+            // SLA breached count
+            const [slaBreach] = await db
+                .select({ count: count() })
+                .from(supportTickets)
+                .where(and(dateFilter, eq(supportTickets.slaBreached, true)));
+
+            // By category
+            const byCategory = await db
+                .select({ category: supportTickets.category, count: count() })
+                .from(supportTickets)
+                .where(dateFilter)
+                .groupBy(supportTickets.category)
+                .orderBy(desc(count()));
+
+            // By priority
+            const byPriority = await db
+                .select({ priority: supportTickets.priority, count: count() })
+                .from(supportTickets)
+                .where(dateFilter)
+                .groupBy(supportTickets.priority);
+
+            // Per day
+            const perDay = await db
+                .select({
+                    date: sql<string>`TO_CHAR(${supportTickets.createdAt}, 'YYYY-MM-DD')`,
+                    count: count()
+                })
+                .from(supportTickets)
+                .where(dateFilter)
+                .groupBy(sql`TO_CHAR(${supportTickets.createdAt}, 'YYYY-MM-DD')`)
+                .orderBy(sql`TO_CHAR(${supportTickets.createdAt}, 'YYYY-MM-DD')`);
+
+            // Top assignees
+            const topAssignees = await db
+                .select({
+                    assignedTo: supportTickets.assignedTo,
+                    count: count(),
+                    resolved: sql<number>`COUNT(*) FILTER (WHERE ${supportTickets.status} IN ('resolved', 'closed'))`
+                })
+                .from(supportTickets)
+                .where(and(dateFilter, isNotNull(supportTickets.assignedTo)))
+                .groupBy(supportTickets.assignedTo)
+                .orderBy(desc(count()))
+                .limit(10);
+
+            return {
+                totalTickets: Number(total?.count || 0),
+                openTickets: Number(open?.count || 0),
+                inProgressTickets: Number(inProg?.count || 0),
+                resolvedTickets: Number(resolved?.count || 0),
+                closedTickets: Number(closed?.count || 0),
+                avgFirstResponseMinutes: avgFrt?.avg ? Math.round(Number(avgFrt.avg)) : null,
+                avgResolutionMinutes: avgRes?.avg ? Math.round(Number(avgRes.avg)) : null,
+                slaBreachedCount: Number(slaBreach?.count || 0),
+                ticketsByCategory: byCategory.map(r => ({ category: r.category, count: Number(r.count) })),
+                ticketsByPriority: byPriority.map(r => ({ priority: r.priority, count: Number(r.count) })),
+                ticketsPerDay: perDay.map(r => ({ date: r.date, count: Number(r.count) })),
+                topAssignees: topAssignees.map(r => ({ assignedTo: r.assignedTo!, count: Number(r.count), resolved: Number(r.resolved) })),
+            };
+        } catch (error) {
+            console.error('Error getting support ticket metrics:', error);
+            throw error;
+        }
+    }
+
+    async logTicketActivity(entry: InsertSupportTicketActivityLog): Promise<void> {
+        try {
+            await db.insert(supportTicketActivityLog).values(entry);
+        } catch (error) {
+            console.error('Error logging ticket activity:', error);
+        }
+    }
+
+    async getTicketActivityLog(ticketId: string): Promise<Array<{ action: string; oldValue: string | null; newValue: string | null; metadata: string | null; createdAt: Date; userName: string | null }>> {
+        try {
+            const entries = await db
+                .select({
+                    action: supportTicketActivityLog.action,
+                    oldValue: supportTicketActivityLog.oldValue,
+                    newValue: supportTicketActivityLog.newValue,
+                    metadata: supportTicketActivityLog.metadata,
+                    createdAt: supportTicketActivityLog.createdAt,
+                    userName: users.name,
+                })
+                .from(supportTicketActivityLog)
+                .leftJoin(users, eq(supportTicketActivityLog.userId, users.id))
+                .where(eq(supportTicketActivityLog.ticketId, ticketId))
+                .orderBy(desc(supportTicketActivityLog.createdAt));
+            return entries;
+        } catch (error) {
+            console.error('Error getting ticket activity log:', error);
+            return [];
+        }
+    }
+
+    async getAllTicketCategories(): Promise<string[]> {
+        try {
+            const result = await db
+                .selectDistinct({ category: supportTickets.category })
+                .from(supportTickets)
+                .orderBy(supportTickets.category);
+            return result.map(r => r.category);
+        } catch (error) {
+            console.error('Error getting ticket categories:', error);
+            return [];
+        }
+    }
+
+    async getAllTicketTags(): Promise<string[]> {
+        try {
+            const result = await db
+                .select({ tag: sql<string>`DISTINCT UNNEST(${supportTickets.tags})` })
+                .from(supportTickets);
+            return result.map(r => r.tag).sort();
+        } catch (error) {
+            console.error('Error getting ticket tags:', error);
+            return [];
+        }
+    }
+
+    async getAdminUsers(): Promise<Array<{ id: string; name: string; email: string }>> {
+        try {
+            const admins = await db
+                .select({ id: users.id, name: users.name, email: users.email })
+                .from(users)
+                .where(eq(users.isAdmin, true))
+                .orderBy(users.name);
+            return admins;
+        } catch (error) {
+            console.error('Error getting admin users:', error);
+            return [];
         }
     }
 

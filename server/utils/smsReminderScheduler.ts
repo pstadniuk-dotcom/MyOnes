@@ -235,11 +235,23 @@ async function sendReminderSms(reminder: ReminderCheck) {
 }
 
 async function checkAndSendRenewalReminders() {
+  const { notificationGate } = await import('../modules/notifications/notification-gate.service');
+
   try {
     const renewals = await usersRepository.getUpcomingRenewals(5);
     for (const sub of renewals) {
       const user = await usersRepository.getUser(sub.userId);
       if (!user?.phone || !(await hasSmsAccountabilityConsent(user.id))) continue;
+
+      // Check the notification gate before sending
+      const allowed = await notificationGate.tryAcquire(
+        sub.userId,
+        'sms_renewal',
+        'renewal_reminder',
+        'sms',
+        { daysUntilRenewal: 5 },
+      );
+      if (!allowed) continue;
 
       await sendRawSms(
         user.phone,

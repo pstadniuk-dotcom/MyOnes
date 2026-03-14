@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Badge } from '@/shared/components/ui/badge';
@@ -13,6 +13,8 @@ import {
   SelectItem,
   SelectValue
 } from '@/shared/components/ui/select';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/shared/components/ui/tabs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useLocation } from 'wouter';
@@ -24,14 +26,34 @@ import {
   ArrowLeft,
   Send,
   Search,
-  Filter,
   User,
   Calendar,
   Tag,
-  ChevronRight
+  ChevronRight,
+  CheckSquare,
+  BarChart3,
+  AlertTriangle,
+  Timer,
+  UserCheck,
+  X,
+  Plus,
+  ArrowUpDown,
+  Inbox,
+  History,
+  Trash2,
+  RefreshCw,
+  Bot,
+  Sparkles,
+  Edit3,
+  XCircle,
+  Play,
+  HelpCircle,
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isPast } from 'date-fns';
 import { apiRequest } from '@/shared/lib/queryClient';
+import { cn } from '@/shared/lib/utils';
+
+// ── Types ──────────────────────────────────────────────────────────────
 
 interface SupportTicket {
   id: string;
@@ -41,9 +63,19 @@ interface SupportTicket {
   category: string;
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
   priority: 'low' | 'medium' | 'high' | 'urgent';
+  assignedTo: string | null;
   adminNotes: string | null;
+  tags: string[];
+  source: string;
+  firstResponseAt: string | null;
+  slaDeadline: string | null;
+  slaBreached: boolean;
+  mergedIntoId: string | null;
+  responseCount: number;
+  lastActivityAt: string;
   createdAt: string;
   updatedAt: string;
+  resolvedAt: string | null;
   userName: string;
   userEmail: string;
 }
@@ -57,88 +89,332 @@ interface SupportTicketResponse {
   createdAt: string;
 }
 
+interface ActivityLogEntry {
+  action: string;
+  oldValue: string | null;
+  newValue: string | null;
+  metadata: string | null;
+  createdAt: string;
+  userName: string | null;
+}
+
 interface SupportTicketDetails {
   ticket: SupportTicket;
   responses: SupportTicketResponse[];
   user: { id: string; name: string; email: string } | null;
+  activityLog: ActivityLogEntry[];
 }
 
+interface TicketMetrics {
+  totalTickets: number;
+  openTickets: number;
+  inProgressTickets: number;
+  resolvedTickets: number;
+  closedTickets: number;
+  avgFirstResponseMinutes: number | null;
+  avgResolutionMinutes: number | null;
+  slaBreachedCount: number;
+  ticketsByCategory: Array<{ category: string; count: number }>;
+  ticketsByPriority: Array<{ priority: string; count: number }>;
+  ticketsPerDay: Array<{ date: string; count: number }>;
+  topAssignees: Array<{ assignedTo: string; count: number; resolved: number }>;
+}
+
+interface FilterOptions {
+  categories: string[];
+  tags: string[];
+  admins: Array<{ id: string; name: string; email: string }>;
+}
+
+// ── Config ─────────────────────────────────────────────────────────────
+
 const statusConfig = {
-  open: {
-    icon: AlertCircle,
-    color: 'bg-red-100 text-red-700 border-red-200',
-    dotColor: 'bg-red-500',
-    label: 'Open'
-  },
-  in_progress: {
-    icon: Clock,
-    color: 'bg-amber-100 text-amber-700 border-amber-200',
-    dotColor: 'bg-amber-500',
-    label: 'In Progress'
-  },
-  resolved: {
-    icon: CheckCircle2,
-    color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    dotColor: 'bg-emerald-500',
-    label: 'Resolved'
-  },
-  closed: {
-    icon: CheckCircle2,
-    color: 'bg-slate-100 text-slate-700 border-slate-200',
-    dotColor: 'bg-slate-400',
-    label: 'Closed'
-  }
+  open: { icon: AlertCircle, color: 'bg-red-100 text-red-700 border-red-200', dotColor: 'bg-red-500', label: 'Open' },
+  in_progress: { icon: Clock, color: 'bg-amber-100 text-amber-700 border-amber-200', dotColor: 'bg-amber-500', label: 'In Progress' },
+  resolved: { icon: CheckCircle2, color: 'bg-emerald-100 text-emerald-700 border-emerald-200', dotColor: 'bg-emerald-500', label: 'Resolved' },
+  closed: { icon: CheckCircle2, color: 'bg-slate-100 text-slate-700 border-slate-200', dotColor: 'bg-slate-400', label: 'Closed' },
 };
 
 const priorityConfig = {
-  low: { color: 'bg-slate-100 text-slate-600', label: 'Low' },
-  medium: { color: 'bg-blue-100 text-blue-600', label: 'Normal' },
-  high: { color: 'bg-orange-100 text-orange-600', label: 'High' },
-  urgent: { color: 'bg-red-100 text-red-600 animate-pulse', label: 'Urgent' }
+  low: { color: 'bg-slate-100 text-slate-600', label: 'Low', weight: 0 },
+  medium: { color: 'bg-blue-100 text-blue-600', label: 'Normal', weight: 1 },
+  high: { color: 'bg-orange-100 text-orange-600', label: 'High', weight: 2 },
+  urgent: { color: 'bg-red-100 text-red-600', label: 'Urgent', weight: 3 },
 };
 
-function SupportTicketList() {
+const invalidateTickets = (queryClient: ReturnType<typeof useQueryClient>) => {
+  queryClient.invalidateQueries({
+    predicate: (query) =>
+      typeof query.queryKey[0] === 'string' &&
+      (query.queryKey[0] as string).startsWith('/api/admin/support-tickets'),
+  });
+};
+
+// ── SLA helpers ────────────────────────────────────────────────────────
+
+function SlaIndicator({ deadline, breached }: { deadline: string | null; breached: boolean }) {
+  if (!deadline) return null;
+  const d = new Date(deadline);
+  const overdue = isPast(d);
+  if (breached || overdue) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+        <AlertTriangle className="h-3 w-3" />
+        SLA breached
+      </span>
+    );
+  }
+  const remaining = formatDistanceToNow(d);
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+      <Timer className="h-3 w-3" />
+      {remaining} left
+    </span>
+  );
+}
+
+function formatMinutes(minutes: number | null): string {
+  if (minutes === null) return '—';
+  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 1440) return `${Math.round(minutes / 60)}h`;
+  return `${Math.round(minutes / 1440)}d`;
+}
+
+// ── Metrics Dashboard ──────────────────────────────────────────────────
+
+function MetricsDashboard() {
+  const { data: metrics, isLoading } = useQuery<TicketMetrics>({
+    queryKey: ['/api/admin/support-tickets/metrics'],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-24" />)}
+      </div>
+    );
+  }
+
+  if (!metrics) return null;
+
+  const kpis = [
+    { label: 'Open', value: metrics.openTickets, color: 'text-red-600', bg: 'bg-red-50' },
+    { label: 'In Progress', value: metrics.inProgressTickets, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Resolved', value: metrics.resolvedTickets, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Total (30d)', value: metrics.totalTickets, color: 'text-slate-700', bg: 'bg-slate-50' },
+    { label: 'Avg First Response', value: formatMinutes(metrics.avgFirstResponseMinutes), color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Avg Resolution', value: formatMinutes(metrics.avgResolutionMinutes), color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'SLA Breached', value: metrics.slaBreachedCount, color: metrics.slaBreachedCount > 0 ? 'text-red-600' : 'text-emerald-600', bg: metrics.slaBreachedCount > 0 ? 'bg-red-50' : 'bg-emerald-50' },
+    { label: 'Resolution Rate', value: metrics.totalTickets > 0 ? `${Math.round(((metrics.resolvedTickets + metrics.closedTickets) / metrics.totalTickets) * 100)}%` : '—', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  ];
+
+  return (
+    <div className="space-y-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {kpis.map((kpi) => (
+          <div key={kpi.label} className={`${kpi.bg} rounded-lg p-3 border`}>
+            <div className="text-xs font-medium text-slate-500 mb-1">{kpi.label}</div>
+            <div className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Category & Assignee breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {metrics.ticketsByCategory.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2 pt-3 px-4">
+              <CardTitle className="text-sm font-medium">By Category</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="space-y-1.5">
+                {metrics.ticketsByCategory.slice(0, 8).map((c) => (
+                  <div key={c.category} className="flex items-center justify-between text-sm">
+                    <span className="capitalize text-slate-600 truncate">{c.category}</span>
+                    <Badge variant="secondary" className="text-xs ml-2">{c.count}</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {metrics.topAssignees.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2 pt-3 px-4">
+              <CardTitle className="text-sm font-medium">Top Assignees</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="space-y-1.5">
+                {metrics.topAssignees.map((a) => (
+                  <div key={a.assignedTo} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-600 truncate">{a.assignedTo}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-slate-400">{a.resolved}/{a.count} resolved</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Ticket Queue (List View) ───────────────────────────────────────────
+
+function SupportTicketList({ viewToggle }: { viewToggle?: React.ReactNode }) {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Filters
   const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [assignedToFilter, setAssignedToFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showMetrics, setShowMetrics] = useState(false);
 
-  const queryKey = statusFilter === 'all'
-    ? '/api/admin/support-tickets'
-    : `/api/admin/support-tickets?status=${statusFilter}`;
+  // Selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
 
-  const { data, isLoading } = useQuery<{ tickets: SupportTicket[], total: number }>({
+  // Build query string
+  const queryParams = useMemo(() => {
+    const p = new URLSearchParams();
+    if (statusFilter !== 'all') p.set('status', statusFilter);
+    if (priorityFilter !== 'all') p.set('priority', priorityFilter);
+    if (assignedToFilter !== 'all') p.set('assignedTo', assignedToFilter);
+    if (categoryFilter !== 'all') p.set('category', categoryFilter);
+    if (searchQuery) p.set('search', searchQuery);
+    p.set('sortBy', sortBy);
+    p.set('sortOrder', sortOrder);
+    p.set('limit', '100');
+    return p.toString();
+  }, [statusFilter, priorityFilter, assignedToFilter, categoryFilter, searchQuery, sortBy, sortOrder]);
+
+  const queryKey = `/api/admin/support-tickets?${queryParams}`;
+
+  const { data, isLoading, refetch } = useQuery<{ tickets: SupportTicket[]; total: number }>({
     queryKey: [queryKey],
+    refetchInterval: 30000, // Auto-refresh every 30s for real-time feel
+  });
+
+  const { data: filterOptions } = useQuery<FilterOptions>({
+    queryKey: ['/api/admin/support-tickets/filter-options'],
+    staleTime: 5 * 60 * 1000,
   });
 
   const tickets = data?.tickets || [];
+  const total = data?.total || 0;
 
-  // Filter by search
-  const filteredTickets = tickets.filter(ticket =>
-    searchQuery === '' ||
-    ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    ticket.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    ticket.userEmail.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Count by status
-  const statusCounts = {
-    all: tickets.length,
+  // Quick status counts from current result
+  const statusCounts = useMemo(() => ({
+    all: total,
     open: tickets.filter(t => t.status === 'open').length,
     in_progress: tickets.filter(t => t.status === 'in_progress').length,
     resolved: tickets.filter(t => t.status === 'resolved').length,
-    closed: tickets.filter(t => t.status === 'closed').length
+    closed: tickets.filter(t => t.status === 'closed').length,
+    sla_breached: tickets.filter(t => t.slaBreached || (t.slaDeadline && isPast(new Date(t.slaDeadline)))).length,
+  }), [tickets, total]);
+
+  // Multi-select
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === tickets.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(tickets.map(t => t.id)));
+    }
+  }, [selectedIds, tickets]);
+
+  // Bulk mutations
+  const bulkClose = useMutation({
+    mutationFn: (ids: string[]) => apiRequest('POST', '/api/admin/support-tickets/bulk-close', { ids }),
+    onSuccess: (_, ids) => {
+      toast({ title: `${ids.length} ticket${ids.length > 1 ? 's' : ''} closed` });
+      setSelectedIds(new Set());
+      invalidateTickets(queryClient);
+    },
+  });
+
+  const bulkDelete = useMutation({
+    mutationFn: (ids: string[]) => apiRequest('POST', '/api/admin/support-tickets/bulk-delete', { ids }),
+    onSuccess: (_, ids) => {
+      toast({ title: `${ids.length} ticket${ids.length > 1 ? 's' : ''} deleted` });
+      setSelectedIds(new Set());
+      invalidateTickets(queryClient);
+    },
+  });
+
+  const bulkUpdate = useMutation({
+    mutationFn: (payload: { ids: string[]; updates: Record<string, any> }) =>
+      apiRequest('POST', '/api/admin/support-tickets/bulk-update', payload),
+    onSuccess: () => {
+      toast({ title: 'Tickets updated' });
+      setSelectedIds(new Set());
+      invalidateTickets(queryClient);
+    },
+  });
+
+  const handleBulkClose = () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Close ${selectedIds.size} ticket${selectedIds.size > 1 ? 's' : ''}?`)) return;
+    bulkClose.mutate(Array.from(selectedIds));
   };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Permanently delete ${selectedIds.size} ticket${selectedIds.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    bulkDelete.mutate(Array.from(selectedIds));
+  };
+
+  const handleBulkAssign = (assignedTo: string) => {
+    bulkUpdate.mutate({ ids: Array.from(selectedIds), updates: { assignedTo: assignedTo === 'unassign' ? null : assignedTo } });
+  };
+
+  const handleBulkPriority = (priority: string) => {
+    bulkUpdate.mutate({ ids: Array.from(selectedIds), updates: { priority } });
+  };
+
+  const handleBulkStatus = (status: string) => {
+    bulkUpdate.mutate({ ids: Array.from(selectedIds), updates: { status } });
+  };
+
+  // Keyboard shortcut: Escape to exit select mode
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectMode) {
+        setSelectMode(false);
+        setSelectedIds(new Set());
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectMode]);
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-4 md:p-6 lg:p-8">
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-7xl mx-auto space-y-4">
           <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <div className="space-y-3">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
+          <div className="grid grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+          </div>
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-20" />)}
           </div>
         </div>
       </div>
@@ -148,174 +424,338 @@ function SupportTicketList() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="bg-white border-b sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Support Tickets</h1>
-              <p className="text-slate-500 mt-1">Manage and respond to user requests</p>
+              <h1 className="text-2xl font-bold text-slate-900">Support Queue</h1>
+              <p className="text-sm text-slate-500">{total} total tickets</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-slate-600">
-                {statusCounts.open} open
-              </Badge>
-              <Badge variant="outline" className="text-amber-600 border-amber-200">
-                {statusCounts.in_progress} in progress
-              </Badge>
+            <div className="flex items-center gap-2 flex-wrap">
+              {viewToggle}
+              <Button variant="outline" size="sm" onClick={() => setShowMetrics(!showMetrics)}>
+                <BarChart3 className="h-4 w-4 mr-1" />
+                {showMetrics ? 'Hide Metrics' : 'Metrics'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Refresh
+              </Button>
+              <Button
+                variant={selectMode ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}
+              >
+                <CheckSquare className="h-4 w-4 mr-1" />
+                {selectMode ? 'Exit Select' : 'Select'}
+              </Button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6">
-        {/* Search and Filters */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-4">
+        {/* Metrics Dashboard (collapsible) */}
+        {showMetrics && <MetricsDashboard />}
+
+        {/* Status Tab Bar */}
+        <div className="flex items-center gap-1 mb-4 bg-white rounded-lg border p-1 overflow-x-auto">
+          {[
+            { key: 'all', label: 'All', count: statusCounts.all },
+            { key: 'open', label: 'Open', count: statusCounts.open, dot: 'bg-red-500' },
+            { key: 'in_progress', label: 'In Progress', count: statusCounts.in_progress, dot: 'bg-amber-500' },
+            { key: 'resolved', label: 'Resolved', count: statusCounts.resolved, dot: 'bg-emerald-500' },
+            { key: 'closed', label: 'Closed', count: statusCounts.closed, dot: 'bg-slate-400' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setStatusFilter(tab.key)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap',
+                statusFilter === tab.key
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
+              )}
+            >
+              {tab.dot && <span className={`w-2 h-2 rounded-full ${tab.dot}`} />}
+              {tab.label}
+              <span className={cn(
+                'text-xs px-1.5 py-0.5 rounded-full',
+                statusFilter === tab.key ? 'bg-white/20' : 'bg-slate-100'
+              )}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Filters Row */}
+        <Card className="mb-4">
+          <CardContent className="p-3">
+            <div className="flex flex-wrap gap-3 items-center">
               {/* Search */}
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search by subject, name, or email..."
+                  placeholder="Search tickets, users, emails..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-9 h-9"
                 />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
+                  </button>
+                )}
               </div>
 
-              {/* Status Filter */}
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <Filter className="h-4 w-4 mr-2 text-slate-400" />
-                  <SelectValue placeholder="Filter status" />
+              {/* Priority */}
+              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger className="w-[130px] h-9">
+                  <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All ({statusCounts.all})</SelectItem>
-                  <SelectItem value="open">Open ({statusCounts.open})</SelectItem>
-                  <SelectItem value="in_progress">In Progress ({statusCounts.in_progress})</SelectItem>
-                  <SelectItem value="resolved">Resolved ({statusCounts.resolved})</SelectItem>
-                  <SelectItem value="closed">Closed ({statusCounts.closed})</SelectItem>
+                  <SelectItem value="all">All Priorities</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Normal</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Category */}
+              {filterOptions?.categories && filterOptions.categories.length > 0 && (
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-[140px] h-9">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {filterOptions.categories.map(c => (
+                      <SelectItem key={c} value={c}><span className="capitalize">{c}</span></SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Assigned To */}
+              {filterOptions?.admins && filterOptions.admins.length > 0 && (
+                <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+                  <SelectTrigger className="w-[150px] h-9">
+                    <SelectValue placeholder="Assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Assignees</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {filterOptions.admins.map(a => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Sort */}
+              <Select value={`${sortBy}:${sortOrder}`} onValueChange={(v) => {
+                const [field, order] = v.split(':');
+                setSortBy(field);
+                setSortOrder(order as 'asc' | 'desc');
+              }}>
+                <SelectTrigger className="w-[160px] h-9">
+                  <ArrowUpDown className="h-3.5 w-3.5 mr-1 text-slate-400" />
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="createdAt:desc">Newest first</SelectItem>
+                  <SelectItem value="createdAt:asc">Oldest first</SelectItem>
+                  <SelectItem value="lastActivityAt:desc">Recent activity</SelectItem>
+                  <SelectItem value="priority:desc">Priority (high → low)</SelectItem>
+                  <SelectItem value="priority:asc">Priority (low → high)</SelectItem>
+                  <SelectItem value="slaDeadline:asc">SLA deadline</SelectItem>
+                  <SelectItem value="updatedAt:desc">Recently updated</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </CardContent>
         </Card>
 
+        {/* Bulk Action Bar */}
+        {selectMode && selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 mb-4 p-3 bg-slate-800 rounded-lg text-white shadow-lg flex-wrap">
+            <Checkbox
+              checked={selectedIds.size === tickets.length && tickets.length > 0}
+              onCheckedChange={toggleSelectAll}
+              className="border-white data-[state=checked]:bg-white data-[state=checked]:text-slate-900"
+            />
+            <span className="text-sm font-medium">{selectedIds.size} selected</span>
+            <span className="text-slate-400">|</span>
+
+            {/* Bulk Status */}
+            <Select onValueChange={handleBulkStatus}>
+              <SelectTrigger className="w-[120px] h-8 bg-slate-700 border-slate-600 text-white text-xs">
+                <SelectValue placeholder="Set status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Bulk Priority */}
+            <Select onValueChange={handleBulkPriority}>
+              <SelectTrigger className="w-[120px] h-8 bg-slate-700 border-slate-600 text-white text-xs">
+                <SelectValue placeholder="Set priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Normal</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Bulk Assign */}
+            {filterOptions?.admins && filterOptions.admins.length > 0 && (
+              <Select onValueChange={handleBulkAssign}>
+                <SelectTrigger className="w-[130px] h-8 bg-slate-700 border-slate-600 text-white text-xs">
+                  <SelectValue placeholder="Assign to" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassign">Unassign</SelectItem>
+                  {filterOptions.admins.map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <Button variant="secondary" size="sm" onClick={handleBulkClose} className="h-8 text-xs">
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+              Close
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="h-8 text-xs">
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              Delete
+            </Button>
+          </div>
+        )}
+
+        {/* Select-all row when in select mode */}
+        {selectMode && tickets.length > 0 && selectedIds.size === 0 && (
+          <div className="flex items-center gap-2 mb-3 p-2 bg-slate-100 rounded-lg border text-sm">
+            <Checkbox onCheckedChange={toggleSelectAll} />
+            <span className="text-slate-500">Select all {tickets.length} tickets</span>
+          </div>
+        )}
+
         {/* Ticket List */}
-        {filteredTickets.length === 0 ? (
+        {tickets.length === 0 ? (
           <Card>
-            <CardContent className="py-12 text-center">
-              <MessageSquare className="h-12 w-12 mx-auto text-slate-300 mb-4" />
-              <h3 className="text-lg font-medium text-slate-700 mb-2">No tickets found</h3>
-              <p className="text-slate-500">
-                {searchQuery ? 'Try adjusting your search or filter' : 'No support tickets yet'}
+            <CardContent className="py-16 text-center">
+              <Inbox className="h-16 w-16 mx-auto text-slate-200 mb-4" />
+              <h3 className="text-lg font-medium text-slate-600 mb-2">No tickets found</h3>
+              <p className="text-slate-400 text-sm">
+                {searchQuery || statusFilter !== 'all' ? 'Try adjusting your filters' : 'No support tickets yet'}
               </p>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {filteredTickets.map((ticket) => {
+          <div className="space-y-2">
+            {tickets.map((ticket) => {
               const status = statusConfig[ticket.status] ?? statusConfig.open;
               const priority = priorityConfig[ticket.priority] ?? priorityConfig.medium;
               const StatusIcon = status.icon;
+              const isSelected = selectedIds.has(ticket.id);
+              const hasUnreadActivity = !ticket.firstResponseAt && ticket.status === 'open';
 
               return (
-                <Card
+                <div
                   key={ticket.id}
-                  className="group cursor-pointer hover:shadow-md hover:border-slate-300 transition-all duration-200"
-                  onClick={() => setLocation(`/admin/support-tickets/${ticket.id}`)}
+                  className={cn(
+                    'group bg-white rounded-lg border p-3 md:p-4 cursor-pointer hover:shadow-sm hover:border-slate-300 transition-all',
+                    isSelected && 'border-blue-300 bg-blue-50/50 shadow-sm',
+                    hasUnreadActivity && 'border-l-4 border-l-red-400',
+                  )}
+                  onClick={() => selectMode ? toggleSelect(ticket.id) : setLocation(`/admin/support-tickets/${ticket.id}`)}
                 >
-                  <CardContent className="p-4 md:p-5">
-                    {/* Mobile Layout */}
-                    <div className="md:hidden space-y-3">
-                      {/* Status & Priority Row */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className={`${status.color} border text-xs`}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {status.label}
-                        </Badge>
-                        <Badge className={`${priority.color} text-xs`}>
-                          {priority.label}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {ticket.category}
-                        </Badge>
+                  <div className="flex items-start gap-3">
+                    {/* Checkbox */}
+                    {selectMode && (
+                      <div className="mt-0.5 shrink-0">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelect(ticket.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
                       </div>
+                    )}
 
-                      {/* Subject */}
-                      <h3 className="font-semibold text-slate-900 line-clamp-2">
-                        {ticket.subject}
-                      </h3>
+                    {/* Priority dot */}
+                    <div className={cn('w-2.5 h-2.5 rounded-full mt-1.5 shrink-0', status.dotColor)} />
 
-                      {/* Message Preview */}
-                      <p className="text-sm text-slate-500 line-clamp-2">
-                        {ticket.description}
-                      </p>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-3">
+                        {/* Left: title + meta */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <h3 className={cn(
+                              'font-semibold text-slate-900 truncate',
+                              hasUnreadActivity && 'font-bold'
+                            )}>
+                              {ticket.subject}
+                            </h3>
+                            <Badge className={`${priority.color} text-xs shrink-0`}>{priority.label}</Badge>
+                            {ticket.tags?.map(tag => (
+                              <Badge key={tag} variant="outline" className="text-xs shrink-0">
+                                <Tag className="h-2.5 w-2.5 mr-0.5" />{tag}
+                              </Badge>
+                            ))}
+                          </div>
 
-                      {/* Meta Info */}
-                      <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t">
-                        <div className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          <span className="truncate max-w-[120px]">{ticket.userName}</span>
+                          <p className="text-sm text-slate-500 line-clamp-1 mb-2">{ticket.description}</p>
+
+                          <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {ticket.userName}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}
+                            </span>
+                            <span className="capitalize">{ticket.category}</span>
+                            {ticket.responseCount > 0 && (
+                              <span className="flex items-center gap-1">
+                                <MessageSquare className="h-3 w-3" />
+                                {ticket.responseCount}
+                              </span>
+                            )}
+                            {ticket.assignedTo && (
+                              <span className="flex items-center gap-1">
+                                <UserCheck className="h-3 w-3" />
+                                <span className="truncate max-w-[80px]">
+                                  {filterOptions?.admins?.find(a => a.id === ticket.assignedTo)?.name || 'Assigned'}
+                                </span>
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span>{formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}</span>
-                      </div>
-                    </div>
 
-                    {/* Desktop Layout */}
-                    <div className="hidden md:flex items-start gap-4">
-                      {/* Status Indicator */}
-                      <div className={`w-3 h-3 rounded-full mt-1.5 ${status.dotColor}`} />
-
-                      {/* Main Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            {/* Subject & Badges */}
-                            <div className="flex items-center gap-2 flex-wrap mb-2">
-                              <h3 className="font-semibold text-slate-900 truncate">
-                                {ticket.subject}
-                              </h3>
-                              <Badge className={`${priority.color} text-xs shrink-0`}>
-                                {priority.label}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs shrink-0">
-                                {ticket.category}
-                              </Badge>
-                            </div>
-
-                            {/* Message Preview */}
-                            <p className="text-sm text-slate-500 line-clamp-1 mb-3">
-                              {ticket.description}
-                            </p>
-
-                            {/* Meta Info */}
-                            <div className="flex items-center gap-4 text-xs text-slate-400">
-                              <span className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {ticket.userName}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {format(new Date(ticket.createdAt), 'MMM d, yyyy')}
-                              </span>
-                              <span>{ticket.userEmail}</span>
-                            </div>
-                          </div>
-
-                          {/* Right side */}
-                          <div className="flex flex-col items-end gap-2 shrink-0">
-                            <Badge className={`${status.color} border`}>
-                              <StatusIcon className="h-3 w-3 mr-1" />
-                              {status.label}
-                            </Badge>
-                            <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-slate-500 transition-colors" />
-                          </div>
+                        {/* Right: status + SLA */}
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <Badge className={`${status.color} border text-xs`}>
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {status.label}
+                          </Badge>
+                          <SlaIndicator deadline={ticket.slaDeadline} breached={ticket.slaBreached} />
+                          <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-slate-500 mt-1 hidden md:block" />
                         </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -325,24 +765,33 @@ function SupportTicketList() {
   );
 }
 
+// ── Ticket Detail View ─────────────────────────────────────────────────
+
 function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [replyMessage, setReplyMessage] = useState('');
   const [adminNotes, setAdminNotes] = useState('');
+  const [newTag, setNewTag] = useState('');
+  const [activeTab, setActiveTab] = useState('conversation');
 
   const { data, isLoading } = useQuery<SupportTicketDetails>({
     queryKey: [`/api/admin/support-tickets/${ticketId}`],
   });
 
+  const { data: filterOptions } = useQuery<FilterOptions>({
+    queryKey: ['/api/admin/support-tickets/filter-options'],
+    staleTime: 5 * 60 * 1000,
+  });
+
   const updateTicket = useMutation({
-    mutationFn: (updates: { status?: string; priority?: string; adminNotes?: string }) =>
+    mutationFn: (updates: Record<string, any>) =>
       apiRequest('PATCH', `/api/admin/support-tickets/${ticketId}`, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/admin/support-tickets/${ticketId}`] });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/support-tickets'] });
-      toast({ title: 'Ticket updated successfully' });
+      invalidateTickets(queryClient);
+      toast({ title: 'Ticket updated' });
     },
     onError: () => {
       toast({ title: 'Failed to update ticket', variant: 'destructive' });
@@ -355,20 +804,57 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
     onSuccess: () => {
       setReplyMessage('');
       queryClient.invalidateQueries({ queryKey: [`/api/admin/support-tickets/${ticketId}`] });
-      toast({ title: 'Reply sent successfully' });
+      invalidateTickets(queryClient);
+      toast({ title: 'Reply sent' });
     },
     onError: () => {
       toast({ title: 'Failed to send reply', variant: 'destructive' });
     }
   });
 
+  const addTag = useMutation({
+    mutationFn: (tag: string) =>
+      apiRequest('POST', `/api/admin/support-tickets/${ticketId}/tags`, { tag }),
+    onSuccess: () => {
+      setNewTag('');
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/support-tickets/${ticketId}`] });
+    },
+  });
+
+  const removeTag = useMutation({
+    mutationFn: (tag: string) =>
+      apiRequest('DELETE', `/api/admin/support-tickets/${ticketId}/tags`, { tag }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/support-tickets/${ticketId}`] });
+    },
+  });
+
+  // Keyboard shortcut: Ctrl+Enter to send reply
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && replyMessage.trim()) {
+        sendReply.mutate(replyMessage);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [replyMessage]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-        <div className="max-w-5xl mx-auto space-y-4">
+        <div className="max-w-6xl mx-auto space-y-4">
           <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-48 w-full" />
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2 space-y-4">
+              <Skeleton className="h-48" />
+              <Skeleton className="h-64" />
+            </div>
+            <div className="space-y-4">
+              <Skeleton className="h-40" />
+              <Skeleton className="h-32" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -377,11 +863,14 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
   if (!data) {
     return (
       <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <Card>
             <CardContent className="py-12 text-center">
               <AlertCircle className="h-12 w-12 mx-auto text-slate-300 mb-4" />
               <h3 className="text-lg font-medium text-slate-700">Ticket not found</h3>
+              <Button variant="outline" className="mt-4" onClick={() => setLocation('/admin/support-tickets')}>
+                Back to Queue
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -389,7 +878,7 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
     );
   }
 
-  const { ticket, responses, user } = data;
+  const { ticket, responses, user, activityLog } = data;
   const status = statusConfig[ticket.status] ?? statusConfig.open;
   const priority = priorityConfig[ticket.priority] ?? priorityConfig.medium;
 
@@ -397,189 +886,214 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 md:px-6 py-4">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-3">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setLocation('/admin/support-tickets')}
-            className="mb-3 -ml-2"
+            className="mb-2 -ml-2"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Tickets
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to Queue
           </Button>
 
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl md:text-2xl font-bold text-slate-900 mb-2">
-                {ticket.subject}
-              </h1>
+              <h1 className="text-xl font-bold text-slate-900 mb-1">{ticket.subject}</h1>
               <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
                 <span className="flex items-center gap-1">
                   <User className="h-3.5 w-3.5" />
                   {user?.name || 'Unknown'}
                 </span>
-                <span className="hidden sm:inline">•</span>
+                <span className="text-slate-300">•</span>
                 <span className="text-slate-400">{user?.email}</span>
-                <span className="hidden sm:inline">•</span>
+                <span className="text-slate-300">•</span>
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5" />
                   {format(new Date(ticket.createdAt), 'MMM d, yyyy h:mm a')}
                 </span>
+                <SlaIndicator deadline={ticket.slaDeadline} breached={ticket.slaBreached} />
               </div>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              <Badge className={`${status.color} border`}>
-                {status.label}
-              </Badge>
-              <Badge className={priority.color}>
-                {priority.label}
-              </Badge>
+              <Badge className={`${status.color} border`}>{status.label}</Badge>
+              <Badge className={priority.color}>{priority.label}</Badge>
+              {ticket.source !== 'web' && (
+                <Badge variant="outline" className="text-xs capitalize">{ticket.source}</Badge>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Main Column */}
+          <div className="lg:col-span-2 space-y-4">
             {/* Original Message */}
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Original Message</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm max-w-none text-slate-700">
-                  <p className="whitespace-pre-wrap">{ticket.description}</p>
+              <CardHeader className="pb-2 pt-3 px-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium">Original Message</CardTitle>
+                  <span className="text-xs text-slate-400">
+                    {format(new Date(ticket.createdAt), 'MMM d, yyyy h:mm a')}
+                  </span>
                 </div>
+              </CardHeader>
+              <CardContent className="px-4 pb-3">
+                <p className="text-sm text-slate-700 whitespace-pre-wrap">{ticket.description}</p>
               </CardContent>
             </Card>
 
-            {/* Conversation */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Conversation
-                  {responses.length > 0 && (
-                    <Badge variant="secondary" className="ml-auto">
-                      {responses.length} {responses.length === 1 ? 'reply' : 'replies'}
-                    </Badge>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {responses.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400">
-                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No responses yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {responses.map((response) => (
-                      <div
-                        key={response.id}
-                        className={`p-4 rounded-lg ${response.isStaff
-                          ? 'bg-blue-50 border-l-4 border-blue-400'
-                          : 'bg-slate-50 border-l-4 border-slate-300'
-                          }`}
-                      >
-                        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                          <Badge variant={response.isStaff ? 'default' : 'secondary'}>
-                            {response.isStaff ? 'Support Team' : 'User'}
-                          </Badge>
-                          <span className="text-xs text-slate-400">
-                            {format(new Date(response.createdAt), 'MMM d, yyyy h:mm a')}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-700 whitespace-pre-wrap">
-                          {response.message}
-                        </p>
+            {/* Tabs: Conversation / Activity */}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="w-full grid grid-cols-2">
+                <TabsTrigger value="conversation" className="text-sm">
+                  <MessageSquare className="h-4 w-4 mr-1" />
+                  Conversation ({responses.length})
+                </TabsTrigger>
+                <TabsTrigger value="activity" className="text-sm">
+                  <History className="h-4 w-4 mr-1" />
+                  Activity ({activityLog?.length || 0})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="conversation" className="mt-3">
+                <Card>
+                  <CardContent className="p-4 space-y-4">
+                    {responses.length === 0 ? (
+                      <div className="text-center py-8 text-slate-400">
+                        <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No responses yet — be the first to reply</p>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    ) : (
+                      <div className="space-y-3">
+                        {responses.map((response) => (
+                          <div
+                            key={response.id}
+                            className={cn(
+                              'p-3 rounded-lg',
+                              response.isStaff
+                                ? 'bg-blue-50 border-l-4 border-blue-400'
+                                : 'bg-slate-50 border-l-4 border-slate-300'
+                            )}
+                          >
+                            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                              <Badge variant={response.isStaff ? 'default' : 'secondary'} className="text-xs">
+                                {response.isStaff ? 'Support Team' : 'User'}
+                              </Badge>
+                              <span className="text-xs text-slate-400">
+                                {format(new Date(response.createdAt), 'MMM d, h:mm a')}
+                              </span>
+                            </div>
+                            <p className="text-sm text-slate-700 whitespace-pre-wrap">{response.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
-                {/* Reply Form */}
-                <div className="pt-4 border-t space-y-3">
-                  <Label htmlFor="reply" className="text-sm font-medium">
-                    Send Reply
-                  </Label>
-                  <Textarea
-                    id="reply"
-                    placeholder="Type your response to the user..."
-                    value={replyMessage}
-                    onChange={(e) => setReplyMessage(e.target.value)}
-                    rows={4}
-                    className="resize-none"
-                  />
-                  <Button
-                    onClick={() => sendReply.mutate(replyMessage)}
-                    disabled={!replyMessage.trim() || sendReply.isPending}
-                    className="w-full sm:w-auto"
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    {sendReply.isPending ? 'Sending...' : 'Send Reply'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                    {/* Reply Form */}
+                    <div className="pt-3 border-t space-y-2">
+                      <Textarea
+                        placeholder="Type your response... (Ctrl+Enter to send)"
+                        value={replyMessage}
+                        onChange={(e) => setReplyMessage(e.target.value)}
+                        rows={3}
+                        className="resize-none text-sm"
+                      />
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Visible to user • Email notification will be sent</span>
+                        <Button
+                          onClick={() => sendReply.mutate(replyMessage)}
+                          disabled={!replyMessage.trim() || sendReply.isPending}
+                          size="sm"
+                        >
+                          <Send className="h-3.5 w-3.5 mr-1" />
+                          {sendReply.isPending ? 'Sending...' : 'Send Reply'}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="activity" className="mt-3">
+                <Card>
+                  <CardContent className="p-4">
+                    {(!activityLog || activityLog.length === 0) ? (
+                      <div className="text-center py-8 text-slate-400">
+                        <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No activity recorded yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {activityLog.map((entry, i) => (
+                          <div key={i} className="flex items-start gap-3 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-slate-300 mt-1.5 shrink-0" />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-slate-700">{entry.userName || 'System'}</span>
+                                <span className="text-slate-500">
+                                  {entry.action === 'status_change' && `changed status from "${entry.oldValue}" to "${entry.newValue}"`}
+                                  {entry.action === 'priority_change' && `changed priority from "${entry.oldValue}" to "${entry.newValue}"`}
+                                  {entry.action === 'assignment' && `assigned to ${entry.newValue === 'unassigned' ? 'nobody' : entry.newValue}`}
+                                  {entry.action === 'reply' && 'sent a reply'}
+                                  {entry.action === 'tag_add' && `added tag "${entry.newValue}"`}
+                                  {entry.action === 'tag_remove' && `removed tag "${entry.oldValue}"`}
+                                  {entry.action === 'note' && 'updated internal notes'}
+                                  {!['status_change', 'priority_change', 'assignment', 'reply', 'tag_add', 'tag_remove', 'note'].includes(entry.action) && entry.action}
+                                </span>
+                              </div>
+                              <span className="text-xs text-slate-400">
+                                {format(new Date(entry.createdAt), 'MMM d, h:mm a')}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Quick Actions */}
+          <div className="space-y-4">
+            {/* Ticket Controls */}
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Ticket Details</CardTitle>
+              <CardHeader className="pb-2 pt-3 px-4">
+                <CardTitle className="text-sm font-medium">Ticket Details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="px-4 pb-3 space-y-3">
                 <div>
-                  <Label className="text-xs text-slate-500 mb-1.5 block">Status</Label>
-                  <Select
-                    value={ticket.status}
-                    onValueChange={(value) => updateTicket.mutate({ status: value })}
-                  >
-                    <SelectTrigger className="w-full">
+                  <Label className="text-xs text-slate-500 mb-1 block">Status</Label>
+                  <Select value={ticket.status} onValueChange={(v) => updateTicket.mutate({ status: v })}>
+                    <SelectTrigger className="w-full h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="open">
-                        <span className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-red-500" />
-                          Open
-                        </span>
+                        <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500" />Open</span>
                       </SelectItem>
                       <SelectItem value="in_progress">
-                        <span className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-amber-500" />
-                          In Progress
-                        </span>
+                        <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-500" />In Progress</span>
                       </SelectItem>
                       <SelectItem value="resolved">
-                        <span className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                          Resolved
-                        </span>
+                        <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500" />Resolved</span>
                       </SelectItem>
                       <SelectItem value="closed">
-                        <span className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-slate-400" />
-                          Closed
-                        </span>
+                        <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-slate-400" />Closed</span>
                       </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
-                  <Label className="text-xs text-slate-500 mb-1.5 block">Priority</Label>
-                  <Select
-                    value={ticket.priority}
-                    onValueChange={(value) => updateTicket.mutate({ priority: value })}
-                  >
-                    <SelectTrigger className="w-full">
+                  <Label className="text-xs text-slate-500 mb-1 block">Priority</Label>
+                  <Select value={ticket.priority} onValueChange={(v) => updateTicket.mutate({ priority: v })}>
+                    <SelectTrigger className="w-full h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -592,37 +1106,136 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
                 </div>
 
                 <div>
-                  <Label className="text-xs text-slate-500 mb-1.5 block">Category</Label>
-                  <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-md border">
-                    <Tag className="h-4 w-4 text-slate-400" />
-                    <span className="text-sm capitalize">{ticket.category}</span>
+                  <Label className="text-xs text-slate-500 mb-1 block">Assigned To</Label>
+                  <Select
+                    value={ticket.assignedTo || 'unassigned'}
+                    onValueChange={(v) => updateTicket.mutate({ assignedTo: v === 'unassigned' ? null : v })}
+                  >
+                    <SelectTrigger className="w-full h-9">
+                      <SelectValue placeholder="Unassigned" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">
+                        <span className="text-slate-400">Unassigned</span>
+                      </SelectItem>
+                      {filterOptions?.admins?.map(a => (
+                        <SelectItem key={a.id} value={a.id}>
+                          <span className="flex items-center gap-1">
+                            <UserCheck className="h-3 w-3" />{a.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-slate-500 mb-1 block">Category</Label>
+                  <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-md border text-sm capitalize">
+                    <Tag className="h-3.5 w-3.5 text-slate-400" />
+                    {ticket.category}
+                  </div>
+                </div>
+
+                {/* SLA Info */}
+                {ticket.slaDeadline && (
+                  <div>
+                    <Label className="text-xs text-slate-500 mb-1 block">SLA Deadline</Label>
+                    <div className="text-sm text-slate-600">
+                      {format(new Date(ticket.slaDeadline), 'MMM d, h:mm a')}
+                      <div className="mt-0.5">
+                        <SlaIndicator deadline={ticket.slaDeadline} breached={ticket.slaBreached} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Response times */}
+                <div className="pt-2 border-t space-y-1.5 text-xs text-slate-500">
+                  <div className="flex justify-between">
+                    <span>First response</span>
+                    <span className="font-medium text-slate-700">
+                      {ticket.firstResponseAt
+                        ? formatDistanceToNow(new Date(ticket.firstResponseAt), { addSuffix: true })
+                        : 'Awaiting'}
+                    </span>
+                  </div>
+                  {ticket.resolvedAt && (
+                    <div className="flex justify-between">
+                      <span>Resolved</span>
+                      <span className="font-medium text-slate-700">
+                        {formatDistanceToNow(new Date(ticket.resolvedAt), { addSuffix: true })}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Replies</span>
+                    <span className="font-medium text-slate-700">{ticket.responseCount}</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Admin Notes */}
+            {/* Tags */}
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Internal Notes</CardTitle>
-                <CardDescription className="text-xs">
-                  Only visible to admin team
-                </CardDescription>
+              <CardHeader className="pb-2 pt-3 px-4">
+                <CardTitle className="text-sm font-medium">Tags</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="px-4 pb-3">
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {ticket.tags?.length > 0 ? ticket.tags.map(tag => (
+                    <Badge key={tag} variant="outline" className="text-xs">
+                      {tag}
+                      <button
+                        onClick={() => removeTag.mutate(tag)}
+                        className="ml-1 hover:text-red-500"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  )) : (
+                    <span className="text-xs text-slate-400">No tags</span>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  <Input
+                    placeholder="Add tag..."
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    className="h-8 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newTag.trim()) {
+                        addTag.mutate(newTag.trim());
+                      }
+                    }}
+                  />
+                  <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => newTag.trim() && addTag.mutate(newTag.trim())}>
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Internal Notes */}
+            <Card>
+              <CardHeader className="pb-2 pt-3 px-4">
+                <CardTitle className="text-sm font-medium">Internal Notes</CardTitle>
+                <CardDescription className="text-xs">Only visible to admin team</CardDescription>
+              </CardHeader>
+              <CardContent className="px-4 pb-3 space-y-2">
                 <Textarea
-                  placeholder="Add internal notes about this ticket..."
+                  placeholder="Add internal notes..."
                   value={adminNotes || ticket.adminNotes || ''}
                   onChange={(e) => setAdminNotes(e.target.value)}
-                  rows={4}
+                  rows={3}
                   className="resize-none text-sm"
                 />
                 <Button
                   variant="secondary"
-                  onClick={() => updateTicket.mutate({ adminNotes })}
-                  disabled={updateTicket.isPending}
                   size="sm"
                   className="w-full"
+                  onClick={() => updateTicket.mutate({ adminNotes })}
+                  disabled={updateTicket.isPending}
                 >
                   {updateTicket.isPending ? 'Saving...' : 'Save Notes'}
                 </Button>
@@ -632,21 +1245,19 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
             {/* User Info */}
             {user && (
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">User Info</CardTitle>
+                <CardHeader className="pb-2 pt-3 px-4">
+                  <CardTitle className="text-sm font-medium">User Info</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2 text-sm">
+                <CardContent className="px-4 pb-3 space-y-2 text-sm">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-slate-400" />
                     <span className="text-slate-700">{user.name}</span>
                   </div>
-                  <div className="text-slate-500 pl-6">
-                    {user.email}
-                  </div>
+                  <div className="text-slate-500 pl-6">{user.email}</div>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-full mt-3"
+                    className="w-full mt-2"
                     onClick={() => setLocation(`/admin/users/${user.id}`)}
                   >
                     View User Profile
@@ -661,10 +1272,440 @@ function SupportTicketDetailView({ ticketId }: { ticketId: string }) {
   );
 }
 
+// ── AI Draft Types ─────────────────────────────────────────────────────
+
+interface AiDraft {
+  id: string;
+  source: 'ticket' | 'live_chat';
+  sourceId: string;
+  userId: string | null;
+  summary: string;
+  draftResponse: string;
+  editedResponse: string | null;
+  status: 'pending' | 'approved' | 'edited' | 'dismissed';
+  model: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  metadata: {
+    subject?: string;
+    category?: string;
+    priority?: string;
+    guestEmail?: string;
+    guestName?: string;
+    messageCount?: number;
+    lastCustomerMessage?: string;
+  } | null;
+  createdAt: string;
+  userName: string | null;
+  userEmail: string | null;
+}
+
+interface AiDraftStats {
+  pending: number;
+  approved: number;
+  edited: number;
+  dismissed: number;
+  total: number;
+  openTickets: number;
+  waitingChats: number;
+}
+
+const draftStatusConfig: Record<string, { label: string; color: string; icon: typeof CheckCircle2 }> = {
+  pending: { label: 'Pending Review', color: 'bg-amber-100 text-amber-800', icon: Clock },
+  approved: { label: 'Approved & Sent', color: 'bg-green-100 text-green-800', icon: CheckCircle2 },
+  edited: { label: 'Edited & Sent', color: 'bg-blue-100 text-blue-800', icon: Edit3 },
+  dismissed: { label: 'Dismissed', color: 'bg-gray-100 text-gray-600', icon: XCircle },
+};
+
+// ── AI Drafts Panel ────────────────────────────────────────────────────
+
+function AiDraftsPanel() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  const [draftTab, setDraftTab] = useState('pending');
+  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedText, setEditedText] = useState('');
+
+  const { data: stats } = useQuery<AiDraftStats>({
+    queryKey: ['/api/admin/ai-support-agent/stats'],
+    refetchInterval: 30000,
+  });
+
+  const { data: draftsData, isLoading: draftsLoading } = useQuery<{ drafts: AiDraft[] }>({
+    queryKey: ['/api/admin/ai-support-agent/drafts', draftTab],
+    queryFn: async () => {
+      const params = draftTab !== 'all' ? `?status=${draftTab}` : '';
+      const res = await apiRequest('GET', `/api/admin/ai-support-agent/drafts${params}`);
+      return res.json();
+    },
+  });
+
+  const scanMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/admin/ai-support-agent/run');
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: 'AI scan complete',
+        description: `${data.ticketDrafts} ticket drafts, ${data.chatDrafts} chat drafts created`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ai-support-agent'] });
+    },
+    onError: () => toast({ title: 'Scan failed', variant: 'destructive' }),
+  });
+
+  const { data: draftDetail } = useQuery({
+    queryKey: ['/api/admin/ai-support-agent/drafts', selectedDraftId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/admin/ai-support-agent/drafts/${selectedDraftId}`);
+      return res.json();
+    },
+    enabled: !!selectedDraftId,
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('POST', `/api/admin/ai-support-agent/drafts/${id}/approve`);
+    },
+    onSuccess: () => {
+      toast({ title: 'Draft approved and sent!' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ai-support-agent'] });
+      invalidateTickets(queryClient);
+      setSelectedDraftId(null);
+    },
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async ({ id, text }: { id: string; text: string }) => {
+      await apiRequest('POST', `/api/admin/ai-support-agent/drafts/${id}/edit`, { editedResponse: text });
+    },
+    onSuccess: () => {
+      toast({ title: 'Edited response sent!' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ai-support-agent'] });
+      invalidateTickets(queryClient);
+      setSelectedDraftId(null);
+      setIsEditing(false);
+    },
+  });
+
+  const dismissMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('POST', `/api/admin/ai-support-agent/drafts/${id}/dismiss`);
+    },
+    onSuccess: () => {
+      toast({ title: 'Draft dismissed' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ai-support-agent'] });
+      setSelectedDraftId(null);
+    },
+  });
+
+  const drafts = draftsData?.drafts || [];
+
+  // Detail view for a selected draft
+  if (selectedDraftId && draftDetail?.draft) {
+    const draft = draftDetail.draft as AiDraft;
+    const conversation = draftDetail.conversation as any[] | null;
+    const sourceDetails = draftDetail.sourceDetails as any;
+    const isPending = draft.status === 'pending';
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => { setSelectedDraftId(null); setIsEditing(false); }}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back to drafts
+          </Button>
+          <Badge className={draftStatusConfig[draft.status]?.color || ''}>
+            {draftStatusConfig[draft.status]?.label || draft.status}
+          </Badge>
+          {draft.model && <span className="text-xs text-slate-500">Model: {draft.model}</span>}
+        </div>
+
+        {/* Source info */}
+        <Card>
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              {draft.source === 'ticket' ? <HelpCircle className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
+              {draft.source === 'ticket' ? 'Support Ticket' : 'Live Chat (Escalated)'}
+            </CardTitle>
+            <CardDescription className="text-xs">
+              {draft.metadata?.subject || sourceDetails?.subject || 'No subject'}
+              {draft.metadata?.category && ` — ${draft.metadata.category}`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 text-sm">
+            <div className="grid grid-cols-2 gap-2">
+              <div><span className="text-slate-500">Customer:</span> {draft.userName || draft.metadata?.guestName || 'Unknown'}</div>
+              <div><span className="text-slate-500">Email:</span> {draft.userEmail || draft.metadata?.guestEmail || 'N/A'}</div>
+            </div>
+            {draft.source === 'ticket' && (
+              <Button variant="ghost" size="sm" className="px-0 mt-1 h-auto text-xs underline" onClick={() => setLocation(`/admin/support-tickets/${draft.sourceId}`)}>
+                Open full ticket →
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* AI Summary */}
+        <Card>
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-amber-500" /> AI Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 text-sm">{draft.summary}</CardContent>
+        </Card>
+
+        {/* Conversation */}
+        {conversation && conversation.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2 pt-3 px-4">
+              <CardTitle className="text-sm">Conversation History</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {draft.source === 'ticket' && sourceDetails?.description && (
+                  <div className="bg-blue-50 rounded-lg p-2.5 text-sm">
+                    <p className="text-xs font-medium text-blue-800 mb-1">Customer (Initial)</p>
+                    <p className="whitespace-pre-wrap">{sourceDetails.description}</p>
+                  </div>
+                )}
+                {conversation.map((msg: any, i: number) => {
+                  const isCustomer = draft.source === 'ticket' ? !msg.isStaff : msg.sender === 'user';
+                  return (
+                    <div key={i} className={`rounded-lg p-2.5 text-sm ${isCustomer ? 'bg-blue-50' : 'bg-green-50'}`}>
+                      <p className={`text-xs font-medium mb-1 ${isCustomer ? 'text-blue-800' : 'text-green-800'}`}>
+                        {isCustomer ? 'Customer' : 'Staff'}
+                      </p>
+                      <p className="whitespace-pre-wrap">{msg.message || msg.content}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* AI Draft */}
+        <Card className="border-2 border-amber-200">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Bot className="h-4 w-4 text-amber-600" /> AI-Drafted Response
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-3">
+            {isEditing ? (
+              <Textarea value={editedText} onChange={(e) => setEditedText(e.target.value)} rows={8} className="text-sm" />
+            ) : (
+              <div className="bg-amber-50 rounded-lg p-3 text-sm whitespace-pre-wrap">
+                {draft.editedResponse || draft.draftResponse}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Actions */}
+        {isPending && (
+          <div className="flex items-center gap-2 justify-end flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => dismissMutation.mutate(draft.id)} disabled={dismissMutation.isPending}>
+              <XCircle className="h-4 w-4 mr-1" /> Dismiss
+            </Button>
+            {isEditing ? (
+              <>
+                <Button variant="outline" size="sm" onClick={() => { setIsEditing(false); setEditedText(''); }}>Cancel</Button>
+                <Button size="sm" onClick={() => editMutation.mutate({ id: draft.id, text: editedText })} disabled={!editedText.trim() || editMutation.isPending}>
+                  <Send className="h-4 w-4 mr-1" /> Send Edited
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={() => { setEditedText(draft.draftResponse); setIsEditing(true); }}>
+                  <Edit3 className="h-4 w-4 mr-1" /> Edit
+                </Button>
+                <Button size="sm" onClick={() => approveMutation.mutate(draft.id)} disabled={approveMutation.isPending} className="bg-green-600 hover:bg-green-700">
+                  <CheckCircle2 className="h-4 w-4 mr-1" /> Approve & Send
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Stats row */}
+      {stats && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-amber-50 border rounded-lg p-3">
+            <div className="text-xs text-slate-500 mb-1">Pending Review</div>
+            <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
+          </div>
+          <div className="bg-green-50 border rounded-lg p-3">
+            <div className="text-xs text-slate-500 mb-1">Sent Today</div>
+            <div className="text-2xl font-bold text-green-600">{stats.approved + stats.edited}</div>
+          </div>
+          <div className="bg-slate-50 border rounded-lg p-3">
+            <div className="text-xs text-slate-500 mb-1">Dismissed</div>
+            <div className="text-2xl font-bold text-slate-600">{stats.dismissed}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Scan button */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1 bg-slate-100 rounded-md p-0.5">
+          {['pending', 'approved', 'edited', 'dismissed', 'all'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setDraftTab(tab)}
+              className={cn(
+                'px-2.5 py-1 text-xs rounded font-medium transition-colors capitalize',
+                draftTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        <Button size="sm" variant="outline" onClick={() => scanMutation.mutate()} disabled={scanMutation.isPending}>
+          <Play className="h-3.5 w-3.5 mr-1" />
+          {scanMutation.isPending ? 'Scanning...' : 'Run AI Scan'}
+        </Button>
+      </div>
+
+      {/* Draft list */}
+      {draftsLoading ? (
+        <div className="space-y-2">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+        </div>
+      ) : drafts.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Bot className="h-12 w-12 mx-auto text-slate-200 mb-3" />
+            <p className="text-sm text-slate-500">No {draftTab !== 'all' ? draftTab : ''} AI drafts</p>
+            <p className="text-xs text-slate-400 mt-1">Click "Run AI Scan" to generate drafts for open tickets & chats</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {drafts.map(draft => {
+            const conf = draftStatusConfig[draft.status];
+            const StatusIcon = conf?.icon || Clock;
+            return (
+              <Card key={draft.id} className="cursor-pointer hover:shadow-sm transition-shadow" onClick={() => setSelectedDraftId(draft.id)}>
+                <CardContent className="p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {draft.source === 'ticket' ? <HelpCircle className="h-3.5 w-3.5 text-blue-600" /> : <MessageSquare className="h-3.5 w-3.5 text-purple-600" />}
+                        <span className="text-[10px] font-medium text-slate-400 uppercase">{draft.source === 'ticket' ? 'Ticket' : 'Chat'}</span>
+                        {draft.metadata?.priority && (
+                          <Badge variant="outline" className="text-[10px] h-4">
+                            {draft.metadata.priority}
+                          </Badge>
+                        )}
+                      </div>
+                      <h4 className="font-semibold text-sm truncate">{draft.metadata?.subject || 'No subject'}</h4>
+                      <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{draft.summary}</p>
+                      <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-400">
+                        <span>{draft.userName || draft.metadata?.guestName || 'Unknown'}</span>
+                        <span>·</span>
+                        <span>{formatDistanceToNow(new Date(draft.createdAt), { addSuffix: true })}</span>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={`shrink-0 text-[10px] ${conf?.color || ''}`}>
+                      <StatusIcon className="h-3 w-3 mr-0.5" />
+                      {conf?.label || draft.status}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Wrapper with View Toggle ───────────────────────────────────────────
+
+function SupportTicketListWithViewToggle({ onSwitchToAI }: { onSwitchToAI: () => void }) {
+  const { data: stats } = useQuery<AiDraftStats>({
+    queryKey: ['/api/admin/ai-support-agent/stats'],
+    staleTime: 60000,
+  });
+
+  const viewToggle = (
+    <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+      <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-white text-slate-900 shadow-sm">
+        <Inbox className="h-4 w-4" />Ticket Queue
+      </button>
+      <button
+        onClick={onSwitchToAI}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-slate-600 hover:bg-white transition-colors relative"
+      >
+        <Bot className="h-4 w-4" />AI Drafts
+        {(stats?.pending ?? 0) > 0 && (
+          <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+            {stats!.pending}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+
+  return <SupportTicketList viewToggle={viewToggle} />;
+}
+
+// ── Entry Point ────────────────────────────────────────────────────────
+
 export default function AdminSupportTicketsPage({ ticketId }: { ticketId?: string }) {
+  const [view, setView] = useState<'queue' | 'ai-drafts'>('queue');
+
   if (ticketId) {
     return <SupportTicketDetailView ticketId={ticketId} />;
   }
 
-  return <SupportTicketList />;
+  if (view === 'ai-drafts') {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <div className="bg-white border-b sticky top-0 z-20">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                  <Bot className="h-6 w-6 text-amber-600" />
+                  AI Support Agent
+                </h1>
+                <p className="text-sm text-slate-500">Review AI-drafted responses before they're sent to customers</p>
+              </div>
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                <button
+                  onClick={() => setView('queue')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-slate-600 hover:bg-white transition-colors"
+                >
+                  <Inbox className="h-4 w-4" />Ticket Queue
+                </button>
+                <button
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-white text-slate-900 shadow-sm"
+                >
+                  <Bot className="h-4 w-4" />AI Drafts
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-4">
+          <AiDraftsPanel />
+        </div>
+      </div>
+    );
+  }
+
+  return <SupportTicketListWithViewToggle onSwitchToAI={() => setView('ai-drafts')} />;
 }

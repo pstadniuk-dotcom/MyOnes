@@ -402,6 +402,18 @@ export class LiveChatService {
     return session;
   }
 
+  async bulkDeleteSessions(sessionIds: string[]) {
+    return await liveChatRepository.bulkDeleteSessions(sessionIds);
+  }
+
+  async bulkCloseSessions(sessionIds: string[], closedBy: string) {
+    const count = await liveChatRepository.bulkCloseSessions(sessionIds, closedBy);
+    for (const id of sessionIds) {
+      liveChatEventBus.emitSessionClosed(id, closedBy);
+    }
+    return count;
+  }
+
   async getSessionHistory(userId: string) {
     return await liveChatRepository.getSessionHistory(userId);
   }

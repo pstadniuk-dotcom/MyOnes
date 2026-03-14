@@ -65,6 +65,7 @@ import AdminLiveChatsPage from "@/pages/admin/AdminLiveChatsPage";
 import AdminChatAnalyticsPage from "@/pages/admin/AdminChatAnalyticsPage";
 import AIUsagePage from "@/pages/admin/AIUsagePage";
 import PRAgentPage from "@/pages/admin/PRAgentPage";
+import AISupportAgentPage from "@/pages/admin/AISupportAgentPage";
 import { AdminLayout } from "@/shared/components/AdminLayout";
 
 // Import shared/public components
@@ -346,6 +347,13 @@ function MainRouter() {
         <ProtectedAdminRoute>
           <AdminLayout>
             <PRAgentPage />
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/ai-support-agent">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <AISupportAgentPage />
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>

@@ -74,7 +74,42 @@ TONE: ${template.toneGuidance}
 
 MAX LENGTH: ${template.maxLength} words for the body.
 
-CRITICAL: The subject line MUST be unique and specific to this prospect. Reference their show/publication name, a recent topic they covered, or a specific angle. NEVER use generic subject lines like "Why Your Multivitamin Is Probably Wrong" — create something fresh that would make THIS specific editor/host open the email.
+CRITICAL TONE RULES:
+- NEVER use words like "disrupt", "revolutionize", "game-changing", "groundbreaking", "cutting-edge"
+- NEVER claim to be "the first", "the best", or "the only"
+- NEVER reference market size ("$50B industry") or position yourself as an industry challenger
+- Lead with VALUE for their audience — what would listeners/readers get out of this?
+- Frame the ask as genuine curiosity: "exploring if there's interest" not demanding coverage
+- Be warm and human, not polished and corporate
+- It's OK to be brief and understated — less is more
+- NEVER use emojis (🎉 🚀 💪 etc.)
+- NEVER start with "Hey!" or "Hey there!" — use "Hi [Name]," or just "[Name],"
+
+❌ NEGATIVE EXAMPLE — this is EXACTLY the kind of pitch we do NOT want:
+"""
+Subject: 🚀 Disrupting the $50B Supplement Industry with AI
+
+Hey! 🎉 Pete here from ONES — we're revolutionizing personalized nutrition with cutting-edge AI technology! We've built the world's first AI health practitioner that creates custom supplement formulas. I'd LOVE to come on your show and share how we're changing the game. Our clinical-grade platform is truly groundbreaking and I think your audience would be blown away! Let me know when works for you!
+"""
+^ This is terrible because: emojis, "disrupting", "revolutionizing", "cutting-edge", "world's first", "$50B", demands coverage, self-congratulatory, generic, no audience value.
+
+✅ GOOD EXAMPLE TONE:
+"""
+Subject: Quick thought on a personalized nutrition segment
+
+Hi Sarah,
+
+I caught your recent episode with Dr. Patel on gut health — really appreciated how you broke down the microbiome research for a general audience.
+
+I run a small supplement company called ONES where we use lab results and health data to build custom formulas for each person. I think your listeners might find it interesting to hear how personalized supplementation actually works in practice — the real science, not the marketing.
+
+Happy to share more context if you're curious. Either way, keep up the great work on the show.
+
+Best,
+Pete
+"""
+
+The subject line MUST be specific to this prospect. Reference their show/publication or a topic relevant to them. Create something that feels personal, not mass-produced.
 
 OUTPUT FORMAT: Return a JSON object with exactly two keys:
 {
@@ -238,10 +273,30 @@ export async function batchDraftPitches(options: {
     limit: maxPitches,
   });
 
+  // Filter out prospects with no actionable contact method — 
+  // don't waste AI credits drafting pitches we can never send
+  const contactableProspects = prospects.filter(p => {
+    // No contact method at all
+    if (p.contactMethod === 'unknown' && !p.contactEmail && !p.contactFormUrl) {
+      logger.info(`[draft-pitch] Skipping "${p.name}" — no email or form (contactMethod: unknown)`);
+      return false;
+    }
+    // Has a "form" but no email and no actual form fields (likely a guidelines page)
+    if (p.contactMethod === 'form' && !p.contactEmail && (!p.formFields || p.formFields.length === 0)) {
+      logger.info(`[draft-pitch] Skipping "${p.name}" — form URL but no submission fields detected`);
+      return false;
+    }
+    return true;
+  });
+
+  if (contactableProspects.length < prospects.length) {
+    logger.info(`[draft-pitch] Filtered out ${prospects.length - contactableProspects.length} uncontactable prospects`);
+  }
+
   const pitched: DraftPitchResult[] = [];
   const errors: string[] = [];
 
-  for (const prospect of prospects) {
+  for (const prospect of contactableProspects) {
     try {
       const result = await draftPitch(prospect);
       pitched.push(result);
@@ -292,6 +347,17 @@ export async function rewritePitch(
       {
         role: 'system',
         content: `You are a PR pitch editor for a health-tech startup. You will receive an existing pitch email and instructions from the founder on what to change. Rewrite the pitch according to their instructions while keeping the core message and personalization intact.
+
+IMPORTANT TONE RULES:
+- NEVER use words like "disrupt", "revolutionize", "game-changing", "groundbreaking"
+- Lead with value for the recipient's audience, not self-promotion
+- Be warm, human, and low-pressure
+- Frame outreach as exploring interest, not demanding coverage
+- NEVER use emojis
+- NEVER start with "Hey!" — use "Hi [Name]," or just "[Name],"
+
+❌ NEGATIVE EXAMPLE — AVOID this style at all costs:
+"Hey! 🎉 Pete here from ONES — we're revolutionizing personalized nutrition with cutting-edge AI technology! Our clinical-grade platform is truly groundbreaking!"
 
 PROSPECT: ${prospect.name} (${prospect.category})
 FOUNDER: ${profile.name}, ${profile.title} at ${profile.company}

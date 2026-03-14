@@ -454,6 +454,12 @@ export default function MyFormulaPage() {
           description: 'Please review and acknowledge the safety warnings for this formula before proceeding.',
           variant: 'destructive',
         });
+      } else if (errorMessage.includes('MEDICAL_DISCLOSURE_NOT_ACKNOWLEDGED')) {
+        toast({
+          title: 'Medical Disclosure Required',
+          description: 'Please confirm that you have disclosed all medications, conditions, and allergies before proceeding.',
+          variant: 'destructive',
+        });
       } else {
         toast({
           title: 'Unable to continue to checkout',
@@ -1775,6 +1781,14 @@ export default function MyFormulaPage() {
               className="bg-primary hover:bg-primary/90"
               onClick={async () => {
                 try {
+                  // Record medical disclosure consent before checkout
+                  if (medDisclosureAcknowledged) {
+                    await apiRequest('POST', '/api/consents/grant', {
+                      consentType: 'medication_disclosure',
+                      consentVersion: '1.0',
+                      consentText: 'I have disclosed all medications, conditions, and allergies and will consult my physician before starting. Not medical advice; not evaluated by the FDA.',
+                    });
+                  }
                   await purchaseSmsOptInMutation.mutateAsync();
                   await checkoutSessionMutation.mutateAsync();
                 } catch {

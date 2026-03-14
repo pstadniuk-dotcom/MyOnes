@@ -13,6 +13,7 @@ import { startBlogGenerationScheduler } from "./utils/blogGenerationScheduler";
 import { startPrAgentScheduler } from "./utils/prAgentScheduler";
 import { startAutoShipScheduler } from "./utils/autoShipScheduler";
 import { startSmartReorderScheduler } from "./utils/smartReorderScheduler";
+import { startAiSupportAgentScheduler } from "./utils/aiSupportAgentScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
 
@@ -42,6 +43,7 @@ const cspDirectives = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: https: blob: https://platform-lookaside.fbsbx.com",
+  "media-src 'self' data: blob:",
   "connect-src 'self' https://api.openai.com https://api.anthropic.com https://accounts.google.com/gsi/ https://www.facebook.com https://web.facebook.com https://graph.facebook.com https://facebook.com wss: ws:",
   "frame-src 'self' https://www.youtube.com https://youtube.com https://accounts.google.com/ https://www.facebook.com https://web.facebook.com",
   "frame-ancestors 'none'",
@@ -257,6 +259,9 @@ app.use((req, res, next) => {
 
       // Start PR Agent scheduler (OFF by default — enabled via Admin → PR Agent Settings)
       startPrAgentScheduler();
+
+      // Start AI Support Agent scheduler (daily at 7:00 AM UTC — drafts responses for admin review)
+      startAiSupportAgentScheduler();
 
       // Note: Wearable data sync is now handled via Junction webhooks
       // No polling schedulers needed - data is pushed to /api/webhooks/junction

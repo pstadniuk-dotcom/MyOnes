@@ -6,18 +6,39 @@
  * 1. Detects all form fields on the page (including iframes)
  * 2. Uses AI to map prospect/founder data to form fields
  * 3. Fills the form fields
- * 4. Detects CAPTCHA and flags for manual completion
+ * 4. Auto-submits if no CAPTCHA detected (when autoSubmit=true)
  * 5. Takes screenshots at each stage for review
- *
- * IMPORTANT: Forms are filled but NOT submitted automatically.
- * Submission happens only after human review + CAPTCHA solve if needed.
+ * 6. Saves form answers to pitch record for audit trail
  */
-import { chromium, type Browser, type Page, type Frame } from 'playwright';
 import OpenAI from 'openai';
+import { join } from 'path';
+import { mkdirSync, existsSync } from 'fs';
 import logger from '../../../infra/logging/logger';
 import { getFounderProfile, type FounderProfile } from '../founder-context';
 import { agentRepository } from '../agent.repository';
 import type { OutreachProspect, OutreachPitch } from '@shared/schema';
+
+// Dynamic playwright import — it's a devDependency and may not be available in production
+type PlaywrightTypes = typeof import('playwright');
+let playwrightModule: PlaywrightTypes | null = null;
+async function getPlaywright(): Promise<PlaywrightTypes> {
+  if (!playwrightModule) {
+    try {
+      playwrightModule = await import('playwright');
+    } catch {
+      throw new Error(
+        'Playwright is not installed. Form filling requires Playwright. ' +
+        'Install it with: npm install playwright && npx playwright install chromium'
+      );
+    }
+  }
+  return playwrightModule;
+}
+
+// Use 'any' for browser types since playwright may not be available at import time
+type Browser = any;
+type Page = any;
+type Frame = any;
 
 export interface FormField {
   id: string;
@@ -34,6 +55,7 @@ export interface FormFillResult {
   fieldsFilled: number;
   hasCaptcha: boolean;
   hasIframe: boolean;
+  submitted: boolean;
   submitButtonText: string | null;
   fieldMappings: Array<{
     fieldLabel: string;
@@ -48,8 +70,9 @@ export interface FormFillResult {
 let browserInstance: Browser | null = null;
 
 async function getBrowser(): Promise<Browser> {
+  const pw = await getPlaywright();
   if (!browserInstance || !browserInstance.isConnected()) {
-    browserInstance = await chromium.launch({
+    browserInstance = await pw.chromium.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
@@ -64,8 +87,11 @@ export async function closeBrowser(): Promise<void> {
   }
 }
 
+const SCREENSHOTS_DIR = join(process.cwd(), 'data', 'form-screenshots');
+
 /**
- * Detect and fill a form for a prospect
+ * Detect and fill a form for a prospect.
+ * When autoSubmit is true and no CAPTCHA is detected, the form will be submitted.
  */
 export async function detectAndFillForm(
   prospect: OutreachProspect,
@@ -81,12 +107,18 @@ export async function detectAndFillForm(
   });
   const page = await context.newPage();
 
+  const screenshotDir = options.screenshotDir || SCREENSHOTS_DIR;
+  if (!existsSync(screenshotDir)) {
+    mkdirSync(screenshotDir, { recursive: true });
+  }
+
   const result: FormFillResult = {
     url: formUrl,
     fieldsDetected: 0,
     fieldsFilled: 0,
     hasCaptcha: false,
     hasIframe: false,
+    submitted: false,
     submitButtonText: null,
     fieldMappings: [],
     screenshotPath: null,
@@ -127,6 +159,13 @@ export async function detectAndFillForm(
 
     if (fields.length === 0) {
       result.errors.push('No form fields detected on page');
+      // Take screenshot of the empty page for debugging
+      const slug = (prospect.name || 'unknown').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      try {
+        const ssPath = join(screenshotDir, `${slug}-no-fields-${Date.now()}.png`);
+        await page.screenshot({ path: ssPath, fullPage: true });
+        result.screenshotPath = ssPath;
+      } catch { /* screenshot is best-effort */ }
       await context.close();
       return result;
     }
@@ -166,7 +205,50 @@ export async function detectAndFillForm(
     }
     await agentRepository.updatePitch(pitch.id, { formAnswers });
 
-    logger.info(`[form-filler] Filled ${result.fieldsFilled}/${result.fieldsDetected} fields on ${formUrl}`);
+    // Take screenshot of filled form (before submit)
+    const slug = (prospect.name || 'unknown').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    try {
+      const ssPath = join(screenshotDir, `${slug}-filled-${Date.now()}.png`);
+      await page.screenshot({ path: ssPath, fullPage: true });
+      result.screenshotPath = ssPath;
+      logger.info(`[form-filler] Screenshot saved: ${ssPath}`);
+      // Save filled screenshot path to pitch record
+      await agentRepository.updatePitch(pitch.id, { formScreenshotFilled: ssPath } as any);
+    } catch { /* screenshot is best-effort */ }
+
+    // Auto-submit if requested and no CAPTCHA
+    if (options.autoSubmit && !result.hasCaptcha && result.submitButtonText && result.fieldsFilled > 0) {
+      try {
+        logger.info(`[form-filler] Auto-submitting form on ${formUrl}`);
+        // Click submit button
+        const submitted = await clickSubmitButton(targetFrame);
+        if (submitted) {
+          // Wait for navigation or confirmation
+          await page.waitForTimeout(3000);
+          result.submitted = true;
+          logger.info(`[form-filler] Form submitted successfully on ${formUrl}`);
+
+          // Take post-submit screenshot
+          try {
+            const postPath = join(screenshotDir, `${slug}-submitted-${Date.now()}.png`);
+            await page.screenshot({ path: postPath, fullPage: true });
+            result.screenshotPath = postPath; // Update to post-submit screenshot
+            // Save submitted screenshot path to pitch record
+            await agentRepository.updatePitch(pitch.id, { formScreenshotSubmitted: postPath } as any);
+          } catch { /* best-effort */ }
+        } else {
+          result.errors.push('Submit button found but click failed');
+        }
+      } catch (err: any) {
+        result.errors.push(`Auto-submit failed: ${err.message}`);
+        logger.warn(`[form-filler] Auto-submit failed on ${formUrl}: ${err.message}`);
+      }
+    } else if (options.autoSubmit && result.hasCaptcha) {
+      result.errors.push('CAPTCHA detected — form filled but not submitted. Submit manually.');
+      logger.info(`[form-filler] CAPTCHA detected on ${formUrl}, skipping auto-submit`);
+    }
+
+    logger.info(`[form-filler] Filled ${result.fieldsFilled}/${result.fieldsDetected} fields on ${formUrl} (submitted: ${result.submitted})`);
 
   } catch (err: any) {
     logger.error(`[form-filler] Error on ${formUrl}: ${err.message}`);
@@ -197,6 +279,16 @@ async function extractFormFields(frame: Frame): Promise<FormField[]> {
       const input = el as HTMLInputElement;
       const type = input.type || input.tagName.toLowerCase();
       if (['hidden', 'submit', 'button', 'search', 'password'].includes(type)) return;
+
+      // Skip invisible fields (hidden signup forms, duplicate fields, etc.)
+      const style = window.getComputedStyle(input);
+      if (
+        style.display === 'none' ||
+        style.visibility === 'hidden' ||
+        style.opacity === '0' ||
+        input.offsetWidth === 0 ||
+        input.offsetHeight === 0
+      ) return;
 
       // Find the best label
       let label = '';
@@ -346,78 +438,152 @@ Return a JSON array of objects: [{ "fieldId": "...", "value": "..." }]`,
 }
 
 /**
- * Fill a single form field
+ * Fill a single form field — only targets visible elements.
+ * Uses Playwright's isVisible() API instead of frame.evaluate() to avoid
+ * esbuild __name() injection breaking in browser context.
  */
 async function fillField(frame: Frame, fieldId: string, value: string, fieldType: string): Promise<boolean> {
   try {
     // Build selector — try ID first, then name
-    const selector = fieldId.startsWith('field_')
+    const baseSelector = fieldId.startsWith('field_')
       ? `input:nth-of-type(${parseInt(fieldId.replace('field_', '')) + 1}), textarea:nth-of-type(${parseInt(fieldId.replace('field_', '')) + 1})`
       : `[id="${fieldId}"], [name="${fieldId}"]`;
 
-    const element = await frame.$(selector);
-    if (!element) {
+    // Find the first VISIBLE matching element using Playwright's locator API
+    let visibleElement: any = null;
+
+    // Try exact match first
+    const locator = frame.locator(baseSelector);
+    const count = await locator.count();
+    logger.info(`[form-filler] Field "${fieldId}" (${fieldType}): selector "${baseSelector}" found ${count} elements`);
+
+    for (let i = 0; i < count; i++) {
+      const el = locator.nth(i);
+      if (await el.isVisible({ timeout: 2000 }).catch(() => false)) {
+        visibleElement = el;
+        break;
+      }
+    }
+
+    if (!visibleElement) {
       // Try broader search
-      const altElement = await frame.$(`[id*="${fieldId}"], [name*="${fieldId}"]`);
-      if (!altElement) return false;
+      const altSelector = `[id*="${fieldId}"], [name*="${fieldId}"]`;
+      const altLocator = frame.locator(altSelector);
+      const altCount = await altLocator.count();
+      logger.info(`[form-filler] Field "${fieldId}": alt selector "${altSelector}" found ${altCount} elements`);
+
+      for (let i = 0; i < altCount; i++) {
+        const el = altLocator.nth(i);
+        if (await el.isVisible({ timeout: 2000 }).catch(() => false)) {
+          visibleElement = el;
+          break;
+        }
+      }
+      if (!visibleElement) {
+        logger.warn(`[form-filler] No visible element for field "${fieldId}"`);
+        return false;
+      }
     }
 
     if (fieldType === 'select' || fieldType === 'select-one') {
-      await frame.selectOption(selector, { label: value });
+      await visibleElement.selectOption({ label: value });
     } else if (fieldType === 'radio') {
       // Find the radio button with matching value/label
-      const radios = await frame.$$(`input[name="${fieldId}"]`);
-      for (const radio of radios) {
+      const radioLocator = frame.locator(`input[name="${fieldId}"]`);
+      const radioCount = await radioLocator.count();
+      for (let i = 0; i < radioCount; i++) {
+        const radio = radioLocator.nth(i);
         const radioValue = await radio.getAttribute('value');
-        const label = await radio.evaluate(el => el.nextElementSibling?.textContent?.trim() || el.parentElement?.textContent?.trim() || '');
-        if (radioValue === value || label?.toLowerCase().includes(value.toLowerCase())) {
-          await radio.click();
+        const labelText = await radio.evaluate((el: HTMLElement) => el.nextElementSibling?.textContent?.trim() || el.parentElement?.textContent?.trim() || '');
+        if (radioValue === value || labelText?.toLowerCase().includes(value.toLowerCase())) {
+          await radio.click({ timeout: 5000 });
           return true;
         }
       }
-      // Click first option as fallback
-      if (radios.length > 0) {
-        await radios[0].click();
+      if (radioCount > 0) {
+        await radioLocator.first().click({ timeout: 5000 });
         return true;
       }
       return false;
     } else if (fieldType === 'checkbox') {
       if (value.toLowerCase() === 'true' || value.toLowerCase() === 'yes') {
-        const isChecked = await frame.$eval(selector, (el) => (el as HTMLInputElement).checked);
+        const isChecked = await visibleElement.isChecked().catch(() => false);
         if (!isChecked) {
-          await frame.click(selector);
+          await visibleElement.click({ timeout: 5000 });
         }
       }
     } else {
-      // Text/textarea — clear and type
-      await frame.click(selector, { clickCount: 3 }); // Select all
-      await frame.fill(selector, value);
+      // Text/textarea — clear and fill
+      await visibleElement.click({ clickCount: 3, timeout: 5000 }); // Select all
+      await visibleElement.fill(value);
     }
 
+    logger.info(`[form-filler] Filled field "${fieldId}" with "${value.substring(0, 50)}..."`);
     return true;
   } catch (err: any) {
-    logger.debug(`[form-filler] Could not fill field "${fieldId}": ${err.message}`);
+    logger.warn(`[form-filler] Could not fill field "${fieldId}": ${err.message}`);
     return false;
   }
 }
 
 /**
- * Detect CAPTCHA on the page
+ * Click the submit button on the form — uses Playwright locator API
+ * instead of frame.evaluate() to avoid esbuild __name() injection issues.
+ */
+async function clickSubmitButton(frame: Frame): Promise<boolean> {
+  // Priority 1: actual submit buttons (visible)
+  for (const selector of ['button[type="submit"]', 'input[type="submit"]']) {
+    const els = frame.locator(selector);
+    const count = await els.count();
+    for (let i = 0; i < count; i++) {
+      const el = els.nth(i);
+      if (await el.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await el.click({ timeout: 5000 });
+        return true;
+      }
+    }
+  }
+
+  // Priority 2: buttons with submit-like text (visible)
+  for (const text of ['Submit', 'Send', 'Apply', 'Request', 'Pitch me']) {
+    const btn = frame.locator(`button:has-text("${text}"), [role="button"]:has-text("${text}")`).first();
+    if (await btn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await btn.click({ timeout: 5000 });
+      return true;
+    }
+  }
+
+  // Priority 3: JotForm-specific submit
+  for (const selector of ['.form-submit-button', '#input_2']) {
+    const el = frame.locator(selector).first();
+    if (await el.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await el.click({ timeout: 5000 });
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Detect CAPTCHA on the page — checks for actual CAPTCHA widgets, not just
+ * the word "captcha" in scripts/comments which causes false positives.
  */
 async function detectCaptcha(page: Page): Promise<boolean> {
   return page.evaluate(() => {
-    const html = document.documentElement.innerHTML.toLowerCase();
-    return (
-      html.includes('recaptcha') ||
-      html.includes('hcaptcha') ||
-      html.includes('captcha') ||
-      html.includes('g-recaptcha') ||
-      html.includes('cf-turnstile') ||
+    // Check for actual CAPTCHA widget elements (not HTML string includes)
+    const hasCaptchaWidget = (
       !!document.querySelector('iframe[src*="recaptcha"]') ||
       !!document.querySelector('iframe[src*="hcaptcha"]') ||
+      !!document.querySelector('iframe[src*="turnstile"]') ||
       !!document.querySelector('.g-recaptcha') ||
-      !!document.querySelector('[data-sitekey]')
+      !!document.querySelector('.h-captcha') ||
+      !!document.querySelector('[data-sitekey]') ||
+      !!document.querySelector('#cf-turnstile') ||
+      !!document.querySelector('[data-hcaptcha-widget-id]') ||
+      !!document.querySelector('.cf-turnstile')
     );
+    return hasCaptchaWidget;
   });
 }
 

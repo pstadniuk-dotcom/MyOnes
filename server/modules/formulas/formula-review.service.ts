@@ -174,9 +174,16 @@ export class FormulaReviewService {
         userId: string,
         reasons: string[],
         daysUntilRenewal?: number,
+        gateResult?: { emailAllowed: boolean; smsAllowed: boolean },
     ): Promise<void> {
         const user = await usersRepository.getUser(userId);
         if (!user) return;
+
+        // Import gate lazily to avoid circular deps
+        const { notificationGate } = await import('../notifications/notification-gate.service');
+
+        const emailAllowed = gateResult?.emailAllowed ?? true;
+        const smsAllowed = gateResult?.smsAllowed ?? true;
 
         const frontendUrl = getFrontendUrl();
         const reviewUrl = `${frontendUrl}/dashboard`;
@@ -185,34 +192,38 @@ export class FormulaReviewService {
             ? `<p>Your next subscription renewal is in <strong>${daysUntilRenewal} day${daysUntilRenewal === 1 ? '' : 's'}</strong> — now is a great time to make sure your formula is up to date.</p>`
             : '';
 
-        await sendNotificationEmail({
-            to: user.email,
-            subject: 'Your Ones formula may need a review',
-            title: 'Formula Review Recommended',
-            content: `
-                <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
-                <p>Based on changes in your health data, we recommend reviewing your personalized formula.</p>
-                <p><strong>What we noticed:</strong></p>
-                <ul>${reasons.map(r => `<li>${r}</li>`).join('')}</ul>
-                ${renewalNote}
-                <p>Log in to review your Health Pulse data, upload any new blood tests, and chat with your AI practitioner to fine-tune your formula.</p>
-            `,
-            actionUrl: reviewUrl,
-            actionText: 'Review Your Formula',
-            type: 'formula_update',
-        });
+        if (emailAllowed) {
+            await sendNotificationEmail({
+                to: user.email,
+                subject: 'Your Ones formula may need a review',
+                title: 'Formula Review Recommended',
+                content: `
+                    <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
+                    <p>Based on changes in your health data, we recommend reviewing your personalized formula.</p>
+                    <p><strong>What we noticed:</strong></p>
+                    <ul>${reasons.map(r => `<li>${r}</li>`).join('')}</ul>
+                    ${renewalNote}
+                    <p>Log in to review your Health Pulse data, upload any new blood tests, and chat with your AI practitioner to fine-tune your formula.</p>
+                `,
+                actionUrl: reviewUrl,
+                actionText: 'Review Your Formula',
+                type: 'formula_update',
+            });
+            await notificationGate.record(userId, 'formula_review', 'formula_drift', 'email', { daysUntilRenewal });
+        }
 
-        if (user.phone) {
+        if (smsAllowed && user.phone) {
             if (await consentsRepository.getUserConsent(user.id, 'sms_accountability')) {
                 await sendNotificationSms({
                     to: user.phone,
                     message: `Your health data suggests your Ones formula may need updating${daysUntilRenewal ? ` — your next renewal is in ${daysUntilRenewal} days` : ''}. Review: ${reviewUrl}`,
                     type: 'formula_update',
                 });
+                await notificationGate.record(userId, 'formula_review', 'formula_drift', 'sms', { daysUntilRenewal });
             }
         }
 
-        logger.info('Formula review notification sent', { userId, reasons, daysUntilRenewal });
+        logger.info('Formula review notification sent', { userId, reasons, daysUntilRenewal, emailAllowed, smsAllowed });
     }
 }
 

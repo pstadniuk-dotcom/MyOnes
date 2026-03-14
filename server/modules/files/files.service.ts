@@ -7,6 +7,7 @@ import { usersRepository } from '../users/users.repository';
 import { sendNotificationEmail } from '../../utils/emailService';
 import logger from '../../infra/logging/logger';
 import { type InsertFileUpload } from '@shared/schema';
+import { systemRepository } from '../system/system.repository';
 
 export class FilesService {
     private objectStorageService: ObjectStorageService;
@@ -26,14 +27,19 @@ export class FilesService {
         return fileUpload;
     }
 
-    async downloadFile(fileId: string, userId: string) {
+    async downloadFile(fileId: string, userId: string, auditInfo?: { ipAddress?: string; userAgent?: string }) {
         const fileUpload = await this.getFile(fileId, userId);
         const objectPath = fileUpload.objectPath;
         const buffer = await this.objectStorageService.getLabReportFile(objectPath, userId);
 
         if (!buffer) {
+            // Log failed download
+            this.logFileAudit(userId, fileId, 'download', objectPath, false, 'Failed to download file from storage', auditInfo);
             throw new Error('Failed to download file from storage');
         }
+
+        // Log successful download
+        this.logFileAudit(userId, fileId, 'download', objectPath, true, undefined, auditInfo);
 
         return {
             buffer,
@@ -211,6 +217,14 @@ export class FilesService {
             })();
         }
 
+        // Log successful upload
+        this.logFileAudit(userId, fileUpload.id, 'upload', normalizedPath, true, undefined, auditInfo, {
+            originalFileName: uploadedFile.name,
+            fileType: fileType,
+            fileSize: uploadedFile.size,
+            mimeType: uploadedFile.mimetype,
+        });
+
         return {
             id: fileUpload.id,
             name: uploadedFile.name,
@@ -296,6 +310,14 @@ export class FilesService {
                 }
             })();
         }
+
+        // Log file update (replacement upload)
+        this.logFileAudit(userId, fileId, 'upload', normalizedPath, true, undefined, auditInfo, {
+            originalFileName: uploadedFile.name,
+            fileSize: uploadedFile.size,
+            mimeType: uploadedFile.mimetype,
+            replacedPath: oldObjectPath,
+        });
 
         return {
             id: fileId,
@@ -402,25 +424,34 @@ export class FilesService {
         return { queued: true, status: 'processing' as const };
     }
 
-    async deleteFile(fileId: string, userId: string) {
+    async deleteFile(fileId: string, userId: string, auditInfo?: { ipAddress?: string; userAgent?: string }) {
         const fileUpload = await filesRepository.getFileUpload(fileId);
         if (!fileUpload) throw new Error('File not found');
-        if (fileUpload.userId !== userId) throw new Error('Access denied');
+        if (fileUpload.userId !== userId) {
+            this.logFileAudit(userId, fileId, 'access_denied', fileUpload.objectPath, false, 'Access denied on delete', auditInfo);
+            throw new Error('Access denied');
+        }
 
         const deletedFromStorage = await this.objectStorageService.secureDeleteLabReport(fileUpload.objectPath, userId);
         const deleted = await filesRepository.softDeleteFileUpload(fileId, userId);
 
         if (!deleted || !deletedFromStorage) {
+            this.logFileAudit(userId, fileId, 'delete', fileUpload.objectPath, false, 'Failed to delete file', auditInfo);
             throw new Error('Failed to delete file');
         }
+
+        // Log successful deletion
+        this.logFileAudit(userId, fileId, 'delete', fileUpload.objectPath, true, undefined, auditInfo, {
+            originalFileName: fileUpload.originalFileName,
+        });
         return true;
     }
 
-    async bulkDeleteFiles(fileIds: string[], userId: string) {
+    async bulkDeleteFiles(fileIds: string[], userId: string, auditInfo?: { ipAddress?: string; userAgent?: string }) {
         const results: { id: string; success: boolean; error?: string }[] = [];
         for (const fileId of fileIds) {
             try {
-                await this.deleteFile(fileId, userId);
+                await this.deleteFile(fileId, userId, auditInfo);
                 results.push({ id: fileId, success: true });
             } catch (error) {
                 const message = error instanceof Error ? error.message : 'Unknown error';
@@ -428,6 +459,35 @@ export class FilesService {
             }
         }
         return results;
+    }
+
+    /**
+     * Non-fatal audit log helper — writes to audit_logs table for HIPAA compliance.
+     * Never throws; failures are logged but won't break file operations.
+     */
+    private logFileAudit(
+        userId: string,
+        fileId: string,
+        action: 'upload' | 'view' | 'download' | 'delete' | 'share' | 'access_denied',
+        objectPath: string,
+        success: boolean,
+        errorMessage?: string,
+        auditInfo?: { ipAddress?: string; userAgent?: string },
+        metadata?: Record<string, any>,
+    ): void {
+        systemRepository.createAuditLog({
+            userId,
+            fileId,
+            action,
+            objectPath,
+            success,
+            errorMessage: errorMessage || null,
+            ipAddress: auditInfo?.ipAddress || null,
+            userAgent: auditInfo?.userAgent || null,
+            metadata: metadata || null,
+        }).catch((err) => {
+            logger.error('Failed to write file audit log', { err, action, fileId, userId });
+        });
     }
 }
 

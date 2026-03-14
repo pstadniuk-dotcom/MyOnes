@@ -21,6 +21,7 @@ export class AuthController {
             const { user, token } = await authService.signup(req.body, clientIP, clientUserAgent);
 
             logger.info('Signup success', { userId: user.id, duration: `${Date.now() - startTime}ms` });
+            logAuthEvent(req, { userId: user.id, email: user.email, action: 'signup', provider: 'email', success: true });
 
             res.status(201).json({
                 user: {
@@ -36,6 +37,7 @@ export class AuthController {
             });
         } catch (error: any) {
             logger.error('Signup error', { error: error.message });
+            logAuthEvent(req, { email: req.body?.email || 'unknown', action: 'signup', provider: 'email', success: false, failureReason: error.message });
             if (error.name === 'ZodError') {
                 return res.status(400).json({ error: 'Validation failed', details: error.errors });
             }
@@ -152,6 +154,8 @@ export class AuthController {
     }
 
     async logout(req: Request, res: Response) {
+        const userId = (req as any).userId;
+        logAuthEvent(req, { userId, email: 'n/a', action: 'logout', provider: 'email', success: true });
         res.json({ message: 'Logged out successfully' });
     }
 
@@ -200,10 +204,12 @@ export class AuthController {
             }
 
             await authService.forgotPassword(email);
+            logAuthEvent(req, { email, action: 'password_reset', provider: 'email', success: true });
 
             res.json({ message: 'If an account exists with this email, a password reset link has been sent.' });
         } catch (error) {
             logger.error('Forgot password error', { error });
+            logAuthEvent(req, { email: req.body?.email || 'unknown', action: 'password_reset', provider: 'email', success: false, failureReason: 'server_error' });
             res.status(500).json({ error: 'Failed to process password reset request' });
         }
     }
@@ -214,10 +220,12 @@ export class AuthController {
             if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
 
             await authService.resetPassword(token, password);
+            logAuthEvent(req, { email: 'token-based', action: 'password_reset', provider: 'email', success: true });
 
             res.json({ message: 'Password reset successful. You can now log in with your new password.' });
         } catch (error: any) {
             logger.error('Reset password error', { error: error.message });
+            logAuthEvent(req, { email: 'token-based', action: 'password_reset', provider: 'email', success: false, failureReason: error.message });
             res.status(400).json({ error: error.message });
         }
     }
@@ -229,6 +237,8 @@ export class AuthController {
 
             const user = await authService.verifyEmail(token);
             if (!user) return res.status(400).json({ error: 'Verification failed' });
+
+            logAuthEvent(req, { userId: user.id, email: user.email, action: 'signup', provider: 'email', success: true });
 
             res.json({
                 message: 'Email verified successfully',
