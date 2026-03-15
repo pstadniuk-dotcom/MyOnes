@@ -21,6 +21,7 @@ export const prAgentConfigSchema = z.object({
   // Search tuning
   maxProspectsPerRun: z.number().int().min(1).max(100).optional(),
   minRelevanceScore: z.number().int().min(0).max(100).optional(),
+  minAudienceSize: z.number().int().min(0).optional(),
   searchQueries: z.object({
     podcast: z.array(z.string()).optional(),
     press: z.array(z.string()).optional(),
@@ -54,6 +55,7 @@ export interface PrAgentConfig {
   // Search tuning
   maxProspectsPerRun: number;     // how many prospects to find per scan
   minRelevanceScore: number;      // 0-100, discard below this
+  minAudienceSize: number;        // minimum estimated audience, skip below this
   searchQueries: {
     podcast?: string[];
     press?: string[];
@@ -84,7 +86,8 @@ const DEFAULT_CONFIG: PrAgentConfig = {
   pitchCron: '0 7 * * 1,4',     // 1 hour after scan
 
   maxProspectsPerRun: 20,
-  minRelevanceScore: 50,
+  minRelevanceScore: 60,
+  minAudienceSize: 5000,     // skip prospects below 5K followers/listeners
   searchQueries: {
     podcast: [
       'health supplement founder podcast guest application',

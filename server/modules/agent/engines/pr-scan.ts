@@ -17,6 +17,7 @@ import { scoreProspect, type ScoreResult } from '../tools/score-prospect';
 import { getSearchQueries } from '../queries/search-queries';
 import logger from '../../../infra/logging/logger';
 import type { InsertOutreachProspect } from '@shared/schema';
+import OpenAI from 'openai';
 
 /** Valid sub-type enum values — must match the outreach_sub_type PG enum */
 const VALID_SUB_TYPES = new Set([
@@ -37,6 +38,87 @@ function sanitizeSubType(subType: string | undefined | null): string | null {
   if (normalized.includes('expert') || normalized === 'source') return 'expert_source';
   logger.warn(`[pr-scan] Unknown subType "${subType}", defaulting to null`);
   return null;
+}
+
+/**
+ * Parse an audience estimate string into a numeric value.
+ * Handles formats like "50K", "1.2M", "10,000 followers", "~25K listeners", etc.
+ * Returns 0 if unparseable.
+ */
+function parseAudienceSize(estimate: string | null | undefined): number {
+  if (!estimate) return 0;
+  const cleaned = estimate.replace(/[,\s]/g, '').toLowerCase();
+  const match = cleaned.match(/([\d.]+)\s*(k|m|b|thousand|million|billion)?/);
+  if (!match) return 0;
+  let num = parseFloat(match[1]);
+  const suffix = match[2];
+  if (suffix === 'k' || suffix === 'thousand') num *= 1_000;
+  else if (suffix === 'm' || suffix === 'million') num *= 1_000_000;
+  else if (suffix === 'b' || suffix === 'billion') num *= 1_000_000_000;
+  return Math.round(num);
+}
+
+/**
+ * Contact enrichment — when initial scrape finds no contact info,
+ * do a targeted OpenAI web search for the prospect's contact/submit page.
+ */
+async function enrichContact(prospectName: string, prospectUrl: string, category: string): Promise<{
+  email: string | null;
+  formUrl: string | null;
+}> {
+  try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const domain = new URL(prospectUrl).hostname.replace(/^www\./, '');
+    const query = category === 'podcast'
+      ? `"${prospectName}" OR site:${domain} contact email submit guest application pitch`
+      : `"${prospectName}" OR site:${domain} contact email editorial submissions pitch press`;
+
+    logger.info(`[contact-enrich] Searching: "${query.substring(0, 60)}..."`);
+
+    const response = await openai.responses.create({
+      model: 'gpt-4o',
+      tools: [{ type: 'web_search_preview' as any }],
+      input: [
+        {
+          role: 'system',
+          content: `You are finding the contact email or guest submission form for "${prospectName}". Return ONLY a JSON object: {"email": "found@email.com", "formUrl": "https://..."} — use null for any you can't find. Only return REAL emails/URLs you find in search results.`,
+        },
+        {
+          role: 'user',
+          content: `Find the contact email address or guest pitch / submission form URL for: ${prospectName} (${prospectUrl}).\n\nSearch query: ${query}`,
+        },
+      ],
+    });
+
+    let textOutput = '';
+    for (const item of response.output) {
+      if (item.type === 'message') {
+        for (const c of item.content) {
+          if ((c as any).type === 'text') textOutput += (c as any).text;
+        }
+      }
+    }
+    if (!textOutput && (response as any).output_text) {
+      textOutput = (response as any).output_text;
+    }
+
+    const jsonMatch = textOutput.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, textOutput];
+    const parsed = JSON.parse(jsonMatch[1]?.trim() || '{}');
+
+    const email = parsed.email && parsed.email.includes('@') ? parsed.email : null;
+    const formUrl = parsed.formUrl && parsed.formUrl.startsWith('http') ? parsed.formUrl : null;
+
+    if (email || formUrl) {
+      logger.info(`[contact-enrich] Found for "${prospectName}": email=${email || 'none'}, form=${formUrl ? 'yes' : 'none'}`);
+    } else {
+      logger.info(`[contact-enrich] No contact info found for "${prospectName}"`);
+    }
+
+    return { email, formUrl };
+  } catch (err: any) {
+    logger.warn(`[contact-enrich] Enrichment failed for "${prospectName}": ${err.message}`);
+    return { email: null, formUrl: null };
+  }
 }
 
 export interface ScanResult {
@@ -169,19 +251,47 @@ export async function runPrScan(options: {
           continue;
         }
 
+        // Skip if below minimum audience size
+        const audienceNum = parseAudienceSize(result.audienceEstimate);
+        if (config.minAudienceSize > 0 && audienceNum > 0 && audienceNum < config.minAudienceSize) {
+          logger.info(`[pr-scan] Skipping "${result.name}" — audience too small (${audienceNum.toLocaleString()} < ${config.minAudienceSize.toLocaleString()})`);
+          continue;
+        }
+
         // Merge contact info
-        const contactEmail = scrapeResult?.emails?.[0] || result.contactEmail || null;
-        const contactFormUrl = scrapeResult?.formUrl || result.contactFormUrl || null;
+        let contactEmail = scrapeResult?.emails?.[0] || result.contactEmail || null;
+        let contactFormUrl = scrapeResult?.formUrl || result.contactFormUrl || null;
 
         // Determine contact method
         let contactMethod: 'email' | 'form' | 'dm' | 'unknown' = 'unknown';
         if (contactEmail) contactMethod = 'email';
         else if (contactFormUrl || scrapeResult?.hasGuestForm) contactMethod = 'form';
 
+        // ── Contact Enrichment ── If no contact found, try a targeted search
+        if (contactMethod === 'unknown') {
+          logger.info(`[pr-scan] No contact for "${result.name}" — running enrichment search...`);
+          const enriched = await enrichContact(result.name, result.url, result.category);
+          if (enriched.email) {
+            contactEmail = enriched.email;
+            contactMethod = 'email';
+          } else if (enriched.formUrl) {
+            contactFormUrl = enriched.formUrl;
+            contactMethod = 'form';
+            // Deep scrape the form URL to get fields
+            try {
+              const formScrape = await executeDeepScrape(enriched.formUrl);
+              if (formScrape?.formFields?.length) {
+                scrapeResult = { ...scrapeResult!, formFields: formScrape.formFields, formUrl: enriched.formUrl };
+              }
+            } catch { /* proceed without form fields */ }
+          }
+          await sleep(1000); // rate limit
+        }
+
         // Skip prospects with no actionable contact method —
         // no point saving a lead we can't actually reach
         if (contactMethod === 'unknown') {
-          logger.info(`[pr-scan] Skipping "${result.name}" — no email or submission form found`);
+          logger.info(`[pr-scan] Skipping "${result.name}" — no contact found even after enrichment`);
           continue;
         }
 
