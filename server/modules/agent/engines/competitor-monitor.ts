@@ -12,16 +12,23 @@ import type { InsertOutreachProspect } from '@shared/schema';
 
 // Competitors in the personalized supplement / health-tech space
 const DEFAULT_COMPETITORS = [
+  // Supplement brands
   'AG1',
   'Athletic Greens',
   'Ritual',
-  'Care/of',
   'Huel',
   'Rootine',
-  'Baze',
   'Persona Nutrition',
   'Gainful',
-  'Elo Health',
+  'Viome',
+  'Tony Robbins supplements',
+  // Blood testing / personalized health
+  'Function Health',
+  'Rythm Health',
+  'Superpower Health',
+  'InsideTracker',
+  'Marek Health',
+  'SteadyMD',
 ];
 
 interface CompetitorAppearance {
