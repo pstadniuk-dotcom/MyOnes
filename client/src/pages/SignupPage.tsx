@@ -36,6 +36,7 @@ export default function SignupPage() {
       password: '',
       confirmPassword: '',
       acceptedTerms: undefined as unknown as true,
+      ageConfirmed: undefined as unknown as true,
     }
   });
 
@@ -227,6 +228,30 @@ export default function SignupPage() {
                           <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
                           {' '}and{' '}
                           <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
+                        </label>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="ageConfirmed"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-start gap-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === true}
+                            onCheckedChange={(checked) => field.onChange(checked === true ? true : undefined)}
+                            id="ageConfirmed"
+                            className="mt-0.5"
+                            data-testid="checkbox-age"
+                          />
+                        </FormControl>
+                        <label htmlFor="ageConfirmed" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                          I confirm I am 18 years of age or older
                         </label>
                       </div>
                       <FormMessage />

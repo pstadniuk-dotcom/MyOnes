@@ -19,6 +19,9 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export class AuthService {
     async signup(data: any, ipAddress?: string | null, userAgent?: string | null) {
+        if (!data.ageConfirmed) {
+            throw new Error('You must confirm you are 18 or older to create an account');
+        }
         const validatedData = signupSchema.parse(data);
 
         // Check if user already exists
@@ -78,17 +81,24 @@ export class AuthService {
 
         // Record referral event if this user was referred
         if (referredByUserId && data.referralCode) {
-            try {
-                const { db } = await import('../../infra/db/db');
-                const { referralEvents } = await import('@shared/schema');
-                await db.insert(referralEvents).values({
-                    referrerUserId: referredByUserId,
-                    referredUserId: user.id,
+            if (referredByUserId === user.id) {
+                logger.warn('Self-referral detected — skipping referral event creation', {
+                    userId: user.id,
                     referralCode: data.referralCode,
-                    eventType: 'signup',
                 });
-            } catch (err) {
-                logger.warn('Failed to record referral event', { error: err });
+            } else {
+                try {
+                    const { db } = await import('../../infra/db/db');
+                    const { referralEvents } = await import('@shared/schema');
+                    await db.insert(referralEvents).values({
+                        referrerUserId: referredByUserId,
+                        referredUserId: user.id,
+                        referralCode: data.referralCode,
+                        eventType: 'signup',
+                    });
+                } catch (err) {
+                    logger.warn('Failed to record referral event', { error: err });
+                }
             }
         }
 

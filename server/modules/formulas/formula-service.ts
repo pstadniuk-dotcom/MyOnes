@@ -1,5 +1,6 @@
 import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, normalizeIngredientName } from "@shared/ingredients";
 import { z } from "zod";
+import { logger } from '../../infra/logging/logger';
 
 // SECURITY: Immutable formula limits - CANNOT be changed by user requests or AI prompts
 export const FORMULA_LIMITS = {
@@ -103,7 +104,8 @@ function getMaxAllowedDoseForIngredient(ingredientName: string): number {
             : individual.doseMg;
     }
 
-    return Number.MAX_SAFE_INTEGER;
+    logger.warn('Unknown ingredient encountered — capping max dose at 1000mg', { ingredientName });
+    return 1000;
 }
 
 export function autoFitFormulaToBudget(formula: any): {

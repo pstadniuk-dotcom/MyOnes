@@ -304,6 +304,17 @@ export default function ConsultationPage() {
     });
   }, [toast, user?.name]);
 
+  // Warn user before leaving if there are messages in the conversation
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (messages.length > 0) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [messages.length]);
+
   // Restore draft on mount
   useEffect(() => {
     const savedDraft = localStorage.getItem(DRAFT_KEY);

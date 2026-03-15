@@ -448,7 +448,27 @@ export class ChatController {
                 } else {
                 sendSSE({ type: 'processing', message: 'Formula detected! Validating recommendations...' });
                 try {
-                    const jsonData = JSON.parse(jsonMatch[1]);
+                    let jsonData: any;
+                    try {
+                        jsonData = JSON.parse(jsonMatch[1]);
+                    } catch (jsonParseErr) {
+                        // Code fence extraction failed to parse — try parsing full response as JSON fallback
+                        logger.warn('JSON.parse failed on code fence content, attempting full response parse', {
+                            userId,
+                            error: jsonParseErr instanceof Error ? jsonParseErr.message : String(jsonParseErr),
+                        });
+                        try {
+                            jsonData = JSON.parse(fullResponse);
+                        } catch (fullParseErr) {
+                            logger.error('JSON parse failed for both code fence and full response — skipping formula card', {
+                                userId,
+                                codeFenceError: jsonParseErr instanceof Error ? jsonParseErr.message : String(jsonParseErr),
+                                fullResponseError: fullParseErr instanceof Error ? fullParseErr.message : String(fullParseErr),
+                            });
+                            // Don't crash — the user just doesn't get a formula card
+                            throw new Error('Unable to parse formula JSON from AI response');
+                        }
+                    }
                     const capsuleCountFromMessage = extractCapsuleCountFromMessage(message);
                     if (capsuleCountFromMessage) jsonData.targetCapsules = capsuleCountFromMessage;
 
@@ -673,6 +693,34 @@ export class ChatController {
                               informational: safetyResult.warnings.filter(w => w.severity === 'informational').length,
                             },
                           });
+
+                          // Lab value verification: warn if formula references biomarkers not in lab data
+                          if (labDataContext && validatedFormula.rationale) {
+                            try {
+                              const biomarkerPatterns = /\b(ApoB|LDL-P|omega-3 index|HbA1c|fasting glucose|ferritin|vitamin D|25-OH|TSH|free T[34]|homocysteine|hs-CRP|CRP|triglycerides|HDL|LDL|total cholesterol|iron|B12|folate|magnesium RBC|zinc|cortisol|testosterone|DHEA|insulin)\b/gi;
+                              const rationale = String(validatedFormula.rationale || '');
+                              const referencedBiomarkers = new Set<string>();
+                              let biomarkerMatch: RegExpExecArray | null;
+                              while ((biomarkerMatch = biomarkerPatterns.exec(rationale)) !== null) {
+                                referencedBiomarkers.add(biomarkerMatch[1].toLowerCase());
+                              }
+                              if (referencedBiomarkers.size > 0) {
+                                const labDataLower = labDataContext.toLowerCase();
+                                const missingFromLab = [...referencedBiomarkers].filter(b => !labDataLower.includes(b));
+                                if (missingFromLab.length > 0) {
+                                  logger.warn('Formula rationale references biomarkers not found in lab data', {
+                                    userId,
+                                    formulaId: savedFormula.id,
+                                    missingBiomarkers: missingFromLab,
+                                    referencedBiomarkers: [...referencedBiomarkers],
+                                  });
+                                }
+                              }
+                            } catch (labCheckErr) {
+                              // Non-critical — don't block formula
+                              logger.debug('Lab value verification check failed', { userId, error: labCheckErr });
+                            }
+                          }
 
                           // Sync auto-ship price if user has an active auto-ship
                           try {

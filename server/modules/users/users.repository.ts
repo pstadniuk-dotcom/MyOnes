@@ -441,6 +441,11 @@ export class UsersRepository {
     }
 
     // Streak Rewards operations
+
+    /**
+     * @deprecated Not wired to checkout — discount is calculated but never applied as a Stripe coupon
+     * or line-item adjustment during payment. Should be removed or integrated as Stripe coupons.
+     */
     private calculateDiscountTier(streakDays: number): { discount: number; tier: string } {
         if (streakDays >= 90) return { discount: 20, tier: 'Champion' };
         if (streakDays >= 60) return { discount: 15, tier: 'Loyal' };
@@ -544,6 +549,10 @@ export class UsersRepository {
         }
     }
 
+    /**
+     * @deprecated Not wired to checkout — discount is calculated but never applied as a Stripe coupon
+     * or line-item adjustment during payment. Should be removed or integrated as Stripe coupons.
+     */
     async applyStreakDiscount(userId: string, orderId: string): Promise<number> {
         try {
             const [user] = await db.select().from(users).where(eq(users.id, userId));

@@ -1201,6 +1201,9 @@ export const signupSchema = z.object({
   acceptedTerms: z.literal(true, {
     errorMap: () => ({ message: 'You must accept the Terms of Service and Privacy Policy' }),
   }),
+  ageConfirmed: z.literal(true, {
+    errorMap: () => ({ message: 'You must confirm you are 18 years of age or older' }),
+  }),
 });
 
 export const loginSchema = z.object({

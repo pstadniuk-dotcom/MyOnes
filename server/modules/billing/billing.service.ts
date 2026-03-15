@@ -397,6 +397,11 @@ class DatabaseBillingProvider implements BillingProvider {
         status: 'active',
         renewsAt: this.getCurrentPeriodEnd(sub),
       });
+    } else {
+      logger.warn('handleInvoicePaid: subscription not found for stripeSubscriptionId — invoice paid but no internal subscription record exists', {
+        stripeSubscriptionId,
+        eventId: event.id,
+      });
     }
   }
 
@@ -414,6 +419,17 @@ class DatabaseBillingProvider implements BillingProvider {
     if (existing) {
       await usersRepository.updateSubscriptionByStripeSubscriptionId(stripeSubscriptionId, {
         status: 'past_due',
+      });
+      logger.warn('handleInvoicePaymentFailed: invoice payment failed for subscription', {
+        stripeSubscriptionId,
+        eventId: event.id,
+        invoiceId: invoice.id,
+      });
+      // TODO: Integrate dunning email — notify user that payment failed and prompt them to update their payment method
+    } else {
+      logger.warn('handleInvoicePaymentFailed: subscription not found for stripeSubscriptionId', {
+        stripeSubscriptionId,
+        eventId: event.id,
       });
     }
   }

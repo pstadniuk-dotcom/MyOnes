@@ -254,7 +254,7 @@ export function containsMedicalClaims(text: string): boolean {
         if (match) {
           const inAllowed = ALLOWLIST_PATTERNS.some(ap => {
             const apRegex = new RegExp(ap.source, ap.flags);
-            const surrounding = text.substring(Math.max(0, match.index - 50), match.index + match[0].length + 50);
+            const surrounding = text.substring(Math.max(0, match.index - 200), match.index + match[0].length + 200);
             return apRegex.test(surrounding);
           });
           if (!inAllowed) return true;

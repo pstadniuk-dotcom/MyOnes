@@ -229,63 +229,63 @@ function MainRouter() {
       <Route path="/admin">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminDashboardPage />
+            <Suspense fallback={<PageLoader />}><AdminDashboardPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/users">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <UserManagementPage />
+            <Suspense fallback={<PageLoader />}><UserManagementPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/users/:id">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <UserDetailPage />
+            <Suspense fallback={<PageLoader />}><UserDetailPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/support-tickets">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminSupportTicketsPage />
+            <Suspense fallback={<PageLoader />}><AdminSupportTicketsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/conversations">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <ConversationsPage />
+            <Suspense fallback={<PageLoader />}><ConversationsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/orders">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <OrdersManagementPage />
+            <Suspense fallback={<PageLoader />}><OrdersManagementPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/audit-logs">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AuditLogsPage />
+            <Suspense fallback={<PageLoader />}><AuditLogsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/blog">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminBlogPage />
+            <Suspense fallback={<PageLoader />}><AdminBlogPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/retail-pricing">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <RetailComparisonPricingPage />
+            <Suspense fallback={<PageLoader />}><RetailComparisonPricingPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
@@ -293,7 +293,7 @@ function MainRouter() {
         {(params) => (
           <ProtectedAdminRoute>
             <AdminLayout>
-              <AdminSupportTicketsPage ticketId={params.id} />
+              <Suspense fallback={<PageLoader />}><AdminSupportTicketsPage ticketId={params.id} /></Suspense>
             </AdminLayout>
           </ProtectedAdminRoute>
         )}
@@ -301,91 +301,91 @@ function MainRouter() {
       <Route path="/admin/membership">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <MembershipAdminPage />
+            <Suspense fallback={<PageLoader />}><MembershipAdminPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/content">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <ContentManagementPage />
+            <Suspense fallback={<PageLoader />}><ContentManagementPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/analytics">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminAnalyticsPage />
+            <Suspense fallback={<PageLoader />}><AdminAnalyticsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/traffic">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <TrafficSourcesPage />
+            <Suspense fallback={<PageLoader />}><TrafficSourcesPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/products">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <ProductCatalogPage />
+            <Suspense fallback={<PageLoader />}><ProductCatalogPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/settings/ai">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AISettingsPage />
+            <Suspense fallback={<PageLoader />}><AISettingsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/live-chats">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminLiveChatsPage />
+            <Suspense fallback={<PageLoader />}><AdminLiveChatsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/chat-analytics">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminChatAnalyticsPage />
+            <Suspense fallback={<PageLoader />}><AdminChatAnalyticsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/ai-usage">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AIUsagePage />
+            <Suspense fallback={<PageLoader />}><AIUsagePage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/pr-agent">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <PRAgentPage />
+            <Suspense fallback={<PageLoader />}><PRAgentPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/ai-support-agent">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AISupportAgentPage />
+            <Suspense fallback={<PageLoader />}><AISupportAgentPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/influencers">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <InfluencerHubPage />
+            <Suspense fallback={<PageLoader />}><InfluencerHubPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/b2b">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <B2bProspectingPage />
+            <Suspense fallback={<PageLoader />}><B2bProspectingPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
