@@ -18,6 +18,27 @@ import { getSearchQueries } from '../queries/search-queries';
 import logger from '../../../infra/logging/logger';
 import type { InsertOutreachProspect } from '@shared/schema';
 
+/** Valid sub-type enum values — must match the outreach_sub_type PG enum */
+const VALID_SUB_TYPES = new Set([
+  'interview', 'panel', 'solo_feature',
+  'product_review', 'guest_article', 'founder_feature', 'expert_source',
+]);
+
+/** Sanitize AI-returned subType to a valid enum value or null */
+function sanitizeSubType(subType: string | undefined | null): string | null {
+  if (!subType) return null;
+  const normalized = subType.toLowerCase().trim();
+  if (VALID_SUB_TYPES.has(normalized)) return normalized;
+  // Map common AI hallucinations to valid values
+  if (normalized.includes('press') || normalized === 'press_release') return 'product_review';
+  if (normalized.includes('interview') || normalized === 'podcast_guest') return 'interview';
+  if (normalized.includes('feature')) return 'founder_feature';
+  if (normalized.includes('article') || normalized === 'editorial') return 'guest_article';
+  if (normalized.includes('expert') || normalized === 'source') return 'expert_source';
+  logger.warn(`[pr-scan] Unknown subType "${subType}", defaulting to null`);
+  return null;
+}
+
 export interface ScanResult {
   runId: string;
   prospectsFound: number;
@@ -178,7 +199,7 @@ export async function runPrScan(options: {
           name: result.name,
           normalizedName: normalizeName(result.name),
           category: result.category,
-          subType: result.subType as any,
+          subType: sanitizeSubType(result.subType) as any,
           url: result.url,
           normalizedUrl: normalizeUrl(result.url),
           contactEmail,
