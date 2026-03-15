@@ -5,7 +5,8 @@
  * and health goals to inject dynamic social proof into pitches.
  */
 import { db } from '../../../infra/db/db';
-import { users, formulas, ingredients, healthProfiles } from '@shared/schema';
+import { users, formulas, healthProfiles } from '@shared/schema';
+import { INDIVIDUAL_INGREDIENTS } from '@shared/ingredients';
 import { count, sql, desc, eq } from 'drizzle-orm';
 import logger from '../../../infra/logging/logger';
 
@@ -47,14 +48,8 @@ export async function getPlatformStats(): Promise<PlatformStats> {
       // Table may not exist in all environments
     }
 
-    // Total ingredients
-    let totalIngredients = 0;
-    try {
-      const [ingredientResult] = await db.select({ count: count() }).from(ingredients);
-      totalIngredients = ingredientResult?.count || 0;
-    } catch {
-      totalIngredients = 200; // Known catalog size
-    }
+    // Total ingredients (from static catalog, not a DB table)
+    const totalIngredients = INDIVIDUAL_INGREDIENTS.length;
 
     // User growth rate (compare current month to previous month)
     let userGrowthRate = 'growing';

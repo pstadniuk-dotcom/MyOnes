@@ -10,7 +10,6 @@
  * 5. Takes screenshots at each stage for review
  * 6. Saves form answers to pitch record for audit trail
  */
-import { type Page, type Frame } from 'playwright';
 import OpenAI from 'openai';
 import { join } from 'path';
 import { mkdirSync, existsSync } from 'fs';

@@ -55,8 +55,8 @@ export interface PrAgentConfig {
   maxProspectsPerRun: number;     // how many prospects to find per scan
   minRelevanceScore: number;      // 0-100, discard below this
   searchQueries: {
-    podcast: string[];
-    press: string[];
+    podcast?: string[];
+    press?: string[];
   };
 
   // Pitch settings

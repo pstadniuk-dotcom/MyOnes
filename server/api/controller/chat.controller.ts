@@ -68,7 +68,7 @@ export class ChatController {
         };
 
         try {
-            const rateLimit = checkRateLimit(clientIP, 10, 10 * 60 * 1000);
+            const rateLimit = checkRateLimit(clientIP, 40, 10 * 60 * 1000);
             if (!rateLimit.allowed) {
                 return res.status(429).json({
                     error: 'Rate limit exceeded',
@@ -95,7 +95,7 @@ export class ChatController {
             }
 
             // ── SECURITY: Per-user rate limiting (prevents abuse from users with multiple IPs)
-            const userRateLimit = checkRateLimit(`user:${userId}`, 15, 10 * 60 * 1000);
+            const userRateLimit = checkRateLimit(`user:${userId}`, 40, 10 * 60 * 1000);
             if (!userRateLimit.allowed) {
                 return res.status(429).json({
                     error: 'You\'re sending messages too quickly. Please wait a moment.',

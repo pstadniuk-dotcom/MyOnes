@@ -89,6 +89,7 @@
     "pdf-to-img": "^5.0.0",
     "pdfmake": "^0.2.20",
     "pg": "^8.18.0",
+    "playwright": "^1.57.0",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
@@ -103,7 +104,6 @@
     "wouter": "^3.3.5",
     "youtube-sr": "^4.3.12",
     "zod": "^3.24.2",
-    "playwright": "^1.57.0",
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {

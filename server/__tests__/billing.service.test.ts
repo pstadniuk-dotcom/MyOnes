@@ -17,6 +17,7 @@ const {
   mockAssignUserMembership, mockCancelUserMembership,
   mockCustomersCreate, mockCheckoutSessionsCreate,
   mockSubscriptionsCancel, mockSubscriptionsUpdate, mockSubscriptionsRetrieve, mockWebhooksConstructEvent,
+  mockGetUserConsent,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockUpdateUser: vi.fn(),
@@ -37,6 +38,7 @@ const {
   mockSubscriptionsUpdate: vi.fn(),
   mockSubscriptionsRetrieve: vi.fn(),
   mockWebhooksConstructEvent: vi.fn(),
+  mockGetUserConsent: vi.fn(),
 }));
 
 vi.mock('../modules/users/users.repository', () => ({
@@ -59,6 +61,12 @@ vi.mock('../modules/membership/membership.repository', () => ({
     getMembershipTier: mockGetMembershipTier,
     assignUserMembership: mockAssignUserMembership,
     cancelUserMembership: mockCancelUserMembership,
+  },
+}));
+
+vi.mock('../modules/consents/consents.repository', () => ({
+  consentsRepository: {
+    getUserConsent: mockGetUserConsent,
   },
 }));
 
@@ -322,6 +330,8 @@ describe('createCheckoutSession', () => {
     mockCustomersCreate.mockResolvedValue({ id: 'cus_new' });
     mockUpdateUser.mockResolvedValue({});
     mockCheckoutSessionsCreate.mockResolvedValue(makeStripeSession());
+    // Default: medication disclosure consent is granted
+    mockGetUserConsent.mockResolvedValue({ granted: true });
   });
 
   it('throws USER_NOT_FOUND when user not found', async () => {

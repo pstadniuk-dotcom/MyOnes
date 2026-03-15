@@ -120,7 +120,11 @@ class AgentRepository {
   // ── Pitches ──────────────────────────────────────────────────────────
 
   async createPitch(data: InsertOutreachPitch): Promise<OutreachPitch> {
-    const [pitch] = await db.insert(outreachPitches).values(data).returning();
+    const values = {
+      ...data,
+      qualityFlags: data.qualityFlags ? (data.qualityFlags as string[]) : undefined,
+    };
+    const [pitch] = await db.insert(outreachPitches).values(values).returning();
     return pitch;
   }
 
@@ -266,6 +270,7 @@ class AgentRepository {
     sentPitches: number;
     responses: number;
     booked: number;
+    followUpsDue: number;
   }> {
     const [totalP] = await db.select({ count: count() }).from(outreachProspects);
     const [podcastP] = await db.select({ count: count() }).from(outreachProspects).where(eq(outreachProspects.category, 'podcast'));
