@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { usersRepository } from '../users/users.repository';
 import { authRepository } from './auth.repository';
 import { consentsRepository } from '../consents/consents.repository';
+import { refreshTokenService } from './refresh-token.service';
 import { signupSchema, loginSchema, type InsertUser, type User } from '@shared/schema';
 import { generateToken } from '../../api/middleware/middleware';
 import { sendNotificationEmail } from '../../utils/emailService';
@@ -10,6 +11,9 @@ import { logger } from '../../infra/logging/logger';
 import { OAuth2Client } from 'google-auth-library';
 import axios from 'axios';
 import { getFrontendUrl } from '../../utils/urlHelper';
+
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -107,9 +111,9 @@ export class AuthService {
         // Generate and send verification email
         await this.sendVerificationEmail(user);
 
-        const token = generateToken(user.id, user.isAdmin || false);
+        const { accessToken, refreshToken } = await refreshTokenService.createTokenPair(user.id, user.isAdmin || false);
 
-        return { user, token };
+        return { user, token: accessToken, refreshToken };
     }
 
     private async sendVerificationEmail(user: User) {
@@ -212,14 +216,34 @@ export class AuthService {
             throw new Error('Invalid email or password');
         }
 
+        // Check account lockout
+        if (user.lockedUntil && new Date() < user.lockedUntil) {
+            const remainingMs = user.lockedUntil.getTime() - Date.now();
+            const remainingMin = Math.ceil(remainingMs / 60000);
+            throw new Error(`Account locked. Try again in ${remainingMin} minute${remainingMin === 1 ? '' : 's'}.`);
+        }
+
         const isValidPassword = await bcrypt.compare(validatedData.password, user.password);
         if (!isValidPassword) {
+            // Increment failed attempts
+            const attempts = (user.failedLoginAttempts || 0) + 1;
+            const updates: Record<string, any> = { failedLoginAttempts: attempts };
+            if (attempts >= MAX_LOGIN_ATTEMPTS) {
+                updates.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
+                logger.warn('Account locked due to too many failed login attempts', { email: validatedData.email, attempts });
+            }
+            await usersRepository.updateUser(user.id, updates);
             throw new Error('Invalid email or password');
         }
 
-        const token = generateToken(user.id, user.isAdmin || false);
+        // Reset failed attempts on successful login
+        if (user.failedLoginAttempts > 0) {
+            await usersRepository.updateUser(user.id, { failedLoginAttempts: 0, lockedUntil: null });
+        }
 
-        return { user, token };
+        const { accessToken, refreshToken } = await refreshTokenService.createTokenPair(user.id, user.isAdmin || false);
+
+        return { user, token: accessToken, refreshToken };
     }
 
     async googleLogin(googleToken: string, ipAddress?: string | null, userAgent?: string | null) {
@@ -299,19 +323,19 @@ export class AuthService {
                 }
             }
 
-            const token = generateToken(user.id, user.isAdmin || false);
-            return { user, token, isNewUser };
+            const { accessToken, refreshToken } = await refreshTokenService.createTokenPair(user.id, user.isAdmin || false);
+            return { user, token: accessToken, refreshToken, isNewUser };
         } catch (error: any) {
             logger.error('Google login error', { error: error.message });
             throw new Error('Google authentication failed');
         }
     }
 
-    async facebookLogin(accessToken: string, ipAddress?: string | null, userAgent?: string | null) {
+    async facebookLogin(fbAccessToken: string, ipAddress?: string | null, userAgent?: string | null) {
         try {
             logger.debug('Attempting Facebook login with token...');
             // Verify Facebook token and get user info
-            const { data } = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`);
+            const { data } = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${fbAccessToken}`);
 
             logger.debug('Facebook response data', { data });
 
@@ -366,8 +390,8 @@ export class AuthService {
                 }
             }
 
-            const token = generateToken(user.id, user.isAdmin || false);
-            return { user, token, isNewUser };
+            const { accessToken, refreshToken } = await refreshTokenService.createTokenPair(user.id, user.isAdmin || false);
+            return { user, token: accessToken, refreshToken, isNewUser };
         } catch (error: any) {
             const fbError = error.response?.data?.error?.message || error.message;
             logger.error('Facebook login error details', {

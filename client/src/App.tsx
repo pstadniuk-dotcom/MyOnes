@@ -1,4 +1,5 @@
 import { Switch, Route, Redirect } from "wouter";
+import { Suspense, lazy } from "react";
 import { queryClient } from "@/shared/lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/shared/components/ui/toaster";
@@ -10,6 +11,7 @@ import { FEATURES, isOptimizeEnabled } from "@/shared/config/features";
 import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
 import ProtectedAdminRoute from "@/features/admin/components/ProtectedAdminRoute";
 import NotFound from "@/pages/not-found";
+import { Loader2 } from "lucide-react";
 import SignupPage from "@/pages/SignupPage";
 import LoginPage from "@/pages/LoginPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
@@ -35,7 +37,7 @@ import ShippingPage from "@/pages/ShippingPage";
 // Import dashboard components
 import { DashboardLayout } from "@/shared/components/DashboardLayout";
 import DashboardHome from "@/pages/DashboardHome";
-import ConsultationPage from "@/pages/ConsultationPage";
+const ConsultationPage = lazy(() => import("@/pages/ConsultationPage"));
 import MyFormulaPage from "@/pages/MyFormulaPage";
 import OptimizePage from "@/pages/OptimizePage";
 import WearablesPage from "@/pages/WearablesPage";
@@ -46,29 +48,29 @@ import SettingsPage from "@/pages/SettingsPage";
 import SupportPage from "@/pages/SupportPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 
-// Import admin components
-import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
-import UserManagementPage from "@/pages/admin/UserManagementPage";
-import UserDetailPage from "@/pages/admin/UserDetailPage";
-import AdminSupportTicketsPage from "@/pages/admin/AdminSupportTicketsPage";
-import ConversationsPage from "@/pages/admin/ConversationsPage";
-import OrdersManagementPage from "@/pages/admin/OrdersManagementPage";
-import AuditLogsPage from "@/pages/admin/AuditLogsPage";
-import AdminBlogPage from "@/pages/admin/AdminBlogPage";
-import RetailComparisonPricingPage from "@/pages/admin/RetailComparisonPricingPage";
-import MembershipAdminPage from "@/pages/admin/MembershipAdminPage";
-import ContentManagementPage from "@/pages/admin/ContentManagementPage";
-import AdminAnalyticsPage from "@/pages/admin/AdminAnalyticsPage";
-import AISettingsPage from "@/pages/admin/AISettingsPage";
-import ProductCatalogPage from "@/pages/admin/ProductCatalogPage";
-import AdminLiveChatsPage from "@/pages/admin/AdminLiveChatsPage";
-import AdminChatAnalyticsPage from "@/pages/admin/AdminChatAnalyticsPage";
-import AIUsagePage from "@/pages/admin/AIUsagePage";
-import PRAgentPage from "@/pages/admin/PRAgentPage";
-import AISupportAgentPage from "@/pages/admin/AISupportAgentPage";
-import TrafficSourcesPage from "@/pages/admin/TrafficSourcesPage";
-import InfluencerHubPage from "@/pages/admin/InfluencerHubPage";
-import B2bProspectingPage from "@/pages/admin/B2bProspectingPage";
+// Import admin components (lazy-loaded for code splitting)
+const AdminDashboardPage = lazy(() => import("@/pages/admin/AdminDashboardPage"));
+const UserManagementPage = lazy(() => import("@/pages/admin/UserManagementPage"));
+const UserDetailPage = lazy(() => import("@/pages/admin/UserDetailPage"));
+const AdminSupportTicketsPage = lazy(() => import("@/pages/admin/AdminSupportTicketsPage"));
+const ConversationsPage = lazy(() => import("@/pages/admin/ConversationsPage"));
+const OrdersManagementPage = lazy(() => import("@/pages/admin/OrdersManagementPage"));
+const AuditLogsPage = lazy(() => import("@/pages/admin/AuditLogsPage"));
+const AdminBlogPage = lazy(() => import("@/pages/admin/AdminBlogPage"));
+const RetailComparisonPricingPage = lazy(() => import("@/pages/admin/RetailComparisonPricingPage"));
+const MembershipAdminPage = lazy(() => import("@/pages/admin/MembershipAdminPage"));
+const ContentManagementPage = lazy(() => import("@/pages/admin/ContentManagementPage"));
+const AdminAnalyticsPage = lazy(() => import("@/pages/admin/AdminAnalyticsPage"));
+const AISettingsPage = lazy(() => import("@/pages/admin/AISettingsPage"));
+const ProductCatalogPage = lazy(() => import("@/pages/admin/ProductCatalogPage"));
+const AdminLiveChatsPage = lazy(() => import("@/pages/admin/AdminLiveChatsPage"));
+const AdminChatAnalyticsPage = lazy(() => import("@/pages/admin/AdminChatAnalyticsPage"));
+const AIUsagePage = lazy(() => import("@/pages/admin/AIUsagePage"));
+const PRAgentPage = lazy(() => import("@/pages/admin/PRAgentPage"));
+const AISupportAgentPage = lazy(() => import("@/pages/admin/AISupportAgentPage"));
+const TrafficSourcesPage = lazy(() => import("@/pages/admin/TrafficSourcesPage"));
+const InfluencerHubPage = lazy(() => import("@/pages/admin/InfluencerHubPage"));
+const B2bProspectingPage = lazy(() => import("@/pages/admin/B2bProspectingPage"));
 import { AdminLayout } from "@/shared/components/AdminLayout";
 
 // Import shared/public components
@@ -80,6 +82,12 @@ import CheckoutSuccessPage from "@/pages/CheckoutSuccessPage";
 import LandingPageV2 from "@/pages/LandingPageV2";
 import ScrollToTop from "./shared/components/ScrollToTop";
 import { LiveChatWidget } from "@/features/live-chat/components/LiveChatWidget";
+
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+  </div>
+);
 
 // Main Router
 function MainRouter() {
@@ -120,14 +128,14 @@ function MainRouter() {
       <Route path="/dashboard/chat">
         <ProtectedRoute>
           <DashboardLayout>
-            <ConsultationPage />
+            <Suspense fallback={<PageLoader />}><ConsultationPage /></Suspense>
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/dashboard/consultation">
         <ProtectedRoute>
           <DashboardLayout>
-            <ConsultationPage />
+            <Suspense fallback={<PageLoader />}><ConsultationPage /></Suspense>
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
@@ -212,7 +220,7 @@ function MainRouter() {
       <Route path="/chat">
         <ProtectedRoute>
           <DashboardLayout>
-            <ConsultationPage />
+            <Suspense fallback={<PageLoader />}><ConsultationPage /></Suspense>
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

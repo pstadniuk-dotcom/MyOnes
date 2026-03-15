@@ -1060,7 +1060,7 @@ export class AdminRepository {
                 topAssignees: topAssignees.map(r => ({ assignedTo: r.assignedTo!, count: Number(r.count), resolved: Number(r.resolved) })),
             };
         } catch (error) {
-            console.error('Error getting support ticket metrics:', error);
+            logger.error('Error getting support ticket metrics', { error });
             throw error;
         }
     }
@@ -1069,7 +1069,7 @@ export class AdminRepository {
         try {
             await db.insert(supportTicketActivityLog).values(entry);
         } catch (error) {
-            console.error('Error logging ticket activity:', error);
+            logger.error('Error logging ticket activity', { error });
         }
     }
 
@@ -1090,7 +1090,7 @@ export class AdminRepository {
                 .orderBy(desc(supportTicketActivityLog.createdAt));
             return entries;
         } catch (error) {
-            console.error('Error getting ticket activity log:', error);
+            logger.error('Error getting ticket activity log', { error });
             return [];
         }
     }
@@ -1103,7 +1103,7 @@ export class AdminRepository {
                 .orderBy(supportTickets.category);
             return result.map(r => r.category);
         } catch (error) {
-            console.error('Error getting ticket categories:', error);
+            logger.error('Error getting ticket categories', { error });
             return [];
         }
     }
@@ -1115,7 +1115,7 @@ export class AdminRepository {
                 .from(supportTickets);
             return result.map(r => r.tag).sort();
         } catch (error) {
-            console.error('Error getting ticket tags:', error);
+            logger.error('Error getting ticket tags', { error });
             return [];
         }
     }
@@ -1129,7 +1129,7 @@ export class AdminRepository {
                 .orderBy(users.name);
             return admins;
         } catch (error) {
-            console.error('Error getting admin users:', error);
+            logger.error('Error getting admin users', { error });
             return [];
         }
     }

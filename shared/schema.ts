@@ -140,6 +140,10 @@ export const users = pgTable("users", {
   referralCode: text("referral_code").unique(), // User's own referral code
   referredByUserId: varchar("referred_by_user_id"), // Who referred them
 
+  // Account lockout (brute-force protection)
+  failedLoginAttempts: integer("failed_login_attempts").default(0).notNull(),
+  lockedUntil: timestamp("locked_until"),
+
   // Soft-delete & suspension (admin operations)
   deletedAt: timestamp("deleted_at"),
   deletedBy: varchar("deleted_by"),
@@ -167,6 +171,20 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   used: boolean("used").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Refresh tokens for JWT rotation
+export const refreshTokens = pgTable("refresh_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  family: varchar("family").notNull(), // Token family for rotation detection
+  expiresAt: timestamp("expires_at").notNull(),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("refresh_tokens_user_id_idx").on(table.userId),
+  index("refresh_tokens_family_idx").on(table.family),
+]);
 
 // Email verification tokens
 export const emailVerificationTokens = pgTable("email_verification_tokens", {

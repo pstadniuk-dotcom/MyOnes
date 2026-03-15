@@ -1,6 +1,7 @@
 import "./env";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import fileUpload from "express-fileupload";
@@ -174,13 +175,13 @@ app.use('/api/', apiLimiter);
 app.use('/api/admin', adminLimiter);
 
 // Configure session middleware for OAuth state management
-if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
-  logger.error('FATAL: SESSION_SECRET not set in production. Set SESSION_SECRET env var.');
+if (!process.env.SESSION_SECRET) {
+  logger.error('FATAL: SESSION_SECRET environment variable is required. Set it before starting the server.');
   process.exit(1);
 }
 
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'dev-only-session-secret-do-not-use-in-production',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -199,6 +200,14 @@ app.use(fileUpload({
   useTempFiles: false,
   tempFileDir: '/tmp/'
 }));
+
+// Request ID tracking — attach unique ID to each request for log correlation
+app.use((req, res, next) => {
+  const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
+  (req as any).requestId = requestId;
+  res.setHeader('X-Request-Id', requestId);
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

@@ -498,12 +498,30 @@ export const reorderService = {
           continue;
         }
 
-        const formula = await formulasRepository.getFormula(schedule.formulaId);
+        // Check if there's an approved recommendation with adjustments
+        let chargeFormulaId = schedule.formulaId;
+        const recommendation = await reorderRepository.getRecommendationByScheduleId(schedule.id);
+        if (recommendation && recommendation.recommendsChanges) {
+          const analysis = recommendation.analysisJson as AIReorderDecision;
+          if (analysis?.suggestedChanges && analysis.suggestedChanges.length > 0) {
+            // If an adjusted formula was created and linked, use it
+            if ((recommendation as any).adjustedFormulaId) {
+              chargeFormulaId = (recommendation as any).adjustedFormulaId;
+              logger.info('[ReorderService] Using adjusted formula for reorder', {
+                scheduleId: schedule.id,
+                originalFormulaId: schedule.formulaId,
+                adjustedFormulaId: chargeFormulaId,
+              });
+            }
+          }
+        }
+
+        const formula = await formulasRepository.getFormula(chargeFormulaId);
         if (!formula) continue;
 
         // Get fresh price quote
         const { formulasService } = await import('../formulas/formulas.service');
-        const quoteResult = await formulasService.getFormulaQuote(schedule.userId, schedule.formulaId);
+        const quoteResult = await formulasService.getFormulaQuote(schedule.userId, chargeFormulaId);
         if (!quoteResult.quote.available || !quoteResult.quote.total) {
           logger.error('[ReorderService] Quote unavailable for formula', { formulaId: schedule.formulaId });
           continue;
@@ -538,7 +556,7 @@ export const reorderService = {
           description: `ONES Smart Re-Order - Formula V${schedule.formulaVersion}`,
           metadata: {
             userId: schedule.userId,
-            formulaId: schedule.formulaId,
+            formulaId: chargeFormulaId,
             formulaVersion: String(schedule.formulaVersion),
             scheduleId: schedule.id,
             orderType: 'smart_reorder',
@@ -549,7 +567,7 @@ export const reorderService = {
           // Create order record
           const order = await usersRepository.createOrder({
             userId: schedule.userId,
-            formulaId: schedule.formulaId,
+            formulaId: chargeFormulaId,
             formulaVersion: schedule.formulaVersion,
             status: 'pending',
             amountCents: priceCents,
@@ -593,12 +611,53 @@ export const reorderService = {
           } catch { /* non-critical */ }
         }
       } catch (err: any) {
-        logger.error('[ReorderService] Charge failed', { scheduleId: schedule.id, error: err?.message || err });
+        logger.error('[ReorderService] Charge failed', {
+          scheduleId: schedule.id,
+          userId: schedule.userId,
+          error: err?.message || err,
+          stripeCode: err?.code,
+        });
 
         if (err?.code === 'authentication_required' || err?.code === 'card_declined') {
-          // Mark schedule for manual intervention
-          await reorderRepository.updateSchedule(schedule.id, { status: 'skipped' });
-          // TODO: Send "payment failed" email
+          const currentAttempts = (schedule as any).paymentAttempts ?? 0;
+          const nextAttempts = currentAttempts + 1;
+
+          if (nextAttempts < 3) {
+            // Retry: increment attempts but keep schedule in approved state
+            await reorderRepository.updateSchedule(schedule.id, {
+              paymentAttempts: nextAttempts,
+            } as any);
+            logger.warn('[ReorderService] Payment attempt failed, will retry', {
+              scheduleId: schedule.id,
+              userId: schedule.userId,
+              attempt: nextAttempts,
+              maxAttempts: 3,
+            });
+          } else {
+            // Final attempt failed — mark as skipped and notify user
+            await reorderRepository.updateSchedule(schedule.id, {
+              status: 'skipped',
+              paymentAttempts: nextAttempts,
+            } as any);
+            logger.error('[ReorderService] Payment failed after 3 attempts — marking schedule as skipped', {
+              scheduleId: schedule.id,
+              userId: schedule.userId,
+            });
+
+            try {
+              await notificationsService.create({
+                userId: schedule.userId,
+                type: 'order_update',
+                title: 'Reorder Payment Failed',
+                content: `We were unable to process payment for your reorder after multiple attempts. Please update your payment method to continue.`,
+                metadata: {
+                  actionUrl: '/dashboard/billing',
+                  icon: 'alert-triangle',
+                  priority: 'high',
+                },
+              });
+            } catch { /* non-critical */ }
+          }
         }
       }
     }
