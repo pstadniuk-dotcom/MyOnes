@@ -338,8 +338,37 @@ function OverviewTab({ dashboard, isLoading, onNavigate }: { dashboard?: Dashboa
 
   const stats = dashboard?.stats;
 
+  // Derive running state from dashboard — these scans are async background tasks
+  const runningRuns = dashboard?.recentRuns?.filter(r => r.status === 'running') ?? [];
+  const isScanRunning = runningRuns.some(r => r.agentName === 'pr_scan') || scanMutation.isPending;
+  const isCompetitorRunning = runningRuns.some(r => r.agentName === 'competitor_scan') || competitorMutation.isPending;
+  const isPitchRunning = runningRuns.some(r => r.agentName === 'pr_pitch_batch') || pitchBatchMutation.isPending;
+  const isAnyRunning = runningRuns.length > 0;
+
   return (
     <div className="space-y-6">
+      {/* Active Scan Banner */}
+      {isAnyRunning && (
+        <Card className="border-blue-300 bg-blue-50 dark:bg-blue-950/20">
+          <CardContent className="pt-4 pb-3 flex items-center gap-3 text-sm text-blue-800 dark:text-blue-200">
+            <Loader2 className="h-5 w-5 animate-spin flex-shrink-0" />
+            <div>
+              <span className="font-medium">
+                {runningRuns.map(r => {
+                  if (r.agentName === 'pr_scan') return 'PR Scan';
+                  if (r.agentName === 'competitor_scan') return 'Competitor Scan';
+                  if (r.agentName === 'pr_pitch_batch') return 'Pitch Drafting';
+                  return r.agentName;
+                }).join(', ')} in progress...
+              </span>
+              <span className="ml-2 text-blue-600 dark:text-blue-300">
+                Results will appear automatically when complete.
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Total Prospects" value={stats?.totalProspects ?? 0} />
@@ -358,21 +387,21 @@ function OverviewTab({ dashboard, isLoading, onNavigate }: { dashboard?: Dashboa
           <CardTitle className="text-base">Quick Actions</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
-          <Button onClick={() => scanMutation.mutate()} disabled={scanMutation.isPending}>
-            {scanMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
-            Run Scan
+          <Button onClick={() => scanMutation.mutate()} disabled={isScanRunning}>
+            {isScanRunning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
+            {isScanRunning ? 'Scanning...' : 'Run Scan'}
           </Button>
-          <Button variant="outline" onClick={() => pitchBatchMutation.mutate()} disabled={pitchBatchMutation.isPending}>
-            {pitchBatchMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-            Draft Pitches
+          <Button variant="outline" onClick={() => pitchBatchMutation.mutate()} disabled={isPitchRunning}>
+            {isPitchRunning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+            {isPitchRunning ? 'Drafting...' : 'Draft Pitches'}
           </Button>
           <Button variant="outline" onClick={() => sendAllMutation.mutate()} disabled={sendAllMutation.isPending}>
             {sendAllMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
             Send All Approved
           </Button>
-          <Button variant="outline" onClick={() => competitorMutation.mutate()} disabled={competitorMutation.isPending}>
-            {competitorMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Globe className="h-4 w-4 mr-2" />}
-            Competitor Scan
+          <Button variant="outline" onClick={() => competitorMutation.mutate()} disabled={isCompetitorRunning}>
+            {isCompetitorRunning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Globe className="h-4 w-4 mr-2" />}
+            {isCompetitorRunning ? 'Scanning...' : 'Competitor Scan'}
           </Button>
           <Button variant="outline" onClick={() => responsesMutation.mutate()} disabled={responsesMutation.isPending}>
             {responsesMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-2" />}
