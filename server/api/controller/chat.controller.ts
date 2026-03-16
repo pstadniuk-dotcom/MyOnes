@@ -76,7 +76,7 @@ export class ChatController {
                 });
             }
 
-            const { message, sessionId, files } = req.body;
+            const { message, sessionId, files, editMessageId } = req.body;
             const userId = req.userId!;
             const attachedFileIds: string[] = Array.isArray(files)
                 ? files.map((f: any) => f.id).filter(Boolean)
@@ -117,6 +117,12 @@ export class ChatController {
             }
             if (!chatSession) {
                 chatSession = await chatRepository.createChatSession({ userId, status: 'active' });
+            }
+
+            // Handle message editing: delete this message and all subsequent ones before adding the new version
+            if (editMessageId && chatSession) {
+                logger.info('Trunkating session for message edit', { sessionId: chatSession.id, editMessageId });
+                await chatRepository.deleteMessagesAfterId(chatSession.id, editMessageId);
             }
 
             // Persist user message immediately so it never disappears if the user

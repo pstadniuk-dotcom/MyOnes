@@ -1,6 +1,6 @@
 import { db } from '../../infra/db/db';
 import { chatSessions, messages, type ChatSession, type InsertChatSession, type Message, type InsertMessage } from '@shared/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import { encryptField, decryptField } from '../../infra/security/fieldEncryption';
 
 export class ChatRepository {
@@ -56,6 +56,27 @@ export class ChatRepository {
     async listMessagesBySession(sessionId: string): Promise<Message[]> {
         const rows = await db.select().from(messages).where(eq(messages.sessionId, sessionId)).orderBy(messages.createdAt);
         return rows.map(m => this.decryptMessage(m));
+    }
+
+    /**
+     * Delete all messages in a session that were created at or after a specific message.
+     * Used for editing/truncating a conversation (ChatGPT-style edit).
+     */
+    async deleteMessagesAfterId(sessionId: string, messageId: string): Promise<void> {
+        // Find the creation time of the target message
+        const [targetMessage] = await db
+            .select({ createdAt: messages.createdAt })
+            .from(messages)
+            .where(eq(messages.id, messageId));
+
+        if (!targetMessage) return;
+
+        // Delete all messages in the session created at or after this message
+        await db
+            .delete(messages)
+            .where(
+                sql`${messages.sessionId} = ${sessionId} AND ${messages.createdAt} >= ${targetMessage.createdAt}`
+            );
     }
 
     /**

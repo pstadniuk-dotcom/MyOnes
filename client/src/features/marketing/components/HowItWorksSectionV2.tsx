@@ -61,7 +61,7 @@ export default function HowItWorksSectionV2() {
           {steps.map((step, index) => (
             <div key={index} className="relative">
               {/* Big background number */}
-              <div className="text-[7rem] font-light leading-none text-[#054700]/10 select-none mb-2 -ml-1">
+              <div className="text-[7rem] font-light leading-none text-[#054700]/40 select-none mb-2 -ml-1">
                 {step.number}
               </div>
               <h3 className="text-xl font-medium text-[#054700] mb-3 -mt-4">

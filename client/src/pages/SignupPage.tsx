@@ -7,12 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/components/ui/form';
 import { Input } from '@/shared/components/ui/input';
 import { Checkbox } from '@/shared/components/ui/checkbox';
-import { Loader2, ArrowLeft, Eye, EyeOff, Check, Circle } from 'lucide-react';
+import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { signupSchema } from '@shared/schema';
 import { SocialAuthButtons } from '@/shared/components/auth/SocialAuthButtons';
-import { PasswordRequirements } from '@/shared/components/auth/PasswordRequirements';
 
 // Extended form validation schema to include password confirmation
 const extendedSignupSchema = signupSchema.extend({
@@ -41,9 +40,6 @@ export default function SignupPage() {
       ageConfirmed: undefined as unknown as true,
     }
   });
-
-  const passwordValue = form.watch('password') || '';
-  
 
   const onSubmit = async (data: SignupForm) => {
     try {
@@ -171,11 +167,10 @@ export default function SignupPage() {
                           </Button>
                         </div>
                       </FormControl>
-                      <PasswordRequirements 
-                        passwordValue={passwordValue} 
-                        isSubmitted={form.formState.submitCount > 0} 
-                      />
-                      {/* Separate error message removed as per request - using requirement points instead */}
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Password must be 8 characters long, include at least one uppercase letter, one lowercase letter, one number, and one special character.
+                      </p>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -240,7 +235,7 @@ export default function SignupPage() {
                           <Link href="/privacy" className="text-primary font-semibold hover:underline decoration-primary/30 underline-offset-2">Privacy Policy</Link>.
                         </label>
                       </div>
-                      <FormMessage />
+                      <FormMessage className='text-xs' />
                     </FormItem>
                   )}
                 />
@@ -264,7 +259,7 @@ export default function SignupPage() {
                           I confirm I am 18 years of age or older
                         </label>
                       </div>
-                      <FormMessage />
+                      <FormMessage className='text-xs' />
                     </FormItem>
                   )}
                 />
