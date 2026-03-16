@@ -5,6 +5,8 @@
  * These utilities help ensure daily logs, streaks, etc. use the correct user date.
  */
 
+import { logger } from '../infra/logging/logger';
+
 /**
  * Get the current date in user's timezone as a Date object set to midnight
  * This ensures daily logs are created for the correct user-local day
@@ -31,7 +33,7 @@ export function getUserLocalMidnight(userTimezone: string = 'America/New_York'):
     const [year, month, day] = userDateString.split('-').map(Number);
     return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0)); // Noon UTC to avoid edge cases
   } catch (error) {
-    console.error(`Invalid timezone "${userTimezone}", falling back to UTC:`, error);
+    logger.warn(`Invalid timezone "${userTimezone}", falling back to UTC`, { error });
     const now = new Date();
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12, 0, 0, 0));
   }
@@ -51,7 +53,7 @@ export function getUserLocalDateString(userTimezone: string = 'America/New_York'
     });
     return formatter.format(new Date());
   } catch (error) {
-    console.error(`Invalid timezone "${userTimezone}", falling back to UTC:`, error);
+    logger.warn(`Invalid timezone "${userTimezone}", falling back to UTC`);
     return new Date().toISOString().slice(0, 10);
   }
 }
@@ -115,7 +117,7 @@ export function toUserLocalDateString(date: Date, userTimezone: string = 'Americ
     });
     return formatter.format(date);
   } catch (error) {
-    console.error(`Invalid timezone "${userTimezone}", using UTC:`, error);
+    logger.warn(`Invalid timezone "${userTimezone}", using UTC`, { error });
     return date.toISOString().slice(0, 10);
   }
 }

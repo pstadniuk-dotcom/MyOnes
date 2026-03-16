@@ -2,6 +2,29 @@ import sgMail from '@sendgrid/mail';
 import { getFrontendUrl } from './urlHelper';
 import { logger } from '../infra/logging/logger';
 
+/** Escape HTML special characters to prevent injection in email templates */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Validate that a URL is http(s) to prevent javascript: or data: URI injection */
+function sanitizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      return url;
+    }
+    return '';
+  } catch {
+    return '';
+  }
+}
+
 // Initialize SendGrid with API key from environment variables
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY?.trim();
 const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL?.trim();
@@ -22,7 +45,13 @@ interface EmailNotification {
 }
 
 function getEmailTemplate(notification: EmailNotification): string {
-  const { title, content, actionUrl, actionText, type } = notification;
+  const { title: rawTitle, content: rawContent, actionUrl: rawActionUrl, actionText: rawActionText, type } = notification;
+
+  // Escape user-provided values to prevent HTML/script injection
+  const title = escapeHtml(rawTitle);
+  const content = escapeHtml(rawContent);
+  const actionText = rawActionText ? escapeHtml(rawActionText) : undefined;
+  const actionUrl = rawActionUrl ? sanitizeUrl(rawActionUrl) : undefined;
 
   const typeConfig: Record<typeof type, { accent: string; icon: string }> = {
     order_update:          { accent: '#004700', icon: '📦' },

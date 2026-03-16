@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { aiRuntimeSettings } from '../infra/ai/ai-config';
 import "dotenv/config";
+import { logger } from '../infra/logging/logger';
 let _openai: OpenAI | null = null;
 function getOpenAI() {
     if (!_openai) {
@@ -89,7 +90,7 @@ async function analyzeWithAI(userMessage: string): Promise<QueryIntent> {
             explanation: result.explanation
         };
     } catch (error) {
-        console.error('AI Intent analysis failed, falling back to logic:', error);
+        logger.error('AI Intent analysis failed, falling back to logic', { error });
         return fallbackLogicAnalysis(userMessage);
     }
 }

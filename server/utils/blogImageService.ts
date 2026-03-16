@@ -64,7 +64,7 @@ async function extractVisualKeywords(title: string): Promise<string> {
       return keywords;
     }
   } catch (err: any) {
-    console.warn(`[blogImage] Keyword extraction failed: ${err.message}, using title fallback`);
+    logger.warn(`[blogImage] Keyword extraction failed: ${err.message}, using title fallback`);
   }
 
   // Fallback: strip filler words from title
@@ -98,7 +98,7 @@ async function generateImage(keywords: string): Promise<string> {
   ensureFalConfigured();
 
   const prompt = buildPrompt(keywords);
-  console.log(`[blogImage] Prompt: "${prompt.substring(0, 120)}…"`);
+  logger.info(`[blogImage] Prompt: "${prompt.substring(0, 120)}…"`);
 
   const result = await fal.subscribe('fal-ai/nano-banana-2', {
     input: {
@@ -135,15 +135,15 @@ export async function generateBlogImage(title: string, slug: string): Promise<st
 
   // 1) Extract visual keywords from the title
   const keywords = await extractVisualKeywords(title);
-  console.log(`[blogImage] Keywords: "${keywords}"`);
+  logger.info(`[blogImage] Keywords: "${keywords}"`);
 
   // 2) Generate photorealistic image with fal.ai Nano Banana 2
   const falImageUrl = await generateImage(keywords);
-  console.log(`[blogImage] Got fal.ai image URL`);
+  logger.info(`[blogImage] Got fal.ai image URL`);
 
   // 3) Download the image from fal.ai CDN
   const imageBuffer = await downloadImage(falImageUrl);
-  console.log(`[blogImage] Downloaded ${(imageBuffer.length / 1024).toFixed(0)}KB image`);
+  logger.info(`[blogImage] Downloaded ${(imageBuffer.length / 1024).toFixed(0)}KB image`);
 
   // 4) Upload to Supabase Storage (JPEG for photos)
   const filename = `${slug}.jpg`;

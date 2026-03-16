@@ -2,6 +2,7 @@
 // These can be AI-generated based on user's formula or use static fallbacks
 
 import OpenAI from 'openai';
+import { logger } from '../infra/logging/logger';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -267,7 +268,7 @@ Generate ONE unique tip with a different activity:`;
     // Remove quotes if AI wrapped the response
     return tip ? tip.replace(/^["']|["']$/g, '') : null;
   } catch (error) {
-    console.error('Error generating personalized health tip:', error);
+    logger.error('Error generating personalized health tip', { error });
     return null;
   }
 }
