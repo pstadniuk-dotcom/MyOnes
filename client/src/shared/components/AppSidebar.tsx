@@ -13,7 +13,20 @@ import {
   Salad,
   Dumbbell,
   Heart,
+  LogOut,
 } from 'lucide-react';
+import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/shared/components/ui/alert-dialog';
 import { FEATURES, isOptimizeEnabled } from '@/shared/config/features';
 import {
   Sidebar,
@@ -105,6 +118,8 @@ const accountItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { logout } = useAuth();
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const isActive = (url: string) => {
     if (url === '/dashboard') {
@@ -213,6 +228,16 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setShowSignOutConfirm(true)}
+                  className="rounded-lg px-3 py-2.5 transition-all duration-200 text-red-600 hover:bg-red-50 hover:text-red-700 mt-1 w-full justify-start"
+                  data-testid="nav-logout"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -222,6 +247,26 @@ export function AppSidebar() {
           © 2026 Ones
         </p>
       </SidebarFooter>
+
+      <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will be signed out of your account. Any unsaved changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={logout}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Sign Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sidebar>
   );
 }

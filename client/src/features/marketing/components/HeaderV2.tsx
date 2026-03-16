@@ -1,13 +1,55 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/shared/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Menu, X, User, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/shared/lib/utils";
 
 export default function HeaderV2() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isAuthenticated, user } = useAuth();
   const [location] = useLocation();
+  const [activeSection, setActiveSection] = useState<string>("");
+
+  useEffect(() => {
+    // Only track if we're on the home page
+    if (location !== "/" && location !== "") return;
+
+    const sections = ["the-problem", "the-difference", "compare", "how-it-works", "pricing"];
+    const observerOptions = {
+      root: null,
+      rootMargin: "-20% 0px -70% 0px", // Adjust for better trigger point
+      threshold: 0,
+    };
+
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          setActiveSection(entry.target.id);
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+
+    sections.forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) observer.observe(element);
+    });
+
+    // Special case for scrolling to top
+    const handleScroll = () => {
+      if (window.scrollY < 100) {
+        setActiveSection("");
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [location]);
 
   const handleNavClick = (sectionId: string) => {
     setMobileMenuOpen(false);
@@ -34,27 +76,42 @@ export default function HeaderV2() {
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-6">
             <Link href="/#the-problem" onClick={() => handleNavClick("the-problem")}>
-              <span className="text-[#054700]/60 hover:text-[#054700] transition-colors cursor-pointer text-sm">
+              <span className={cn(
+                "transition-colors cursor-pointer text-sm",
+                activeSection === "the-problem" ? "text-[#054700] font-medium" : "text-[#054700]/60 hover:text-[#054700]"
+              )}>
                 The Problem
               </span>
             </Link>
             <Link href="/#the-difference" onClick={() => handleNavClick("the-difference")}>
-              <span className="text-[#054700]/60 hover:text-[#054700] transition-colors cursor-pointer text-sm">
+              <span className={cn(
+                "transition-colors cursor-pointer text-sm",
+                activeSection === "the-difference" ? "text-[#054700] font-medium" : "text-[#054700]/60 hover:text-[#054700]"
+              )}>
                 The Difference
               </span>
             </Link>
             <Link href="/#compare" onClick={() => handleNavClick("compare")}>
-              <span className="text-[#054700]/60 hover:text-[#054700] transition-colors cursor-pointer text-sm">
+              <span className={cn(
+                "transition-colors cursor-pointer text-sm",
+                activeSection === "compare" ? "text-[#054700] font-medium" : "text-[#054700]/60 hover:text-[#054700]"
+              )}>
                 Compare
               </span>
             </Link>
             <Link href="/#how-it-works" onClick={() => handleNavClick("how-it-works")}>
-              <span className="text-[#054700]/60 hover:text-[#054700] transition-colors cursor-pointer text-sm">
+              <span className={cn(
+                "transition-colors cursor-pointer text-sm",
+                activeSection === "how-it-works" ? "text-[#054700] font-medium" : "text-[#054700]/60 hover:text-[#054700]"
+              )}>
                 How It Works
               </span>
             </Link>
             <Link href="/#pricing" onClick={() => handleNavClick("pricing")}>
-              <span className="text-[#054700]/60 hover:text-[#054700] transition-colors cursor-pointer text-sm">
+              <span className={cn(
+                "transition-colors cursor-pointer text-sm",
+                activeSection === "pricing" ? "text-[#054700] font-medium" : "text-[#054700]/60 hover:text-[#054700]"
+              )}>
                 Pricing
               </span>
             </Link>
@@ -117,27 +174,42 @@ export default function HeaderV2() {
         <div className="lg:hidden bg-[#ede8e2] border-t border-[#054700]/5">
           <div className="container mx-auto px-6 py-6 space-y-4">
             <Link href="/#the-problem" onClick={() => handleNavClick("the-problem")}>
-              <span className="block text-[#054700]/60 hover:text-[#054700] py-2">
+              <span className={cn(
+                "block py-2 transition-colors",
+                activeSection === "the-problem" ? "text-[#054700] font-semibold" : "text-[#054700]/60 hover:text-[#054700]"
+              )}>
                 The Problem
               </span>
             </Link>
             <Link href="/#the-difference" onClick={() => handleNavClick("the-difference")}>
-              <span className="block text-[#054700]/60 hover:text-[#054700] py-2">
+              <span className={cn(
+                "block py-2 transition-colors",
+                activeSection === "the-difference" ? "text-[#054700] font-semibold" : "text-[#054700]/60 hover:text-[#054700]"
+              )}>
                 The Difference
               </span>
             </Link>
             <Link href="/#compare" onClick={() => handleNavClick("compare")}>
-              <span className="block text-[#054700]/60 hover:text-[#054700] py-2">
+              <span className={cn(
+                "block py-2 transition-colors",
+                activeSection === "compare" ? "text-[#054700] font-semibold" : "text-[#054700]/60 hover:text-[#054700]"
+              )}>
                 Compare
               </span>
             </Link>
             <Link href="/#how-it-works" onClick={() => handleNavClick("how-it-works")}>
-              <span className="block text-[#054700]/60 hover:text-[#054700] py-2">
+              <span className={cn(
+                "block py-2 transition-colors",
+                activeSection === "how-it-works" ? "text-[#054700] font-semibold" : "text-[#054700]/60 hover:text-[#054700]"
+              )}>
                 How It Works
               </span>
             </Link>
             <Link href="/#pricing" onClick={() => handleNavClick("pricing")}>
-              <span className="block text-[#054700]/60 hover:text-[#054700] py-2">
+              <span className={cn(
+                "block py-2 transition-colors",
+                activeSection === "pricing" ? "text-[#054700] font-semibold" : "text-[#054700]/60 hover:text-[#054700]"
+              )}>
                 Pricing
               </span>
             </Link>

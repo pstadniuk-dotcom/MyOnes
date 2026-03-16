@@ -10,9 +10,13 @@ import { Loader2, ArrowLeft, Lock, CheckCircle, XCircle, Eye, EyeOff } from 'luc
 import { Link, useLocation } from 'wouter';
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest } from '@/shared/lib/api';
+import { PasswordRequirements } from '@/shared/components/auth/PasswordRequirements';
 
 const resetPasswordSchema = z.object({
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters long')
+    .regex(/[0-9]/, 'Password must contain at least one number')
+    .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Please confirm your password",
@@ -40,7 +44,10 @@ export default function ResetPasswordPage() {
       password: '',
       confirmPassword: '',
     },
+    mode: 'onChange',
   });
+
+  const passwordValue = form.watch('password') || '';
 
   useEffect(() => {
     if (!token) {
@@ -211,7 +218,10 @@ export default function ResetPasswordPage() {
                           </Button>
                         </div>
                       </FormControl>
-                      <FormMessage />
+                      <PasswordRequirements 
+                        passwordValue={passwordValue} 
+                        isSubmitted={form.formState.submitCount > 0} 
+                      />
                     </FormItem>
                   )}
                 />

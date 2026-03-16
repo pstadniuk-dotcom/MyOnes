@@ -549,7 +549,7 @@ export default function ProfilePage() {
         <Tabs className="space-y-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="health">Health Info</TabsTrigger>
+            <TabsTrigger value="health">Health Profile</TabsTrigger>
           </TabsList>
           <Card>
             <CardContent className="pt-6">
@@ -598,7 +598,7 @@ export default function ProfilePage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 bg-white/60 backdrop-blur-sm">
           <TabsTrigger value="profile" data-testid="tab-profile" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Profile</TabsTrigger>
-          <TabsTrigger value="health" data-testid="tab-health" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Health Info</TabsTrigger>
+          <TabsTrigger value="health" data-testid="tab-health" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Health Profile</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-6">

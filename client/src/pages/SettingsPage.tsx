@@ -12,6 +12,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/shared/lib/queryClient';
 import { getCurrentTimezone } from '@/shared/hooks/use-timezone';
 import { useAuth } from '@/contexts/AuthContext';
+import { PasswordRequirements } from '@/shared/components/auth/PasswordRequirements';
 
 // Time slot options for each notification type
 const TIME_SLOT_OPTIONS = [
@@ -46,6 +47,7 @@ export default function SettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordSubmitted, setPasswordSubmitted] = useState(false);
 
   // Fetch notification preferences from database
   const { data: notificationPrefs, isLoading: isLoadingPrefs } = useQuery<{
@@ -136,6 +138,7 @@ export default function SettingsPage() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setPasswordSubmitted(false);
     },
     onError: (error: Error) => {
       toast({
@@ -149,6 +152,8 @@ export default function SettingsPage() {
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
 
+    setPasswordSubmitted(true);
+    
     if (newPassword !== confirmPassword) {
       toast({
         variant: 'destructive',
@@ -158,12 +163,11 @@ export default function SettingsPage() {
       return;
     }
 
-    if (newPassword.length < 8) {
-      toast({
-        variant: 'destructive',
-        title: 'Password too short',
-        description: 'Password must be at least 8 characters long.',
-      });
+    const isStrong = newPassword.length >= 8 && 
+                    /[0-9]/.test(newPassword) && 
+                    /[^a-zA-Z0-9]/.test(newPassword);
+
+    if (!isStrong) {
       return;
     }
 
@@ -306,9 +310,10 @@ export default function SettingsPage() {
                       )}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Must be at least 8 characters long
-                  </p>
+                  <PasswordRequirements 
+                    passwordValue={newPassword} 
+                    isSubmitted={passwordSubmitted} 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirm-password">Confirm New Password</Label>
