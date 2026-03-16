@@ -2303,6 +2303,7 @@ export const outreachProspects = pgTable("outreach_prospects", {
     enrichmentScore?: number;
     enrichedAt?: string;
   }>(),
+  leadTier: varchar("lead_tier", { length: 10 }), // strong | medium | weak
   lastContactedAt: timestamp("last_contacted_at"),
   responseClassification: varchar("response_classification", { length: 30 }), // interested | declined | ask_later | forwarded | auto_reply
   discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
@@ -2356,10 +2357,28 @@ export const agentRuns = pgTable("agent_runs", {
   }>>(),
 });
 
+/** Journalist/editor contacts discovered at a prospect publication */
+export const prospectContacts = pgTable("prospect_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  prospectId: varchar("prospect_id").notNull().references(() => outreachProspects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  role: text("role"),                           // "Staff Writer", "Editor", "Contributor"
+  email: text("email"),
+  linkedinUrl: text("linkedin_url"),
+  twitterHandle: text("twitter_handle"),        // "@handle"
+  beat: text("beat"),                           // "supplements", "health tech", "nutrition"
+  recentArticles: json("recent_articles").$type<string[]>(),
+  confidenceScore: integer("confidence_score"), // 0–100
+  isPrimary: boolean("is_primary").default(false).notNull(), // preferred contact at this outlet
+  notes: text("notes"),
+  discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertOutreachProspectSchema = createInsertSchema(outreachProspects).omit({ id: true, discoveredAt: true });
 export const insertOutreachPitchSchema = createInsertSchema(outreachPitches).omit({ id: true, createdAt: true });
 export const insertAgentRunSchema = createInsertSchema(agentRuns).omit({ id: true, startedAt: true });
+export const insertProspectContactSchema = createInsertSchema(prospectContacts).omit({ id: true, discoveredAt: true });
 
 // Types
 export type OutreachProspect = typeof outreachProspects.$inferSelect;
@@ -2368,6 +2387,8 @@ export type OutreachPitch = typeof outreachPitches.$inferSelect;
 export type InsertOutreachPitch = z.infer<typeof insertOutreachPitchSchema>;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type InsertAgentRun = z.infer<typeof insertAgentRunSchema>;
+export type ProspectContact = typeof prospectContacts.$inferSelect;
+export type InsertProspectContact = z.infer<typeof insertProspectContactSchema>;
 
 // ─── AI Support Agent (Draft Responses) ──────────────────────────────────────
 

@@ -59,6 +59,11 @@ import {
   Zap,
   Globe,
   MessageCircle,
+  Linkedin,
+  Twitter,
+  Star,
+  Plus,
+  UserPlus,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -79,6 +84,7 @@ interface Prospect {
   contactMethod: string;
   topics: string[] | null;
   notes: string | null;
+  leadTier: 'strong' | 'medium' | 'weak' | null;
   discoveredAt: string;
 }
 
@@ -96,6 +102,22 @@ interface Pitch {
   sentVia: string | null;
   responseReceived: boolean;
   createdAt: string;
+}
+
+interface ProspectContact {
+  id: string;
+  prospectId: string;
+  name: string;
+  role: string | null;
+  email: string | null;
+  linkedinUrl: string | null;
+  twitterHandle: string | null;
+  beat: string | null;
+  recentArticles: string[] | null;
+  confidenceScore: number | null;
+  isPrimary: boolean;
+  notes: string | null;
+  discoveredAt: string;
 }
 
 interface AgentRun {
@@ -506,6 +528,7 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [contactFilter, setContactFilter] = useState<string>('all');
+  const [tierFilter, setTierFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [draftingIds, setDraftingIds] = useState<Set<string>>(new Set());
 
@@ -567,7 +590,8 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' }) {
       (p.topics && p.topics.some(t => t.toLowerCase().includes(searchTerm.toLowerCase())));
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
     const matchesContact = contactFilter === 'all' || p.contactMethod === contactFilter;
-    return matchesSearch && matchesStatus && matchesContact;
+    const matchesTier = tierFilter === 'all' || (tierFilter === 'unrated' ? !p.leadTier : p.leadTier === tierFilter);
+    return matchesSearch && matchesStatus && matchesContact && matchesTier;
   });
 
   const allSelected = prospects.length > 0 && prospects.every(p => selectedIds.has(p.id));
@@ -641,6 +665,26 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' }) {
               </Button>
             ))}
           </div>
+          {/* Lead tier filters */}
+          <div className="flex gap-1 border-l pl-2">
+            {[
+              { key: 'all', label: 'All Tiers' },
+              { key: 'strong', label: '🟢 Strong' },
+              { key: 'medium', label: '🟡 Medium' },
+              { key: 'weak', label: '🔴 Weak' },
+              { key: 'unrated', label: 'Unrated' },
+            ].map(f => (
+              <Button
+                key={f.key}
+                size="sm"
+                variant={tierFilter === f.key ? 'secondary' : 'ghost'}
+                onClick={() => setTierFilter(f.key)}
+                className="text-xs h-7"
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
@@ -674,6 +718,7 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' }) {
               </TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Score</TableHead>
+              <TableHead>Tier</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Discovered</TableHead>
@@ -703,6 +748,9 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' }) {
                 </TableCell>
                 <TableCell>
                   <ScoreBadge score={p.relevanceScore} />
+                </TableCell>
+                <TableCell>
+                  <TierBadge tier={p.leadTier} />
                 </TableCell>
                 <TableCell>
                   <ContactBadge method={p.contactMethod} email={p.contactEmail} />
@@ -1731,10 +1779,53 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactEmail, setNewContactEmail] = useState('');
+  const [newContactRole, setNewContactRole] = useState('');
+
   // Fetch pitches for this prospect
   const { data: prospectPitches } = useQuery<{ pitch: Pitch; prospect: Prospect }[]>({
     queryKey: ['/api/agent/pitches', 'prospect', prospect.id],
     queryFn: () => apiRequest('GET', `/api/agent/pitches?prospectId=${prospect.id}`).then(r => r.json()),
+  });
+
+  // Fetch journalist contacts for this prospect
+  const { data: contacts, isLoading: contactsLoading } = useQuery<ProspectContact[]>({
+    queryKey: ['/api/agent/prospects', prospect.id, 'contacts'],
+    queryFn: () => apiRequest('GET', `/api/agent/prospects/${prospect.id}/contacts`).then(r => r.json()),
+  });
+
+  const addContactMutation = useMutation({
+    mutationFn: (data: { name: string; email?: string; role?: string }) =>
+      apiRequest('POST', `/api/agent/prospects/${prospect.id}/contacts`, data).then(r => r.json()),
+    onSuccess: () => {
+      toast({ title: 'Contact added' });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects', prospect.id, 'contacts'] });
+      setShowAddContact(false);
+      setNewContactName('');
+      setNewContactEmail('');
+      setNewContactRole('');
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const deleteContactMutation = useMutation({
+    mutationFn: (contactId: string) =>
+      apiRequest('DELETE', `/api/agent/prospects/${prospect.id}/contacts/${contactId}`),
+    onSuccess: () => {
+      toast({ title: 'Contact removed' });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects', prospect.id, 'contacts'] });
+    },
+  });
+
+  const setPrimaryMutation = useMutation({
+    mutationFn: (contactId: string) =>
+      apiRequest('PATCH', `/api/agent/prospects/${prospect.id}/contacts/${contactId}`, { isPrimary: true }),
+    onSuccess: () => {
+      toast({ title: 'Primary contact updated' });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects', prospect.id, 'contacts'] });
+    },
   });
 
   const draftMutation = useMutation({
@@ -1751,8 +1842,10 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
   const enrichMutation = useMutation({
     mutationFn: () => apiRequest('POST', `/api/agent/prospects/${prospect.id}/enrich`, {}).then(r => r.json()),
     onSuccess: (data: any) => {
-      toast({ title: 'Prospect enriched', description: `Quality score: ${data.enrichmentScore || 'N/A'}` });
+      const journalistsMsg = data.journalistsFound ? ` · ${data.journalistsFound} writer(s) found` : '';
+      toast({ title: 'Prospect enriched', description: `Quality score: ${data.enrichmentScore || 'N/A'}${journalistsMsg}` });
       queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects', prospect.id, 'contacts'] });
     },
     onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
   });
@@ -1770,7 +1863,7 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{prospect.name}</DialogTitle>
           <DialogDescription>
@@ -1821,6 +1914,179 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
             </div>
           )}
 
+          {/* Journalist/Writer Contacts */}
+          <div className="border-t pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-muted-foreground text-sm font-medium flex items-center gap-1">
+                <Users className="h-4 w-4" /> Writers / Contacts
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setShowAddContact(!showAddContact)}
+              >
+                <Plus className="h-3 w-3 mr-1" /> Add
+              </Button>
+            </div>
+
+            {showAddContact && (
+              <div className="bg-muted/50 p-3 rounded-lg mb-2 space-y-2">
+                <Input
+                  placeholder="Name"
+                  value={newContactName}
+                  onChange={e => setNewContactName(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Email (optional)"
+                    value={newContactEmail}
+                    onChange={e => setNewContactEmail(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                  <Input
+                    placeholder="Role (optional)"
+                    value={newContactRole}
+                    onChange={e => setNewContactRole(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowAddContact(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={!newContactName.trim() || addContactMutation.isPending}
+                    onClick={() => addContactMutation.mutate({
+                      name: newContactName.trim(),
+                      email: newContactEmail.trim() || undefined,
+                      role: newContactRole.trim() || undefined,
+                    })}
+                  >
+                    {addContactMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {contactsLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                <Loader2 className="h-3 w-3 animate-spin" /> Loading contacts...
+              </div>
+            ) : contacts && contacts.length > 0 ? (
+              <div className="space-y-2">
+                {contacts.map(contact => (
+                  <div key={contact.id} className={`bg-muted/50 p-2.5 rounded-lg text-xs ${contact.isPrimary ? 'ring-1 ring-blue-300 bg-blue-50/50' : ''}`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium text-sm">{contact.name}</span>
+                          {contact.isPrimary && (
+                            <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-blue-100">
+                              <Star className="h-2.5 w-2.5 mr-0.5" /> Primary
+                            </Badge>
+                          )}
+                        </div>
+                        {contact.role && (
+                          <span className="text-muted-foreground">{contact.role}</span>
+                        )}
+                        {contact.beat && (
+                          <span className="text-muted-foreground ml-1">· Covers: {contact.beat}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 ml-2 shrink-0">
+                        {!contact.isPrimary && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            title="Set as primary contact"
+                            onClick={() => setPrimaryMutation.mutate(contact.id)}
+                          >
+                            <Star className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-red-400 hover:text-red-600"
+                          onClick={() => deleteContactMutation.mutate(contact.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-1.5">
+                      {contact.email && (
+                        <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline flex items-center gap-0.5">
+                          <Mail className="h-3 w-3" /> {contact.email}
+                        </a>
+                      )}
+                      {contact.linkedinUrl && (
+                        <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-0.5">
+                          <Linkedin className="h-3 w-3" /> LinkedIn
+                        </a>
+                      )}
+                      {contact.twitterHandle && (
+                        <a href={`https://x.com/${contact.twitterHandle.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-0.5">
+                          <Twitter className="h-3 w-3" /> {contact.twitterHandle}
+                        </a>
+                      )}
+                    </div>
+
+                    {contact.recentArticles && contact.recentArticles.length > 0 && (
+                      <div className="mt-1.5 text-[11px] text-muted-foreground">
+                        <span className="font-medium">Recent articles:</span>{' '}
+                        {contact.recentArticles.join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground py-1">
+                No contacts yet. Click <strong>Enrich</strong> to discover writers, or add manually.
+              </p>
+            )}
+          </div>
+
+          {/* Lead Tier Selector */}
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Lead Tier</span>
+            <div className="flex gap-1">
+              {(['strong', 'medium', 'weak'] as const).map(tier => (
+                <Button
+                  key={tier}
+                  size="sm"
+                  variant={prospect.leadTier === tier ? 'default' : 'outline'}
+                  className={`text-xs h-7 ${
+                    prospect.leadTier === tier
+                      ? tier === 'strong' ? 'bg-green-600 hover:bg-green-700'
+                        : tier === 'medium' ? 'bg-yellow-500 hover:bg-yellow-600'
+                        : 'bg-red-500 hover:bg-red-600'
+                      : ''
+                  }`}
+                  onClick={() => {
+                    const newTier = prospect.leadTier === tier ? null : tier;
+                    apiRequest('PATCH', `/api/agent/prospects/${prospect.id}`, { leadTier: newTier })
+                      .then(() => {
+                        prospect.leadTier = newTier;
+                        toast({ title: newTier ? `Marked as ${newTier} lead` : 'Tier removed' });
+                        queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
+                      })
+                      .catch((err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }));
+                  }}
+                >
+                  {tier === 'strong' ? '🟢' : tier === 'medium' ? '🟡' : '🔴'} {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                </Button>
+              ))}
+            </div>
+          </div>
+
           {/* Pitch History */}
           {prospectPitches && prospectPitches.length > 0 && (
             <div className="border-t pt-3">
@@ -1842,41 +2108,46 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
             </div>
           )}
         </div>
-        <DialogFooter>
-          {prospect.status !== 'cold' && (
-            <Button variant="ghost" className="text-muted-foreground mr-auto" onClick={() => archiveMutation.mutate()} disabled={archiveMutation.isPending}>
-              <Trash2 className="h-4 w-4 mr-2" /> Archive
+        <DialogFooter className="flex-wrap gap-2 sm:justify-between">
+          <div className="flex gap-2">
+            {prospect.status !== 'cold' && (
+              <Button variant="ghost" className="text-muted-foreground" onClick={() => archiveMutation.mutate()} disabled={archiveMutation.isPending}>
+                <Trash2 className="h-4 w-4 mr-1" /> Archive
+              </Button>
+            )}
+            {prospect.status !== 'manually_contacted' && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                onClick={() => {
+                  apiRequest('PATCH', `/api/agent/prospects/${prospect.id}`, { status: 'manually_contacted' })
+                    .then(() => {
+                      toast({ title: 'Marked as manually contacted' });
+                      queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
+                      queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
+                      onClose();
+                    })
+                    .catch((err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }));
+                }}
+              >
+                <UserCheck className="h-4 w-4 mr-1" /> Contacted
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
+            <Button variant="outline" size="sm" onClick={() => enrichMutation.mutate()} disabled={enrichMutation.isPending}>
+              {enrichMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Zap className="h-4 w-4 mr-1" />}
+              Enrich
             </Button>
-          )}
-          {prospect.status !== 'manually_contacted' && (
-            <Button
-              variant="outline"
-              className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-              onClick={() => {
-                apiRequest('PATCH', `/api/agent/prospects/${prospect.id}`, { status: 'manually_contacted' })
-                  .then(() => {
-                    toast({ title: 'Marked as manually contacted' });
-                    queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
-                    queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
-                    onClose();
-                  })
-                  .catch((err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }));
-              }}
-            >
-              <UserCheck className="h-4 w-4 mr-2" /> Manually Contacted
-            </Button>
-          )}
-          <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button variant="outline" onClick={() => enrichMutation.mutate()} disabled={enrichMutation.isPending}>
-            {enrichMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
-            Enrich
-          </Button>
-          {prospect.status === 'new' && (
-            <Button onClick={() => draftMutation.mutate()} disabled={draftMutation.isPending}>
-              {draftMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-              Draft Pitch
-            </Button>
-          )}
+            {prospect.status === 'new' && (
+              <Button size="sm" onClick={() => draftMutation.mutate()} disabled={draftMutation.isPending}>
+                {draftMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
+                Draft Pitch
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -2198,6 +2469,20 @@ function ScoreBadge({ score }: { score: number | null }) {
   if (score === null || score === undefined) return <span className="text-xs text-muted-foreground">—</span>;
   const color = score >= 75 ? 'text-green-600' : score >= 50 ? 'text-yellow-600' : 'text-red-500';
   return <span className={`font-mono text-sm font-medium ${color}`}>{score}</span>;
+}
+
+function TierBadge({ tier }: { tier: 'strong' | 'medium' | 'weak' | null }) {
+  if (!tier) return <span className="text-xs text-muted-foreground">—</span>;
+  const config = {
+    strong: { emoji: '🟢', label: 'Strong', className: 'bg-green-100 text-green-800 border-green-200' },
+    medium: { emoji: '🟡', label: 'Medium', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+    weak:   { emoji: '🔴', label: 'Weak',   className: 'bg-red-100 text-red-800 border-red-200' },
+  }[tier];
+  return (
+    <Badge variant="outline" className={`text-xs ${config.className}`}>
+      {config.emoji} {config.label}
+    </Badge>
+  );
 }
 
 function ContactBadge({ method, email }: { method: string; email: string | null }) {
