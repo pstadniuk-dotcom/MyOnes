@@ -304,6 +304,18 @@ export default function ConsultationPage() {
     });
   }, [toast, user?.name]);
 
+  // Warn user before leaving if they've sent messages in the conversation
+  const userHasSentMessage = messages.some(m => m.sender === 'user');
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (userHasSentMessage) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [userHasSentMessage]);
+
   // Restore draft on mount
   useEffect(() => {
     const savedDraft = localStorage.getItem(DRAFT_KEY);

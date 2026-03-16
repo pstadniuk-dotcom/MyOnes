@@ -6,8 +6,9 @@
  * It loads the actual page and extracts emails, forms, and metadata
  * that the web search summary might have missed.
  */
-import { chromium, type Browser, type Page } from 'playwright';
+import { type Page } from 'playwright';
 import logger from '../../../infra/logging/logger';
+import { acquireContext, releaseContext, closeBrowserPool } from './browser-pool';
 import type { AgentTool } from '../agent-runner';
 
 export interface DeepScrapeResult {
@@ -40,23 +41,9 @@ const IGNORE_EMAILS = new Set([
   'test@test.com',
 ]);
 
-let browserInstance: Browser | null = null;
-
-async function getBrowser(): Promise<Browser> {
-  if (!browserInstance || !browserInstance.isConnected()) {
-    browserInstance = await chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-  }
-  return browserInstance;
-}
-
+/** @deprecated Use closeBrowserPool() from browser-pool.ts instead */
 export async function closeBrowser(): Promise<void> {
-  if (browserInstance) {
-    await browserInstance.close();
-    browserInstance = null;
-  }
+  await closeBrowserPool();
 }
 
 /**
@@ -93,10 +80,7 @@ export async function executeDeepScrape(
   url: string,
   lookForContactPage: boolean = true,
 ): Promise<DeepScrapeResult> {
-  const browser = await getBrowser();
-  const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  });
+  const context = await acquireContext();
   const page = await context.newPage();
 
   const result: DeepScrapeResult = {
@@ -201,7 +185,7 @@ export async function executeDeepScrape(
   } catch (err: any) {
     logger.warn(`[deep-scrape] Failed to scrape ${url}: ${err.message}`);
   } finally {
-    await context.close();
+    await releaseContext(context);
   }
 
   return result;

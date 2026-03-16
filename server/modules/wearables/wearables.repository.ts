@@ -1,4 +1,5 @@
 import { db } from '../../infra/db/db';
+import { logger } from '../../infra/logging/logger';
 import {
     wearableConnections,
     biometricData,
@@ -31,14 +32,14 @@ export class WearablesRepository {
                             refreshToken: conn.refreshToken ? decryptToken(conn.refreshToken) : null
                         };
                     } catch (error) {
-                        console.error('Error decrypting tokens for connection:', conn.id, error);
+                        logger.error('Error decrypting tokens for connection', { connectionId: conn.id, error });
                         return conn;
                     }
                 }
                 return conn;
             });
         } catch (error) {
-            console.error('Error getting wearable connections:', error);
+            logger.error('Error getting wearable connections', { error });
             return [];
         }
     }
@@ -61,14 +62,14 @@ export class WearablesRepository {
                             refreshToken: conn.refreshToken ? decryptToken(conn.refreshToken) : null
                         };
                     } catch (error) {
-                        console.error('Error decrypting tokens for connection:', conn.id, error);
+                        logger.error('Error decrypting tokens for connection', { connectionId: conn.id, error });
                         return conn;
                     }
                 }
                 return conn;
             });
         } catch (error) {
-            console.error('Error getting all wearable connections:', error);
+            logger.error('Error getting all wearable connections', { error });
             return [];
         }
     }
@@ -95,14 +96,14 @@ export class WearablesRepository {
                             refreshToken: conn.refreshToken ? decryptToken(conn.refreshToken) : null
                         };
                     } catch (error) {
-                        console.error('Error decrypting tokens for connection:', conn.id, error);
+                        logger.error('Error decrypting tokens for connection', { connectionId: conn.id, error });
                         return conn;
                     }
                 }
                 return conn;
             });
         } catch (error) {
-            console.error('Error getting connections nearing expiry:', error);
+            logger.error('Error getting connections nearing expiry', { error });
             return [];
         }
     }
@@ -132,7 +133,7 @@ export class WearablesRepository {
                 refreshToken: connection.refreshToken ?? null
             };
         } catch (error) {
-            console.error('Error creating wearable connection:', error);
+            logger.error('Error creating wearable connection', { error });
             throw new Error('Failed to create wearable connection');
         }
     }
@@ -164,14 +165,14 @@ export class WearablesRepository {
                         refreshToken: updatedConnection.refreshToken ? decryptToken(updatedConnection.refreshToken) : null
                     };
                 } catch (error) {
-                    console.error('Error decrypting tokens after update:', error);
+                    logger.error('Error decrypting tokens after update', { error });
                     return updatedConnection;
                 }
             }
 
             return updatedConnection;
         } catch (error) {
-            console.error('Error updating wearable connection:', error);
+            logger.error('Error updating wearable connection', { error });
             return undefined;
         }
     }
@@ -198,7 +199,7 @@ export class WearablesRepository {
                 .returning();
             return !!connection;
         } catch (error) {
-            console.error('Error disconnecting wearable device:', error);
+            logger.error('Error disconnecting wearable device', { error });
             return false;
         }
     }
@@ -280,7 +281,7 @@ export class WearablesRepository {
                 },
             });
         } catch (error) {
-            console.error('Error saving biometric data:', error);
+            logger.error('Error saving biometric data', { error });
             throw new Error('Failed to save biometric data');
         }
     }
@@ -308,7 +309,7 @@ export class WearablesRepository {
                 return row;
             });
         } catch (error) {
-            console.error('Error getting biometric data:', error);
+            logger.error('Error getting biometric data', { error });
             return [];
         }
     }
@@ -327,7 +328,7 @@ export class WearablesRepository {
 
             return trend || null;
         } catch (error) {
-            console.error('Error getting biometric trends:', error);
+            logger.error('Error getting biometric trends', { error });
             return null;
         }
     }
@@ -440,7 +441,7 @@ export class WearablesRepository {
                 },
             });
         } catch (error) {
-            console.error('Error saving Junction biometric data:', error);
+            logger.error('Error saving Junction biometric data', { error });
             // Don't throw — webhook handlers should not crash on DB errors
         }
     }

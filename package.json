@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.70.0",
+    "@fal-ai/client": "^1.9.4",
     "@google-cloud/storage": "^7.17.1",
     "@greatsumini/react-facebook-login": "^3.4.0",
     "@hookform/resolvers": "^3.10.0",
@@ -79,6 +80,7 @@
     "framer-motion": "^11.13.1",
     "google-auth-library": "^10.5.0",
     "googleapis": "^171.4.0",
+    "helmet": "^8.1.0",
     "jsonrepair": "^3.13.1",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.453.0",
@@ -87,6 +89,7 @@
     "pdf-to-img": "^5.0.0",
     "pdfmake": "^0.2.20",
     "pg": "^8.18.0",
+    "playwright": "^1.57.0",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",

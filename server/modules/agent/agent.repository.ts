@@ -73,6 +73,11 @@ class AgentRepository {
     await db.update(outreachProspects).set(data).where(eq(outreachProspects.id, id));
   }
 
+  async deleteProspect(id: string): Promise<void> {
+    // Pitches cascade-delete via FK onDelete: 'cascade'
+    await db.delete(outreachProspects).where(eq(outreachProspects.id, id));
+  }
+
   /**
    * Check for existing prospects by normalized URL or normalized name.
    * Returns sets of both existing normalized URLs and names for comprehensive dedup.
@@ -115,7 +120,11 @@ class AgentRepository {
   // ── Pitches ──────────────────────────────────────────────────────────
 
   async createPitch(data: InsertOutreachPitch): Promise<OutreachPitch> {
-    const [pitch] = await db.insert(outreachPitches).values(data).returning();
+    const values = {
+      ...data,
+      qualityFlags: data.qualityFlags ? (data.qualityFlags as string[]) : undefined,
+    };
+    const [pitch] = await db.insert(outreachPitches).values(values).returning();
     return pitch;
   }
 
@@ -150,6 +159,17 @@ class AgentRepository {
 
   async updatePitch(id: string, data: Partial<OutreachPitch>): Promise<void> {
     await db.update(outreachPitches).set(data).where(eq(outreachPitches.id, id));
+  }
+
+  async deletePitch(id: string): Promise<void> {
+    await db.delete(outreachPitches).where(eq(outreachPitches.id, id));
+  }
+
+  async markPitchResponded(id: string): Promise<void> {
+    await db.update(outreachPitches).set({
+      responseReceived: true,
+      responseAt: new Date(),
+    }).where(eq(outreachPitches.id, id));
   }
 
   async getPitchesWithProspects(filters: {
@@ -250,6 +270,7 @@ class AgentRepository {
     sentPitches: number;
     responses: number;
     booked: number;
+    followUpsDue: number;
   }> {
     const [totalP] = await db.select({ count: count() }).from(outreachProspects);
     const [podcastP] = await db.select({ count: count() }).from(outreachProspects).where(eq(outreachProspects.category, 'podcast'));
@@ -269,7 +290,14 @@ class AgentRepository {
       sentPitches: sentPitches.count,
       responses: responses.count,
       booked: booked.count,
+      followUpsDue: 0, // Populated from getPendingFollowUps().length when needed
     };
+  }
+
+  async getStatsWithFollowUps() {
+    const base = await this.getStats();
+    const followUps = await this.getPendingFollowUps();
+    return { ...base, followUpsDue: followUps.length };
   }
 }
 

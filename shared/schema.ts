@@ -10,7 +10,8 @@ import {
   pgEnum,
   date,
   decimal,
-  uniqueIndex
+  uniqueIndex,
+  index
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -38,7 +39,8 @@ export const reorderRecommendationStatusEnum = pgEnum('reorder_recommendation_st
 export const streakTypeEnum = pgEnum('streak_type', ['overall', 'nutrition', 'workout', 'supplements', 'lifestyle']);
 export const adminActionEnum = pgEnum('admin_action', [
   'user_delete', 'user_suspend', 'user_unsuspend', 'user_admin_grant', 'user_admin_revoke',
-  'order_status_change', 'order_refund',
+  'user_view', 'user_note_add', 'data_export', 'conversation_view',
+  'order_status_change', 'order_refund', 'manufacturer_order_retry',
   'ticket_status_change', 'ticket_assign', 'ticket_reply',
   'settings_update', 'settings_reset',
   'faq_create', 'faq_update', 'faq_delete',
@@ -48,6 +50,7 @@ export const adminActionEnum = pgEnum('admin_action', [
   'ingredient_pricing_update',
   'formula_review_trigger',
   'newsletter_subscriber_toggle',
+  'bulk_delete_tickets', 'bulk_close_tickets', 'bulk_update_tickets',
 ]);
 
 // Users table - updated with name, email, phone, password
@@ -123,6 +126,24 @@ export const users = pgTable("users", {
   // null = use defaults from shared/metricCatalog.ts
   metricPreferences: json("metric_preferences"),
 
+  // Attribution & UTM tracking (captured at signup)
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  utmContent: text("utm_content"),
+  utmTerm: text("utm_term"),
+  referrer: text("referrer"), // HTTP referrer at signup
+  landingPage: text("landing_page"), // First page visited
+  signupChannel: text("signup_channel"), // Computed: direct, organic, social, paid, referral, email
+
+  // Referral tracking
+  referralCode: text("referral_code").unique(), // User's own referral code
+  referredByUserId: varchar("referred_by_user_id"), // Who referred them
+
+  // Account lockout (brute-force protection)
+  failedLoginAttempts: integer("failed_login_attempts").default(0).notNull(),
+  lockedUntil: timestamp("locked_until"),
+
   // Soft-delete & suspension (admin operations)
   deletedAt: timestamp("deleted_at"),
   deletedBy: varchar("deleted_by"),
@@ -131,7 +152,15 @@ export const users = pgTable("users", {
   suspendedReason: text("suspended_reason"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("users_email_idx").on(table.email),
+  index("users_phone_idx").on(table.phone),
+  index("users_stripe_customer_idx").on(table.stripeCustomerId),
+  index("users_created_at_idx").on(table.createdAt),
+  index("users_referral_code_idx").on(table.referralCode),
+  index("users_utm_source_idx").on(table.utmSource),
+  index("users_signup_channel_idx").on(table.signupChannel),
+]);
 
 // Password reset tokens
 export const passwordResetTokens = pgTable("password_reset_tokens", {
@@ -142,6 +171,20 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   used: boolean("used").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Refresh tokens for JWT rotation
+export const refreshTokens = pgTable("refresh_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  family: varchar("family").notNull(), // Token family for rotation detection
+  expiresAt: timestamp("expires_at").notNull(),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("refresh_tokens_user_id_idx").on(table.userId),
+  index("refresh_tokens_family_idx").on(table.family),
+]);
 
 // Email verification tokens
 export const emailVerificationTokens = pgTable("email_verification_tokens", {
@@ -206,7 +249,10 @@ export const chatSessions = pgTable("chat_sessions", {
   title: varchar("title", { length: 255 }),
   status: chatStatusEnum("status").default('active').notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("chat_sessions_user_id_idx").on(table.userId),
+  index("chat_sessions_created_at_idx").on(table.createdAt),
+]);
 
 // Messages within chat sessions
 export const messages = pgTable("messages", {
@@ -224,7 +270,9 @@ export const messages = pgTable("messages", {
     disclaimers?: string[];
   }>(), // Formula data if AI created one in this message
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("messages_session_id_idx").on(table.sessionId),
+]);
 
 // Supplement formulas
 export const formulas = pgTable("formulas", {
@@ -272,7 +320,9 @@ export const formulas = pgTable("formulas", {
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"), // Null = active, timestamp = archived
-});
+}, (table) => [
+  index("formulas_user_id_idx").on(table.userId),
+]);
 
 // Formula warning acknowledgments — legal paper trail
 export const formulaWarningAcknowledgments = pgTable("formula_warning_acknowledgments", {
@@ -405,7 +455,12 @@ export const orders = pgTable("orders", {
     /** Timestamp when this snapshot was captured */
     capturedAt: string;
   }>(),
-});
+}, (table) => [
+  index("orders_user_id_idx").on(table.userId),
+  index("orders_status_idx").on(table.status),
+  index("orders_placed_at_idx").on(table.placedAt),
+  index("orders_stripe_session_idx").on(table.stripeSessionId),
+]);
 
 // Ingredient pricing reference for equivalent stack estimates
 export const ingredientPricing = pgTable("ingredient_pricing", {
@@ -478,7 +533,10 @@ export const fileUploads = pgTable("file_uploads", {
   // Soft delete for compliance (never actually delete PHI)
   deletedAt: timestamp("deleted_at"),
   deletedBy: varchar("deleted_by").references(() => users.id),
-});
+}, (table) => [
+  index("file_uploads_user_id_idx").on(table.userId),
+  index("file_uploads_type_idx").on(table.type),
+]);
 
 // HIPAA-compliant audit log for all file operations
 export const auditLogs = pgTable("audit_logs", {
@@ -493,7 +551,11 @@ export const auditLogs = pgTable("audit_logs", {
   success: boolean("success").notNull(),
   errorMessage: text("error_message"),
   metadata: json("metadata").$type<Record<string, any>>(),
-});
+}, (table) => [
+  index("audit_logs_user_id_idx").on(table.userId),
+  index("audit_logs_file_id_idx").on(table.fileId),
+  index("audit_logs_timestamp_idx").on(table.timestamp),
+]);
 
 // Admin action audit log — tracks all admin write operations
 export const adminAuditLogs = pgTable("admin_audit_logs", {
@@ -959,6 +1021,177 @@ export type AppSetting = typeof appSettings.$inferSelect;
 export type InsertUserAdminNote = z.infer<typeof insertUserAdminNoteSchema>;
 export type UserAdminNote = typeof userAdminNotes.$inferSelect;
 
+// Referral tracking - tracks referral code usage and rewards
+export const referralEvents = pgTable("referral_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  referrerUserId: varchar("referrer_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  referredUserId: varchar("referred_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  referralCode: text("referral_code").notNull(),
+  eventType: text("event_type").notNull(), // 'signup', 'first_order', 'reorder'
+  rewardType: text("reward_type"), // 'discount', 'credit', 'free_month'
+  rewardAmountCents: integer("reward_amount_cents"),
+  rewardApplied: boolean("reward_applied").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("referral_events_referrer_idx").on(table.referrerUserId),
+  index("referral_events_referred_idx").on(table.referredUserId),
+]);
+
+export const insertReferralEventSchema = createInsertSchema(referralEvents);
+export type InsertReferralEvent = z.infer<typeof insertReferralEventSchema>;
+export type ReferralEvent = typeof referralEvents.$inferSelect;
+
+// Marketing campaigns - tracks campaigns across channels
+export const marketingCampaigns = pgTable("marketing_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  channel: text("channel").notNull(), // 'email', 'social', 'paid', 'content', 'podcast', 'influencer'
+  utmCampaign: text("utm_campaign").unique(), // Maps to utm_campaign param
+  status: text("status").default('draft').notNull(), // 'draft', 'active', 'paused', 'completed'
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  budgetCents: integer("budget_cents"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("marketing_campaigns_status_idx").on(table.status),
+  index("marketing_campaigns_channel_idx").on(table.channel),
+]);
+
+export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaigns);
+export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSchema>;
+export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
+
+// Influencer Management
+export const influencers = pgTable("influencers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  handle: text("handle"), // @handle
+  platform: text("platform").notNull(), // instagram, tiktok, youtube, podcast, twitter, linkedin
+  followerCount: integer("follower_count"),
+  engagementRate: decimal("engagement_rate", { precision: 5, scale: 2 }), // e.g. 3.50%
+  niche: text("niche"), // fitness, wellness, biohacking, nutrition, longevity
+  email: text("email"),
+  phone: text("phone"),
+  website: text("website"),
+
+  // Partnership details
+  agreementType: text("agreement_type"), // affiliate, ambassador, one_time, gifting
+  commissionPercent: integer("commission_percent"), // e.g. 15
+  promoCode: text("promo_code").unique(),
+  contractStartDate: timestamp("contract_start_date"),
+  contractEndDate: timestamp("contract_end_date"),
+
+  // Tracking
+  status: text("status").default('prospect').notNull(), // prospect, contacted, negotiating, active, paused, churned
+  totalSignups: integer("total_signups").default(0).notNull(),
+  totalOrders: integer("total_orders").default(0).notNull(),
+  totalRevenueCents: integer("total_revenue_cents").default(0).notNull(),
+  totalCommissionCents: integer("total_commission_cents").default(0).notNull(),
+  lastPostDate: timestamp("last_post_date"),
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("influencers_status_idx").on(table.status),
+  index("influencers_platform_idx").on(table.platform),
+  index("influencers_promo_code_idx").on(table.promoCode),
+]);
+
+export const insertInfluencerSchema = createInsertSchema(influencers);
+export type InsertInfluencer = z.infer<typeof insertInfluencerSchema>;
+export type Influencer = typeof influencers.$inferSelect;
+
+// Influencer content tracking
+export const influencerContent = pgTable("influencer_content", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  influencerId: varchar("influencer_id").notNull().references(() => influencers.id, { onDelete: "cascade" }),
+  contentType: text("content_type").notNull(), // post, story, reel, video, podcast_mention, blog
+  platform: text("platform").notNull(),
+  url: text("url"),
+  expectedDate: timestamp("expected_date"),
+  publishedDate: timestamp("published_date"),
+  status: text("status").default('planned').notNull(), // planned, submitted, approved, published, missed
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("influencer_content_influencer_idx").on(table.influencerId),
+]);
+
+export const insertInfluencerContentSchema = createInsertSchema(influencerContent);
+export type InsertInfluencerContent = z.infer<typeof insertInfluencerContentSchema>;
+export type InfluencerContent = typeof influencerContent.$inferSelect;
+
+// B2B Medical Prospecting
+export const b2bProspects = pgTable("b2b_prospects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceName: text("practice_name").notNull(),
+  practiceType: text("practice_type").notNull(), // naturopathic, integrative, functional_medicine, sports_medicine, chiropractic, wellness_clinic, pharmacy
+  specialty: text("specialty"),
+  website: text("website"),
+  phone: text("phone"),
+  email: text("email"),
+
+  // Address
+  addressLine1: text("address_line1"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+
+  // Contacts
+  primaryContactName: text("primary_contact_name"),
+  primaryContactTitle: text("primary_contact_title"),
+  primaryContactEmail: text("primary_contact_email"),
+
+  // Scoring & status
+  leadScore: integer("lead_score").default(0).notNull(), // 0-100
+  status: text("status").default('new').notNull(), // new, contacted, responded, meeting_scheduled, sample_sent, trial, active_partner, churned, rejected
+  source: text("source"), // npi_registry, google_places, manual, referral, inbound
+  providerCount: integer("provider_count"),
+
+  // Tracking
+  contactedAt: timestamp("contacted_at"),
+  lastActivityAt: timestamp("last_activity_at"),
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("b2b_prospects_status_idx").on(table.status),
+  index("b2b_prospects_type_idx").on(table.practiceType),
+  index("b2b_prospects_state_idx").on(table.state),
+  index("b2b_prospects_lead_score_idx").on(table.leadScore),
+]);
+
+export const insertB2bProspectSchema = createInsertSchema(b2bProspects);
+export type InsertB2bProspect = z.infer<typeof insertB2bProspectSchema>;
+export type B2bProspect = typeof b2bProspects.$inferSelect;
+
+// B2B outreach tracking
+export const b2bOutreach = pgTable("b2b_outreach", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  prospectId: varchar("prospect_id").notNull().references(() => b2bProspects.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // email, call, meeting, sample_sent, follow_up
+  subject: text("subject"),
+  body: text("body"),
+  sentAt: timestamp("sent_at"),
+  openedAt: timestamp("opened_at"),
+  repliedAt: timestamp("replied_at"),
+  outcome: text("outcome"), // positive, negative, no_response, meeting_booked
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("b2b_outreach_prospect_idx").on(table.prospectId),
+]);
+
+export const insertB2bOutreachSchema = createInsertSchema(b2bOutreach);
+export type InsertB2bOutreach = z.infer<typeof insertB2bOutreachSchema>;
+export type B2bOutreach = typeof b2bOutreach.$inferSelect;
+
 // Auth-specific schemas
 export const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters long').max(45, 'Name must be less than 45 characters'),
@@ -971,10 +1204,13 @@ export const signupSchema = z.object({
   acceptedTerms: z.literal(true, {
     errorMap: () => ({ message: 'You must accept the Terms of Service and Privacy Policy' }),
   }),
+  ageConfirmed: z.literal(true, {
+    errorMap: () => ({ message: 'You must confirm you are 18 years of age or older' }),
+  }),
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
+  email: z.string().email('Please enter a valid email address').max(254, 'Email is too long').transform(v => v.toLowerCase().trim()),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -1131,6 +1367,9 @@ export const faqItems = pgTable("faq_items", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Support ticket source enum
+export const supportTicketSourceEnum = pgEnum('support_ticket_source', ['web', 'email', 'chat', 'api', 'internal']);
+
 // Support tickets table
 export const supportTickets = pgTable("support_tickets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1142,6 +1381,14 @@ export const supportTickets = pgTable("support_tickets", {
   category: text("category").notNull(),
   assignedTo: text("assigned_to"),
   adminNotes: text("admin_notes"),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
+  source: supportTicketSourceEnum("source").default('web').notNull(),
+  firstResponseAt: timestamp("first_response_at"),
+  slaDeadline: timestamp("sla_deadline"),
+  slaBreached: boolean("sla_breached").default(false).notNull(),
+  mergedIntoId: varchar("merged_into_id"),
+  responseCount: integer("response_count").default(0).notNull(),
+  lastActivityAt: timestamp("last_activity_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at"),
@@ -1154,6 +1401,18 @@ export const supportTicketResponses = pgTable("support_ticket_responses", {
   userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
   isStaff: boolean("is_staff").default(false).notNull(),
   message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Support ticket activity log (audit trail)
+export const supportTicketActivityLog = pgTable("support_ticket_activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: varchar("ticket_id").notNull().references(() => supportTickets.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(), // status_change, assignment, priority_change, reply, tag_add, tag_remove, merge, note
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  metadata: text("metadata"), // JSON string for extra context
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1206,6 +1465,11 @@ export const insertSupportTicketResponseSchema = createInsertSchema(supportTicke
   createdAt: true,
 });
 
+export const insertSupportTicketActivityLogSchema = createInsertSchema(supportTicketActivityLog).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertHelpArticleSchema = createInsertSchema(helpArticles).omit({
   id: true,
   createdAt: true,
@@ -1221,6 +1485,9 @@ export type SupportTicket = typeof supportTickets.$inferSelect;
 
 export type InsertSupportTicketResponse = z.infer<typeof insertSupportTicketResponseSchema>;
 export type SupportTicketResponse = typeof supportTicketResponses.$inferSelect;
+
+export type InsertSupportTicketActivityLog = z.infer<typeof insertSupportTicketActivityLogSchema>;
+export type SupportTicketActivityLog = typeof supportTicketActivityLog.$inferSelect;
 
 export type InsertHelpArticle = z.infer<typeof insertHelpArticleSchema>;
 export type HelpArticle = typeof helpArticles.$inferSelect;
@@ -1983,7 +2250,7 @@ export const outreachSubTypeEnum = pgEnum('outreach_sub_type', [
 ]);
 
 export const outreachProspectStatusEnum = pgEnum('outreach_prospect_status', [
-  'new', 'pitched', 'responded', 'booked', 'published', 'rejected', 'cold',
+  'new', 'pitched', 'responded', 'booked', 'published', 'rejected', 'cold', 'manually_contacted',
 ]);
 
 export const outreachContactMethodEnum = pgEnum('outreach_contact_method', [
@@ -2031,6 +2298,17 @@ export const outreachProspects = pgTable("outreach_prospects", {
     required: boolean;
   }>>(),
   notes: text("notes"),
+  enrichmentData: json("enrichment_data").$type<{
+    episodeCount?: number;
+    lastPublishDate?: string;
+    rssFeedUrl?: string;
+    socialLinks?: string[];
+    enrichmentScore?: number;
+    enrichedAt?: string;
+  }>(),
+  leadTier: varchar("lead_tier", { length: 10 }), // strong | medium | weak
+  lastContactedAt: timestamp("last_contacted_at"),
+  responseClassification: varchar("response_classification", { length: 30 }), // interested | declined | ask_later | forwarded | auto_reply
   discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
   source: varchar("source", { length: 50 }).default('web_search').notNull(),
 });
@@ -2045,6 +2323,8 @@ export const outreachPitches = pgTable("outreach_pitches", {
   subject: text("subject").notNull(),
   body: text("body").notNull(),
   formAnswers: json("form_answers").$type<Record<string, string>>(),
+  formScreenshotFilled: text("form_screenshot_filled"), // path to screenshot of filled form
+  formScreenshotSubmitted: text("form_screenshot_submitted"), // path to screenshot after submit
   status: outreachPitchStatusEnum("status").default('draft').notNull(),
   reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: "set null" }),
   reviewedAt: timestamp("reviewed_at"),
@@ -2053,7 +2333,10 @@ export const outreachPitches = pgTable("outreach_pitches", {
   responseReceived: boolean("response_received").default(false).notNull(),
   responseAt: timestamp("response_at"),
   responseSummary: text("response_summary"),
+  responseClassification: varchar("response_classification", { length: 30 }), // interested | declined | ask_later | forwarded | auto_reply
   followUpDueAt: timestamp("follow_up_due_at"),
+  qualityScore: integer("quality_score"),
+  qualityFlags: json("quality_flags").$type<string[]>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -2077,10 +2360,28 @@ export const agentRuns = pgTable("agent_runs", {
   }>>(),
 });
 
+/** Journalist/editor contacts discovered at a prospect publication */
+export const prospectContacts = pgTable("prospect_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  prospectId: varchar("prospect_id").notNull().references(() => outreachProspects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  role: text("role"),                           // "Staff Writer", "Editor", "Contributor"
+  email: text("email"),
+  linkedinUrl: text("linkedin_url"),
+  twitterHandle: text("twitter_handle"),        // "@handle"
+  beat: text("beat"),                           // "supplements", "health tech", "nutrition"
+  recentArticles: json("recent_articles").$type<string[]>(),
+  confidenceScore: integer("confidence_score"), // 0–100
+  isPrimary: boolean("is_primary").default(false).notNull(), // preferred contact at this outlet
+  notes: text("notes"),
+  discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertOutreachProspectSchema = createInsertSchema(outreachProspects).omit({ id: true, discoveredAt: true });
 export const insertOutreachPitchSchema = createInsertSchema(outreachPitches).omit({ id: true, createdAt: true });
 export const insertAgentRunSchema = createInsertSchema(agentRuns).omit({ id: true, startedAt: true });
+export const insertProspectContactSchema = createInsertSchema(prospectContacts).omit({ id: true, discoveredAt: true });
 
 // Types
 export type OutreachProspect = typeof outreachProspects.$inferSelect;
@@ -2089,3 +2390,77 @@ export type OutreachPitch = typeof outreachPitches.$inferSelect;
 export type InsertOutreachPitch = z.infer<typeof insertOutreachPitchSchema>;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type InsertAgentRun = z.infer<typeof insertAgentRunSchema>;
+export type ProspectContact = typeof prospectContacts.$inferSelect;
+export type InsertProspectContact = z.infer<typeof insertProspectContactSchema>;
+
+// ─── AI Support Agent (Draft Responses) ──────────────────────────────────────
+
+export const aiSupportDraftStatusEnum = pgEnum('ai_support_draft_status', ['pending', 'approved', 'edited', 'dismissed']);
+export const aiSupportDraftSourceEnum = pgEnum('ai_support_draft_source', ['ticket', 'live_chat']);
+
+export const aiSupportDrafts = pgTable("ai_support_drafts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  /** 'ticket' or 'live_chat' */
+  source: aiSupportDraftSourceEnum("source").notNull(),
+  /** Reference to either supportTickets.id or liveChatSessions.id */
+  sourceId: varchar("source_id").notNull(),
+  /** The user/customer who submitted the ticket or started the chat */
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  /** Summary of the customer's issue, generated by AI */
+  summary: text("summary").notNull(),
+  /** AI-generated draft response ready for admin review */
+  draftResponse: text("draft_response").notNull(),
+  /** Admin-edited version (populated when admin edits before sending) */
+  editedResponse: text("edited_response"),
+  /** pending → approved/edited/dismissed */
+  status: aiSupportDraftStatusEnum("status").default('pending').notNull(),
+  /** Which AI model generated the draft */
+  model: text("model"),
+  /** Admin who reviewed this draft */
+  reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  /** When the admin reviewed/actioned the draft */
+  reviewedAt: timestamp("reviewed_at"),
+  /** Additional context: ticket subject, chat metadata, etc. */
+  metadata: json("metadata").$type<{
+    subject?: string;
+    category?: string;
+    priority?: string;
+    guestEmail?: string;
+    guestName?: string;
+    messageCount?: number;
+    lastCustomerMessage?: string;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Insert schema
+export const insertAiSupportDraftSchema = createInsertSchema(aiSupportDrafts).omit({ id: true, createdAt: true });
+
+// Types
+export type AiSupportDraft = typeof aiSupportDrafts.$inferSelect;
+export type InsertAiSupportDraft = z.infer<typeof insertAiSupportDraftSchema>;
+
+// ─── Notification Log (cross-scheduler dedup) ────────────────────────────────
+
+export const notificationChannelEnum = pgEnum('notification_channel', ['email', 'sms', 'in_app']);
+
+export const notificationLog = pgTable("notification_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** Which scheduler/service sent it: formula_review | smart_reorder | sms_renewal */
+  source: varchar("source", { length: 50 }).notNull(),
+  /** Notification topic for dedup: renewal_nudge | reorder_review | formula_drift */
+  topic: varchar("topic", { length: 50 }).notNull(),
+  /** email | sms | in_app */
+  channel: notificationChannelEnum("channel").notNull(),
+  /** Optional metadata (drift score, days until renewal, etc.) */
+  metadata: json("metadata").$type<Record<string, any>>(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+
+// Insert schema
+export const insertNotificationLogSchema = createInsertSchema(notificationLog).omit({ id: true, sentAt: true });
+
+// Types
+export type NotificationLogEntry = typeof notificationLog.$inferSelect;
+export type InsertNotificationLogEntry = z.infer<typeof insertNotificationLogSchema>;

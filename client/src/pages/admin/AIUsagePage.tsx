@@ -76,16 +76,67 @@ export default function AIUsagePage() {
     },
   });
 
-  const dailyAvgCents = data?.dailyCosts?.length
-    ? Math.round(data.totalCostCents / data.dailyCosts.length)
+  // Use days elapsed since first usage (not the full window) for accurate projections
+  // This prevents diluting a busy day across weeks of no data
+  const elapsedDays = (() => {
+    if (!data?.dailyCosts?.length) return days;
+    const firstDate = new Date(data.dailyCosts[0].date);
+    const now = new Date();
+    const diff = Math.ceil((now.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(diff, 1);
+  })();
+
+  const dailyAvgCents = data
+    ? Math.round(data.totalCostCents / elapsedDays)
     : 0;
 
   const projectedMonthlyCents = dailyAvgCents * 30;
 
+  // Aggregate daily costs into weekly buckets (always fill all weeks in the window)
+  const weeklyCosts = (() => {
+    if (!data?.dailyCosts) return [];
+    const now = new Date();
+    const weeks: Array<{ label: string; totalCostCents: number; callCount: number }> = [];
+    const totalWeeks = Math.ceil(days / 7);
+
+    // Build a map of date → cost for quick lookup
+    const costMap = new Map<string, { totalCostCents: number; callCount: number }>();
+    for (const d of data.dailyCosts) {
+      costMap.set(d.date, { totalCostCents: d.totalCostCents, callCount: d.callCount });
+    }
+
+    for (let w = totalWeeks - 1; w >= 0; w--) {
+      const weekEnd = new Date(now);
+      weekEnd.setDate(weekEnd.getDate() - w * 7);
+      const weekStart = new Date(weekEnd);
+      weekStart.setDate(weekStart.getDate() - 6);
+
+      let totalCostCents = 0;
+      let callCount = 0;
+      for (let d = new Date(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
+        const key = d.toISOString().slice(0, 10);
+        const entry = costMap.get(key);
+        if (entry) {
+          totalCostCents += entry.totalCostCents;
+          callCount += entry.callCount;
+        }
+      }
+
+      const startLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`;
+      const endLabel = `${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
+      weeks.push({ label: `${startLabel}–${endLabel}`, totalCostCents, callCount });
+    }
+    return weeks;
+  })();
+
   // Max for chart scaling
-  const maxDailyCost = data?.dailyCosts?.length
-    ? Math.max(...data.dailyCosts.map(d => d.totalCostCents), 1)
+  const maxWeeklyCost = weeklyCosts.length
+    ? Math.max(...weeklyCosts.map(w => w.totalCostCents), 1)
     : 1;
+
+  const weeklyAvgCents = weeklyCosts.length
+    ? Math.round(data!.totalCostCents / weeklyCosts.length)
+    : 0;
 
   const topUser = data?.byUser?.[0];
 
@@ -183,39 +234,44 @@ export default function AIUsagePage() {
             </Card>
           </div>
 
-          {/* Daily Cost Chart */}
-          {data.dailyCosts.length > 0 && (
+          {/* Weekly Cost Chart */}
+          {weeklyCosts.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" /> Daily AI Spend
+                  <BarChart3 className="h-4 w-4" /> Weekly AI Spend
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-end gap-[2px] h-40">
-                  {data.dailyCosts.map((day) => (
+                <div className="flex gap-2 h-40">
+                  {weeklyCosts.map((week) => (
                     <div
-                      key={day.date}
-                      className="flex-1 group relative"
+                      key={week.label}
+                      className="flex-1 group relative flex flex-col justify-end"
                     >
                       <div
                         className={cn(
                           "w-full rounded-t transition-colors",
-                          day.totalCostCents > dailyAvgCents * 2 ? "bg-red-400" : "bg-blue-400 group-hover:bg-blue-500"
+                          week.totalCostCents > weeklyAvgCents * 2 ? "bg-red-400" : "bg-blue-400 group-hover:bg-blue-500"
                         )}
                         style={{
-                          height: `${Math.max((day.totalCostCents / maxDailyCost) * 100, 2)}%`,
+                          height: week.totalCostCents > 0
+                            ? `${Math.max((week.totalCostCents / maxWeeklyCost) * 100, 4)}%`
+                            : '2px',
                         }}
                       />
                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
-                        {day.date}: {formatCost(day.totalCostCents)} ({day.callCount} calls)
+                        {week.label}: {formatCost(week.totalCostCents)} ({week.callCount} calls)
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                  <span>{data.dailyCosts[0]?.date}</span>
-                  <span>{data.dailyCosts[data.dailyCosts.length - 1]?.date}</span>
+                  {weeklyCosts.map((week) => (
+                    <span key={week.label} className="flex-1 text-center truncate text-[10px]">
+                      {week.label}
+                    </span>
+                  ))}
                 </div>
               </CardContent>
             </Card>

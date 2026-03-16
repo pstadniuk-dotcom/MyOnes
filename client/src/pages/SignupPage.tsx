@@ -38,6 +38,7 @@ export default function SignupPage() {
       password: '',
       confirmPassword: '',
       acceptedTerms: undefined as unknown as true,
+      ageConfirmed: undefined as unknown as true,
     }
   });
 
@@ -48,7 +49,20 @@ export default function SignupPage() {
     try {
       // Extract signup data without confirmPassword
       const { confirmPassword, ...signupData } = data;
-      await signup(signupData);
+
+      // Capture UTM params and referral from URL
+      const params = new URLSearchParams(window.location.search);
+      const attribution: Record<string, string> = {};
+      if (params.get('utm_source')) attribution.utmSource = params.get('utm_source')!;
+      if (params.get('utm_medium')) attribution.utmMedium = params.get('utm_medium')!;
+      if (params.get('utm_campaign')) attribution.utmCampaign = params.get('utm_campaign')!;
+      if (params.get('utm_content')) attribution.utmContent = params.get('utm_content')!;
+      if (params.get('utm_term')) attribution.utmTerm = params.get('utm_term')!;
+      if (params.get('ref')) attribution.referralCode = params.get('ref')!;
+      attribution.referrer = document.referrer || '';
+      attribution.landingPage = sessionStorage.getItem('landing_page') || window.location.pathname;
+
+      await signup({ ...signupData, ...attribution } as any);
     } catch (error) {
       // Error handling is managed by AuthContext
       console.error('Signup error:', error);
@@ -224,6 +238,30 @@ export default function SignupPage() {
                           <Link href="/terms" className="text-primary font-semibold hover:underline decoration-primary/30 underline-offset-2">Terms of Service</Link>
                           {' '}and{' '}
                           <Link href="/privacy" className="text-primary font-semibold hover:underline decoration-primary/30 underline-offset-2">Privacy Policy</Link>.
+                        </label>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="ageConfirmed"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-start gap-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === true}
+                            onCheckedChange={(checked) => field.onChange(checked === true ? true : undefined)}
+                            id="ageConfirmed"
+                            className="mt-0.5"
+                            data-testid="checkbox-age"
+                          />
+                        </FormControl>
+                        <label htmlFor="ageConfirmed" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                          I confirm I am 18 years of age or older
                         </label>
                       </div>
                       <FormMessage />

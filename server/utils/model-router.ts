@@ -1,3 +1,5 @@
+import { logger } from '../infra/logging/logger';
+
 export interface Message {
   id: string;
   sessionId: string;
@@ -54,7 +56,7 @@ export function classifyQuery(
   
   // ALWAYS use o1-mini for formula creation/adjustment
   if (hasFormulaKeyword || sessionContext.hasActiveFormula) {
-    console.log('🔀 MODEL ROUTER: Using o1-mini (formula-related)');
+    logger.debug('MODEL ROUTER: Using o1-mini (formula-related)');
     return {
       model: 'o1-mini',
       reason: 'Formula creation or adjustment requires validation and lab context',
@@ -64,7 +66,7 @@ export function classifyQuery(
   
   // ALWAYS use o1-mini for lab-related questions
   if (hasLabKeyword || sessionContext.hasLabReports) {
-    console.log('🔀 MODEL ROUTER: Using o1-mini (lab analysis)');
+    logger.debug('MODEL ROUTER: Using o1-mini (lab analysis)');
     return {
       model: 'o1-mini',
       reason: 'Lab analysis requires comprehensive medical knowledge',
@@ -74,7 +76,7 @@ export function classifyQuery(
   
   // ALWAYS use o1-mini for complex medical consultations
   if (hasMedicalKeyword && (messageLength > 200 || sessionContext.messageCount > 3)) {
-    console.log('🔀 MODEL ROUTER: Using o1-mini (complex medical consultation)');
+    logger.debug('MODEL ROUTER: Using o1-mini (complex medical consultation)');
     return {
       model: 'o1-mini',
       reason: 'Complex medical question requiring deep analysis',
@@ -84,7 +86,7 @@ export function classifyQuery(
   
   // Use GPT-4o for simple, straightforward questions
   if (hasSimpleKeyword && messageLength < 150 && !hasMedicalKeyword) {
-    console.log('🔀 MODEL ROUTER: Using gpt-4o (simple question)');
+    logger.debug('MODEL ROUTER: Using gpt-4o (simple question)');
     return {
       model: 'gpt-4o',
       reason: 'Simple informational question',
@@ -94,7 +96,7 @@ export function classifyQuery(
   
   // Use GPT-4 for general conversation, short questions
   if (messageLength < 100 && sessionContext.messageCount < 5 && !hasMedicalKeyword) {
-    console.log('🔀 MODEL ROUTER: Using gpt-4 (general conversation)');
+    logger.debug('MODEL ROUTER: Using gpt-4 (general conversation)');
     return {
       model: 'gpt-4',
       reason: 'Brief conversational message',
@@ -103,7 +105,7 @@ export function classifyQuery(
   }
   
   // Default to o1-mini for safety (medical context)
-  console.log('🔀 MODEL ROUTER: Using o1-mini (default/safety)');
+  logger.debug('MODEL ROUTER: Using o1-mini (default/safety)');
   return {
     model: 'o1-mini',
     reason: 'Default to comprehensive analysis for safety',

@@ -13,6 +13,15 @@ import {
   ChevronUp,
   ExternalLink,
   Copy,
+  LogIn,
+  UserCog,
+  Upload,
+  Download,
+  Trash2,
+  XCircle,
+  Eye,
+  Share2,
+  Inbox,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -29,16 +38,11 @@ import { apiRequest } from '@/shared/lib/queryClient';
 import { useToast } from '@/shared/hooks/use-toast';
 import { cn } from '@/shared/lib/utils';
 
-type TabType = 'file-audit' | 'safety' | 'acknowledgments' | 'consents';
+type TabType = 'auth-events' | 'admin-actions' | 'file-audit' | 'safety' | 'acknowledgments' | 'consents';
 
-// ---- Expandable Row Wrapper ----
-function ExpandableRow({
-  cells,
-  details,
-}: {
-  cells: React.ReactNode;
-  details: React.ReactNode;
-}) {
+// ---- Shared Components ----
+
+function ExpandableRow({ cells, details }: { cells: React.ReactNode; details: React.ReactNode }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <>
@@ -54,9 +58,7 @@ function ExpandableRow({
       {expanded && (
         <TableRow className="bg-gray-50/60">
           <TableCell colSpan={10} className="p-0">
-            <div className="px-6 py-4 border-t border-gray-100">
-              {details}
-            </div>
+            <div className="px-6 py-4 border-t border-gray-100">{details}</div>
           </TableCell>
         </TableRow>
       )}
@@ -92,6 +94,226 @@ function DetailGrid({ items }: { items: { label: string; value: React.ReactNode 
   );
 }
 
+function EmptyState({ icon: Icon, message }: { icon: React.ComponentType<{ className?: string }>; message: string }) {
+  return (
+    <Card>
+      <CardContent className="py-12 flex flex-col items-center gap-3 text-gray-400">
+        <Icon className="h-8 w-8" />
+        <p className="text-sm">{message}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FileActionBadge({ action }: { action: string }) {
+  const configs: Record<string, { icon: React.ReactNode; className: string; label: string }> = {
+    upload: { icon: <Upload className="h-3 w-3" />, className: 'bg-blue-100 text-blue-800 border-blue-200', label: 'Upload' },
+    download: { icon: <Download className="h-3 w-3" />, className: 'bg-green-100 text-green-800 border-green-200', label: 'Download' },
+    delete: { icon: <Trash2 className="h-3 w-3" />, className: 'bg-red-100 text-red-800 border-red-200', label: 'Delete' },
+    view: { icon: <Eye className="h-3 w-3" />, className: 'bg-gray-100 text-gray-800 border-gray-200', label: 'View' },
+    access_denied: { icon: <XCircle className="h-3 w-3" />, className: 'bg-red-100 text-red-800 border-red-200', label: 'Denied' },
+    share: { icon: <Share2 className="h-3 w-3" />, className: 'bg-purple-100 text-purple-800 border-purple-200', label: 'Share' },
+  };
+  const cfg = configs[action] || { icon: null, className: 'bg-gray-100 text-gray-700', label: action };
+  return <Badge variant="outline" className={cn('inline-flex items-center gap-1', cfg.className)}>{cfg.icon}{cfg.label}</Badge>;
+}
+
+// ---- Auth Events Tab ----
+function AuthEventsTab() {
+  const [, setLocation] = useLocation();
+  const [page, setPage] = useState(1);
+  const [actionFilter, setActionFilter] = useState('');
+  const limit = 25;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['/api/admin/audit-logs/auth', page, actionFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (actionFilter) params.set('action', actionFilter);
+      const res = await apiRequest('GET', '/api/admin/audit-logs/auth?' + params);
+      return res.json();
+    },
+  });
+
+  const totalPages = data ? Math.ceil(data.total / limit) : 1;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Select value={actionFilter} onValueChange={(val) => { setActionFilter(val === 'all' ? '' : val); setPage(1); }}>
+          <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="All events" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All events</SelectItem>
+            <SelectItem value="login_success">Login success</SelectItem>
+            <SelectItem value="login_failed">Login failed</SelectItem>
+            <SelectItem value="signup">Signup</SelectItem>
+            <SelectItem value="logout">Logout</SelectItem>
+            <SelectItem value="password_reset">Password reset</SelectItem>
+            <SelectItem value="google_login">Google login</SelectItem>
+            <SelectItem value="facebook_login">Facebook login</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-gray-400">{data?.total ?? 0} events</span>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+      ) : (data?.data?.length ?? 0) === 0 ? (
+        <EmptyState icon={LogIn} message="No authentication events recorded yet." />
+      ) : (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-8"></TableHead>
+                <TableHead>Timestamp</TableHead>
+                <TableHead>Event</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Provider</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.data.map((log: any) => (
+                <ExpandableRow
+                  key={log.id}
+                  cells={<>
+                    <TableCell className="text-sm">{format(new Date(log.createdAt), 'MMM d, yyyy HH:mm:ss')}</TableCell>
+                    <TableCell><Badge variant="outline" className="capitalize">{log.action?.replace(/_/g, ' ')}</Badge></TableCell>
+                    <TableCell className="text-xs">{log.email || '\u2014'}</TableCell>
+                    <TableCell className="text-xs capitalize">{log.provider || 'email'}</TableCell>
+                    <TableCell>{log.success ? <Badge className="bg-green-100 text-green-800">Success</Badge> : <Badge variant="destructive">Failed</Badge>}</TableCell>
+                  </>}
+                  details={
+                    <DetailGrid items={[
+                      { label: 'User ID', value: log.userId ? <CopyableId id={log.userId} label={log.userId} /> : '\u2014' },
+                      { label: 'Email', value: log.email || '\u2014' },
+                      { label: 'Action', value: log.action?.replace(/_/g, ' ') },
+                      { label: 'Provider', value: log.provider || 'email' },
+                      { label: 'Status', value: log.success ? 'Success' : 'Failed' },
+                      { label: 'Failure Reason', value: log.failureReason || '\u2014' },
+                      { label: 'IP Address', value: log.ipAddress || '\u2014' },
+                      { label: 'Timestamp', value: format(new Date(log.createdAt), 'PPpp') },
+                      { label: 'User Agent', value: log.userAgent ? <span className="text-xs break-all">{log.userAgent}</span> : '\u2014' },
+                      { label: 'Navigate', value: log.userId ? <button onClick={(e) => { e.stopPropagation(); setLocation('/admin/users/' + log.userId); }} className="text-xs text-[#054700] hover:underline flex items-center gap-1"><ExternalLink className="h-3 w-3" /> View user</button> : null },
+                    ]} />
+                  }
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+    </div>
+  );
+}
+
+// ---- Admin Actions Tab ----
+function AdminActionsTab() {
+  const [, setLocation] = useLocation();
+  const [page, setPage] = useState(1);
+  const [actionFilter, setActionFilter] = useState('');
+  const limit = 25;
+
+  const PHI_ACTIONS = ['user_view', 'conversation_view', 'data_export'];
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['/api/admin/audit-logs/admin', page, actionFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (actionFilter) params.set('action', actionFilter);
+      const res = await apiRequest('GET', '/api/admin/audit-logs/admin?' + params);
+      return res.json();
+    },
+  });
+
+  const totalPages = data ? Math.ceil(data.total / limit) : 1;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Select value={actionFilter} onValueChange={(val) => { setActionFilter(val === 'all' ? '' : val); setPage(1); }}>
+          <SelectTrigger className="w-[200px] h-9"><SelectValue placeholder="All actions" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All actions</SelectItem>
+            <SelectItem value="user_view">PHI: User view</SelectItem>
+            <SelectItem value="conversation_view">PHI: Conversation view</SelectItem>
+            <SelectItem value="data_export">PHI: Data export</SelectItem>
+            <SelectItem value="settings_update">Settings update</SelectItem>
+            <SelectItem value="ticket_reply">Ticket reply</SelectItem>
+            <SelectItem value="user_note_add">User note</SelectItem>
+            <SelectItem value="ingredient_pricing_update">Pricing update</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-gray-400">{data?.total ?? 0} actions</span>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+      ) : (data?.data?.length ?? 0) === 0 ? (
+        <EmptyState icon={UserCog} message="No admin actions recorded yet." />
+      ) : (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-8"></TableHead>
+                <TableHead>Timestamp</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Target</TableHead>
+                <TableHead>Admin</TableHead>
+                <TableHead>PHI</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.data.map((log: any) => (
+                <ExpandableRow
+                  key={log.id}
+                  cells={<>
+                    <TableCell className="text-sm">{format(new Date(log.createdAt), 'MMM d, yyyy HH:mm:ss')}</TableCell>
+                    <TableCell><Badge variant="outline" className="capitalize">{log.action?.replace(/_/g, ' ')}</Badge></TableCell>
+                    <TableCell className="text-xs">
+                      <span className="text-gray-500">{log.targetType}</span>
+                      {log.targetId && <> &middot; <CopyableId id={log.targetId} /></>}
+                    </TableCell>
+                    <TableCell>{log.adminId ? <CopyableId id={log.adminId} /> : '\u2014'}</TableCell>
+                    <TableCell>
+                      {PHI_ACTIONS.includes(log.action)
+                        ? <Badge className="bg-amber-100 text-amber-800 border-amber-200 inline-flex items-center gap-1"><Shield className="h-3 w-3" />PHI</Badge>
+                        : <span className="text-xs text-gray-400">\u2014</span>}
+                    </TableCell>
+                  </>}
+                  details={
+                    <div className="space-y-4">
+                      <DetailGrid items={[
+                        { label: 'Admin ID', value: log.adminId ? <CopyableId id={log.adminId} label={log.adminId} /> : '\u2014' },
+                        { label: 'Action', value: log.action?.replace(/_/g, ' ') },
+                        { label: 'Target Type', value: log.targetType },
+                        { label: 'Target ID', value: log.targetId ? <CopyableId id={log.targetId} label={log.targetId} /> : '\u2014' },
+                        { label: 'IP Address', value: log.ipAddress || '\u2014' },
+                        { label: 'Timestamp', value: format(new Date(log.createdAt), 'PPpp') },
+                        { label: 'Navigate', value: log.targetType === 'user' && log.targetId ? <button onClick={(e) => { e.stopPropagation(); setLocation('/admin/users/' + log.targetId); }} className="text-xs text-[#054700] hover:underline flex items-center gap-1"><ExternalLink className="h-3 w-3" /> View user</button> : null },
+                      ]} />
+                      {log.details && (
+                        <div>
+                          <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-2">Details</p>
+                          <pre className="text-xs bg-gray-100 rounded-lg p-3 overflow-auto max-h-48 text-gray-700">{JSON.stringify(log.details, null, 2)}</pre>
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+    </div>
+  );
+}
+
 // ---- File Audit Logs Tab ----
 function FileAuditLogsTab() {
   const [, setLocation] = useLocation();
@@ -121,7 +343,7 @@ function FileAuditLogsTab() {
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
       ) : (data?.data?.length ?? 0) === 0 ? (
-        <Card><CardContent className="py-8 text-center text-gray-400 text-sm">No file audit logs found.</CardContent></Card>
+        <EmptyState icon={FileText} message="No file operations recorded yet. Upload, download, or delete events will appear here." />
       ) : (
         <div className="rounded-md border">
           <Table>
@@ -130,9 +352,9 @@ function FileAuditLogsTab() {
                 <TableHead className="w-8"></TableHead>
                 <TableHead>Timestamp</TableHead>
                 <TableHead>Action</TableHead>
-                <TableHead>User ID</TableHead>
+                <TableHead>File</TableHead>
+                <TableHead>User</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>IP Address</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -141,17 +363,20 @@ function FileAuditLogsTab() {
                   key={log.id}
                   cells={<>
                     <TableCell className="text-sm">{format(new Date(log.timestamp), 'MMM d, yyyy HH:mm:ss')}</TableCell>
-                    <TableCell><Badge variant="outline">{log.action}</Badge></TableCell>
+                    <TableCell><FileActionBadge action={log.action} /></TableCell>
+                    <TableCell className="text-xs max-w-[180px] truncate">{log.metadata?.originalFileName || log.objectPath || '\u2014'}</TableCell>
                     <TableCell>{log.userId ? <CopyableId id={log.userId} /> : '\u2014'}</TableCell>
-                    <TableCell>{log.success ? <Badge className="bg-green-100 text-green-800">Success</Badge> : <Badge variant="destructive">Failed</Badge>}</TableCell>
-                    <TableCell className="text-xs">{log.ipAddress || '\u2014'}</TableCell>
+                    <TableCell>{log.success ? <Badge className="bg-green-100 text-green-800">OK</Badge> : <Badge variant="destructive">Failed</Badge>}</TableCell>
                   </>}
                   details={
                     <DetailGrid items={[
                       { label: 'Full User ID', value: log.userId ? <CopyableId id={log.userId} label={log.userId} /> : '\u2014' },
                       { label: 'File ID', value: log.fileId ? <CopyableId id={log.fileId} label={log.fileId} /> : '\u2014' },
+                      { label: 'File Name', value: log.metadata?.originalFileName || '\u2014' },
+                      { label: 'Object Path', value: log.objectPath || '\u2014' },
                       { label: 'Action', value: log.action },
                       { label: 'Status', value: log.success ? 'Success' : 'Failed' },
+                      { label: 'Error', value: log.errorMessage || '\u2014' },
                       { label: 'IP Address', value: log.ipAddress || '\u2014' },
                       { label: 'Timestamp', value: format(new Date(log.timestamp), 'PPpp') },
                       { label: 'User Agent', value: log.userAgent ? <span className="text-xs break-all">{log.userAgent}</span> : '\u2014' },
@@ -206,7 +431,7 @@ function SafetyLogsTab() {
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
       ) : (data?.data?.length ?? 0) === 0 ? (
-        <Card><CardContent className="py-8 text-center text-gray-400 text-sm">No safety logs found.</CardContent></Card>
+        <EmptyState icon={Shield} message="No safety events recorded yet." />
       ) : (
         <div className="rounded-md border">
           <Table>
@@ -284,7 +509,7 @@ function WarningAcknowledgmentsTab() {
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
       ) : (data?.data?.length ?? 0) === 0 ? (
-        <Card><CardContent className="py-8 text-center text-gray-400 text-sm">No warning acknowledgments found.</CardContent></Card>
+        <EmptyState icon={AlertTriangle} message="No warning acknowledgments recorded yet." />
       ) : (
         <div className="rounded-md border">
           <Table>
@@ -322,8 +547,16 @@ function WarningAcknowledgmentsTab() {
                         <div>
                           <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-2">Acknowledged Warnings</p>
                           <ul className="space-y-1">
-                            {ack.acknowledgedWarnings.map((w: string, i: number) => (
-                              <li key={i} className="flex items-start gap-2 text-sm text-gray-700"><AlertTriangle className="h-3.5 w-3.5 text-yellow-500 mt-0.5 shrink-0" />{w}</li>
+                            {ack.acknowledgedWarnings.map((w: any, i: number) => (
+                              <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                                <AlertTriangle className={cn('h-3.5 w-3.5 mt-0.5 shrink-0', w.severity === 'critical' ? 'text-red-500' : w.severity === 'serious' ? 'text-yellow-500' : 'text-blue-400')} />
+                                <div>
+                                  <span>{typeof w === 'string' ? w : w.message || JSON.stringify(w)}</span>
+                                  {w.category && <Badge variant="outline" className="ml-2 text-[10px] py-0">{w.category.replace(/_/g, ' ')}</Badge>}
+                                  {w.ingredients?.length > 0 && <p className="text-xs text-gray-400 mt-0.5">Ingredients: {w.ingredients.join(', ')}</p>}
+                                  {w.drugs?.length > 0 && <p className="text-xs text-gray-400 mt-0.5">Drugs: {w.drugs.join(', ')}</p>}
+                                </div>
+                              </li>
                             ))}
                           </ul>
                         </div>
@@ -382,7 +615,7 @@ function ConsentsTab() {
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
       ) : (data?.data?.length ?? 0) === 0 ? (
-        <Card><CardContent className="py-8 text-center text-gray-400 text-sm">No consent records found.</CardContent></Card>
+        <EmptyState icon={CheckCircle} message="No consent records found yet." />
       ) : (
         <div className="rounded-md border">
           <Table>
@@ -430,7 +663,7 @@ function ConsentsTab() {
   );
 }
 
-// ---- Shared ----
+// ---- Shared Helpers ----
 function SeverityBadge({ severity }: { severity: string }) {
   switch (severity) {
     case 'critical': return <Badge variant="destructive">Critical</Badge>;
@@ -464,6 +697,8 @@ function Pagination({ page, totalPages, onPageChange }: { page: number; totalPag
 
 // ---- Tab Config ----
 const TABS: { key: TabType; label: string; icon: React.ReactNode; description: string }[] = [
+  { key: 'auth-events', label: 'Auth Events', icon: <LogIn className="h-4 w-4" />, description: 'Login, signup & password events' },
+  { key: 'admin-actions', label: 'Admin Actions', icon: <UserCog className="h-4 w-4" />, description: 'Admin operations & PHI access' },
   { key: 'file-audit', label: 'File Audit', icon: <FileText className="h-4 w-4" />, description: 'HIPAA file operation logs' },
   { key: 'safety', label: 'Safety Events', icon: <Shield className="h-4 w-4" />, description: 'Formula safety validations' },
   { key: 'acknowledgments', label: 'Acknowledgments', icon: <AlertTriangle className="h-4 w-4" />, description: 'User warning acknowledgments' },
@@ -472,25 +707,25 @@ const TABS: { key: TabType; label: string; icon: React.ReactNode; description: s
 
 // ---- Main Page ----
 export default function AuditLogsPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('safety');
+  const [activeTab, setActiveTab] = useState<TabType>('auth-events');
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2"><Shield className="h-5 w-5" /> Audit & Compliance</h1>
-        <p className="text-sm text-gray-500 mt-1">File audits, safety events, warning acknowledgments, and consent records. Click any row to expand details.</p>
+        <p className="text-sm text-gray-500 mt-1">Authentication events, admin actions, file audits, safety events, warning acknowledgments, and consent records. Click any row to expand details.</p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         {TABS.map((tab) => (
           <Card
             key={tab.key}
             className={cn('cursor-pointer transition-all', activeTab === tab.key ? 'ring-2 ring-[#054700] shadow-md' : 'hover:shadow-sm')}
             onClick={() => setActiveTab(tab.key)}
           >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">{tab.icon}{tab.label}</CardTitle>
-              <CardDescription className="text-xs">{tab.description}</CardDescription>
+            <CardHeader className="p-3 pb-2">
+              <CardTitle className="text-xs flex items-center gap-1.5">{tab.icon}{tab.label}</CardTitle>
+              <CardDescription className="text-[10px] leading-tight">{tab.description}</CardDescription>
             </CardHeader>
           </Card>
         ))}
@@ -504,6 +739,8 @@ export default function AuditLogsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {activeTab === 'auth-events' && <AuthEventsTab />}
+          {activeTab === 'admin-actions' && <AdminActionsTab />}
           {activeTab === 'file-audit' && <FileAuditLogsTab />}
           {activeTab === 'safety' && <SafetyLogsTab />}
           {activeTab === 'acknowledgments' && <WarningAcknowledgmentsTab />}

@@ -1,5 +1,29 @@
 import sgMail from '@sendgrid/mail';
 import { getFrontendUrl } from './urlHelper';
+import { logger } from '../infra/logging/logger';
+
+/** Escape HTML special characters to prevent injection in email templates */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Validate that a URL is http(s) to prevent javascript: or data: URI injection */
+function sanitizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      return url;
+    }
+    return '';
+  } catch {
+    return '';
+  }
+}
 
 // Initialize SendGrid with API key from environment variables
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY?.trim();
@@ -21,7 +45,13 @@ interface EmailNotification {
 }
 
 function getEmailTemplate(notification: EmailNotification): string {
-  const { title, content, actionUrl, actionText, type } = notification;
+  const { title: rawTitle, content: rawContent, actionUrl: rawActionUrl, actionText: rawActionText, type } = notification;
+
+  // Escape user-provided values to prevent HTML/script injection
+  const title = escapeHtml(rawTitle);
+  const content = escapeHtml(rawContent);
+  const actionText = rawActionText ? escapeHtml(rawActionText) : undefined;
+  const actionUrl = rawActionUrl ? sanitizeUrl(rawActionUrl) : undefined;
 
   const typeConfig: Record<typeof type, { accent: string; icon: string }> = {
     order_update:          { accent: '#004700', icon: '📦' },
@@ -116,7 +146,7 @@ function getEmailTemplate(notification: EmailNotification): string {
 export async function sendNotificationEmail(notification: EmailNotification): Promise<boolean> {
   try {
     if (!SENDGRID_API_KEY || !SENDGRID_FROM_EMAIL) {
-      console.error('❌ SendGrid not configured: Missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL environment variables');
+      logger.error('SendGrid not configured: Missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL environment variables');
       return false;
     }
 
@@ -127,17 +157,18 @@ export async function sendNotificationEmail(notification: EmailNotification): Pr
       html: getEmailTemplate(notification),
     };
 
-    console.log(`📤 Attempting SendGrid send to ${notification.to} from ${SENDGRID_FROM_EMAIL}...`);
+    logger.info('Attempting SendGrid send', { to: notification.to, from: SENDGRID_FROM_EMAIL });
     const [response] = await sgMail.send(msg);
-    console.log(`✅ Email sent successfully to ${notification.to} - status: ${response.statusCode}`);
+    logger.info('Email sent successfully', { to: notification.to, statusCode: response.statusCode });
     return true;
   } catch (error: any) {
-    console.error('❌ Error sending email via SendGrid:', error?.message || error);
-    if (error?.response) {
-      // SendGrid returns detailed errors in response.body
-      console.error('❌ SendGrid response status:', error.response.status);
-      console.error('❌ SendGrid response body:', JSON.stringify(error.response.body, null, 2));
-    }
+    logger.error('Error sending email via SendGrid', {
+      error: error?.message || error,
+      ...(error?.response && {
+        responseStatus: error.response.status,
+        responseBody: error.response.body,
+      }),
+    });
     return false;
   }
 }

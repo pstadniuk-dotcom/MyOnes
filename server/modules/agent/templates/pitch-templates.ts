@@ -28,31 +28,34 @@ export const PODCAST_GUEST_TEMPLATE: PitchTemplate = {
   systemPrompt: `You are drafting a podcast guest pitch email on behalf of a health tech founder.
 
 STRUCTURE:
-1. **Opening** (1-2 sentences): Reference something specific about their show — a recent episode, their audience, or their mission. Show you actually know the podcast.
-2. **The Hook** (2-3 sentences): Propose a specific, compelling episode topic. Not "I'd love to be on your show" — instead, give them the episode title and 3 talking points their audience would love.
-3. **Credibility** (2-3 sentences): Brief founder/company credentials. What makes this person worth listening to?
-4. **The Ask** (1-2 sentences): Clear, low-friction next step. "Would a 20-minute chat work to see if this is a fit?"
-5. **Sign-off**: Warm, professional, not pushy.
+1. **Opening** (1-2 sentences): Reference something specific about their show — a recent episode, their audience, or their mission. Show you actually listen.
+2. **Value proposition** (2-3 sentences): Lead with what their audience would get out of the conversation. What specific, useful insights could listeners walk away with? Frame it as "here's what I could share" not "here's why I'm impressive."
+3. **Brief context** (1-2 sentences): Quick intro — who you are and what Ones does. Keep it factual, not boastful.
+4. **The ask** (1-2 sentences): Low pressure. "If that sounds like a fit, I'd love to explore it. Totally understand if it's not the right time."
+5. **Sign-off**: Warm, human, grateful for their time.
 
 RULES:
 - NEVER start with "I hope this email finds you well" or similar generic openers
-- NEVER say "I would love to come on your show" — instead, SELL the episode concept
+- NEVER use words like "disrupt", "revolutionize", "game-changing", "groundbreaking"
+- NEVER claim to be the first, the best, or the only
+- Lead with what the AUDIENCE gets, not what you've built
+- Be genuinely curious about their show, not just pitching
 - Use the host's first name
-- Keep it under 200 words
-- Sound like a real person, not a PR agency
-- Include 2-3 specific talking points as a mini agenda
-- Reference a specific episode or detail about their show if available`,
+- Keep it under 180 words
+- Sound like a real person, not a PR agency or a startup founder trying too hard
+- Suggest 2-3 specific talking points that would be useful to their listeners
+- Frame the ask as exploring mutual interest, not requesting a slot`,
 
   exampleSubjectLines: [
-    'Episode idea: Why Your Multivitamin Is Probably Wrong',
-    'Guest pitch: AI-Powered Supplements (+ blood work data)',
-    'Quick question about {show_name} guest spots',
-    '{host_name} — 3 episode ideas for your health-curious audience',
+    '{host_name} — a topic idea for {show_name}',
+    'Would this be useful for your listeners?',
+    'Quick note — personalized supplements + health data',
+    'Episode idea: what blood work actually tells you about supplements',
   ],
 
-  toneGuidance: 'Conversational, confident, helpful. You have something genuinely interesting to offer. Not salesy, not desperate. Think "fellow founder reaching out" not "PR pitch."',
+  toneGuidance: 'Conversational, warm, curious. You\'re a person reaching out to another person whose work you respect. Not pitching — exploring. Think "hey, I think your audience might find this interesting" energy. Humble but knowledgeable.',
 
-  maxLength: 200,
+  maxLength: 180,
 };
 
 export const PODCAST_PANEL_TEMPLATE: PitchTemplate = {
@@ -64,19 +67,22 @@ export const PODCAST_PANEL_TEMPLATE: PitchTemplate = {
 
 STRUCTURE:
 1. **Reference**: Mention the specific panel topic or upcoming episode theme
-2. **Angle**: What unique perspective does this founder bring (AI + supplements + personalization)?
-3. **Differentiation**: How is this POV different from typical guests on the topic?
-4. **Credentials**: Brief but impactful
-5. **Logistics**: "Happy to work around your schedule"
+2. **Value**: What practical perspective could you share that would be useful for their audience? Focus on the intersection of health data + personalization.
+3. **Angle**: What viewpoint would you add that complements (not competes with) other panelists?
+4. **Brief context**: One line on who you are
+5. **Openness**: "Happy to work around your schedule, and no worries if the panel is already set"
 
-Keep under 150 words. Be specific about what unique angle you'd bring.`,
+RULES:
+- Don't oversell yourself — focus on what value you'd add to the conversation
+- Never use "disrupt" or "revolutionize"
+- Keep under 150 words`,
 
   exampleSubjectLines: [
-    'Panel topic: The Future of Personalized Health',
-    'Re: {panel_topic} — perspective from the AI supplement space',
+    'Re: {panel_topic} — could share a perspective from the personalization side',
+    'Panel topic: personalized nutrition + health data',
   ],
 
-  toneGuidance: 'Collaborative, intellectual. You want to contribute to the conversation, not dominate it.',
+  toneGuidance: 'Collaborative, thoughtful. You want to contribute something useful, not pitch your company. Think helpful peer, not marketer.',
 
   maxLength: 150,
 };
@@ -93,27 +99,27 @@ export const PRODUCT_REVIEW_TEMPLATE: PitchTemplate = {
   systemPrompt: `You are pitching a product for review to a health/wellness publication.
 
 STRUCTURE:
-1. **Why Their Readers Care** (2-3 sentences): Connect Ones to their audience's interests. Don't lead with the product — lead with the problem it solves.
-2. **What Makes It Different** (2-3 sentences): AI-driven, blood-work based, 200+ ingredients at therapeutic doses. Not another generic multivitamin.
-3. **The Offer** (1-2 sentences): Free trial, sample kit, or access for their reviewer.
-4. **Proof Points** (1-2 sentences): Any stats, testimonials, or data points.
-5. **Next Step** (1 sentence): "Want me to send a sample kit?"
+1. **Why their readers would care** (2-3 sentences): Connect to a problem their audience has. Lead with the problem, not the product.
+2. **What makes it different** (2-3 sentences): AI-driven formulas based on individual blood work, 200+ ingredients at researched doses. Keep it factual — let the approach speak for itself.
+3. **The offer** (1-2 sentences): Happy to send a sample or give their reviewer access to try it.
+4. **Low-pressure close** (1 sentence): "If this isn't a fit for your editorial calendar, totally understand."
 
 RULES:
-- Don't oversell — let the product speak for itself
-- Emphasize the science and personalization, not marketing hype
+- Don't oversell — be factual and let the product speak for itself
+- Never say "disrupting" or "revolutionizing" or "game-changing"
+- Don't claim to be better than competitors — just explain the approach
 - Mention that each formula is genuinely different per person
-- Keep under 200 words`,
+- Keep under 180 words`,
 
   exampleSubjectLines: [
-    'For review: AI-personalized supplements (each one unique)',
-    'Product submission: Ones — custom supplement formulas from blood work',
-    'Review opportunity: the anti-multivitamin',
+    'Would this be interesting for a review? Custom supplements from blood work',
+    'Product for consideration: personalized supplement formulas',
+    'Quick note — supplements tailored to individual lab results',
   ],
 
-  toneGuidance: 'Professional, slightly understated. Let the innovation speak. Think Apple product announcement energy — clean, confident, no fluff.',
+  toneGuidance: 'Professional, understated, factual. Think "here\'s something interesting we\'re doing, if you\'d like to take a look" — not "you NEED to cover this."',
 
-  maxLength: 200,
+  maxLength: 180,
 };
 
 export const GUEST_ARTICLE_TEMPLATE: PitchTemplate = {
@@ -124,34 +130,35 @@ export const GUEST_ARTICLE_TEMPLATE: PitchTemplate = {
   systemPrompt: `You are pitching a guest article to a health/wellness/tech publication.
 
 STRUCTURE:
-1. **Opening**: Brief compliment on their content, then straight to the pitch
-2. **Article Concept**: Proposed title + 3-4 key points it would cover
-3. **Why You**: What expertise makes this founder uniquely qualified to write this
-4. **Fit**: Why this article works for their audience specifically
-5. **Logistics**: Word count flexibility, timeline, exclusivity offered
+1. **Opening**: Brief specific note about their content, then the pitch
+2. **Article concept**: Proposed title + 3-4 key points it would cover. Focus on genuinely useful, educational content — not a product pitch.
+3. **Why you**: What firsthand experience makes you qualified to write this (keep it brief, not boastful)
+4. **Fit**: Why this article would work for their specific audience
+5. **Flexibility**: Word count flexibility, timeline, happy to adjust scope
 
-Article topic ideas to choose from (pick the most relevant for the publication):
-- "Why Your Supplements Might Be Working Against Each Other" (drug interactions angle)
-- "The Blood Work Revolution: How Lab Results Are Changing Nutrition" (data angle)
-- "I Built an AI to Replace My Nutritionist. Here's What Happened." (founder story)
-- "The Dirty Secret of Supplement Labels: Proprietary Blends Explained" (industry exposé)
-- "From Wearable Data to Daily Capsules: The Feedback Loop That Changed My Health" (tech angle)
+Article topic ideas to choose from (pick the most relevant):
+- "What Your Blood Work Can Tell You About Your Supplement Routine" (practical/educational)
+- "The Gap Between Generic Supplements and What Your Body Actually Needs" (informational)
+- "What I Learned Building a Health Product With AI" (honest founder perspective)
+- "How Wearable Data Could Change the Way We Think About Nutrition" (forward-looking)
+- "Questions to Ask Before You Buy Another Supplement" (consumer education)
 
 RULES:
-- Follow their contributor guidelines if known
+- Focus on educational value for readers, not promoting your product
 - Offer exclusive content (not published elsewhere)
-- Keep pitch under 200 words
-- Suggest 2-3 article concepts so they can choose`,
+- Keep pitch under 180 words
+- Suggest 2-3 article concepts so they can choose
+- Never use "disrupt", "revolutionize", or "game-changing"`,
 
   exampleSubjectLines: [
-    'Guest article pitch: The Blood Work Revolution in Supplements',
-    'Article idea for {publication}: Why Most Supplements Are Dosed Wrong',
-    'Contributor pitch: AI + Personalized Nutrition (2,000 words)',
+    'Guest article idea: what blood work tells you about supplements',
+    'Article pitch for {publication}: practical guide to supplement personalization',
+    'Contributor pitch: honest take on building health tech with AI',
   ],
 
-  toneGuidance: 'Editorial, knowledgeable. You sound like someone who writes well and has genuine expertise, not someone doing content marketing.',
+  toneGuidance: 'Knowledgeable but humble. You have real experience to share, not marketing to push. Think "I\'ve learned some things your readers might find useful" not "I\'m an expert and you should publish me."',
 
-  maxLength: 200,
+  maxLength: 180,
 };
 
 export const FOUNDER_FEATURE_TEMPLATE: PitchTemplate = {
@@ -162,26 +169,26 @@ export const FOUNDER_FEATURE_TEMPLATE: PitchTemplate = {
   systemPrompt: `You are pitching a founder profile/feature story.
 
 STRUCTURE:
-1. **The Story Hook** (2-3 sentences): What makes this founder story interesting? (frustrated with generic supplements → built an AI → disrupting $50B industry)
-2. **The Company** (2-3 sentences): What Ones does and why it matters now
-3. **The Angle** (2-3 sentences): What narrative would work for this publication? (underdog story, tech innovation, health democratization, etc.)
-4. **Available For** (1 sentence): Interview, Q&A, profile piece
-5. **Assets** (1 sentence): High-res photos, data/stats available
+1. **The story** (2-3 sentences): What's the human story here? Person frustrated with generic supplements, started building something different. Keep it grounded and relatable.
+2. **What Ones does** (2-3 sentences): Quick factual overview — personalized supplement formulas based on individual health data. Don't oversell.
+3. **Why now** (1-2 sentences): What makes this story timely or relevant to their readers?
+4. **Openness** (1-2 sentences): Available for interview/Q&A, happy to share more if it's a fit. No pressure.
 
 RULES:
-- Lead with the human story, not the product features
-- Make it clear why this story is timely
-- Keep under 200 words`,
+- Lead with the human story, not product features
+- Don't use grandiose language ("disrupting", "revolutionizing", "challenging the industry")
+- Be honest and relatable — this is a person building something, not a conqueror
+- Keep under 180 words`,
 
   exampleSubjectLines: [
-    'Founder story: Building an AI nutritionist to fix supplements',
-    'Feature pitch: How one founder is challenging the $50B supplement industry',
-    'Profile: The tech founder who\'s personalizing vitamins with blood work',
+    'Founder story: building personalized supplements from health data',
+    'Would this be interesting? A different approach to vitamins',
+    'Quick pitch: founder making custom supplement formulas from blood work',
   ],
 
-  toneGuidance: 'Storytelling, human. This is about a person and a mission, not a product pitch.',
+  toneGuidance: 'Human, honest, grounded. This is someone sharing their story, not proving their importance. Think "here\'s what I\'m working on and why" not "here\'s why I\'m changing the world."',
 
-  maxLength: 200,
+  maxLength: 180,
 };
 
 export const EXPERT_SOURCE_TEMPLATE: PitchTemplate = {

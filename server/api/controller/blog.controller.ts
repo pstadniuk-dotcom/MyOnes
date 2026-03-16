@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { logger } from '../../infra/logging/logger';
 import { blogRepository } from '../../modules/blog/blog.repository';
 import { insertBlogPostSchema } from '../../../shared/schema';
 import OpenAI from 'openai';
@@ -52,7 +53,7 @@ export async function listPosts(req: Request, res: Response) {
       pages: Math.ceil(total / limit),
     });
   } catch (err: any) {
-    console.error('[blog] listPosts error:', err);
+    logger.error('[blog] listPosts error', { error: err });
     return res.status(500).json({ error: 'Failed to load posts' });
   }
 }
@@ -63,7 +64,7 @@ export async function getCategories(req: Request, res: Response) {
     const categories = await blogRepository.getCategories();
     return res.json({ categories });
   } catch (err: any) {
-    console.error('[blog] getCategories error:', err);
+    logger.error('[blog] getCategories error', { error: err });
     return res.status(500).json({ error: 'Failed to load categories' });
   }
 }
@@ -76,7 +77,7 @@ export async function searchPosts(req: Request, res: Response) {
     const posts = await blogRepository.search(q, 10);
     return res.json({ posts });
   } catch (err: any) {
-    console.error('[blog] search error:', err);
+    logger.error('[blog] search error', { error: err });
     return res.status(500).json({ error: 'Search failed' });
   }
 }
@@ -99,7 +100,7 @@ export async function getPost(req: Request, res: Response) {
 
     return res.json({ post, related, validSlugs });
   } catch (err: any) {
-    console.error('[blog] getPost error:', err);
+    logger.error('[blog] getPost error', { error: err });
     return res.status(500).json({ error: 'Failed to load post' });
   }
 }
@@ -136,7 +137,7 @@ export async function getSitemap(req: Request, res: Response) {
     res.setHeader('Cache-Control', 'public, max-age=43200'); // 12h cache
     return res.send(xml);
   } catch (err: any) {
-    console.error('[blog] getSitemap error:', err);
+    logger.error('[blog] getSitemap error', { error: err });
     return res.status(500).send('<?xml version="1.0"?><urlset/>');
   }
 }
@@ -169,7 +170,7 @@ export async function getBlogSitemap(req: Request, res: Response) {
     res.setHeader('Cache-Control', 'public, max-age=43200');
     return res.send(xml);
   } catch (err: any) {
-    console.error('[blog] getBlogSitemap error:', err);
+    logger.error('[blog] getBlogSitemap error', { error: err });
     return res.status(500).send('<?xml version="1.0"?><urlset/>');
   }
 }
@@ -193,7 +194,7 @@ export async function createPost(req: Request, res: Response) {
     if (parsed.data.isPublished) pingSitemapIndexers().catch(() => {});
     return res.status(201).json({ post });
   } catch (err: any) {
-    console.error('[blog] createPost error:', err);
+    logger.error('[blog] createPost error', { error: err });
     return res.status(500).json({ error: 'Failed to create post' });
   }
 }
@@ -206,7 +207,7 @@ export async function updatePost(req: Request, res: Response) {
     if (!post) return res.status(404).json({ error: 'Post not found' });
     return res.json({ post });
   } catch (err: any) {
-    console.error('[blog] updatePost error:', err);
+    logger.error('[blog] updatePost error', { error: err });
     return res.status(500).json({ error: 'Failed to update post' });
   }
 }
@@ -221,7 +222,7 @@ export async function bulkCreatePosts(req: Request, res: Response) {
     const created = await blogRepository.bulkCreate(posts);
     return res.status(201).json({ created: created.length, posts: created.map(p => p.slug) });
   } catch (err: any) {
-    console.error('[blog] bulkCreate error:', err);
+    logger.error('[blog] bulkCreate error', { error: err });
     return res.status(500).json({ error: 'Bulk insert failed', detail: err.message });
   }
 }
@@ -244,7 +245,7 @@ export async function adminListPosts(req: Request, res: Response) {
 
     return res.json({ posts, total, page, pages: Math.ceil(total / limit) });
   } catch (err: any) {
-    console.error('[blog] adminListPosts error:', err);
+    logger.error('[blog] adminListPosts error', { error: err });
     return res.status(500).json({ error: 'Failed to load posts' });
   }
 }
@@ -256,7 +257,7 @@ export async function adminGetPost(req: Request, res: Response) {
     if (!post) return res.status(404).json({ error: 'Post not found' });
     return res.json({ post });
   } catch (err: any) {
-    console.error('[blog] adminGetPost error:', err);
+    logger.error('[blog] adminGetPost error', { error: err });
     return res.status(500).json({ error: 'Failed to load post' });
   }
 }
@@ -268,7 +269,7 @@ export async function adminUpdatePost(req: Request, res: Response) {
     if (!post) return res.status(404).json({ error: 'Post not found' });
     return res.json({ post });
   } catch (err: any) {
-    console.error('[blog] adminUpdatePost error:', err);
+    logger.error('[blog] adminUpdatePost error', { error: err });
     return res.status(500).json({ error: 'Failed to update post' });
   }
 }
@@ -284,7 +285,7 @@ export async function adminTogglePublish(req: Request, res: Response) {
     if (!post) return res.status(404).json({ error: 'Post not found' });
     return res.json({ post });
   } catch (err: any) {
-    console.error('[blog] adminTogglePublish error:', err);
+    logger.error('[blog] adminTogglePublish error', { error: err });
     return res.status(500).json({ error: 'Failed to update publish status' });
   }
 }
@@ -296,7 +297,7 @@ export async function adminDeletePost(req: Request, res: Response) {
     if (!deleted) return res.status(404).json({ error: 'Post not found' });
     return res.json({ success: true });
   } catch (err: any) {
-    console.error('[blog] adminDeletePost error:', err);
+    logger.error('[blog] adminDeletePost error', { error: err });
     return res.status(500).json({ error: 'Failed to delete post' });
   }
 }
@@ -360,7 +361,7 @@ Please revise the article content accordingly.`;
 
     return res.json({ revisedContent });
   } catch (err: any) {
-    console.error('[blog] adminAiRevise error:', err);
+    logger.error('[blog] adminAiRevise error', { error: err });
     return res.status(500).json({ error: 'AI revision failed', detail: err.message });
   }
 }
@@ -494,7 +495,7 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
         generated.metaDescription = generated.metaDescription.slice(0, 162).trimEnd() + '...';
       }
       if (generated.metaDescription.length < 100) {
-        console.warn(`[admin-gen] metaDescription too short (${generated.metaDescription.length} chars) for: "${generated.metaTitle}"`);
+        logger.warn('[admin-gen] metaDescription too short', { length: generated.metaDescription.length, metaTitle: generated.metaTitle });
       }
     }
 
@@ -543,14 +544,14 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
           imgSlug,
         );
       } catch (imgErr: any) {
-        console.error('[blog] Image generation failed, continuing without image:', imgErr.message);
+        logger.error('[blog] Image generation failed, continuing without image', { error: imgErr.message });
         generated.featuredImage = null;
       }
     }
 
     return res.json({ generated });
   } catch (err: any) {
-    console.error('[blog] adminAiGenerate error:', err);
+    logger.error('[blog] adminAiGenerate error', { error: err });
     return res.status(500).json({ error: 'AI generation failed', detail: err.message });
   }
 }
@@ -584,8 +585,8 @@ export async function adminTriggerAutoGenRun(req: Request, res: Response) {
 
   // Run in background — errors logged, not returned to client
   runDailyBlogGeneration(overrides).then((result) => {
-    console.log('[blog-scheduler] Manual run complete', result);
+    logger.info('[blog-scheduler] Manual run complete', { result });
   }).catch((err) => {
-    console.error('[blog-scheduler] Manual run failed', err.message);
+    logger.error('[blog-scheduler] Manual run failed', { error: err.message });
   });
 }

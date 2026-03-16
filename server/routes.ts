@@ -25,7 +25,8 @@ import {
   labsRoutes,
   blogRoutes,
   liveChatRoutes,
-  agentRoutes
+  agentRoutes,
+  aiSupportAgentRoutes
 } from "./api/routes";
 import { initializeAiSettings } from "./infra/ai/ai-config";
 import logger from "./infra/logging/logger";
@@ -95,6 +96,9 @@ export async function registerRoutes(app: Express, rateLimiters?: { authLimiter?
 
   // PR Agent (admin-only)
   app.use('/api/agent', agentRoutes);
+
+  // AI Support Agent (admin-only)
+  app.use('/api/admin/ai-support-agent', aiSupportAgentRoutes);
 
   // AI & Communication
   app.use('/api/chat', chatRoutes);

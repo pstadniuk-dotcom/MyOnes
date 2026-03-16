@@ -32,10 +32,11 @@ Score this prospect on these criteria (total max 100):
    - 0-9: Barely related
 
 2. **Audience Size** (0-20): Based on any available signals (social followers, ratings, monthly readers)
-   - 15-20: Large audience (100K+ reach)
-   - 10-14: Medium audience (10K-100K)
-   - 5-9: Small but engaged niche (1K-10K)
-   - 0-4: Very small or unknown
+   - 17-20: Very large audience (500K+ reach)
+   - 13-16: Large audience (100K-500K)
+   - 9-12: Medium audience (10K-100K)
+   - 5-8: Small niche (5K-10K) — only worth it if topic relevance is very high
+   - 0-4: Tiny or unknown audience — score low, we do not want low-reach leads
 
 3. **Recency** (0-15): How active is this outlet?
    - 12-15: Very active (weekly content, recent episodes)
@@ -71,9 +72,9 @@ Return ONLY a JSON object with these exact keys:
 
 Recommendation thresholds:
 - 75+: high_priority
-- 55-74: worth_pitching
-- 35-54: low_priority
-- <35: skip`;
+- 60-74: worth_pitching
+- 45-59: low_priority — only recommend if topic relevance is 18+ and audience is 5K+
+- <45: skip — not worth our time`;
 
 /**
  * Create the score prospect tool for the agent runner

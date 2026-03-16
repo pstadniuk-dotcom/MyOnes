@@ -1,4 +1,5 @@
 import { Switch, Route, Redirect } from "wouter";
+import { Suspense, lazy } from "react";
 import { queryClient } from "@/shared/lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/shared/components/ui/toaster";
@@ -10,6 +11,7 @@ import { FEATURES, isOptimizeEnabled } from "@/shared/config/features";
 import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
 import ProtectedAdminRoute from "@/features/admin/components/ProtectedAdminRoute";
 import NotFound from "@/pages/not-found";
+import { Loader2 } from "lucide-react";
 import SignupPage from "@/pages/SignupPage";
 import LoginPage from "@/pages/LoginPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
@@ -35,7 +37,7 @@ import ShippingPage from "@/pages/ShippingPage";
 // Import dashboard components
 import { DashboardLayout } from "@/shared/components/DashboardLayout";
 import DashboardHome from "@/pages/DashboardHome";
-import ConsultationPage from "@/pages/ConsultationPage";
+const ConsultationPage = lazy(() => import("@/pages/ConsultationPage"));
 import MyFormulaPage from "@/pages/MyFormulaPage";
 import OptimizePage from "@/pages/OptimizePage";
 import WearablesPage from "@/pages/WearablesPage";
@@ -46,25 +48,29 @@ import SettingsPage from "@/pages/SettingsPage";
 import SupportPage from "@/pages/SupportPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 
-// Import admin components
-import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
-import UserManagementPage from "@/pages/admin/UserManagementPage";
-import UserDetailPage from "@/pages/admin/UserDetailPage";
-import AdminSupportTicketsPage from "@/pages/admin/AdminSupportTicketsPage";
-import ConversationsPage from "@/pages/admin/ConversationsPage";
-import OrdersManagementPage from "@/pages/admin/OrdersManagementPage";
-import AuditLogsPage from "@/pages/admin/AuditLogsPage";
-import AdminBlogPage from "@/pages/admin/AdminBlogPage";
-import RetailComparisonPricingPage from "@/pages/admin/RetailComparisonPricingPage";
-import MembershipAdminPage from "@/pages/admin/MembershipAdminPage";
-import ContentManagementPage from "@/pages/admin/ContentManagementPage";
-import AdminAnalyticsPage from "@/pages/admin/AdminAnalyticsPage";
-import AISettingsPage from "@/pages/admin/AISettingsPage";
-import ProductCatalogPage from "@/pages/admin/ProductCatalogPage";
-import AdminLiveChatsPage from "@/pages/admin/AdminLiveChatsPage";
-import AdminChatAnalyticsPage from "@/pages/admin/AdminChatAnalyticsPage";
-import AIUsagePage from "@/pages/admin/AIUsagePage";
-import PRAgentPage from "@/pages/admin/PRAgentPage";
+// Import admin components (lazy-loaded for code splitting)
+const AdminDashboardPage = lazy(() => import("@/pages/admin/AdminDashboardPage"));
+const UserManagementPage = lazy(() => import("@/pages/admin/UserManagementPage"));
+const UserDetailPage = lazy(() => import("@/pages/admin/UserDetailPage"));
+const AdminSupportTicketsPage = lazy(() => import("@/pages/admin/AdminSupportTicketsPage"));
+const ConversationsPage = lazy(() => import("@/pages/admin/ConversationsPage"));
+const OrdersManagementPage = lazy(() => import("@/pages/admin/OrdersManagementPage"));
+const AuditLogsPage = lazy(() => import("@/pages/admin/AuditLogsPage"));
+const AdminBlogPage = lazy(() => import("@/pages/admin/AdminBlogPage"));
+const RetailComparisonPricingPage = lazy(() => import("@/pages/admin/RetailComparisonPricingPage"));
+const MembershipAdminPage = lazy(() => import("@/pages/admin/MembershipAdminPage"));
+const ContentManagementPage = lazy(() => import("@/pages/admin/ContentManagementPage"));
+const AdminAnalyticsPage = lazy(() => import("@/pages/admin/AdminAnalyticsPage"));
+const AISettingsPage = lazy(() => import("@/pages/admin/AISettingsPage"));
+const ProductCatalogPage = lazy(() => import("@/pages/admin/ProductCatalogPage"));
+const AdminLiveChatsPage = lazy(() => import("@/pages/admin/AdminLiveChatsPage"));
+const AdminChatAnalyticsPage = lazy(() => import("@/pages/admin/AdminChatAnalyticsPage"));
+const AIUsagePage = lazy(() => import("@/pages/admin/AIUsagePage"));
+const PRAgentPage = lazy(() => import("@/pages/admin/PRAgentPage"));
+const AISupportAgentPage = lazy(() => import("@/pages/admin/AISupportAgentPage"));
+const TrafficSourcesPage = lazy(() => import("@/pages/admin/TrafficSourcesPage"));
+const InfluencerHubPage = lazy(() => import("@/pages/admin/InfluencerHubPage"));
+const B2bProspectingPage = lazy(() => import("@/pages/admin/B2bProspectingPage"));
 import { AdminLayout } from "@/shared/components/AdminLayout";
 
 // Import shared/public components
@@ -76,6 +82,12 @@ import CheckoutSuccessPage from "@/pages/CheckoutSuccessPage";
 import LandingPageV2 from "@/pages/LandingPageV2";
 import ScrollToTop from "./shared/components/ScrollToTop";
 import { LiveChatWidget } from "@/features/live-chat/components/LiveChatWidget";
+
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+  </div>
+);
 
 // Main Router
 function MainRouter() {
@@ -116,14 +128,14 @@ function MainRouter() {
       <Route path="/dashboard/chat">
         <ProtectedRoute>
           <DashboardLayout>
-            <ConsultationPage />
+            <Suspense fallback={<PageLoader />}><ConsultationPage /></Suspense>
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/dashboard/consultation">
         <ProtectedRoute>
           <DashboardLayout>
-            <ConsultationPage />
+            <Suspense fallback={<PageLoader />}><ConsultationPage /></Suspense>
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
@@ -208,7 +220,7 @@ function MainRouter() {
       <Route path="/chat">
         <ProtectedRoute>
           <DashboardLayout>
-            <ConsultationPage />
+            <Suspense fallback={<PageLoader />}><ConsultationPage /></Suspense>
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
@@ -217,63 +229,63 @@ function MainRouter() {
       <Route path="/admin">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminDashboardPage />
+            <Suspense fallback={<PageLoader />}><AdminDashboardPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/users">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <UserManagementPage />
+            <Suspense fallback={<PageLoader />}><UserManagementPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/users/:id">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <UserDetailPage />
+            <Suspense fallback={<PageLoader />}><UserDetailPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/support-tickets">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminSupportTicketsPage />
+            <Suspense fallback={<PageLoader />}><AdminSupportTicketsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/conversations">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <ConversationsPage />
+            <Suspense fallback={<PageLoader />}><ConversationsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/orders">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <OrdersManagementPage />
+            <Suspense fallback={<PageLoader />}><OrdersManagementPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/audit-logs">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AuditLogsPage />
+            <Suspense fallback={<PageLoader />}><AuditLogsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/blog">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminBlogPage />
+            <Suspense fallback={<PageLoader />}><AdminBlogPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/retail-pricing">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <RetailComparisonPricingPage />
+            <Suspense fallback={<PageLoader />}><RetailComparisonPricingPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
@@ -281,7 +293,7 @@ function MainRouter() {
         {(params) => (
           <ProtectedAdminRoute>
             <AdminLayout>
-              <AdminSupportTicketsPage ticketId={params.id} />
+              <Suspense fallback={<PageLoader />}><AdminSupportTicketsPage ticketId={params.id} /></Suspense>
             </AdminLayout>
           </ProtectedAdminRoute>
         )}
@@ -289,63 +301,91 @@ function MainRouter() {
       <Route path="/admin/membership">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <MembershipAdminPage />
+            <Suspense fallback={<PageLoader />}><MembershipAdminPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/content">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <ContentManagementPage />
+            <Suspense fallback={<PageLoader />}><ContentManagementPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/analytics">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminAnalyticsPage />
+            <Suspense fallback={<PageLoader />}><AdminAnalyticsPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/traffic">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><TrafficSourcesPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/products">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <ProductCatalogPage />
+            <Suspense fallback={<PageLoader />}><ProductCatalogPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/settings/ai">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AISettingsPage />
+            <Suspense fallback={<PageLoader />}><AISettingsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/live-chats">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminLiveChatsPage />
+            <Suspense fallback={<PageLoader />}><AdminLiveChatsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/chat-analytics">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AdminChatAnalyticsPage />
+            <Suspense fallback={<PageLoader />}><AdminChatAnalyticsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/ai-usage">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <AIUsagePage />
+            <Suspense fallback={<PageLoader />}><AIUsagePage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
       <Route path="/admin/pr-agent">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <PRAgentPage />
+            <Suspense fallback={<PageLoader />}><PRAgentPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/ai-support-agent">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><AISupportAgentPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/influencers">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><InfluencerHubPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/b2b">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><B2bProspectingPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
@@ -368,6 +408,11 @@ function MainRouter() {
       <Route component={NotFound} />
     </Switch>
   );
+}
+
+// Capture landing page on first visit for attribution
+if (!sessionStorage.getItem('landing_page')) {
+  sessionStorage.setItem('landing_page', window.location.pathname + window.location.search);
 }
 
 function App() {

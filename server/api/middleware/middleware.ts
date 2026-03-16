@@ -3,6 +3,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { usersRepository } from '../../modules/users/users.repository';
 import { logger } from '../../infra/logging/logger';
@@ -18,22 +19,16 @@ declare global {
 }
 
 // JWT Configuration - SECURITY CRITICAL
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const isProduction = NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production';
-
 const JWT_SECRET_RAW = process.env.JWT_SECRET;
 
 if (!JWT_SECRET_RAW) {
-  if (isProduction) {
-    logger.error('FATAL: JWT_SECRET environment variable is required in production.');
-    logger.error('Set JWT_SECRET in Railway dashboard: railway.app → Variables');
-    process.exit(1);
-  }
-  logger.warn('JWT_SECRET not set. Using insecure dev fallback. DO NOT DEPLOY THIS.');
+  logger.error('FATAL: JWT_SECRET environment variable is required. Set it before starting the server.');
+  process.exit(1);
 }
 
-export const JWT_SECRET: string = JWT_SECRET_RAW || 'dev-only-insecure-secret-do-not-use-in-production';
-export const JWT_EXPIRES_IN = '7d';
+export const JWT_SECRET: string = JWT_SECRET_RAW;
+export const JWT_EXPIRES_IN = '15m';
+export const REFRESH_TOKEN_EXPIRES_DAYS = 7;
 
 /**
  * Generate a JWT token for a user
@@ -54,32 +49,80 @@ export function verifyToken(token: string): { userId: string; isAdmin?: boolean 
   }
 }
 
+// SSE ticket store — short-lived single-use tokens for EventSource connections
+const sseTicketStore = new Map<string, { userId: string; expiresAt: number }>();
+
+/**
+ * Create a short-lived single-use SSE ticket for a user.
+ * Used instead of passing JWTs in URL query params (which leak into logs/referrers).
+ */
+export function createSseTicket(userId: string): string {
+  const ticket = crypto.randomBytes(32).toString('hex');
+  sseTicketStore.set(ticket, { userId, expiresAt: Date.now() + 30_000 }); // 30 seconds
+  return ticket;
+}
+
+/**
+ * Validate and consume an SSE ticket (single-use).
+ */
+function consumeSseTicket(ticket: string): string | null {
+  const entry = sseTicketStore.get(ticket);
+  if (!entry) return null;
+  sseTicketStore.delete(ticket); // single-use
+  if (Date.now() > entry.expiresAt) return null;
+  return entry.userId;
+}
+
+// Clean up expired SSE tickets
+setInterval(() => {
+  const now = Date.now();
+  sseTicketStore.forEach((value, key) => {
+    if (now > value.expiresAt) sseTicketStore.delete(key);
+  });
+}, 30_000);
+
 /**
  * Middleware to require authentication
  */
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  // Support token via query param for SSE (EventSource can't set headers)
+  // Support SSE ticket via query param (EventSource can't set headers)
+  const queryTicket = req.query.ticket as string | undefined;
+  // Legacy: still accept token query param for backwards compat during migration
   const queryToken = req.query.token as string | undefined;
 
-  let token: string | undefined;
+  // 1. Try Bearer token from Authorization header
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.split(' ')[1];
-  } else if (queryToken) {
-    token = queryToken;
+    const token = authHeader.split(' ')[1];
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    req.userId = decoded.userId;
+    return next();
   }
 
-  if (!token) {
-    return res.status(401).json({ error: 'Authentication required' });
+  // 2. Try SSE ticket (preferred for EventSource)
+  if (queryTicket) {
+    const userId = consumeSseTicket(queryTicket);
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid or expired SSE ticket' });
+    }
+    req.userId = userId;
+    return next();
   }
 
-  const decoded = verifyToken(token);
-  if (!decoded) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  // 3. Legacy: JWT in query param (deprecated — will be removed)
+  if (queryToken) {
+    const decoded = verifyToken(queryToken);
+    if (!decoded) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    req.userId = decoded.userId;
+    return next();
   }
 
-  req.userId = decoded.userId;
-  next();
+  return res.status(401).json({ error: 'Authentication required' });
 }
 
 /**

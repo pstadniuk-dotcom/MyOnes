@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { usersRepository } from '../users/users.repository';
 import { authRepository } from './auth.repository';
 import { consentsRepository } from '../consents/consents.repository';
+import { refreshTokenService } from './refresh-token.service';
 import { signupSchema, loginSchema, type InsertUser, type User } from '@shared/schema';
 import { generateToken } from '../../api/middleware/middleware';
 import { sendNotificationEmail } from '../../utils/emailService';
@@ -11,10 +12,16 @@ import { OAuth2Client } from 'google-auth-library';
 import axios from 'axios';
 import { getFrontendUrl } from '../../utils/urlHelper';
 
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export class AuthService {
     async signup(data: any, ipAddress?: string | null, userAgent?: string | null) {
+        if (!data.ageConfirmed) {
+            throw new Error('You must confirm you are 18 or older to create an account');
+        }
         const validatedData = signupSchema.parse(data);
 
         // Check if user already exists
@@ -27,16 +34,73 @@ export class AuthService {
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(validatedData.password, saltRounds);
 
-        // Create user with ToS acceptance timestamp
+        // Compute signup channel from UTM params
+        const utmSource = data.utmSource || null;
+        const utmMedium = data.utmMedium || null;
+        let signupChannel = 'direct';
+        if (data.referralCode) signupChannel = 'referral';
+        else if (utmMedium === 'cpc' || utmMedium === 'ppc' || utmMedium === 'paid') signupChannel = 'paid';
+        else if (utmMedium === 'email') signupChannel = 'email';
+        else if (utmMedium === 'social' || ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin'].includes(utmSource || '')) signupChannel = 'social';
+        else if (utmSource === 'podcast' || utmMedium === 'podcast') signupChannel = 'podcast';
+        else if (utmSource) signupChannel = 'organic';
+        else if (data.referrer && !data.referrer.includes('ones.health')) signupChannel = 'organic';
+
+        // Generate unique referral code for this user
+        const referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+
+        // Resolve referral if a code was provided
+        let referredByUserId: string | null = null;
+        if (data.referralCode) {
+            const referrer = await usersRepository.getUserByReferralCode(data.referralCode);
+            if (referrer) {
+                referredByUserId = referrer.id;
+            }
+        }
+
+        // Create user with ToS acceptance timestamp and attribution data
         const userData: InsertUser = {
             name: validatedData.name,
             email: validatedData.email,
             phone: validatedData.phone || null,
             password: hashedPassword,
             tosAcceptedAt: new Date(),
+            utmSource,
+            utmMedium,
+            utmCampaign: data.utmCampaign || null,
+            utmContent: data.utmContent || null,
+            utmTerm: data.utmTerm || null,
+            referrer: data.referrer || null,
+            landingPage: data.landingPage || null,
+            signupChannel,
+            referralCode,
+            referredByUserId,
         };
 
         const user = await usersRepository.createUser(userData);
+
+        // Record referral event if this user was referred
+        if (referredByUserId && data.referralCode) {
+            if (referredByUserId === user.id) {
+                logger.warn('Self-referral detected — skipping referral event creation', {
+                    userId: user.id,
+                    referralCode: data.referralCode,
+                });
+            } else {
+                try {
+                    const { db } = await import('../../infra/db/db');
+                    const { referralEvents } = await import('@shared/schema');
+                    await db.insert(referralEvents).values({
+                        referrerUserId: referredByUserId,
+                        referredUserId: user.id,
+                        referralCode: data.referralCode,
+                        eventType: 'signup',
+                    });
+                } catch (err) {
+                    logger.warn('Failed to record referral event', { error: err });
+                }
+            }
+        }
 
         // Record Terms of Service & Privacy Policy acceptance as consent record
         try {
@@ -57,9 +121,9 @@ export class AuthService {
         // Generate and send verification email
         await this.sendVerificationEmail(user);
 
-        const token = generateToken(user.id, user.isAdmin || false);
+        const { accessToken, refreshToken } = await refreshTokenService.createTokenPair(user.id, user.isAdmin || false);
 
-        return { user, token };
+        return { user, token: accessToken, refreshToken };
     }
 
     private async sendVerificationEmail(user: User) {
@@ -162,14 +226,34 @@ export class AuthService {
             throw new Error('Invalid email or password');
         }
 
+        // Check account lockout
+        if (user.lockedUntil && new Date() < user.lockedUntil) {
+            const remainingMs = user.lockedUntil.getTime() - Date.now();
+            const remainingMin = Math.ceil(remainingMs / 60000);
+            throw new Error(`Account locked. Try again in ${remainingMin} minute${remainingMin === 1 ? '' : 's'}.`);
+        }
+
         const isValidPassword = await bcrypt.compare(validatedData.password, user.password);
         if (!isValidPassword) {
+            // Increment failed attempts
+            const attempts = (user.failedLoginAttempts || 0) + 1;
+            const updates: Record<string, any> = { failedLoginAttempts: attempts };
+            if (attempts >= MAX_LOGIN_ATTEMPTS) {
+                updates.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
+                logger.warn('Account locked due to too many failed login attempts', { email: validatedData.email, attempts });
+            }
+            await usersRepository.updateUser(user.id, updates);
             throw new Error('Invalid email or password');
         }
 
-        const token = generateToken(user.id, user.isAdmin || false);
+        // Reset failed attempts on successful login
+        if (user.failedLoginAttempts > 0) {
+            await usersRepository.updateUser(user.id, { failedLoginAttempts: 0, lockedUntil: null });
+        }
 
-        return { user, token };
+        const { accessToken, refreshToken } = await refreshTokenService.createTokenPair(user.id, user.isAdmin || false);
+
+        return { user, token: accessToken, refreshToken };
     }
 
     async googleLogin(googleToken: string, ipAddress?: string | null, userAgent?: string | null) {
@@ -249,19 +333,19 @@ export class AuthService {
                 }
             }
 
-            const token = generateToken(user.id, user.isAdmin || false);
-            return { user, token, isNewUser };
+            const { accessToken, refreshToken } = await refreshTokenService.createTokenPair(user.id, user.isAdmin || false);
+            return { user, token: accessToken, refreshToken, isNewUser };
         } catch (error: any) {
             logger.error('Google login error', { error: error.message });
             throw new Error('Google authentication failed');
         }
     }
 
-    async facebookLogin(accessToken: string, ipAddress?: string | null, userAgent?: string | null) {
+    async facebookLogin(fbAccessToken: string, ipAddress?: string | null, userAgent?: string | null) {
         try {
             logger.debug('Attempting Facebook login with token...');
             // Verify Facebook token and get user info
-            const { data } = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`);
+            const { data } = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${fbAccessToken}`);
 
             logger.debug('Facebook response data', { data });
 
@@ -316,8 +400,8 @@ export class AuthService {
                 }
             }
 
-            const token = generateToken(user.id, user.isAdmin || false);
-            return { user, token, isNewUser };
+            const { accessToken, refreshToken } = await refreshTokenService.createTokenPair(user.id, user.isAdmin || false);
+            return { user, token: accessToken, refreshToken, isNewUser };
         } catch (error: any) {
             const fbError = error.response?.data?.error?.message || error.message;
             logger.error('Facebook login error details', {

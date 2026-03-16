@@ -47,13 +47,44 @@ export default function ContactPage() {
     }
   }, [typeFromUrl]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Message Sent!",
-      description: "We'll get back to you within 24-48 hours.",
-    });
-    setFormData({ name: '', email: '', inquiryType: '', message: '' });
+    setSubmitting(true);
+
+    try {
+      const response = await fetch('/api/support/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          category: formData.inquiryType,
+          subject: `${formData.inquiryType} inquiry from ${formData.name}`,
+          message: formData.message,
+          source: 'contact_form',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit');
+      }
+
+      toast({
+        title: "Message Sent!",
+        description: "We'll get back to you within 24-48 hours.",
+      });
+      setFormData({ name: '', email: '', inquiryType: '', message: '' });
+    } catch {
+      toast({
+        title: "Failed to send",
+        description: "Please try again or email us directly at support@ones.health",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const selectedInquiry = inquiryTypes.find(t => t.value === formData.inquiryType);

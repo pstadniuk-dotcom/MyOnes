@@ -12,6 +12,10 @@ router.post('/facebook', authController.facebookLogin);
 router.post('/logout', authController.logout);
 router.get('/me', requireAuth, authController.getMe);
 
+// Token Management
+router.post('/refresh', authController.refresh);
+router.post('/sse-ticket', requireAuth, authController.getSseTicket);
+
 // Password Management
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);

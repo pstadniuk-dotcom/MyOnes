@@ -9,6 +9,39 @@ function handleSessionExpired() {
   window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
 }
 
+// Track whether a refresh is already in-flight to avoid parallel refresh calls
+let refreshPromise: Promise<boolean> | null = null;
+
+/**
+ * Attempt to refresh the access token using the stored refresh token.
+ * Returns true if refresh succeeded, false otherwise.
+ */
+async function tryRefreshToken(): Promise<boolean> {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) return false;
+
+  try {
+    const res = await fetch(buildApiUrl('/api/auth/refresh'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+      credentials: 'include',
+    });
+
+    if (!res.ok) {
+      localStorage.removeItem('refreshToken');
+      return false;
+    }
+
+    const data = await res.json();
+    localStorage.setItem('authToken', data.token);
+    localStorage.setItem('refreshToken', data.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     // Handle 401 errors globally - session expired
@@ -50,6 +83,28 @@ export async function apiRequest(
     credentials: "include",
   });
 
+  // On 401, try to refresh the token and retry once
+  if (res.status === 401 && localStorage.getItem('refreshToken')) {
+    if (!refreshPromise) {
+      refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
+    }
+    const refreshed = await refreshPromise;
+    if (refreshed) {
+      // Retry original request with new token
+      const retryRes = await fetch(fullUrl, {
+        method,
+        headers: {
+          ...getAuthHeaders(),
+          ...(data ? { "Content-Type": "application/json" } : {}),
+        },
+        body: data ? JSON.stringify(data) : undefined,
+        credentials: "include",
+      });
+      await throwIfResNotOk(retryRes);
+      return retryRes;
+    }
+  }
+
   await throwIfResNotOk(res);
   return res;
 }
@@ -84,9 +139,9 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
       staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for 5 min
-      retry: false,
+      retry: 1,
     },
     mutations: {
       retry: false,

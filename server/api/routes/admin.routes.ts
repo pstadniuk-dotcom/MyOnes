@@ -8,6 +8,8 @@ const router = Router();
 
 // Dashboard & Analytics
 router.get('/stats', requireAdmin, adminController.getStats);
+router.get('/stats/enhanced', requireAdmin, adminController.getEnhancedStats);
+router.get('/stats/financial', requireAdmin, adminController.getFinancialMetrics);
 router.get('/analytics/growth', requireAdmin, adminController.getGrowthAnalytics);
 router.get('/analytics/revenue', requireAdmin, adminController.getRevenueAnalytics);
 
@@ -24,11 +26,18 @@ router.post('/users/:id/notes', requireAdmin, adminController.addUserNote);
 
 // Support System
 router.get('/notifications/counts', requireAdmin, adminController.getNotificationCounts);
+router.get('/support-tickets/metrics', requireAdmin, adminController.getSupportTicketMetrics);
+router.get('/support-tickets/filter-options', requireAdmin, adminController.getTicketFilterOptions);
 router.get('/support-tickets', requireAdmin, adminController.listSupportTickets);
 router.get('/support-tickets/:id', requireAdmin, adminController.getSupportTicketDetails);
 router.patch('/support-tickets/:id', requireAdmin, adminController.updateSupportTicket);
 router.patch('/support-tickets/:id/assign', requireAdmin, adminController.assignSupportTicket);
 router.post('/support-tickets/:id/reply', requireAdmin, adminController.replyToSupportTicket);
+router.post('/support-tickets/:id/tags', requireAdmin, adminController.addTicketTag);
+router.delete('/support-tickets/:id/tags', requireAdmin, adminController.removeTicketTag);
+router.post('/support-tickets/bulk-delete', requireAdmin, adminController.bulkDeleteSupportTickets);
+router.post('/support-tickets/bulk-close', requireAdmin, adminController.bulkCloseSupportTickets);
+router.post('/support-tickets/bulk-update', requireAdmin, adminController.bulkUpdateSupportTickets);
 
 // Live Chat (Admin)
 router.get('/live-chats', requireAdmin, liveChatController.adminListSessions);
@@ -36,6 +45,8 @@ router.get('/live-chats/count', requireAdmin, liveChatController.adminGetChatCou
 router.get('/live-chats/stream', requireAdmin, liveChatController.adminStream);
 router.get('/live-chats/admins', requireAdmin, liveChatController.adminListAdmins);
 router.get('/live-chats/analytics', requireAdmin, liveChatController.getAnalytics);
+router.post('/live-chats/bulk-delete', requireAdmin, liveChatController.adminBulkDeleteSessions);
+router.post('/live-chats/bulk-close', requireAdmin, liveChatController.adminBulkCloseSessions);
 router.get('/live-chats/canned-responses', requireAdmin, liveChatController.listCannedResponses);
 router.post('/live-chats/canned-responses', requireAdmin, liveChatController.createCannedResponse);
 router.post('/live-chats/canned-responses/use', requireAdmin, liveChatController.useCannedResponse);
@@ -92,6 +103,7 @@ router.get('/ai-usage/user/:id', requireAdmin, adminController.getAiUsageByUser)
 // Audit & Compliance
 router.get('/audit-logs', requireAdmin, adminController.listAuditLogs);
 router.get('/audit-logs/admin', requireAdmin, adminController.listAdminAuditLogs);
+router.get('/audit-logs/auth', requireAdmin, adminController.listAuthAuditLogs);
 router.get('/safety-logs', requireAdmin, adminController.listSafetyLogs);
 router.get('/warning-acknowledgments', requireAdmin, adminController.listWarningAcknowledgments);
 router.get('/consents', requireAdmin, adminController.listConsents);
@@ -111,6 +123,37 @@ router.delete('/help-articles/:id', requireAdmin, adminController.deleteHelpArti
 // Newsletter Subscribers
 router.get('/newsletter', requireAdmin, adminController.listNewsletterSubscribers);
 router.patch('/newsletter/:id', requireAdmin, adminController.toggleNewsletterSubscriber);
+
+// Traffic & Attribution Analytics
+router.get('/analytics/traffic-sources', requireAdmin, adminController.getTrafficSources);
+router.get('/analytics/utm-campaigns', requireAdmin, adminController.getUtmCampaigns);
+router.get('/analytics/referrals', requireAdmin, adminController.getReferralStats);
+
+// Marketing Campaigns
+router.get('/campaigns', requireAdmin, adminController.listCampaigns);
+router.post('/campaigns', requireAdmin, adminController.createCampaign);
+router.patch('/campaigns/:id', requireAdmin, adminController.updateCampaign);
+router.delete('/campaigns/:id', requireAdmin, adminController.deleteCampaign);
+
+// Influencer Hub
+router.get('/influencers', requireAdmin, adminController.listInfluencers);
+router.get('/influencers/stats', requireAdmin, adminController.getInfluencerStats);
+router.get('/influencers/:id', requireAdmin, adminController.getInfluencer);
+router.post('/influencers', requireAdmin, adminController.createInfluencer);
+router.patch('/influencers/:id', requireAdmin, adminController.updateInfluencer);
+router.delete('/influencers/:id', requireAdmin, adminController.deleteInfluencer);
+router.get('/influencers/:id/content', requireAdmin, adminController.listInfluencerContent);
+router.post('/influencers/:id/content', requireAdmin, adminController.createInfluencerContent);
+
+// B2B Medical Prospecting
+router.get('/b2b/prospects', requireAdmin, adminController.listB2bProspects);
+router.get('/b2b/stats', requireAdmin, adminController.getB2bStats);
+router.get('/b2b/prospects/:id', requireAdmin, adminController.getB2bProspect);
+router.post('/b2b/prospects', requireAdmin, adminController.createB2bProspect);
+router.patch('/b2b/prospects/:id', requireAdmin, adminController.updateB2bProspect);
+router.delete('/b2b/prospects/:id', requireAdmin, adminController.deleteB2bProspect);
+router.get('/b2b/prospects/:id/outreach', requireAdmin, adminController.listB2bOutreach);
+router.post('/b2b/prospects/:id/outreach', requireAdmin, adminController.createB2bOutreach);
 
 // Formula Review Scheduler — manual trigger for testing
 router.post('/formula-review/trigger', requireAdmin, async (req, res) => {

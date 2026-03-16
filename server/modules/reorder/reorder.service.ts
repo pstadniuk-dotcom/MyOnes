@@ -11,11 +11,13 @@
  */
 
 import OpenAI from 'openai';
+import { logger } from '../../infra/logging/logger';
 import { reorderRepository } from './reorder.repository';
 import { wearableTrendAnalysisService, type WearableTrendAnalysis } from './wearableTrendAnalysis.service';
 import { usersRepository } from '../users/users.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
 import { notificationsService } from '../notifications/notifications.service';
+import { notificationGate } from '../notifications/notification-gate.service';
 import type { ReorderSchedule, ReorderRecommendation, User, Formula, HealthProfile } from '@shared/schema';
 import { ALL_INGREDIENTS, findIngredientByName, type IngredientInfo } from '@shared/ingredients';
 
@@ -249,7 +251,7 @@ export const reorderService = {
         aiDecision = parsed;
       }
     } catch (err) {
-      console.error('[ReorderService] AI analysis failed:', err);
+      logger.error('[ReorderService] AI analysis failed', { error: err });
       aiDecision = {
         decision: 'KEEP',
         trendSummary: 'AI analysis temporarily unavailable. Defaulting to current formula.',
@@ -296,88 +298,105 @@ export const reorderService = {
     const smsBody = analysis?.smsSummary ||
       'Your ONES formula is up for reorder. Reply APPROVE to keep your current formula, or DELAY to push back 2 weeks.';
 
-    // Send SMS if user has phone + SMS opt-in
+    const gateMeta = { scheduleId: schedule.id, recommendationId: recommendation.id };
+
+    // Send SMS if user has phone + SMS opt-in + gate allows
     if (user.phone) {
-      try {
-        const twilio = await import('twilio');
-        const twilioClient = twilio.default(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+      const smsAllowed = await notificationGate.canSend(schedule.userId, 'reorder_review', 'sms');
+      if (smsAllowed) {
+        try {
+          const twilio = await import('twilio');
+          const twilioClient = twilio.default(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-        const message = await twilioClient.messages.create({
-          body: `ONES: ${smsBody}\n\nReply:\n• APPROVE - reorder with current formula\n• DELAY - push back 2 weeks`,
-          from: process.env.TWILIO_PHONE_NUMBER,
-          to: user.phone,
-        });
+          const message = await twilioClient.messages.create({
+            body: `ONES: ${smsBody}\n\nReply:\n• APPROVE - reorder with current formula\n• DELAY - push back 2 weeks`,
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: user.phone,
+          });
 
-        await reorderRepository.updateRecommendation(recommendation.id, {
-          smsMessageSid: message.sid,
-          smsSentAt: new Date(),
-          status: 'sent',
-        });
-      } catch (err) {
-        console.error('[ReorderService] SMS send failed:', err);
+          await reorderRepository.updateRecommendation(recommendation.id, {
+            smsMessageSid: message.sid,
+            smsSentAt: new Date(),
+            status: 'sent',
+          });
+
+          await notificationGate.record(schedule.userId, 'smart_reorder', 'reorder_review', 'sms', gateMeta);
+        } catch (err) {
+          logger.error('[ReorderService] SMS send failed', { error: err });
+        }
       }
     }
 
-    // Always send email
-    try {
-      const { sendNotificationEmail } = await import('../../utils/emailService');
+    // Send email if gate allows
+    const emailAllowed = await notificationGate.canSend(schedule.userId, 'reorder_review', 'email');
+    if (emailAllowed) {
+      try {
+        const { sendNotificationEmail } = await import('../../utils/emailService');
 
-      const formula = await formulasRepository.getFormula(schedule.formulaId);
-      const findings = analysis?.findings || [];
-      const findingsHtml = findings.length > 0
-        ? findings.map(f => {
-          const emoji = f.trend === 'improving' ? '📈' : f.trend === 'declining' ? '📉' : '➡️';
-          return `<li>${emoji} <strong>${f.metric}</strong>: ${f.detail}</li>`;
-        }).join('')
-        : '<li>No significant changes detected</li>';
+        const formula = await formulasRepository.getFormula(schedule.formulaId);
+        const findings = analysis?.findings || [];
+        const findingsHtml = findings.length > 0
+          ? findings.map(f => {
+            const emoji = f.trend === 'improving' ? '📈' : f.trend === 'declining' ? '📉' : '➡️';
+            return `<li>${emoji} <strong>${f.metric}</strong>: ${f.detail}</li>`;
+          }).join('')
+          : '<li>No significant changes detected</li>';
 
-      const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
+        const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
 
-      await sendNotificationEmail({
-        to: user.email,
-        subject: 'Your ONES formula reorder is coming up',
-        title: 'Smart Re-Order Review',
-        type: 'formula_update',
-        content: `
-          <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
-          <p>Your 8-week supply of Formula V${formula?.version || schedule.formulaVersion} is running low. Here's what your wearable data shows:</p>
-          <ul>${findingsHtml}</ul>
-          <p><strong>${analysis?.trendSummary || 'Your metrics have been stable.'}</strong></p>
-          <p>${analysis?.recommendsChanges
-            ? 'Based on your data, I have some formula adjustment suggestions ready for you.'
-            : 'Your current formula appears to be working well — no changes recommended.'
-          }</p>
-          <p>Reply to the SMS we sent, or visit your dashboard to approve your reorder.</p>
-        `,
-        actionUrl: `${frontendUrl}/dashboard/formula`,
-        actionText: 'Review Reorder',
-      });
+        await sendNotificationEmail({
+          to: user.email,
+          subject: 'Your ONES formula reorder is coming up',
+          title: 'Smart Re-Order Review',
+          type: 'formula_update',
+          content: `
+            <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
+            <p>Your 8-week supply of Formula V${formula?.version || schedule.formulaVersion} is running low. Here's what your wearable data shows:</p>
+            <ul>${findingsHtml}</ul>
+            <p><strong>${analysis?.trendSummary || 'Your metrics have been stable.'}</strong></p>
+            <p>${analysis?.recommendsChanges
+              ? 'Based on your data, I have some formula adjustment suggestions ready for you.'
+              : 'Your current formula appears to be working well — no changes recommended.'
+            }</p>
+            <p>Reply to the SMS we sent, or visit your dashboard to approve your reorder.</p>
+          `,
+          actionUrl: `${frontendUrl}/dashboard/formula`,
+          actionText: 'Review Reorder',
+        });
 
-      await reorderRepository.updateRecommendation(recommendation.id, {
-        emailSentAt: new Date(),
-      });
-    } catch (err) {
-      console.error('[ReorderService] Email send failed:', err);
+        await reorderRepository.updateRecommendation(recommendation.id, {
+          emailSentAt: new Date(),
+        });
+
+        await notificationGate.record(schedule.userId, 'smart_reorder', 'reorder_review', 'email', gateMeta);
+      } catch (err) {
+        logger.error('[ReorderService] Email send failed', { error: err });
+      }
     }
 
-    // In-app notification
-    try {
-      await notificationsService.create({
-        userId: schedule.userId,
-        type: 'formula_update',
-        title: 'Reorder Review Ready',
-        content: analysis?.recommendsChanges
-          ? 'Your AI practitioner has formula adjustment suggestions based on 8 weeks of wearable data.'
-          : 'Your formula reorder is ready. Your metrics look stable — approve to reorder.',
-        formulaId: schedule.formulaId,
-        metadata: {
-          actionUrl: '/dashboard/formula',
-          icon: 'sparkles',
-          priority: 'high',
-        },
-      });
-    } catch (err) {
-      console.error('[ReorderService] Notification failed:', err);
+    // In-app notification (gate check)
+    const inAppAllowed = await notificationGate.canSend(schedule.userId, 'reorder_review', 'in_app');
+    if (inAppAllowed) {
+      try {
+        await notificationsService.create({
+          userId: schedule.userId,
+          type: 'formula_update',
+          title: 'Reorder Review Ready',
+          content: analysis?.recommendsChanges
+            ? 'Your AI practitioner has formula adjustment suggestions based on 8 weeks of wearable data.'
+            : 'Your formula reorder is ready. Your metrics look stable — approve to reorder.',
+          formulaId: schedule.formulaId,
+          metadata: {
+            actionUrl: '/dashboard/formula',
+            icon: 'sparkles',
+            priority: 'high',
+          },
+        });
+
+        await notificationGate.record(schedule.userId, 'smart_reorder', 'reorder_review', 'in_app', gateMeta);
+      } catch (err) {
+        logger.error('[ReorderService] Notification failed', { error: err });
+      }
     }
   },
 
@@ -456,7 +475,7 @@ export const reorderService = {
         await this.handleKeep(rec, true);
         count++;
       } catch (err) {
-        console.error(`[ReorderService] Auto-approve failed for recommendation ${rec.id}:`, err);
+        logger.error('[ReorderService] Auto-approve failed', { recommendationId: rec.id, error: err });
       }
     }
 
@@ -475,18 +494,36 @@ export const reorderService = {
       try {
         const user = await usersRepository.getUser(schedule.userId);
         if (!user?.stripeCustomerId) {
-          console.error(`[ReorderService] No Stripe customer for user ${schedule.userId}`);
+          logger.error('[ReorderService] No Stripe customer for user', { userId: schedule.userId });
           continue;
         }
 
-        const formula = await formulasRepository.getFormula(schedule.formulaId);
+        // Check if there's an approved recommendation with adjustments
+        let chargeFormulaId = schedule.formulaId;
+        const recommendation = await reorderRepository.getRecommendationByScheduleId(schedule.id);
+        if (recommendation && recommendation.recommendsChanges) {
+          const analysis = recommendation.analysisJson as AIReorderDecision;
+          if (analysis?.suggestedChanges && analysis.suggestedChanges.length > 0) {
+            // If an adjusted formula was created and linked, use it
+            if ((recommendation as any).adjustedFormulaId) {
+              chargeFormulaId = (recommendation as any).adjustedFormulaId;
+              logger.info('[ReorderService] Using adjusted formula for reorder', {
+                scheduleId: schedule.id,
+                originalFormulaId: schedule.formulaId,
+                adjustedFormulaId: chargeFormulaId,
+              });
+            }
+          }
+        }
+
+        const formula = await formulasRepository.getFormula(chargeFormulaId);
         if (!formula) continue;
 
         // Get fresh price quote
         const { formulasService } = await import('../formulas/formulas.service');
-        const quoteResult = await formulasService.getFormulaQuote(schedule.userId, schedule.formulaId);
+        const quoteResult = await formulasService.getFormulaQuote(schedule.userId, chargeFormulaId);
         if (!quoteResult.quote.available || !quoteResult.quote.total) {
-          console.error(`[ReorderService] Quote unavailable for formula ${schedule.formulaId}`);
+          logger.error('[ReorderService] Quote unavailable for formula', { formulaId: schedule.formulaId });
           continue;
         }
 
@@ -504,7 +541,7 @@ export const reorderService = {
           || (customer as any).default_source;
 
         if (!defaultPaymentMethod) {
-          console.error(`[ReorderService] No payment method on file for user ${schedule.userId}`);
+          logger.error('[ReorderService] No payment method on file for user', { userId: schedule.userId });
           // TODO: Send "update payment method" email
           continue;
         }
@@ -519,7 +556,7 @@ export const reorderService = {
           description: `ONES Smart Re-Order - Formula V${schedule.formulaVersion}`,
           metadata: {
             userId: schedule.userId,
-            formulaId: schedule.formulaId,
+            formulaId: chargeFormulaId,
             formulaVersion: String(schedule.formulaVersion),
             scheduleId: schedule.id,
             orderType: 'smart_reorder',
@@ -530,7 +567,7 @@ export const reorderService = {
           // Create order record
           const order = await usersRepository.createOrder({
             userId: schedule.userId,
-            formulaId: schedule.formulaId,
+            formulaId: chargeFormulaId,
             formulaVersion: schedule.formulaVersion,
             status: 'pending',
             amountCents: priceCents,
@@ -574,12 +611,53 @@ export const reorderService = {
           } catch { /* non-critical */ }
         }
       } catch (err: any) {
-        console.error(`[ReorderService] Charge failed for schedule ${schedule.id}:`, err?.message || err);
+        logger.error('[ReorderService] Charge failed', {
+          scheduleId: schedule.id,
+          userId: schedule.userId,
+          error: err?.message || err,
+          stripeCode: err?.code,
+        });
 
         if (err?.code === 'authentication_required' || err?.code === 'card_declined') {
-          // Mark schedule for manual intervention
-          await reorderRepository.updateSchedule(schedule.id, { status: 'skipped' });
-          // TODO: Send "payment failed" email
+          const currentAttempts = (schedule as any).paymentAttempts ?? 0;
+          const nextAttempts = currentAttempts + 1;
+
+          if (nextAttempts < 3) {
+            // Retry: increment attempts but keep schedule in approved state
+            await reorderRepository.updateSchedule(schedule.id, {
+              paymentAttempts: nextAttempts,
+            } as any);
+            logger.warn('[ReorderService] Payment attempt failed, will retry', {
+              scheduleId: schedule.id,
+              userId: schedule.userId,
+              attempt: nextAttempts,
+              maxAttempts: 3,
+            });
+          } else {
+            // Final attempt failed — mark as skipped and notify user
+            await reorderRepository.updateSchedule(schedule.id, {
+              status: 'skipped',
+              paymentAttempts: nextAttempts,
+            } as any);
+            logger.error('[ReorderService] Payment failed after 3 attempts — marking schedule as skipped', {
+              scheduleId: schedule.id,
+              userId: schedule.userId,
+            });
+
+            try {
+              await notificationsService.create({
+                userId: schedule.userId,
+                type: 'order_update',
+                title: 'Reorder Payment Failed',
+                content: `We were unable to process payment for your reorder after multiple attempts. Please update your payment method to continue.`,
+                metadata: {
+                  actionUrl: '/dashboard/billing',
+                  icon: 'alert-triangle',
+                  priority: 'high',
+                },
+              });
+            } catch { /* non-critical */ }
+          }
         }
       }
     }

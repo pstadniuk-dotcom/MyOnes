@@ -48,16 +48,16 @@ const DEFAULT_PROFILE: FounderProfile = {
     'Pete is the founder of Ones, a personalized supplement platform that uses AI to create custom daily formulas based on individual health data, lab results, and wearable metrics.',
 
   bioMedium:
-    'Pete is the founder and CEO of Ones, a health technology company reimagining how people take supplements. Ones uses conversational AI to analyze individual health profiles, blood work, and real-time wearable data to create one truly personalized daily supplement formula — replacing the guesswork of generic multivitamins with science-backed, precision-dosed formulations. With a catalog of over 200 ingredients and proprietary system blends, Ones delivers measurable health outcomes through continuous optimization.',
+    'Pete is the founder and CEO of Ones, a health technology company rethinking how people approach supplements. Ones uses AI to help people create a personalized daily supplement formula based on their individual health data — including blood work and wearable metrics — instead of relying on generic multivitamins. The platform offers over 200 ingredients at researched doses, tailored to each person.',
 
   bioLong:
-    `Pete is the founder and CEO of Ones, a health technology company on a mission to make personalized nutrition accessible to everyone. After years of navigating the overwhelming supplement industry — where conflicting advice and one-size-fits-all products dominate — Pete built Ones to solve the problem at its root.
+    `Pete is the founder and CEO of Ones, a health technology company working to make personalized nutrition more accessible. After spending years navigating the supplement aisle — sorting through conflicting advice and generic products — he started building something that could do better.
 
-Ones uses a conversational AI practitioner to deeply understand each user's health goals, challenges, and biology. By analyzing lab results, health history, and real-time biometric data from wearables like Oura, Whoop, and Fitbit, the platform creates a single, custom-formulated daily supplement tailored to the individual.
+Ones uses a conversational AI to understand each person's health goals, history, and biology. By looking at lab results, health background, and biometric data from wearables like Oura, Whoop, and Fitbit, the platform creates a single custom supplement formula tailored to the individual.
 
-The platform's ingredient catalog includes over 200 individually-dosed compounds and 18 proprietary system blends covering everything from adrenal support to cardiovascular health. Each formula is continuously optimized as new health data comes in, creating a feedback loop between supplementation and measurable outcomes.
+The ingredient catalog includes over 200 individually-dosed compounds and 18 system blends covering areas like adrenal support, cardiovascular health, and more. Each formula can be updated as new health data comes in.
 
-Pete's vision is a world where your supplement adapts to you — not the other way around. Ones represents the intersection of AI, personalized medicine, and preventive health, making clinical-grade formulation available outside of expensive functional medicine practices.`,
+Pete's goal is simple: your supplement should work for you specifically, not be a guess. Ones brings the kind of personalization you'd get from a functional medicine practitioner, but makes it more accessible and affordable.`,
 
   headshotUrl: '', // TODO: add when available
   pressKitUrl: '', // TODO: add when available
@@ -74,23 +74,23 @@ Pete's vision is a world where your supplement adapts to you — not the other w
   ],
 
   talkingPoints: [
-    'Why generic multivitamins don\'t work — the one-size-fits-all problem',
-    'How AI can analyze blood work better than most practitioners',
-    'The feedback loop: wearable data → formula adjustments → measurable results',
-    'Making clinical-grade personalization affordable (not just for the wealthy)',
-    'Over 200 ingredients at precise therapeutic doses — not fairy-dusted formulas',
-    'Why your supplement should change as you change',
-    'Privacy-first AI health conversations — encrypted data handling',
-    'The shift from reactive healthcare to proactive health management',
+    'Why one-size-fits-all supplements often miss the mark for individuals',
+    'How health data (blood work, wearables) can inform better supplement choices',
+    'The idea of a supplement that adapts as your health data changes',
+    'Making personalized nutrition more accessible and affordable',
+    'Why ingredient doses matter and what "proprietary blend" labels actually mean',
+    'The role AI can play in analyzing health data for personalization',
+    'Privacy-first approach to handling health data',
+    'Moving from reactive healthcare toward proactive health habits',
   ],
 
   uniqueAngles: [
-    'Founder story: frustrated with generic supplements → built an AI to fix it',
-    'Tech angle: how we use GPT-4o and Claude to be an AI health practitioner',
-    'Data angle: real-time wearable integration creating a health feedback loop',
-    'Industry disruption: challenging the $50B supplement industry\'s status quo',
-    'Health equity: making personalized nutrition accessible beyond elite biohackers',
-    'Science angle: therapeutic dosing vs. the "proprietary blend" scam',
+    'Founder story: frustrated with generic supplements, started building something more personalized',
+    'Tech angle: using AI to help people understand what supplements actually make sense for their body',
+    'Data angle: integrating wearable data so your supplement routine can adapt as you change',
+    'Personalization: making individual-level supplement formulation more accessible',
+    'Health equity: bringing personalized nutrition beyond expensive functional medicine offices',
+    'Transparency angle: honest dosing vs. hidden "proprietary blends"',
   ],
 
   credentials: [

@@ -304,6 +304,28 @@ export default function UserDetailPage() {
     );
   }
 
+  if (userError && !user) {
+    return (
+      <div className="p-8">
+        <div className="text-center py-12">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Failed to load user</h3>
+          <p className="text-muted-foreground mb-4">
+            {userError.message || 'An error occurred while loading user details.'}
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/admin/users', userId] })} data-testid="button-retry">
+              Try Again
+            </Button>
+            <Button variant="outline" onClick={() => setLocation('/admin/users')} data-testid="button-back-to-users">
+              Back to Users
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="p-8">

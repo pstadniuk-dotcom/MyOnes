@@ -4,6 +4,7 @@ import { usersRepository } from '../users/users.repository';
 import { membershipRepository } from '../membership/membership.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
 import { manufacturerPricingService } from '../formulas/manufacturer-pricing.service';
+import { consentsRepository } from '../consents/consents.repository';
 import { db } from '../../infra/db/db';
 import { ingredientPricing, users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
@@ -396,6 +397,11 @@ class DatabaseBillingProvider implements BillingProvider {
         status: 'active',
         renewsAt: this.getCurrentPeriodEnd(sub),
       });
+    } else {
+      logger.warn('handleInvoicePaid: subscription not found for stripeSubscriptionId — invoice paid but no internal subscription record exists', {
+        stripeSubscriptionId,
+        eventId: event.id,
+      });
     }
   }
 
@@ -413,6 +419,17 @@ class DatabaseBillingProvider implements BillingProvider {
     if (existing) {
       await usersRepository.updateSubscriptionByStripeSubscriptionId(stripeSubscriptionId, {
         status: 'past_due',
+      });
+      logger.warn('handleInvoicePaymentFailed: invoice payment failed for subscription', {
+        stripeSubscriptionId,
+        eventId: event.id,
+        invoiceId: invoice.id,
+      });
+      // TODO: Integrate dunning email — notify user that payment failed and prompt them to update their payment method
+    } else {
+      logger.warn('handleInvoicePaymentFailed: subscription not found for stripeSubscriptionId', {
+        stripeSubscriptionId,
+        eventId: event.id,
       });
     }
   }
@@ -653,6 +670,12 @@ class DatabaseBillingProvider implements BillingProvider {
       if (safetyValidation?.requiresAcknowledgment && !formula.warningsAcknowledgedAt) {
         throw new Error('SAFETY_WARNINGS_NOT_ACKNOWLEDGED');
       }
+    }
+
+    // MEDICAL DISCLOSURE GATE: Require medication_disclosure consent before checkout
+    const medDisclosureConsent = await consentsRepository.getUserConsent(userId, 'medication_disclosure');
+    if (!medDisclosureConsent || !medDisclosureConsent.granted) {
+      throw new Error('MEDICAL_DISCLOSURE_NOT_ACKNOWLEDGED');
     }
 
     let formulaAmountCents = 0;

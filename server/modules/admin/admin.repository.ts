@@ -1,3 +1,4 @@
+import { logger } from '../../infra/logging/logger';
 import { db } from '../../infra/db/db';
 import {
     users,
@@ -5,6 +6,7 @@ import {
     orders,
     supportTickets,
     supportTicketResponses,
+    supportTicketActivityLog,
     chatSessions,
     messages,
     fileUploads,
@@ -14,20 +16,37 @@ import {
     userAdminNotes,
     wearableConnections,
     aiUsageLogs,
+    referralEvents,
+    marketingCampaigns,
+    influencers,
+    influencerContent,
+    b2bProspects,
+    b2bOutreach,
     type User,
     type Formula,
     type Order,
     type SupportTicket,
     type SupportTicketResponse,
+    type InsertSupportTicketActivityLog,
     type ChatSession,
     type Message,
     type FileUpload,
     type HealthProfile,
     type InsertSupportTicketResponse,
     type WearableConnection,
-    type IngredientPricing
+    type IngredientPricing,
+    type MarketingCampaign,
+    type InsertMarketingCampaign,
+    type Influencer,
+    type InsertInfluencer,
+    type InfluencerContent,
+    type InsertInfluencerContent,
+    type B2bProspect,
+    type InsertB2bProspect,
+    type B2bOutreach,
+    type InsertB2bOutreach,
 } from '@shared/schema';
-import { eq, desc, asc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull, sum } from 'drizzle-orm';
+import { eq, desc, asc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull, sum, not, ne } from 'drizzle-orm';
 import { decryptToken } from '../../utils/tokenEncryption';
 import { decryptField } from '../../infra/security/fieldEncryption';
 
@@ -86,7 +105,7 @@ export class AdminRepository {
                 totalFormulas
             };
         } catch (error) {
-            console.error('Error getting admin stats:', error);
+            logger.error('Error getting admin stats', { error });
             return {
                 totalUsers: 0,
                 totalPaidUsers: 0,
@@ -95,6 +114,221 @@ export class AdminRepository {
                 totalOrders: 0,
                 totalFormulas: 0
             };
+        }
+    }
+
+    async getEnhancedStats(days: number = 30): Promise<{
+        totalUsers: number;
+        totalRevenue: number;
+        totalOrders: number;
+        totalFormulas: number;
+        trends: {
+            users: { current: number; previous: number; changePercent: number };
+            revenue: { current: number; previous: number; changePercent: number };
+            orders: { current: number; previous: number; changePercent: number };
+            formulas: { current: number; previous: number; changePercent: number };
+        };
+        sparklines: {
+            users: number[];
+            revenue: number[];
+            orders: number[];
+        };
+    }> {
+        try {
+            const now = new Date();
+            const currentStart = new Date();
+            currentStart.setDate(now.getDate() - days);
+            const previousStart = new Date();
+            previousStart.setDate(currentStart.getDate() - days);
+
+            // Totals
+            const [userStats] = await db.select({ count: count() }).from(users);
+            const totalUsers = Number(userStats?.count || 0);
+            const [formulaStats] = await db.select({ count: count() }).from(formulas);
+            const totalFormulas = Number(formulaStats?.count || 0);
+            const [orderStats] = await db.select({ count: count() }).from(orders);
+            const totalOrders = Number(orderStats?.count || 0);
+            const [revenueStats] = await db
+                .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+                .from(orders);
+            const totalRevenue = Number(revenueStats?.total || 0) / 100;
+
+            // Current period counts
+            const [currentUsers] = await db.select({ count: count() }).from(users)
+                .where(gte(users.createdAt, currentStart));
+            const [previousUsers] = await db.select({ count: count() }).from(users)
+                .where(and(gte(users.createdAt, previousStart), lt(users.createdAt, currentStart)));
+
+            const [currentOrders] = await db.select({ count: count() }).from(orders)
+                .where(gte(orders.placedAt, currentStart));
+            const [previousOrders] = await db.select({ count: count() }).from(orders)
+                .where(and(gte(orders.placedAt, previousStart), lt(orders.placedAt, currentStart)));
+
+            const [currentRevenue] = await db
+                .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+                .from(orders).where(gte(orders.placedAt, currentStart));
+            const [previousRevenue] = await db
+                .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+                .from(orders).where(and(gte(orders.placedAt, previousStart), lt(orders.placedAt, currentStart)));
+
+            const [currentFormulas] = await db.select({ count: count() }).from(formulas)
+                .where(gte(formulas.createdAt, currentStart));
+            const [previousFormulas] = await db.select({ count: count() }).from(formulas)
+                .where(and(gte(formulas.createdAt, previousStart), lt(formulas.createdAt, currentStart)));
+
+            const calcChange = (curr: number, prev: number) =>
+                prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100);
+
+            const cUsers = Number(currentUsers?.count || 0);
+            const pUsers = Number(previousUsers?.count || 0);
+            const cOrders = Number(currentOrders?.count || 0);
+            const pOrders = Number(previousOrders?.count || 0);
+            const cRevenue = Number(currentRevenue?.total || 0) / 100;
+            const pRevenue = Number(previousRevenue?.total || 0) / 100;
+            const cFormulas = Number(currentFormulas?.count || 0);
+            const pFormulas = Number(previousFormulas?.count || 0);
+
+            // Sparkline data: daily counts for last 7 days
+            const sparklineStart = new Date();
+            sparklineStart.setDate(now.getDate() - 7);
+
+            const dailyUsers = await db
+                .select({ date: sql<string>`DATE(created_at)`, count: count() })
+                .from(users)
+                .where(gte(users.createdAt, sparklineStart))
+                .groupBy(sql`DATE(created_at)`)
+                .orderBy(sql`DATE(created_at)`);
+
+            const dailyOrders = await db
+                .select({ date: sql<string>`DATE(placed_at)`, count: count() })
+                .from(orders)
+                .where(gte(orders.placedAt, sparklineStart))
+                .groupBy(sql`DATE(placed_at)`)
+                .orderBy(sql`DATE(placed_at)`);
+
+            const dailyRevenue = await db
+                .select({ date: sql<string>`DATE(placed_at)`, total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+                .from(orders)
+                .where(gte(orders.placedAt, sparklineStart))
+                .groupBy(sql`DATE(placed_at)`)
+                .orderBy(sql`DATE(placed_at)`);
+
+            // Fill in missing days with 0
+            const fillSparkline = (data: Array<{ date: string; count?: number; total?: number }>, useTotal = false): number[] => {
+                const map = new Map<string, number>();
+                data.forEach(d => map.set(d.date, useTotal ? Number(d.total || 0) / 100 : Number(d.count || 0)));
+                const result: number[] = [];
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(now.getDate() - i);
+                    const key = d.toISOString().split('T')[0];
+                    result.push(map.get(key) || 0);
+                }
+                return result;
+            };
+
+            return {
+                totalUsers,
+                totalRevenue,
+                totalOrders,
+                totalFormulas,
+                trends: {
+                    users: { current: cUsers, previous: pUsers, changePercent: calcChange(cUsers, pUsers) },
+                    revenue: { current: cRevenue, previous: pRevenue, changePercent: calcChange(cRevenue, pRevenue) },
+                    orders: { current: cOrders, previous: pOrders, changePercent: calcChange(cOrders, pOrders) },
+                    formulas: { current: cFormulas, previous: pFormulas, changePercent: calcChange(cFormulas, pFormulas) },
+                },
+                sparklines: {
+                    users: fillSparkline(dailyUsers),
+                    revenue: fillSparkline(dailyRevenue, true),
+                    orders: fillSparkline(dailyOrders),
+                },
+            };
+        } catch (error) {
+            logger.error('Error getting enhanced stats', { error });
+            return {
+                totalUsers: 0, totalRevenue: 0, totalOrders: 0, totalFormulas: 0,
+                trends: {
+                    users: { current: 0, previous: 0, changePercent: 0 },
+                    revenue: { current: 0, previous: 0, changePercent: 0 },
+                    orders: { current: 0, previous: 0, changePercent: 0 },
+                    formulas: { current: 0, previous: 0, changePercent: 0 },
+                },
+                sparklines: { users: [], revenue: [], orders: [] },
+            };
+        }
+    }
+
+    async getFinancialMetrics(): Promise<{
+        mrr: number;
+        arr: number;
+        averageOrderValue: number;
+        ltv: number;
+        totalCustomers: number;
+        churnRate: number;
+        reorderRate: number;
+    }> {
+        try {
+            // Total revenue and orders
+            const [revStats] = await db
+                .select({
+                    totalRevenueCents: sql<number>`COALESCE(SUM(amount_cents), 0)`,
+                    totalOrders: count(),
+                })
+                .from(orders);
+
+            const totalRevenueCents = Number(revStats?.totalRevenueCents || 0);
+            const totalOrders = Number(revStats?.totalOrders || 0);
+            const averageOrderValue = totalOrders > 0 ? totalRevenueCents / totalOrders / 100 : 0;
+
+            // Distinct paying customers
+            const payingCustomers = await db.selectDistinct({ userId: orders.userId }).from(orders);
+            const totalCustomers = payingCustomers.length;
+
+            // LTV = total revenue / total customers
+            const ltv = totalCustomers > 0 ? totalRevenueCents / 100 / totalCustomers : 0;
+
+            // Revenue in last 30 days for MRR approximation
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            const [recentRev] = await db
+                .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+                .from(orders)
+                .where(gte(orders.placedAt, thirtyDaysAgo));
+            const mrr = Number(recentRev?.total || 0) / 100;
+            const arr = mrr * 12;
+
+            // Reorder rate: users with 2+ orders / users with 1+ orders
+            const orderCounts = await db
+                .select({ userId: orders.userId, cnt: count() })
+                .from(orders)
+                .groupBy(orders.userId);
+            const repeatCustomers = orderCounts.filter(c => Number(c.cnt) >= 2).length;
+            const reorderRate = totalCustomers > 0 ? Math.round((repeatCustomers / totalCustomers) * 100) : 0;
+
+            // Churn rate: users who ordered 60+ days ago but not in last 60 days
+            const sixtyDaysAgo = new Date();
+            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+            const recentOrderUsers = await db
+                .selectDistinct({ userId: orders.userId })
+                .from(orders)
+                .where(gte(orders.placedAt, sixtyDaysAgo));
+            const recentSet = new Set(recentOrderUsers.map(r => r.userId));
+            const churned = payingCustomers.filter(c => !recentSet.has(c.userId)).length;
+            const churnRate = totalCustomers > 0 ? Math.round((churned / totalCustomers) * 100) : 0;
+
+            return {
+                mrr: Math.round(mrr * 100) / 100,
+                arr: Math.round(arr * 100) / 100,
+                averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+                ltv: Math.round(ltv * 100) / 100,
+                totalCustomers,
+                churnRate,
+                reorderRate,
+            };
+        } catch (error) {
+            logger.error('Error getting financial metrics', { error });
+            return { mrr: 0, arr: 0, averageOrderValue: 0, ltv: 0, totalCustomers: 0, churnRate: 0, reorderRate: 0 };
         }
     }
 
@@ -137,7 +371,7 @@ export class AdminRepository {
                 };
             });
         } catch (error) {
-            console.error('Error getting user growth data:', error);
+            logger.error('Error getting user growth data', { error });
             return [];
         }
     }
@@ -164,7 +398,7 @@ export class AdminRepository {
                 orders: Number(row.orders)
             }));
         } catch (error) {
-            console.error('Error getting revenue data:', error);
+            logger.error('Error getting revenue data', { error });
             return [];
         }
     }
@@ -407,7 +641,7 @@ export class AdminRepository {
                 total: Number(countRows?.[0]?.count || 0)
             };
         } catch (error) {
-            console.error('Error searching users:', error);
+            logger.error('Error searching users', { error });
             return { users: [], total: 0 };
         }
     }
@@ -447,7 +681,7 @@ export class AdminRepository {
 
             return enrichedOrders;
         } catch (error) {
-            console.error('Error getting today\'s orders:', error);
+            logger.error('Error getting today\'s orders', { error });
             return [];
         }
     }
@@ -504,21 +738,80 @@ export class AdminRepository {
                 wearableDevices: userWearables
             };
         } catch (error) {
-            console.error('Error getting user timeline:', error);
+            logger.error('Error getting user timeline', { error });
             throw error;
         }
     }
 
-    async listAllSupportTickets(status?: string, limit: number = 50, offset: number = 0): Promise<{ tickets: Array<SupportTicket & { userName: string, userEmail: string }>, total: number }> {
+    async listAllSupportTickets(options: {
+        status?: string;
+        priority?: string;
+        assignedTo?: string | 'unassigned';
+        category?: string;
+        search?: string;
+        tag?: string;
+        slaBreached?: boolean;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        limit?: number;
+        offset?: number;
+    } = {}): Promise<{ tickets: Array<SupportTicket & { userName: string, userEmail: string }>, total: number }> {
         try {
-            let whereClause = undefined;
+            const {
+                status, priority, assignedTo, category, search, tag,
+                slaBreached, sortBy = 'createdAt', sortOrder = 'desc',
+                limit = 50, offset = 0
+            } = options;
+
+            const conditions: any[] = [];
             if (status && status !== 'all') {
-                whereClause = eq(supportTickets.status, status as any);
+                conditions.push(eq(supportTickets.status, status as any));
             }
+            if (priority && priority !== 'all') {
+                conditions.push(eq(supportTickets.priority, priority as any));
+            }
+            if (assignedTo === 'unassigned') {
+                conditions.push(sql`${supportTickets.assignedTo} IS NULL`);
+            } else if (assignedTo) {
+                conditions.push(eq(supportTickets.assignedTo, assignedTo));
+            }
+            if (category && category !== 'all') {
+                conditions.push(eq(supportTickets.category, category));
+            }
+            if (search) {
+                conditions.push(
+                    or(
+                        ilike(supportTickets.subject, `%${search}%`),
+                        ilike(supportTickets.description, `%${search}%`),
+                        ilike(users.name, `%${search}%`),
+                        ilike(users.email, `%${search}%`)
+                    )
+                );
+            }
+            if (tag) {
+                conditions.push(sql`${tag} = ANY(${supportTickets.tags})`);
+            }
+            if (slaBreached !== undefined) {
+                conditions.push(eq(supportTickets.slaBreached, slaBreached));
+            }
+
+            const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+            // Sorting
+            const sortColumnMap: Record<string, any> = {
+                createdAt: supportTickets.createdAt,
+                updatedAt: supportTickets.updatedAt,
+                lastActivityAt: supportTickets.lastActivityAt,
+                priority: supportTickets.priority,
+                slaDeadline: supportTickets.slaDeadline,
+            };
+            const sortCol = sortColumnMap[sortBy] || supportTickets.createdAt;
+            const orderFn = sortOrder === 'asc' ? asc : desc;
 
             const [countResult] = await db
                 .select({ count: count() })
                 .from(supportTickets)
+                .innerJoin(users, eq(supportTickets.userId, users.id))
                 .where(whereClause);
 
             const ticketList = await db
@@ -530,7 +823,7 @@ export class AdminRepository {
                 .from(supportTickets)
                 .innerJoin(users, eq(supportTickets.userId, users.id))
                 .where(whereClause)
-                .orderBy(desc(supportTickets.createdAt))
+                .orderBy(orderFn(sortCol))
                 .limit(limit)
                 .offset(offset);
 
@@ -539,7 +832,7 @@ export class AdminRepository {
                 total: Number(countResult?.count || 0)
             };
         } catch (error) {
-            console.error('Error listing all support tickets:', error);
+            logger.error('Error listing all support tickets', { error });
             return { tickets: [], total: 0 };
         }
     }
@@ -549,7 +842,7 @@ export class AdminRepository {
             const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, id));
             return ticket || undefined;
         } catch (error) {
-            console.error('Error getting support ticket:', error);
+            logger.error('Error getting support ticket', { error });
             return undefined;
         }
     }
@@ -562,7 +855,7 @@ export class AdminRepository {
                 .where(eq(supportTicketResponses.ticketId, ticketId))
                 .orderBy(supportTicketResponses.createdAt);
         } catch (error) {
-            console.error('Error listing support ticket responses:', error);
+            logger.error('Error listing support ticket responses', { error });
             return [];
         }
     }
@@ -570,9 +863,36 @@ export class AdminRepository {
     async createSupportTicketResponse(response: InsertSupportTicketResponse): Promise<SupportTicketResponse> {
         try {
             const [created] = await db.insert(supportTicketResponses).values(response).returning();
+
+            // Update ticket response count and last activity
+            const updateData: any = {
+                updatedAt: new Date(),
+                lastActivityAt: new Date(),
+                responseCount: sql`${supportTickets.responseCount} + 1`,
+            };
+
+            // Set firstResponseAt if this is staff and it's the first staff response
+            if (response.isStaff) {
+                const existingStaffResponses = await db
+                    .select({ count: count() })
+                    .from(supportTicketResponses)
+                    .where(and(
+                        eq(supportTicketResponses.ticketId, response.ticketId),
+                        eq(supportTicketResponses.isStaff, true),
+                        ne(supportTicketResponses.id, created.id)
+                    ));
+                if (Number(existingStaffResponses[0]?.count || 0) === 0) {
+                    updateData.firstResponseAt = new Date();
+                }
+            }
+
+            await db.update(supportTickets)
+                .set(updateData)
+                .where(eq(supportTickets.id, response.ticketId));
+
             return created;
         } catch (error) {
-            console.error('Error creating support ticket response:', error);
+            logger.error('Error creating support ticket response', { error });
             throw new Error('Failed to create support ticket response');
         }
     }
@@ -581,14 +901,40 @@ export class AdminRepository {
         try {
             const [updated] = await db
                 .update(supportTickets)
-                .set({ ...updates, updatedAt: new Date() })
+                .set({ ...updates, updatedAt: new Date(), lastActivityAt: new Date() })
                 .where(eq(supportTickets.id, id))
                 .returning();
             return updated || undefined;
         } catch (error) {
-            console.error('Error updating support ticket:', error);
+            logger.error('Error updating support ticket', { error });
             return undefined;
         }
+    }
+
+    async bulkDeleteSupportTickets(ticketIds: string[]): Promise<number> {
+        if (ticketIds.length === 0) return 0;
+        const deleted = await db.delete(supportTickets).where(inArray(supportTickets.id, ticketIds)).returning();
+        return deleted.length;
+    }
+
+    async bulkCloseSupportTickets(ticketIds: string[]): Promise<number> {
+        if (ticketIds.length === 0) return 0;
+        const updated = await db
+            .update(supportTickets)
+            .set({ status: 'closed', updatedAt: new Date(), resolvedAt: new Date(), lastActivityAt: new Date() })
+            .where(inArray(supportTickets.id, ticketIds))
+            .returning();
+        return updated.length;
+    }
+
+    async bulkUpdateSupportTickets(ticketIds: string[], updates: Partial<SupportTicket>): Promise<number> {
+        if (ticketIds.length === 0) return 0;
+        const updated = await db
+            .update(supportTickets)
+            .set({ ...updates, updatedAt: new Date(), lastActivityAt: new Date() })
+            .where(inArray(supportTickets.id, ticketIds))
+            .returning();
+        return updated.length;
     }
 
     async getOpenSupportTicketCount(): Promise<{ open: number; inProgress: number }> {
@@ -606,8 +952,185 @@ export class AdminRepository {
                 inProgress: Number(inProgressCount?.count || 0),
             };
         } catch (error) {
-            console.error('Error getting open support ticket count:', error);
+            logger.error('Error getting open support ticket count', { error });
             return { open: 0, inProgress: 0 };
+        }
+    }
+
+    async getSupportTicketMetrics(days: number = 30): Promise<{
+        totalTickets: number;
+        openTickets: number;
+        inProgressTickets: number;
+        resolvedTickets: number;
+        closedTickets: number;
+        avgFirstResponseMinutes: number | null;
+        avgResolutionMinutes: number | null;
+        slaBreachedCount: number;
+        ticketsByCategory: Array<{ category: string; count: number }>;
+        ticketsByPriority: Array<{ priority: string; count: number }>;
+        ticketsPerDay: Array<{ date: string; count: number }>;
+        topAssignees: Array<{ assignedTo: string; count: number; resolved: number }>;
+    }> {
+        try {
+            const since = new Date();
+            since.setDate(since.getDate() - days);
+
+            const dateFilter = gte(supportTickets.createdAt, since);
+
+            // Total and status counts
+            const [total] = await db.select({ count: count() }).from(supportTickets).where(dateFilter);
+            const [open] = await db.select({ count: count() }).from(supportTickets).where(and(dateFilter, eq(supportTickets.status, 'open')));
+            const [inProg] = await db.select({ count: count() }).from(supportTickets).where(and(dateFilter, eq(supportTickets.status, 'in_progress')));
+            const [resolved] = await db.select({ count: count() }).from(supportTickets).where(and(dateFilter, eq(supportTickets.status, 'resolved')));
+            const [closed] = await db.select({ count: count() }).from(supportTickets).where(and(dateFilter, eq(supportTickets.status, 'closed')));
+
+            // Avg first response time (in minutes)
+            const [avgFrt] = await db
+                .select({
+                    avg: sql<number>`AVG(EXTRACT(EPOCH FROM (${supportTickets.firstResponseAt} - ${supportTickets.createdAt})) / 60)`
+                })
+                .from(supportTickets)
+                .where(and(dateFilter, isNotNull(supportTickets.firstResponseAt)));
+
+            // Avg resolution time (in minutes)
+            const [avgRes] = await db
+                .select({
+                    avg: sql<number>`AVG(EXTRACT(EPOCH FROM (${supportTickets.resolvedAt} - ${supportTickets.createdAt})) / 60)`
+                })
+                .from(supportTickets)
+                .where(and(dateFilter, isNotNull(supportTickets.resolvedAt)));
+
+            // SLA breached count
+            const [slaBreach] = await db
+                .select({ count: count() })
+                .from(supportTickets)
+                .where(and(dateFilter, eq(supportTickets.slaBreached, true)));
+
+            // By category
+            const byCategory = await db
+                .select({ category: supportTickets.category, count: count() })
+                .from(supportTickets)
+                .where(dateFilter)
+                .groupBy(supportTickets.category)
+                .orderBy(desc(count()));
+
+            // By priority
+            const byPriority = await db
+                .select({ priority: supportTickets.priority, count: count() })
+                .from(supportTickets)
+                .where(dateFilter)
+                .groupBy(supportTickets.priority);
+
+            // Per day
+            const perDay = await db
+                .select({
+                    date: sql<string>`TO_CHAR(${supportTickets.createdAt}, 'YYYY-MM-DD')`,
+                    count: count()
+                })
+                .from(supportTickets)
+                .where(dateFilter)
+                .groupBy(sql`TO_CHAR(${supportTickets.createdAt}, 'YYYY-MM-DD')`)
+                .orderBy(sql`TO_CHAR(${supportTickets.createdAt}, 'YYYY-MM-DD')`);
+
+            // Top assignees
+            const topAssignees = await db
+                .select({
+                    assignedTo: supportTickets.assignedTo,
+                    count: count(),
+                    resolved: sql<number>`COUNT(*) FILTER (WHERE ${supportTickets.status} IN ('resolved', 'closed'))`
+                })
+                .from(supportTickets)
+                .where(and(dateFilter, isNotNull(supportTickets.assignedTo)))
+                .groupBy(supportTickets.assignedTo)
+                .orderBy(desc(count()))
+                .limit(10);
+
+            return {
+                totalTickets: Number(total?.count || 0),
+                openTickets: Number(open?.count || 0),
+                inProgressTickets: Number(inProg?.count || 0),
+                resolvedTickets: Number(resolved?.count || 0),
+                closedTickets: Number(closed?.count || 0),
+                avgFirstResponseMinutes: avgFrt?.avg ? Math.round(Number(avgFrt.avg)) : null,
+                avgResolutionMinutes: avgRes?.avg ? Math.round(Number(avgRes.avg)) : null,
+                slaBreachedCount: Number(slaBreach?.count || 0),
+                ticketsByCategory: byCategory.map(r => ({ category: r.category, count: Number(r.count) })),
+                ticketsByPriority: byPriority.map(r => ({ priority: r.priority, count: Number(r.count) })),
+                ticketsPerDay: perDay.map(r => ({ date: r.date, count: Number(r.count) })),
+                topAssignees: topAssignees.map(r => ({ assignedTo: r.assignedTo!, count: Number(r.count), resolved: Number(r.resolved) })),
+            };
+        } catch (error) {
+            logger.error('Error getting support ticket metrics', { error });
+            throw error;
+        }
+    }
+
+    async logTicketActivity(entry: InsertSupportTicketActivityLog): Promise<void> {
+        try {
+            await db.insert(supportTicketActivityLog).values(entry);
+        } catch (error) {
+            logger.error('Error logging ticket activity', { error });
+        }
+    }
+
+    async getTicketActivityLog(ticketId: string): Promise<Array<{ action: string; oldValue: string | null; newValue: string | null; metadata: string | null; createdAt: Date; userName: string | null }>> {
+        try {
+            const entries = await db
+                .select({
+                    action: supportTicketActivityLog.action,
+                    oldValue: supportTicketActivityLog.oldValue,
+                    newValue: supportTicketActivityLog.newValue,
+                    metadata: supportTicketActivityLog.metadata,
+                    createdAt: supportTicketActivityLog.createdAt,
+                    userName: users.name,
+                })
+                .from(supportTicketActivityLog)
+                .leftJoin(users, eq(supportTicketActivityLog.userId, users.id))
+                .where(eq(supportTicketActivityLog.ticketId, ticketId))
+                .orderBy(desc(supportTicketActivityLog.createdAt));
+            return entries;
+        } catch (error) {
+            logger.error('Error getting ticket activity log', { error });
+            return [];
+        }
+    }
+
+    async getAllTicketCategories(): Promise<string[]> {
+        try {
+            const result = await db
+                .selectDistinct({ category: supportTickets.category })
+                .from(supportTickets)
+                .orderBy(supportTickets.category);
+            return result.map(r => r.category);
+        } catch (error) {
+            logger.error('Error getting ticket categories', { error });
+            return [];
+        }
+    }
+
+    async getAllTicketTags(): Promise<string[]> {
+        try {
+            const result = await db
+                .select({ tag: sql<string>`DISTINCT UNNEST(${supportTickets.tags})` })
+                .from(supportTickets);
+            return result.map(r => r.tag).sort();
+        } catch (error) {
+            logger.error('Error getting ticket tags', { error });
+            return [];
+        }
+    }
+
+    async getAdminUsers(): Promise<Array<{ id: string; name: string; email: string }>> {
+        try {
+            const admins = await db
+                .select({ id: users.id, name: users.name, email: users.email })
+                .from(users)
+                .where(eq(users.isAdmin, true))
+                .orderBy(users.name);
+            return admins;
+        } catch (error) {
+            logger.error('Error getting admin users', { error });
+            return [];
         }
     }
 
@@ -652,7 +1175,7 @@ export class AdminRepository {
                 total: Number(totalCount)
             };
         } catch (error) {
-            console.error('Error getting user messages:', error);
+            logger.error('Error getting user messages', { error });
             throw new Error('Failed to get user messages');
         }
     }
@@ -716,7 +1239,7 @@ export class AdminRepository {
                 total: Number(totalCount)
             };
         } catch (error) {
-            console.error('Error getting all conversations:', error);
+            logger.error('Error getting all conversations', { error });
             throw new Error('Failed to get conversations');
         }
     }
@@ -740,7 +1263,7 @@ export class AdminRepository {
                 }
             };
         } catch (error) {
-            console.error('Error getting conversation insights:', error);
+            logger.error('Error getting conversation insights', { error });
             return null;
         }
     }
@@ -773,7 +1296,7 @@ export class AdminRepository {
                 set: { value: insightsData, updatedAt: new Date() }
             });
         } catch (error) {
-            console.error('Error saving conversation insights:', error);
+            logger.error('Error saving conversation insights', { error });
             throw new Error('Failed to save conversation insights');
         }
     }
@@ -813,7 +1336,7 @@ export class AdminRepository {
                 messages: sessionMessages.map(m => ({ ...m, content: decryptMessageContent(m.content) }))
             };
         } catch (error) {
-            console.error('Error getting conversation details:', error);
+            logger.error('Error getting conversation details', { error });
             throw new Error('Failed to get conversation details');
         }
     }
@@ -868,7 +1391,7 @@ export class AdminRepository {
                 }
             };
         } catch (error) {
-            console.error('Error getting conversion funnel:', error);
+            logger.error('Error getting conversion funnel', { error });
             return { totalSignups: 0, profilesComplete: 0, formulasCreated: 0, firstOrders: 0, reorders: 0, conversionRates: {} };
         }
     }
@@ -916,7 +1439,7 @@ export class AdminRepository {
 
             return cohorts.reverse();
         } catch (error) {
-            console.error('Error getting cohort retention:', error);
+            logger.error('Error getting cohort retention', { error });
             return [];
         }
     }
@@ -979,7 +1502,7 @@ export class AdminRepository {
                 }
             };
         } catch (error) {
-            console.error('Error getting reorder health:', error);
+            logger.error('Error getting reorder health', { error });
             return { dueSoon: [], overdue: [], atRisk: [], summary: {} };
         }
     }
@@ -1088,7 +1611,7 @@ export class AdminRepository {
                 totalAvailableIndividuals: allIndividualNames.length
             };
         } catch (error) {
-            console.error('Error getting formula insights:', error);
+            logger.error('Error getting formula insights', { error });
             return {
                 totalFormulas: 0,
                 averageIngredients: 0,
@@ -1119,7 +1642,7 @@ export class AdminRepository {
                 overdueReorders: reorderHealth.summary.overdueCount + reorderHealth.summary.atRiskCount
             };
         } catch (error) {
-            console.error('Error getting pending actions:', error);
+            logger.error('Error getting pending actions', { error });
             return {};
         }
     }
@@ -1153,7 +1676,7 @@ export class AdminRepository {
 
             return activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, limit);
         } catch (error) {
-            console.error('Error getting activity feed:', error);
+            logger.error('Error getting activity feed', { error });
             return [];
         }
     }
@@ -1180,7 +1703,7 @@ export class AdminRepository {
 
             return { orders: enrichedOrders, total: Number(countResult?.count || 0) };
         } catch (error) {
-            console.error('Error getting all orders:', error);
+            logger.error('Error getting all orders', { error });
             return { orders: [], total: 0 };
         }
     }
@@ -1190,7 +1713,7 @@ export class AdminRepository {
             const [order] = await db.update(orders).set({ status: status as any, trackingUrl, shippedAt: status === 'shipped' ? new Date() : undefined }).where(eq(orders.id, id)).returning();
             return order || undefined;
         } catch (error) {
-            console.error('Error updating order status:', error);
+            logger.error('Error updating order status', { error });
             return undefined;
         }
     }
@@ -1202,7 +1725,7 @@ export class AdminRepository {
                 .from(ingredientPricing)
                 .orderBy(ingredientPricing.ingredientName);
         } catch (error) {
-            console.error('Error listing ingredient pricing:', error);
+            logger.error('Error listing ingredient pricing', { error });
             return [];
         }
     }
@@ -1233,7 +1756,7 @@ export class AdminRepository {
 
             return updated || undefined;
         } catch (error) {
-            console.error('Error updating ingredient pricing:', error);
+            logger.error('Error updating ingredient pricing', { error });
             return undefined;
         }
     }
@@ -1246,7 +1769,7 @@ export class AdminRepository {
                 return { ...note, adminName: admin?.name || 'Unknown' };
             }));
         } catch (error) {
-            console.error('Error getting user admin notes:', error);
+            logger.error('Error getting user admin notes', { error });
             return [];
         }
     }
@@ -1257,7 +1780,7 @@ export class AdminRepository {
             const [admin] = await db.select({ name: users.name }).from(users).where(eq(users.id, adminId));
             return { ...note, adminName: admin?.name || 'Unknown' };
         } catch (error) {
-            console.error('Error adding user admin note:', error);
+            logger.error('Error adding user admin note', { error });
             throw new Error('Failed to add admin note');
         }
     }
@@ -1282,7 +1805,7 @@ export class AdminRepository {
                 return { id: user.id, name: user.name, email: user.email, phone: user.phone, createdAt: user.createdAt.toISOString(), hasFormula: !!formulaExists, orderCount: userOrders.length, totalSpent };
             }));
         } catch (error) {
-            console.error('Error exporting users:', error);
+            logger.error('Error exporting users', { error });
             return [];
         }
     }
@@ -1301,7 +1824,7 @@ export class AdminRepository {
                 return { id: order.id, userName: user?.name || 'Unknown', userEmail: user?.email || 'Unknown', status: order.status, amountCents: order.amountCents || 0, supplyMonths: order.supplyMonths, placedAt: order.placedAt.toISOString(), shippedAt: order.shippedAt?.toISOString() || null };
             }));
         } catch (error) {
-            console.error('Error exporting orders:', error);
+            logger.error('Error exporting orders', { error });
             return [];
         }
     }
@@ -1320,6 +1843,337 @@ export class AdminRepository {
     async deleteUser(id: string): Promise<boolean> {
         const result = await db.delete(users).where(eq(users.id, id)).returning();
         return result.length > 0;
+    }
+
+    // ---- Traffic Source & Attribution Analytics ----
+
+    async getTrafficSourceBreakdown(days?: number): Promise<Array<{ channel: string; count: number; paidCount: number; revenue: number }>> {
+        try {
+            const conditions = [];
+            if (days) {
+                const startDate = new Date();
+                startDate.setDate(startDate.getDate() - days);
+                conditions.push(gte(users.createdAt, startDate));
+            }
+
+            const channelData = await db
+                .select({
+                    channel: sql<string>`COALESCE(${users.signupChannel}, 'direct')`,
+                    count: count(),
+                })
+                .from(users)
+                .where(conditions.length > 0 ? and(...conditions) : undefined)
+                .groupBy(sql`COALESCE(${users.signupChannel}, 'direct')`);
+
+            // Get paid users and revenue per channel
+            const results = [];
+            for (const row of channelData) {
+                const channelUsers = await db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(and(
+                        sql`COALESCE(${users.signupChannel}, 'direct') = ${row.channel}`,
+                        ...(conditions.length > 0 ? conditions : [])
+                    ));
+                const userIds = channelUsers.map(u => u.id);
+
+                let paidCount = 0;
+                let revenue = 0;
+                if (userIds.length > 0) {
+                    const orderData = await db
+                        .select({
+                            paidUsers: sql<number>`COUNT(DISTINCT ${orders.userId})`,
+                            totalRevenue: sql<number>`COALESCE(SUM(${orders.amountCents}), 0)`,
+                        })
+                        .from(orders)
+                        .where(inArray(orders.userId, userIds));
+                    paidCount = Number(orderData[0]?.paidUsers || 0);
+                    revenue = Number(orderData[0]?.totalRevenue || 0) / 100;
+                }
+
+                results.push({
+                    channel: row.channel,
+                    count: Number(row.count),
+                    paidCount,
+                    revenue,
+                });
+            }
+
+            return results.sort((a, b) => b.count - a.count);
+        } catch (error) {
+            logger.error('Error getting traffic source breakdown', { error });
+            return [];
+        }
+    }
+
+    async getUtmCampaignBreakdown(days?: number): Promise<Array<{ campaign: string; source: string; medium: string; signups: number; orders: number; revenue: number }>> {
+        try {
+            const conditions = [isNotNull(users.utmCampaign)];
+            if (days) {
+                const startDate = new Date();
+                startDate.setDate(startDate.getDate() - days);
+                conditions.push(gte(users.createdAt, startDate));
+            }
+
+            const campaigns = await db
+                .select({
+                    campaign: users.utmCampaign,
+                    source: sql<string>`MODE() WITHIN GROUP (ORDER BY ${users.utmSource})`,
+                    medium: sql<string>`MODE() WITHIN GROUP (ORDER BY ${users.utmMedium})`,
+                    signups: count(),
+                })
+                .from(users)
+                .where(and(...conditions))
+                .groupBy(users.utmCampaign)
+                .orderBy(desc(count()));
+
+            const results = [];
+            for (const row of campaigns) {
+                const campaignUsers = await db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(and(eq(users.utmCampaign, row.campaign!), ...(conditions.slice(1))));
+                const userIds = campaignUsers.map(u => u.id);
+
+                let orderCount = 0;
+                let revenue = 0;
+                if (userIds.length > 0) {
+                    const [orderData] = await db
+                        .select({
+                            orders: count(),
+                            totalRevenue: sql<number>`COALESCE(SUM(${orders.amountCents}), 0)`,
+                        })
+                        .from(orders)
+                        .where(inArray(orders.userId, userIds));
+                    orderCount = Number(orderData?.orders || 0);
+                    revenue = Number(orderData?.totalRevenue || 0) / 100;
+                }
+
+                results.push({
+                    campaign: row.campaign || 'unknown',
+                    source: row.source || 'unknown',
+                    medium: row.medium || 'unknown',
+                    signups: Number(row.signups),
+                    orders: orderCount,
+                    revenue,
+                });
+            }
+
+            return results;
+        } catch (error) {
+            logger.error('Error getting UTM campaign breakdown', { error });
+            return [];
+        }
+    }
+
+    async getReferralStats(): Promise<{
+        totalReferrers: number;
+        totalReferred: number;
+        topReferrers: Array<{ userId: string; name: string; email: string; referralCode: string; referralCount: number; revenueGenerated: number }>;
+    }> {
+        try {
+            const referredUsers = await db
+                .select({ count: count() })
+                .from(users)
+                .where(isNotNull(users.referredByUserId));
+            const totalReferred = Number(referredUsers[0]?.count || 0);
+
+            const referrerCounts = await db
+                .select({
+                    userId: users.referredByUserId,
+                    count: count(),
+                })
+                .from(users)
+                .where(isNotNull(users.referredByUserId))
+                .groupBy(users.referredByUserId);
+            const totalReferrers = referrerCounts.length;
+
+            // Top referrers with their details
+            const topReferrers = [];
+            const sorted = referrerCounts.sort((a, b) => Number(b.count) - Number(a.count)).slice(0, 10);
+            for (const r of sorted) {
+                if (!r.userId) continue;
+                const [referrer] = await db.select({ name: users.name, email: users.email, referralCode: users.referralCode }).from(users).where(eq(users.id, r.userId));
+                if (!referrer) continue;
+
+                // Revenue from referred users
+                const referredIds = await db.select({ id: users.id }).from(users).where(eq(users.referredByUserId, r.userId));
+                let revenueGenerated = 0;
+                if (referredIds.length > 0) {
+                    const [rev] = await db.select({ total: sql<number>`COALESCE(SUM(${orders.amountCents}), 0)` })
+                        .from(orders).where(inArray(orders.userId, referredIds.map(u => u.id)));
+                    revenueGenerated = Number(rev?.total || 0) / 100;
+                }
+
+                topReferrers.push({
+                    userId: r.userId,
+                    name: referrer.name,
+                    email: referrer.email,
+                    referralCode: referrer.referralCode || '',
+                    referralCount: Number(r.count),
+                    revenueGenerated,
+                });
+            }
+
+            return { totalReferrers, totalReferred, topReferrers };
+        } catch (error) {
+            logger.error('Error getting referral stats', { error });
+            return { totalReferrers: 0, totalReferred: 0, topReferrers: [] };
+        }
+    }
+
+    // ---- Marketing Campaigns CRUD ----
+
+    async listMarketingCampaigns(): Promise<MarketingCampaign[]> {
+        return await db.select().from(marketingCampaigns).orderBy(desc(marketingCampaigns.createdAt));
+    }
+
+    async getMarketingCampaign(id: string): Promise<MarketingCampaign | undefined> {
+        const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, id));
+        return campaign;
+    }
+
+    async createMarketingCampaign(data: InsertMarketingCampaign): Promise<MarketingCampaign> {
+        const [campaign] = await db.insert(marketingCampaigns).values(data).returning();
+        return campaign;
+    }
+
+    async updateMarketingCampaign(id: string, updates: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign | undefined> {
+        const [campaign] = await db
+            .update(marketingCampaigns)
+            .set({ ...updates, updatedAt: new Date() })
+            .where(eq(marketingCampaigns.id, id))
+            .returning();
+        return campaign;
+    }
+
+    async deleteMarketingCampaign(id: string): Promise<boolean> {
+        const result = await db.delete(marketingCampaigns).where(eq(marketingCampaigns.id, id)).returning();
+        return result.length > 0;
+    }
+
+    // ---- Influencer Management ----
+
+    async listInfluencers(status?: string): Promise<Influencer[]> {
+        if (status && status !== 'all') {
+            return await db.select().from(influencers).where(eq(influencers.status, status)).orderBy(desc(influencers.createdAt));
+        }
+        return await db.select().from(influencers).orderBy(desc(influencers.createdAt));
+    }
+
+    async getInfluencer(id: string): Promise<Influencer | undefined> {
+        const [inf] = await db.select().from(influencers).where(eq(influencers.id, id));
+        return inf;
+    }
+
+    async createInfluencer(data: InsertInfluencer): Promise<Influencer> {
+        const [inf] = await db.insert(influencers).values(data).returning();
+        return inf;
+    }
+
+    async updateInfluencer(id: string, updates: Partial<InsertInfluencer>): Promise<Influencer | undefined> {
+        const [inf] = await db.update(influencers).set({ ...updates, updatedAt: new Date() }).where(eq(influencers.id, id)).returning();
+        return inf;
+    }
+
+    async deleteInfluencer(id: string): Promise<boolean> {
+        const result = await db.delete(influencers).where(eq(influencers.id, id)).returning();
+        return result.length > 0;
+    }
+
+    async getInfluencerStats(): Promise<{ total: number; active: number; totalRevenue: number; totalCommissions: number; byPlatform: Array<{ platform: string; count: number }> }> {
+        try {
+            const [total] = await db.select({ count: count() }).from(influencers);
+            const [active] = await db.select({ count: count() }).from(influencers).where(eq(influencers.status, 'active'));
+            const [revenue] = await db.select({
+                revenue: sql<number>`COALESCE(SUM(total_revenue_cents), 0)`,
+                commissions: sql<number>`COALESCE(SUM(total_commission_cents), 0)`,
+            }).from(influencers);
+            const byPlatform = await db.select({ platform: influencers.platform, count: count() }).from(influencers).groupBy(influencers.platform);
+
+            return {
+                total: Number(total?.count || 0),
+                active: Number(active?.count || 0),
+                totalRevenue: Number(revenue?.revenue || 0) / 100,
+                totalCommissions: Number(revenue?.commissions || 0) / 100,
+                byPlatform: byPlatform.map(p => ({ platform: p.platform, count: Number(p.count) })),
+            };
+        } catch (error) {
+            logger.error('Error getting influencer stats', { error });
+            return { total: 0, active: 0, totalRevenue: 0, totalCommissions: 0, byPlatform: [] };
+        }
+    }
+
+    async listInfluencerContent(influencerId: string): Promise<InfluencerContent[]> {
+        return await db.select().from(influencerContent).where(eq(influencerContent.influencerId, influencerId)).orderBy(desc(influencerContent.createdAt));
+    }
+
+    async createInfluencerContent(data: InsertInfluencerContent): Promise<InfluencerContent> {
+        const [content] = await db.insert(influencerContent).values(data).returning();
+        return content;
+    }
+
+    // ---- B2B Medical Prospecting ----
+
+    async listB2bProspects(status?: string, limit = 50, offset = 0): Promise<{ prospects: B2bProspect[]; total: number }> {
+        const conditions = [];
+        if (status && status !== 'all') conditions.push(eq(b2bProspects.status, status));
+
+        const [totalResult] = await db.select({ count: count() }).from(b2bProspects).where(conditions.length > 0 ? and(...conditions) : undefined);
+        const prospects = await db.select().from(b2bProspects)
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(desc(b2bProspects.leadScore))
+            .limit(limit).offset(offset);
+
+        return { prospects, total: Number(totalResult?.count || 0) };
+    }
+
+    async getB2bProspect(id: string): Promise<B2bProspect | undefined> {
+        const [prospect] = await db.select().from(b2bProspects).where(eq(b2bProspects.id, id));
+        return prospect;
+    }
+
+    async createB2bProspect(data: InsertB2bProspect): Promise<B2bProspect> {
+        const [prospect] = await db.insert(b2bProspects).values(data).returning();
+        return prospect;
+    }
+
+    async updateB2bProspect(id: string, updates: Partial<InsertB2bProspect>): Promise<B2bProspect | undefined> {
+        const [prospect] = await db.update(b2bProspects).set({ ...updates, updatedAt: new Date() }).where(eq(b2bProspects.id, id)).returning();
+        return prospect;
+    }
+
+    async deleteB2bProspect(id: string): Promise<boolean> {
+        const result = await db.delete(b2bProspects).where(eq(b2bProspects.id, id)).returning();
+        return result.length > 0;
+    }
+
+    async getB2bStats(): Promise<{ total: number; byStatus: Array<{ status: string; count: number }>; byType: Array<{ type: string; count: number }>; avgLeadScore: number }> {
+        try {
+            const [total] = await db.select({ count: count() }).from(b2bProspects);
+            const byStatus = await db.select({ status: b2bProspects.status, count: count() }).from(b2bProspects).groupBy(b2bProspects.status);
+            const byType = await db.select({ type: b2bProspects.practiceType, count: count() }).from(b2bProspects).groupBy(b2bProspects.practiceType);
+            const [avgScore] = await db.select({ avg: sql<number>`COALESCE(AVG(lead_score), 0)` }).from(b2bProspects);
+
+            return {
+                total: Number(total?.count || 0),
+                byStatus: byStatus.map(s => ({ status: s.status, count: Number(s.count) })),
+                byType: byType.map(t => ({ type: t.type, count: Number(t.count) })),
+                avgLeadScore: Math.round(Number(avgScore?.avg || 0)),
+            };
+        } catch (error) {
+            logger.error('Error getting B2B stats', { error });
+            return { total: 0, byStatus: [], byType: [], avgLeadScore: 0 };
+        }
+    }
+
+    async listB2bOutreach(prospectId: string): Promise<B2bOutreach[]> {
+        return await db.select().from(b2bOutreach).where(eq(b2bOutreach.prospectId, prospectId)).orderBy(desc(b2bOutreach.createdAt));
+    }
+
+    async createB2bOutreach(data: InsertB2bOutreach): Promise<B2bOutreach> {
+        const [outreach] = await db.insert(b2bOutreach).values(data).returning();
+        return outreach;
     }
 }
 

@@ -11,22 +11,15 @@
  * Uses the subscriptions.renewsAt column (populated from Stripe's current_period_end)
  * so notifications are naturally tied to the billing cycle.
  *
- * Dedup: each user is notified at most once per renewal cycle via in-memory Set
- * that resets weekly (or on server restart).
+ * Dedup: uses the centralized notification gate (notification_log table)
+ * which enforces per-channel cooldowns and daily caps across all schedulers.
  */
 
 import cron from 'node-cron';
 import { usersRepository } from '../modules/users/users.repository';
 import { formulaReviewService } from '../modules/formulas/formula-review.service';
+import { notificationGate } from '../modules/notifications/notification-gate.service';
 import logger from '../infra/logging/logger';
-
-// Track users notified this cycle to avoid duplicate emails
-const notifiedThisCycle = new Set<string>();
-
-function resetCycleTracking() {
-    notifiedThisCycle.clear();
-    logger.info('Formula review scheduler: cycle tracking reset');
-}
 
 /**
  * Notify users whose renewal is exactly `daysAhead` days away
@@ -39,12 +32,16 @@ async function checkRenewalCohort(daysAhead: number) {
     let errors = 0;
 
     for (const sub of subs) {
-        if (notifiedThisCycle.has(sub.userId)) {
-            skipped++;
-            continue;
-        }
-
         try {
+            // Check notification gate BEFORE doing expensive drift computation
+            const emailAllowed = await notificationGate.canSend(sub.userId, 'formula_drift', 'email');
+            const smsAllowed = await notificationGate.canSend(sub.userId, 'formula_drift', 'sms');
+
+            if (!emailAllowed && !smsAllowed) {
+                skipped++;
+                continue;
+            }
+
             const status = await formulaReviewService.getReviewStatus(sub.userId);
 
             if (!status.needsReview) {
@@ -56,9 +53,9 @@ async function checkRenewalCohort(daysAhead: number) {
                 sub.userId,
                 status.reasons,
                 daysAhead,
+                { emailAllowed, smsAllowed },
             );
 
-            notifiedThisCycle.add(sub.userId);
             notified++;
 
             logger.info('Formula review scheduler: notified user', {
@@ -107,12 +104,7 @@ export function startAutoOptimizeScheduler() {
         await runFormulaReviewCheck();
     });
 
-    // Reset cycle tracking every Sunday midnight UTC
-    cron.schedule('0 0 * * 0', () => {
-        resetCycleTracking();
-    });
-
-    logger.info('Formula review scheduler: started — runs daily at 09:00 UTC');
+    logger.info('Formula review scheduler: started — runs daily at 09:00 UTC (dedup via notification gate)');
 }
 
 // Export for manual testing / admin triggers

@@ -25,7 +25,9 @@ export interface WebSearchResult {
 
 const SYSTEM_PROMPT = `You are a PR research agent for Ones (ones.health), a personalized supplement platform that uses AI and blood work to create custom daily capsule formulas.
 
-Your job is to find REAL, ACTIONABLE outreach opportunities. For each opportunity, extract:
+Your job is to find REAL, HIGH-QUALITY outreach opportunities. We only want established outlets with meaningful audiences.
+
+For each opportunity, extract:
 1. Name of the publication/podcast
 2. Category: "podcast" or "press"
 3. Sub-type: "interview", "panel", "solo_feature" (podcast) or "product_review", "guest_article", "founder_feature", "expert_source" (press)
@@ -34,7 +36,7 @@ Your job is to find REAL, ACTIONABLE outreach opportunities. For each opportunit
 6. Contact form URL — if they have a submission form
 7. Host/editor name
 8. Publication/show name
-9. Audience size estimate (social followers, ratings, etc.)
+9. Audience size estimate — IMPORTANT: Provide a NUMERIC estimate where possible (e.g. "50000", "120000"). Check their social media followers, Apple Podcasts ratings, monthly readers, YouTube subscribers. If exact numbers are not available, estimate based on context. Do NOT return vague strings like "medium" or "unknown".
 10. Topics they cover (array of keywords)
 11. Relevance score (0-100): How relevant to a personalized supplement / health tech company
 12. Why it's relevant (1-2 sentences)
@@ -42,10 +44,12 @@ Your job is to find REAL, ACTIONABLE outreach opportunities. For each opportunit
 CRITICAL RULES:
 - Only return REAL opportunities found in search results
 - DO NOT fabricate URLs, emails, or names
-- If something looks like a generic directory listing with no real contact info, skip it
+- SKIP small outlets — focus on established podcasts/publications with 5,000+ followers/listeners
+- SKIP generic directory listings with no real contact info
 - Prefer opportunities that specifically invite applications/pitches
 - Prioritize health, wellness, biohacking, nutrition, supplements, health tech topics
 - Score higher for opportunities that mention supplements, personalized health, or AI health
+- Prefer outlets where a contact email or submission form is clearly available
 
 Return results as a JSON array of objects with these exact keys:
 name, category, subType, url, contactEmail, contactFormUrl, hostName, publicationName, audienceEstimate, topics, relevanceScore, whyRelevant`;
@@ -102,7 +106,7 @@ export async function executeWebSearch(
         { role: 'system', content: SYSTEM_PROMPT },
         {
           role: 'user',
-          content: `Search the web for this query and find ${category} outreach opportunities for a personalized supplement company:\n\n${query}\n\nReturn the top ${maxResults} most actionable results as a JSON array. Only include results with a relevance score of 40 or higher.`,
+          content: `Search the web for this query and find ${category} outreach opportunities for a personalized supplement company:\n\n${query}\n\nReturn the top ${maxResults} most actionable results as a JSON array. Only include results with a relevance score of 60 or higher. Skip any outlet with under 5,000 estimated audience/followers.`,
         },
       ],
     });

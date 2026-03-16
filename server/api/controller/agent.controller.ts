@@ -1,25 +1,74 @@
 /**
  * Agent Controller — API handlers for PR Agent operations
+ *
+ * Improvements over original:
+ * - OAuth credentials encrypted at rest via fieldEncryption
+ * - Scan/pitch mutex to prevent concurrent runs
+ * - Returns runId from async triggers for progress tracking
+ * - Input validation on config updates via Zod
+ * - New endpoints: analytics funnel, cost tracking, enrichment,
+ *   competitor scan, response detection, follow-up processing,
+ *   pitch quality scoring, weekly summary
  */
 import type { Request, Response } from 'express';
+import { existsSync } from 'fs';
+import { resolve, basename } from 'path';
+import { z } from 'zod';
 import { agentRepository } from '../../modules/agent/agent.repository';
-import { getPrAgentConfig, savePrAgentConfig, getDefaultConfig } from '../../modules/agent/agent-config';
+import { getPrAgentConfig, savePrAgentConfig, getDefaultConfig, prAgentConfigSchema } from '../../modules/agent/agent-config';
 import { getFounderProfile, saveFounderProfile, getDefaultProfile } from '../../modules/agent/founder-context';
 import { runPrScan } from '../../modules/agent/engines/pr-scan';
 import { draftPitch, batchDraftPitches, draftFollowUp, rewritePitch } from '../../modules/agent/engines/draft-pitch';
 import { sendPitchEmail, sendApprovedPitches } from '../../modules/agent/engines/gmail-sender';
 import { detectAndFillForm } from '../../modules/agent/tools/form-filler';
 import { ALL_TEMPLATES } from '../../modules/agent/templates/pitch-templates';
+import { scorePitchQuality } from '../../modules/agent/tools/pitch-quality';
+import { getMonthlySpend, checkBudgetAlert } from '../../modules/agent/tools/cost-tracker';
+import { enrichProspect, batchEnrichProspects } from '../../modules/agent/tools/prospect-enrichment';
+import { getPlatformStats } from '../../modules/agent/tools/platform-stats';
+import { detectResponses } from '../../modules/agent/engines/response-detector';
+import { processFollowUps } from '../../modules/agent/engines/follow-up-scheduler';
+import { runCompetitorScan } from '../../modules/agent/engines/competitor-monitor';
+import { generateWeeklySummary, sendWeeklySummaryEmail } from '../../modules/agent/engines/weekly-summary';
+import { prioritizeProspects } from '../../modules/agent/engines/smart-prioritization';
+import { generateChannelMessages } from '../../modules/agent/engines/multi-channel';
+import { draftPressRelease } from '../../modules/agent/engines/press-release-drafter';
+import { encryptField, decryptField } from '../../infra/security/fieldEncryption';
 import logger from '../../infra/logging/logger';
+
+// ── Mutex locks for scan/pitch operations ────────────────────────────────────
+let scanRunning = false;
+let pitchBatchRunning = false;
 
 // ── Dashboard / Stats ────────────────────────────────────────────────────────
 
 export async function getAgentDashboard(req: Request, res: Response) {
   try {
-    const stats = await agentRepository.getStats();
+    const stats = await agentRepository.getStatsWithFollowUps();
     const config = await getPrAgentConfig();
     const recentRuns = await agentRepository.getLatestRuns(undefined, 5);
-    res.json({ stats, enabled: config.enabled, recentRuns });
+
+    // Include funnel data and cost info
+    let costInfo = null;
+    try { costInfo = await getMonthlySpend(); } catch { /* optional */ }
+
+    let budgetAlert = null;
+    try { budgetAlert = await checkBudgetAlert(); } catch { /* optional */ }
+
+    res.json({
+      stats,
+      enabled: config.enabled,
+      recentRuns,
+      funnel: {
+        discovered: stats.totalProspects,
+        pitched: stats.pendingPitches + stats.sentPitches,
+        sent: stats.sentPitches,
+        responded: stats.responses,
+        booked: stats.booked,
+      },
+      cost: costInfo,
+      budgetAlert: budgetAlert?.alert ? budgetAlert.message : null,
+    });
   } catch (err: any) {
     logger.error('[agent-api] Dashboard error', { error: err.message });
     res.status(500).json({ error: 'Failed to load dashboard' });
@@ -34,9 +83,9 @@ export async function listProspects(req: Request, res: Response) {
     const result = await agentRepository.listProspects({
       category: category as any,
       status: status as any,
-      minScore: minScore ? Number(minScore) : undefined,
-      limit: limit ? Number(limit) : 50,
-      offset: offset ? Number(offset) : 0,
+      minScore: minScore ? Math.min(100, Math.max(0, Number(minScore))) : undefined,
+      limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
+      offset: offset ? Math.max(0, Number(offset)) : 0,
     });
     res.json(result);
   } catch (err: any) {
@@ -69,12 +118,24 @@ export async function updateProspect(req: Request, res: Response) {
 
 export async function listPitches(req: Request, res: Response) {
   try {
-    const { category, status, limit, offset } = req.query;
+    const { category, status, limit, offset, prospectId } = req.query;
+    if (prospectId) {
+      // Return pitches for a specific prospect
+      const result = await agentRepository.getPitchesWithProspects({
+        category: category as any,
+        status: status as any,
+        limit: limit ? Number(limit) : 50,
+        offset: offset ? Number(offset) : 0,
+      });
+      // Filter client-side for prospectId (repo already joins)
+      const filtered = result.filter(r => r.pitch.prospectId === prospectId);
+      return res.json(filtered);
+    }
     const result = await agentRepository.getPitchesWithProspects({
       category: category as any,
       status: status as any,
-      limit: limit ? Number(limit) : 50,
-      offset: offset ? Number(offset) : 0,
+      limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
+      offset: offset ? Math.max(0, Number(offset)) : 0,
     });
     res.json(result);
   } catch (err: any) {
@@ -145,44 +206,93 @@ export async function aiRewritePitch(req: Request, res: Response) {
   }
 }
 
-// ── Actions ──────────────────────────────────────────────────────────────────
+// ── Pitch Quality Scoring ────────────────────────────────────────────────────
+
+export async function scorePitch(req: Request, res: Response) {
+  try {
+    const pitch = await agentRepository.getPitchById(req.params.id);
+    if (!pitch) return res.status(404).json({ error: 'Pitch not found' });
+    const prospect = await agentRepository.getProspectById(pitch.prospectId);
+    if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+
+    const result = scorePitchQuality(pitch, prospect);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to score pitch' });
+  }
+}
+
+// ── Actions (with mutex locks) ───────────────────────────────────────────────
 
 export async function triggerScan(req: Request, res: Response) {
+  if (scanRunning) {
+    return res.status(409).json({ error: 'A scan is already running. Please wait for it to complete.' });
+  }
+
   try {
     const { categories, queriesPerCategory, maxProspects } = req.body;
-    // Run asynchronously so the API returns immediately
+    scanRunning = true;
+
+    // Start scan and capture runId
     const promise = runPrScan({
       categories: categories || ['podcast', 'press'],
       queriesPerCategory: queriesPerCategory || 3,
       maxProspects: maxProspects || 20,
     });
 
-    // Return the run ID immediately
     promise.then(result => {
-      logger.info('[agent-api] Manual scan complete', { prospectsNew: result.prospectsNew });
+      scanRunning = false;
+      logger.info('[agent-api] Manual scan complete', { prospectsNew: result.prospectsNew, runId: result.runId });
     }).catch(err => {
+      scanRunning = false;
       logger.error('[agent-api] Manual scan failed', { error: err.message });
     });
 
-    res.json({ message: 'Scan started. Check the Runs tab for progress.', status: 'running' });
+    // Return immediately — frontend can poll /runs for progress
+    // We return a best-effort runId by querying the latest running scan
+    const latestRuns = await agentRepository.getLatestRuns('pr_scan', 1);
+    const runId = latestRuns[0]?.id || null;
+
+    res.json({
+      message: 'Scan started. Check the Runs tab for progress.',
+      status: 'running',
+      runId,
+    });
   } catch (err: any) {
+    scanRunning = false;
     res.status(500).json({ error: 'Failed to start scan' });
   }
 }
 
 export async function triggerPitchBatch(req: Request, res: Response) {
+  if (pitchBatchRunning) {
+    return res.status(409).json({ error: 'A pitch batch is already running. Please wait for it to complete.' });
+  }
+
   try {
     const { category, maxPitches } = req.body;
+    pitchBatchRunning = true;
+
     const promise = batchDraftPitches({ category, maxPitches });
 
     promise.then(result => {
-      logger.info('[agent-api] Pitch batch complete', { pitched: result.pitched.length });
+      pitchBatchRunning = false;
+      logger.info('[agent-api] Pitch batch complete', { pitched: result.pitched.length, runId: result.runId });
     }).catch(err => {
+      pitchBatchRunning = false;
       logger.error('[agent-api] Pitch batch failed', { error: err.message });
     });
 
-    res.json({ message: 'Pitch batch started. Drafts will appear in the review queue.', status: 'running' });
+    const latestRuns = await agentRepository.getLatestRuns('pr_pitch_batch', 1);
+    const runId = latestRuns[0]?.id || null;
+
+    res.json({
+      message: 'Pitch batch started. Drafts will appear in the review queue.',
+      status: 'running',
+      runId,
+    });
   } catch (err: any) {
+    pitchBatchRunning = false;
     res.status(500).json({ error: 'Failed to start pitch batch' });
   }
 }
@@ -206,8 +316,50 @@ export async function triggerSendPitch(req: Request, res: Response) {
     const prospect = await agentRepository.getProspectById(pitch.prospectId);
     if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
 
+    // Route form-based prospects to the form filler instead of email
+    if (prospect.contactMethod === 'form') {
+      const formResult = await detectAndFillForm(prospect, pitch, { autoSubmit: true });
+      if (formResult.errors.length > 0 && formResult.fieldsFilled === 0) {
+        return res.status(502).json({
+          success: false,
+          error: `Form fill failed: ${formResult.errors.join('; ')}`,
+          formResult,
+        });
+      }
+      // Update pitch status based on whether form was actually submitted
+      const config = await getPrAgentConfig();
+      if (formResult.submitted) {
+        const updateData: Record<string, any> = {
+          status: 'sent',
+          sentAt: new Date(),
+          sentVia: 'form_auto',
+        };
+        // Only schedule follow-up if the prospect also has an email address
+        // (form-only contacts have no mechanism to receive follow-up emails)
+        if (prospect.contactEmail) {
+          updateData.followUpDueAt = new Date(Date.now() + config.followUpDays * 24 * 60 * 60 * 1000);
+        }
+        await agentRepository.updatePitch(pitch.id, updateData);
+        await agentRepository.updateProspect(prospect.id, { status: 'pitched' });
+      } else if (formResult.fieldsFilled > 0) {
+        // Form was filled but not submitted (CAPTCHA or submit failed)
+        await agentRepository.updatePitch(pitch.id, { sentVia: 'form_manual' });
+      }
+      return res.json({
+        success: true,
+        method: 'form',
+        formResult,
+        message: formResult.submitted
+          ? `Form submitted! ${formResult.fieldsFilled}/${formResult.fieldsDetected} fields filled and form submitted.`
+          : `Filled ${formResult.fieldsFilled}/${formResult.fieldsDetected} fields${formResult.hasCaptcha ? ' — CAPTCHA detected, submit manually at: ' + formResult.url : ' but auto-submit failed. Submit manually.'}`,
+      });
+    }
+
     const result = await sendPitchEmail(pitch, prospect);
-    res.json(result);
+    if (!result.success) {
+      return res.status(502).json({ error: result.error || 'Send failed' });
+    }
+    res.json({ ...result, method: 'email' });
   } catch (err: any) {
     res.status(500).json({ error: `Failed to send pitch: ${err.message}` });
   }
@@ -237,10 +389,146 @@ export async function triggerFormFill(req: Request, res: Response) {
       return res.status(400).json({ error: 'Prospect contact method is not form-based' });
     }
 
-    const result = await detectAndFillForm(prospect, pitch);
+    // triggerFormFill is a preview/test — does NOT auto-submit
+    const result = await detectAndFillForm(prospect, pitch, { autoSubmit: false });
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: `Failed to fill form: ${err.message}` });
+  }
+}
+
+// ── Enrichment ───────────────────────────────────────────────────────────────
+
+export async function triggerEnrichProspect(req: Request, res: Response) {
+  try {
+    const prospect = await agentRepository.getProspectById(req.params.id);
+    if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+
+    const result = await enrichProspect(prospect);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to enrich prospect: ${err.message}` });
+  }
+}
+
+export async function triggerBatchEnrich(req: Request, res: Response) {
+  try {
+    const { prospectIds } = req.body;
+    if (!Array.isArray(prospectIds) || prospectIds.length === 0) {
+      return res.status(400).json({ error: 'prospectIds array is required' });
+    }
+    const result = await batchEnrichProspects(prospectIds);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to batch enrich' });
+  }
+}
+
+// ── Competitor Monitoring ────────────────────────────────────────────────────
+
+export async function triggerCompetitorScan(req: Request, res: Response) {
+  try {
+    const { competitors, maxPerCompetitor } = req.body;
+    const promise = runCompetitorScan({ competitors, maxPerCompetitor });
+
+    promise.then(result => {
+      logger.info('[agent-api] Competitor scan complete', { prospectsCreated: result.prospectsCreated });
+    }).catch(err => {
+      logger.error('[agent-api] Competitor scan failed', { error: err.message });
+    });
+
+    res.json({ message: 'Competitor scan started.', status: 'running' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to start competitor scan' });
+  }
+}
+
+// ── Response Detection ───────────────────────────────────────────────────────
+
+export async function triggerResponseCheck(req: Request, res: Response) {
+  try {
+    const result = await detectResponses();
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to check responses: ${err.message}` });
+  }
+}
+
+// ── Follow-Up Processing ────────────────────────────────────────────────────
+
+export async function triggerFollowUpProcessing(req: Request, res: Response) {
+  try {
+    const result = await processFollowUps();
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to process follow-ups: ${err.message}` });
+  }
+}
+
+// ── Analytics ────────────────────────────────────────────────────────────────
+
+export async function getAnalytics(req: Request, res: Response) {
+  try {
+    const stats = await agentRepository.getStats();
+    const costInfo = await getMonthlySpend();
+    const budgetAlert = await checkBudgetAlert();
+    const platformStats = await getPlatformStats();
+
+    res.json({
+      funnel: {
+        discovered: stats.totalProspects,
+        pitched: stats.pendingPitches + stats.sentPitches,
+        sent: stats.sentPitches,
+        responded: stats.responses,
+        booked: stats.booked,
+        conversionRates: {
+          pitchRate: stats.totalProspects > 0 ? ((stats.pendingPitches + stats.sentPitches) / stats.totalProspects * 100).toFixed(1) + '%' : '0%',
+          sendRate: (stats.pendingPitches + stats.sentPitches) > 0 ? (stats.sentPitches / (stats.pendingPitches + stats.sentPitches) * 100).toFixed(1) + '%' : '0%',
+          responseRate: stats.sentPitches > 0 ? (stats.responses / stats.sentPitches * 100).toFixed(1) + '%' : '0%',
+          bookingRate: stats.responses > 0 ? (stats.booked / stats.responses * 100).toFixed(1) + '%' : '0%',
+        },
+      },
+      cost: costInfo,
+      budgetAlert: budgetAlert.alert ? budgetAlert.message : null,
+      platform: platformStats,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to load analytics' });
+  }
+}
+
+// ── Weekly Summary ───────────────────────────────────────────────────────────
+
+export async function getWeeklySummary(req: Request, res: Response) {
+  try {
+    const summary = await generateWeeklySummary();
+    res.json(summary);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to generate summary' });
+  }
+}
+
+export async function triggerWeeklySummaryEmail(req: Request, res: Response) {
+  try {
+    const { email } = req.body;
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ error: 'email field is required' });
+    }
+    const sent = await sendWeeklySummaryEmail(email);
+    res.json({ sent });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to send summary email' });
+  }
+}
+
+// ── Platform Stats ───────────────────────────────────────────────────────────
+
+export async function getPlatformStatsHandler(req: Request, res: Response) {
+  try {
+    const stats = await getPlatformStats();
+    res.json(stats);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get platform stats' });
   }
 }
 
@@ -251,7 +539,7 @@ export async function listRuns(req: Request, res: Response) {
     const { agentName, limit } = req.query;
     const runs = await agentRepository.getLatestRuns(
       agentName as string | undefined,
-      limit ? Number(limit) : 20,
+      limit ? Math.min(100, Math.max(1, Number(limit))) : 20,
     );
     res.json(runs);
   } catch (err: any) {
@@ -282,9 +570,16 @@ export async function getConfig(req: Request, res: Response) {
 
 export async function updateConfig(req: Request, res: Response) {
   try {
+    // Zod validation happens inside savePrAgentConfig
     const updated = await savePrAgentConfig(req.body, (req as any).userId);
     res.json(updated);
   } catch (err: any) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
+        error: 'Invalid config values',
+        details: err.errors.map(e => ({ field: e.path.join('.'), message: e.message })),
+      });
+    }
     res.status(500).json({ error: 'Failed to update config' });
   }
 }
@@ -329,7 +624,7 @@ export async function resetProfile(req: Request, res: Response) {
   }
 }
 
-// ── Gmail OAuth Config ───────────────────────────────────────────────────────
+// ── Gmail OAuth Config (with encryption) ─────────────────────────────────────
 
 const GMAIL_CONFIG_KEY = 'gmail_oauth_config';
 
@@ -339,12 +634,28 @@ export async function getGmailConfig(req: Request, res: Response) {
     if (!config || !config.clientId) {
       return res.json({ clientId: '', clientSecret: '', refreshToken: '', configured: false });
     }
-    // Mask secrets — return last 6 chars only
+
+    // Decrypt stored credentials
+    let clientId = config.clientId;
+    let clientSecret = config.clientSecret;
+    let refreshToken = config.refreshToken;
+
+    try {
+      if (config.encrypted) {
+        clientId = decryptField(clientId);
+        clientSecret = decryptField(clientSecret);
+        refreshToken = decryptField(refreshToken);
+      }
+    } catch {
+      // Fallback: data might not be encrypted yet (migration case)
+    }
+
+    // Mask secrets for display — return last 6 chars only
     const mask = (s: string) => s ? '•'.repeat(Math.max(0, s.length - 6)) + s.slice(-6) : '';
     res.json({
-      clientId: mask(config.clientId),
-      clientSecret: mask(config.clientSecret),
-      refreshToken: mask(config.refreshToken),
+      clientId: mask(clientId),
+      clientSecret: mask(clientSecret),
+      refreshToken: mask(refreshToken),
       configured: true,
     });
   } catch (err: any) {
@@ -361,17 +672,44 @@ export async function updateGmailConfig(req: Request, res: Response) {
 
     // If values contain mask chars (•), merge with existing — user didn't change that field
     const existing = await agentRepository.getAgentConfig(GMAIL_CONFIG_KEY) as Record<string, string> | null;
-    const resolve = (newVal: string, field: string) =>
-      newVal.includes('•') && existing?.[field] ? existing[field] : newVal;
 
-    const merged = {
-      clientId: resolve(clientId, 'clientId'),
-      clientSecret: resolve(clientSecret, 'clientSecret'),
-      refreshToken: resolve(refreshToken, 'refreshToken'),
+    const resolveValue = (newVal: string, field: string) => {
+      if (!newVal.includes('•')) return newVal;
+      if (!existing?.[field]) return newVal;
+      // Decrypt existing value if encrypted
+      try {
+        return existing.encrypted ? decryptField(existing[field]) : existing[field];
+      } catch {
+        return existing[field];
+      }
     };
 
-    await agentRepository.saveAgentConfig(GMAIL_CONFIG_KEY, merged, (req as any).userId);
-    logger.info('[agent-api] Gmail OAuth credentials updated');
+    const resolvedClientId = resolveValue(clientId, 'clientId');
+    const resolvedClientSecret = resolveValue(clientSecret, 'clientSecret');
+    const resolvedRefreshToken = resolveValue(refreshToken, 'refreshToken');
+
+    // Encrypt credentials before storing
+    let encryptedConfig: Record<string, any>;
+    try {
+      encryptedConfig = {
+        clientId: encryptField(resolvedClientId),
+        clientSecret: encryptField(resolvedClientSecret),
+        refreshToken: encryptField(resolvedRefreshToken),
+        encrypted: true,
+      };
+    } catch {
+      // If encryption not available (no key set), store as-is with warning
+      logger.warn('[agent-api] FIELD_ENCRYPTION_KEY not set — storing Gmail credentials without encryption');
+      encryptedConfig = {
+        clientId: resolvedClientId,
+        clientSecret: resolvedClientSecret,
+        refreshToken: resolvedRefreshToken,
+        encrypted: false,
+      };
+    }
+
+    await agentRepository.saveAgentConfig(GMAIL_CONFIG_KEY, encryptedConfig, (req as any).userId);
+    logger.info('[agent-api] Gmail OAuth credentials updated (encrypted)');
     res.json({ configured: true });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to save Gmail config' });
@@ -388,6 +726,58 @@ export async function deleteGmailConfig(req: Request, res: Response) {
   }
 }
 
+// ── Smart Prioritization ──────────────────────────────────────────────────────
+
+export async function getPrioritizedProspects(req: Request, res: Response) {
+  try {
+    const { category, limit } = req.query;
+    const { prospects } = await agentRepository.listProspects({
+      status: 'new',
+      category: category as any,
+      limit: limit ? Math.min(100, Number(limit)) : 50,
+    });
+    const prioritized = prioritizeProspects(prospects, {
+      preferCategory: category as any,
+      boostEnriched: true,
+    });
+    res.json(prioritized);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to prioritize prospects' });
+  }
+}
+
+// ── Multi-Channel Messages ────────────────────────────────────────────────────
+
+export async function generateChannelMessagesHandler(req: Request, res: Response) {
+  try {
+    const pitch = await agentRepository.getPitchById(req.params.pitchId);
+    if (!pitch) return res.status(404).json({ error: 'Pitch not found' });
+    const prospect = await agentRepository.getProspectById(pitch.prospectId);
+    if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+
+    const { channels } = req.body;
+    const messages = await generateChannelMessages(prospect, pitch, channels);
+    res.json(messages);
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to generate channel messages: ${err.message}` });
+  }
+}
+
+// ── Press Release ─────────────────────────────────────────────────────────────
+
+export async function draftPressReleaseHandler(req: Request, res: Response) {
+  try {
+    const { milestone, title, description, metrics, quotes } = req.body;
+    if (!milestone || !title || !description) {
+      return res.status(400).json({ error: 'milestone, title, and description are required' });
+    }
+    const result = await draftPressRelease(milestone, { title, description, metrics, quotes });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to draft press release: ${err.message}` });
+  }
+}
+
 // ── Templates ────────────────────────────────────────────────────────────────
 
 export async function listTemplates(req: Request, res: Response) {
@@ -395,5 +785,117 @@ export async function listTemplates(req: Request, res: Response) {
     res.json(ALL_TEMPLATES);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to list templates' });
+  }
+}
+
+// ── Delete Operations ────────────────────────────────────────────────────────
+
+export async function deleteProspect(req: Request, res: Response) {
+  try {
+    const prospect = await agentRepository.getProspectById(req.params.id);
+    if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+    await agentRepository.deleteProspect(req.params.id);
+    logger.info(`[agent-api] Prospect deleted: ${prospect.name}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error('[agent-api] Delete prospect error', { error: err.message });
+    res.status(500).json({ error: 'Failed to delete prospect' });
+  }
+}
+
+export async function deletePitch(req: Request, res: Response) {
+  try {
+    const pitch = await agentRepository.getPitchById(req.params.id);
+    if (!pitch) return res.status(404).json({ error: 'Pitch not found' });
+    await agentRepository.deletePitch(req.params.id);
+    logger.info(`[agent-api] Pitch deleted: ${pitch.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error('[agent-api] Delete pitch error', { error: err.message });
+    res.status(500).json({ error: 'Failed to delete pitch' });
+  }
+}
+
+// ── Follow-Up & Response Tracking ────────────────────────────────────────────
+
+export async function markPitchResponded(req: Request, res: Response) {
+  try {
+    const pitch = await agentRepository.getPitchById(req.params.id);
+    if (!pitch) return res.status(404).json({ error: 'Pitch not found' });
+
+    await agentRepository.markPitchResponded(pitch.id);
+
+    // Also update the prospect status
+    await agentRepository.updateProspectStatus(pitch.prospectId, 'responded');
+
+    logger.info(`[agent-api] Pitch marked as responded: ${pitch.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error('[agent-api] Mark responded error', { error: err.message });
+    res.status(500).json({ error: 'Failed to mark as responded' });
+  }
+}
+
+export async function triggerFollowUp(req: Request, res: Response) {
+  try {
+    const pitch = await agentRepository.getPitchById(req.params.id);
+    if (!pitch) return res.status(404).json({ error: 'Pitch not found' });
+    const prospect = await agentRepository.getProspectById(pitch.prospectId);
+    if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+
+    // Block follow-ups for form-only contacts (no email to send to)
+    if (prospect.contactMethod === 'form' && !prospect.contactEmail) {
+      return res.status(400).json({ error: 'Cannot draft follow-up for form-only contacts — no email address available.' });
+    }
+
+    const result = await draftFollowUp(pitch, prospect);
+    res.json(result);
+  } catch (err: any) {
+    logger.error('[agent-api] Follow-up draft failed', { error: err.message });
+    res.status(500).json({ error: `Failed to draft follow-up: ${err.message}` });
+  }
+}
+
+export async function getPendingFollowUps(req: Request, res: Response) {
+  try {
+    const pending = await agentRepository.getPendingFollowUps();
+    res.json(pending);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get pending follow-ups' });
+  }
+}
+
+// ── Form Screenshots ─────────────────────────────────────────────────────────
+
+export async function getFormScreenshot(req: Request, res: Response) {
+  try {
+    const pitch = await agentRepository.getPitchById(req.params.id);
+    if (!pitch) return res.status(404).json({ error: 'Pitch not found' });
+
+    const type = req.params.type; // 'filled' or 'submitted'
+    const screenshotPath = type === 'submitted'
+      ? (pitch as any).formScreenshotSubmitted
+      : (pitch as any).formScreenshotFilled;
+
+    if (!screenshotPath) {
+      return res.status(404).json({ error: `No ${type} screenshot available` });
+    }
+
+    // Security: ensure the path is within the expected screenshots directory
+    const resolved = resolve(screenshotPath);
+    const screenshotsDir = resolve(process.cwd(), 'data', 'form-screenshots');
+    if (!resolved.startsWith(screenshotsDir)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (!existsSync(resolved)) {
+      return res.status(404).json({ error: 'Screenshot file not found' });
+    }
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `inline; filename="${basename(resolved)}"`);
+    res.sendFile(resolved);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to serve screenshot' });
   }
 }

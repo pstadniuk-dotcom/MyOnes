@@ -5,7 +5,7 @@ import {
   type LiveChatMessage, type InsertLiveChatMessage,
   type LiveChatCannedResponse, type InsertLiveChatCannedResponse,
 } from '@shared/schema';
-import { eq, and, desc, gt, sql, or, ne, lt, gte } from 'drizzle-orm';
+import { eq, and, desc, gt, sql, or, ne, lt, gte, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 
 export class LiveChatRepository {
@@ -312,6 +312,25 @@ export class LiveChatRepository {
       avgResponseTimeSeconds: (avgResponseTime as any)?.avg_seconds || null,
       dailyVolume: (dailyVolume as unknown as any[]) || [],
     };
+  }
+
+  // ─── Bulk Delete ───────────────────────────────────────────────
+
+  async bulkDeleteSessions(sessionIds: string[]): Promise<number> {
+    if (sessionIds.length === 0) return 0;
+    // Messages cascade-delete via FK
+    const deleted = await db.delete(liveChatSessions).where(inArray(liveChatSessions.id, sessionIds)).returning();
+    return deleted.length;
+  }
+
+  async bulkCloseSessions(sessionIds: string[], closedBy: string): Promise<number> {
+    if (sessionIds.length === 0) return 0;
+    const updated = await db
+      .update(liveChatSessions)
+      .set({ status: 'closed', closedAt: new Date(), closedBy })
+      .where(inArray(liveChatSessions.id, sessionIds))
+      .returning();
+    return updated.length;
   }
 
   // ─── Offline → Ticket ──────────────────────────────────────────
