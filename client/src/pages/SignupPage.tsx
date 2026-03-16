@@ -7,11 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/components/ui/form';
 import { Input } from '@/shared/components/ui/input';
 import { Checkbox } from '@/shared/components/ui/checkbox';
-import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Loader2, ArrowLeft, Eye, EyeOff, Check, Circle } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { signupSchema } from '@shared/schema';
 import { SocialAuthButtons } from '@/shared/components/auth/SocialAuthButtons';
+import { PasswordRequirements } from '@/shared/components/auth/PasswordRequirements';
 
 // Extended form validation schema to include password confirmation
 const extendedSignupSchema = signupSchema.extend({
@@ -30,6 +31,7 @@ export default function SignupPage() {
 
   const form = useForm<SignupForm>({
     resolver: zodResolver(extendedSignupSchema),
+    mode: 'onChange',
     defaultValues: {
       name: '',
       email: '',
@@ -39,6 +41,9 @@ export default function SignupPage() {
       ageConfirmed: undefined as unknown as true,
     }
   });
+
+  const passwordValue = form.watch('password') || '';
+  
 
   const onSubmit = async (data: SignupForm) => {
     try {
@@ -96,12 +101,13 @@ export default function SignupPage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Full Name</FormLabel>
+                      <FormLabel>Full Name <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Input
                           placeholder="Enter your full name"
                           id="name"
                           autoComplete="name"
+                          maxLength={45}
                           {...field}
                           data-testid="input-name"
                         />
@@ -116,7 +122,7 @@ export default function SignupPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email Address</FormLabel>
+                      <FormLabel>Email Address <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Input
                           type="email"
@@ -137,7 +143,7 @@ export default function SignupPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel>Password <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Input
@@ -165,7 +171,11 @@ export default function SignupPage() {
                           </Button>
                         </div>
                       </FormControl>
-                      <FormMessage />
+                      <PasswordRequirements 
+                        passwordValue={passwordValue} 
+                        isSubmitted={form.formState.submitCount > 0} 
+                      />
+                      {/* Separate error message removed as per request - using requirement points instead */}
                     </FormItem>
                   )}
                 />
@@ -175,7 +185,7 @@ export default function SignupPage() {
                   name="confirmPassword"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Confirm Password</FormLabel>
+                      <FormLabel>Confirm Password <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Input
@@ -225,9 +235,9 @@ export default function SignupPage() {
                         </FormControl>
                         <label htmlFor="acceptedTerms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
                           I agree to the{' '}
-                          <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
+                          <Link href="/terms" className="text-primary font-semibold hover:underline decoration-primary/30 underline-offset-2">Terms of Service</Link>
                           {' '}and{' '}
-                          <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
+                          <Link href="/privacy" className="text-primary font-semibold hover:underline decoration-primary/30 underline-offset-2">Privacy Policy</Link>.
                         </label>
                       </div>
                       <FormMessage />

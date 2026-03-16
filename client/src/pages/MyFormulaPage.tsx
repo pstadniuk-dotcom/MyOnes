@@ -767,6 +767,20 @@ export default function MyFormulaPage() {
 
   // No formula yet (empty state) - either no data or 404 error
   if (!currentFormula && (isNoFormulaError || !currentError)) {
+    // If the user has archived formulas, show them so they can restore one
+    const archivedFormulas = archivedData?.archived ?? [];
+    if (isLoadingArchived) {
+      return <FormulaSkeleton />;
+    }
+    if (archivedFormulas.length > 0) {
+      return (
+        <FormulaAllArchivedState
+          archivedFormulas={archivedFormulas}
+          onRestore={(id) => restoreFormulaMutation.mutate(id)}
+          isRestoring={restoreFormulaMutation.isPending}
+        />
+      );
+    }
     return <FormulaEmptyState />;
   }
 
@@ -3449,6 +3463,70 @@ function FormulaEmptyState() {
             <Link href="/dashboard/consultation">
               <MessageSquare className="w-4 h-4 mr-2" />
               Start AI Consultation
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// All-Archived State Component - shown when the user has archived all their formulas
+function FormulaAllArchivedState({
+  archivedFormulas,
+  onRestore,
+  isRestoring,
+}: {
+  archivedFormulas: Array<{ id: string; name?: string; version: number; archivedAt?: Date | null }>;
+  onRestore: (id: string) => void;
+  isRestoring: boolean;
+}) {
+  return (
+    <div className="space-y-6" data-testid="all-archived-formula-page">
+      <div>
+        <h1 className="text-xl md:text-3xl font-bold tracking-tight">My Formula</h1>
+        <p className="text-sm md:text-base text-muted-foreground">Your personalized supplement formula</p>
+      </div>
+      <Card>
+        <CardContent className="pt-12 pb-12 text-center">
+          <Archive className="w-16 h-16 text-muted-foreground mx-auto mb-6" />
+          <h3 className="text-2xl font-semibold mb-3">All Formulas Archived</h3>
+          <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+            You have archived all your formulas. Restore one below to make it active again, or start a new AI consultation.
+          </p>
+          <div className="flex flex-col gap-3 max-w-sm mx-auto mb-8">
+            {archivedFormulas.map((formula) => (
+              <div
+                key={formula.id}
+                className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3 text-left"
+              >
+                <div>
+                  <p className="font-medium text-sm">
+                    {formula.name || `Formula v${formula.version}`}
+                  </p>
+                  {formula.archivedAt && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Archived {new Date(formula.archivedAt).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isRestoring}
+                  onClick={() => onRestore(formula.id)}
+                  data-testid={`button-restore-formula-${formula.id}`}
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                  Restore
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button asChild size="lg" variant="outline" data-testid="button-start-consultation-from-archived">
+            <Link href="/dashboard/consultation">
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Start New AI Consultation
             </Link>
           </Button>
         </CardContent>

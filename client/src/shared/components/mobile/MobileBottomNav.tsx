@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageSquare, FlaskConical, Sparkles, ClipboardList, Menu, Home, User, Settings, FileText, Activity, ChevronUp, X, Watch } from 'lucide-react';
+import { MessageSquare, FlaskConical, Sparkles, ClipboardList, Menu, Home, User, Settings, FileText, Activity, ChevronUp, X, Watch, LogOut } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/shared/lib/utils';
 import {
@@ -9,6 +9,17 @@ import {
   SheetTitle,
 } from '@/shared/components/ui/sheet';
 import { FEATURES, isOptimizeEnabled } from '@/shared/config/features';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/shared/components/ui/alert-dialog';
 
 // Base nav items - filtered based on feature flags
 const allNavItems = [
@@ -45,6 +56,8 @@ function filterByFeature<T extends { requiresFeature: string | null }>(items: T[
 export function MobileBottomNav() {
   const [location, navigate] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { logout } = useAuth();
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   // Filter nav items based on feature flags
   const navItems = filterByFeature(allNavItems);
@@ -198,9 +211,49 @@ export function MobileBottomNav() {
                 </button>
               );
             })}
+
+            {/* Sign Out Button */}
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setShowSignOutConfirm(true);
+              }}
+              className={cn(
+                "w-full flex items-center gap-4 p-4 rounded-xl transition-all",
+                "touch-feedback text-left hover:bg-red-50 text-red-600"
+              )}
+            >
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-50 text-red-600">
+                <LogOut className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-base">Sign Out</p>
+                <p className="text-sm text-red-500/70 truncate">Sign out of your account</p>
+              </div>
+            </button>
           </div>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
+        <AlertDialogContent className="w-[90vw] rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will be signed out of your account. Any unsaved changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-2">
+            <AlertDialogCancel className="flex-1 rounded-2xl mt-0">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={logout}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-2xl"
+            >
+              Sign Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
