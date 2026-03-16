@@ -66,6 +66,8 @@ app.use(helmet({
       formAction: ["'self'"],
     },
   },
+  // Allows Google/Facebook login popups to communicate back to the app
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
   // HSTS in production with preload
   strictTransportSecurity: process.env.NODE_ENV === 'production'
     ? { maxAge: 31536000, includeSubDomains: true, preload: true }
