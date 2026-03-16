@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Separator } from '@/shared/components/ui/separator';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/shared/components/ui/accordion';
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,7 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest, queryClient, getAuthHeaders } from '@/shared/lib/queryClient';
 import { buildApiUrl } from '@/shared/lib/api';
 import type { User as UserType, HealthProfile } from '@shared/schema';
+import { AddressAutocomplete } from '@/shared/components/address/AddressAutocomplete';
 
 // Loading skeleton components
 function ProfileSkeleton() {
@@ -657,6 +659,24 @@ export default function ProfilePage() {
                 <div>
                   <h3 className="text-sm font-medium mb-3">Address</h3>
                 </div>
+                {/* <div>
+                  <Label htmlFor="addressLookup">Search Address</Label>
+                  <AddressAutocomplete
+                    id="addressLookup"
+                    countryCode={profile.country}
+                    onSelectAddress={(fields) =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        addressLine1: fields.addressLine1 ?? prev.addressLine1,
+                        city: fields.city ?? prev.city,
+                        state: fields.state ?? prev.state,
+                        postalCode: fields.postalCode ?? prev.postalCode,
+                        country: fields.country ?? prev.country,
+                      }))
+                    }
+                    data-testid="input-address-lookup"
+                  />
+                </div> */}
                 <div>
                   <Label htmlFor="addressLine1">Street Address</Label>
                   <Input
@@ -783,393 +803,411 @@ export default function ProfilePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Basic Demographics */}
-              <div className="space-y-2 mb-4">
-                <h3 className="text-lg font-semibold text-[#054700]">Basic Information</h3>
-                <p className="text-sm text-[#5a6623]">Essential details for health calculations</p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div>
-                  <Label htmlFor="age">Age</Label>
-                  {healthLoading ? (
-                    <Skeleton className="h-10 w-full" />
-                  ) : (
-                    <Input
-                      id="age"
-                      type="number"
-                      value={healthData.age}
-                      onChange={(e) => handleHealthNumberChange('age', e.target.value, 1, 120)}
-                      placeholder="Enter your age"
-                      min="1"
-                      max="120"
-                      data-testid="input-age"
-                    />
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="sex">Sex</Label>
-                  {healthLoading ? (
-                    <Skeleton className="h-10 w-full" />
-                  ) : (
-                    <Select value={healthData.sex} onValueChange={(value) => setHealthData({ ...healthData, sex: value })}>
-                      <SelectTrigger data-testid="select-sex">
-                        <SelectValue placeholder="Select sex" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-                <div className="">
-                  <Label>Height</Label>
-                  {healthLoading ? (
-                    <Skeleton className="h-10 w-full" />
-                  ) : (
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <Label htmlFor="height-feet" className="text-xs text-muted-foreground">Feet</Label>
-                        <Input
-                          id="height-feet"
-                          type="number"
-                          value={healthData.heightFeet}
-                          onChange={(e) => handleHealthNumberChange('heightFeet', e.target.value, 1, 8)}
-                          placeholder="5"
-                          min="3"
-                          max="8"
-                          data-testid="input-height-feet"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <Label htmlFor="height-inches" className="text-xs text-muted-foreground">Inches</Label>
-                        <Input
-                          id="height-inches"
-                          type="number"
-                          value={healthData.heightInches}
-                          onChange={(e) => handleHealthNumberChange('heightInches', e.target.value, 0, 11)}
-                          placeholder="10"
-                          min="0"
-                          max="11"
-                          data-testid="input-height-inches"
-                        />
-                      </div>
+              <Accordion type="single" collapsible defaultValue="basic-info" className="w-full">
+                {/* Basic Information */}
+                <AccordionItem value="basic-info" className="border-[#5a6623]/10">
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <div className="flex flex-col items-start text-left">
+                      <span className="text-lg font-semibold text-[#054700]">Basic Information</span>
+                      <span className="text-sm font-normal text-[#5a6623]">Essential details for health calculations</span>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="weight">Weight (lbs)</Label>
-                  {healthLoading ? (
-                    <Skeleton className="h-10 w-full" />
-                  ) : (
-                    <Input
-                      id="weight"
-                      type="number"
-                      value={healthData.weightLbs}
-                      onChange={(e) => handleHealthNumberChange('weightLbs', e.target.value, 40, 500)}
-                      placeholder="Enter weight in lbs"
-                      min="0"
-                      max="500"
-                      data-testid="input-weight"
-                    />
-                  )}
-                </div>
-              </div>
-
-              <Separator className="bg-[#5a6623]/20" />
-
-              {/* Vital Signs */}
-              <div className="space-y-2 mb-4">
-                <h3 className="text-lg font-semibold text-[#054700]">Vital Signs</h3>
-                <p className="text-sm text-[#5a6623]">Current measurements for accurate health scoring</p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div>
-                  <Label htmlFor="bpSystolic">Blood Pressure - Systolic</Label>
-                  <Input
-                    id="bpSystolic"
-                    type="number"
-                    value={healthData.bloodPressureSystolic}
-                    onChange={(e) => handleHealthNumberChange('bloodPressureSystolic', e.target.value, 70, 200)}
-                    min="70"
-                    max="200"
-                    placeholder="e.g. 120"
-                    data-testid="input-bp-systolic"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="bpDiastolic">Blood Pressure - Diastolic</Label>
-                  <Input
-                    id="bpDiastolic"
-                    type="number"
-                    value={healthData.bloodPressureDiastolic}
-                    onChange={(e) => handleHealthNumberChange('bloodPressureDiastolic', e.target.value, 40, 130)}
-                    min="40"
-                    max="130"
-                    placeholder="e.g. 80"
-                    data-testid="input-bp-diastolic"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="heartRate">Resting Heart Rate (bpm)</Label>
-                  <Input
-                    id="heartRate"
-                    type="number"
-                    value={healthData.restingHeartRate}
-                    onChange={(e) => handleHealthNumberChange('restingHeartRate', e.target.value, 30, 220)}
-                    min="30"
-                    max="220"
-                    placeholder="e.g. 70"
-                    data-testid="input-heart-rate"
-                  />
-                </div>
-              </div>
-
-              <Separator className="bg-[#5a6623]/20" />
-
-              {/* Lifestyle Factors */}
-              <div className="space-y-2 mb-4">
-                <h3 className="text-lg font-semibold text-[#054700]">Lifestyle Factors</h3>
-                <p className="text-sm text-[#5a6623]">Help us understand your daily habits</p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div>
-                  <Label htmlFor="sleep">Sleep Hours per Night</Label>
-                  <Input
-                    id="sleep"
-                    type="number"
-                    value={healthData.sleepHoursPerNight}
-                    onChange={(e) => handleHealthNumberChange('sleepHoursPerNight', e.target.value, 0, 24)}
-                    min="0"
-                    max="24"
-                    placeholder="e.g. 7"
-                    data-testid="input-sleep"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="exercise">Exercise Days per Week</Label>
-                  <Input
-                    id="exercise"
-                    type="number"
-                    value={healthData.exerciseDaysPerWeek}
-                    onChange={(e) => handleHealthNumberChange('exerciseDaysPerWeek', e.target.value, 0, 7)}
-                    placeholder="e.g. 3"
-                    min="0"
-                    max="7"
-                    data-testid="input-exercise"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="stress">Stress Level (1-10)</Label>
-                  <Input
-                    id="stress"
-                    type="number"
-                    value={healthData.stressLevel}
-                    onChange={(e) => handleHealthNumberChange('stressLevel', e.target.value, 1, 10)}
-                    placeholder="e.g. 5"
-                    min="1"
-                    max="10"
-                    data-testid="input-stress"
-                  />
-                </div>
-              </div>
-
-              <Separator className="bg-[#5a6623]/20" />
-
-              {/* Risk Factors */}
-              <div className="space-y-2 mb-4">
-                <h3 className="text-lg font-semibold text-[#054700]">Risk Factors</h3>
-                <p className="text-sm text-[#5a6623]">Important for personalized recommendations</p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="smoking">Smoking Status</Label>
-                  <Select value={healthData.smokingStatus} onValueChange={(value) => setHealthData({ ...healthData, smokingStatus: value })}>
-                    <SelectTrigger data-testid="select-smoking">
-                      <SelectValue placeholder="Select smoking status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="never">Never</SelectItem>
-                      <SelectItem value="former">Former Smoker</SelectItem>
-                      <SelectItem value="current">Current Smoker</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="alcohol">Alcohol Drinks per Week</Label>
-                  <Input
-                    id="alcohol"
-                    type="number"
-                    value={healthData.alcoholDrinksPerWeek}
-                    onChange={(e) => handleHealthNumberChange('alcoholDrinksPerWeek', e.target.value, 0, 50)}
-                    placeholder="e.g. 2"
-                    min="0"
-                    max="50"
-                    data-testid="input-alcohol"
-                  />
-                </div>
-              </div>
-
-              <Separator className="bg-[#5a6623]/20" />
-
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="conditions">Health Conditions</Label>
-                  {healthLoading ? (
-                    <Skeleton className="h-20 w-full" />
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {healthData.conditions.map((condition, idx) => (
-                          <Badge key={idx} variant="secondary" className="text-sm">
-                            {condition}
-                            <button
-                              className="ml-2 text-muted-foreground hover:text-destructive"
-                              onClick={() => {
-                                const newConditions = healthData.conditions.filter((_, i) => i !== idx);
-                                setHealthData({ ...healthData, conditions: newConditions });
-                              }}
-                            >
-                              ×
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <Input
-                        id="conditions"
-                        value={conditionInput}
-                        onChange={(e) => setConditionInput(e.target.value)}
-                        placeholder="Add a health condition..."
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const value = conditionInput.trim();
-                            if (value && !healthData.conditions.includes(value)) {
-                              setHealthData({ ...healthData, conditions: [...healthData.conditions, value] });
-                              setConditionInput('');
-                            }
-                          }
-                        }}
-                        data-testid="input-conditions"
-                      />
-                    </>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="medications">Current Medications</Label>
-                  {healthLoading ? (
-                    <Skeleton className="h-20 w-full" />
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {healthData.medications.map((medication, idx) => (
-                          <Badge key={idx} variant="outline" className="text-sm">
-                            {medication}
-                            <button
-                              className="ml-2 text-muted-foreground hover:text-destructive"
-                              onClick={() => {
-                                const newMedications = healthData.medications.filter((_, i) => i !== idx);
-                                setHealthData({ ...healthData, medications: newMedications });
-                              }}
-                            >
-                              ×
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <Input
-                        id="medications"
-                        value={medicationInput}
-                        onChange={(e) => setMedicationInput(e.target.value)}
-                        placeholder="Add a medication..."
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const value = medicationInput.trim();
-                            if (value && !healthData.medications.includes(value)) {
-                              setHealthData({ ...healthData, medications: [...healthData.medications, value] });
-                              setMedicationInput('');
-                            }
-                          }
-                        }}
-                        data-testid="input-medications"
-                      />
-                      {/* Medication Safety Disclosure */}
-                      <div className="mt-3">
-                        {healthProfile?.medicationDisclosedAt ? (
-                          <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
-                            <ShieldCheck className="h-4 w-4 flex-shrink-0" />
-                            <span>
-                              Medication disclosure recorded on{' '}
-                              {new Date(healthProfile.medicationDisclosedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                            </span>
-                          </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div>
+                        <Label htmlFor="age">Age</Label>
+                        {healthLoading ? (
+                          <Skeleton className="h-10 w-full" />
                         ) : (
-                          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                            <Checkbox
-                              id="medication-disclosure"
-                              checked={medicationDisclosureChecked}
-                              onCheckedChange={(v) => setMedicationDisclosureChecked(!!v)}
-                              className="mt-0.5"
-                            />
-                            <Label htmlFor="medication-disclosure" className="text-xs text-amber-800 leading-snug cursor-pointer font-normal">
-                              I confirm the medication list above is complete and accurate. I understand that Ones uses this information to flag potential supplement–drug interactions. I will update this list if my medications change.
-                            </Label>
+                          <Input
+                            id="age"
+                            type="number"
+                            value={healthData.age}
+                            onChange={(e) => handleHealthNumberChange('age', e.target.value, 1, 120)}
+                            placeholder="Enter your age"
+                            min="1"
+                            max="120"
+                            data-testid="input-age"
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="sex">Sex</Label>
+                        {healthLoading ? (
+                          <Skeleton className="h-10 w-full" />
+                        ) : (
+                          <Select value={healthData.sex} onValueChange={(value) => setHealthData({ ...healthData, sex: value })}>
+                            <SelectTrigger data-testid="select-sex">
+                              <SelectValue placeholder="Select sex" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="male">Male</SelectItem>
+                              <SelectItem value="female">Female</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                      <div className="">
+                        <Label>Height</Label>
+                        {healthLoading ? (
+                          <Skeleton className="h-10 w-full" />
+                        ) : (
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <Label htmlFor="height-feet" className="text-xs text-muted-foreground">Feet</Label>
+                              <Input
+                                id="height-feet"
+                                type="number"
+                                value={healthData.heightFeet}
+                                onChange={(e) => handleHealthNumberChange('heightFeet', e.target.value, 1, 8)}
+                                placeholder="5"
+                                min="3"
+                                max="8"
+                                data-testid="input-height-feet"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <Label htmlFor="height-inches" className="text-xs text-muted-foreground">Inches</Label>
+                              <Input
+                                id="height-inches"
+                                type="number"
+                                value={healthData.heightInches}
+                                onChange={(e) => handleHealthNumberChange('heightInches', e.target.value, 0, 11)}
+                                placeholder="10"
+                                min="0"
+                                max="11"
+                                data-testid="input-height-inches"
+                              />
+                            </div>
                           </div>
                         )}
                       </div>
-                    </>
-                  )}
-                </div>
+                    </div>
 
-                <div>
-                  <Label htmlFor="allergies">Allergies</Label>
-                  {healthLoading ? (
-                    <Skeleton className="h-20 w-full" />
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {healthData.allergies.map((allergy, idx) => (
-                          <Badge key={idx} variant="destructive" className="text-sm">
-                            {allergy}
-                            <button
-                              className="ml-2 text-white hover:text-gray-300"
-                              onClick={() => {
-                                const newAllergies = healthData.allergies.filter((_, i) => i !== idx);
-                                setHealthData({ ...healthData, allergies: newAllergies });
-                              }}
-                            >
-                              ×
-                            </button>
-                          </Badge>
-                        ))}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="weight">Weight (lbs)</Label>
+                        {healthLoading ? (
+                          <Skeleton className="h-10 w-full" />
+                        ) : (
+                          <Input
+                            id="weight"
+                            type="number"
+                            value={healthData.weightLbs}
+                            onChange={(e) => handleHealthNumberChange('weightLbs', e.target.value, 40, 500)}
+                            placeholder="Enter weight in lbs"
+                            min="0"
+                            max="500"
+                            data-testid="input-weight"
+                          />
+                        )}
                       </div>
-                      <Input
-                        id="allergies"
-                        value={allergyInput}
-                        onChange={(e) => setAllergyInput(e.target.value)}
-                        placeholder="Add an allergy..."
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const value = allergyInput.trim();
-                            if (value && !healthData.allergies.includes(value)) {
-                              setHealthData({ ...healthData, allergies: [...healthData.allergies, value] });
-                              setAllergyInput('');
-                            }
-                          }
-                        }}
-                        data-testid="input-allergies"
-                      />
-                    </>
-                  )}
-                </div>
-              </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Vital Signs */}
+                <AccordionItem value="vital-signs" className="border-[#5a6623]/10">
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <div className="flex flex-col items-start text-left">
+                      <span className="text-lg font-semibold text-[#054700]">Vital Signs</span>
+                      <span className="text-sm font-normal text-[#5a6623]">Current measurements for accurate health scoring</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div>
+                        <Label htmlFor="bpSystolic">Blood Pressure - Systolic</Label>
+                        <Input
+                          id="bpSystolic"
+                          type="number"
+                          value={healthData.bloodPressureSystolic}
+                          onChange={(e) => handleHealthNumberChange('bloodPressureSystolic', e.target.value, 70, 200)}
+                          min="70"
+                          max="200"
+                          placeholder="e.g. 120"
+                          data-testid="input-bp-systolic"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="bpDiastolic">Blood Pressure - Diastolic</Label>
+                        <Input
+                          id="bpDiastolic"
+                          type="number"
+                          value={healthData.bloodPressureDiastolic}
+                          onChange={(e) => handleHealthNumberChange('bloodPressureDiastolic', e.target.value, 40, 130)}
+                          min="40"
+                          max="130"
+                          placeholder="e.g. 80"
+                          data-testid="input-bp-diastolic"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="heartRate">Resting Heart Rate (bpm)</Label>
+                        <Input
+                          id="heartRate"
+                          type="number"
+                          value={healthData.restingHeartRate}
+                          onChange={(e) => handleHealthNumberChange('restingHeartRate', e.target.value, 30, 220)}
+                          min="30"
+                          max="220"
+                          placeholder="e.g. 70"
+                          data-testid="input-heart-rate"
+                        />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Lifestyle Factors */}
+                <AccordionItem value="lifestyle-factors" className="border-[#5a6623]/10">
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <div className="flex flex-col items-start text-left">
+                      <span className="text-lg font-semibold text-[#054700]">Lifestyle Factors</span>
+                      <span className="text-sm font-normal text-[#5a6623]">Help us understand your daily habits</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div>
+                        <Label htmlFor="sleep">Sleep Hours per Night</Label>
+                        <Input
+                          id="sleep"
+                          type="number"
+                          value={healthData.sleepHoursPerNight}
+                          onChange={(e) => handleHealthNumberChange('sleepHoursPerNight', e.target.value, 0, 24)}
+                          min="0"
+                          max="24"
+                          placeholder="e.g. 7"
+                          data-testid="input-sleep"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="exercise">Exercise Days per Week</Label>
+                        <Input
+                          id="exercise"
+                          type="number"
+                          value={healthData.exerciseDaysPerWeek}
+                          onChange={(e) => handleHealthNumberChange('exerciseDaysPerWeek', e.target.value, 0, 7)}
+                          placeholder="e.g. 3"
+                          min="0"
+                          max="7"
+                          data-testid="input-exercise"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="stress">Stress Level (1-10)</Label>
+                        <Input
+                          id="stress"
+                          type="number"
+                          value={healthData.stressLevel}
+                          onChange={(e) => handleHealthNumberChange('stressLevel', e.target.value, 1, 10)}
+                          placeholder="e.g. 5"
+                          min="1"
+                          max="10"
+                          data-testid="input-stress"
+                        />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Risk Factors */}
+                <AccordionItem value="risk-factors" className="border-none">
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <div className="flex flex-col items-start text-left">
+                      <span className="text-lg font-semibold text-[#054700]">Risk Factors</span>
+                      <span className="text-sm font-normal text-[#5a6623]">Important for personalized recommendations</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="smoking">Smoking Status</Label>
+                        <Select value={healthData.smokingStatus} onValueChange={(value) => setHealthData({ ...healthData, smokingStatus: value })}>
+                          <SelectTrigger data-testid="select-smoking">
+                            <SelectValue placeholder="Select smoking status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="never">Never</SelectItem>
+                            <SelectItem value="former">Former Smoker</SelectItem>
+                            <SelectItem value="current">Current Smoker</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="alcohol">Alcohol Drinks per Week</Label>
+                        <Input
+                          id="alcohol"
+                          type="number"
+                          value={healthData.alcoholDrinksPerWeek}
+                          onChange={(e) => handleHealthNumberChange('alcoholDrinksPerWeek', e.target.value, 0, 50)}
+                          placeholder="e.g. 2"
+                          min="0"
+                          max="50"
+                          data-testid="input-alcohol"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-6 pt-2">
+                      <div>
+                        <Label htmlFor="conditions">Health Conditions</Label>
+                        {healthLoading ? (
+                          <Skeleton className="h-20 w-full" />
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {healthData.conditions.map((condition, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-sm">
+                                  {condition}
+                                  <button
+                                    className="ml-2 text-muted-foreground hover:text-destructive"
+                                    onClick={() => {
+                                      const newConditions = healthData.conditions.filter((_, i) => i !== idx);
+                                      setHealthData({ ...healthData, conditions: newConditions });
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                            <Input
+                              id="conditions"
+                              value={conditionInput}
+                              onChange={(e) => setConditionInput(e.target.value)}
+                              placeholder="Add a health condition..."
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const value = conditionInput.trim();
+                                  if (value && !healthData.conditions.includes(value)) {
+                                    setHealthData({ ...healthData, conditions: [...healthData.conditions, value] });
+                                    setConditionInput('');
+                                  }
+                                }
+                              }}
+                              data-testid="input-conditions"
+                            />
+                          </>
+                        )}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="medications">Current Medications</Label>
+                        {healthLoading ? (
+                          <Skeleton className="h-20 w-full" />
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {healthData.medications.map((medication, idx) => (
+                                <Badge key={idx} variant="outline" className="text-sm">
+                                  {medication}
+                                  <button
+                                    className="ml-2 text-muted-foreground hover:text-destructive"
+                                    onClick={() => {
+                                      const newMedications = healthData.medications.filter((_, i) => i !== idx);
+                                      setHealthData({ ...healthData, medications: newMedications });
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                            <Input
+                              id="medications"
+                              value={medicationInput}
+                              onChange={(e) => setMedicationInput(e.target.value)}
+                              placeholder="Add a medication..."
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const value = medicationInput.trim();
+                                  if (value && !healthData.medications.includes(value)) {
+                                    setHealthData({ ...healthData, medications: [...healthData.medications, value] });
+                                    setMedicationInput('');
+                                  }
+                                }
+                              }}
+                              data-testid="input-medications"
+                            />
+                            {/* Medication Safety Disclosure */}
+                            <div className="mt-3">
+                              {healthProfile?.medicationDisclosedAt ? (
+                                <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                                  <ShieldCheck className="h-4 w-4 flex-shrink-0" />
+                                  <span>
+                                    Medication disclosure recorded on{' '}
+                                    {new Date(healthProfile.medicationDisclosedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                                  <Checkbox
+                                    id="medication-disclosure"
+                                    checked={medicationDisclosureChecked}
+                                    onCheckedChange={(v) => setMedicationDisclosureChecked(!!v)}
+                                    className="mt-0.5"
+                                  />
+                                  <Label htmlFor="medication-disclosure" className="text-xs text-amber-800 leading-snug cursor-pointer font-normal">
+                                    I confirm the medication list above is complete and accurate. I understand that Ones uses this information to flag potential supplement–drug interactions. I will update this list if my medications change.
+                                  </Label>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="allergies">Allergies</Label>
+                        {healthLoading ? (
+                          <Skeleton className="h-20 w-full" />
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {healthData.allergies.map((allergy, idx) => (
+                                <Badge key={idx} variant="destructive" className="text-sm">
+                                  {allergy}
+                                  <button
+                                    className="ml-2 text-white hover:text-gray-300"
+                                    onClick={() => {
+                                      const newAllergies = healthData.allergies.filter((_, i) => i !== idx);
+                                      setHealthData({ ...healthData, allergies: newAllergies });
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                            <Input
+                              id="allergies"
+                              value={allergyInput}
+                              onChange={(e) => setAllergyInput(e.target.value)}
+                              placeholder="Add an allergy..."
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const value = allergyInput.trim();
+                                  if (value && !healthData.allergies.includes(value)) {
+                                    setHealthData({ ...healthData, allergies: [...healthData.allergies, value] });
+                                    setAllergyInput('');
+                                  }
+                                }
+                              }}
+                              data-testid="input-allergies"
+                            />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
 
               <div className="flex justify-end">
                 <Button

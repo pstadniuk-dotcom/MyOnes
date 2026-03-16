@@ -135,7 +135,7 @@ export function AppSidebar() {
           <img src="/ones-logo-light.svg" alt="Ones" className="h-7" />
         </Link>
       </SidebarHeader>
-      <SidebarContent className="px-3 py-4">
+      <SidebarContent className="px-3 py-4 flex flex-col">
         <SidebarGroup>
           <SidebarGroupLabel className="text-[#5a6623] text-xs font-medium uppercase tracking-wider px-3 mb-2">
             Your Health Journey
@@ -228,10 +228,17 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupContent>
+            <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={() => setShowSignOutConfirm(true)}
-                  className="rounded-lg px-3 py-2.5 transition-all duration-200 text-red-600 hover:bg-red-50 hover:text-red-700 mt-1 w-full justify-start"
+                  className="rounded-lg px-3 py-2.5 transition-all duration-200 text-red-600 hover:bg-red-50 hover:text-red-700 w-full justify-start"
                   data-testid="nav-logout"
                 >
                   <LogOut className="w-4 h-4" />

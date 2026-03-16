@@ -696,6 +696,19 @@ export default function MyFormulaPage() {
     return columns;
   }, [archivedData?.archived, columnCount]);
 
+  const archivedCount = archivedData?.archived?.length ?? 0;
+  const archivedSectionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showArchived) return;
+    archivedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [showArchived]);
+
+  useEffect(() => {
+    if (!showArchived) return;
+    if (archivedCount === 0) setShowArchived(false);
+  }, [archivedCount, showArchived]);
+
   // Ingredient filtering and searching
   const filteredIngredients = useMemo(() => {
     if (!selectedFormula) return [];
@@ -829,6 +842,22 @@ export default function MyFormulaPage() {
             </Badge>
           )}
           <Button
+            variant="outline"
+            className="gap-1.5 sm:gap-2 text-xs sm:text-sm"
+            size="sm"
+            data-testid="button-view-archived-formulas"
+            disabled={archivedCount === 0}
+            onClick={() => {
+              setActiveTab('formulas');
+              setShowArchived((prev) => !prev);
+            }}
+          >
+            <Archive className="w-4 h-4" />
+            <span className="hidden sm:inline">{showArchived ? 'View Active Formulas' : 'View Archived Formulas'}</span>
+            <span className="sm:hidden">{showArchived ? 'Active' : 'Archived'}</span>
+            <span className="text-muted-foreground">({archivedCount})</span>
+          </Button>
+          <Button
             variant="default"
             className="gap-1.5 sm:gap-2 bg-primary hover:bg-primary/90 text-xs sm:text-sm"
             size="sm"
@@ -869,71 +898,73 @@ export default function MyFormulaPage() {
             </div>
           ) : allFormulas && allFormulas.length > 0 ? (
             <>
-              <div className="flex flex-row gap-4 items-start">
-                {formulaColumns.map((col, colIdx) => (
-                  <div key={colIdx} className="flex-1 flex flex-col gap-4">
-                    {col.map((formula) => (
-                      <FormulaCard
-                        key={formula.id}
-                        formula={formula}
-                        isSelected={selectedFormulaId === formula.id}
-                        isExpanded={expandedFormulaIds.has(formula.id)}
-                        isNewest={formula.id === currentFormula?.id}
-                        onSelect={() => setSelectedFormulaId(formula.id)}
-                        onToggleExpand={() => setExpandedFormulaIds(prev => {
-                          const next = new Set(prev);
-                          if (next.has(formula.id)) next.delete(formula.id);
-                          else next.add(formula.id);
-                          return next;
-                        })}
-                        onRename={(id, currentName) => {
-                          setRenamingFormulaId(id);
-                          setNewFormulaName(currentName || '');
-                        }}
-                        onArchive={(id) => archiveFormulaMutation.mutate(id)}
-                        isArchiving={archiveFormulaMutation.isPending}
-                        onOpenPricing={() => handleOpenPricingForFormula(formula.id)}
-                        onCustomize={() => handleCustomizeFormula(formula.id)}
-                        onOrder={() => handleOpenPricingForFormula(formula.id)}
-                        getIndividualIngredientDetails={getIndividualIngredientDetails}
-                        expandedIndividualIngredients={expandedIndividualIngredients}
-                        setExpandedIndividualIngredients={setExpandedIndividualIngredients}
-                      />
+              {showArchived ? (
+                <div className="space-y-4" data-testid="archived-formulas-view">
+                  <div ref={archivedSectionRef} />
+                  <div className="space-y-1" data-testid="section-archived-formulas">
+                    <div className="flex items-center gap-2">
+                      <Archive className="w-4 h-4 text-muted-foreground" />
+                      <h3 className="text-base font-semibold">
+                        Archived formulas <span className="text-muted-foreground font-normal">({archivedCount})</span>
+                      </h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Restore an older formula to make it active again.
+                    </p>
+                  </div>
+                  <div className="flex flex-row gap-4 items-start">
+                    {archivedColumns.map((col, colIdx) => (
+                      <div key={colIdx} className="flex-1 flex flex-col gap-4">
+                        {col.map((formula) => (
+                          <ArchivedFormulaCard
+                            key={formula.id}
+                            formula={formula}
+                            onRestore={(id) => restoreFormulaMutation.mutate(id)}
+                            isRestoring={restoreFormulaMutation.isPending}
+                          />
+                        ))}
+                      </div>
                     ))}
                   </div>
-                ))}
-              </div>
-
-              {/* Build Custom Formula Card — hidden for now */}
-
-              {/* Archived Formulas Section */}
-              {(archivedData?.archived?.length || 0) > 0 && (
-                <Collapsible open={showArchived} onOpenChange={setShowArchived}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="outline" className="w-full">
-                      <Archive className="w-4 h-4 mr-2" />
-                      {showArchived ? 'Hide' : 'View'} Archived Formulas ({archivedData?.archived?.length || 0})
-                      {showArchived ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-4">
-                    <div className="flex flex-row gap-4 items-start">
-                      {archivedColumns.map((col, colIdx) => (
-                        <div key={colIdx} className="flex-1 flex flex-col gap-4">
-                          {col.map((formula) => (
-                            <ArchivedFormulaCard
-                              key={formula.id}
-                              formula={formula}
-                              onRestore={(id) => restoreFormulaMutation.mutate(id)}
-                              isRestoring={restoreFormulaMutation.isPending}
-                            />
-                          ))}
-                        </div>
+                </div>
+              ) : (
+                <div className="flex flex-row gap-4 items-start" data-testid="active-formulas-view">
+                  {formulaColumns.map((col, colIdx) => (
+                    <div key={colIdx} className="flex-1 flex flex-col gap-4">
+                      {col.map((formula) => (
+                        <FormulaCard
+                          key={formula.id}
+                          formula={formula}
+                          isSelected={selectedFormulaId === formula.id}
+                          isExpanded={expandedFormulaIds.has(formula.id)}
+                          isNewest={formula.id === currentFormula?.id}
+                          onSelect={() => setSelectedFormulaId(formula.id)}
+                          onToggleExpand={() => setExpandedFormulaIds(prev => {
+                            const next = new Set(prev);
+                            if (next.has(formula.id)) next.delete(formula.id);
+                            else next.add(formula.id);
+                            return next;
+                          })}
+                          onRename={(id, currentName) => {
+                            setRenamingFormulaId(id);
+                            setNewFormulaName(currentName || '');
+                          }}
+                          onArchive={(id) => archiveFormulaMutation.mutate(id)}
+                          isArchiving={archiveFormulaMutation.isPending}
+                          onOpenPricing={() => handleOpenPricingForFormula(formula.id)}
+                          onCustomize={() => handleCustomizeFormula(formula.id)}
+                          onOrder={() => handleOpenPricingForFormula(formula.id)}
+                          getIndividualIngredientDetails={getIndividualIngredientDetails}
+                          expandedIndividualIngredients={expandedIndividualIngredients}
+                          setExpandedIndividualIngredients={setExpandedIndividualIngredients}
+                        />
                       ))}
                     </div>
-                  </CollapsibleContent>
-                </Collapsible>
+                  ))}
+                </div>
               )}
+
+              {/* Build Custom Formula Card — hidden for now */}
             </>
           ) : (
             <Card>

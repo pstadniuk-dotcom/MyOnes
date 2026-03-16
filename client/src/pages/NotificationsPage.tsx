@@ -308,7 +308,7 @@ export default function NotificationsPage() {
                 ? "When you receive notifications about your formula, orders, or account, they'll appear here."
                 : `You don't have any ${filter.replace('_', ' ')} notifications at the moment.`}
             </p>
-            {filter !== 'all' && (
+            {/* {filter !== 'all' && (
               <Button
                 variant="ghost"
                 className="mt-2 text-primary"
@@ -316,7 +316,7 @@ export default function NotificationsPage() {
               >
                 View all notifications
               </Button>
-            )}
+            )} */}
           </CardContent>
         </Card>
       )}
