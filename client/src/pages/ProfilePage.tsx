@@ -595,11 +595,13 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 bg-white/60 backdrop-blur-sm">
-          <TabsTrigger value="profile" data-testid="tab-profile" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Profile</TabsTrigger>
-          <TabsTrigger value="health" data-testid="tab-health" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Health Profile</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="sticky top-[-24px] z-20 -mx-6 px-6 pt-6 pb-4  backdrop-blur-md  border-[#054700]/5 mb-6">
+          <TabsList className="grid w-full grid-cols-2 bg-white/80 backdrop-blur-sm shadow-sm border border-[#054700]/5">
+            <TabsTrigger value="profile" data-testid="tab-profile" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Profile</TabsTrigger>
+            <TabsTrigger value="health" data-testid="tab-health" className="data-[state=active]:bg-[#054700] data-[state=active]:text-white">Health Profile</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="profile" className="space-y-6">
           {/* Personal Information */}
@@ -1300,7 +1302,7 @@ export default function ProfilePage() {
                   {updateHealthProfileMutation.isPending && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   )}
-                  {hasExistingHealthProfile ? 'Update Health Info' : 'Save Health Info'}
+                  {hasExistingHealthProfile ? 'Update Health Profile' : 'Save Health Info'}
                 </Button>
               </div>
             </CardContent>

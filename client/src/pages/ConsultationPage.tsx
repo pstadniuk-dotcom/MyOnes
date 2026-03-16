@@ -250,6 +250,10 @@ export default function ConsultationPage() {
   // Inline capsule selection state (tracks which message has active selection)
   const [selectingCapsuleMessageId, setSelectingCapsuleMessageId] = useState<string | null>(null);
 
+  // Message editing state
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+
   // File preview state (for opening uploaded PDFs/images in a popup)
   const [previewFile, setPreviewFile] = useState<{ id: string; name: string; type: string } | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
@@ -570,7 +574,7 @@ export default function ConsultationPage() {
   // may finish in the background and should appear automatically on return.
   useEffect(() => {
     if (!historyData?.messages) return;
-    if (activeStreamingMessageId) return; // Don't clobber active local stream UI
+    if (activeStreamingMessageId || isTyping) return; // Don't clobber active local UI or pending requests
 
     const targetSessionId = currentSessionId || localStorage.getItem(SESSION_KEY);
     if (!targetSessionId) return;
@@ -910,7 +914,7 @@ export default function ConsultationPage() {
   }, [user?.id, queryClient]);
 
   // Enhanced message sending with file support
-  const handleSendMessage = useCallback(async (messageText?: string, attachedFiles?: UploadedFile[]) => {
+  const handleSendMessage = useCallback(async (messageText?: string, attachedFiles?: UploadedFile[], editMessageId?: string) => {
     let currentMessage = messageText || inputValue;
     if (!currentMessage.trim() && !attachedFiles?.length) return;
 
@@ -953,7 +957,21 @@ export default function ConsultationPage() {
         : undefined
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages(prev => {
+      if (editMessageId) {
+        const editIndex = prev.findIndex(m => m.id === editMessageId);
+        if (editIndex !== -1) {
+          return prev.slice(0, editIndex).concat([userMessage]);
+        }
+      }
+      return [...prev, userMessage];
+    });
+
+    if (editMessageId) {
+      setEditingMessageId(null);
+      setEditingContent('');
+    }
+
     void queryClient.invalidateQueries({ queryKey: ['/api/chat/consultations/history', user?.id] });
     setInputValue('');
     clearDraft(); // Clear autosaved draft when message is sent
@@ -978,6 +996,7 @@ export default function ConsultationPage() {
       const requestBody = {
         message: currentMessage,
         sessionId: currentSessionId,
+        editMessageId: editMessageId,
         files: attachedFiles?.map(file => ({
           id: file.id,
           name: file.name,
@@ -1157,6 +1176,7 @@ export default function ConsultationPage() {
                     queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/current'] });
                     queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/history'] });
                   }
+                  void queryClient.invalidateQueries({ queryKey: ['/api/chat/consultations/history', user?.id] });
                   setIsTyping(false);
                 } else if (data.type === 'formula_error') {
                   console.error('Formula validation error:', data.error);
@@ -1190,6 +1210,7 @@ export default function ConsultationPage() {
                     description: data.error,
                     variant: "destructive"
                   });
+                  void queryClient.invalidateQueries({ queryKey: ['/api/chat/consultations/history', user?.id] });
                   setIsTyping(false);
                   setActiveStreamingMessageId(null);
                   completed = true;
@@ -2361,6 +2382,20 @@ export default function ConsultationPage() {
                           >
                             <Copy className="!size-3" />
                           </Button>
+                          {message.sender === 'user' && !isTyping && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingMessageId(message.id);
+                                setEditingContent(message.content);
+                              }}
+                              className="!size-4 p-0 min-w-0 opacity-0 group-hover:opacity-100 transition-all"
+                              data-testid={`button-edit-message-${message.id}`}
+                            >
+                              <Pencil className="!size-3" />
+                            </Button>
+                          )}
                           {/* <Button
                             variant="ghost"
                             size="sm"
@@ -2385,8 +2420,39 @@ export default function ConsultationPage() {
                               {thinkingMessage || 'Thinking...'}
                             </div>
                           )
-                        ) : (
-                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{removeJsonBlocks(message.content)}</p>
+                         ) : (
+                          editingMessageId === message.id ? (
+                            <div className="space-y-3 mt-2">
+                              <Textarea
+                                value={editingContent}
+                                onChange={(e) => setEditingContent(e.target.value)}
+                                className="min-h-[80px] bg-background/50 text-[#054700] border-[#054700]/20 text-sm"
+                                autoFocus
+                              />
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditingMessageId(null);
+                                    setEditingContent('');
+                                  }}
+                                  className="h-7 text-[10px] uppercase tracking-wider font-bold hover:bg-black/5"
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSendMessage(editingContent, message.fileAttachments || (message.fileAttachment ? [message.fileAttachment] : [] as any), message.id)}
+                                  className="h-7 text-[10px] uppercase tracking-wider font-bold bg-[#054700] hover:bg-[#054700]/90 text-white"
+                                >
+                                  Save & Submit
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{removeJsonBlocks(message.content)}</p>
+                          )
                         )}
 
                         {/* Inline Capsule Selector */}
