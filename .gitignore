@@ -7,8 +7,8 @@ vite.config.ts.*
 .claude
 
 # Large media files (use CDN instead)
-*.mov
-*.mp4
+# *.mov
+# *.mp4
  
 # Ignore environment files (never commit secrets)
 .env
