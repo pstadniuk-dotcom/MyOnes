@@ -22,6 +22,7 @@ export function getMinIngredientCountForCapsules(_targetCapsules?: number): numb
 
 // Formula extraction schema for AI response parsing
 export const FormulaExtractionSchema = z.object({
+    formulaName: z.string().optional(),
     bases: z.array(z.object({
         ingredient: z.string(),
         amount: z.number(),

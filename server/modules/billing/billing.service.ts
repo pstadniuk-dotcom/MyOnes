@@ -653,7 +653,12 @@ class DatabaseBillingProvider implements BillingProvider {
     }
 
     // Get frontend URL dynamically from request or environment
-    const frontendUrl = req ? getBaseUrl(req) : (process.env.FRONTEND_URL || 'http://localhost:5000').replace(/\/$/, '');
+    const frontendUrl = req ? getBaseUrl(req) : (() => {
+      if (!process.env.FRONTEND_URL) {
+        throw new Error('FRONTEND_URL environment variable is required when no request context is available');
+      }
+      return process.env.FRONTEND_URL.replace(/\/$/, '');
+    })();
 
     const includeMembership = payload?.includeMembership !== false;
     const formulaId = typeof payload?.formulaId === 'string' ? payload.formulaId : undefined;

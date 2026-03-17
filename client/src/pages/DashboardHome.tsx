@@ -159,7 +159,7 @@ export default function HomePage() {
         </Card>
 
         {/* Formula Version */}
-        <Card data-testid="card-formula-version" className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all cursor-pointer" onClick={() => navigate(currentFormula ? '/dashboard/formula' : '/dashboard/chat')}>
+        <Card data-testid="card-formula-version" className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all cursor-pointer" onClick={() => navigate(currentFormula ? '/dashboard/formula' : '/dashboard/chat?new=true')}>
           <CardHeader className="space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-[#5a6623]">Current Formula</CardTitle>
           </CardHeader>
@@ -194,7 +194,7 @@ export default function HomePage() {
         </Card>
 
         {/* Consultations */}
-        <Card data-testid="card-consultations" className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all cursor-pointer" onClick={() => navigate('/dashboard/chat')}>
+        <Card data-testid="card-consultations" className="border-[#054700]/10 shadow-2xl hover:border-[#054700]/20 hover:shadow-md transition-all cursor-pointer" onClick={() => navigate('/dashboard/chat?new=true')}>
           <CardHeader className="space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-[#5a6623]">Consultations</CardTitle>
           </CardHeader>

@@ -76,7 +76,7 @@ export async function getPlatformStats(): Promise<PlatformStats> {
     const stats: PlatformStats = {
       totalUsers,
       totalFormulas,
-      totalIngredients: totalIngredients || 200,
+      totalIngredients: totalIngredients || 150,
       topHealthGoals: [
         'Energy & Focus',
         'Sleep Quality',
@@ -107,8 +107,7 @@ export async function getPlatformStats(): Promise<PlatformStats> {
     return {
       totalUsers: 0,
       totalFormulas: 0,
-      totalIngredients: 200,
-      topHealthGoals: ['Energy', 'Sleep', 'Stress', 'Immunity', 'Gut Health'],
+      totalIngredients: 150,      topHealthGoals: ['Energy', 'Sleep', 'Stress', 'Immunity', 'Gut Health'],
       topIngredients: ['Ashwagandha', 'Magnesium', 'Vitamin D3', 'Omega-3', 'B-Complex'],
       averageIngredientsPerFormula: 12,
       userGrowthRate: 'growing',

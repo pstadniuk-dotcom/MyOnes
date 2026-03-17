@@ -49,7 +49,11 @@ function getEmailTemplate(notification: EmailNotification): string {
 
   // Escape user-provided values to prevent HTML/script injection
   const title = escapeHtml(rawTitle);
-  const content = escapeHtml(rawContent);
+  // Content is server-generated HTML from trusted callers — do not escape.
+  // Defensive: reverse any accidental double-escaping (e.g. from a previous code path).
+  const content = rawContent.includes('&lt;')
+    ? rawContent.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    : rawContent;
   const actionText = rawActionText ? escapeHtml(rawActionText) : undefined;
   const actionUrl = rawActionUrl ? sanitizeUrl(rawActionUrl) : undefined;
 
@@ -119,11 +123,9 @@ function getEmailTemplate(notification: EmailNotification): string {
           <!-- Footer -->
           <tr>
             <td style="padding:24px 40px;text-align:center;">
-              <img src="${getFrontendUrl()}/ones-logo-light.svg"
-                   alt="Ones"
-                   width="140"
-                   style="display:block;margin:0 auto 10px;height:auto;"
-              />
+              <div style="margin:0 auto 10px;text-align:center;">
+                <span style="font-size:36px;font-weight:700;color:#054700;letter-spacing:-1px;font-family:Georgia,'Times New Roman',serif;">Ones</span>
+              </div>
               <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#111827;">Personalized AI Supplements</p>
               <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">Your custom formula, delivered to your door.</p>
               <p style="margin:0;font-size:12px;color:#9ca3af;">

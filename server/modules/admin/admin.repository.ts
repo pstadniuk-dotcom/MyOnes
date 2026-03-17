@@ -1656,22 +1656,40 @@ export class AdminRepository {
                 activities.push({ type: 'signup', id: u.id, userId: u.id, userName: u.name, description: `${u.name} signed up`, timestamp: u.createdAt });
             }
 
+            // Fetch orders and their users in 2 queries instead of N+1
             const recentOrders = await db.select().from(orders).orderBy(desc(orders.placedAt)).limit(limit);
-            for (const o of recentOrders) {
-                const [user] = await db.select({ name: users.name }).from(users).where(eq(users.id, o.userId));
-                activities.push({ type: 'order', id: o.id, userId: o.userId, userName: user?.name || 'Unknown', description: `${user?.name || 'Unknown'} placed an order`, timestamp: o.placedAt, metadata: { status: o.status, amountCents: o.amountCents } });
+            if (recentOrders.length > 0) {
+                const orderUserIds = [...new Set(recentOrders.map(o => o.userId))];
+                const orderUsers = await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, orderUserIds));
+                const orderUserMap = new Map(orderUsers.map(u => [u.id, u.name]));
+                for (const o of recentOrders) {
+                    const userName = orderUserMap.get(o.userId) || 'Unknown';
+                    activities.push({ type: 'order', id: o.id, userId: o.userId, userName, description: `${userName} placed an order`, timestamp: o.placedAt, metadata: { status: o.status, amountCents: o.amountCents } });
+                }
             }
 
+            // Fetch formulas and their users in 2 queries instead of N+1
             const recentFormulas = await db.select().from(formulas).orderBy(desc(formulas.createdAt)).limit(limit);
-            for (const f of recentFormulas) {
-                const [user] = await db.select({ name: users.name }).from(users).where(eq(users.id, f.userId));
-                activities.push({ type: 'formula', id: f.id, userId: f.userId, userName: user?.name || 'Unknown', description: `${user?.name || 'Unknown'} ${f.version > 1 ? 'updated' : 'created'} their formula`, timestamp: f.createdAt, metadata: { version: f.version, totalMg: f.totalMg } });
+            if (recentFormulas.length > 0) {
+                const formulaUserIds = [...new Set(recentFormulas.map(f => f.userId))];
+                const formulaUsers = await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, formulaUserIds));
+                const formulaUserMap = new Map(formulaUsers.map(u => [u.id, u.name]));
+                for (const f of recentFormulas) {
+                    const userName = formulaUserMap.get(f.userId) || 'Unknown';
+                    activities.push({ type: 'formula', id: f.id, userId: f.userId, userName, description: `${userName} ${f.version > 1 ? 'updated' : 'created'} their formula`, timestamp: f.createdAt, metadata: { version: f.version, totalMg: f.totalMg } });
+                }
             }
 
+            // Fetch tickets and their users in 2 queries instead of N+1
             const recentTickets = await db.select().from(supportTickets).orderBy(desc(supportTickets.createdAt)).limit(limit);
-            for (const t of recentTickets) {
-                const [user] = await db.select({ name: users.name }).from(users).where(eq(users.id, t.userId));
-                activities.push({ type: 'ticket', id: t.id, userId: t.userId, userName: user?.name || 'Unknown', description: `${user?.name || 'Unknown'} opened a support ticket: ${t.subject}`, timestamp: t.createdAt, metadata: { status: t.status, subject: t.subject } });
+            if (recentTickets.length > 0) {
+                const ticketUserIds = [...new Set(recentTickets.map(t => t.userId))];
+                const ticketUsers = await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ticketUserIds));
+                const ticketUserMap = new Map(ticketUsers.map(u => [u.id, u.name]));
+                for (const t of recentTickets) {
+                    const userName = ticketUserMap.get(t.userId) || 'Unknown';
+                    activities.push({ type: 'ticket', id: t.id, userId: t.userId, userName, description: `${userName} opened a support ticket: ${t.subject}`, timestamp: t.createdAt, metadata: { status: t.status, subject: t.subject } });
+                }
             }
 
             return activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, limit);
@@ -1693,13 +1711,26 @@ export class AdminRepository {
             const [countResult] = await db.select({ count: count() }).from(orders).where(whereClause);
             const orderList = await db.select().from(orders).where(whereClause).orderBy(desc(orders.placedAt)).limit(limit).offset(offset);
 
-            const enrichedOrders = await Promise.all(
-                orderList.map(async (order) => {
-                    const [user] = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.id, order.userId));
-                    const [formula] = await db.select().from(formulas).where(and(eq(formulas.userId, order.userId), eq(formulas.version, order.formulaVersion)));
-                    return { ...order, user, formula };
-                })
-            );
+            // Batch-fetch users and formulas to avoid N+1 queries
+            const userIds = [...new Set(orderList.map(o => o.userId))];
+            const [orderUserRows, formulaRows] = await Promise.all([
+                userIds.length > 0
+                    ? db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(inArray(users.id, userIds))
+                    : Promise.resolve([]),
+                orderList.length > 0
+                    ? db.select().from(formulas).where(
+                        inArray(formulas.userId, userIds)
+                    )
+                    : Promise.resolve([]),
+            ]);
+            const userRowMap = new Map(orderUserRows.map(u => [u.id, u]));
+            // Key formulas by "userId:version" for O(1) lookup
+            const formulaRowMap = new Map(formulaRows.map(f => [`${f.userId}:${f.version}`, f]));
+            const enrichedOrders = orderList.map(order => ({
+                ...order,
+                user: userRowMap.get(order.userId) ?? null,
+                formula: formulaRowMap.get(`${order.userId}:${order.formulaVersion}`) ?? null,
+            }));
 
             return { orders: enrichedOrders, total: Number(countResult?.count || 0) };
         } catch (error) {

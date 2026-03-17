@@ -27,7 +27,7 @@ if (!JWT_SECRET_RAW) {
 }
 
 export const JWT_SECRET: string = JWT_SECRET_RAW;
-export const JWT_EXPIRES_IN = '15m';
+export const JWT_EXPIRES_IN = '1h';
 export const REFRESH_TOKEN_EXPIRES_DAYS = 7;
 
 /**

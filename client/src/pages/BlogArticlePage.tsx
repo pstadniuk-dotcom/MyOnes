@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRoute, Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
+import DOMPurify from 'dompurify';
 import { ArrowLeft, Clock, Tag, Calendar, ChevronRight, Info, FlaskConical, ArrowRight, List } from 'lucide-react';
 import { Badge } from '@/shared/components/ui/badge';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -283,13 +284,15 @@ function renderMarkdown(content: string, validSlugSet?: Set<string>) {
   let olBuffer: string[] = [];
 
   const inlineMarkdown = (text: string) => {
-    return text
+    const raw = text
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/`(.+?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
       // Handle markdown images: ![alt text](url) — must come BEFORE link handling
       .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, src) => {
-        return `<img src="${src}" alt="${alt}" class="w-full rounded-xl my-6 object-cover max-h-96" loading="lazy" />`;
+        // Only allow http(s) image sources
+        const safeSrc = /^https?:\/\//i.test(src) ? src : '';
+        return `<img src="${safeSrc}" alt="${alt}" class="w-full rounded-xl my-6 object-cover max-h-96" loading="lazy" />`;
       })
       .replace(/\[(.+?)\]\((.+?)\)/g, (_match, label, href) => {
         // For internal /blog/ links, strip dead links that point to unpublished slugs
@@ -302,6 +305,10 @@ function renderMarkdown(content: string, validSlugSet?: Set<string>) {
         }
         return `<a href="${href}" class="text-emerald-600 font-medium hover:underline">${label}</a>`;
       });
+    return DOMPurify.sanitize(raw, {
+      ALLOWED_TAGS: ['strong', 'em', 'code', 'img', 'a'],
+      ALLOWED_ATTR: ['class', 'href', 'src', 'alt', 'loading'],
+    });
   };
 
   // Parse a markdown table cell — strip leading/trailing whitespace

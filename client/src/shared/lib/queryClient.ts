@@ -116,15 +116,34 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
     async ({ queryKey }) => {
       const endpoint = buildEndpointFromQueryKey(queryKey);
-      const res = await fetch(buildApiUrl(endpoint), {
+      const fetchOptions: RequestInit = {
         headers: {
           ...getAuthHeaders(),
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
         },
         credentials: "include",
-        cache: 'no-store', // Force browser to not use cache
-      });
+        cache: 'no-store',
+      };
+      let res = await fetch(buildApiUrl(endpoint), fetchOptions);
+
+      // On 401, try to refresh the token and retry once
+      if (res.status === 401 && localStorage.getItem('refreshToken')) {
+        if (!refreshPromise) {
+          refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
+        }
+        const refreshed = await refreshPromise;
+        if (refreshed) {
+          res = await fetch(buildApiUrl(endpoint), {
+            ...fetchOptions,
+            headers: {
+              ...getAuthHeaders(),
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+            },
+          });
+        }
+      }
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
         return null;

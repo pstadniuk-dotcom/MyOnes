@@ -67,6 +67,7 @@ const AdminLiveChatsPage = lazy(() => import("@/pages/admin/AdminLiveChatsPage")
 const AdminChatAnalyticsPage = lazy(() => import("@/pages/admin/AdminChatAnalyticsPage"));
 const AIUsagePage = lazy(() => import("@/pages/admin/AIUsagePage"));
 const PRAgentPage = lazy(() => import("@/pages/admin/PRAgentPage"));
+const MetaAdsPage = lazy(() => import("@/pages/admin/MetaAdsPage"));
 const AISupportAgentPage = lazy(() => import("@/pages/admin/AISupportAgentPage"));
 const TrafficSourcesPage = lazy(() => import("@/pages/admin/TrafficSourcesPage"));
 const InfluencerHubPage = lazy(() => import("@/pages/admin/InfluencerHubPage"));
@@ -372,6 +373,13 @@ function MainRouter() {
         <ProtectedAdminRoute>
           <AdminLayout>
             <Suspense fallback={<PageLoader />}><AISupportAgentPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/meta-ads">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><MetaAdsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>

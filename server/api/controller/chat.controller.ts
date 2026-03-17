@@ -595,6 +595,7 @@ export class ChatController {
 
                           const formulaData = {
                               userId,
+                              name: validatedFormula.formulaName || null,
                               bases: validatedFormula.bases,
                               additions: validatedFormula.additions,
                               totalMg: validatedFormula.totalMg,
@@ -1055,7 +1056,7 @@ export class ChatController {
             }
 
             // Transform formula for frontend display (convert ingredient/amount to name/dose format)
-            let formulaForDisplay = null;
+            let formulaForDisplay: Record<string, unknown> | null = null;
             let savedFormulaId = null;
 
             // Check if a formula was saved
@@ -1065,6 +1066,7 @@ export class ChatController {
                 const savedAdditions = savedFormula.additions ?? [];
 
                 formulaForDisplay = {
+                    formulaName: savedFormula.name || null,
                     bases: savedBases.map((b: any) => ({
                         name: b.ingredient || b.name,
                         dose: typeof b.amount === 'number' ? `${b.amount}mg` : (b.dose || `${b.amount}mg`),
@@ -1100,7 +1102,7 @@ export class ChatController {
                 role: 'assistant',
                 content: cleanResponse,
                 model: model,
-                formula: formulaForDisplay || undefined
+                formula: (formulaForDisplay || undefined) as any
             });
 
             // Now send completion event — messages are already in DB at this point

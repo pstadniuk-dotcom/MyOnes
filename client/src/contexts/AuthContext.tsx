@@ -75,27 +75,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [handleSessionExpired]);
 
-  // End-of-day auto-logout: log users out at midnight local time
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const now = new Date();
-    const midnight = new Date(now);
-    midnight.setHours(24, 0, 0, 0); // next midnight
-    const msUntilMidnight = midnight.getTime() - now.getTime();
-
-    const timer = setTimeout(() => {
-      toast({
-        title: "Session Ended",
-        description: "Your daily session has ended. Please log in again.",
-        variant: "default",
-      });
-      logout();
-    }, msUntilMidnight);
-
-    return () => clearTimeout(timer);
-  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Initialize authentication state from localStorage
   useEffect(() => {
     const initializeAuth = async () => {

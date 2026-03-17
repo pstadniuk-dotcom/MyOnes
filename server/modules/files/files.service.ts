@@ -149,10 +149,6 @@ export class FilesService {
 
                     const labDataExtraction = await analyzeLabReport(normalizedPath, mimeType, userId, onProgress);
                     if (labDataExtraction && fileId) {
-                        // Generate AI insights for all markers in batch
-                        const markerInsights = await labsService.generateAllMarkerInsights(
-                            labDataExtraction.extractedData || []
-                        );
                         await filesRepository.updateFileUpload(fileId, {
                             labReportData: {
                                 testDate: labDataExtraction.testDate,
@@ -163,15 +159,28 @@ export class FilesService {
                                 riskPatterns: labDataExtraction.riskPatterns,
                                 analysisStatus: 'completed',
                                 extractedData: labDataExtraction.extractedData || [],
-                                markerInsights,
                             }
                         });
+                        // Fire-and-forget: generate marker insights in background
+                        void labsService.generateAllMarkerInsights(labDataExtraction.extractedData || []).then(async (markerInsights) => {
+                            const currentData = (await filesRepository.getFileUpload(fileId))?.labReportData as any;
+                            if (currentData) {
+                                await filesRepository.updateFileUpload(fileId, {
+                                    labReportData: { ...currentData, markerInsights }
+                                });
+                                logger.info(`✨ Marker insights generated in background for ${fileName}`);
+                            }
+                        }).catch(err => logger.warn(`Background insight generation failed for ${fileName}:`, err));
                         logger.info(`✅ Lab report analysis completed: ${fileName}`);
                         // Record analysis completion time
                         await filesRepository.updateFileUpload(fileId, { analysisCompletedAt: new Date() } as any);
-                        // Send lab results ready notification
+                        // Send lab results ready notification (skip if no biomarkers extracted)
                         try {
                             const markerCount = labDataExtraction.extractedData?.length || 0;
+                            if (markerCount === 0) {
+                                logger.info('Skipping lab results notification — 0 biomarkers extracted', { userId, fileName });
+                                return;
+                            }
                             await notificationsService.create({
                                 userId,
                                 type: 'system',
@@ -187,17 +196,15 @@ export class FilesService {
                             const labUser = await usersRepository.getUser(userId);
                             if (labUser && await notificationsService.shouldSendEmail(userId, 'consultation')) {
                                 const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
+                                const firstName = labUser.name?.split(' ')[0] || 'there';
+                                const labSource = labDataExtraction.labName ? ` from ${labDataExtraction.labName}` : '';
+                                const plural = markerCount !== 1 ? 's' : '';
                                 await sendNotificationEmail({
                                     to: labUser.email,
                                     subject: 'Your lab results have been analyzed',
                                     title: 'Lab Results Ready',
                                     type: 'system',
-                                    content: `
-                                        <p>Hi ${labUser.name?.split(' ')[0] || 'there'},</p>
-                                        <p>We've finished analyzing your lab report${labDataExtraction.labName ? ` from ${labDataExtraction.labName}` : ''}.</p>
-                                        <p><strong>${markerCount} biomarker${markerCount !== 1 ? 's' : ''}</strong> were extracted and are ready for review.</p>
-                                        <p>Chat with your AI practitioner to get personalized insights and see how your results might affect your formula.</p>
-                                    `,
+                                    content: `<p>Hi ${firstName},</p><p>We've finished analyzing your lab report${labSource}.</p><p><strong>${markerCount} biomarker${plural}</strong> were extracted and are ready for review.</p><p>Chat with your AI practitioner to get personalized insights and see how your results might affect your formula.</p>`,
                                     actionUrl: `${frontendUrl}/dashboard/labs`,
                                     actionText: 'View Lab Results',
                                 });
@@ -282,9 +289,6 @@ export class FilesService {
                 try {
                     const labDataExtraction = await analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId);
                     if (labDataExtraction) {
-                        const markerInsights = await labsService.generateAllMarkerInsights(
-                            labDataExtraction.extractedData || []
-                        );
                         await filesRepository.updateFileUpload(fileId, {
                             labReportData: {
                                 testDate: labDataExtraction.testDate,
@@ -295,11 +299,19 @@ export class FilesService {
                                 riskPatterns: labDataExtraction.riskPatterns,
                                 analysisStatus: 'completed',
                                 extractedData: labDataExtraction.extractedData || [],
-                                markerInsights,
                             }
                         });
                         logger.info(`✅ Lab report re-analysis completed: ${uploadedFile.name}`);
                         await filesRepository.updateFileUpload(fileId, { analysisCompletedAt: new Date() } as any);
+                        // Fire-and-forget: generate marker insights in background
+                        void labsService.generateAllMarkerInsights(labDataExtraction.extractedData || []).then(async (markerInsights) => {
+                            const currentData = (await filesRepository.getFileUpload(fileId))?.labReportData as any;
+                            if (currentData) {
+                                await filesRepository.updateFileUpload(fileId, {
+                                    labReportData: { ...currentData, markerInsights }
+                                });
+                            }
+                        }).catch(err => logger.warn(`Background insight generation failed:`, err));
                     }
                 } catch (error) {
                     logger.error('Lab report analysis failed during update:', error);
@@ -343,13 +355,19 @@ export class FilesService {
             userId
         );
 
-        const markerInsights = await labsService.generateAllMarkerInsights(
-            labData?.extractedData || []
-        );
-
         await filesRepository.updateFileUpload(fileId, {
-            labReportData: { ...labData, analysisStatus: 'completed', markerInsights }
+            labReportData: { ...labData, analysisStatus: 'completed' }
         });
+
+        // Fire-and-forget: generate marker insights in background
+        void labsService.generateAllMarkerInsights(labData?.extractedData || []).then(async (markerInsights) => {
+            const currentData = (await filesRepository.getFileUpload(fileId))?.labReportData as any;
+            if (currentData) {
+                await filesRepository.updateFileUpload(fileId, {
+                    labReportData: { ...currentData, markerInsights }
+                });
+            }
+        }).catch(err => logger.warn(`Background insight generation failed:`, err));
 
         return labData;
     }
@@ -383,14 +401,20 @@ export class FilesService {
                     userId
                 );
 
-                const markerInsights = await labsService.generateAllMarkerInsights(
-                    labData?.extractedData || []
-                );
-
                 await filesRepository.updateFileUpload(fileId, {
-                    labReportData: { ...labData, analysisStatus: 'completed', markerInsights },
+                    labReportData: { ...labData, analysisStatus: 'completed' },
                     analysisCompletedAt: new Date(),
                 } as any);
+
+                // Fire-and-forget: generate marker insights in background
+                void labsService.generateAllMarkerInsights(labData?.extractedData || []).then(async (markerInsights) => {
+                    const currentData = (await filesRepository.getFileUpload(fileId))?.labReportData as any;
+                    if (currentData) {
+                        await filesRepository.updateFileUpload(fileId, {
+                            labReportData: { ...currentData, markerInsights }
+                        });
+                    }
+                }).catch(err => logger.warn(`Background insight generation failed:`, err));
 
                 // Send lab re-analysis notification
                 try {

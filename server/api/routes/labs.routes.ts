@@ -7,8 +7,15 @@ const router = Router();
 /**
  * Get aggregated biomarker dashboard across all lab reports
  * Returns: markers with trends, deltas, history, summary counts, report list
- * Each marker includes pre-generated AI insight (generated at upload time)
+ * Each marker includes pre-generated AI insight when available
  */
 router.get('/biomarkers', requireAuth, labsController.getBiomarkersDashboard);
+
+/**
+ * Generate marker insights on-demand for specific biomarker keys
+ * Body: { markerKeys: string[] }
+ * Returns cached insights if available, generates missing ones lazily
+ */
+router.post('/marker-insights', requireAuth, labsController.getMarkerInsights);
 
 export default router;

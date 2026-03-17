@@ -18,6 +18,13 @@ import { startSmartReorderScheduler } from "./utils/smartReorderScheduler";
 import { startAiSupportAgentScheduler } from "./utils/aiSupportAgentScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
+import { testEncryption } from "./infra/security/fieldEncryption";
+
+// Verify encryption key works before accepting traffic
+if (!testEncryption()) {
+  logger.error('FATAL: Field encryption self-test failed. Check FIELD_ENCRYPTION_KEY.');
+  process.exit(1);
+}
 
 // Catch unhandled errors so the server doesn't silently die
 process.on('uncaughtException', (err) => {
@@ -291,26 +298,24 @@ app.get('/api/health', (_req, res) => {
         logger.warn('Failed to recover stale processing records', { error: err });
       }
 
-      // Start SMS reminder scheduler
-      startSmsReminderScheduler();
+      // Start all schedulers with error isolation — a failing scheduler must not prevent others from starting
+      const schedulers: Array<{ name: string; start: () => void }> = [
+        { name: 'SmsReminder', start: startSmsReminderScheduler },
+        { name: 'AutoOptimize', start: startAutoOptimizeScheduler },
+        { name: 'AutoShip', start: startAutoShipScheduler },
+        { name: 'SmartReorder', start: startSmartReorderScheduler },
+        { name: 'BlogGeneration', start: startBlogGenerationScheduler },
+        { name: 'PrAgent', start: startPrAgentScheduler },
+        { name: 'AiSupportAgent', start: startAiSupportAgentScheduler },
+      ];
 
-      // Start formula review scheduler (checks subscription renewals daily at 9am UTC)
-      startAutoOptimizeScheduler();
-
-      // Start auto-ship pre-renewal scheduler (refreshes quotes 10 days before renewal at 8am UTC)
-      startAutoShipScheduler();
-
-      // Start Smart Re-Order scheduler (AI review + auto-approve + charge for members)
-      startSmartReorderScheduler();
-
-      // Start blog auto-generation scheduler (OFF by default — enabled via Admin → Blog Settings)
-      startBlogGenerationScheduler();
-
-      // Start PR Agent scheduler (OFF by default — enabled via Admin → PR Agent Settings)
-      startPrAgentScheduler();
-
-      // Start AI Support Agent scheduler (daily at 7:00 AM UTC — drafts responses for admin review)
-      startAiSupportAgentScheduler();
+      for (const { name, start } of schedulers) {
+        try {
+          start();
+        } catch (err) {
+          logger.error(`Failed to start ${name} scheduler — it will NOT run until server restart`, { error: err });
+        }
+      }
 
       // Note: Wearable data sync is now handled via Junction webhooks
       // No polling schedulers needed - data is pushed to /api/webhooks/junction
