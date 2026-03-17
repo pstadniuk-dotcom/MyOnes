@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,6 +12,18 @@ import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { signupSchema } from '@shared/schema';
 import { SocialAuthButtons } from '@/shared/components/auth/SocialAuthButtons';
+import { PasswordRequirements } from '@/shared/components/auth/PasswordRequirements';
+
+const sanitizeFullName = (value: string) => {
+  const lettersAndSpacesOnly = value.replace(/[^A-Za-z\s]/g, '');
+  const collapseWhitespace = lettersAndSpacesOnly.replace(/\s+/g, ' ');
+  return collapseWhitespace.replace(/^\s+/, '');
+};
+
+const preventDigitsInFullName = (event: KeyboardEvent<HTMLInputElement>) => {
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (/^\d$/.test(event.key)) event.preventDefault();
+};
 
 // Extended form validation schema to include password confirmation
 const extendedSignupSchema = signupSchema.extend({
@@ -40,6 +52,8 @@ export default function SignupPage() {
       ageConfirmed: undefined as unknown as true,
     }
   });
+
+  const passwordValue = form.watch('password');
 
   const onSubmit = async (data: SignupForm) => {
     try {
@@ -105,6 +119,16 @@ export default function SignupPage() {
                           autoComplete="name"
                           maxLength={45}
                           {...field}
+                          value={field.value ?? ''}
+                          onKeyDown={preventDigitsInFullName}
+                          onChange={(e) => field.onChange(sanitizeFullName(e.target.value))}
+                          onBlur={(e) => {
+                            field.onBlur();
+                            form.setValue('name', sanitizeFullName(e.target.value).trim(), {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                          }}
                           data-testid="input-name"
                         />
                       </FormControl>
@@ -167,10 +191,7 @@ export default function SignupPage() {
                           </Button>
                         </div>
                       </FormControl>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Password must be 8 characters long, include at least one uppercase letter, one lowercase letter, one number, and one special character.
-                      </p>
-                      <FormMessage />
+                      <PasswordRequirements passwordValue={passwordValue} variant="summary" />
                     </FormItem>
                   )}
                 />
