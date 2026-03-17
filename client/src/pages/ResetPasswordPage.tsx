@@ -218,13 +218,7 @@ export default function ResetPasswordPage() {
                           </Button>
                         </div>
                       </FormControl>
-                      {/* <PasswordRequirements 
-                        passwordValue={passwordValue} 
-                        isSubmitted={form.formState.submitCount > 0} 
-                      /> */}
-                       <p className="mt-2 text-xs text-muted-foreground">
-                        Password must be 8 characters long, include at least one uppercase letter, one lowercase letter, one number, and one special character.
-                      </p>
+                       <PasswordRequirements passwordValue={passwordValue} variant="summary" />
                       <FormMessage />
                     </FormItem>
                   )}

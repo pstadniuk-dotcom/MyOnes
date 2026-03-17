@@ -34,6 +34,7 @@ import {
   Activity,
   AlertCircle,
   ShieldCheck,
+  ChevronDown,
   Loader2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -806,7 +807,8 @@ export default function ProfilePage() {
               <Accordion type="single" collapsible defaultValue="basic-info" className="w-full">
                 {/* Basic Information */}
                 <AccordionItem value="basic-info" className="border-[#5a6623]/10">
-                  <AccordionTrigger className="hover:no-underline py-4">
+                  <AccordionTrigger className="hover:no-underline py-4 justify-start items-start gap-3 [&>svg:last-child]:hidden">
+                    <ChevronDown className="mt-1 h-4 w-4 shrink-0 transition-transform duration-200 text-[#054700]" />
                     <div className="flex flex-col items-start text-left">
                       <span className="text-lg font-semibold text-[#054700]">Basic Information</span>
                       <span className="text-sm font-normal text-[#5a6623]">Essential details for health calculations</span>
@@ -909,7 +911,8 @@ export default function ProfilePage() {
 
                 {/* Vital Signs */}
                 <AccordionItem value="vital-signs" className="border-[#5a6623]/10">
-                  <AccordionTrigger className="hover:no-underline py-4">
+                  <AccordionTrigger className="hover:no-underline py-4 justify-start items-start gap-3 [&>svg:last-child]:hidden">
+                    <ChevronDown className="mt-1 h-4 w-4 shrink-0 transition-transform duration-200 text-[#054700]" />
                     <div className="flex flex-col items-start text-left">
                       <span className="text-lg font-semibold text-[#054700]">Vital Signs</span>
                       <span className="text-sm font-normal text-[#5a6623]">Current measurements for accurate health scoring</span>
@@ -962,7 +965,8 @@ export default function ProfilePage() {
 
                 {/* Lifestyle Factors */}
                 <AccordionItem value="lifestyle-factors" className="border-[#5a6623]/10">
-                  <AccordionTrigger className="hover:no-underline py-4">
+                  <AccordionTrigger className="hover:no-underline py-4 justify-start items-start gap-3 [&>svg:last-child]:hidden">
+                    <ChevronDown className="mt-1 h-4 w-4 shrink-0 transition-transform duration-200 text-[#054700]" />
                     <div className="flex flex-col items-start text-left">
                       <span className="text-lg font-semibold text-[#054700]">Lifestyle Factors</span>
                       <span className="text-sm font-normal text-[#5a6623]">Help us understand your daily habits</span>
@@ -1015,7 +1019,8 @@ export default function ProfilePage() {
 
                 {/* Risk Factors */}
                 <AccordionItem value="risk-factors" className="border-none">
-                  <AccordionTrigger className="hover:no-underline py-4">
+                  <AccordionTrigger className="hover:no-underline py-4 justify-start items-start gap-3 [&>svg:last-child]:hidden">
+                    <ChevronDown className="mt-1 h-4 w-4 shrink-0 transition-transform duration-200 text-[#054700]" />
                     <div className="flex flex-col items-start text-left">
                       <span className="text-lg font-semibold text-[#054700]">Risk Factors</span>
                       <span className="text-sm font-normal text-[#5a6623]">Important for personalized recommendations</span>

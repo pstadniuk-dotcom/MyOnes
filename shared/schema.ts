@@ -1194,7 +1194,11 @@ export type B2bOutreach = typeof b2bOutreach.$inferSelect;
 
 // Auth-specific schemas
 export const signupSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters long').max(45, 'Name must be less than 45 characters'),
+  name: z.string()
+    .trim()
+    .min(2, 'Name must be at least 2 characters long')
+    .max(45, 'Name must be less than 45 characters')
+    .regex(/^[A-Za-z]+(?: [A-Za-z]+)*$/, 'Name can contain only alphabets'),
   email: z.string().email('Please enter a valid email address'),
   password: z.string()
     .min(8, 'Password must be at least 8 characters long')

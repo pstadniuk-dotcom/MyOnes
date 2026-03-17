@@ -8,9 +8,16 @@ interface Requirement {
 interface PasswordRequirementsProps {
   passwordValue: string;
   isSubmitted?: boolean;
+  variant?: 'list' | 'summary';
+  className?: string;
 }
 
-export const PasswordRequirements = ({ passwordValue, isSubmitted = false }: PasswordRequirementsProps) => {
+export const PasswordRequirements = ({
+  passwordValue,
+  isSubmitted = false,
+  variant = 'list',
+  className,
+}: PasswordRequirementsProps) => {
   const requirements: Requirement[] = [
     { 
       label: 'Minimum 8 characters', 
@@ -26,8 +33,25 @@ export const PasswordRequirements = ({ passwordValue, isSubmitted = false }: Pas
     },
   ];
 
+  const hasStartedTyping = passwordValue.length > 0;
+  const allMet = requirements.every((req) => req.met);
+
+  if (variant === 'summary') {
+    const colorClass = !hasStartedTyping
+      ? 'text-muted-foreground'
+      : allMet
+        ? 'text-green-600 dark:text-green-400'
+        : 'text-destructive';
+
+    return (
+      <p className={`mt-2 text-xs transition-colors duration-200 ${colorClass} ${className ?? ''}`}>
+        Password must be at least 8 characters long, include at least one number, and one special character.
+      </p>
+    );
+  }
+
   return (
-    <div className="mt-2 text-[10px] space-y-1.5 text-muted-foreground bg-muted/30 p-2.5 rounded-md border border-border/50 transition-all duration-300">
+    <div className={`mt-2 text-[10px] space-y-1.5 text-muted-foreground bg-muted/30 p-2.5 rounded-md border border-border/50 transition-all duration-300 ${className ?? ''}`}>
       <p className="font-semibold text-[11px] mb-1.5 text-foreground/80">Password Requirements:</p>
       <ul className="space-y-1.5">
         {requirements.map((req, index) => {

@@ -310,13 +310,8 @@ export default function SettingsPage() {
                       )}
                     </Button>
                   </div>
-                  {/* <PasswordRequirements 
-                    passwordValue={newPassword} 
-                    isSubmitted={passwordSubmitted} 
-                  /> */}
-                   <p className="mt-2 text-xs text-muted-foreground">
-                      Password must be 8 characters long, include at least one uppercase letter, one lowercase letter, one number, and one special character.
-                    </p>
+                   <PasswordRequirements passwordValue={newPassword} variant="summary" />
+
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirm-password">Confirm New Password</Label>

@@ -2377,7 +2377,7 @@ export default function ConsultationPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleCopyMessage(message.content)}
-                            className="!size-4 p-0 min-w-0 opacity-0 group-hover:opacity-100 transition-all"
+                            className="!size-4 p-0 min-w-0  transition-all"
                             data-testid={`button-copy-message-${message.id}`}
                           >
                             <Copy className="!size-3" />
@@ -2390,7 +2390,7 @@ export default function ConsultationPage() {
                                 setEditingMessageId(message.id);
                                 setEditingContent(message.content);
                               }}
-                              className="!size-4 p-0 min-w-0 opacity-0 group-hover:opacity-100 transition-all"
+                              className="!size-4 p-0 min-w-0 transition-all"
                               data-testid={`button-edit-message-${message.id}`}
                             >
                               <Pencil className="!size-3" />
