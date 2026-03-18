@@ -700,11 +700,21 @@ export function generateConsultationHTML(data: ConsultationExportData): string {
       .print-spacer { display: none; }
     }
   </style>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("print-btn")?.addEventListener("click", () => {
+        window.print();
+      });
+      document.getElementById("close-btn")?.addEventListener("click", () => {
+        window.close();
+      });
+    });
+  </script>
 </head>
 <body>
   <div class="print-bar no-print">
-    <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
-    <button class="print-btn print-btn-secondary" onclick="window.close()">Close</button>
+    <button class="print-btn" id="print-btn">🖨️ Print / Save as PDF</button>
+    <button class="print-btn print-btn-secondary" id="close-btn">Close</button>
   </div>
   <div class="print-spacer no-print"></div>
 

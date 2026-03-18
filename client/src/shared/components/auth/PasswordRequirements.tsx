@@ -37,11 +37,11 @@ export const PasswordRequirements = ({
   const allMet = requirements.every((req) => req.met);
 
   if (variant === 'summary') {
-    const colorClass = !hasStartedTyping
-      ? 'text-muted-foreground'
-      : allMet
-        ? 'text-green-600 dark:text-green-400'
-        : 'text-destructive';
+    if (!hasStartedTyping) return null;
+
+    const colorClass = allMet
+      ? 'text-green-600 dark:text-green-400'
+      : 'text-destructive';
 
     return (
       <p className={`mt-2 text-xs transition-colors duration-200 ${colorClass} ${className ?? ''}`}>
