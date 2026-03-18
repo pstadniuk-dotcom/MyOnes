@@ -468,8 +468,28 @@ interface MarkerContext {
   referenceRange: string;
 }
 
-function MarkerInsightPanel({ insight, marker }: { insight?: MarkerInsightData | null; marker?: MarkerContext }) {
+function MarkerInsightPanel({ insight, marker, markerKey }: { insight?: MarkerInsightData | null; marker?: MarkerContext; markerKey?: string }) {
   const [, navigate] = useLocation();
+  const [lazyInsight, setLazyInsight] = useState<MarkerInsightData | null>(null);
+  const [isLoadingInsight, setIsLoadingInsight] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  const effectiveInsight = insight || lazyInsight;
+
+  // Lazily fetch insight if not pre-cached
+  useEffect(() => {
+    if (insight || lazyInsight || isLoadingInsight || loadFailed || !markerKey) return;
+    setIsLoadingInsight(true);
+    apiRequest('POST', '/api/labs/marker-insights', { markerKeys: [markerKey] })
+      .then(r => r.json())
+      .then(data => {
+        const fetched = data?.insights?.[markerKey];
+        if (fetched) setLazyInsight(fetched);
+        else setLoadFailed(true);
+      })
+      .catch(() => setLoadFailed(true))
+      .finally(() => setIsLoadingInsight(false));
+  }, [insight, lazyInsight, isLoadingInsight, loadFailed, markerKey]);
 
   const handleDiscuss = () => {
     const name = marker?.name || 'this marker';
@@ -494,40 +514,49 @@ function MarkerInsightPanel({ insight, marker }: { insight?: MarkerInsightData |
     navigate('/dashboard/chat?new=true');
   };
 
-  if (!insight) return null;
+  if (!effectiveInsight && isLoadingInsight) {
+    return (
+      <div className="flex items-center gap-2 py-3 text-sm text-[#5a6623]">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Generating AI insights...
+      </div>
+    );
+  }
+
+  if (!effectiveInsight) return null;
 
   return (
     <div className="space-y-3">
       {/* Why It Matters */}
-      {insight.whyItMatters && (
+      {effectiveInsight.whyItMatters && (
         <div>
           <h5 className="text-[11px] font-semibold text-[#5a6623] uppercase tracking-wide mb-1 flex items-center gap-1.5">
             <Info className="h-3 w-3" />
             Why It Matters
           </h5>
-          <p className="text-sm text-[#054700] leading-relaxed">{insight.whyItMatters}</p>
+          <p className="text-sm text-[#054700] leading-relaxed">{effectiveInsight.whyItMatters}</p>
         </div>
       )}
 
       {/* Your Result */}
-      {insight.yourResult && (
+      {effectiveInsight.yourResult && (
         <div className="bg-[#ede8e2] rounded-lg p-3 border border-[#5a6623]/10">
           <h5 className="text-[11px] font-semibold text-[#5a6623] uppercase tracking-wide mb-1">Your Result</h5>
-          <p className="text-sm text-[#054700] leading-relaxed">{insight.yourResult}</p>
+          <p className="text-sm text-[#054700] leading-relaxed">{effectiveInsight.yourResult}</p>
         </div>
       )}
 
       {/* Foods: Eat + Limit side by side */}
-      {(insight.foodsToEat.length > 0 || insight.foodsToLimit.length > 0) && (
+      {(effectiveInsight.foodsToEat.length > 0 || effectiveInsight.foodsToLimit.length > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {insight.foodsToEat.length > 0 && (
+          {effectiveInsight.foodsToEat.length > 0 && (
             <div className="bg-emerald-50/60 rounded-lg p-3 border border-emerald-200/40">
               <h5 className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <UtensilsCrossed className="h-3 w-3" />
                 Eat More
               </h5>
               <ul className="space-y-1">
-                {insight.foodsToEat.map((food, i) => (
+                {effectiveInsight.foodsToEat.map((food, i) => (
                   <li key={i} className="text-xs text-[#054700] flex items-start gap-1.5">
                     <span className="text-emerald-500 mt-0.5">•</span>
                     {food}
@@ -536,14 +565,14 @@ function MarkerInsightPanel({ insight, marker }: { insight?: MarkerInsightData |
               </ul>
             </div>
           )}
-          {insight.foodsToLimit.length > 0 && (
+          {effectiveInsight.foodsToLimit.length > 0 && (
             <div className="bg-red-50/50 rounded-lg p-3 border border-red-200/30">
               <h5 className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <Ban className="h-3 w-3" />
                 Limit
               </h5>
               <ul className="space-y-1">
-                {insight.foodsToLimit.map((food, i) => (
+                {effectiveInsight.foodsToLimit.map((food, i) => (
                   <li key={i} className="text-xs text-[#054700] flex items-start gap-1.5">
                     <span className="text-red-400 mt-0.5">•</span>
                     {food}
@@ -556,13 +585,13 @@ function MarkerInsightPanel({ insight, marker }: { insight?: MarkerInsightData |
       )}
 
       {/* Activity & Lifestyle */}
-      {insight.activity && (
+      {effectiveInsight.activity && (
         <div>
           <h5 className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-1 flex items-center gap-1.5">
             <Dumbbell className="h-3 w-3" />
             Activity & Lifestyle
           </h5>
-          <p className="text-sm text-[#054700] leading-relaxed">{insight.activity}</p>
+          <p className="text-sm text-[#054700] leading-relaxed">{effectiveInsight.activity}</p>
         </div>
       )}
 
@@ -637,6 +666,8 @@ export default function LabReportsPage() {
   // ── UI state ─────────────────────────────────────────────────────────
   const [showConsentDialog, setShowConsentDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
   const uploads = useActiveUploads();
   const isUploading = uploads.size > 0;
   const uploadingFileName = uploads.size > 0 ? Array.from(uploads.values())[0]?.fileName : null;
@@ -883,7 +914,7 @@ export default function LabReportsPage() {
 
   const uploadFile = async (file: File) => {
     const uploadId = `${file.name}-${Date.now()}`;
-    toast({ title: "Uploading lab report", description: `${file.name} is uploading. You can navigate away safely.` });
+    toast({ title: "Uploading lab report", description: `${file.name} — analysis may take a few minutes. Please wait before starting a consultation.` });
 
     const uploadPromise = (async () => {
       try {
@@ -906,7 +937,7 @@ export default function LabReportsPage() {
         }
         await queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
         queryClient.invalidateQueries({ queryKey: ['/api/labs/biomarkers'] });
-        toast({ title: "Upload complete", description: `${file.name} was uploaded and is being analyzed.` });
+        toast({ title: "Upload complete", description: `${file.name} is now being analyzed — this may take a few minutes. Please wait before starting a consultation.` });
         if (fileInputRef.current) fileInputRef.current.value = '';
       } catch (error: any) {
         toast({ title: "Upload failed", description: error.message || "Please try again.", variant: "destructive" });
@@ -920,9 +951,7 @@ export default function LabReportsPage() {
     notifyUploadListeners();
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const validateAndUpload = async (file: File) => {
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
     if (!allowedTypes.includes(file.type)) {
       toast({ title: "Invalid file type", description: "Please upload a PDF, JPG, or PNG file.", variant: "destructive" });
@@ -934,6 +963,41 @@ export default function LabReportsPage() {
     }
     if (hasLabDataConsent) { await uploadFile(file); }
     else { setPendingFile(file); setShowConsentDialog(true); }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await validateAndUpload(file);
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer.types.includes('Files')) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current === 0) setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    await validateAndUpload(file);
   };
 
   const handleManualEntry = async () => {
@@ -1127,7 +1191,24 @@ export default function LabReportsPage() {
   // ── Render ───────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6" data-testid="page-lab-reports">
+    <div
+      className="space-y-6 relative"
+      data-testid="page-lab-reports"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="fixed inset-0 z-50 bg-[#054700]/10 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+          <div className="bg-white border-2 border-dashed border-[#054700] rounded-2xl p-12 shadow-2xl text-center">
+            <Upload className="h-12 w-12 text-[#054700] mx-auto mb-4" />
+            <p className="text-lg font-semibold text-[#054700]">Drop your lab report here</p>
+            <p className="text-sm text-[#5a6623] mt-1">PDF, JPG, or PNG &mdash; up to 10MB</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Page Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -1172,7 +1253,7 @@ export default function LabReportsPage() {
               Uploading &amp; analyzing: <span className="font-semibold">{uploadingFileName}</span>
             </p>
             <p className="text-xs text-amber-600 mt-0.5">
-              This may take a moment. Your report will appear below when ready.
+              This may take a few minutes. Please wait for analysis to complete before starting a consultation so your AI practitioner can reference your latest results.
             </p>
           </div>
         </div>
@@ -1189,8 +1270,9 @@ export default function LabReportsPage() {
             <p className="text-xs text-blue-600 mt-0.5">
               {(() => {
                 const detail = (processingReports[0]?.labReportData as any)?.progressDetail;
-                if (detail) return detail;
-                return 'AI is extracting biomarkers and generating insights. Results will appear automatically.';
+                return detail
+                  ? `${detail} Please hold off on consultations until complete.`
+                  : 'This may take a few minutes. Please hold off on consultations until analysis is complete so your practitioner has your full results.';
               })()}
             </p>
           </div>
@@ -1593,6 +1675,7 @@ export default function LabReportsPage() {
                           {/* AI-powered marker insight */}
                           <MarkerInsightPanel
                             insight={marker.insight}
+                            markerKey={marker.key}
                             marker={{
                               name: marker.name,
                               value: marker.latest.rawValue,
@@ -1645,14 +1728,17 @@ export default function LabReportsPage() {
 
       {/* Empty state — only show when no reports exist at all */}
       {!hasDashboard && !dashboardLoading && !labReportsLoading && (!labReports || labReports.length === 0) && (
-        <Card className="border-dashed bg-white border-[#5a6623]/30">
+        <Card className="border-dashed bg-white border-[#5a6623]/30 transition-colors hover:border-[#054700]/50">
           <CardContent className="flex flex-col items-center justify-center py-12 px-4">
             <div className="h-14 w-14 rounded-full bg-[#054700]/10 flex items-center justify-center mb-4">
               <Beaker className="h-7 w-7 text-[#054700]" />
             </div>
             <h3 className="text-lg font-semibold mb-2 text-[#054700]">No lab data yet</h3>
-            <p className="text-[#5a6623] text-center text-sm max-w-md mb-5">
+            <p className="text-[#5a6623] text-center text-sm max-w-md mb-3">
               Upload your blood work to see a full breakdown of every biomarker with trends, reference ranges, and AI-powered insights.
+            </p>
+            <p className="text-[#5a6623]/60 text-center text-xs mb-5">
+              Drag &amp; drop a file here, or use the buttons below
             </p>
             <div className="flex gap-3">
               <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="bg-[#054700] hover:bg-[#054700]/90">
@@ -1675,7 +1761,7 @@ export default function LabReportsPage() {
       {/* ── Uploaded Files (collapsible, split into Lab Reports + Images) ── */}
       {labReports && labReports.length > 0 && (
         <Card className="border-[#5a6623]/10 shadow-2xl">
-          <CardHeader className="pb-2">
+          <CardHeader className="py-4">
             <div className="flex items-center justify-between w-full">
               <button
                 onClick={() => setShowReports(!showReports)}

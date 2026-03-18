@@ -405,7 +405,10 @@ export async function triggerEnrichProspect(req: Request, res: Response) {
     if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
 
     const result = await enrichProspect(prospect);
-    res.json(result);
+
+    // Return contacts alongside enrichment data
+    const contacts = await agentRepository.getContactsByProspectId(prospect.id);
+    res.json({ ...result, contacts });
   } catch (err: any) {
     res.status(500).json({ error: `Failed to enrich prospect: ${err.message}` });
   }
@@ -421,6 +424,85 @@ export async function triggerBatchEnrich(req: Request, res: Response) {
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to batch enrich' });
+  }
+}
+
+// ── Prospect Contacts (Journalists/Editors) ──────────────────────────────────
+
+export async function listProspectContacts(req: Request, res: Response) {
+  try {
+    const contacts = await agentRepository.getContactsByProspectId(req.params.id);
+    res.json(contacts);
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to list contacts: ${err.message}` });
+  }
+}
+
+export async function createProspectContact(req: Request, res: Response) {
+  try {
+    const prospect = await agentRepository.getProspectById(req.params.id);
+    if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+
+    const { name, role, email, linkedinUrl, twitterHandle, beat, notes } = req.body;
+    if (!name) return res.status(400).json({ error: 'Contact name is required' });
+
+    const contact = await agentRepository.createContact({
+      prospectId: req.params.id,
+      name,
+      role: role || null,
+      email: email || null,
+      linkedinUrl: linkedinUrl || null,
+      twitterHandle: twitterHandle || null,
+      beat: beat || null,
+      notes: notes || null,
+      confidenceScore: 100, // manually added = high confidence
+      isPrimary: false,
+    });
+    res.status(201).json(contact);
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to create contact: ${err.message}` });
+  }
+}
+
+export async function updateProspectContact(req: Request, res: Response) {
+  try {
+    const contact = await agentRepository.getContactById(req.params.contactId);
+    if (!contact) return res.status(404).json({ error: 'Contact not found' });
+
+    const { name, role, email, linkedinUrl, twitterHandle, beat, notes, isPrimary } = req.body;
+    const updates: Record<string, any> = {};
+    if (name !== undefined) updates.name = name;
+    if (role !== undefined) updates.role = role;
+    if (email !== undefined) updates.email = email;
+    if (linkedinUrl !== undefined) updates.linkedinUrl = linkedinUrl;
+    if (twitterHandle !== undefined) updates.twitterHandle = twitterHandle;
+    if (beat !== undefined) updates.beat = beat;
+    if (notes !== undefined) updates.notes = notes;
+
+    // Handle isPrimary toggle
+    if (isPrimary === true) {
+      await agentRepository.setPrimaryContact(req.params.contactId, contact.prospectId);
+    } else if (isPrimary === false) {
+      updates.isPrimary = false;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await agentRepository.updateContact(req.params.contactId, updates);
+    }
+
+    const updated = await agentRepository.getContactById(req.params.contactId);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to update contact: ${err.message}` });
+  }
+}
+
+export async function deleteProspectContact(req: Request, res: Response) {
+  try {
+    await agentRepository.deleteContact(req.params.contactId);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to delete contact: ${err.message}` });
   }
 }
 

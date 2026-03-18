@@ -6,11 +6,13 @@
  * - Social media presence detection
  * - Domain authority estimation
  * - Content recency verification
+ * - **Journalist/writer discovery** for press/magazine prospects
  */
 import logger from '../../../infra/logging/logger';
 import { agentRepository } from '../agent.repository';
 import { getRecentEpisodes, searchPodcasts, isPodcastIndexConfigured } from './podcast-index';
-import type { OutreachProspect } from '@shared/schema';
+import { discoverJournalists, type DiscoveredJournalist } from './journalist-discovery';
+import type { OutreachProspect, InsertProspectContact } from '@shared/schema';
 
 export interface EnrichmentData {
   // RSS/Podcast data
@@ -36,6 +38,9 @@ export interface EnrichmentData {
   contentFrequency?: 'daily' | 'weekly' | 'monthly' | 'sporadic' | 'inactive';
   isActive?: boolean;
 
+  // Journalist discovery
+  journalistsFound?: number;
+
   // Enrichment metadata
   enrichedAt: string;
   enrichmentScore?: number; // 0-100, overall data quality
@@ -60,10 +65,25 @@ export async function enrichProspect(prospect: OutreachProspect): Promise<Enrich
       await enrichFromRssFeed(prospect.url, enrichment);
     }
 
+    // Journalist/writer discovery for press prospects
+    if (prospect.category === 'press' && prospect.url) {
+      await enrichWithJournalists(prospect, enrichment);
+    }
+
     // Calculate enrichment quality score
     enrichment.enrichmentScore = calculateEnrichmentScore(enrichment);
 
-    logger.info(`[enrichment] Enriched "${prospect.name}": score=${enrichment.enrichmentScore}`);
+    // Persist enrichment data to the prospect record
+    await agentRepository.updateProspect(prospect.id, {
+      enrichmentData: {
+        ...(prospect.enrichmentData as any || {}),
+        enrichmentScore: enrichment.enrichmentScore,
+        enrichedAt: enrichment.enrichedAt,
+        journalistsFound: enrichment.journalistsFound,
+      },
+    });
+
+    logger.info(`[enrichment] Enriched "${prospect.name}": score=${enrichment.enrichmentScore}, journalists=${enrichment.journalistsFound || 0}`);
   } catch (err: any) {
     logger.warn(`[enrichment] Failed to enrich "${prospect.name}": ${err.message}`);
   }
@@ -171,8 +191,77 @@ function calculateEnrichmentScore(enrichment: EnrichmentData): number {
   if (enrichment.contentFrequency) score += 10;
   if (enrichment.socialProfiles?.length) score += 15;
   if (enrichment.lastActivityDate) score += 15;
+  if (enrichment.journalistsFound && enrichment.journalistsFound > 0) score += 25;
 
   return Math.min(100, score);
+}
+
+/**
+ * Discover journalists/writers at a press prospect and save them as contacts
+ */
+async function enrichWithJournalists(
+  prospect: OutreachProspect,
+  enrichment: EnrichmentData,
+): Promise<void> {
+  try {
+    const { journalists } = await discoverJournalists(
+      prospect.publicationName || prospect.name,
+      prospect.url,
+      (prospect.topics as string[]) || [],
+    );
+
+    if (journalists.length === 0) {
+      logger.info(`[enrichment] No journalists found at "${prospect.name}"`);
+      enrichment.journalistsFound = 0;
+      return;
+    }
+
+    // Get existing contacts for this prospect to avoid duplicates
+    const existingContacts = await agentRepository.getContactsByProspectId(prospect.id);
+    const existingNames = new Set(existingContacts.map(c => c.name.toLowerCase().trim()));
+
+    // Filter out duplicates and prepare inserts
+    const newJournalists = journalists.filter(
+      j => !existingNames.has(j.name.toLowerCase().trim())
+    );
+
+    if (newJournalists.length === 0) {
+      logger.info(`[enrichment] All ${journalists.length} journalists at "${prospect.name}" already exist`);
+      enrichment.journalistsFound = existingContacts.length;
+      return;
+    }
+
+    const contactInserts: InsertProspectContact[] = newJournalists.map((j, i) => ({
+      prospectId: prospect.id,
+      name: j.name,
+      role: j.role,
+      email: j.email,
+      linkedinUrl: j.linkedinUrl,
+      twitterHandle: j.twitterHandle,
+      beat: j.beat,
+      recentArticles: j.recentArticles,
+      confidenceScore: j.confidenceScore,
+      isPrimary: i === 0 && existingContacts.length === 0, // First journalist = primary if none exist
+    }));
+
+    await agentRepository.createContacts(contactInserts);
+
+    // If we found an email for the top journalist and prospect has no email, update it
+    const bestContact = newJournalists.find(j => j.email);
+    if (bestContact?.email && !prospect.contactEmail) {
+      await agentRepository.updateProspect(prospect.id, {
+        contactEmail: bestContact.email,
+        contactMethod: 'email',
+      });
+      logger.info(`[enrichment] Updated prospect "${prospect.name}" with journalist email: ${bestContact.email}`);
+    }
+
+    enrichment.journalistsFound = existingContacts.length + newJournalists.length;
+    logger.info(`[enrichment] Saved ${newJournalists.length} new journalists at "${prospect.name}"`);
+  } catch (err: any) {
+    logger.warn(`[enrichment] Journalist discovery failed for "${prospect.name}": ${err.message}`);
+    enrichment.journalistsFound = 0;
+  }
 }
 
 /**

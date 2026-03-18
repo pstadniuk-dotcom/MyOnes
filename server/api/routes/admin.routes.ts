@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { adminController } from '../controller/admin.controller';
 import { liveChatController } from '../controller/live-chat.controller';
+import { metaAdsController } from '../controller/meta-ads.controller';
 import { requireAdmin } from '../middleware/middleware';
 import { runFormulaReviewCheck } from '../../utils/autoOptimizeScheduler';
 
@@ -164,5 +165,15 @@ router.post('/formula-review/trigger', requireAdmin, async (req, res) => {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// Meta Ads Bot
+router.get('/meta-ads/connection', requireAdmin, metaAdsController.checkConnection);
+router.post('/meta-ads/generate-copy', requireAdmin, metaAdsController.generateCopy);
+router.get('/meta-ads/drafts', requireAdmin, metaAdsController.listDrafts);
+router.get('/meta-ads/drafts/:id', requireAdmin, metaAdsController.getDraft);
+router.patch('/meta-ads/drafts/:id', requireAdmin, metaAdsController.updateDraft);
+router.delete('/meta-ads/drafts/:id', requireAdmin, metaAdsController.deleteDraft);
+router.post('/meta-ads/publish', requireAdmin, metaAdsController.publish);
+router.get('/meta-ads/campaigns', requireAdmin, metaAdsController.listCampaigns);
 
 export default router;

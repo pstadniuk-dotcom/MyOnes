@@ -29,16 +29,29 @@ export const PODCAST_GUEST_TEMPLATE: PitchTemplate = {
 
 STRUCTURE:
 1. **Opening** (1-2 sentences): Reference something specific about their show — a recent episode, their audience, or their mission. Show you actually listen.
-2. **Value proposition** (2-3 sentences): Lead with what their audience would get out of the conversation. What specific, useful insights could listeners walk away with? Frame it as "here's what I could share" not "here's why I'm impressive."
-3. **Brief context** (1-2 sentences): Quick intro — who you are and what Ones does. Keep it factual, not boastful.
-4. **The ask** (1-2 sentences): Low pressure. "If that sounds like a fit, I'd love to explore it. Totally understand if it's not the right time."
-5. **Sign-off**: Warm, human, grateful for their time.
+2. **Value proposition** (3-5 sentences): This is the MOST IMPORTANT part. Frame it as something YOU personally struggled with. There are TWO problems and we solve BOTH:
+   
+   **Problem 1 — The DIY Stacker:** People buy 8, 10, 12 different supplement bottles hoping they get it right. They're guessing at what they need, often getting lower quality ingredients, overdosing on some things, underdosing on others. Spending a fortune without actually knowing if any of it is right for their body.
+   
+   **Problem 2 — The Generic One-Size-Fits-All:** On the other side, companies like AG1 or daily multivitamins offer a single generic blend. "Just trust us." Zero customization, nothing personalized to the individual. It's convenient but it's designed for an "average person" that doesn't exist.
+   
+   **Ones solves both:** Our AI analyzes your actual blood work, health data, and wearable metrics to design one custom formula from over 150 ingredients at research-backed doses. No more guessing with a stack of bottles, no more settling for a generic blend that wasn't built for you. And the AI adapts your formula as your health data changes.
+   
+   Name BOTH problems clearly. Frame it personally: "something I struggled with" or "something I dealt with." Then show how Ones eliminates both.
+3. **Brief intro + ask** (1-2 sentences): Who you are (one line), then a low-pressure ask. "If that sounds like a fit, I'd love to explore it."
+4. **Sign-off**: Warm, human, grateful for their time.
 
 RULES:
 - NEVER start with "I hope this email finds you well" or similar generic openers
 - NEVER use words like "disrupt", "revolutionize", "game-changing", "groundbreaking"
 - NEVER claim to be the first, the best, or the only
-- Lead with what the AUDIENCE gets, not what you've built
+- The value proposition should make people think "wait, I'm either guessing with a stack of bottles OR settling for a generic blend. Neither is actually built for me"
+- Name BOTH sides of the problem: the DIY stacker buying 12 bottles AND the generic one-size-fits-all like AG1 or multivitamins
+- Frame it personally: "something I struggled with" or "something I dealt with," not "your listeners deal with"
+- NEVER say "listeners" or "your audience" in the pitch body. Talk directly to the host about the problem as something real people (including you) face
+- NEVER use em dashes (—). Use commas, periods, or just start a new sentence instead
+- Show how Ones eliminates both problems with one AI-designed formula built from your actual health data
+- Always mention the AI: it's the engine that analyzes health data and selects the right ingredients at the right doses
 - Be genuinely curious about their show, not just pitching
 - Use the host's first name
 - Keep it under 180 words
@@ -99,8 +112,8 @@ export const PRODUCT_REVIEW_TEMPLATE: PitchTemplate = {
   systemPrompt: `You are pitching a product for review to a health/wellness publication.
 
 STRUCTURE:
-1. **Why their readers would care** (2-3 sentences): Connect to a problem their audience has. Lead with the problem, not the product.
-2. **What makes it different** (2-3 sentences): AI-driven formulas based on individual blood work, 200+ ingredients at researched doses. Keep it factual — let the approach speak for itself.
+1. **Why their readers would care** (2-3 sentences): Their readers face one of two problems. Either they're buying 10+ different supplement bottles, guessing at what they need, often getting lower quality ingredients, overdosing on some things and underdosing on others. Or they've gone the AG1 / daily multivitamin route, convenient but completely generic, zero customization, designed for an "average person" that doesn't exist. Neither is built for their individual body.
+2. **What makes it different** (2-3 sentences): Ones solves both problems. Our AI analyzes each person's blood work, health data, and wearable metrics to design one custom formula from over 150 ingredients at research-backed doses. No more guessing with a stack of bottles, no more settling for a generic blend. The AI adapts the formula as health data changes. Keep it factual.
 3. **The offer** (1-2 sentences): Happy to send a sample or give their reviewer access to try it.
 4. **Low-pressure close** (1 sentence): "If this isn't a fit for your editorial calendar, totally understand."
 
@@ -108,6 +121,7 @@ RULES:
 - Don't oversell — be factual and let the product speak for itself
 - Never say "disrupting" or "revolutionizing" or "game-changing"
 - Don't claim to be better than competitors — just explain the approach
+- Name both problems: the DIY stacker AND the generic one-size-fits-all
 - Mention that each formula is genuinely different per person
 - Keep under 180 words`,
 
@@ -138,8 +152,9 @@ STRUCTURE:
 
 Article topic ideas to choose from (pick the most relevant):
 - "What Your Blood Work Can Tell You About Your Supplement Routine" (practical/educational)
+- "Why Your Supplement Cabinet Is Probably Wrong for Your Body" (the problem with one-size-fits-all)
 - "The Gap Between Generic Supplements and What Your Body Actually Needs" (informational)
-- "What I Learned Building a Health Product With AI" (honest founder perspective)
+- "Stop Guessing: How to Know If Your Supplements Are Actually Right for You" (consumer education)
 - "How Wearable Data Could Change the Way We Think About Nutrition" (forward-looking)
 - "Questions to Ask Before You Buy Another Supplement" (consumer education)
 
@@ -169,8 +184,8 @@ export const FOUNDER_FEATURE_TEMPLATE: PitchTemplate = {
   systemPrompt: `You are pitching a founder profile/feature story.
 
 STRUCTURE:
-1. **The story** (2-3 sentences): What's the human story here? Person frustrated with generic supplements, started building something different. Keep it grounded and relatable.
-2. **What Ones does** (2-3 sentences): Quick factual overview — personalized supplement formulas based on individual health data. Don't oversell.
+1. **The story** (2-3 sentences): The human story. Pete was stuck in the same trap as everyone else. He was buying 10 different supplement bottles, guessing at what he needed, overdosing on some things, underdosing on others. He looked at the AG1 / multivitamin route but that was just a generic blend with zero customization. Neither option was actually built for his body. So he started building something different.
+2. **What Ones does** (2-3 sentences): Ones uses AI to analyze your blood work, health data, and wearable metrics to design one custom formula from over 150 ingredients at research-backed doses, solving both the "stack of bottles" problem and the "generic one-size-fits-all" problem. The AI adapts the formula as new health data comes in. Don't oversell.
 3. **Why now** (1-2 sentences): What makes this story timely or relevant to their readers?
 4. **Openness** (1-2 sentences): Available for interview/Q&A, happy to share more if it's a fit. No pressure.
 

@@ -54,6 +54,11 @@ import {
   getPrioritizedProspects,
   generateChannelMessagesHandler,
   draftPressReleaseHandler,
+  getFormScreenshot,
+  listProspectContacts,
+  createProspectContact,
+  updateProspectContact,
+  deleteProspectContact,
 } from '../controller/agent.controller';
 
 const router = Router();
@@ -79,6 +84,12 @@ router.delete('/prospects/:id', deleteProspect);
 router.post('/prospects/:id/enrich', triggerEnrichProspect);
 router.post('/prospects/batch-enrich', triggerBatchEnrich);
 
+// Prospect Contacts (Journalists/Editors)
+router.get('/prospects/:id/contacts', listProspectContacts);
+router.post('/prospects/:id/contacts', createProspectContact);
+router.patch('/prospects/:id/contacts/:contactId', updateProspectContact);
+router.delete('/prospects/:id/contacts/:contactId', deleteProspectContact);
+
 // Pitches
 router.get('/pitches', listPitches);
 router.get('/pitches/:id', getPitch);
@@ -90,6 +101,7 @@ router.post('/pitches/:id/rewrite', aiRewritePitch);
 router.post('/pitches/:id/responded', markPitchResponded);
 router.post('/pitches/:id/follow-up', triggerFollowUp);
 router.get('/pitches/:id/quality-score', scorePitch);
+router.get('/pitches/:id/screenshot/:type', getFormScreenshot);
 
 // Actions
 router.post('/scan', triggerScan);

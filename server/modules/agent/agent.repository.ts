@@ -4,8 +4,10 @@
 import { db } from '../../infra/db/db';
 import {
   outreachProspects, outreachPitches, agentRuns, appSettings,
+  prospectContacts,
   type InsertOutreachProspect, type InsertOutreachPitch,
   type OutreachProspect, type OutreachPitch, type AgentRun,
+  type ProspectContact, type InsertProspectContact,
 } from '@shared/schema';
 import { eq, desc, and, or, inArray, sql, count, isNull, gte, lte } from 'drizzle-orm';
 import logger from '../../infra/logging/logger';
@@ -298,6 +300,53 @@ class AgentRepository {
     const base = await this.getStats();
     const followUps = await this.getPendingFollowUps();
     return { ...base, followUpsDue: followUps.length };
+  }
+
+  // ── Prospect Contacts (Journalists/Editors) ─────────────────────────
+
+  async createContact(data: InsertProspectContact): Promise<ProspectContact> {
+    const [contact] = await db.insert(prospectContacts).values(data as any).returning();
+    return contact;
+  }
+
+  async createContacts(data: InsertProspectContact[]): Promise<ProspectContact[]> {
+    if (data.length === 0) return [];
+    const contacts = await db.insert(prospectContacts).values(data as any).returning();
+    return contacts;
+  }
+
+  async getContactsByProspectId(prospectId: string): Promise<ProspectContact[]> {
+    return db.select().from(prospectContacts)
+      .where(eq(prospectContacts.prospectId, prospectId))
+      .orderBy(desc(prospectContacts.confidenceScore));
+  }
+
+  async getContactById(id: string): Promise<ProspectContact | null> {
+    const [contact] = await db.select().from(prospectContacts)
+      .where(eq(prospectContacts.id, id)).limit(1);
+    return contact || null;
+  }
+
+  async updateContact(id: string, data: Partial<ProspectContact>): Promise<void> {
+    await db.update(prospectContacts).set(data).where(eq(prospectContacts.id, id));
+  }
+
+  async deleteContact(id: string): Promise<void> {
+    await db.delete(prospectContacts).where(eq(prospectContacts.id, id));
+  }
+
+  async deleteContactsByProspectId(prospectId: string): Promise<void> {
+    await db.delete(prospectContacts).where(eq(prospectContacts.prospectId, prospectId));
+  }
+
+  async setPrimaryContact(contactId: string, prospectId: string): Promise<void> {
+    // Unset all primary contacts for this prospect, then set the specified one
+    await db.update(prospectContacts)
+      .set({ isPrimary: false })
+      .where(eq(prospectContacts.prospectId, prospectId));
+    await db.update(prospectContacts)
+      .set({ isPrimary: true })
+      .where(eq(prospectContacts.id, contactId));
   }
 }
 

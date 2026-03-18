@@ -13,6 +13,7 @@ interface Message {
   sender: 'user' | 'ai';
   timestamp: Date;
   formula?: {
+    formulaName?: string | null;
     bases: { name: string; dose: string; purpose: string }[];
     additions: { name: string; dose: string; purpose: string }[];
     totalMg: number;
@@ -216,7 +217,7 @@ export default function AIChat() {
                 <div className="mt-3 p-3 bg-background/50 rounded-lg border text-foreground">
                   <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-green-500" />
-                    Personalized Formula ({message.formula.totalMg}mg)
+                    {message.formula.formulaName || 'Personalized Formula'} ({message.formula.totalMg}mg)
                   </h4>
 
                   {/* Formula Bases */}

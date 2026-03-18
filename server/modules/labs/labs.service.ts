@@ -1353,11 +1353,11 @@ Return a JSON object where each KEY is the exact marker name provided, and the v
         const result: Record<string, MarkerInsight> = {};
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-        for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
-            const batch = batches[batchIdx];
-            const userMessage = `Here are the lab results. Generate insights for each marker:\n\n${batch.map(m => m.line).join('\n')}`;
+        // Run all batches in parallel — each batch is independent
+        const batchResults = await Promise.allSettled(
+            batches.map(async (batch, batchIdx) => {
+                const userMessage = `Here are the lab results. Generate insights for each marker:\n\n${batch.map(m => m.line).join('\n')}`;
 
-            try {
                 const completion = await openai.chat.completions.create({
                     model: 'gpt-4o-mini',
                     messages: [
@@ -1372,35 +1372,119 @@ Return a JSON object where each KEY is the exact marker name provided, and the v
                 const raw = completion.choices?.[0]?.message?.content;
                 if (!raw) {
                     logger.warn(`Batch ${batchIdx + 1}/${batches.length}: AI returned empty response`);
-                    continue;
+                    return { batchIdx, batch, parsed: null };
                 }
 
                 const parsed = JSON.parse(raw) as Record<string, any>;
-
-                // Normalize: map display names → canonical keys
-                for (const m of batch) {
-                    const entry = parsed[m.display]
-                        || Object.entries(parsed).find(([k]) => k.toLowerCase() === m.display.toLowerCase())?.[1];
-                    if (entry && typeof entry === 'object') {
-                        result[m.key] = {
-                            whyItMatters: entry.whyItMatters || '',
-                            yourResult: entry.yourResult || '',
-                            foodsToEat: Array.isArray(entry.foodsToEat) ? entry.foodsToEat : [],
-                            foodsToLimit: Array.isArray(entry.foodsToLimit) ? entry.foodsToLimit : [],
-                            activity: entry.activity || '',
-                        };
-                    }
-                }
-
                 logger.info(`Batch ${batchIdx + 1}/${batches.length}: ${Object.keys(parsed).length} insights parsed`);
-            } catch (err) {
-                logger.error(`Batch ${batchIdx + 1}/${batches.length} marker insight generation failed:`, err);
-                // Continue with remaining batches instead of failing entirely
+                return { batchIdx, batch, parsed };
+            })
+        );
+
+        for (const settledResult of batchResults) {
+            if (settledResult.status === 'rejected') {
+                logger.error('Batch marker insight generation failed:', settledResult.reason);
+                continue;
+            }
+            const { batch, parsed } = settledResult.value;
+            if (!parsed) continue;
+
+            // Normalize: map display names → canonical keys
+            for (const m of batch) {
+                const entry = parsed[m.display]
+                    || Object.entries(parsed).find(([k]) => k.toLowerCase() === m.display.toLowerCase())?.[1];
+                if (entry && typeof entry === 'object') {
+                    result[m.key] = {
+                        whyItMatters: entry.whyItMatters || '',
+                        yourResult: entry.yourResult || '',
+                        foodsToEat: Array.isArray(entry.foodsToEat) ? entry.foodsToEat : [],
+                        foodsToLimit: Array.isArray(entry.foodsToLimit) ? entry.foodsToLimit : [],
+                        activity: entry.activity || '',
+                    };
+                }
             }
         }
 
         logger.info(`✨ Generated ${Object.keys(result).length} marker insights total across ${batches.length} batches`);
         return result;
+    }
+
+    /**
+     * Generate insights on-demand for specific markers by key.
+     * Checks DB cache first; generates only missing ones, then persists.
+     */
+    async getMarkerInsightsOnDemand(
+        userId: string,
+        markerKeys: string[]
+    ): Promise<Record<string, MarkerInsight>> {
+        if (!markerKeys || markerKeys.length === 0) return {};
+
+        const allReports = await filesRepository.getLabReportsByUser(userId);
+        const completedReports = allReports.filter(r => {
+            const ld = r.labReportData as any;
+            return ld?.analysisStatus === 'completed' && Array.isArray(ld?.extractedData);
+        });
+
+        // Collect cached insights and find markers requiring generation
+        const cached: Record<string, MarkerInsight> = {};
+        const needed = new Set(markerKeys);
+
+        for (const r of completedReports) {
+            const ld = r.labReportData as any;
+            if (ld?.markerInsights && typeof ld.markerInsights === 'object') {
+                for (const key of [...needed]) {
+                    if (ld.markerInsights[key]) {
+                        cached[key] = ld.markerInsights[key];
+                        needed.delete(key);
+                    }
+                }
+            }
+        }
+
+        if (needed.size === 0) return cached;
+
+        // Build extractedData entries for the needed markers from latest reports
+        const extractedForGeneration: Array<Record<string, any>> = [];
+        const reportToUpdate: string | null = completedReports.length > 0
+            ? completedReports[completedReports.length - 1].id  // latest
+            : null;
+
+        for (const r of [...completedReports].reverse()) {
+            const ld = r.labReportData as any;
+            for (const m of (ld.extractedData || [])) {
+                const key = canonicalKey(m.testName || m.name || '');
+                if (key && needed.has(key)) {
+                    extractedForGeneration.push(m);
+                    needed.delete(key);
+                }
+            }
+            if (needed.size === 0) break;
+        }
+
+        if (extractedForGeneration.length === 0) return cached;
+
+        // Generate insights for the missing markers
+        const generated = await this.generateAllMarkerInsights(extractedForGeneration);
+
+        // Persist to latest report's labReportData for future cache hits
+        if (reportToUpdate && Object.keys(generated).length > 0) {
+            void (async () => {
+                try {
+                    const currentFile = await filesRepository.getFileUpload(reportToUpdate);
+                    const currentData = currentFile?.labReportData as any;
+                    if (currentData) {
+                        const merged = { ...(currentData.markerInsights || {}), ...generated };
+                        await filesRepository.updateFileUpload(reportToUpdate, {
+                            labReportData: { ...currentData, markerInsights: merged }
+                        });
+                    }
+                } catch (err) {
+                    logger.warn('Failed to persist on-demand insights:', err);
+                }
+            })();
+        }
+
+        return { ...cached, ...generated };
     }
 }
 

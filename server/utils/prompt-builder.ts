@@ -796,6 +796,7 @@ The "purpose" field for each ingredient MUST:
 
 \`\`\`json
 {
+  "formulaName": "Cardio Shield & Lipid Balance",
   "bases": [
     {"ingredient": "Heart Support", "amount": 1378, "unit": "mg", "purpose": "2x dose for your elevated ApoB (147, target <90) and LDL-P (1776) - provides comprehensive cardiovascular nutrients including hawthorn, CoQ10, and B-vitamins for arterial health"}
   ],
@@ -810,6 +811,12 @@ The "purpose" field for each ingredient MUST:
 }
 \`\`\`
 NOTE: DO NOT include "totalMg" - backend calculates it automatically!
+
+**FORMULA NAMING:**
+Every formula JSON MUST include a "formulaName" field — a concise, professional name (3-6 words) that reflects the formula's primary therapeutic focus. Think like a practitioner naming a compound.
+✅ Good: "Adrenal Recovery & Focus Blend", "Deep Sleep Restoration Formula", "Cardio Shield & Lipid Balance"
+❌ Bad: "Pete's Custom Mix", "Health Supplement #3", "Version 2", "General Wellness"
+If the formula is revised, update the name to reflect any shift in focus.
 
 **🚨 MANDATORY: AFTER THE JSON BLOCK, EXPLAIN YOUR REASONING 🚨**
 
@@ -955,6 +962,7 @@ Advisory/rhetorical tips like "Are you drinking enough water?" are NOT data-gath
 **CRITICAL: Include targetCapsules in your formula JSON based on what the user selected:**
 \`\`\`json
 {
+  "formulaName": "Concise Formula Name",
   "targetCapsules": 9,
   "bases": [...],
   "additions": [...],
@@ -1684,6 +1692,7 @@ Do NOT wait for user to say "create it" - they already asked by requesting formu
 
 \`\`\`json
 {
+  "formulaName": "Heart & Stress Resilience Complex",
   "bases": [
     {"ingredient": "Heart Support", "amount": 689, "unit": "mg", "purpose": "Targets your elevated lipid markers - contains hawthorn, CoQ10, and B-vitamins that support arterial health and healthy cholesterol metabolism"}
   ],

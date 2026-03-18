@@ -91,7 +91,9 @@ CRITICAL TONE RULES:
 - NEVER use words like "disrupt", "revolutionize", "game-changing", "groundbreaking", "cutting-edge"
 - NEVER claim to be "the first", "the best", or "the only"
 - NEVER reference market size ("$50B industry") or position yourself as an industry challenger
-- Lead with VALUE for their audience — what would listeners/readers get out of this?
+- NEVER use em dashes (—). Use commas, periods, or start a new sentence instead
+- NEVER say "listeners" or "your audience" in the pitch body. Talk about the problem as something real people face, including yourself
+- Frame the value proposition personally: "something I struggled with" or "something I dealt with"
 - Frame the ask as genuine curiosity: "exploring if there's interest" not demanding coverage
 - Be warm and human, not polished and corporate
 - It's OK to be brief and understated — less is more
@@ -114,9 +116,11 @@ Hi Sarah,
 
 I caught your recent episode with Dr. Patel on gut health — really appreciated how you broke down the microbiome research for a general audience.
 
-I run a small supplement company called ONES where we use lab results and health data to build custom formulas for each person. I think your listeners might find it interesting to hear how personalized supplementation actually works in practice — the real science, not the marketing.
+Here's something I struggled with and I think a lot of people deal with: you're either buying 10 different supplement bottles, guessing at what you need, overdosing on some things, underdosing on others, spending a fortune without knowing if any of it is right. Or you go the AG1 or daily multivitamin route, which is convenient but completely generic. Zero customization, just "trust us." Neither option is actually built for your body.
 
-Happy to share more context if you're curious. Either way, keep up the great work on the show.
+I built Ones to solve both of those problems. Our AI analyzes your blood work, health data, and wearable metrics to design one custom formula from over 150 ingredients at research-backed doses, built specifically for you. And the AI adapts it as your health changes, so it's not a static product.
+
+I'm Pete, the founder. If that sounds like something your audience would dig, I'd love to chat. No pressure either way.
 
 Best,
 Pete

@@ -5,7 +5,7 @@ const testimonials = [
   {
     name: "Rick M.",
     role: "72 year old male",
-    image: null,
+    image: "/Reviews/Rick matthews photo.jpg",
     rating: 5,
     text: "I am an active older gentleman with a big family history of cancer. I wanted to be proactive about my health — issues that pushed me towards using your products were general inflammation, thin skin, thyroid, arthritis, and prostate. I like your unorthodox approach and since being on my formula I've noticed my overall energy levels are up. When I ran out of product I noticed a significant drop in my energy levels. No miracles at my age, but I do believe there is hope this can extend quality of life.",
     highlight: "my overall energy levels are up",
@@ -14,7 +14,7 @@ const testimonials = [
   {
     name: "Leslie H.",
     role: "47 year old female",
-    image: null,
+    image: "/Reviews/Leslie Hargis Testimonial.jpg",
     rating: 5,
     text: "I was suffering from fatigue and depression that interrupted my life. Within 1.5 months of being on my formula I felt like a different person. My energy levels were in sharp contrast to what I had before starting, to the point where my husband was interested in what I was taking. I recommend this product to everyone — a customized formula just for me was what made the difference.",
     highlight: "I felt like a different person",
@@ -23,7 +23,7 @@ const testimonials = [
   {
     name: "Tammy S.",
     role: "55 year old female",
-    image: null,
+    image: "/Reviews/Tammy Silvernail Testimonial.jpg",
     rating: 5,
     text: "I had very low energy and hormone issues. I felt better than I've ever felt on the custom formula! 🤩",
     highlight: "better than I've ever felt",
@@ -72,11 +72,19 @@ function TestimonialCard({ testimonial }: { testimonial: typeof testimonials[num
 
       {/* Author */}
       <div className="flex items-center gap-3 pt-4 border-t border-[#054700]/10 mt-auto">
-        <div className="w-10 h-10 rounded-full bg-[#054700]/10 flex items-center justify-center">
-          <span className="text-[#054700] font-medium text-sm">
-            {testimonial.name.split(' ').map(n => n[0]).join('')}
-          </span>
-        </div>
+        {testimonial.image ? (
+          <img
+            src={testimonial.image}
+            alt={testimonial.name}
+            className="w-10 h-10 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-[#054700]/10 flex items-center justify-center">
+            <span className="text-[#054700] font-medium text-sm">
+              {testimonial.name.split(' ').map(n => n[0]).join('')}
+            </span>
+          </div>
+        )}
         <div>
           <div className="font-medium text-[#054700]">{testimonial.name}</div>
           <div className="text-sm text-[#054700]/60">{testimonial.role}</div>

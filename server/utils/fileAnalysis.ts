@@ -98,9 +98,9 @@ async function ocrPage(dataUrl: string, pageNum: number): Promise<string> {
           ]
         }
       ],
-      max_tokens: 2000
+      max_tokens: 4000
     }),
-    60_000,
+    45_000,
     `PDF page ${pageNum} OCR`
   );
   return response.choices[0]?.message?.content || '';
@@ -108,7 +108,7 @@ async function ocrPage(dataUrl: string, pageNum: number): Promise<string> {
 
 export type AnalysisProgressCallback = (step: string, detail?: string) => void;
 
-const PDF_CONCURRENCY = 4; // process 4 pages at a time
+const PDF_CONCURRENCY = 6; // process pages in parallel
 
 /**
  * Extracts text from PDF files using OpenAI Vision API
@@ -118,7 +118,7 @@ export async function extractTextFromPDF(buffer: Buffer, onProgress?: AnalysisPr
   try {
     logger.info('Converting PDF to images');
     const { pdf } = await import('pdf-to-img');
-    const document = await pdf(buffer, { scale: 1.5 });
+    const document = await pdf(buffer, { scale: 1.3 });
 
     // Collect all page images first
     const pageImages: { pageNum: number; dataUrl: string }[] = [];
@@ -131,14 +131,17 @@ export async function extractTextFromPDF(buffer: Buffer, onProgress?: AnalysisPr
 
     const totalPages = pageImages.length;
     logger.info(`Collected ${totalPages} page(s), OCRing in batches of ${PDF_CONCURRENCY}`);
-    onProgress?.('ocr', `Scanning ${totalPages} pages...`);
+    onProgress?.('ocr', `Scanning ${totalPages} pages — this may take a few minutes.`);
 
     // Process pages in parallel batches, freeing image data as we go
     const extractedTexts: string[] = new Array(totalPages).fill('');
     for (let i = 0; i < totalPages; i += PDF_CONCURRENCY) {
       const batch = pageImages.slice(i, i + PDF_CONCURRENCY);
+      const batchNum = Math.floor(i / PDF_CONCURRENCY) + 1;
+      const totalBatches = Math.ceil(totalPages / PDF_CONCURRENCY);
       const batchNums = batch.map(p => p.pageNum).join(', ');
       logger.debug(`Processing pages ${batchNums}`);
+      onProgress?.('ocr', `Scanning pages ${i + 1}–${Math.min(i + PDF_CONCURRENCY, totalPages)} of ${totalPages} (batch ${batchNum}/${totalBatches})...`);
 
       const results = await Promise.allSettled(
         batch.map(p => ocrPage(p.dataUrl, p.pageNum))
@@ -184,7 +187,7 @@ export async function extractTextFromImage(buffer: Buffer, mimeType: string): Pr
 
     const response = await withTimeout(
       openai.chat.completions.create({
-        model: 'gpt-4.1', // Vision model for lab report OCR
+        model: 'gpt-4.1',
         messages: [
           {
             role: 'user',
@@ -203,9 +206,9 @@ export async function extractTextFromImage(buffer: Buffer, mimeType: string): Pr
             ]
           }
         ],
-        max_tokens: 2000
+        max_tokens: 4000
       }),
-      60_000,
+      30_000,
       'Image OCR'
     );
 
@@ -250,10 +253,10 @@ Return ONLY valid JSON without any markdown formatting.`;
 
   const userMessage = `Extract structured data from this lab report:\n\n${rawText}`;
 
-  // Try with increasing token budgets
+  // gpt-4o supports max 16384 completion tokens — retry with longer timeout if first attempt times out
   const attempts: Array<{ maxTokens: number; timeout: number }> = [
-    { maxTokens: 16384, timeout: 120_000 },
-    { maxTokens: 32768, timeout: 180_000 },
+    { maxTokens: 16384, timeout: 240_000 },
+    { maxTokens: 16384, timeout: 300_000 },
   ];
 
   for (let i = 0; i < attempts.length; i++) {
@@ -282,14 +285,9 @@ Return ONLY valid JSON without any markdown formatting.`;
         throw new Error('No response from AI');
       }
 
-      // If truncated, try higher budget on next iteration
-      if (finishReason === 'length' && i < attempts.length - 1) {
-        logger.warn(`Response truncated at ${maxTokens} tokens, retrying with higher limit`);
-        continue;
-      }
-
+      // If truncated, attempt partial parse (gpt-4o caps at 16384 output tokens)
       if (finishReason === 'length') {
-        logger.warn('Response still truncated at maximum budget, attempting partial parse');
+        logger.warn('Response truncated at token limit, attempting partial parse');
       }
 
       let structured: any;
@@ -390,7 +388,7 @@ export async function analyzeLabReport(
   userId: string,
   onProgress?: AnalysisProgressCallback
 ): Promise<LabDataExtraction> {
-  // Overall 5-minute timeout for the entire analysis pipeline
+  // Overall 3-minute timeout for the entire analysis pipeline
   return withTimeout((async () => {
     try {
       // Get file buffer directly from ObjectStorageService
@@ -408,10 +406,10 @@ export async function analyzeLabReport(
 
     // Extract text based on file type
     if (fileType === 'pdf') {
-      onProgress?.('ocr', 'Converting PDF pages...');
+      onProgress?.('ocr', 'Converting PDF pages — this may take a few minutes.');
       extractedText = await extractTextFromPDF(fileBuffer, onProgress);
     } else if (fileType === 'image') {
-      onProgress?.('ocr', 'Reading image...');
+      onProgress?.('ocr', 'Reading image — this may take a few minutes.');
       extractedText = await extractTextFromImage(fileBuffer, mimeType);
     } else if (fileType === 'text') {
       extractedText = await extractTextFromTextFile(fileBuffer);
@@ -421,15 +419,15 @@ export async function analyzeLabReport(
 
     // Structure the extracted text into lab data
     logger.info('OCR complete', { chars: extractedText.length, estimatedTokens: Math.round(extractedText.length / 4) });
-    onProgress?.('structuring', 'Analyzing biomarkers...');
+    onProgress?.('structuring', 'Analyzing biomarkers — almost done.');
     const labData = await structureLabData(extractedText);
 
-    onProgress?.('insights', 'Generating insights...');
+    onProgress?.('insights', 'Finalizing analysis...');
 
     return labData;
   } catch (error) {
     logger.error('Lab report analysis error', { error });
     throw error;
   }
-  })(), 5 * 60_000, 'Overall lab report analysis');
+  })(), 8 * 60_000, 'Overall lab report analysis');
 }
