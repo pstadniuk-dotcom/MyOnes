@@ -937,7 +937,7 @@ export default function LabReportsPage() {
         }
         await queryClient.invalidateQueries({ queryKey: ['/api/files', 'user', user?.id, 'lab-reports'] });
         queryClient.invalidateQueries({ queryKey: ['/api/labs/biomarkers'] });
-        toast({ title: "Upload complete", description: `${file.name} is now being analyzed — this may take a few minutes. Please wait before starting a consultation.` });
+        toast({ title: "Lab report uploaded successfully", description: `You can view your uploaded file. Graph analysis is currently in progress and may take a few minutes. Please wait before starting a consultation.` });
         if (fileInputRef.current) fileInputRef.current.value = '';
       } catch (error: any) {
         toast({ title: "Upload failed", description: error.message || "Please try again.", variant: "destructive" });

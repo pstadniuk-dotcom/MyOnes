@@ -85,13 +85,13 @@ export default function VerifyEmailPage() {
                             </Button>
                         ) : status === 'error' ? (
                             <>
-                                <Button
+                                {/* <Button
                                     variant="outline"
                                     className="w-full"
                                     onClick={() => setLocation('/verify-email')}
                                 >
                                     Back to Verification Notice
-                                </Button>
+                                </Button> */}
                                 <Button
                                     className="w-full"
                                     onClick={() => setLocation('/signup')}
