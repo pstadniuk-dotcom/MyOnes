@@ -208,12 +208,35 @@ export default function MyFormulaPage() {
   // Queries - using default queryFn pattern with proper typing
   const { data: currentFormulaData, isLoading: isLoadingCurrent, error: currentError } = useQuery<CurrentFormulaResponse>({
     queryKey: ['/api/users/me/formula/current'],
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest('GET', '/api/users/me/formula/current');
+        return res.json();
+      } catch (error: any) {
+        // Correctly handle 404 from apiRequest/throwIfResNotOk
+        if (error.status === 404 || error.message?.includes('404')) {
+          return null;
+        }
+        throw error;
+      }
+    }
   });
 
   const { data: historyData, isLoading: isLoadingHistory } = useQuery<FormulaHistoryResponse>({
     queryKey: ['/api/users/me/formula/history'],
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest('GET', '/api/users/me/formula/history');
+        return res.json();
+      } catch (error: any) {
+        if (error.status === 404 || error.message?.includes('404')) {
+          return { history: [] };
+        }
+        throw error;
+      }
+    }
   });
 
   const { data: archivedData, isLoading: isLoadingArchived } = useQuery<{ archived: Formula[] }>({
@@ -593,10 +616,16 @@ export default function MyFormulaPage() {
 
   // Auto-select newest formula on load
   useEffect(() => {
-    if (currentFormula && !selectedFormulaId) {
+    // If current formula is available and nothing is selected, or selected formula is gone from allFormulas list
+    if (currentFormula && (!selectedFormulaId || !allFormulas.find(f => f.id === selectedFormulaId))) {
       setSelectedFormulaId(currentFormula.id);
     }
-  }, [currentFormula, selectedFormulaId]);
+    
+    // If there are no formulas at all, reset selection
+    if (!currentFormula && allFormulas.length === 0 && selectedFormulaId) {
+      setSelectedFormulaId(null);
+    }
+  }, [currentFormula, allFormulas, selectedFormulaId]);
 
   useEffect(() => {
     const targetCaps = selectedFormula?.targetCapsules;
@@ -833,14 +862,20 @@ export default function MyFormulaPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          {selectedFormula && (
+          {/* {selectedFormula && (
             <Badge variant="secondary" className="text-xs sm:text-sm" data-testid="badge-formula-version">
               <FlaskConical className="w-3 h-3 mr-1" />
               <span className="hidden sm:inline">{selectedFormula.name || `Version ${selectedFormula.version}`}</span>
               <span className="sm:hidden">v{selectedFormula.version}</span>
               {selectedFormula.id === currentFormula?.id && ' (New)'}
             </Badge>
-          )}
+          )} */}
+
+          <Badge variant="secondary" className="text-xs sm:text-sm">
+            <FlaskConical className="w-3.5 h-3.5 text-primary" />
+            <span className="font-medium">Total Formulas: {allFormulas.length + archivedCount}</span>
+          </Badge>
+
           <Button
             variant="outline"
             className="gap-1.5 sm:gap-2 text-xs sm:text-sm"
@@ -3554,7 +3589,7 @@ function FormulaAllArchivedState({
               </div>
             ))}
           </div>
-          <Button asChild size="lg" variant="outline" data-testid="button-start-consultation-from-archived">
+          <Button asChild size="lg" variant="default" data-testid="button-start-consultation-from-archived">
             <Link href="/dashboard/consultation">
               <MessageSquare className="w-4 h-4 mr-2" />
               Start New AI Consultation
