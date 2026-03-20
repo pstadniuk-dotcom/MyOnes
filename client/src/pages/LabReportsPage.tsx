@@ -338,11 +338,11 @@ function PanelScoreBar({ panel }: { panel: PanelScore }) {
 
 // ── Summary Stat Card ──────────────────────────────────────────────────
 
-function SummaryCard({ label, value, icon: Icon, iconBg, iconColor, sub }: {
-  label: string; value: number | string; icon: any; iconBg: string; iconColor: string; sub?: string;
+function SummaryCard({ label, value, icon: Icon, iconBg, iconColor, sub, onClick }: {
+  label: string; value: number | string; icon: any; iconBg: string; iconColor: string; sub?: string; onClick?: () => void;
 }) {
   return (
-    <div className="glass-card rounded-2xl border border-[#5a6623]/10 shadow-2xl shadow-lg shadow-[#054700]/5 p-4 flex flex-col gap-2 shadow-sm">
+    <div onClick={onClick} className={`glass-card rounded-2xl border border-[#5a6623]/10 shadow-lg shadow-[#054700]/5 p-4 flex flex-col gap-2 ${onClick ? 'cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all' : ''}`}>
       <div className="flex items-center justify-between">
         <div className={`h-9 w-9 rounded-full ${iconBg} flex items-center justify-center`}>
           <Icon className={`h-4 w-4 ${iconColor}`} />
@@ -689,6 +689,14 @@ export default function LabReportsPage() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
+  const handleSummaryCardClick = (filter: string) => {
+    setShowAllMarkers(true);
+    setStatusFilter(filter);
+    setTimeout(() => {
+      document.getElementById('all-biomarkers-section')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
   // ── Queries ──────────────────────────────────────────────────────────
 
   const { data: consents, error: consentsError } = useQuery<UserConsent[]>({
@@ -779,7 +787,17 @@ export default function LabReportsPage() {
       .filter((m): m is AggregatedBiomarker => m !== null)
       .filter(m => {
         if (categoryFilter !== 'all' && m.category !== categoryFilter) return false;
-        if (statusFilter !== 'all' && m.latest.status !== statusFilter) return false;
+        if (statusFilter !== 'all') {
+          if (statusFilter === 'out_of_range') {
+            if (m.latest.status === 'normal') return false;
+          } else if (statusFilter === 'improving') {
+            if (m.trend !== 'improving') return false;
+          } else if (statusFilter === 'worsening') {
+            if (m.trend !== 'worsening') return false;
+          } else if (m.latest.status !== statusFilter) {
+            return false;
+          }
+        }
         if (searchQuery) {
           const q = searchQuery.toLowerCase();
           const friendlyCategory = (PANEL_FRIENDLY_NAMES[m.category] || m.category).toLowerCase();
@@ -914,7 +932,7 @@ export default function LabReportsPage() {
 
   const uploadFile = async (file: File) => {
     const uploadId = `${file.name}-${Date.now()}`;
-    toast({ title: "Uploading lab report", description: `${file.name} — analysis may take a few minutes. Please wait before starting a consultation.` });
+    // toast({ title: "Uploading lab report", description: `${file.name} — analysis may take a few minutes. Please wait before starting a consultation.` });
 
     const uploadPromise = (async () => {
       try {
@@ -1310,6 +1328,20 @@ export default function LabReportsPage() {
           </CardHeader>
           <CardContent className="p-4 sm:p-6 space-y-5">
 
+            {/* ── Summary Stat Cards ── */}
+            {summary && summary.totalMarkers > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <SummaryCard label="Total Markers" value={summary.totalMarkers} icon={Activity} iconBg="bg-[#054700]/10" iconColor="text-[#054700]" sub={`${summary.normal} in range`} onClick={() => handleSummaryCardClick('all')} />
+                <SummaryCard label="Out of Range" value={summary.high + summary.low + summary.critical} icon={AlertTriangle} iconBg="bg-amber-100" iconColor="text-amber-600" sub={summary.critical > 0 ? `${summary.critical} critical` : undefined} onClick={() => handleSummaryCardClick('out_of_range')} />
+                {comparison?.hasMultipleReports && (
+                  <SummaryCard label="Improving" value={summary.improving} icon={TrendingUp} iconBg="bg-emerald-100" iconColor="text-emerald-600" sub="since last report" onClick={() => handleSummaryCardClick('improving')} />
+                )}
+                {comparison?.hasMultipleReports && (
+                  <SummaryCard label="Worsening" value={summary.worsening} icon={TrendingDown} iconBg="bg-red-100" iconColor="text-red-600" sub="need attention" onClick={() => handleSummaryCardClick('worsening')} />
+                )}
+              </div>
+            )}
+
             {/* ── Health Score Hero ── */}
             {dashboard?.healthScore && dashboard.healthScore.overall > 0 && (
               <div className="glass-card rounded-2xl border border-[#5a6623]/10 shadow-2xl shadow-lg shadow-[#054700]/5 p-5 sm:p-6">
@@ -1348,20 +1380,6 @@ export default function LabReportsPage() {
                     )}
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* ── Summary Stat Cards ── */}
-            {summary && summary.totalMarkers > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Total Markers" value={summary.totalMarkers} icon={Activity} iconBg="bg-[#054700]/10" iconColor="text-[#054700]" sub={`${summary.normal} in range`} />
-                <SummaryCard label="Out of Range" value={summary.high + summary.low + summary.critical} icon={AlertTriangle} iconBg="bg-amber-100" iconColor="text-amber-600" sub={summary.critical > 0 ? `${summary.critical} critical` : undefined} />
-                {comparison?.hasMultipleReports && (
-                  <SummaryCard label="Improving" value={summary.improving} icon={TrendingUp} iconBg="bg-emerald-100" iconColor="text-emerald-600" sub="since last report" />
-                )}
-                {comparison?.hasMultipleReports && (
-                  <SummaryCard label="Worsening" value={summary.worsening} icon={TrendingDown} iconBg="bg-red-100" iconColor="text-red-600" sub="need attention" />
-                )}
               </div>
             )}
 
@@ -1449,7 +1467,7 @@ export default function LabReportsPage() {
 
       {/* ── Biomarker Table (collapsed by default) ── */}
       {hasDashboard && (
-        <div>
+        <div id="all-biomarkers-section" className="scroll-mt-24">
           <button
             onClick={() => setShowAllMarkers(!showAllMarkers)}
             className="w-full flex items-center justify-between bg-[#ede8e2] border border-[#5a6623]/20 rounded-2xl px-5 py-3.5 hover:bg-[#ede8e2]/80 transition-colors group"
@@ -1533,7 +1551,7 @@ export default function LabReportsPage() {
               </select>
 
               {/* Status filter */}
-              <div className="flex items-center gap-1 bg-white border border-[#5a6623]/20 rounded-lg p-1">
+              <div className="flex items-center gap-1 bg-white border border-[#5a6623]/20 rounded-lg p-1 flex-wrap">
                 {(['all', 'normal', 'high', 'low', 'critical'] as const).map(s => (
                   <button
                     key={s}
@@ -1547,6 +1565,19 @@ export default function LabReportsPage() {
                     {s === 'all' ? 'All' : STATUS_CONFIG[s].label}
                   </button>
                 ))}
+                {['out_of_range', 'improving', 'worsening'].includes(statusFilter) && (
+                  <button
+                    className="px-2.5 py-1 text-xs font-medium rounded-md transition-all bg-[#054700] text-white shadow-sm flex items-center gap-1.5"
+                  >
+                    {statusFilter === 'out_of_range' ? 'Out of Range' : statusFilter === 'improving' ? 'Improving' : 'Worsening'}
+                    <span 
+                      onClick={(e) => { e.stopPropagation(); setStatusFilter('all'); }} 
+                      className="ml-1 hover:text-white/80 cursor-pointer"
+                    >
+                      ×
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
           </CardHeader>

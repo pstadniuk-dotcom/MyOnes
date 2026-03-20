@@ -574,7 +574,7 @@ export default function ConsultationPage() {
   // may finish in the background and should appear automatically on return.
   useEffect(() => {
     if (!historyData?.messages) return;
-    if (activeStreamingMessageId || isTyping) return; // Don't clobber active local UI or pending requests
+    if (activeStreamingMessageId) return; // Don't clobber active local UI or pending requests
 
     const targetSessionId = currentSessionId || localStorage.getItem(SESSION_KEY);
     if (!targetSessionId) return;
@@ -595,6 +595,15 @@ export default function ConsultationPage() {
       };
     });
 
+    const currentLastId = messages[messages.length - 1]?.id;
+    const serverLastId = normalizedServerMessages[normalizedServerMessages.length - 1]?.id;
+
+    // Never overwrite optimistic local messages with an older/shorter server snapshot.
+    // This preserves the basic chat UX where the user's message appears immediately.
+    if (messages.length > 0 && normalizedServerMessages.length < messages.length) {
+      return;
+    }
+
     // Keep "analyzing" indicator behavior consistent even after user navigates away.
     const serverLastMessage = normalizedServerMessages[normalizedServerMessages.length - 1];
     const isAssistantPending = serverLastMessage?.sender === 'user';
@@ -610,15 +619,6 @@ export default function ConsultationPage() {
         setThinkingMessage(null);
         setThinkingSteps([]);
       }
-    }
-
-    const currentLastId = messages[messages.length - 1]?.id;
-    const serverLastId = normalizedServerMessages[normalizedServerMessages.length - 1]?.id;
-
-    // Never overwrite optimistic local messages with an older/shorter server snapshot.
-    // This preserves the basic chat UX where the user's message appears immediately.
-    if (messages.length > 0 && normalizedServerMessages.length < messages.length) {
-      return;
     }
 
     const needsUpdate =

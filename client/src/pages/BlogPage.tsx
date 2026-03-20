@@ -127,6 +127,7 @@ export default function BlogPage() {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const listRef = useRef<HTMLElement>(null);
 
   // Page-level SEO meta
   useEffect(() => {
@@ -252,7 +253,7 @@ export default function BlogPage() {
       )}
 
       {/* Posts grid */}
-      <section className="py-16 bg-white">
+      <section ref={listRef} className="py-16 bg-white scroll-mt-24">
         <div className="container mx-auto px-6 max-w-6xl">
           {isLoading ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -302,7 +303,12 @@ export default function BlogPage() {
             <div className="flex items-center justify-center gap-3 mt-12">
               <Button
                 variant="ghost" size="sm"
-                onClick={() => setPage(p => Math.max(0, p - 1))}
+                onClick={() => {
+                  setPage(p => Math.max(0, p - 1));
+                  setTimeout(() => {
+                    listRef.current?.scrollIntoView({ behavior: 'smooth' });
+                  }, 150);
+                }}
                 disabled={page === 0}
                 className="text-[#054700]"
               >
@@ -311,7 +317,12 @@ export default function BlogPage() {
               <span className="text-sm text-[#5a6623]">Page {page + 1} of {totalPages}</span>
               <Button
                 variant="ghost" size="sm"
-                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                onClick={() => {
+                  setPage(p => Math.min(totalPages - 1, p + 1));
+                  setTimeout(() => {
+                    listRef.current?.scrollIntoView({ behavior: 'smooth' });
+                  }, 150);
+                }}
                 disabled={page >= totalPages - 1}
                 className="text-[#054700]"
               >
