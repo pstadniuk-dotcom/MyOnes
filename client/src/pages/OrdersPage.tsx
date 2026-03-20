@@ -512,9 +512,9 @@ export default function OrdersPage() {
                   </Button>
                 )}
 
-                {/* <Button variant="outline" data-testid="button-change-plan" className="border-[#52796F] text-[#52796F] hover:bg-[#52796F] hover:text-white">
+                <Button variant="outline" data-testid="button-change-plan" className="border-[#52796F] text-[#52796F] hover:bg-[#52796F] hover:text-white">
                   Change Plan
-                </Button> */}
+                </Button>
 
                 {subscription?.status === 'active' && (
                   <Button
