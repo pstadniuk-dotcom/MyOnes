@@ -187,7 +187,7 @@ export class FilesService {
                                 title: 'Lab Results Analyzed',
                                 content: `Your lab report has been analyzed — ${markerCount} biomarker${markerCount !== 1 ? 's' : ''} extracted. Chat with your AI practitioner to discuss findings.`,
                                 metadata: {
-                                    actionUrl: '/dashboard/labs',
+                                    actionUrl: '/dashboard/lab-reports',
                                     icon: 'file-check',
                                     priority: 'high'
                                 }
@@ -205,7 +205,7 @@ export class FilesService {
                                     title: 'Lab Results Ready',
                                     type: 'system',
                                     content: `<p>Hi ${firstName},</p><p>We've finished analyzing your lab report${labSource}.</p><p><strong>${markerCount} biomarker${plural}</strong> were extracted and are ready for review.</p><p>Chat with your AI practitioner to get personalized insights and see how your results might affect your formula.</p>`,
-                                    actionUrl: `${frontendUrl}/dashboard/labs`,
+                                    actionUrl: `${frontendUrl}/dashboard/lab-reports`,
                                     actionText: 'View Lab Results',
                                 });
                             }
@@ -425,7 +425,7 @@ export class FilesService {
                         title: 'Lab Re-Analysis Complete',
                         content: `Your lab report has been re-analyzed — ${markerCount} biomarker${markerCount !== 1 ? 's' : ''} extracted.`,
                         metadata: {
-                            actionUrl: '/dashboard/labs',
+                            actionUrl: '/dashboard/lab-reports',
                             icon: 'file-check',
                             priority: 'medium'
                         }
