@@ -32,12 +32,12 @@ function normalizeCountryRestriction(countryCode?: string): string | undefined {
 }
 
 function parseAddressFromPlace(place: any): AddressFields {
-  const components: Array<{ long_name: string; short_name: string; types: string[] }> = place?.address_components ?? [];
+  const components: Array<{ longText: string; shortText: string; types: string[] }> = place?.addressComponents ?? [];
 
   const findShort = (type: string) =>
-    components.find((c) => Array.isArray(c.types) && c.types.includes(type))?.short_name ?? '';
+    components.find((c) => Array.isArray(c.types) && c.types.includes(type))?.shortText ?? '';
   const findLong = (type: string) =>
-    components.find((c) => Array.isArray(c.types) && c.types.includes(type))?.long_name ?? '';
+    components.find((c) => Array.isArray(c.types) && c.types.includes(type))?.longText ?? '';
 
   const streetNumber = findLong('street_number');
   const route = findLong('route');
@@ -55,7 +55,7 @@ function parseAddressFromPlace(place: any): AddressFields {
   const country = findShort('country');
 
   const fallbackLine1 =
-    typeof place?.formatted_address === 'string' ? place.formatted_address.split(',')[0]?.trim() : '';
+    typeof place?.formattedAddress === 'string' ? place.formattedAddress.split(',')[0]?.trim() : '';
 
   return {
     addressLine1: addressLine1 || fallbackLine1 || undefined,
@@ -73,8 +73,6 @@ export function AddressAutocomplete(props: AddressAutocompleteProps) {
   const countryRestriction = useMemo(() => normalizeCountryRestriction(props.countryCode), [props.countryCode]);
 
   const rootRef = useRef<HTMLDivElement>(null);
-  const placesServiceRef = useRef<any>(null);
-  const autoCompleteServiceRef = useRef<any>(null);
 
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -94,9 +92,6 @@ export function AddressAutocomplete(props: AddressAutocompleteProps) {
         if (cancelled) return;
         const googleAny = (window as any).google;
         if (!googleAny?.maps?.places) throw new Error('Google Places library is not available');
-
-        autoCompleteServiceRef.current = new googleAny.maps.places.AutocompleteService();
-        placesServiceRef.current = new googleAny.maps.places.PlacesService(document.createElement('div'));
       })
       .catch((e: any) => {
         if (cancelled) return;
@@ -127,8 +122,8 @@ export function AddressAutocomplete(props: AddressAutocompleteProps) {
 
   useEffect(() => {
     if (!enabled) return;
-    if (!autoCompleteServiceRef.current) return;
 
+    let cancelled = false;
     const q = query.trim();
     if (q.length < 3) {
       setPredictions([]);
@@ -136,49 +131,59 @@ export function AddressAutocomplete(props: AddressAutocompleteProps) {
     }
 
     const handle = setTimeout(() => {
-      const service = autoCompleteServiceRef.current;
-      const request: any = { input: q, types: ['address'] };
-      if (countryRestriction) request.componentRestrictions = { country: countryRestriction };
+      const googleAny = (window as any).google;
+      if (!googleAny?.maps?.places?.AutocompleteSuggestion) return;
 
-      service.getPlacePredictions(request, (results: any, status: any) => {
-        const googleAny = (window as any).google;
-        const ok = status === googleAny?.maps?.places?.PlacesServiceStatus?.OK;
-        setPredictions(ok && Array.isArray(results) ? results : []);
-      });
+      const request: any = { input: q };
+      if (countryRestriction) request.includedRegionCodes = [countryRestriction.toUpperCase()];
+
+      googleAny.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request)
+        .then((response: any) => {
+          if (cancelled) return;
+          if (response && response.suggestions) {
+            const results = response.suggestions.map((s: any) => ({
+              description: s.placePrediction.text.text,
+              place_id: s.placePrediction.placeId
+            }));
+            setPredictions(results);
+          } else {
+            setPredictions([]);
+          }
+        })
+        .catch((e: any) => {
+          console.error('Autocomplete API error:', e);
+          if (!cancelled) setPredictions([]);
+        });
     }, 250);
 
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [enabled, query, countryRestriction]);
 
   const selectPrediction = (prediction: Prediction) => {
-    const service = placesServiceRef.current;
-    if (!service) return;
+    const googleAny = (window as any).google;
+    if (!googleAny?.maps?.places?.Place) return;
 
     setIsLoading(true);
     setError(null);
 
-    service.getDetails(
-      {
-        placeId: prediction.place_id,
-        fields: ['address_components', 'formatted_address'],
-      },
-      (place: any, status: any) => {
-        const googleAny = (window as any).google;
-        const ok = status === googleAny?.maps?.places?.PlacesServiceStatus?.OK;
-        if (!ok || !place) {
-          setError('Could not load that address. Please try another.');
-          setIsLoading(false);
-          return;
-        }
-
+    const place = new googleAny.maps.places.Place({ id: prediction.place_id });
+    place.fetchFields({ fields: ['addressComponents', 'formattedAddress'] })
+      .then(() => {
         const parsed = parseAddressFromPlace(place);
         props.onSelectAddress(parsed);
-        setQuery(typeof place.formatted_address === 'string' ? place.formatted_address : prediction.description);
+        setQuery(typeof place.formattedAddress === 'string' ? place.formattedAddress : prediction.description);
         setPredictions([]);
         setIsOpen(false);
         setIsLoading(false);
-      }
-    );
+      })
+      .catch((e: any) => {
+        console.error('Place Details API error:', e);
+        setError('Could not load that address. Please try another.');
+        setIsLoading(false);
+      });
   };
 
   return (

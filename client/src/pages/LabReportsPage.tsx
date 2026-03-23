@@ -625,6 +625,7 @@ function deriveFallbackLabSummary(labReports?: FileUpload[]): string | null {
     ? ((latestCompleted as any).labReportData.extractedData as any[]) : [];
 
   if (extracted.length === 0) {
+    if (latestCompleted.mimeType === 'text/plain') return null;
     return 'Latest report is uploaded and being interpreted. Marker-level extraction will appear shortly.';
   }
 
@@ -1333,12 +1334,12 @@ export default function LabReportsPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <SummaryCard label="Total Markers" value={summary.totalMarkers} icon={Activity} iconBg="bg-[#054700]/10" iconColor="text-[#054700]" sub={`${summary.normal} in range`} onClick={() => handleSummaryCardClick('all')} />
                 <SummaryCard label="Out of Range" value={summary.high + summary.low + summary.critical} icon={AlertTriangle} iconBg="bg-amber-100" iconColor="text-amber-600" sub={summary.critical > 0 ? `${summary.critical} critical` : undefined} onClick={() => handleSummaryCardClick('out_of_range')} />
-                {comparison?.hasMultipleReports && (
+                {/* {comparison?.hasMultipleReports && (
+                )} */}
                   <SummaryCard label="Improving" value={summary.improving} icon={TrendingUp} iconBg="bg-emerald-100" iconColor="text-emerald-600" sub="since last report" onClick={() => handleSummaryCardClick('improving')} />
-                )}
-                {comparison?.hasMultipleReports && (
+                {/* {comparison?.hasMultipleReports && (
+                )} */}
                   <SummaryCard label="Worsening" value={summary.worsening} icon={TrendingDown} iconBg="bg-red-100" iconColor="text-red-600" sub="need attention" onClick={() => handleSummaryCardClick('worsening')} />
-                )}
               </div>
             )}
 

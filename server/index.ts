@@ -66,7 +66,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:", "https://platform-lookaside.fbsbx.com", "https://maps.googleapis.com"],
-      connectSrc: ["'self'", "https://api.openai.com", "https://api.anthropic.com", "https://accounts.google.com/gsi/", "https://www.facebook.com", "https://web.facebook.com", "https://graph.facebook.com", "https://facebook.com","https://maps.googleapis.com",  "https://maps.gstatic.com", "wss:", "ws:"],
+      connectSrc: ["'self'", "https://api.openai.com", "https://api.anthropic.com", "https://accounts.google.com/gsi/", "https://www.facebook.com", "https://web.facebook.com", "https://graph.facebook.com", "https://facebook.com","https://maps.googleapis.com",  "https://maps.gstatic.com", "https://places.googleapis.com", "wss:", "ws:"],
       frameSrc: ["'self'", "https://www.youtube.com", "https://youtube.com", "https://accounts.google.com/", "https://www.facebook.com", "https://web.facebook.com"],
       frameAncestors: ["'none'"],
       baseUri: ["'self'"],

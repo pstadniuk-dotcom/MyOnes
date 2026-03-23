@@ -660,7 +660,7 @@ export default function ProfilePage() {
                 <div>
                   <h3 className="text-sm font-medium mb-3">Address</h3>
                 </div>
-                {/* <div>
+                <div>
                   <Label htmlFor="addressLookup">Search Address</Label>
                   <AddressAutocomplete
                     id="addressLookup"
@@ -677,7 +677,7 @@ export default function ProfilePage() {
                     }
                     data-testid="input-address-lookup"
                   />
-                </div> */}
+                </div>
                 <div>
                   <Label htmlFor="addressLine1">Street Address</Label>
                   <Input
