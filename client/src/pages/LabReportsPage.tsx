@@ -1291,7 +1291,8 @@ export default function LabReportsPage() {
                 const detail = (processingReports[0]?.labReportData as any)?.progressDetail;
                 return detail
                   ? `${detail} Please wait until your lab analysis is complete.`
-                  : 'This may take a few minutes. Please hold off on consultations until analysis is complete so your practitioner has your full results.';
+                  // : 'This may take a few minutes. Please hold off on consultations until analysis is complete so your practitioner has your full results.';
+                  : 'Please wait until your lab analysis is complete.';
               })()}
             </p>
           </div>
