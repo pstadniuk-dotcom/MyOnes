@@ -101,7 +101,7 @@ export default function AboutPage() {
             <p className="text-[#5a6623] mb-8">
               Start your health journey with a personalized AI consultation.
             </p>
-            <Link href="/">
+            <Link href="/signup">
               <Button size="lg" className="bg-[#054700] hover:bg-[#054700]/90" data-testid="button-get-started">
                 Get Started <ArrowRight className="ml-2 h-5 w-5" />
               </Button>

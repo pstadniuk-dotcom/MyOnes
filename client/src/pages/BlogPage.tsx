@@ -343,7 +343,7 @@ export default function BlogPage() {
             <p className="text-[#5a6623] mb-8">
               Our AI health practitioner builds a custom supplement blend based on your unique biomarkers and goals.
             </p>
-            <Link href="/">
+            <Link href="/signup">
               <Button size="lg" className="bg-[#054700] hover:bg-[#054700]/90" data-testid="button-subscribe-blog">
                 Start for free <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
