@@ -18,6 +18,8 @@ type Prediction = {
 type AddressAutocompleteProps = {
   id?: string;
   placeholder?: string;
+  value?: string;
+  onChange?: (value: string) => void;
   countryCode?: string;
   onSelectAddress: (fields: AddressFields) => void;
   disabled?: boolean;
@@ -74,7 +76,9 @@ export function AddressAutocomplete(props: AddressAutocompleteProps) {
 
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const [query, setQuery] = useState('');
+  const [internalQuery, setInternalQuery] = useState('');
+  const query = props.value !== undefined ? props.value : internalQuery;
+
   const [isLoading, setIsLoading] = useState(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -174,7 +178,12 @@ export function AddressAutocomplete(props: AddressAutocompleteProps) {
       .then(() => {
         const parsed = parseAddressFromPlace(place);
         props.onSelectAddress(parsed);
-        setQuery(typeof place.formattedAddress === 'string' ? place.formattedAddress : prediction.description);
+        const nextQuery = parsed.addressLine1 || (typeof place.formattedAddress === 'string' ? place.formattedAddress : prediction.description);
+        if (props.onChange) {
+          props.onChange(nextQuery);
+        } else {
+          setInternalQuery(nextQuery);
+        }
         setPredictions([]);
         setIsOpen(false);
         setIsLoading(false);
@@ -192,7 +201,11 @@ export function AddressAutocomplete(props: AddressAutocompleteProps) {
         id={props.id}
         value={query}
         onChange={(e) => {
-          setQuery(e.target.value);
+          if (props.onChange) {
+            props.onChange(e.target.value);
+          } else {
+            setInternalQuery(e.target.value);
+          }
           setIsOpen(true);
         }}
         onFocus={() => setIsOpen(true)}
