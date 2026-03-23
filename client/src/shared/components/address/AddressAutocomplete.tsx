@@ -129,10 +129,10 @@ export function AddressAutocomplete(props: AddressAutocompleteProps) {
 
     let cancelled = false;
     const q = query.trim();
-    if (q.length < 3) {
-      setPredictions([]);
-      return;
-    }
+    // if (q.length < 3) {
+    //   setPredictions([]);
+    //   return;
+    // }
 
     const handle = setTimeout(() => {
       const googleAny = (window as any).google;
