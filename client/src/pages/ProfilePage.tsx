@@ -661,9 +661,12 @@ export default function ProfilePage() {
                   <h3 className="text-sm font-medium mb-3">Address</h3>
                 </div>
                 <div>
-                  <Label htmlFor="addressLookup">Search Address</Label>
+                  <Label htmlFor="addressLine1">Street Address</Label>
                   <AddressAutocomplete
-                    id="addressLookup"
+                    id="addressLine1"
+                    value={profile.addressLine1}
+                    onChange={(val) => setProfile({ ...profile, addressLine1: val })}
+                    placeholder="123 Main Street"
                     countryCode={profile.country}
                     onSelectAddress={(fields) =>
                       setProfile((prev) => ({
@@ -675,16 +678,6 @@ export default function ProfilePage() {
                         country: fields.country ?? prev.country,
                       }))
                     }
-                    data-testid="input-address-lookup"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="addressLine1">Street Address</Label>
-                  <Input
-                    id="addressLine1"
-                    value={profile.addressLine1}
-                    onChange={(e) => setProfile({ ...profile, addressLine1: e.target.value })}
-                    placeholder="123 Main Street"
                     data-testid="input-address-line1"
                   />
                 </div>
