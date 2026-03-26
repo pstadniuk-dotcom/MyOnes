@@ -21,7 +21,7 @@ export interface ScoreResult {
   reasoning: string;
 }
 
-const SCORING_PROMPT = `You are evaluating a PR/outreach prospect for Ones (ones.health), a personalized supplement platform that uses AI and blood work to create custom daily capsule formulas.
+const SCORING_PROMPT = `You are evaluating a PR/outreach prospect for Ones (ones.health), a personalized supplement platform that uses AI and blood work to create custom daily supplements.
 
 Score this prospect on these criteria (total max 100):
 

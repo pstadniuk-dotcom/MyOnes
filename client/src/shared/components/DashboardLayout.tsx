@@ -238,15 +238,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     <SidebarProvider defaultOpen={true} style={style as React.CSSProperties}>
       <div className="flex h-screen w-full bg-[#ede8e2]">
         <AppSidebar />
-        <SidebarInset>
-          <div className="flex flex-col h-full">
+        <SidebarInset className="min-w-0">
+          <div className="flex flex-col h-full min-w-0">
             {/* Dashboard Header - V2 Branding */}
             <header
-              className="flex items-center justify-between h-16 px-6 border-b border-[#054700]/5 bg-[#ede8e2]/80 backdrop-blur-md"
+              className="flex items-center justify-between h-14 px-6 border-b border-[#054700]/5 bg-[#ede8e2]/80 backdrop-blur-md"
               data-testid="header-dashboard"
             >
               <div className="flex items-center gap-3">
                 <SidebarTrigger className="text-[#054700] hover:bg-[#054700]/5" data-testid="button-sidebar-toggle" />
+                <span className="hidden sm:block text-sm font-medium text-[#054700]/50 select-none">Dashboard</span>
               </div>
 
               <div className="flex items-center gap-3">
@@ -258,7 +259,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </header>
 
             {/* Dashboard Content */}
-            <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-[#eef2eb] via-[#ede8e2] to-[#e4e8de] relative">
+            <main className="flex-1 overflow-auto min-w-0 p-6 bg-gradient-to-br from-[#eef2eb] via-[#ede8e2] to-[#e4e8de] relative">
               {/* Decorative gradient blobs — fixed so they cover full viewport with no cutoff */}
               <div className="pointer-events-none fixed inset-0 overflow-hidden z-0" aria-hidden="true">
                 <div className="absolute -top-20 -left-20 w-[500px] h-[500px] rounded-full bg-[#054700]/15 blur-[100px] animate-blob-1" />
@@ -268,7 +269,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <div className="absolute top-[15%] right-[10%] w-[400px] h-[400px] rounded-full bg-[#5a6623]/14 blur-[90px] animate-blob-5" />
                 <div className="absolute bottom-[15%] left-[10%] w-[350px] h-[350px] rounded-full bg-[#8fa370]/15 blur-[80px] animate-blob-6" />
               </div>
-              <div className="relative z-10">
+              <div className="relative z-10 min-w-0">
                 {children}
               </div>
             </main>

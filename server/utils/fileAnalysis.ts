@@ -320,12 +320,14 @@ Return ONLY valid JSON without any markdown formatting.`;
         logger.warn(`Attempt ${i + 1} failed, retrying`, { error: (error as Error).message });
         continue;
       }
-      logger.error('Lab data structuring error', { error });
-      return { rawText };
+      logger.error('All lab data structuring attempts failed', { error });
+      // Return with empty extractedData so callers can detect the failure
+      // instead of silently returning { rawText } which gets normalized away
+      return { rawText, extractedData: [] };
     }
   }
 
-  return { rawText };
+  return { rawText, extractedData: [] };
 }
 
 /**

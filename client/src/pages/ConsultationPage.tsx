@@ -279,6 +279,8 @@ export default function ConsultationPage() {
   const lastScrollTop = useRef(0);
   const isUserScrolling = useRef(false);
   const scrollLockTimeout = useRef<NodeJS.Timeout | null>(null);
+  const streamingRafRef = useRef<number | null>(null);
+  const streamingContentStarted = useRef(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -1120,23 +1122,27 @@ export default function ConsultationPage() {
                   ));
                 } else if (data.type === 'chunk') {
                   // Accumulate content and show cleaned version in real-time
-                  // This lets user see the "thinking" process without JSON code
                   accumulatedContent += data.content;
 
-                  // Display cleaned content (removes JSON blocks) in real-time
-                  const cleanedContent = removeJsonBlocks(accumulatedContent);
-                  setMessages(prev => prev.map(msg =>
-                    msg.id === aiMessageId
-                      ? { ...msg, content: cleanedContent }
-                      : msg
-                  ));
+                  // Throttle UI updates via requestAnimationFrame to prevent flicker
+                  if (streamingRafRef.current) cancelAnimationFrame(streamingRafRef.current);
+                  streamingRafRef.current = requestAnimationFrame(() => {
+                    const cleanedContent = removeJsonBlocks(accumulatedContent);
+                    if (cleanedContent.trim().length > 0) {
+                      streamingContentStarted.current = true;
+                    }
+                    setMessages(prev => prev.map(msg =>
+                      msg.id === aiMessageId
+                        ? { ...msg, content: cleanedContent }
+                        : msg
+                    ));
 
-                  // Clear thinking steps once we have visible content
-                  // But allow processing messages to override this during formula creation
-                  if (cleanedContent.trim().length > 0 && (thinkingMessage === 'thinking' || thinkingMessage === 'Analyzing your health data...')) {
-                    setThinkingMessage(null);
-                    setThinkingSteps([]);
-                  }
+                    // Clear thinking steps once we have visible content
+                    if (cleanedContent.trim().length > 0 && (thinkingMessage === 'thinking' || thinkingMessage === 'Analyzing your health data...')) {
+                      setThinkingMessage(null);
+                      setThinkingSteps([]);
+                    }
+                  });
 
                   if (data.sessionId && !currentSessionId) {
                     setCurrentSessionId(data.sessionId);
@@ -1160,16 +1166,25 @@ export default function ConsultationPage() {
                   ));
                 } else if (data.type === 'complete') {
                   completed = true;
-                  setThinkingMessage(null); // Clear thinking status
-                  setThinkingSteps([]);     // Clear thinking steps
-                  setActiveStreamingMessageId(null); // Now clear the streaming indicator
+                  // Cancel any pending RAF to prevent stale updates after completion
+                  if (streamingRafRef.current) {
+                    cancelAnimationFrame(streamingRafRef.current);
+                    streamingRafRef.current = null;
+                  }
+                  setThinkingMessage(null);
+                  setThinkingSteps([]);
 
-                  // Now show the final accumulated content (cleaned by removeJsonBlocks during render)
+                  // Set final content FIRST, then clear streaming indicator
+                  // This prevents a flash where streaming is off but content hasn't updated
+                  const finalContent = removeJsonBlocks(accumulatedContent);
                   setMessages(prev => prev.map(msg =>
                     msg.id === aiMessageId
-                      ? { ...msg, content: accumulatedContent, formula: data.formula || msg.formula }
+                      ? { ...msg, content: finalContent, formula: data.formula || msg.formula }
                       : msg
                   ));
+                  // Clear streaming indicator AFTER content is set (same tick via batching)
+                  setActiveStreamingMessageId(null);
+                  streamingContentStarted.current = false;
 
                   if (data.formula) {
                     // Invalidate formula queries so the new formula appears in My Formula tab
@@ -1965,34 +1980,46 @@ export default function ConsultationPage() {
                     s.id === 'generate' ? { ...s, label: 'Creating your formula', detail: data.message, status: 'active' } : s
                   ));
                 } else if (data.type === 'chunk') {
-                  // Accumulate and show cleaned content in real-time
                   accumulatedContent += data.content;
 
-                  // Display cleaned content (removes JSON blocks) in real-time
-                  const cleanedContent = removeJsonBlocks(accumulatedContent);
-                  setMessages(prev => prev.map(msg =>
-                    msg.id === aiMessageId
-                      ? { ...msg, content: cleanedContent }
-                      : msg
-                  ));
+                  // Throttle UI updates via requestAnimationFrame to prevent flicker
+                  if (streamingRafRef.current) cancelAnimationFrame(streamingRafRef.current);
+                  streamingRafRef.current = requestAnimationFrame(() => {
+                    const cleanedContent = removeJsonBlocks(accumulatedContent);
+                    if (cleanedContent.trim().length > 0) {
+                      streamingContentStarted.current = true;
+                    }
+                    setMessages(prev => prev.map(msg =>
+                      msg.id === aiMessageId
+                        ? { ...msg, content: cleanedContent }
+                        : msg
+                    ));
 
-                  // Clear thinking message once we have visible content
-                  if (cleanedContent.trim().length > 0) {
-                    setThinkingMessage(null);
-                    setThinkingSteps([]);
-                  }
+                    // Clear thinking message once we have visible content
+                    if (cleanedContent.trim().length > 0) {
+                      setThinkingMessage(null);
+                      setThinkingSteps([]);
+                    }
+                  });
                 } else if (data.type === 'complete') {
                   completed = true;
+                  if (streamingRafRef.current) {
+                    cancelAnimationFrame(streamingRafRef.current);
+                    streamingRafRef.current = null;
+                  }
                   setThinkingMessage(null);
                   setThinkingSteps([]);
                   console.log('💊 Stream complete, formula:', !!data.formula);
 
-                  // Now show the final accumulated content
+                  // Set final cleaned content FIRST, then clear streaming indicator
+                  const finalContent = removeJsonBlocks(accumulatedContent);
                   setMessages(prev => prev.map(msg =>
                     msg.id === aiMessageId
-                      ? { ...msg, content: accumulatedContent, formula: data.formula || msg.formula }
+                      ? { ...msg, content: finalContent, formula: data.formula || msg.formula }
                       : msg
                   ));
+                  setActiveStreamingMessageId(null);
+                  streamingContentStarted.current = false;
 
                   if (data.formula) {
                     queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/current'] });
@@ -2411,7 +2438,7 @@ export default function ConsultationPage() {
                       {/* Message content - left aligned */}
                       <div className="w-full">
                         {/* Show thinking steps ONLY when this specific message is streaming and has no content yet */}
-                        {message.sender === 'ai' && message.id === activeStreamingMessageId && !message.content ? (
+                        {message.sender === 'ai' && message.id === activeStreamingMessageId && !message.content && !streamingContentStarted.current ? (
                           thinkingSteps.length > 0 ? (
                             <ThinkingSteps steps={thinkingSteps} />
                           ) : (
@@ -2517,7 +2544,7 @@ export default function ConsultationPage() {
 
                         {/* Enhanced formula visualization with animations */}
                         {message.formula && (
-                          <div className="mt-4 p-3 sm:p-4 bg-card rounded-lg border animate-in fade-in-50 duration-500 overflow-hidden">
+                          <div className="mt-4 p-3 sm:p-4 bg-card rounded-lg border fade-in-50 duration-500 overflow-hidden">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                               <h4 className="font-semibold text-base flex items-center gap-2 text-primary">
                                 <CheckCircle className="w-5 h-5 text-green-500 animate-in zoom-in-50 duration-700" />

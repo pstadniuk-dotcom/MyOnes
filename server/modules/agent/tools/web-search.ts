@@ -23,7 +23,7 @@ export interface WebSearchResult {
   whyRelevant: string;
 }
 
-const SYSTEM_PROMPT = `You are a PR research agent for Ones (ones.health), a personalized supplement platform that uses AI and blood work to create custom daily capsule formulas.
+const SYSTEM_PROMPT = `You are a PR research agent for Ones (ones.health), a personalized supplement platform that uses AI and blood work to create custom daily supplements.
 
 Your job is to find REAL, HIGH-QUALITY outreach opportunities. We only want established outlets with meaningful audiences.
 
@@ -75,13 +75,13 @@ export function createWebSearchTool(): AgentTool {
         },
         maxResults: {
           type: 'number',
-          description: 'Maximum number of results to return (default: 5)',
+          description: 'Maximum number of results to return (default: 10)',
         },
       },
       required: ['query', 'category'],
     },
     execute: async (args: { query: string; category: 'podcast' | 'press'; maxResults?: number }) => {
-      return executeWebSearch(args.query, args.category, args.maxResults || 5);
+      return executeWebSearch(args.query, args.category, args.maxResults || 10);
     },
   };
 }
@@ -92,7 +92,7 @@ export function createWebSearchTool(): AgentTool {
 export async function executeWebSearch(
   query: string,
   category: 'podcast' | 'press',
-  maxResults: number = 5,
+  maxResults: number = 10,
 ): Promise<{ results: WebSearchResult[]; searchQuery: string; prospectsFound: number }> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -106,7 +106,7 @@ export async function executeWebSearch(
         { role: 'system', content: SYSTEM_PROMPT },
         {
           role: 'user',
-          content: `Search the web for this query and find ${category} outreach opportunities for a personalized supplement company:\n\n${query}\n\nReturn the top ${maxResults} most actionable results as a JSON array. Only include results with a relevance score of 60 or higher. Skip any outlet with under 5,000 estimated audience/followers.`,
+          content: `Search the web for this query and find ${category} outreach opportunities for a personalized supplement company:\n\n${query}\n\nReturn the top ${maxResults} most actionable results as a JSON array. Be thorough — find as many relevant outlets as possible from the search results. Only include results with a relevance score of 60 or higher. Skip any outlet with under 5,000 estimated audience/followers.`,
         },
       ],
     });

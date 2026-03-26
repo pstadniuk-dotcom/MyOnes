@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import { adminController } from '../controller/admin.controller';
-import { liveChatController } from '../controller/live-chat.controller';
-import { metaAdsController } from '../controller/meta-ads.controller';
 import { requireAdmin } from '../middleware/middleware';
 import { runFormulaReviewCheck } from '../../utils/autoOptimizeScheduler';
+import { generateSocialPosts, generateContentIdeas, generateSocialImage, type GeneratePostsInput } from '../../utils/socialPostService';
+import { uploadBrandAsset, listBrandAssets, deleteBrandAsset, analyzeBrandStyle, getBrandStyleProfile } from '../../utils/brandAssetService';
+import { logger } from '../../infra/logging/logger';
+import type { UploadedFile } from 'express-fileupload';
+import crmRoutes from '../../modules/crm/crm.routes';
 
 const router = Router();
+
+// CRM System
+router.use('/crm', requireAdmin, crmRoutes);
 
 // Dashboard & Analytics
 router.get('/stats', requireAdmin, adminController.getStats);
@@ -39,28 +45,6 @@ router.delete('/support-tickets/:id/tags', requireAdmin, adminController.removeT
 router.post('/support-tickets/bulk-delete', requireAdmin, adminController.bulkDeleteSupportTickets);
 router.post('/support-tickets/bulk-close', requireAdmin, adminController.bulkCloseSupportTickets);
 router.post('/support-tickets/bulk-update', requireAdmin, adminController.bulkUpdateSupportTickets);
-
-// Live Chat (Admin)
-router.get('/live-chats', requireAdmin, liveChatController.adminListSessions);
-router.get('/live-chats/count', requireAdmin, liveChatController.adminGetChatCount);
-router.get('/live-chats/stream', requireAdmin, liveChatController.adminStream);
-router.get('/live-chats/admins', requireAdmin, liveChatController.adminListAdmins);
-router.get('/live-chats/analytics', requireAdmin, liveChatController.getAnalytics);
-router.post('/live-chats/bulk-delete', requireAdmin, liveChatController.adminBulkDeleteSessions);
-router.post('/live-chats/bulk-close', requireAdmin, liveChatController.adminBulkCloseSessions);
-router.get('/live-chats/canned-responses', requireAdmin, liveChatController.listCannedResponses);
-router.post('/live-chats/canned-responses', requireAdmin, liveChatController.createCannedResponse);
-router.post('/live-chats/canned-responses/use', requireAdmin, liveChatController.useCannedResponse);
-router.patch('/live-chats/canned-responses/:id', requireAdmin, liveChatController.updateCannedResponse);
-router.delete('/live-chats/canned-responses/:id', requireAdmin, liveChatController.deleteCannedResponse);
-router.get('/live-chats/:id', requireAdmin, liveChatController.adminGetSession);
-router.get('/live-chats/:id/messages', requireAdmin, liveChatController.adminGetMessages);
-router.post('/live-chats/:id/messages', requireAdmin, liveChatController.adminSendMessage);
-router.post('/live-chats/:id/close', requireAdmin, liveChatController.adminCloseSession);
-router.get('/live-chats/:id/stream', requireAdmin, liveChatController.adminStreamSession);
-router.post('/live-chats/:id/typing', requireAdmin, liveChatController.adminTyping);
-router.post('/live-chats/:id/stop-typing', requireAdmin, liveChatController.adminStopTyping);
-router.post('/live-chats/:id/transfer', requireAdmin, liveChatController.adminTransferSession);
 
 // Conversation Intelligence
 router.get('/conversations/stats', requireAdmin, adminController.getConversationStats);
@@ -96,6 +80,12 @@ router.patch('/ingredient-pricing/:id', requireAdmin, adminController.updateIngr
 
 // Product Catalog
 router.get('/products/catalog', requireAdmin, adminController.getProductCatalog);
+
+// Ingredient Catalog Sync
+router.get('/ingredient-catalog/sync-logs', requireAdmin, adminController.getIngredientSyncLogs);
+router.get('/ingredient-catalog/ingredients', requireAdmin, adminController.getManufacturerIngredients);
+router.post('/ingredient-catalog/sync', requireAdmin, adminController.triggerIngredientSync);
+router.get('/ingredient-catalog/affected-formulas', requireAdmin, adminController.getAffectedFormulas);
 
 // AI Usage Tracking
 router.get('/ai-usage', requireAdmin, adminController.getAiUsageSummary);
@@ -166,14 +156,117 @@ router.post('/formula-review/trigger', requireAdmin, async (req, res) => {
   }
 });
 
-// Meta Ads Bot
-router.get('/meta-ads/connection', requireAdmin, metaAdsController.checkConnection);
-router.post('/meta-ads/generate-copy', requireAdmin, metaAdsController.generateCopy);
-router.get('/meta-ads/drafts', requireAdmin, metaAdsController.listDrafts);
-router.get('/meta-ads/drafts/:id', requireAdmin, metaAdsController.getDraft);
-router.patch('/meta-ads/drafts/:id', requireAdmin, metaAdsController.updateDraft);
-router.delete('/meta-ads/drafts/:id', requireAdmin, metaAdsController.deleteDraft);
-router.post('/meta-ads/publish', requireAdmin, metaAdsController.publish);
-router.get('/meta-ads/campaigns', requireAdmin, metaAdsController.listCampaigns);
+// Social Post Generation
+router.post('/social/generate-posts', requireAdmin, async (req, res) => {
+  try {
+    const { platform, topic, tone, count, includeHashtags, contentType } = req.body;
+    if (!platform || typeof platform !== 'string') {
+      return res.status(400).json({ error: 'platform is required' });
+    }
+    const validPlatforms = ['instagram', 'twitter', 'linkedin', 'facebook', 'tiktok', 'threads'];
+    if (!validPlatforms.includes(platform)) {
+      return res.status(400).json({ error: `Invalid platform. Must be one of: ${validPlatforms.join(', ')}` });
+    }
+    const posts = await generateSocialPosts({ platform: platform as GeneratePostsInput['platform'], topic, tone, count, includeHashtags, contentType });
+    return res.json({ success: true, posts });
+  } catch (err: any) {
+    logger.error('[social-gen] generate-posts error', { error: err.message });
+    return res.status(500).json({ error: err.message || 'Failed to generate posts' });
+  }
+});
+
+router.post('/social/generate-ideas', requireAdmin, async (req, res) => {
+  try {
+    const daysAhead = Math.min(Math.max(parseInt(req.body.daysAhead) || 7, 1), 14);
+    const ideas = await generateContentIdeas(daysAhead);
+    return res.json({ success: true, ...ideas });
+  } catch (err: any) {
+    logger.error('[social-gen] generate-ideas error', { error: err.message });
+    return res.status(500).json({ error: err.message || 'Failed to generate ideas' });
+  }
+});
+
+router.post('/social/generate-image', requireAdmin, async (req, res) => {
+  try {
+    const { visualConcept, platform } = req.body;
+    if (!visualConcept || typeof visualConcept !== 'string') {
+      return res.status(400).json({ error: 'visualConcept is required' });
+    }
+    const validPlatforms = ['instagram', 'twitter', 'linkedin', 'facebook', 'tiktok', 'threads'];
+    const safePlatform = validPlatforms.includes(platform) ? platform : 'instagram';
+    const imageUrl = await generateSocialImage({ visualConcept, platform: safePlatform });
+    return res.json({ success: true, imageUrl });
+  } catch (err: any) {
+    logger.error('[social-gen] generate-image error', { error: err.message });
+    return res.status(500).json({ error: err.message || 'Failed to generate image' });
+  }
+});
+
+// ── Brand Assets ─────────────────────────────────────────────────────────
+
+router.get('/social/brand-assets', requireAdmin, async (_req, res) => {
+  try {
+    const assets = await listBrandAssets();
+    return res.json({ success: true, assets });
+  } catch (err: any) {
+    logger.error('[brand-assets] list error', { error: err.message });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/social/brand-assets', requireAdmin, async (req, res) => {
+  try {
+    if (!req.files || !req.files.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const file = req.files.file as UploadedFile;
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      return res.status(400).json({ error: 'Only JPEG, PNG, WebP, and GIF images are allowed' });
+    }
+    const category = req.body.category || 'other';
+    const validCategories = ['social_post', 'ad', 'logo', 'product', 'lifestyle', 'other'];
+    if (!validCategories.includes(category)) {
+      return res.status(400).json({ error: `Invalid category. Must be one of: ${validCategories.join(', ')}` });
+    }
+    const description = typeof req.body.description === 'string' ? req.body.description.slice(0, 500) : undefined;
+    const asset = await uploadBrandAsset(file.data, file.name, file.mimetype, category, description);
+    return res.json({ success: true, asset });
+  } catch (err: any) {
+    logger.error('[brand-assets] upload error', { error: err.message });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/social/brand-assets/:id', requireAdmin, async (req, res) => {
+  try {
+    const deleted = await deleteBrandAsset(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Asset not found' });
+    return res.json({ success: true });
+  } catch (err: any) {
+    logger.error('[brand-assets] delete error', { error: err.message });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/social/analyze-brand', requireAdmin, async (_req, res) => {
+  try {
+    const profile = await analyzeBrandStyle();
+    return res.json({ success: true, profile });
+  } catch (err: any) {
+    logger.error('[brand-assets] analyze error', { error: err.message });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/social/brand-profile', requireAdmin, async (_req, res) => {
+  try {
+    const profile = await getBrandStyleProfile();
+    return res.json({ success: true, profile });
+  } catch (err: any) {
+    logger.error('[brand-assets] get-profile error', { error: err.message });
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 export default router;

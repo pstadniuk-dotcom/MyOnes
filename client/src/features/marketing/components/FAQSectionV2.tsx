@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 
 const faqs = [
@@ -38,12 +38,32 @@ const faqs = [
 
 export default function FAQSectionV2() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const sectionRef = useRef<HTMLElement>(null);
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRevealed(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <section id="faq" className="py-24 md:py-32 bg-[#ede8e2]">
+    <section ref={sectionRef} id="faq" className="py-24 md:py-32 bg-[#ede8e2]">
       <div className="container mx-auto px-6 max-w-4xl">
         {/* Header */}
-        <div className="text-center mb-16">
+        <div
+          className={`text-center mb-16 transition-all duration-700 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
           <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             Questions & Answers
           </span>
@@ -57,39 +77,52 @@ export default function FAQSectionV2() {
         </div>
 
         {/* FAQ Items */}
-        <div className="space-y-4">
-          {faqs.map((faq, index) => (
-            <div
-              key={index}
-              className="bg-[#ede8e2] rounded-2xl overflow-hidden"
-            >
-              <button
-                onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                className="w-full px-5 sm:px-8 py-5 sm:py-6 text-left flex items-center justify-between gap-4 hover:bg-[#e4ddd6] transition-colors"
-              >
-                <span className="text-base sm:text-lg font-medium text-[#054700]">
-                  {faq.question}
-                </span>
-                <ChevronDown 
-                  className={`w-5 h-5 text-[#054700]/60 flex-shrink-0 transition-transform duration-300 ${
-                    openIndex === index ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-              
+        <div className="space-y-3">
+          {faqs.map((faq, index) => {
+            const isOpen = openIndex === index;
+            return (
               <div
-                className={`overflow-hidden transition-all duration-300 ${
-                  openIndex === index ? "max-h-96" : "max-h-0"
+                key={index}
+                className={`rounded-2xl overflow-hidden transition-all duration-300 ${
+                  isOpen
+                    ? "bg-white shadow-lg shadow-[#054700]/[0.06] ring-1 ring-[#054700]/[0.06]"
+                    : "bg-white/70 shadow-sm hover:shadow-md hover:bg-white"
                 }`}
               >
-                <div className="px-5 sm:px-8 pb-5 sm:pb-6">
-                  <p className="text-[#054700]/60 leading-relaxed text-sm sm:text-base">
-                    {faq.answer}
-                  </p>
+                <button
+                  onClick={() => setOpenIndex(isOpen ? null : index)}
+                  className="w-full px-5 sm:px-8 py-5 sm:py-6 text-left flex items-center justify-between gap-4 transition-colors cursor-pointer"
+                >
+                  <span className={`text-base sm:text-lg font-medium transition-colors duration-200 ${
+                    isOpen ? "text-[#054700]" : "text-[#054700]/80"
+                  }`}>
+                    {faq.question}
+                  </span>
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                    isOpen ? "bg-[#054700] rotate-180" : "bg-[#054700]/[0.07]"
+                  }`}>
+                    <ChevronDown 
+                      className={`w-4 h-4 transition-colors duration-300 ${
+                        isOpen ? "text-white" : "text-[#054700]/60"
+                      }`}
+                    />
+                  </div>
+                </button>
+                
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-out ${
+                    isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <div className="px-5 sm:px-8 pb-5 sm:pb-6 -mt-1">
+                    <p className="text-[#054700]/60 leading-relaxed text-sm sm:text-base">
+                      {faq.answer}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
 

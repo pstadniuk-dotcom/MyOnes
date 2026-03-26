@@ -127,13 +127,13 @@ export async function getPitchStatsBlock(): Promise<string> {
   ];
 
   if (stats.totalUsers > 0) {
-    lines.push(`- ${stats.totalUsers.toLocaleString()} users have created personalized supplement formulas`);
+    lines.push(`- ${stats.totalUsers.toLocaleString()} users have created personalized supplements`);
   }
   if (stats.totalFormulas > 0) {
-    lines.push(`- ${stats.totalFormulas.toLocaleString()} custom formulas created`);
+    lines.push(`- ${stats.totalFormulas.toLocaleString()} custom supplements created`);
   }
   lines.push(`- Catalog of ${stats.totalIngredients}+ individually-dosed ingredients`);
-  lines.push(`- Average formula contains ${stats.averageIngredientsPerFormula} ingredients at therapeutic doses`);
+  lines.push(`- Average supplement contains ${stats.averageIngredientsPerFormula} ingredients at therapeutic doses`);
   lines.push(`- Top health goals: ${stats.topHealthGoals.join(', ')}`);
   lines.push(`- Most requested ingredients: ${stats.topIngredients.join(', ')}`);
 

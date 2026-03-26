@@ -152,6 +152,76 @@ export class FormulasRepository {
         }
     }
 
+    async getAllActiveFormulas(): Promise<Formula[]> {
+        try {
+            return await db
+                .select()
+                .from(formulas)
+                .where(isNull(formulas.archivedAt));
+        } catch (error) {
+            logger.error('Error getting all active formulas', { error });
+            return [];
+        }
+    }
+
+    async flagFormulaDiscontinued(formulaId: string, discontinuedNames: string[]): Promise<void> {
+        await db
+            .update(formulas)
+            .set({
+                needsReformulation: true,
+                discontinuedIngredients: discontinuedNames,
+                discontinuedFlaggedAt: new Date(),
+            })
+            .where(eq(formulas.id, formulaId));
+    }
+
+    async clearFormulaDiscontinuedFlag(formulaId: string): Promise<void> {
+        await db
+            .update(formulas)
+            .set({
+                needsReformulation: false,
+                discontinuedIngredients: [],
+                discontinuedFlaggedAt: null,
+            })
+            .where(eq(formulas.id, formulaId));
+    }
+
+    async getFormulasNeedingReformulation(): Promise<Array<{
+        formulaId: string;
+        formulaName: string | null;
+        userId: string;
+        userEmail: string;
+        userName: string | null;
+        discontinuedIngredients: string[];
+        discontinuedFlaggedAt: Date | null;
+    }>> {
+        try {
+            const rows = await db
+                .select({
+                    formulaId: formulas.id,
+                    formulaName: formulas.name,
+                    userId: formulas.userId,
+                    userEmail: users.email,
+                    userName: users.name,
+                    discontinuedIngredients: formulas.discontinuedIngredients,
+                    discontinuedFlaggedAt: formulas.discontinuedFlaggedAt,
+                })
+                .from(formulas)
+                .innerJoin(users, eq(formulas.userId, users.id))
+                .where(and(
+                    eq(formulas.needsReformulation, true),
+                    isNull(formulas.archivedAt),
+                ));
+            return rows.map(r => ({
+                ...r,
+                discontinuedIngredients: (r.discontinuedIngredients as string[]) || [],
+            }));
+        } catch (error) {
+            logger.error('Error getting formulas needing reformulation', { error });
+            return [];
+        }
+    }
+
     async getFormulaHistory(userId: string, includeArchived: boolean = false): Promise<Formula[]> {
         try {
             const whereClause = includeArchived

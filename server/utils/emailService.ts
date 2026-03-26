@@ -124,7 +124,7 @@ function getEmailTemplate(notification: EmailNotification): string {
           <tr>
             <td style="padding:24px 40px;text-align:center;">
               <div style="margin:0 auto 10px;text-align:center;">
-                <span style="font-size:36px;font-weight:700;color:#054700;letter-spacing:-1px;font-family:Georgia,'Times New Roman',serif;">Ones</span>
+                <img src="${getFrontendUrl()}/Ones%20Logo%20Green.svg" alt="Ones" width="48" height="48" style="display:inline-block;width:48px;height:48px;" />
               </div>
               <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#111827;">Personalized AI Supplements</p>
               <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">Your custom formula, delivered to your door.</p>

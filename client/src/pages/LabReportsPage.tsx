@@ -123,6 +123,34 @@ interface AnalysisSummary {
   focusAreas: FocusArea[];  // troubled panels with embedded markers + advice
 }
 
+interface BiologicalAgeFactor {
+  name: string;
+  source: 'labs' | 'wearables' | 'profile';
+  value: string;
+  impact: number;
+  assessment: 'excellent' | 'good' | 'fair' | 'poor';
+  detail: string;
+}
+
+interface BiologicalAgeBreakdown {
+  labScore: number | null;
+  labOffset: number | null;
+  wearableScore: number | null;
+  wearableOffset: number | null;
+  lifestyleScore: number | null;
+  lifestyleOffset: number | null;
+  factors: BiologicalAgeFactor[];
+}
+
+interface BiologicalAge {
+  age: number;
+  chronologicalAge: number;
+  delta: number;
+  label: string;
+  dataSources: string[];
+  breakdown?: BiologicalAgeBreakdown;
+}
+
 interface BiomarkersDashboard {
   markers: AggregatedBiomarker[];
   healthScore: HealthScore;
@@ -161,6 +189,7 @@ interface BiomarkersDashboard {
       percentChange: number | null;
     }>;
   };
+  biologicalAge: BiologicalAge | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -242,9 +271,9 @@ function SparkLine({ values, status }: { values: (number | null)[]; status: stri
   const min = Math.min(...valid);
   const max = Math.max(...valid);
   const range = max - min || 1;
-  const h = 28;
-  const w = 72;
-  const padding = 2;
+  const h = 32;
+  const w = 88;
+  const padding = 3;
 
   const points = values.map((v, i) => {
     if (v === null) return null;
@@ -256,22 +285,24 @@ function SparkLine({ values, status }: { values: (number | null)[]; status: stri
   if (points.length < 2) return null;
 
   const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${h} L ${points[0].x.toFixed(1)} ${h} Z`;
   const strokeColor = status === 'normal' ? '#059669' : status === 'critical' ? '#dc2626' : status === 'high' ? '#d97706' : '#2563eb';
 
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="flex-shrink-0">
+      <path d={areaD} fill={strokeColor} opacity="0.08" />
       <path d={pathD} fill="none" stroke={strokeColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
-      {points.length > 0 && (
-        <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="2.5" fill={strokeColor} />
-      )}
+      {points.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r={i === points.length - 1 ? 2.5 : 1.5} fill={strokeColor} opacity={i === points.length - 1 ? 1 : 0.4} />
+      ))}
     </svg>
   );
 }
 
 // ── Score Ring (circular gauge) ────────────────────────────────────────
 
-function ScoreRing({ score, grade, size = 140, strokeWidth = 10 }: {
-  score: number; grade: string; size?: number; strokeWidth?: number;
+function ScoreRing({ score, grade, size = 140, strokeWidth = 10, variant = 'light' }: {
+  score: number; grade: string; size?: number; strokeWidth?: number; variant?: 'light' | 'dark';
 }) {
   const r = (size - strokeWidth) / 2;
   const circ = 2 * Math.PI * r;
@@ -279,9 +310,11 @@ function ScoreRing({ score, grade, size = 140, strokeWidth = 10 }: {
   const offset = circ * (1 - pct);
   const center = size / 2;
 
-  // Color based on score
-  const color = score >= 90 ? '#059669' : score >= 80 ? '#0d9488' : score >= 70 ? '#d97706' : score >= 60 ? '#ea580c' : '#dc2626';
-  const bgColor = score >= 90 ? '#d1fae5' : score >= 80 ? '#ccfbf1' : score >= 70 ? '#fef3c7' : score >= 60 ? '#ffedd5' : '#fee2e2';
+  // Warmer, more premium score colors
+  const color = score >= 90 ? '#2d8a4e' : score >= 80 ? '#4a9a6a' : score >= 70 ? '#c4952e' : score >= 60 ? '#c47a2e' : '#c44e2e';
+  const bgColor = variant === 'dark'
+    ? 'rgba(255,255,255,0.1)'
+    : (score >= 90 ? '#e8f4ec' : score >= 80 ? '#e8f0ec' : score >= 70 ? '#f5eede' : score >= 60 ? '#f5e8de' : '#f5e2de');
 
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
@@ -299,8 +332,8 @@ function ScoreRing({ score, grade, size = 140, strokeWidth = 10 }: {
       </svg>
       {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold" style={{ color }}>{score}</span>
-        <span className="text-sm font-semibold text-[#054700] -mt-0.5">{grade}</span>
+        <span className={`text-3xl font-bold ${variant === 'dark' ? 'text-white' : 'text-[#2d2418]'}`} style={variant === 'light' ? { color } : undefined}>{score}</span>
+        <span className={`text-sm font-semibold -mt-0.5 ${variant === 'dark' ? 'text-white/70' : 'text-[#5a4e3a]'}`}>{grade}</span>
       </div>
     </div>
   );
@@ -314,7 +347,7 @@ function PanelScoreBar({ panel }: { panel: PanelScore }) {
   const icon = CATEGORY_ICONS[panel.category] || '📋';
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 rounded-xl bg-white/40 px-3 py-2.5">
       <span className="text-sm flex-shrink-0 w-5 text-center">{icon}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
@@ -336,13 +369,88 @@ function PanelScoreBar({ panel }: { panel: PanelScore }) {
   );
 }
 
+// ── Biomarker Distribution Bar ─────────────────────────────────────────
+
+function BiomarkerDistributionBar({ summary }: {
+  summary: { totalMarkers: number; normal: number; high: number; low: number; critical: number };
+}) {
+  const total = summary.totalMarkers || 1;
+  const segments = [
+    { count: summary.normal, color: 'bg-emerald-400', label: 'Optimal', textColor: 'text-emerald-600' },
+    { count: summary.high, color: 'bg-amber-400', label: 'High', textColor: 'text-amber-600' },
+    { count: summary.low, color: 'bg-blue-400', label: 'Low', textColor: 'text-blue-600' },
+    { count: summary.critical, color: 'bg-red-400', label: 'Critical', textColor: 'text-red-500' },
+  ].filter(s => s.count > 0);
+
+  return (
+    <div className="space-y-2">
+      <div className="h-3 rounded-full flex overflow-hidden bg-gray-100">
+        {segments.map((seg, i) => (
+          <div
+            key={i}
+            className={`${seg.color} transition-all duration-700 ease-out ${i === 0 ? 'rounded-l-full' : ''} ${i === segments.length - 1 ? 'rounded-r-full' : ''}`}
+            style={{ width: `${(seg.count / total) * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="flex items-center gap-4 flex-wrap">
+        {segments.map((seg, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <div className={`h-2 w-2 rounded-full ${seg.color}`} />
+            <span className={`text-xs font-semibold ${seg.textColor}`}>{seg.count}</span>
+            <span className="text-xs text-[#5a6623]">{seg.label}</span>
+          </div>
+        ))}
+        <span className="text-xs text-[#5a6623] ml-auto">{total} total</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Category Pill Nav ──────────────────────────────────────────────────
+
+function CategoryPillNav({ panels, onSelect }: { panels: PanelScore[]; onSelect?: (category: string) => void }) {
+  const gradeStyle = (grade: string) => {
+    switch (grade) {
+      case 'A': return 'bg-emerald-50 border-emerald-200 text-emerald-700';
+      case 'B': return 'bg-teal-50 border-teal-200 text-teal-700';
+      case 'C': return 'bg-amber-50 border-amber-200 text-amber-700';
+      case 'D': return 'bg-orange-50 border-orange-200 text-orange-700';
+      default: return 'bg-red-50 border-red-200 text-red-700';
+    }
+  };
+
+  // Sort: worst grades first so they get attention
+  const sorted = [...panels].sort((a, b) => a.score - b.score);
+
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+      {sorted.map(p => (
+        <button
+          key={p.category}
+          onClick={() => onSelect?.(p.category)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-all hover:shadow-sm ${gradeStyle(p.grade)}`}
+        >
+          <span className="text-sm">{CATEGORY_ICONS[p.category] || '📋'}</span>
+          <span>{PANEL_FRIENDLY_NAMES[p.category] || p.category}</span>
+          <span className="font-bold">{p.grade}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Summary Stat Card ──────────────────────────────────────────────────
 
 function SummaryCard({ label, value, icon: Icon, iconBg, iconColor, sub, onClick }: {
   label: string; value: number | string; icon: any; iconBg: string; iconColor: string; sub?: string; onClick?: () => void;
 }) {
   return (
-    <div onClick={onClick} className={`glass-card rounded-2xl border border-[#5a6623]/10 shadow-lg shadow-[#054700]/5 p-4 flex flex-col gap-2 ${onClick ? 'cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all' : ''}`}>
+    <div
+      onClick={onClick}
+      className={`relative overflow-hidden rounded-2xl border border-white/50 p-4 flex flex-col gap-2 ${onClick ? 'cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300' : ''}`}
+      style={{ background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(20px) saturate(1.6)', WebkitBackdropFilter: 'blur(20px) saturate(1.6)' }}
+    >
       <div className="flex items-center justify-between">
         <div className={`h-9 w-9 rounded-full ${iconBg} flex items-center justify-center`}>
           <Icon className={`h-4 w-4 ${iconColor}`} />
@@ -367,7 +475,7 @@ function FocusAreaCard({ area }: { area: FocusArea }) {
   const followupActions = area.actions.filter(a => a.type === 'followup');
 
   return (
-    <div className="glass-card rounded-2xl border border-[#5a6623]/10 shadow-2xl shadow-sm overflow-hidden">
+    <div className="relative overflow-hidden rounded-2xl border border-white/50 shadow-sm" style={{ background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(16px) saturate(1.4)', WebkitBackdropFilter: 'blur(16px) saturate(1.4)' }}>
       {/* Header */}
       <div className="px-5 pt-4 pb-3">
         <div className="flex items-center justify-between mb-2">
@@ -383,7 +491,7 @@ function FocusAreaCard({ area }: { area: FocusArea }) {
       </div>
 
       {/* Abnormal markers */}
-      <div className="px-5 py-3 bg-gray-50/50 border-y border-[#5a6623]/8">
+      <div className="px-5 py-3 bg-white/30 border-y border-[#054700]/5">
         <div className="space-y-2">
           {area.markers.map((m, i) => {
             const isHigh = m.status === 'high' || m.status === 'critical';
@@ -685,10 +793,12 @@ export default function LabReportsPage() {
   const [expandedMarker, setExpandedMarker] = useState<string | null>(null);
   const [showReports, setShowReports] = useState(false);
   const [showAllMarkers, setShowAllMarkers] = useState(false);
+  const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
   const [reportFilter, setReportFilter] = useState<string>('all');
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [showBioAgeExplainer, setShowBioAgeExplainer] = useState(false);
 
   const handleSummaryCardClick = (filter: string) => {
     setShowAllMarkers(true);
@@ -1211,7 +1321,7 @@ export default function LabReportsPage() {
 
   return (
     <div
-      className="space-y-6 relative"
+      className="space-y-6 relative min-w-0 overflow-hidden"
       data-testid="page-lab-reports"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -1328,7 +1438,7 @@ export default function LabReportsPage() {
               </CardDescription>
             )}
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 space-y-5">
+          <CardContent className="p-4 sm:p-6 space-y-5 min-w-0 overflow-hidden">
 
             {/* ── Summary Stat Cards ── */}
             {summary && summary.totalMarkers > 0 && (
@@ -1346,117 +1456,229 @@ export default function LabReportsPage() {
 
             {/* ── Health Score Hero ── */}
             {dashboard?.healthScore && dashboard.healthScore.overall > 0 && (
-              <div className="glass-card rounded-2xl border border-[#5a6623]/10 shadow-2xl shadow-lg shadow-[#054700]/5 p-5 sm:p-6">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-8">
-                  {/* Score Ring */}
-                  <div className="flex flex-col items-center gap-1">
-                    <ScoreRing score={dashboard.healthScore.overall} grade={dashboard.healthScore.grade} />
-                    <span className="text-xs font-medium text-[#5a6623] mt-1">Lab Health Score</span>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-full">
+                {/* Health Score Card — frosted glass */}
+                <div className="relative overflow-hidden rounded-2xl border border-white/60 p-5 sm:p-6 shadow-premium" style={{ background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(24px) saturate(1.6)', WebkitBackdropFilter: 'blur(24px) saturate(1.6)' }}>
+                  {/* Warm organic gradient underneath the glass */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#ede8e2]/60 via-[#f5f0ea]/40 to-[#e6dfd6]/50 pointer-events-none" />
+                  {/* Subtle warm radial glow */}
+                  <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#d4c4a8]/20 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-8 -left-8 w-36 h-36 bg-[#c4cc9f]/15 rounded-full blur-2xl pointer-events-none" />
 
-                  {/* Right side — label + panels */}
-                  <div className="flex-1 w-full space-y-4">
-                    {/* Score headline */}
-                    <div>
-                      <h3 className="text-lg font-bold text-[#054700]">
+                  <div className="relative z-10 flex flex-col items-center text-center gap-3">
+                    <ScoreRing score={dashboard.healthScore.overall} grade={dashboard.healthScore.grade} variant="light" size={130} strokeWidth={10} />
+
+                    <div className="space-y-1">
+                      <h3 className="text-base font-semibold text-[#054700] tracking-[-0.01em]">
                         {dashboard.healthScore.label}
                       </h3>
-                      <p className="text-sm text-[#5a6623] mt-0.5 flex items-center gap-1.5">
-                        {dashboard.healthScore.momentum === 'improving' && <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />}
-                        {dashboard.healthScore.momentum === 'declining' && <TrendingDown className="h-3.5 w-3.5 text-red-600" />}
-                        {dashboard.healthScore.momentum === 'steady' && <Minus className="h-3.5 w-3.5 text-[#5a6623]" />}
+                      <p className="text-xs text-[#5a6623]/70 flex items-center gap-1.5 justify-center">
+                        {dashboard.healthScore.momentum === 'improving' && <TrendingUp className="h-3 w-3 text-emerald-600" />}
+                        {dashboard.healthScore.momentum === 'declining' && <TrendingDown className="h-3 w-3 text-red-500" />}
+                        {dashboard.healthScore.momentum === 'steady' && <Minus className="h-3 w-3 text-[#5a6623]/50" />}
                         {dashboard.healthScore.momentumLabel}
                       </p>
                     </div>
 
-                    {/* Panel breakdown */}
-                    {dashboard.healthScore.panels.length > 0 && (
-                      <div className="space-y-2.5">
-                        <h4 className="text-xs font-semibold text-[#5a6623] uppercase tracking-wide">Panel Breakdown</h4>
-                        <div className="grid gap-2.5 sm:grid-cols-2">
-                          {dashboard.healthScore.panels.map(panel => (
-                            <PanelScoreBar key={panel.category} panel={panel} />
+
+                  </div>
+                </div>
+
+                {/* Biological Age Card — warm glass with nature texture */}
+                {dashboard.biologicalAge ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowBioAgeExplainer(true)}
+                    className="relative overflow-hidden rounded-2xl border border-[#d4c4a8]/40 p-5 sm:p-6 text-left transition-all hover:shadow-xl hover:scale-[1.01] group cursor-pointer"
+                    style={{ background: 'linear-gradient(135deg, #ede8e2 0%, #e2dbd2 40%, #d8cfc3 100%)' }}
+                  >
+                    {/* Nature image bg with heavy overlay for texture */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      <img src="/hero-nature.jpg" alt="" className="w-full h-full object-cover opacity-[0.08]" />
+                    </div>
+                    {/* Frosted overlay */}
+                    <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(237,232,226,0.65)', backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)' }} />
+                    {/* Warm radial accents */}
+                    <div className="absolute top-0 right-0 w-48 h-48 bg-[#c4a882]/15 rounded-full blur-3xl pointer-events-none" />
+                    <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-[#8a9a2c]/10 rounded-full blur-2xl pointer-events-none" />
+                    {/* Inner shadow for depth */}
+                    <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.04)' }} />
+
+                    <div className="relative z-10 flex flex-col items-center text-center gap-2.5 h-full justify-center">
+                      {/* Age number — large, warm, not green */}
+                      <div className="relative">
+                        <span className="text-[60px] font-light text-[#2d2418] tracking-[-0.03em] leading-none">{dashboard.biologicalAge.age}</span>
+                      </div>
+                      <span className="text-[11px] font-semibold text-[#8a7a62] tracking-[0.15em] uppercase">Health Age</span>
+
+                      {/* Delta badge */}
+                      <span className={`inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1 rounded-full ${
+                        dashboard.biologicalAge.delta <= -3
+                          ? 'bg-emerald-100/80 text-emerald-800'
+                          : dashboard.biologicalAge.delta <= 0
+                            ? 'bg-teal-100/80 text-teal-800'
+                            : dashboard.biologicalAge.delta <= 3
+                              ? 'bg-amber-100/80 text-amber-800'
+                              : 'bg-red-100/80 text-red-800'
+                      }`}>
+                        {dashboard.biologicalAge.delta <= 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />}
+                        {dashboard.biologicalAge.label}
+                      </span>
+
+                      {/* Data source indicators — prominent with icons */}
+                      <div className="flex items-center gap-2 mt-1">
+                        {dashboard.biologicalAge.dataSources.includes('labs') && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#054700]/70 bg-white/60 rounded-full px-2.5 py-1 border border-[#054700]/10">
+                            <Beaker className="h-3 w-3" /> Labs
+                          </span>
+                        )}
+                        {dashboard.biologicalAge.dataSources.includes('wearables') && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#054700]/70 bg-white/60 rounded-full px-2.5 py-1 border border-[#054700]/10">
+                            <Heart className="h-3 w-3" /> Wearables
+                          </span>
+                        )}
+                        {dashboard.biologicalAge.dataSources.includes('profile') && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#054700]/70 bg-white/60 rounded-full px-2.5 py-1 border border-[#054700]/10">
+                            <Dumbbell className="h-3 w-3" /> Lifestyle
+                          </span>
+                        )}
+                        {/* Show inactive sources as dimmed hints */}
+                        {!dashboard.biologicalAge.dataSources.includes('wearables') && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#8a7a62]/35 bg-white/30 rounded-full px-2.5 py-1 border border-[#8a7a62]/8">
+                            <Heart className="h-3 w-3" /> Wearables
+                          </span>
+                        )}
+                      </div>
+
+                      <span className="text-[10px] text-[#8a7a62]/50 mt-0.5 flex items-center gap-1 group-hover:text-[#8a7a62]/70 transition-colors">
+                        <Info className="h-3 w-3" /> Tap to see methodology
+                      </span>
+                    </div>
+                  </button>
+                ) : (
+                  /* Placeholder card when no bio age — warm glass style */
+                  <div className="relative overflow-hidden rounded-2xl border border-[#d4c4a8]/30 p-5 sm:p-6 flex flex-col items-center justify-center text-center gap-2" style={{ background: 'linear-gradient(135deg, #ede8e2 0%, #e2dbd2 100%)' }}>
+                    <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
+                    <div className="relative z-10 flex flex-col items-center gap-2">
+                      <Activity className="h-8 w-8 text-[#8a7a62]/30" />
+                      <span className="text-sm font-medium text-[#8a7a62]/60">Health Age</span>
+                      <span className="text-xs text-[#8a7a62]/40">Complete your health profile to unlock</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+
+
+            {/* ── Detailed Analysis (Progressive Disclosure) ── */}
+            {dashboard?.analysisSummary && dashboard.analysisSummary.headline && (
+              <>
+                {/* Always-visible summary */}
+                <div className="rounded-xl bg-[#ede8e2]/40 border border-[#d4c4a8]/20 px-5 py-4">
+                  <h3 className="text-base font-semibold text-[#054700] mb-1 tracking-[-0.01em]">{dashboard.analysisSummary.headline}</h3>
+                  <p className="text-sm text-[#5a6623] leading-relaxed">{dashboard.analysisSummary.narrative}</p>
+                </div>
+
+                {/* Toggle for detailed breakdown */}
+                <button
+                  onClick={() => setShowDetailedAnalysis(!showDetailedAnalysis)}
+                  className="w-full flex items-center justify-center gap-2 text-sm font-medium text-[#054700] hover:text-[#054700]/80 transition-all duration-200 py-2.5 rounded-xl border border-[#d4c4a8]/25 hover:bg-[#ede8e2]/40 hover:border-[#d4c4a8]/40"
+                >
+                  {showDetailedAnalysis ? 'Hide Detailed Analysis' : 'View Detailed Analysis'}
+                  {showDetailedAnalysis ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+
+                {showDetailedAnalysis && (
+                  <div className="space-y-5 animate-in fade-in slide-in-from-top-2 duration-300">
+
+                {/* ── Top row: Strengths + Changes side by side ── */}
+                {(
+                  (dashboard.analysisSummary.strengths && dashboard.analysisSummary.strengths.length > 0) ||
+                  (comparison?.hasMultipleReports && comparison.changes.length > 0)
+                ) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Strengths card */}
+                    {dashboard.analysisSummary.strengths && dashboard.analysisSummary.strengths.length > 0 && (
+                      <div className="relative overflow-hidden rounded-2xl border border-emerald-200/50 p-4" style={{ background: 'rgba(236,253,245,0.6)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+                        <h4 className="text-[11px] font-semibold text-emerald-700 uppercase tracking-[0.08em] mb-3 flex items-center gap-1.5">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          All Clear
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {dashboard.analysisSummary.strengths.map((panel, i) => (
+                            <span key={i} className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-white/70 rounded-full px-2.5 py-1 border border-emerald-200/50">
+                              <span>{CATEGORY_ICONS[panel] || '✅'}</span>
+                              {PANEL_FRIENDLY_NAMES[panel] || panel}
+                            </span>
                           ))}
                         </div>
                       </div>
                     )}
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* ── Summary + Changes ── */}
-            {dashboard?.analysisSummary && dashboard.analysisSummary.headline && (
-              <div className="space-y-4">
-                {/* Headline + one-line narrative */}
-                <div>
-                  <h3 className="text-base font-bold text-[#054700] mb-1">{dashboard.analysisSummary.headline}</h3>
-                  <p className="text-sm text-[#5a6623]">{dashboard.analysisSummary.narrative}</p>
-                </div>
-
-                {/* Comparison changes — keep if user has multiple reports */}
-                {comparison?.hasMultipleReports && comparison.changes.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold text-[#5a6623] uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                      Changes Since Last Report
-                    </h4>
-                    <div className="space-y-1.5">
-                      {comparison.changes.slice(0, 6).map((change, i) => {
-                        const trendCfg = TREND_CONFIG[change.trend];
-                        const TrendIcon = trendCfg.icon;
-                        return (
-                          <div key={i} className="flex items-center gap-3 bg-white rounded-lg border border-[#5a6623]/10 px-3 py-2">
-                            <TrendIcon className={`h-4 w-4 flex-shrink-0 ${trendCfg.color}`} />
-                            <span className="text-sm font-medium text-[#054700] flex-1">{change.name}</span>
-                            <span className="text-xs text-[#5a6623]">{change.from}</span>
-                            <span className="text-xs text-[#5a6623]">→</span>
-                            <span className={`text-xs font-semibold ${trendCfg.color}`}>{change.to}</span>
-                            {change.percentChange != null && (
-                              <span className={`text-xs ${trendCfg.color}`}>
-                                ({change.percentChange > 0 ? '+' : ''}{change.percentChange.toFixed(1)}%)
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    {/* Changes card */}
+                    {comparison?.hasMultipleReports && comparison.changes.length > 0 && (
+                      <div className="relative overflow-hidden rounded-2xl border border-white/50 p-4" style={{ background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+                        <h4 className="text-[11px] font-semibold text-[#5a6623] uppercase tracking-[0.08em] mb-3 flex items-center gap-1.5">
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                          Changes Since Last Report
+                        </h4>
+                        <div className="space-y-1.5">
+                          {comparison.changes.slice(0, 5).map((change, i) => {
+                            const trendCfg = TREND_CONFIG[change.trend];
+                            const TrendIcon = trendCfg.icon;
+                            return (
+                              <div key={i} className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 bg-white/50">
+                                <TrendIcon className={`h-3.5 w-3.5 flex-shrink-0 ${trendCfg.color}`} />
+                                <span className="text-xs font-medium text-[#054700] flex-1 truncate">{change.name}</span>
+                                <span className="text-[11px] text-[#5a6623] tabular-nums">{change.from}</span>
+                                <span className="text-[10px] text-[#5a6623]/50">→</span>
+                                <span className={`text-[11px] font-semibold tabular-nums ${trendCfg.color}`}>{change.to}</span>
+                                {change.percentChange != null && (
+                                  <span className={`text-[10px] ${trendCfg.color}`}>
+                                    {change.percentChange > 0 ? '+' : ''}{change.percentChange.toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* ── Focus Areas (troubled panels with actions) ── */}
                 {dashboard.analysisSummary.focusAreas && dashboard.analysisSummary.focusAreas.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-semibold text-[#5a6623] uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                    <h4 className="text-[11px] font-semibold text-[#5a6623] uppercase tracking-[0.08em] mb-3 flex items-center gap-1.5">
                       <Sparkles className="h-3.5 w-3.5" />
                       Focus Areas
                     </h4>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="sm:columns-2 gap-4 space-y-4">
                       {dashboard.analysisSummary.focusAreas.map((area, i) => (
-                        <FocusAreaCard key={i} area={area} />
+                        <div key={i} id={`focus-${area.panel}`} className="break-inside-avoid">
+                          <FocusAreaCard area={area} />
+                        </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* ── Strengths (clean panels) ── */}
-                {dashboard.analysisSummary.strengths && dashboard.analysisSummary.strengths.length > 0 && (
-                  <div className="bg-emerald-50/60 rounded-xl border border-emerald-200/40 px-4 py-3">
-                    <h4 className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      All Clear
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {dashboard.analysisSummary.strengths.map((panel, i) => (
-                        <span key={i} className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-100/60 rounded-full px-2.5 py-1 border border-emerald-200/50">
-                          <span>{CATEGORY_ICONS[panel] || '✅'}</span>
-                          {PANEL_FRIENDLY_NAMES[panel] || panel}
-                        </span>
+                {/* ── Panel Breakdown (contained card) ── */}
+                {dashboard.healthScore.panels.length > 0 && (
+                  <div className="relative overflow-hidden rounded-2xl border border-white/50 p-5" style={{ background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+                    <h4 className="text-[11px] font-semibold text-[#5a6623] uppercase tracking-[0.08em] mb-4">Panel Breakdown</h4>
+                    <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                      {dashboard.healthScore.panels.map(panel => (
+                        <PanelScoreBar key={panel.category} panel={panel} />
                       ))}
                     </div>
                   </div>
                 )}
-              </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Fallback when analysisSummary is not yet computed */}
@@ -1469,10 +1691,10 @@ export default function LabReportsPage() {
 
       {/* ── Biomarker Table (collapsed by default) ── */}
       {hasDashboard && (
-        <div id="all-biomarkers-section" className="scroll-mt-24">
+        <div id="biomarker-table">
           <button
             onClick={() => setShowAllMarkers(!showAllMarkers)}
-            className="w-full flex items-center justify-between bg-[#ede8e2] border border-[#5a6623]/20 rounded-2xl px-5 py-3.5 hover:bg-[#ede8e2]/80 transition-colors group"
+            className={`w-full flex items-center justify-between bg-[#ede8e2] border border-[#5a6623]/15 px-5 py-3.5 hover:bg-[#ede8e2]/80 transition-all group ${showAllMarkers ? 'rounded-t-2xl rounded-b-none border-b-0' : 'rounded-2xl'}`}
           >
             <div className="flex items-center gap-2.5">
               <Beaker className="h-5 w-5 text-[#054700]" />
@@ -1489,7 +1711,7 @@ export default function LabReportsPage() {
           </button>
 
           {showAllMarkers && (
-        <Card className="border-[#5a6623]/10 shadow-2xl overflow-hidden rounded-t-none border-t-0 -mt-1">
+        <Card className="border-[#5a6623]/15 shadow-2xl overflow-hidden rounded-t-none border-t-0">
           <CardHeader className="pb-3 border-b border-[#5a6623]/10">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-2 text-xs text-[#5a6623]">
@@ -2015,6 +2237,132 @@ export default function LabReportsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Bio Age Explainer Dialog ── */}
+      <Dialog open={showBioAgeExplainer} onOpenChange={setShowBioAgeExplainer}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-[#054700]" />
+              How We Estimate Health Age
+            </DialogTitle>
+            <DialogDescription>
+              Your Health Age is a wellness estimate based on your biomarkers, wearable data, and lifestyle profile.
+            </DialogDescription>
+          </DialogHeader>
+          {dashboard?.biologicalAge && (
+            <div className="space-y-5 py-2">
+              {/* Summary */}
+              <div className="flex items-center justify-between bg-[#f5f7f0] rounded-xl p-4 border border-[#c4cc9f]/40">
+                <div>
+                  <div className="text-sm text-[#5a6623]">Chronological Age</div>
+                  <div className="text-2xl font-bold text-[#054700]">{dashboard.biologicalAge.chronologicalAge}</div>
+                </div>
+                <div className="text-2xl text-[#5a6623]/30">→</div>
+                <div className="text-center">
+                  <div className="text-sm text-[#5a6623]">Health Age</div>
+                  <div className={`text-2xl font-bold ${dashboard.biologicalAge.delta <= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>{dashboard.biologicalAge.age}</div>
+                </div>
+                <div className={`px-3 py-1.5 rounded-full text-sm font-semibold ${dashboard.biologicalAge.delta <= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {dashboard.biologicalAge.delta > 0 ? '+' : ''}{dashboard.biologicalAge.delta} yrs
+                </div>
+              </div>
+
+              {/* Breakdown by source */}
+              {dashboard.biologicalAge.breakdown && (
+                <>
+                  {/* Source contributions */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-semibold text-[#5a6623] uppercase tracking-wide">Score Breakdown</h4>
+                    <div className="grid gap-2">
+                      {dashboard.biologicalAge.breakdown.labOffset != null && (
+                        <div className="flex items-center justify-between bg-white rounded-lg border border-[#5a6623]/10 px-3 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <Beaker className="h-4 w-4 text-[#054700]" />
+                            <span className="text-sm font-medium text-[#054700]">Lab Biomarkers</span>
+                          </div>
+                          <span className={`text-sm font-bold ${dashboard.biologicalAge.breakdown.labOffset > 0 ? 'text-amber-600' : dashboard.biologicalAge.breakdown.labOffset < 0 ? 'text-emerald-600' : 'text-[#5a6623]'}`}>
+                            {dashboard.biologicalAge.breakdown.labOffset > 0 ? '+' : ''}{dashboard.biologicalAge.breakdown.labOffset} yrs
+                          </span>
+                        </div>
+                      )}
+                      {dashboard.biologicalAge.breakdown.wearableOffset != null && (
+                        <div className="flex items-center justify-between bg-white rounded-lg border border-[#5a6623]/10 px-3 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <Heart className="h-4 w-4 text-[#054700]" />
+                            <span className="text-sm font-medium text-[#054700]">Wearable Biometrics</span>
+                          </div>
+                          <span className={`text-sm font-bold ${dashboard.biologicalAge.breakdown.wearableOffset > 0 ? 'text-amber-600' : dashboard.biologicalAge.breakdown.wearableOffset < 0 ? 'text-emerald-600' : 'text-[#5a6623]'}`}>
+                            {dashboard.biologicalAge.breakdown.wearableOffset > 0 ? '+' : ''}{dashboard.biologicalAge.breakdown.wearableOffset} yrs
+                          </span>
+                        </div>
+                      )}
+                      {dashboard.biologicalAge.breakdown.lifestyleOffset != null && (
+                        <div className="flex items-center justify-between bg-white rounded-lg border border-[#5a6623]/10 px-3 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <Dumbbell className="h-4 w-4 text-[#054700]" />
+                            <span className="text-sm font-medium text-[#054700]">Lifestyle Factors</span>
+                          </div>
+                          <span className={`text-sm font-bold ${dashboard.biologicalAge.breakdown.lifestyleOffset > 0 ? 'text-amber-600' : dashboard.biologicalAge.breakdown.lifestyleOffset < 0 ? 'text-emerald-600' : 'text-[#5a6623]'}`}>
+                            {dashboard.biologicalAge.breakdown.lifestyleOffset > 0 ? '+' : ''}{dashboard.biologicalAge.breakdown.lifestyleOffset} yrs
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Individual factors */}
+                  {dashboard.biologicalAge.breakdown.factors.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-semibold text-[#5a6623] uppercase tracking-wide">Key Factors ({dashboard.biologicalAge.breakdown.factors.length})</h4>
+                      <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1">
+                        {dashboard.biologicalAge.breakdown.factors.map((f, i) => (
+                          <div key={i} className="flex items-center gap-2 bg-white rounded-lg border border-[#5a6623]/8 px-3 py-2">
+                            <div className={`h-2 w-2 rounded-full flex-shrink-0 ${
+                              f.assessment === 'excellent' ? 'bg-emerald-500' :
+                              f.assessment === 'good' ? 'bg-teal-400' :
+                              f.assessment === 'fair' ? 'bg-amber-500' : 'bg-red-500'
+                            }`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-[#054700] truncate">{f.name}</span>
+                                <span className={`text-xs font-bold flex-shrink-0 ml-2 ${
+                                  f.impact > 0.3 ? 'text-amber-600' :
+                                  f.impact < -0.3 ? 'text-emerald-600' : 'text-[#5a6623]'
+                                }`}>
+                                  {f.impact > 0 ? '+' : ''}{f.impact}y
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] text-[#5a6623]/60">{f.value}</span>
+                                <span className="text-[10px] text-[#5a6623]/40">·</span>
+                                <span className="text-[10px] text-[#5a6623]/50">{f.detail}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Data sources */}
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[10px] text-[#5a6623]/40 uppercase tracking-wide">Data sources:</span>
+                {dashboard.biologicalAge.dataSources.map((src, i) => (
+                  <span key={i} className="text-[10px] text-[#5a6623]/50 bg-[#5a6623]/5 rounded-full px-2 py-0.5 capitalize">{src}</span>
+                ))}
+              </div>
+
+              {/* Disclaimer */}
+              <p className="text-[10px] text-[#5a6623]/40 leading-relaxed">
+                This is a wellness estimate inspired by published aging algorithms (Levine PhenoAge, Klemera-Doubal). It is not a clinical diagnostic and should not replace medical advice.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── Consent Dialog ── */}
       <Dialog open={showConsentDialog} onOpenChange={setShowConsentDialog}>

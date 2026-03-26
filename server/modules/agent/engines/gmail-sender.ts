@@ -6,10 +6,12 @@
  * All sends require prior human approval (pitch status = 'approved').
  */
 import { google } from 'googleapis';
+import sgMail from '@sendgrid/mail';
 import logger from '../../../infra/logging/logger';
 import { agentRepository } from '../agent.repository';
 import { getPrAgentConfig } from '../agent-config';
 import type { OutreachPitch, OutreachProspect } from '@shared/schema';
+import { logPitchActivity } from '../../crm/crm-bridge';
 
 // Gmail OAuth setup — credentials stored in app_settings
 const GMAIL_CONFIG_KEY = 'gmail_oauth_config';
@@ -25,15 +27,13 @@ interface GmailConfig {
  */
 async function getGmailClient(): Promise<ReturnType<typeof google.gmail> | null> {
   const config = await agentRepository.getAgentConfig(GMAIL_CONFIG_KEY);
-  if (!config || !config.clientId || !config.clientSecret || !config.refreshToken) {
-    logger.warn('[gmail] Gmail OAuth not configured — pitches will be queued for manual send');
-    return null;
-  }
 
-  let { clientId, clientSecret, refreshToken } = config as GmailConfig & { encrypted?: boolean };
+  let clientId = config?.clientId || '';
+  let clientSecret = config?.clientSecret || '';
+  let refreshToken = config?.refreshToken || '';
 
   // Decrypt credentials if they were encrypted at rest
-  if (config.encrypted) {
+  if (config?.encrypted && clientId && clientSecret && refreshToken) {
     try {
       const { decryptField } = await import('../../../infra/security/fieldEncryption');
       clientId = decryptField(clientId);
@@ -43,6 +43,18 @@ async function getGmailClient(): Promise<ReturnType<typeof google.gmail> | null>
       logger.error('[gmail] Failed to decrypt OAuth credentials', { error: err.message });
       return null;
     }
+  }
+
+  // Fallback to environment variables if DB config is missing
+  if (!clientId || !clientSecret || !refreshToken) {
+    clientId = process.env.GMAIL_CLIENT_ID || '';
+    clientSecret = process.env.GMAIL_CLIENT_SECRET || '';
+    refreshToken = process.env.GMAIL_REFRESH_TOKEN || '';
+  }
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    logger.warn('[gmail] Gmail OAuth not configured — pitches will be queued for manual send');
+    return null;
   }
 
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
@@ -63,48 +75,82 @@ export async function sendPitchEmail(
     return { success: false, error: `Pitch status is "${pitch.status}", must be "approved"` };
   }
 
-  if (!prospect.contactEmail) {
-    return { success: false, error: 'No contact email for this prospect' };
+  if (!prospect.contactEmail || prospect.contactEmail === 'null') {
+    return { success: false, error: `No contact email for prospect "${prospect.name}". Add an email address before sending.` };
   }
 
   const config = await getPrAgentConfig();
-  const gmail = await getGmailClient();
+  const fromAddress = config.gmailFrom || 'pete@ones.health';
 
-  if (!gmail) {
-    return { success: false, error: 'Gmail not configured. Send manually from pete@ones.health' };
+  // Try Gmail first
+  const gmail = await getGmailClient();
+  if (gmail) {
+    try {
+      const raw = buildMimeMessage({
+        from: fromAddress,
+        to: prospect.contactEmail,
+        subject: pitch.subject,
+        body: pitch.body,
+      });
+
+      const result = await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: { raw },
+      });
+
+      const messageId = result.data.id || '';
+      await agentRepository.updatePitch(pitch.id, {
+        status: 'sent',
+        sentAt: new Date(),
+        sentVia: 'gmail',
+        followUpDueAt: new Date(Date.now() + config.followUpDays * 24 * 60 * 60 * 1000),
+      });
+
+      logger.info(`[gmail] Sent pitch to ${prospect.contactEmail} (messageId: ${messageId})`);
+
+      // Log to CRM timeline
+      logPitchActivity(prospect, { ...pitch, sentVia: 'gmail' } as any, pitch.pitchType?.startsWith('follow_up') ? 'follow_up_sent' : 'pitch_sent').catch(() => {});
+
+      return { success: true, messageId };
+    } catch (err: any) {
+      logger.warn(`[gmail] Gmail send failed for ${prospect.contactEmail}: ${err.message}. Trying SendGrid fallback...`);
+    }
+  }
+
+  // Fallback to SendGrid
+  const sendgridKey = process.env.SENDGRID_API_KEY?.trim();
+  const sendgridFrom = process.env.SENDGRID_FROM_EMAIL?.trim() || fromAddress;
+  if (!sendgridKey) {
+    return { success: false, error: 'Gmail OAuth expired and SendGrid not configured. Update your Gmail refresh token or set SENDGRID_API_KEY.' };
   }
 
   try {
-    // Build MIME message
-    const fromAddress = config.gmailFrom || 'pete@ones.health';
-    const raw = buildMimeMessage({
-      from: fromAddress,
+    sgMail.setApiKey(sendgridKey);
+    const sendgridName = process.env.SENDGRID_FROM_NAME?.trim() || 'Pete';
+    const [response] = await sgMail.send({
       to: prospect.contactEmail,
+      from: { email: sendgridFrom, name: sendgridName },
+      replyTo: { email: 'pete@ones.health', name: 'Pete' },
       subject: pitch.subject,
-      body: pitch.body,
+      text: pitch.body,
     });
 
-    const result = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: { raw },
-    });
-
-    const messageId = result.data.id || '';
-
-    // Update pitch record
     await agentRepository.updatePitch(pitch.id, {
       status: 'sent',
       sentAt: new Date(),
-      sentVia: 'gmail',
+      sentVia: 'sendgrid',
       followUpDueAt: new Date(Date.now() + config.followUpDays * 24 * 60 * 60 * 1000),
     });
 
-    logger.info(`[gmail] Sent pitch to ${prospect.contactEmail} (messageId: ${messageId})`);
-    return { success: true, messageId };
+    logger.info(`[sendgrid-fallback] Sent pitch to ${prospect.contactEmail} (status: ${response.statusCode})`);
 
-  } catch (err: any) {
-    logger.error(`[gmail] Failed to send to ${prospect.contactEmail}: ${err.message}`);
-    return { success: false, error: err.message };
+    // Log to CRM timeline
+    logPitchActivity(prospect, { ...pitch, sentVia: 'sendgrid' } as any, pitch.pitchType?.startsWith('follow_up') ? 'follow_up_sent' : 'pitch_sent').catch(() => {});
+
+    return { success: true, messageId: `sg-${Date.now()}` };
+  } catch (sgErr: any) {
+    logger.error(`[sendgrid-fallback] Also failed for ${prospect.contactEmail}: ${sgErr.message}`);
+    return { success: false, error: `Gmail: invalid_grant (token expired). SendGrid fallback: ${sgErr.message}` };
   }
 }
 
@@ -156,9 +202,10 @@ export async function sendApprovedPitches(): Promise<{
       continue;
     }
 
-    if (prospect.contactMethod === 'form') {
-      // Skip form-based prospects in batch — they require individual review
-      logger.info(`[gmail-sender] Skipping form-based prospect "${prospect.name}" — use individual send`);
+    if (!prospect.contactEmail) {
+      logger.info(`[gmail-sender] Skipping "${prospect.name}" — no email address`);
+      failed++;
+      errors.push(`${prospect.name}: no email address`);
       continue;
     }
 

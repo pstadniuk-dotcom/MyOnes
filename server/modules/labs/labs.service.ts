@@ -4,6 +4,9 @@ import { LAB_TREND_RULES, DEFAULT_CLINICAL_DIRECTION, type ClinicalDirection } f
 import { canonicalKey, canonicalName } from './biomarker-aliases';
 import logger from '../../infra/logging/logger';
 import type { FileUpload } from '@shared/schema';
+import { usersRepository } from '../users/users.repository';
+import { wearablesRepository } from '../wearables/wearables.repository';
+import { wearablesService } from '../wearables/wearables.service';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -110,6 +113,34 @@ export interface LabAnalysisSummary {
     focusAreas: FocusArea[];  // troubled panels with markers + advice
 }
 
+export interface BiologicalAge {
+    age: number;              // computed biological age
+    chronologicalAge: number; // user's stated age
+    delta: number;            // difference (negative = younger)
+    label: string;            // e.g. "3 years younger"
+    dataSources: string[];    // which data contributed ("labs", "wearables", "profile")
+    breakdown: BiologicalAgeBreakdown; // per-category scoring for explainer
+}
+
+export interface BiologicalAgeBreakdown {
+    labScore: number | null;         // 0-100, contribution from biomarkers
+    labOffset: number | null;        // years offset from labs
+    wearableScore: number | null;    // 0-100, contribution from wearables
+    wearableOffset: number | null;   // years offset from wearables
+    lifestyleScore: number | null;   // 0-100, contribution from lifestyle
+    lifestyleOffset: number | null;  // years offset from lifestyle
+    factors: BiologicalAgeFactor[];  // individual contributing factors
+}
+
+export interface BiologicalAgeFactor {
+    name: string;           // e.g. "hs-CRP", "Resting Heart Rate"  
+    source: 'labs' | 'wearables' | 'profile';
+    value: string;          // e.g. "0.8 mg/L", "58 bpm"
+    impact: number;         // years offset this factor contributes
+    assessment: 'excellent' | 'good' | 'fair' | 'poor';
+    detail: string;         // human explanation
+}
+
 export interface BiomarkersDashboard {
     markers: AggregatedBiomarker[];
     healthScore: HealthScore;
@@ -148,6 +179,7 @@ export interface BiomarkersDashboard {
             percentChange: number | null;
         }>;
     };
+    biologicalAge: BiologicalAge | null;
 }
 
 // ── Marker category inference ──────────────────────────────────────────
@@ -427,6 +459,504 @@ function computeHealthScore(markers: AggregatedBiomarker[]): HealthScore {
         panels,
         momentum,
         momentumLabel,
+    };
+}
+
+// ── Biological Age Computation ─────────────────────────────────────────
+
+/**
+ * Advanced biological age estimation using per-marker deviation scoring,
+ * wearable biometrics, and lifestyle factors.
+ *
+ * Methodology (inspired by Levine PhenoAge & Klemera-Doubal):
+ *   1. For each key biomarker, compute how far the value deviates from
+ *      the age/sex-adjusted optimal range (not just in/out of range)
+ *   2. Weight markers by their published association with mortality/aging
+ *   3. Incorporate wearable biometrics (HRV, RHR, sleep, VO2 proxy)
+ *   4. Apply lifestyle modifiers (exercise frequency, smoking, stress)
+ *   5. Sum weighted deviations into a total offset (years), clamped ±12
+ *
+ * Key difference from simple health-score mapping: this uses continuous
+ * deviation scoring per marker rather than binary in/out-of-range,
+ * and weights markers by their aging-relevance (not clinical urgency).
+ */
+async function computeBiologicalAge(
+    userId: string,
+    markers: AggregatedBiomarker[],
+    healthScore: number,
+): Promise<BiologicalAge | null> {
+    let profile: any;
+    try {
+        profile = await usersRepository.getHealthProfile(userId);
+    } catch {
+        return null;
+    }
+    if (!profile?.age || profile.age < 18) return null;
+
+    const chronoAge = profile.age;
+    const sex = (profile?.sex || 'other') as string;
+    const factors: BiologicalAgeFactor[] = [];
+    const dataSources: string[] = [];
+
+    // Helper: find marker by regex
+    const findM = (pattern: RegExp) => markers.find(m => pattern.test(m.name.toLowerCase()));
+
+    // ── 1. BIOMARKER-BASED SCORING ──
+    // Each marker has: optimal range, aging weight, and continuous scoring
+    // Impact formula: deviation from optimal → fractional years
+    let labOffset = 0;
+    let labFactorCount = 0;
+
+    interface MarkerRule {
+        pattern: RegExp;
+        label: string;
+        optimalLow: number;
+        optimalHigh: number;
+        worstLow: number;   // value at which impact maxes out negative
+        worstHigh: number;  // value at which impact maxes out positive
+        weight: number;     // aging-relevance weight (0-2)
+        lowerBetter?: boolean; // for markers where lower = younger
+        unit: string;
+    }
+
+    const markerRules: MarkerRule[] = [
+        // Inflammation (highest aging correlation per Levine)
+        { pattern: /\bcrp\b|hs.?crp/, label: 'hs-CRP', optimalLow: 0, optimalHigh: 1.0, worstLow: 0, worstHigh: 10, weight: 1.8, lowerBetter: true, unit: 'mg/L' },
+        { pattern: /homocysteine/, label: 'Homocysteine', optimalLow: 5, optimalHigh: 8, worstLow: 0, worstHigh: 20, weight: 1.2, unit: 'µmol/L' },
+
+        // Metabolic / Glycemic
+        { pattern: /\ba1c\b|hba1c|hemoglobin a1c/, label: 'HbA1c', optimalLow: 4.5, optimalHigh: 5.2, worstLow: 3.5, worstHigh: 7.0, weight: 1.6, unit: '%' },
+        { pattern: /fasting glucose/, label: 'Fasting Glucose', optimalLow: 72, optimalHigh: 90, worstLow: 50, worstHigh: 140, weight: 1.3, unit: 'mg/dL' },
+        { pattern: /\binsulin\b/, label: 'Fasting Insulin', optimalLow: 2, optimalHigh: 6, worstLow: 0, worstHigh: 25, weight: 1.2, lowerBetter: true, unit: 'µIU/mL' },
+
+        // Lipids
+        { pattern: /\bldl\b(?!.*particle|.*small|.*pattern)/, label: 'LDL Cholesterol', optimalLow: 50, optimalHigh: 100, worstLow: 0, worstHigh: 200, weight: 1.0, unit: 'mg/dL' },
+        { pattern: /\bhdl\b(?!.*vldl|.*non)/, label: 'HDL Cholesterol', optimalLow: sex === 'male' ? 50 : 55, optimalHigh: 90, worstLow: 20, worstHigh: 120, weight: 1.1, unit: 'mg/dL' },
+        { pattern: /triglyceride/, label: 'Triglycerides', optimalLow: 40, optimalHigh: 80, worstLow: 10, worstHigh: 300, weight: 1.0, lowerBetter: true, unit: 'mg/dL' },
+        { pattern: /apolipoprotein b|apob/, label: 'ApoB', optimalLow: 40, optimalHigh: 80, worstLow: 20, worstHigh: 150, weight: 1.3, lowerBetter: true, unit: 'mg/dL' },
+
+        // Kidney
+        { pattern: /\begfr\b|\bgfr\b/, label: 'eGFR', optimalLow: 90, optimalHigh: 120, worstLow: 30, worstHigh: 150, weight: 1.4, unit: 'mL/min' },
+        { pattern: /cystatin/, label: 'Cystatin C', optimalLow: 0.6, optimalHigh: 0.9, worstLow: 0.3, worstHigh: 2.0, weight: 1.3, lowerBetter: true, unit: 'mg/L' },
+
+        // Liver
+        { pattern: /\balt\b/, label: 'ALT', optimalLow: 10, optimalHigh: 25, worstLow: 0, worstHigh: 80, weight: 0.8, lowerBetter: true, unit: 'U/L' },
+        { pattern: /\bggt\b|gamma.?glutamyl/, label: 'GGT', optimalLow: 10, optimalHigh: 25, worstLow: 0, worstHigh: 80, weight: 0.9, lowerBetter: true, unit: 'U/L' },
+        { pattern: /\balbumin\b(?!.*urine)/, label: 'Albumin', optimalLow: 4.2, optimalHigh: 5.0, worstLow: 2.5, worstHigh: 5.5, weight: 1.5, unit: 'g/dL' },
+
+        // Blood
+        { pattern: /\bhemoglobin\b(?!.*a1c)/, label: 'Hemoglobin', optimalLow: sex === 'male' ? 14.5 : 13.0, optimalHigh: sex === 'male' ? 16.0 : 15.0, worstLow: 8, worstHigh: 20, weight: 0.9, unit: 'g/dL' },
+        { pattern: /white blood cell|\bwbc\b/, label: 'WBC', optimalLow: 4.0, optimalHigh: 6.5, worstLow: 1.5, worstHigh: 15, weight: 1.1, unit: 'k/µL' },
+        { pattern: /\brdw\b/, label: 'RDW', optimalLow: 11.5, optimalHigh: 13.0, worstLow: 10, worstHigh: 18, weight: 1.0, lowerBetter: true, unit: '%' },
+
+        // Vitamins / Hormones
+        { pattern: /vitamin d|25.?hydroxy/, label: 'Vitamin D', optimalLow: 40, optimalHigh: 60, worstLow: 5, worstHigh: 100, weight: 0.7, unit: 'ng/mL' },
+        { pattern: /\bdhea\b/, label: 'DHEA-S', optimalLow: sex === 'male' ? 200 : 150, optimalHigh: sex === 'male' ? 400 : 350, worstLow: 50, worstHigh: 600, weight: 0.8, unit: 'µg/dL' },
+        { pattern: /testosterone(?!.*free)/, label: 'Total Testosterone', optimalLow: sex === 'male' ? 500 : 15, optimalHigh: sex === 'male' ? 900 : 70, worstLow: sex === 'male' ? 100 : 5, worstHigh: sex === 'male' ? 1200 : 100, weight: 0.7, unit: 'ng/dL' },
+
+        // Thyroid
+        { pattern: /\btsh\b/, label: 'TSH', optimalLow: 1.0, optimalHigh: 2.5, worstLow: 0.01, worstHigh: 10, weight: 0.8, unit: 'mIU/L' },
+    ];
+
+    for (const rule of markerRules) {
+        const m = findM(rule.pattern);
+        if (!m?.latest.value) continue;
+        const v = m.latest.value;
+
+        // Continuous deviation scoring:
+        // 0 = within optimal range, ±1 = at the worst boundary
+        let deviation: number;
+        if (v >= rule.optimalLow && v <= rule.optimalHigh) {
+            deviation = 0; // Optimal
+        } else if (v < rule.optimalLow) {
+            const distFromOptimal = rule.optimalLow - v;
+            const maxDist = rule.optimalLow - rule.worstLow;
+            deviation = maxDist > 0 ? Math.min(1, distFromOptimal / maxDist) : 0;
+            // For "lower is better" markers, being below optimal is actually good
+            if (rule.lowerBetter && v >= rule.worstLow) deviation = -deviation * 0.3;
+        } else {
+            const distFromOptimal = v - rule.optimalHigh;
+            const maxDist = rule.worstHigh - rule.optimalHigh;
+            deviation = maxDist > 0 ? Math.min(1, distFromOptimal / maxDist) : 0;
+            if (rule.lowerBetter) deviation = deviation; // Higher is worse for lowerBetter markers
+        }
+
+        // Convert deviation to years: max ±1.5 years per marker, weighted
+        const impact = deviation * rule.weight * 1.5;
+        labOffset += impact;
+        labFactorCount++;
+
+        // Determine assessment
+        const absDeviation = Math.abs(deviation);
+        const assessment: BiologicalAgeFactor['assessment'] =
+            absDeviation < 0.05 ? 'excellent' :
+            absDeviation < 0.25 ? 'good' :
+            absDeviation < 0.6 ? 'fair' : 'poor';
+
+        const impactYears = Math.round(impact * 10) / 10;
+        if (Math.abs(impactYears) >= 0.1) {
+            factors.push({
+                name: rule.label,
+                source: 'labs',
+                value: `${m.latest.rawValue} ${m.latest.unit || rule.unit}`,
+                impact: impactYears,
+                assessment,
+                detail: assessment === 'excellent' ? `Optimal range (${rule.optimalLow}–${rule.optimalHigh} ${rule.unit})`
+                    : assessment === 'good' ? `Near optimal (target: ${rule.optimalLow}–${rule.optimalHigh} ${rule.unit})`
+                    : `Target: ${rule.optimalLow}–${rule.optimalHigh} ${rule.unit}`,
+            });
+        }
+    }
+
+    if (labFactorCount > 0) {
+        dataSources.push('labs');
+        // Normalize: if we have many markers, cap the total lab impact
+        // This prevents having 20 markers all adding +0.5 from ballooning
+        labOffset = Math.max(-6, Math.min(6, labOffset));
+    }
+
+    let totalOffset = labOffset;
+    const labScore = labFactorCount > 0 ? Math.round(Math.max(0, Math.min(100, 50 - labOffset * 8))) : null;
+
+    // ── 2. WEARABLE-BASED SCORING ──
+    let wearableOffset = 0;
+    let wearableScore: number | null = null;
+    try {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(endDate.getDate() - 30);
+
+        // Try Junction API (current wearable integration) first, fall back to legacy DB table
+        let biometricRows: any[] = [];
+        try {
+            const endStr = endDate.toISOString().split('T')[0];
+            const startStr = startDate.toISOString().split('T')[0];
+            const junctionResult = await wearablesService.getBiometricData(userId, startStr, endStr);
+            if (junctionResult?.data?.length >= 3) {
+                // Flatten Junction's nested format into flat rows matching the fields the scoring expects
+                biometricRows = junctionResult.data.map((d: any) => ({
+                    restingHeartRate: d.heart?.restingRate ?? null,
+                    hrvMs: d.heart?.hrvMs ?? null,
+                    sleepHours: d.sleep?.totalMinutes ?? null,  // stored as minutes, scoring handles conversion
+                    deepSleepMinutes: d.sleep?.deepSleepMinutes ?? null,
+                    steps: d.activity?.steps ?? null,
+                    spo2Percentage: d.body?.spo2 ?? null,
+                }));
+
+            }
+        } catch (junctionErr: any) {
+            logger.warn('[BioAge] Junction wearable fetch failed, using legacy fallback', { error: junctionErr?.message || junctionErr });
+        }
+
+        // Fall back to legacy biometric_data table if Junction returned nothing
+        if (biometricRows.length < 3) {
+            const legacyRows = await wearablesRepository.getBiometricData(userId, startDate, endDate);
+            if (legacyRows.length >= 3) {
+                biometricRows = legacyRows;
+            }
+        }
+
+        if (biometricRows.length >= 3) {
+            dataSources.push('wearables');
+
+            const avgMetric = (field: string) => {
+                const vals = biometricRows.map((r: any) => r[field]).filter((v: any) => v != null && v > 0);
+                return vals.length > 0 ? vals.reduce((s: number, v: number) => s + v, 0) / vals.length : null;
+            };
+
+            // Resting heart rate — strongest wearable predictor of CV mortality
+            const rhr = avgMetric('restingHeartRate');
+            if (rhr != null) {
+                // Optimal: 50-60bpm; each 5bpm above 60 adds ~0.5 years
+                let rhrImpact = 0;
+                if (rhr <= 52) rhrImpact = -1.5;
+                else if (rhr <= 58) rhrImpact = -0.8;
+                else if (rhr <= 64) rhrImpact = -0.2;
+                else if (rhr <= 72) rhrImpact = 0.3;
+                else if (rhr <= 80) rhrImpact = 1.0;
+                else rhrImpact = 2.0;
+                wearableOffset += rhrImpact;
+                factors.push({
+                    name: 'Resting Heart Rate',
+                    source: 'wearables',
+                    value: `${Math.round(rhr)} bpm`,
+                    impact: Math.round(rhrImpact * 10) / 10,
+                    assessment: rhr <= 58 ? 'excellent' : rhr <= 64 ? 'good' : rhr <= 75 ? 'fair' : 'poor',
+                    detail: `30-day avg. Optimal: 50–60 bpm`,
+                });
+            }
+
+            // HRV — age-adjusted (decreases ~1ms/year after age 25)
+            const hrv = avgMetric('hrvMs');
+            if (hrv != null) {
+                // Age-expected HRV baseline (rough population median)
+                const expectedHrv = Math.max(15, 75 - (chronoAge - 25) * 1.0);
+                const ratio = hrv / expectedHrv;
+                let hrvImpact = 0;
+                if (ratio >= 1.5) hrvImpact = -2.0;
+                else if (ratio >= 1.2) hrvImpact = -1.2;
+                else if (ratio >= 0.9) hrvImpact = -0.3;
+                else if (ratio >= 0.7) hrvImpact = 0.5;
+                else if (ratio >= 0.5) hrvImpact = 1.2;
+                else hrvImpact = 2.0;
+                wearableOffset += hrvImpact;
+                factors.push({
+                    name: 'Heart Rate Variability',
+                    source: 'wearables',
+                    value: `${Math.round(hrv)} ms`,
+                    impact: Math.round(hrvImpact * 10) / 10,
+                    assessment: ratio >= 1.2 ? 'excellent' : ratio >= 0.9 ? 'good' : ratio >= 0.7 ? 'fair' : 'poor',
+                    detail: `30-day avg. Expected for age ${chronoAge}: ~${Math.round(expectedHrv)} ms`,
+                });
+            }
+
+            // Sleep duration
+            const sleepMin = avgMetric('sleepHours');
+            if (sleepMin != null) {
+                const sleepHrs = sleepMin / 60;
+                let sleepImpact = 0;
+                if (sleepHrs >= 7.0 && sleepHrs <= 8.5) sleepImpact = -0.5;
+                else if (sleepHrs >= 6.5 && sleepHrs <= 9.0) sleepImpact = 0;
+                else if (sleepHrs < 6) sleepImpact = 1.5;
+                else if (sleepHrs < 6.5) sleepImpact = 0.8;
+                else sleepImpact = 0.5; // >9 hours
+                wearableOffset += sleepImpact;
+                if (Math.abs(sleepImpact) >= 0.1) {
+                    factors.push({
+                        name: 'Sleep Duration',
+                        source: 'wearables',
+                        value: `${sleepHrs.toFixed(1)} hrs`,
+                        impact: Math.round(sleepImpact * 10) / 10,
+                        assessment: sleepHrs >= 7 && sleepHrs <= 8.5 ? 'excellent' : sleepHrs >= 6.5 ? 'good' : 'poor',
+                        detail: `30-day avg. Optimal: 7–8.5 hours`,
+                    });
+                }
+            }
+
+            // Deep sleep percentage (if available)
+            const deepSleep = avgMetric('deepSleepMinutes');
+            const totalSleep = avgMetric('sleepHours');
+            if (deepSleep != null && totalSleep != null && totalSleep > 0) {
+                const deepPct = (deepSleep / totalSleep) * 100;
+                let deepImpact = 0;
+                if (deepPct >= 20) deepImpact = -0.5;
+                else if (deepPct >= 15) deepImpact = -0.2;
+                else if (deepPct < 10) deepImpact = 0.8;
+                wearableOffset += deepImpact;
+                if (Math.abs(deepImpact) >= 0.1) {
+                    factors.push({
+                        name: 'Deep Sleep',
+                        source: 'wearables',
+                        value: `${Math.round(deepPct)}% of total`,
+                        impact: Math.round(deepImpact * 10) / 10,
+                        assessment: deepPct >= 20 ? 'excellent' : deepPct >= 15 ? 'good' : deepPct >= 10 ? 'fair' : 'poor',
+                        detail: `30-day avg. Optimal: ≥20% deep sleep`,
+                    });
+                }
+            }
+
+            // Steps (proxy for daily activity / cardiorespiratory fitness)
+            const steps = avgMetric('steps');
+            if (steps != null) {
+                let stepsImpact = 0;
+                if (steps >= 12000) stepsImpact = -0.8;
+                else if (steps >= 8000) stepsImpact = -0.4;
+                else if (steps >= 6000) stepsImpact = 0;
+                else if (steps >= 4000) stepsImpact = 0.5;
+                else stepsImpact = 1.0;
+                wearableOffset += stepsImpact;
+                if (Math.abs(stepsImpact) >= 0.1) {
+                    factors.push({
+                        name: 'Daily Steps',
+                        source: 'wearables',
+                        value: `${Math.round(steps).toLocaleString()} avg`,
+                        impact: Math.round(stepsImpact * 10) / 10,
+                        assessment: steps >= 10000 ? 'excellent' : steps >= 7000 ? 'good' : steps >= 5000 ? 'fair' : 'poor',
+                        detail: `30-day avg. Optimal: ≥8,000 steps/day`,
+                    });
+                }
+            }
+
+            // SpO2
+            const spo2 = avgMetric('spo2Percentage');
+            if (spo2 != null) {
+                let spo2Impact = 0;
+                if (spo2 >= 97) spo2Impact = -0.2;
+                else if (spo2 < 94) spo2Impact = 1.0;
+                else if (spo2 < 96) spo2Impact = 0.3;
+                wearableOffset += spo2Impact;
+                if (Math.abs(spo2Impact) >= 0.1) {
+                    factors.push({
+                        name: 'Blood Oxygen (SpO2)',
+                        source: 'wearables',
+                        value: `${Math.round(spo2)}%`,
+                        impact: Math.round(spo2Impact * 10) / 10,
+                        assessment: spo2 >= 97 ? 'excellent' : spo2 >= 95 ? 'good' : 'poor',
+                        detail: `30-day avg. Optimal: ≥97%`,
+                    });
+                }
+            }
+
+            wearableOffset = Math.max(-5, Math.min(5, wearableOffset));
+            wearableScore = Math.round(Math.max(0, Math.min(100, 50 - wearableOffset * 10)));
+            totalOffset += wearableOffset;
+        }
+    } catch (err) {
+        logger.debug('Wearable data not available for biological age:', err);
+    }
+
+    // ── 3. LIFESTYLE FACTORS ──
+    let lifestyleOffset = 0;
+    let lifestyleScore: number | null = null;
+    if (profile) {
+        let hasLifestyleData = false;
+
+        if (profile.exerciseDaysPerWeek != null) {
+            hasLifestyleData = true;
+            let exImpact = 0;
+            if (profile.exerciseDaysPerWeek >= 5) exImpact = -1.0;
+            else if (profile.exerciseDaysPerWeek >= 3) exImpact = -0.4;
+            else if (profile.exerciseDaysPerWeek === 1) exImpact = 0.3;
+            else if (profile.exerciseDaysPerWeek === 0) exImpact = 1.0;
+            lifestyleOffset += exImpact;
+            if (Math.abs(exImpact) >= 0.1) {
+                factors.push({
+                    name: 'Exercise Frequency',
+                    source: 'profile',
+                    value: `${profile.exerciseDaysPerWeek} days/week`,
+                    impact: Math.round(exImpact * 10) / 10,
+                    assessment: profile.exerciseDaysPerWeek >= 5 ? 'excellent' : profile.exerciseDaysPerWeek >= 3 ? 'good' : 'poor',
+                    detail: 'Optimal: 4–5 days/week of moderate+ activity',
+                });
+            }
+        }
+
+        if (profile.smokingStatus === 'current') {
+            hasLifestyleData = true;
+            lifestyleOffset += 3.0;
+            factors.push({
+                name: 'Smoking Status',
+                source: 'profile',
+                value: 'Current smoker',
+                impact: 3.0,
+                assessment: 'poor',
+                detail: 'Smoking adds 3+ years to biological age',
+            });
+        } else if (profile.smokingStatus === 'former') {
+            hasLifestyleData = true;
+            lifestyleOffset += 0.5;
+            factors.push({
+                name: 'Smoking Status',
+                source: 'profile',
+                value: 'Former smoker',
+                impact: 0.5,
+                assessment: 'fair',
+                detail: 'Former smoking has residual impact for several years',
+            });
+        }
+
+        if (profile.stressLevel != null && profile.stressLevel > 0) {
+            hasLifestyleData = true;
+            let stressImpact = 0;
+            if (profile.stressLevel <= 3) stressImpact = -0.3;
+            else if (profile.stressLevel <= 5) stressImpact = 0;
+            else if (profile.stressLevel <= 7) stressImpact = 0.5;
+            else stressImpact = 1.2;
+            lifestyleOffset += stressImpact;
+            if (Math.abs(stressImpact) >= 0.1) {
+                factors.push({
+                    name: 'Stress Level',
+                    source: 'profile',
+                    value: `${profile.stressLevel}/10`,
+                    impact: Math.round(stressImpact * 10) / 10,
+                    assessment: profile.stressLevel <= 3 ? 'excellent' : profile.stressLevel <= 5 ? 'good' : profile.stressLevel <= 7 ? 'fair' : 'poor',
+                    detail: 'Chronic stress accelerates cellular aging',
+                });
+            }
+        }
+
+        if (profile.alcoholDrinksPerWeek != null) {
+            hasLifestyleData = true;
+            let alcImpact = 0;
+            if (profile.alcoholDrinksPerWeek === 0) alcImpact = 0;
+            else if (profile.alcoholDrinksPerWeek <= 4) alcImpact = 0;
+            else if (profile.alcoholDrinksPerWeek <= 7) alcImpact = 0.3;
+            else if (profile.alcoholDrinksPerWeek <= 14) alcImpact = 0.8;
+            else alcImpact = 1.5;
+            lifestyleOffset += alcImpact;
+            if (Math.abs(alcImpact) >= 0.1) {
+                factors.push({
+                    name: 'Alcohol Intake',
+                    source: 'profile',
+                    value: `${profile.alcoholDrinksPerWeek} drinks/week`,
+                    impact: Math.round(alcImpact * 10) / 10,
+                    assessment: profile.alcoholDrinksPerWeek <= 4 ? 'good' : profile.alcoholDrinksPerWeek <= 7 ? 'fair' : 'poor',
+                    detail: 'Optimal: ≤4 drinks/week',
+                });
+            }
+        }
+
+        // BMI if weight & height available
+        if (profile.weightLbs && profile.heightCm) {
+            hasLifestyleData = true;
+            const weightKg = profile.weightLbs * 0.453592;
+            const heightM = profile.heightCm / 100;
+            const bmi = weightKg / (heightM * heightM);
+            let bmiImpact = 0;
+            if (bmi >= 18.5 && bmi <= 24.9) bmiImpact = -0.3;
+            else if (bmi >= 25 && bmi <= 29.9) bmiImpact = 0.8;
+            else if (bmi >= 30) bmiImpact = 1.5;
+            else if (bmi < 18.5) bmiImpact = 0.5;
+            lifestyleOffset += bmiImpact;
+            if (Math.abs(bmiImpact) >= 0.1) {
+                factors.push({
+                    name: 'BMI',
+                    source: 'profile',
+                    value: `${bmi.toFixed(1)}`,
+                    impact: Math.round(bmiImpact * 10) / 10,
+                    assessment: bmi >= 18.5 && bmi <= 24.9 ? 'excellent' : bmi <= 29.9 ? 'fair' : 'poor',
+                    detail: 'Optimal BMI: 18.5–24.9',
+                });
+            }
+        }
+
+        if (hasLifestyleData) {
+            if (!dataSources.includes('profile')) dataSources.push('profile');
+            lifestyleOffset = Math.max(-2, Math.min(4, lifestyleOffset));
+            lifestyleScore = Math.round(Math.max(0, Math.min(100, 50 - lifestyleOffset * 12)));
+            totalOffset += lifestyleOffset;
+        }
+    }
+
+    // Clamp total offset to ±12 years, ensure bio age ≥ 18
+    totalOffset = Math.max(-12, Math.min(12, totalOffset));
+    const bioAge = Math.max(18, Math.round(chronoAge + totalOffset));
+    const delta = bioAge - chronoAge;
+
+    const label = delta === 0
+        ? 'Right on track'
+        : delta < 0
+            ? `${Math.abs(delta)} year${Math.abs(delta) !== 1 ? 's' : ''} younger`
+            : `${delta} year${delta !== 1 ? 's' : ''} older`;
+
+    // Sort factors by absolute impact (most impactful first)
+    factors.sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact));
+
+    return {
+        age: bioAge,
+        chronologicalAge: chronoAge,
+        delta,
+        label,
+        dataSources,
+        breakdown: {
+            labScore,
+            labOffset: labFactorCount > 0 ? Math.round(labOffset * 10) / 10 : null,
+            wearableScore,
+            wearableOffset: wearableScore != null ? Math.round(wearableOffset * 10) / 10 : null,
+            lifestyleScore,
+            lifestyleOffset: lifestyleScore != null ? Math.round(lifestyleOffset * 10) / 10 : null,
+            factors,
+        },
     };
 }
 
@@ -1192,6 +1722,14 @@ export class LabsService {
         const healthScore = computeHealthScore(markers);
         const analysisSummary = generateAnalysisSummary(markers, healthScore);
 
+        // Compute biological age (non-blocking — gracefully returns null on failure)
+        let biologicalAge: BiologicalAge | null = null;
+        try {
+            biologicalAge = await computeBiologicalAge(userId, markers, healthScore.overall);
+        } catch (err) {
+            logger.debug('Biological age computation failed:', err);
+        }
+
         const latestReport = completedReports[completedReports.length - 1];
         const prevReport = completedReports.length >= 2 ? completedReports[completedReports.length - 2] : null;
 
@@ -1224,6 +1762,7 @@ export class LabsService {
                 previousReportDate: prevReport ? this.getReportDate(prevReport) : null,
                 changes,
             },
+            biologicalAge,
         };
 
         // Fire-and-forget: lazily backfill insights for any report that was
@@ -1288,6 +1827,7 @@ export class LabsService {
                 };
             }),
             comparison: { hasMultipleReports: false, latestReportDate: null, previousReportDate: null, changes: [] },
+            biologicalAge: null,
         };
     }
     // ── Batch AI marker-insight generation (called at upload time) ────

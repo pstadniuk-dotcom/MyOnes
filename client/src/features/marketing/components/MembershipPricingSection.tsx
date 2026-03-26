@@ -3,6 +3,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Check, ArrowRight, Loader2, Scale, Layers, ShieldCheck, Package, Beaker } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRef, useState, useEffect } from "react";
 
 interface MembershipTier {
   id: string;
@@ -58,6 +59,9 @@ function findActiveTier(tiers: ReturnType<typeof transformTiers>) {
 export default function MembershipPricingSection() {
   const { user } = useAuth();
   const ctaHref = user ? '/membership' : '/signup';
+  const sectionRef = useRef<HTMLElement>(null);
+  const [revealed, setRevealed] = useState(false);
+
   // Fetch tiers from API
   const { data: apiTiers, isLoading } = useQuery<MembershipTier[]>({
     queryKey: ['/api/membership/tiers'],
@@ -68,6 +72,21 @@ export default function MembershipPricingSection() {
     },
     staleTime: 60000, // Cache for 1 minute
   });
+
+  useEffect(() => {
+    if (isLoading) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRevealed(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, [isLoading]);
 
   // Transform and prepare tiers for display
   const rawTiers = apiTiers && apiTiers.length > 0 ? transformTiers(apiTiers) : fallbackTiers;
@@ -95,102 +114,79 @@ export default function MembershipPricingSection() {
   }
 
   return (
-    <section id="pricing" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
-      <div className="container mx-auto px-6 max-w-6xl">
+    <section ref={sectionRef} id="pricing" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         {/* ── Section Header ── */}
-        <div className="max-w-2xl mx-auto text-center mb-10">
-          <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
+        <div
+          className={`max-w-2xl mx-auto text-center mb-14 md:mb-20 transition-all duration-700 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
+          <span className="text-[11px] font-semibold tracking-[0.25em] uppercase text-[#5a6623]/70">
             Membership & Pricing
           </span>
-          <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl text-[#054700] font-light leading-tight text-balance">
+          <h2 className="mt-5 text-3xl sm:text-4xl md:text-5xl lg:text-[3.4rem] text-[#054700] font-light leading-[1.08] tracking-[-0.02em]">
             One membership.{" "}
             <span className="text-[#8a9a2c]">Everything you need.</span>
           </h2>
-          <p className="mt-6 text-lg text-[#054700]/60 leading-relaxed">
+          <p className="mt-6 text-lg md:text-xl text-[#054700]/50 leading-relaxed max-w-xl mx-auto font-light">
             Lock in your rate forever. AI consultations, formula optimization, and member pricing on supplements and labs.
           </p>
         </div>
 
-        {/* ── Tier Strip ── */}
-        <div className="max-w-3xl mx-auto mb-10">
-          <div className="bg-white/70 backdrop-blur-sm rounded-2xl px-6 md:px-10 py-5 shadow-sm">
-            {/* Price points */}
-            <div className="flex justify-between items-end mb-3">
-              {tiers.map((tier) => (
-                <div key={tier.id} className="text-center flex-1">
-                  <div className={`text-2xl md:text-3xl font-light transition-colors ${tier.active ? "text-[#054700]" : "text-[#054700]/25"}`}>
-                    ${tier.priceMonthly}
-                    <span className="text-xs font-normal">/mo</span>
-                  </div>
+        {/* ── Two-column layout ── */}
+        <div
+          className={`grid lg:grid-cols-[1.15fr_0.85fr] gap-6 lg:gap-8 max-w-5xl mx-auto transition-all duration-700 delay-200 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
+          {/* ═══ Left — Hero Membership Card ═══ */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-3xl overflow-hidden shadow-xl shadow-[#054700]/5 border border-[#054700]/[0.06] flex flex-col">
+            {/* Header — green strip with price + urgency */}
+            <div className="bg-[#054700] px-8 md:px-10 py-8">
+              <div className="flex items-center justify-between mb-5">
+                <div className="inline-flex items-center gap-2 bg-white/10 px-3.5 py-1.5 rounded-full">
+                  <span className="text-sm">🎉</span>
+                  <span className="text-white/80 text-sm font-medium">{activeTier.name} Member</span>
                 </div>
-              ))}
-            </div>
+                {spotsRemaining && (
+                  <span className="text-[#8a9a2c] text-xs font-semibold">
+                    {spotsRemaining} of {activeTier.limit} spots left
+                  </span>
+                )}
+              </div>
 
-            {/* Progress bar */}
-            <div className="relative h-1.5 bg-[#054700]/10 rounded-full mb-3">
-              <div
-                className="absolute left-0 top-0 h-full bg-[#054700]/40 rounded-full transition-all duration-500"
-                style={{ width: `${((activeTier.claimed || 0) / (activeTier.limit || 100)) * 25}%` }}
-              />
-              {tiers.map((tier, index) => (
-                <div
-                  key={tier.id}
-                  className={`absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-colors ${tier.active
-                    ? "bg-[#054700] border-[#054700]"
-                    : index < tiers.findIndex(t => t.active)
-                      ? "bg-[#054700]/70 border-[#054700]/70"
-                      : "bg-white/70 backdrop-blur-sm border-[#054700]/20"
-                    }`}
-                  style={{ left: `${index * 33.33}%`, transform: 'translate(-50%, -50%)' }}
-                />
-              ))}
-            </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-5xl md:text-6xl font-light text-white tracking-tight">${activeTier.priceMonthly}</span>
+                <span className="text-white/50 text-lg">/month forever</span>
+              </div>
 
-            {/* Tier labels */}
-            <div className="flex justify-between items-start">
-              {tiers.map((tier) => (
-                <div key={tier.id} className="text-center flex-1">
-                  <div className={`text-xs font-medium ${tier.active ? "text-[#054700]" : "text-[#054700]/30"}`}>
-                    {tier.name}
+              {savingsPercent > 0 && (
+                <p className="mt-3 text-[#8a9a2c] text-sm font-medium">
+                  {savingsPercent}% off standard pricing, locked for life
+                </p>
+              )}
+
+              {/* Progress bar — compact, inside header */}
+              {spotsRemaining && activeTier.limit && (
+                <div className="mt-5">
+                  <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#8a9a2c] rounded-full transition-all duration-700"
+                      style={{ width: `${((activeTier.claimed || 0) / activeTier.limit) * 100}%` }}
+                    />
                   </div>
-                  <div className={`text-[10px] mt-0.5 ${tier.active ? "text-[#054700]/60" : "text-[#054700]/25"}`}>
-                    {tier.limit ? `First ${tier.limit.toLocaleString()}` : "After launch"}
-                  </div>
-                  {tier.active && spotsRemaining && (
-                    <div className="text-[10px] text-[#5a6623] font-medium mt-0.5">
-                      {spotsRemaining} spots left
-                    </div>
-                  )}
-                  {!tier.active && tier.id !== 'standard' && (
-                    <div className="text-[10px] text-[#054700]/20 mt-0.5">
-                      Coming next
-                    </div>
-                  )}
+                  <p className="text-white/35 text-xs mt-2">
+                    Price increases to ${tiers.find(t => t.id === 'early')?.priceMonthly || 15}/mo when founding spots fill
+                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Two-column: Membership Card + Supplement Pricing ── */}
-        <div className="grid lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          {/* Left — Membership Card */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl shadow-[#054700]/5 overflow-hidden flex flex-col">
-            <div className="bg-[#054700] px-8 py-10 text-center">
-              <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-white/80 text-sm mb-4">
-                🎉 {activeTier.name} Member
-              </div>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="text-5xl md:text-6xl font-light text-white">${activeTier.priceMonthly}</span>
-                <span className="text-white/60">/month forever</span>
-              </div>
-              <p className="mt-3 text-white/70 text-sm">
-                {savingsPercent > 0 ? `${savingsPercent}% off standard pricing, locked for life` : 'Standard pricing'}
-              </p>
+              )}
             </div>
 
-            <div className="px-8 py-10 flex-1 flex flex-col">
-              <ul className="space-y-5 mb-10 flex-1">
+
+            {/* Features — single column, left-aligned */}
+            <div className="px-8 md:px-10 pt-8 pb-6 flex-1 flex items-center">
+              <ul className="space-y-4">
                 {[
                   "Unlimited AI health consultations",
                   "Lab and wearable data analysis",
@@ -199,92 +195,130 @@ export default function MembershipPricingSection() {
                   "Lab testing at member rates",
                   "Future platform upgrades included",
                 ].map((feature, index) => (
-                  <li key={index} className="flex items-center gap-4">
-                    <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[#054700]/10 flex items-center justify-center">
-                      <Check className="w-4 h-4 text-[#054700]" />
+                  <li key={index} className="flex items-center gap-3.5">
+                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#054700]/[0.07] flex items-center justify-center">
+                      <Check className="w-3.5 h-3.5 text-[#054700]" />
                     </div>
-                    <span className="text-[#054700]/80 text-base">{feature}</span>
+                    <span className="text-[#054700]/75 text-[15px]">{feature}</span>
                   </li>
                 ))}
               </ul>
+            </div>
 
+            {/* CTA */}
+            <div className="px-8 md:px-10 pt-4 pb-8">
               <Link href={ctaHref}>
-                <Button className="w-full bg-[#054700] hover:bg-[#053600] text-[#ede8e2] py-6 text-lg rounded-full group">
+                <Button className="w-full bg-[#054700] hover:bg-[#053600] text-[#ede8e2] py-6 text-lg rounded-full font-medium group">
                   Claim Your {activeTier.name} Spot
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
+              <p className="text-center text-[#054700]/30 text-xs mt-3">
+                Cancel anytime · Rejoin within 3 months to keep your rate
+              </p>
+            </div>
+          </div>
 
-              <div className="mt-5 pt-5 border-t border-[#054700]/10 text-center">
-                <p className="text-xs text-[#054700]/50">
-                  Cancel anytime. Rejoin within 3 months to keep your rate. Tier locked when you become a paying member.
+          {/* ═══ Right — Supplement Pricing (Supporting) ═══ */}
+          <div className="bg-white/60 backdrop-blur-sm rounded-3xl border border-[#054700]/[0.06] overflow-hidden flex flex-col">
+            {/* Header — lighter treatment, not competing */}
+            <div className="px-8 pt-8 pb-6">
+              <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-[#054700]/40 mb-3">
+                Your Supplements
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl md:text-5xl font-light text-[#054700]">$100</span>
+                <span className="text-[#054700]/30 text-lg">–</span>
+                <span className="text-4xl md:text-5xl font-light text-[#054700]">$200</span>
+              </div>
+              <p className="text-sm text-[#054700]/40 mt-2">/month based on your formula</p>
+            </div>
+
+            <div className="mx-8 border-t border-[#054700]/[0.06]" />
+
+            {/* Factors — compact */}
+            <div className="px-8 py-6 flex-1">
+              <p className="text-sm text-[#054700]/50 mb-5 leading-relaxed">
+                Your cost depends on what your body needs, not what we want to charge you.
+              </p>
+              <div className="space-y-4">
+                {pricingFactors.slice(0, 4).map((factor, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#054700]/[0.05] flex items-center justify-center mt-0.5">
+                      <factor.icon className="w-4 h-4 text-[#054700]/50" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-[#054700]/80">{factor.title}</h4>
+                      <p className="text-xs text-[#054700]/40 leading-relaxed mt-0.5">{factor.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom note */}
+            <div className="px-8 pb-8">
+              <div className="bg-[#054700]/[0.04] rounded-xl px-5 py-4 text-center">
+                <p className="text-sm text-[#054700]/60">
+                  Typically{" "}
+                  <span className="text-[#054700] font-medium">15% cheaper</span>{" "}
+                  than buying separately
                 </p>
-                <p className="text-xs text-[#054700]/40 mt-2">
-                  Membership not required to order supplements. Members get discounted pricing and ongoing formula updates.
+                <p className="text-xs text-[#054700]/35 mt-1">
+                  Exact cost shown before you order
                 </p>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Right — Supplement Pricing */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl shadow-[#054700]/5 overflow-hidden flex flex-col">
-              <div className="bg-[#074700] px-8 py-10 text-center">
-                <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-white/80 text-sm mb-4">
-                  💊 Your Supplements
+        {/* ── Tier progression — condensed inline ── */}
+        <div
+          className={`mt-10 max-w-3xl mx-auto transition-all duration-700 delay-400 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+          }`}
+        >
+          <div className="flex items-center justify-center gap-1 md:gap-2">
+            {tiers.map((tier, index) => (
+              <div key={tier.id} className="flex items-center gap-1 md:gap-2">
+                <div
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    tier.active
+                      ? "bg-[#054700] text-white"
+                      : index < tiers.findIndex(t => t.active)
+                      ? "bg-[#054700]/20 text-[#054700]/60"
+                      : "bg-[#054700]/[0.06] text-[#054700]/30"
+                  }`}
+                >
+                  ${tier.priceMonthly}/mo
+                  {tier.active && spotsRemaining && (
+                    <span className="ml-1.5 text-[#8a9a2c]">← You're here</span>
+                  )}
                 </div>
-                <div className="flex items-center justify-center gap-3">
-                  <span className="text-5xl md:text-6xl font-light text-white">$100</span>
-                  <span className="text-xl text-white/40">–</span>
-                  <span className="text-5xl md:text-6xl font-light text-white">$200</span>
-                </div>
-                <p className="mt-3 text-white/70 text-sm">/month based on your formula</p>
+                {index < tiers.length - 1 && (
+                  <div className="w-4 md:w-6 h-px bg-[#054700]/10" />
+                )}
               </div>
-
-              <div className="px-8 py-8 flex-1 flex flex-col">
-                <p className="text-sm text-[#074700]/60 mb-6">
-                  Your formula cost depends on what your body needs, not what we want to charge you.
-                </p>
-
-                <div className="space-y-5 flex-1">
-                  {pricingFactors.map((factor, index) => (
-                    <div key={index} className="flex items-start gap-4">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[#074700]/10 flex items-center justify-center">
-                        <factor.icon className="w-5 h-5 text-[#074700]" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-[#074700] mb-1">{factor.title}</h4>
-                        <p className="text-xs text-[#074700]/60 leading-relaxed">{factor.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-6 pt-5 border-t border-[#074700]/10 text-center">
-                  <p className="text-sm text-[#074700]/60">
-                    Typically{" "}
-                    <span className="text-[#074700] font-medium">15% cheaper</span>{" "}
-                    than buying each ingredient separately.
-                  </p>
-                  <p className="text-xs text-[#074700]/50 mt-2">
-                    You see your exact formula cost before you order. No surprises.
-                  </p>
-                </div>
-              </div>
+            ))}
           </div>
         </div>
 
         {/* ── Trust badges ── */}
-        <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm text-[#054700]/60">
+        <div
+          className={`mt-8 flex flex-wrap justify-center gap-6 md:gap-8 text-sm text-[#054700]/50 transition-all duration-700 delay-500 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <Check className="w-4 h-4 text-[#054700]" />
+            <Check className="w-4 h-4 text-[#054700]/40" />
             <span>No credit card to start</span>
           </div>
           <div className="flex items-center gap-2">
-            <Check className="w-4 h-4 text-[#054700]" />
+            <Check className="w-4 h-4 text-[#054700]/40" />
             <span>Cancel anytime</span>
           </div>
           <div className="flex items-center gap-2">
-            <Check className="w-4 h-4 text-[#054700]" />
+            <Check className="w-4 h-4 text-[#054700]/40" />
             <span>Rate locked forever</span>
           </div>
         </div>

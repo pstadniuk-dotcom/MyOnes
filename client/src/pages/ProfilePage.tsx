@@ -83,11 +83,24 @@ export default function ProfilePage() {
   const [location] = useLocation();
   const searchParams = new URLSearchParams(location.split('?')[1] || '');
   const initialTab = searchParams.get('tab') || 'profile';
+  const initialSection = searchParams.get('section') || 'basic-info';
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [openSection, setOpenSection] = useState<string | undefined>(initialSection);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showConsentDialog, setShowConsentDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  // Sync tab and section from URL when navigating from other pages
+  useEffect(() => {
+    const params = new URLSearchParams(location.split('?')[1] || '');
+    const tab = params.get('tab') || 'profile';
+    const section = params.get('section');
+    setActiveTab(tab);
+    if (section) {
+      setOpenSection(section);
+    }
+  }, [location]);
 
   // React Query for user data
   const { data: userData, isLoading: userLoading, error: userError } = useQuery<{ user: UserType }>({
@@ -797,7 +810,7 @@ export default function ProfilePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <Accordion type="single" collapsible defaultValue="basic-info" className="w-full">
+              <Accordion type="single" collapsible value={openSection} onValueChange={setOpenSection} className="w-full">
                 {/* Basic Information */}
                 <AccordionItem value="basic-info" className="border-[#5a6623]/10">
                   <AccordionTrigger className="hover:no-underline py-4 justify-start items-start gap-3 [&>svg:last-child]:hidden">

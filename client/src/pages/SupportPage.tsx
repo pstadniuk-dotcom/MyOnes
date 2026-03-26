@@ -1,13 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Label } from '@/shared/components/ui/label';
-import { Textarea } from '@/shared/components/ui/textarea';
 import { Badge } from '@/shared/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/shared/components/ui/accordion';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import {
   HelpCircle,
@@ -16,20 +13,12 @@ import {
   Book,
   Search,
   ChevronRight,
-  Clock,
-  CheckCircle,
   AlertCircle,
-  Plus,
-  ArrowLeft,
-  Send,
-  User
+  Phone,
+  Smartphone,
 } from 'lucide-react';
-import { Link } from 'wouter';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { useToast } from '@/shared/hooks/use-toast';
-import { apiRequest, queryClient } from '@/shared/lib/queryClient';
-import { useAuth } from '@/contexts/AuthContext';
-import type { FaqItem, SupportTicket, SupportTicketResponse, HelpArticle } from '@shared/schema';
+import { useQuery } from '@tanstack/react-query';
+import type { FaqItem, HelpArticle } from '@shared/schema';
 
 // Article content renderer with better formatting
 function ArticleContent({ content }: { content: string }) {
@@ -169,54 +158,11 @@ const helpCategoryConfigs = [
   }
 ];
 
-const getStatusIcon = (status: string) => {
-  switch (status) {
-    case 'resolved':
-      return <CheckCircle className="w-4 h-4 text-green-600" />;
-    case 'in_progress':
-      return <Clock className="w-4 h-4 text-yellow-600" />;
-    case 'open':
-      return <AlertCircle className="w-4 h-4 text-blue-600" />;
-    case 'closed':
-      return <CheckCircle className="w-4 h-4 text-[#5a6623]" />;
-    default:
-      return <AlertCircle className="w-4 h-4 text-red-600" />;
-  }
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'resolved':
-      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-    case 'in_progress':
-      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
-    case 'open':
-      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
-    case 'closed':
-      return 'bg-gray-100 text-[#054700] dark:bg-gray-900/30 dark:text-gray-300';
-    default:
-      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-  }
-};
-
 export default function SupportPage() {
   const [activeTab, setActiveTab] = useState('help');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<HelpArticle | null>(null);
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-  const [replyMessage, setReplyMessage] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
-  const { toast } = useToast();
-
-  // Form state for new ticket
-  const [newTicket, setNewTicket] = useState({
-    subject: '',
-    category: '',
-    description: '',
-    priority: 'medium'
-  });
 
   // Fetch FAQ items
   const { data: faqData, isLoading: faqLoading, error: faqError } = useQuery<{ faqItems: FaqItem[] }>({
@@ -224,83 +170,12 @@ export default function SupportPage() {
   });
 
   // Fetch help articles
-  const { data: helpData, isLoading: helpLoading } = useQuery<{ articles: HelpArticle[] }>({
+  const { data: helpData } = useQuery<{ articles: HelpArticle[] }>({
     queryKey: ['/api/support/help'],
-  });
-
-  // Fetch user support tickets
-  const { data: ticketsData, isLoading: ticketsLoading } = useQuery<{ tickets: SupportTicket[] }>({
-    queryKey: ['/api/support/tickets'],
-    enabled: !!user,
-  });
-
-  // Fetch single ticket with responses
-  const { data: ticketDetailData, isLoading: ticketDetailLoading } = useQuery<{ ticket: SupportTicket; responses: SupportTicketResponse[] }>({
-    queryKey: ['/api/support/tickets', selectedTicketId],
-    queryFn: async () => {
-      const res = await apiRequest('GET', `/api/support/tickets/${selectedTicketId}`);
-      return res.json();
-    },
-    enabled: !!selectedTicketId && !!user,
-  });
-
-  // Scroll to bottom of messages when they load or change
-  useEffect(() => {
-    if (ticketDetailData?.responses) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [ticketDetailData?.responses]);
-
-  // Reply to ticket mutation
-  const replyMutation = useMutation({
-    mutationFn: async ({ ticketId, message }: { ticketId: string; message: string }) => {
-      const res = await apiRequest('POST', `/api/support/tickets/${ticketId}/responses`, { message });
-      return res.json();
-    },
-    onSuccess: () => {
-      setReplyMessage('');
-      queryClient.invalidateQueries({ queryKey: ['/api/support/tickets', selectedTicketId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/support/tickets'] });
-      toast({ title: 'Reply sent', description: 'Your message has been sent to the support team.' });
-    },
-    onError: () => {
-      toast({ title: 'Error sending reply', description: 'Please try again.', variant: 'destructive' });
-    },
-  });
-
-  // Create support ticket mutation
-  const createTicketMutation = useMutation({
-    mutationFn: async (ticketData: typeof newTicket) => {
-      const response = await apiRequest('POST', '/api/support/tickets', ticketData);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: 'Support ticket created',
-        description: 'We\'ll get back to you within 24 hours.',
-      });
-      setNewTicket({
-        subject: '',
-        category: '',
-        description: '',
-        priority: 'medium'
-      });
-      // Invalidate tickets query to refetch
-      queryClient.invalidateQueries({ queryKey: ['/api/support/tickets'] });
-      setActiveTab('tickets');
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error creating ticket',
-        description: 'Please try again later.',
-        variant: 'destructive',
-      });
-    },
   });
 
   const faqItems = faqData?.faqItems || [];
   const helpArticles = helpData?.articles || [];
-  const supportTickets = ticketsData?.tickets || [];
 
   // Filter FAQs based on search query
   const filteredFAQs = faqItems.filter(item =>
@@ -320,24 +195,8 @@ export default function SupportPage() {
     const articlesInCategory = helpArticles.filter(article =>
       article.category === config.category
     ).length;
-    return {
-      ...config,
-      articles: articlesInCategory
-    };
+    return { ...config, articles: articlesInCategory };
   });
-
-  const handleCreateTicket = () => {
-    if (!newTicket.subject || !newTicket.description || !newTicket.category) {
-      toast({
-        title: 'Missing information',
-        description: 'Please fill in all required fields.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    createTicketMutation.mutate(newTicket);
-  };
 
   return (
     <div className="space-y-6" data-testid="page-support">
@@ -348,16 +207,15 @@ export default function SupportPage() {
             Help & Support
           </h1>
           <p className="text-muted-foreground">
-            Get help, find answers, or contact our support team
+            Get help, find answers, or contact our team
           </p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="help" data-testid="tab-help">Help Center</TabsTrigger>
-          <TabsTrigger value="contact" data-testid="tab-contact">Contact Support</TabsTrigger>
-          <TabsTrigger value="tickets" data-testid="tab-tickets">My Tickets</TabsTrigger>
+          <TabsTrigger value="contact" data-testid="tab-contact">Contact Us</TabsTrigger>
         </TabsList>
 
         <TabsContent value="help" className="space-y-6">
@@ -381,56 +239,26 @@ export default function SupportPage() {
           {selectedArticle ? (
             <Card data-testid="section-article-detail">
               <CardContent className="pt-6">
-                {/* Breadcrumbs */}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6" data-testid="breadcrumbs">
-                  <button
-                    onClick={() => {
-                      setSelectedArticle(null);
-                      setSelectedCategory(null);
-                      setSearchQuery('');
-                    }}
-                    className="hover:text-foreground transition-colors"
-                    data-testid="breadcrumb-home"
-                  >
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
+                  <button onClick={() => { setSelectedArticle(null); setSelectedCategory(null); setSearchQuery(''); }} className="hover:text-foreground transition-colors">
                     Help Center
                   </button>
                   <ChevronRight className="w-4 h-4" />
-                  <button
-                    onClick={() => {
-                      setSelectedArticle(null);
-                      setSelectedCategory(selectedArticle.category);
-                      setSearchQuery('');
-                    }}
-                    className="hover:text-foreground transition-colors"
-                    data-testid="breadcrumb-category"
-                  >
+                  <button onClick={() => { setSelectedArticle(null); setSelectedCategory(selectedArticle.category); setSearchQuery(''); }} className="hover:text-foreground transition-colors">
                     {selectedArticle.category}
                   </button>
                   <ChevronRight className="w-4 h-4" />
                   <span className="text-foreground">{selectedArticle.title}</span>
                 </div>
-
-                {/* Back Button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedArticle(null)}
-                  className="mb-6"
-                  data-testid="button-back"
-                >
+                <Button variant="outline" size="sm" onClick={() => setSelectedArticle(null)} className="mb-6">
                   <ChevronRight className="w-4 h-4 rotate-180 mr-2" />
                   Back to Articles
                 </Button>
-
-                {/* Article Content */}
                 <div className="space-y-6">
                   <div className="border-b pb-6">
-                    <h1 className="text-3xl md:text-4xl font-bold mb-3 text-[#054700]" data-testid="article-title">
-                      {selectedArticle.title}
-                    </h1>
+                    <h1 className="text-3xl md:text-4xl font-bold mb-3 text-[#054700]">{selectedArticle.title}</h1>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <Badge variant="secondary" className="text-xs">{selectedArticle.category}</Badge>
-                      <span>•</span>
                       <span>Last updated {new Date(selectedArticle.updatedAt).toLocaleDateString()}</span>
                     </div>
                   </div>
@@ -439,145 +267,68 @@ export default function SupportPage() {
               </CardContent>
             </Card>
           ) : selectedCategory ? (
-            /* Category Article List View */
             <Card data-testid="section-category-articles">
               <CardContent className="pt-6">
-                {/* Breadcrumbs */}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6" data-testid="breadcrumbs">
-                  <button
-                    onClick={() => {
-                      setSelectedCategory(null);
-                      setSearchQuery('');
-                    }}
-                    className="hover:text-foreground transition-colors"
-                    data-testid="breadcrumb-home"
-                  >
-                    Help Center
-                  </button>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
+                  <button onClick={() => { setSelectedCategory(null); setSearchQuery(''); }} className="hover:text-foreground transition-colors">Help Center</button>
                   <ChevronRight className="w-4 h-4" />
                   <span className="text-foreground">{selectedCategory}</span>
                 </div>
-
-                {/* Category Title */}
                 <div className="mb-6">
                   <h2 className="text-2xl font-bold mb-2">{selectedCategory}</h2>
-                  <p className="text-muted-foreground">
-                    {helpArticles.filter(a => a.category === selectedCategory).length} articles
-                  </p>
+                  <p className="text-muted-foreground">{helpArticles.filter(a => a.category === selectedCategory).length} articles</p>
                 </div>
-
-                {/* Article Cards Grid */}
-                <div className="grid gap-4 md:grid-cols-2" data-testid="article-cards-grid">
+                <div className="grid gap-4 md:grid-cols-2">
                   {helpArticles
                     .filter(article => article.category === selectedCategory)
                     .sort((a, b) => a.displayOrder - b.displayOrder)
-                    .map((article) => {
-                      const excerpt = article.content.slice(0, 150) + (article.content.length > 150 ? '...' : '');
-                      return (
-                        <Card
-                          key={article.id}
-                          className="hover-elevate cursor-pointer transition-all"
-                          onClick={() => {
-                            setSelectedArticle(article);
-                            setSelectedCategory(article.category);
-                          }}
-                          data-testid={`article-card-${article.id}`}
-                        >
-                          <CardContent className="pt-6">
-                            <h3 className="font-semibold mb-2 line-clamp-2">
-                              {article.title}
-                            </h3>
-                            <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
-                              {excerpt}
-                            </p>
-                            <div className="flex items-center justify-between">
-                              <Badge variant="outline" className="text-xs">
-                                Updated {new Date(article.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              </Badge>
-                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                    .map((article) => (
+                      <Card key={article.id} className="hover-elevate cursor-pointer transition-all" onClick={() => { setSelectedArticle(article); setSelectedCategory(article.category); }}>
+                        <CardContent className="pt-6">
+                          <h3 className="font-semibold mb-2 line-clamp-2">{article.title}</h3>
+                          <p className="text-sm text-muted-foreground mb-3 line-clamp-3">{article.content.slice(0, 150)}...</p>
+                          <div className="flex items-center justify-between">
+                            <Badge variant="outline" className="text-xs">Updated {new Date(article.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Badge>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                 </div>
               </CardContent>
             </Card>
-          ) : searchQuery ? (
-            /* Search Results - Article Cards */
-            filteredArticles.length > 0 ? (
-              <Card data-testid="section-search-results">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Search className="w-5 h-5" />
-                    Search Results
-                  </CardTitle>
-                  <CardDescription>
-                    Found {filteredArticles.length} article{filteredArticles.length !== 1 ? 's' : ''}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {filteredArticles.map((article) => {
-                      const excerpt = article.content.slice(0, 150) + (article.content.length > 150 ? '...' : '');
-                      return (
-                        <Card
-                          key={article.id}
-                          className="hover-elevate cursor-pointer transition-all"
-                          onClick={() => {
-                            setSelectedArticle(article);
-                            setSelectedCategory(article.category);
-                          }}
-                          data-testid={`search-result-${article.id}`}
-                        >
-                          <CardContent className="pt-6">
-                            <div className="mb-2">
-                              <Badge variant="secondary" className="text-xs mb-2">
-                                {article.category}
-                              </Badge>
-                            </div>
-                            <h3 className="font-semibold mb-2 line-clamp-2">
-                              {article.title}
-                            </h3>
-                            <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
-                              {excerpt}
-                            </p>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground">
-                                Updated {new Date(article.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              </span>
-                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null
+          ) : searchQuery && filteredArticles.length > 0 ? (
+            <Card data-testid="section-search-results">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Search className="w-5 h-5" />Search Results</CardTitle>
+                <CardDescription>Found {filteredArticles.length} article{filteredArticles.length !== 1 ? 's' : ''}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {filteredArticles.map((article) => (
+                    <Card key={article.id} className="hover-elevate cursor-pointer transition-all" onClick={() => { setSelectedArticle(article); setSelectedCategory(article.category); }}>
+                      <CardContent className="pt-6">
+                        <Badge variant="secondary" className="text-xs mb-2">{article.category}</Badge>
+                        <h3 className="font-semibold mb-2 line-clamp-2">{article.title}</h3>
+                        <p className="text-sm text-muted-foreground mb-3 line-clamp-3">{article.content.slice(0, 150)}...</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           ) : (
-            /* Default View - Category Cards */
             <div className="grid gap-4 md:grid-cols-2" data-testid="category-cards-grid">
               {helpCategories.map((category, idx) => (
-                <Card
-                  key={idx}
-                  className="hover-elevate transition-all cursor-pointer"
-                  onClick={() => setSelectedCategory(category.category)}
-                  data-testid={`category-card-${category.category.toLowerCase().replace(/\s+/g, '-')}`}
-                >
+                <Card key={idx} className="hover-elevate transition-all cursor-pointer" onClick={() => setSelectedCategory(category.category)}>
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between mb-3">
-                      <div className="p-2 bg-primary/10 rounded-lg">
-                        <category.icon className="w-5 h-5 text-primary" />
-                      </div>
+                      <div className="p-2 bg-primary/10 rounded-lg"><category.icon className="w-5 h-5 text-primary" /></div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <h3 className="font-medium mb-2">{category.title}</h3>
                     <p className="text-sm text-muted-foreground mb-2">{category.description}</p>
-                    <Badge variant="secondary" className="text-xs">
-                      {category.articles} articles
-                    </Badge>
+                    <Badge variant="secondary" className="text-xs">{category.articles} articles</Badge>
                   </CardContent>
                 </Card>
               ))}
@@ -587,13 +338,8 @@ export default function SupportPage() {
           {/* FAQ Section */}
           <Card data-testid="section-faq">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <HelpCircle className="w-5 h-5" />
-                Frequently Asked Questions
-              </CardTitle>
-              <CardDescription>
-                Find quick answers to common questions
-              </CardDescription>
+              <CardTitle className="flex items-center gap-2"><HelpCircle className="w-5 h-5" />Frequently Asked Questions</CardTitle>
+              <CardDescription>Find quick answers to common questions</CardDescription>
             </CardHeader>
             <CardContent>
               {faqLoading ? (
@@ -614,11 +360,9 @@ export default function SupportPage() {
               ) : filteredFAQs.length > 0 ? (
                 <Accordion type="single" collapsible className="w-full">
                   {filteredFAQs.map((item) => (
-                    <AccordionItem key={item.id} value={item.id} data-testid={`faq-${item.id}`}>
+                    <AccordionItem key={item.id} value={item.id}>
                       <AccordionTrigger className="text-left text-sm">{item.question}</AccordionTrigger>
-                      <AccordionContent className="text-sm text-muted-foreground leading-relaxed">
-                        {item.answer}
-                      </AccordionContent>
+                      <AccordionContent className="text-sm text-muted-foreground leading-relaxed">{item.answer}</AccordionContent>
                     </AccordionItem>
                   ))}
                 </Accordion>
@@ -626,20 +370,14 @@ export default function SupportPage() {
                 <div className="text-center py-8">
                   <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="font-medium mb-2">No results found</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Try different keywords or contact support for personalized help
-                  </p>
-                  <Button variant="outline" onClick={() => setActiveTab('contact')} data-testid="button-contact-support">
-                    Contact Support
-                  </Button>
+                  <p className="text-sm text-muted-foreground mb-4">Try different keywords or reach out to us directly</p>
+                  <Button variant="outline" onClick={() => setActiveTab('contact')}>Contact Us</Button>
                 </div>
               ) : (
                 <div className="text-center py-8">
                   <HelpCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="font-medium mb-2">No FAQs available yet</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Check back soon for helpful answers to common questions
-                  </p>
+                  <p className="text-sm text-muted-foreground">Check back soon for helpful answers to common questions</p>
                 </div>
               )}
             </CardContent>
@@ -647,345 +385,81 @@ export default function SupportPage() {
         </TabsContent>
 
         <TabsContent value="contact" className="space-y-6">
-          {/* Contact Options */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card data-testid="section-contact-form">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5" />
-                  Submit a Support Ticket
-                </CardTitle>
-                <CardDescription>
-                  Get personalized help from our support team
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="ticket-subject">Subject</Label>
-                    <Input
-                      id="ticket-subject"
-                      placeholder="Brief description of your issue"
-                      value={newTicket.subject}
-                      onChange={(e) => setNewTicket({ ...newTicket, subject: e.target.value })}
-                      data-testid="input-ticket-subject"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="ticket-category">Category</Label>
-                    <Select value={newTicket.category} onValueChange={(value) => setNewTicket({ ...newTicket, category: value })}>
-                      <SelectTrigger data-testid="select-ticket-category">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="formula">Formula & Health</SelectItem>
-                        <SelectItem value="billing">Billing & Account</SelectItem>
-                        <SelectItem value="technical">Technical Issue</SelectItem>
-                        <SelectItem value="shipping">Shipping & Delivery</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+          {/* Contact Methods */}
+          <div className="grid gap-6 md:grid-cols-3">
+            <Card data-testid="section-contact-email">
+              <CardContent className="pt-6 text-center">
+                <div className="p-4 bg-primary/10 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                  <Mail className="w-8 h-8 text-primary" />
                 </div>
-
-                <div>
-                  <Label htmlFor="ticket-priority">Priority</Label>
-                  <Select value={newTicket.priority} onValueChange={(value) => setNewTicket({ ...newTicket, priority: value })}>
-                    <SelectTrigger data-testid="select-ticket-priority">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="ticket-message">Message</Label>
-                  <Textarea
-                    id="ticket-message"
-                    placeholder="Please provide as much detail as possible about your issue..."
-                    className="min-h-[120px]"
-                    value={newTicket.description}
-                    onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
-                    data-testid="textarea-ticket-message"
-                  />
-                </div>
-
-                <Button
-                  className="w-full"
-                  disabled={!newTicket.subject || !newTicket.description || !newTicket.category || createTicketMutation.isPending}
-                  onClick={handleCreateTicket}
-                  data-testid="button-submit-ticket"
+                <h3 className="font-semibold text-lg mb-2">Email Us</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Send us an email and we'll get back to you within 24 hours
+                </p>
+                <a
+                  href="mailto:support@ones.health"
+                  className="text-primary font-medium hover:underline text-lg"
                 >
-                  {createTicketMutation.isPending ? 'Creating...' : 'Submit Support Ticket'}
-                </Button>
+                  support@ones.health
+                </a>
               </CardContent>
             </Card>
 
-            {/* Contact Information */}
-            <div className="space-y-6">
-              <Card data-testid="section-contact-info">
-                <CardHeader>
-                  <CardTitle>Email Support</CardTitle>
-                  <CardDescription>
-                    Prefer email? Send us a message and we'll respond within 24 hours
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-start gap-4 p-4 bg-primary/5 border rounded-lg">
-                    <div className="p-3 bg-primary/10 rounded-lg">
-                      <Mail className="w-6 h-6 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-semibold text-lg mb-1">support@ones.ai</div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Our support team typically responds within 24 hours during business days
-                      </p>
-                      <div className="text-xs text-muted-foreground">
-                        <strong>Note:</strong> For faster assistance, we recommend submitting a support ticket using the form above
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+            <Card data-testid="section-contact-phone">
+              <CardContent className="pt-6 text-center">
+                <div className="p-4 bg-primary/10 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                  <Phone className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">Call Us</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Speak with our team Monday–Friday, 9am–5pm EST
+                </p>
+                <a
+                  href="tel:+13414443914"
+                  className="text-primary font-medium hover:underline text-lg"
+                >
+                  (341) 444-3914
+                </a>
+              </CardContent>
+            </Card>
 
-              <Card data-testid="section-emergency-contact">
-                <CardHeader>
-                  <CardTitle className="text-red-600">Medical Emergency</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200">
-                    <p className="text-sm text-red-800 dark:text-red-300 mb-3">
-                      <strong>Important:</strong> Ones provides supplement recommendations, not medical advice.
-                      For medical emergencies, please contact emergency services immediately.
-                    </p>
-                    <div className="space-y-1 text-sm text-red-700 dark:text-red-400">
-                      <div><strong>Emergency:</strong> 911</div>
-                      <div><strong>Poison Control:</strong> 1-800-222-1222</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <Card data-testid="section-contact-text">
+              <CardContent className="pt-6 text-center">
+                <div className="p-4 bg-primary/10 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                  <Smartphone className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">Text Us</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Send a text for quick questions — we usually reply within minutes
+                </p>
+                <a
+                  href="sms:+13414443914"
+                  className="text-primary font-medium hover:underline text-lg"
+                >
+                  (341) 444-3914
+                </a>
+              </CardContent>
+            </Card>
           </div>
-        </TabsContent>
 
-        <TabsContent value="tickets" className="space-y-6">
-          {selectedTicketId ? (
-            /* ── Ticket Detail View ── */
-            <Card data-testid="section-ticket-detail">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => { setSelectedTicketId(null); setReplyMessage(''); }}
-                    data-testid="button-back-tickets"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-1" />
-                    Back
-                  </Button>
-                  {ticketDetailData?.ticket && (
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <CardTitle className="text-lg">{ticketDetailData.ticket.subject}</CardTitle>
-                        <Badge className={getStatusColor(ticketDetailData.ticket.status)}>
-                          {ticketDetailData.ticket.status.replace('_', ' ')}
-                        </Badge>
-                      </div>
-                      <CardDescription className="mt-1">
-                        Ticket #{ticketDetailData.ticket.id.slice(0, 8)} · Created {new Date(ticketDetailData.ticket.createdAt).toLocaleDateString()}
-                        {ticketDetailData.ticket.category && ` · ${ticketDetailData.ticket.category}`}
-                      </CardDescription>
-                    </div>
-                  )}
+          {/* Medical Emergency */}
+          <Card data-testid="section-emergency-contact">
+            <CardHeader>
+              <CardTitle className="text-red-600">Medical Emergency</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200">
+                <p className="text-sm text-red-800 dark:text-red-300 mb-3">
+                  <strong>Important:</strong> Ones provides supplement recommendations, not medical advice.
+                  For medical emergencies, please contact emergency services immediately.
+                </p>
+                <div className="space-y-1 text-sm text-red-700 dark:text-red-400">
+                  <div><strong>Emergency:</strong> 911</div>
+                  <div><strong>Poison Control:</strong> 1-800-222-1222</div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {ticketDetailLoading ? (
-                  <div className="space-y-4">
-                    <Skeleton className="h-20 w-full" />
-                    <Skeleton className="h-20 w-3/4" />
-                    <Skeleton className="h-12 w-full" />
-                  </div>
-                ) : ticketDetailData ? (
-                  <div className="space-y-6">
-                    {/* Original message */}
-                    <div className="rounded-lg border bg-muted/30 p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <User className="w-4 h-4 text-primary" />
-                        </div>
-                        <div>
-                          <span className="font-medium text-sm">You</span>
-                          <span className="text-xs text-muted-foreground ml-2">
-                            {new Date(ticketDetailData.ticket.createdAt).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-sm whitespace-pre-wrap pl-10">{ticketDetailData.ticket.description}</p>
-                    </div>
-
-                    {/* Conversation thread */}
-                    {ticketDetailData.responses.length > 0 && (
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Conversation</h4>
-                        {ticketDetailData.responses.map((response) => (
-                          <div
-                            key={response.id}
-                            className={`rounded-lg border p-4 ${
-                              response.isStaff
-                                ? 'bg-primary/5 border-primary/20 ml-4'
-                                : 'bg-muted/30 mr-4'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                response.isStaff ? 'bg-primary/20' : 'bg-muted'
-                              }`}>
-                                {response.isStaff
-                                  ? <MessageCircle className="w-4 h-4 text-primary" />
-                                  : <User className="w-4 h-4 text-muted-foreground" />
-                                }
-                              </div>
-                              <div>
-                                <span className="font-medium text-sm">
-                                  {response.isStaff ? 'Ones Support' : 'You'}
-                                </span>
-                                <span className="text-xs text-muted-foreground ml-2">
-                                  {new Date(response.createdAt).toLocaleString()}
-                                </span>
-                              </div>
-                            </div>
-                            <p className="text-sm whitespace-pre-wrap pl-10">{response.message}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div ref={messagesEndRef} />
-
-                    {/* Reply form — only show if ticket is not closed/resolved */}
-                    {ticketDetailData.ticket.status !== 'closed' && ticketDetailData.ticket.status !== 'resolved' ? (
-                      <div className="border-t pt-4 space-y-3">
-                        <Label htmlFor="reply-message" className="text-sm font-medium">Reply</Label>
-                        <Textarea
-                          id="reply-message"
-                          placeholder="Type your reply..."
-                          className="min-h-[80px]"
-                          value={replyMessage}
-                          onChange={(e) => setReplyMessage(e.target.value)}
-                          data-testid="textarea-ticket-reply"
-                        />
-                        <div className="flex justify-end">
-                          <Button
-                            onClick={() => replyMutation.mutate({ ticketId: selectedTicketId!, message: replyMessage })}
-                            disabled={!replyMessage.trim() || replyMutation.isPending}
-                            data-testid="button-send-reply"
-                          >
-                            <Send className="w-4 h-4 mr-2" />
-                            {replyMutation.isPending ? 'Sending...' : 'Send Reply'}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="border-t pt-4">
-                        <p className="text-sm text-muted-foreground text-center">
-                          This ticket has been {ticketDetailData.ticket.status}. To reopen, please create a new ticket.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">Ticket not found</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            /* ── Ticket List View ── */
-            <Card data-testid="section-support-tickets">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>My Support Tickets</CardTitle>
-                    <CardDescription>
-                      Track your support requests and responses
-                    </CardDescription>
-                  </div>
-                  <Button onClick={() => setActiveTab('contact')} data-testid="button-new-ticket">
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Ticket
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {ticketsLoading ? (
-                  <div className="space-y-4">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="space-y-2">
-                        <Skeleton className="h-6 w-1/2" />
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-4 w-1/4" />
-                      </div>
-                    ))}
-                  </div>
-                ) : supportTickets.length > 0 ? (
-                  <div className="space-y-4">
-                    {supportTickets.map((ticket) => (
-                      <Card
-                        key={ticket.id}
-                        className="hover-elevate cursor-pointer transition-shadow hover:shadow-md"
-                        onClick={() => setSelectedTicketId(ticket.id)}
-                        data-testid={`ticket-${ticket.id}`}
-                      >
-                        <CardContent className="pt-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-2">
-                                {getStatusIcon(ticket.status)}
-                                <span className="font-medium">{ticket.id.slice(0, 8)}...</span>
-                              </div>
-                              <Badge className={getStatusColor(ticket.status)}>
-                                {ticket.status.replace('_', ' ')}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">
-                                {new Date(ticket.createdAt).toLocaleDateString()}
-                              </span>
-                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                            </div>
-                          </div>
-                          <h4 className="font-medium mb-2">{ticket.subject}</h4>
-                          <div className="text-sm text-muted-foreground">
-                            Last updated: {new Date(ticket.updatedAt).toLocaleDateString()}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <MessageCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="font-medium mb-2">No support tickets yet</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      When you contact support, your tickets will appear here
-                    </p>
-                    <Button onClick={() => setActiveTab('contact')} data-testid="button-create-first-ticket">
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      Create Your First Ticket
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

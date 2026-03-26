@@ -320,6 +320,11 @@ export const formulas = pgTable("formulas", {
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"), // Null = active, timestamp = archived
+
+  // Discontinued ingredient tracking
+  needsReformulation: boolean("needs_reformulation").default(false).notNull(),
+  discontinuedIngredients: json("discontinued_ingredients").$type<string[]>().default([]),
+  discontinuedFlaggedAt: timestamp("discontinued_flagged_at"),
 }, (table) => [
   index("formulas_user_id_idx").on(table.userId),
 ]);
@@ -2242,15 +2247,17 @@ export const insertAiUsageLogSchema = createInsertSchema(aiUsageLogs).omit({
 export type InsertAiUsageLog = z.infer<typeof insertAiUsageLogSchema>;
 export type AiUsageLog = typeof aiUsageLogs.$inferSelect;
 
-// ── PR Agent / Outreach System ──────────────────────────────────────────────
+// ── Outreach Agent System ────────────────────────────────────────────────────
 
-export const outreachCategoryEnum = pgEnum('outreach_category', ['podcast', 'press']);
+export const outreachCategoryEnum = pgEnum('outreach_category', ['podcast', 'press', 'investor']);
 
 export const outreachSubTypeEnum = pgEnum('outreach_sub_type', [
   // podcast sub-types
   'interview', 'panel', 'solo_feature',
   // press sub-types
   'product_review', 'guest_article', 'founder_feature', 'expert_source',
+  // investor sub-types
+  'angel', 'seed_vc', 'series_a', 'growth_vc', 'family_office',
 ]);
 
 export const outreachProspectStatusEnum = pgEnum('outreach_prospect_status', [
@@ -2269,7 +2276,7 @@ export const agentRunStatusEnum = pgEnum('agent_run_status', [
   'running', 'completed', 'failed', 'paused',
 ]);
 
-/** Prospects discovered by the PR Agent */
+/** Prospects discovered by the Outreach Agent */
 export const outreachProspects = pgTable("outreach_prospects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -2317,7 +2324,7 @@ export const outreachProspects = pgTable("outreach_prospects", {
   source: varchar("source", { length: 50 }).default('web_search').notNull(),
 });
 
-/** Pitches drafted by the PR Agent, reviewed/approved by human */
+/** Pitches drafted by the Outreach Agent, reviewed/approved by human */
 export const outreachPitches = pgTable("outreach_pitches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   prospectId: varchar("prospect_id").notNull().references(() => outreachProspects.id, { onDelete: "cascade" }),
@@ -2397,7 +2404,135 @@ export type InsertAgentRun = z.infer<typeof insertAgentRunSchema>;
 export type ProspectContact = typeof prospectContacts.$inferSelect;
 export type InsertProspectContact = z.infer<typeof insertProspectContactSchema>;
 
-// ─── AI Support Agent (Draft Responses) ──────────────────────────────────────
+// ─── CRM System (Unified Contacts, Deals, Activities) ───────────────────────
+
+export const crmContactTypeEnum = pgEnum('crm_contact_type', ['person', 'company']);
+
+export const crmDealStageEnum = pgEnum('crm_deal_stage', [
+  'lead', 'contacted', 'responded', 'meeting', 'negotiation', 'closed_won', 'closed_lost',
+]);
+
+export const crmDealCategoryEnum = pgEnum('crm_deal_category', [
+  'podcast', 'press', 'investor', 'b2b', 'partnership', 'other',
+]);
+
+export const crmActivityTypeEnum = pgEnum('crm_activity_type', [
+  'email_sent', 'email_received', 'call', 'meeting', 'note', 'task',
+  'status_change', 'pitch_drafted', 'pitch_approved', 'pitch_sent',
+  'form_submitted', 'follow_up_sent', 'response_detected', 'deal_stage_changed',
+]);
+
+/** Universal contact registry — every person or company you interact with */
+export const crmContacts = pgTable("crm_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  company: text("company"),
+  title: text("title"),
+  type: crmContactTypeEnum("type").default('person').notNull(),
+  linkedinUrl: text("linkedin_url"),
+  twitterHandle: text("twitter_handle"),
+  website: text("website"),
+  avatarUrl: text("avatar_url"),
+  tags: json("tags").$type<string[]>().default([]),
+  customFields: json("custom_fields").$type<Record<string, any>>().default({}),
+  source: varchar("source", { length: 50 }),
+  leadScore: integer("lead_score").default(0),
+  // Link back to outreach system (nullable — not all contacts come from agent)
+  outreachProspectId: varchar("outreach_prospect_id").references(() => outreachProspects.id, { onDelete: "set null" }),
+  b2bProspectId: varchar("b2b_prospect_id").references(() => b2bProspects.id, { onDelete: "set null" }),
+  notes: text("notes"),
+  lastActivityAt: timestamp("last_activity_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("crm_contacts_email_idx").on(table.email),
+  index("crm_contacts_company_idx").on(table.company),
+  index("crm_contacts_source_idx").on(table.source),
+  index("crm_contacts_outreach_prospect_idx").on(table.outreachProspectId),
+]);
+
+/** Deals / opportunities — tracks pipeline progress for any category */
+export const crmDeals = pgTable("crm_deals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").notNull().references(() => crmContacts.id, { onDelete: "cascade" }),
+  // Optional link to outreach prospect for agent-discovered deals
+  outreachProspectId: varchar("outreach_prospect_id").references(() => outreachProspects.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  stage: crmDealStageEnum("stage").default('lead').notNull(),
+  category: crmDealCategoryEnum("category").default('other').notNull(),
+  valueCents: integer("value_cents"),
+  currency: varchar("currency", { length: 3 }).default('USD'),
+  probability: integer("probability"), // 0-100
+  expectedCloseDate: timestamp("expected_close_date"),
+  actualCloseDate: timestamp("actual_close_date"),
+  owner: varchar("owner", { length: 100 }),
+  tags: json("tags").$type<string[]>().default([]),
+  customFields: json("custom_fields").$type<Record<string, any>>().default({}),
+  notes: text("notes"),
+  lostReason: text("lost_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  closedAt: timestamp("closed_at"),
+}, (table) => [
+  index("crm_deals_contact_idx").on(table.contactId),
+  index("crm_deals_stage_idx").on(table.stage),
+  index("crm_deals_category_idx").on(table.category),
+  index("crm_deals_outreach_prospect_idx").on(table.outreachProspectId),
+]);
+
+/** Activity timeline — every interaction, note, task, and agent event */
+export const crmActivities = pgTable("crm_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").notNull().references(() => crmContacts.id, { onDelete: "cascade" }),
+  dealId: varchar("deal_id").references(() => crmDeals.id, { onDelete: "set null" }),
+  type: crmActivityTypeEnum("type").notNull(),
+  subject: text("subject"),
+  body: text("body"),
+  metadata: json("metadata").$type<Record<string, any>>(), // Extra context (email IDs, pitch IDs, etc.)
+  // Task / reminder fields
+  dueAt: timestamp("due_at"),
+  completedAt: timestamp("completed_at"),
+  isPinned: boolean("is_pinned").default(false).notNull(),
+  createdBy: varchar("created_by", { length: 100 }), // 'system' | 'agent' | admin user ID
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("crm_activities_contact_idx").on(table.contactId),
+  index("crm_activities_deal_idx").on(table.dealId),
+  index("crm_activities_type_idx").on(table.type),
+  index("crm_activities_due_at_idx").on(table.dueAt),
+  index("crm_activities_created_at_idx").on(table.createdAt),
+]);
+
+/** Saved views — custom filters + column sets for contacts, deals, etc. */
+export const crmSavedViews = pgTable("crm_saved_views", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  entity: varchar("entity", { length: 20 }).notNull(), // 'contacts' | 'deals' | 'activities'
+  filters: json("filters").$type<Record<string, any>>().default({}),
+  sort: json("sort").$type<{ field: string; direction: 'asc' | 'desc' }[]>().default([]),
+  columns: json("columns").$type<string[]>(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdBy: varchar("created_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// CRM Insert schemas
+export const insertCrmContactSchema = createInsertSchema(crmContacts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCrmDealSchema = createInsertSchema(crmDeals).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCrmActivitySchema = createInsertSchema(crmActivities).omit({ id: true, createdAt: true });
+export const insertCrmSavedViewSchema = createInsertSchema(crmSavedViews).omit({ id: true, createdAt: true });
+
+// CRM Types
+export type CrmContact = typeof crmContacts.$inferSelect;
+export type InsertCrmContact = z.infer<typeof insertCrmContactSchema>;
+export type CrmDeal = typeof crmDeals.$inferSelect;
+export type InsertCrmDeal = z.infer<typeof insertCrmDealSchema>;
+export type CrmActivity = typeof crmActivities.$inferSelect;
+export type InsertCrmActivity = z.infer<typeof insertCrmActivitySchema>;
+export type CrmSavedView = typeof crmSavedViews.$inferSelect;
+export type InsertCrmSavedView = z.infer<typeof insertCrmSavedViewSchema>;
 
 export const aiSupportDraftStatusEnum = pgEnum('ai_support_draft_status', ['pending', 'approved', 'edited', 'dismissed']);
 export const aiSupportDraftSourceEnum = pgEnum('ai_support_draft_source', ['ticket', 'live_chat']);
@@ -2468,3 +2603,43 @@ export const insertNotificationLogSchema = createInsertSchema(notificationLog).o
 // Types
 export type NotificationLogEntry = typeof notificationLog.$inferSelect;
 export type InsertNotificationLogEntry = z.infer<typeof insertNotificationLogSchema>;
+
+// ============================================
+// MANUFACTURER INGREDIENT CATALOG
+// ============================================
+
+export const manufacturerIngredientStatusEnum = pgEnum('manufacturer_ingredient_status', ['active', 'discontinued']);
+
+export const manufacturerIngredients = pgTable("manufacturer_ingredients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  status: manufacturerIngredientStatusEnum("status").default('active').notNull(),
+  firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+  discontinuedAt: timestamp("discontinued_at"),
+}, (table) => [
+  index("manufacturer_ingredients_status_idx").on(table.status),
+  index("manufacturer_ingredients_name_idx").on(table.name),
+]);
+
+export const manufacturerCatalogSyncLogs = pgTable("manufacturer_catalog_sync_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+  totalFromApi: integer("total_from_api").notNull(),
+  newIngredients: integer("new_ingredients").default(0).notNull(),
+  discontinuedIngredients: integer("discontinued_ingredients").default(0).notNull(),
+  reactivatedIngredients: integer("reactivated_ingredients").default(0).notNull(),
+  addedNames: json("added_names").$type<string[]>(),
+  removedNames: json("removed_names").$type<string[]>(),
+  reactivatedNames: json("reactivated_names").$type<string[]>(),
+});
+
+// Insert schemas
+export const insertManufacturerIngredientSchema = createInsertSchema(manufacturerIngredients).omit({ id: true, firstSeenAt: true, lastSeenAt: true });
+export const insertManufacturerCatalogSyncLogSchema = createInsertSchema(manufacturerCatalogSyncLogs).omit({ id: true, syncedAt: true });
+
+// Types
+export type ManufacturerIngredient = typeof manufacturerIngredients.$inferSelect;
+export type InsertManufacturerIngredient = z.infer<typeof insertManufacturerIngredientSchema>;
+export type ManufacturerCatalogSyncLog = typeof manufacturerCatalogSyncLogs.$inferSelect;
+export type InsertManufacturerCatalogSyncLog = z.infer<typeof insertManufacturerCatalogSyncLogSchema>;

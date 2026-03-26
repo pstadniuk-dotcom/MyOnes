@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { requireAdmin } from '../middleware/middleware';
 import {
   getAgentDashboard,
+  getPipelineView,
   listProspects,
   getProspect,
   updateProspect,
@@ -22,6 +23,7 @@ import {
   aiRewritePitch,
   scorePitch,
   triggerScan,
+  triggerInvestorScan,
   triggerPitchBatch,
   triggerDraftPitch,
   triggerSendPitch,
@@ -51,6 +53,10 @@ import {
   updateProfile,
   resetProfile,
   listTemplates,
+  listCustomTemplates,
+  createCustomTemplate,
+  updateCustomTemplate,
+  deleteCustomTemplate,
   getPrioritizedProspects,
   generateChannelMessagesHandler,
   draftPressReleaseHandler,
@@ -59,6 +65,7 @@ import {
   createProspectContact,
   updateProspectContact,
   deleteProspectContact,
+  triggerRedraftAll,
 } from '../controller/agent.controller';
 
 const router = Router();
@@ -74,6 +81,9 @@ router.get('/analytics', getAnalytics);
 router.get('/weekly-summary', getWeeklySummary);
 router.post('/weekly-summary/send', triggerWeeklySummaryEmail);
 router.get('/platform-stats', getPlatformStatsHandler);
+
+// Pipeline (prospects + latest pitch)
+router.get('/pipeline', getPipelineView);
 
 // Prospects
 router.get('/prospects', listProspects);
@@ -105,7 +115,9 @@ router.get('/pitches/:id/screenshot/:type', getFormScreenshot);
 
 // Actions
 router.post('/scan', triggerScan);
+router.post('/investor-scan', triggerInvestorScan);
 router.post('/pitch-batch', triggerPitchBatch);
+router.post('/redraft-all', triggerRedraftAll);
 router.post('/prospects/:prospectId/draft', triggerDraftPitch);
 router.post('/pitches/:id/send', triggerSendPitch);
 router.post('/send-approved', triggerSendAllApproved);
@@ -148,5 +160,11 @@ router.post('/profile/reset', resetProfile);
 
 // Templates
 router.get('/templates', listTemplates);
+
+// Custom Email Templates
+router.get('/custom-templates', listCustomTemplates);
+router.post('/custom-templates', createCustomTemplate);
+router.put('/custom-templates/:id', updateCustomTemplate);
+router.delete('/custom-templates/:id', deleteCustomTemplate);
 
 export default router;

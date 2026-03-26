@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
@@ -13,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/co
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import {
   FlaskConical, Calendar, TrendingUp, AlertTriangle, CheckCircle, Download,
   MessageSquare, RefreshCw, Info, Pill, Beaker, Search, Filter, Eye,
@@ -68,6 +70,9 @@ interface Formula {
   chatSessionId?: string;
   createdAt: Date;
   archivedAt?: Date | null;
+  needsReformulation?: boolean;
+  discontinuedIngredients?: string[];
+  discontinuedFlaggedAt?: string | null;
   changes?: {
     id: string;
     summary: string;
@@ -173,7 +178,6 @@ export default function MyFormulaPage() {
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
   const [revertReason, setRevertReason] = useState('');
   const [selectedFormulaId, setSelectedFormulaId] = useState<string | null>(null);
-  const [expandedFormulaIds, setExpandedFormulaIds] = useState<Set<string>>(new Set());
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
   const [includeMembershipAtCheckout, setIncludeMembershipAtCheckout] = useState(true);
   const [enableAutoShip, setEnableAutoShip] = useState(true);
@@ -706,6 +710,35 @@ export default function MyFormulaPage() {
     return () => window.removeEventListener('resize', updateColumns);
   }, []);
 
+  // Compute diff summaries between consecutive formula versions
+  const formulaDiffMap = useMemo<Record<string, string>>(() => {
+    const diffs: Record<string, string> = {};
+    // allFormulas is sorted newest-first
+    for (let i = 0; i < allFormulas.length - 1; i++) {
+      const current = allFormulas[i];
+      const previous = allFormulas[i + 1];
+      const currentNames = new Set([
+        ...current.bases.map(b => b.ingredient),
+        ...current.additions.map(a => a.ingredient),
+      ]);
+      const previousNames = new Set([
+        ...previous.bases.map(b => b.ingredient),
+        ...previous.additions.map(a => a.ingredient),
+      ]);
+      const added = [...currentNames].filter(n => !previousNames.has(n));
+      const removed = [...previousNames].filter(n => !currentNames.has(n));
+      const parts: string[] = [];
+      if (added.length > 0) parts.push(`+${added.slice(0, 2).join(', ')}${added.length > 2 ? ` +${added.length - 2} more` : ''}`);
+      if (removed.length > 0) parts.push(`−${removed.slice(0, 2).join(', ')}${removed.length > 2 ? ` +${removed.length - 2} more` : ''}`);
+      if (parts.length === 0 && current.totalMg !== previous.totalMg) {
+        const delta = current.totalMg - previous.totalMg;
+        parts.push(`${delta > 0 ? '+' : ''}${delta}mg dose change`);
+      }
+      if (parts.length > 0) diffs[current.id] = parts.join(' · ');
+    }
+    return diffs;
+  }, [allFormulas]);
+
   // Distribute formulas into columns for masonry layout
   const formulaColumns = useMemo<Formula[][]>(() => {
     const columns: Formula[][] = Array.from({ length: columnCount }, () => []);
@@ -851,6 +884,29 @@ export default function MyFormulaPage() {
           </span>
         </div>
       )}
+
+      {/* Discontinued ingredient warning — blocks checkout until reformulated */}
+      {selectedFormula?.needsReformulation && (selectedFormula.discontinuedIngredients?.length ?? 0) > 0 && (
+        <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-semibold">Formula update required</p>
+            <p>
+              {selectedFormula.discontinuedIngredients!.length === 1
+                ? `The ingredient "${selectedFormula.discontinuedIngredients![0]}" is`
+                : `${selectedFormula.discontinuedIngredients!.length} ingredients (${selectedFormula.discontinuedIngredients!.join(', ')}) are`
+              }{' '}
+              no longer available from our manufacturer. Your formula is on hold until updated.
+            </p>
+            <Link href="/dashboard/chat">
+              <Button size="sm" variant="destructive" className="mt-2">
+                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                Chat with AI to Update Formula
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
       {/* Header Section */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
@@ -897,7 +953,7 @@ export default function MyFormulaPage() {
             className="gap-1.5 sm:gap-2 bg-primary hover:bg-primary/90 text-xs sm:text-sm"
             size="sm"
             data-testid="button-order-formula"
-            disabled={!selectedFormula}
+            disabled={!selectedFormula || !!selectedFormula?.needsReformulation}
             onClick={() => setShowOrderConfirmation(true)}
           >
             <ShoppingCart className="w-4 h-4" />
@@ -971,15 +1027,8 @@ export default function MyFormulaPage() {
                           key={formula.id}
                           formula={formula}
                           isSelected={selectedFormulaId === formula.id}
-                          isExpanded={expandedFormulaIds.has(formula.id)}
                           isNewest={formula.id === currentFormula?.id}
                           onSelect={() => setSelectedFormulaId(formula.id)}
-                          onToggleExpand={() => setExpandedFormulaIds(prev => {
-                            const next = new Set(prev);
-                            if (next.has(formula.id)) next.delete(formula.id);
-                            else next.add(formula.id);
-                            return next;
-                          })}
                           onRename={(id, currentName) => {
                             setRenamingFormulaId(id);
                             setNewFormulaName(currentName || '');
@@ -990,8 +1039,7 @@ export default function MyFormulaPage() {
                           onCustomize={() => handleCustomizeFormula(formula.id)}
                           onOrder={() => handleOpenPricingForFormula(formula.id)}
                           getIndividualIngredientDetails={getIndividualIngredientDetails}
-                          expandedIndividualIngredients={expandedIndividualIngredients}
-                          setExpandedIndividualIngredients={setExpandedIndividualIngredients}
+                          diffSummary={formulaDiffMap[formula.id]}
                         />
                       ))}
                     </div>
@@ -1875,7 +1923,7 @@ export default function MyFormulaPage() {
                   // Errors are handled in mutation onError
                 }
               }}
-              disabled={purchaseSmsOptInMutation.isPending || checkoutSessionMutation.isPending || !medDisclosureAcknowledged || (smsOptInAtFirstPurchase && !userPhone && !checkoutPhone.trim()) || (() => {
+              disabled={purchaseSmsOptInMutation.isPending || checkoutSessionMutation.isPending || !medDisclosureAcknowledged || (smsOptInAtFirstPurchase && !userPhone && !checkoutPhone.trim()) || !!selectedFormula?.needsReformulation || (() => {
                 // Block checkout if formula has serious warnings that haven't been acknowledged
                 if (!selectedFormula) return false;
                 const sv = (selectedFormula as any)?.safetyValidation;
@@ -1963,10 +2011,9 @@ export default function MyFormulaPage() {
 interface FormulaCardProps {
   formula: Formula;
   isSelected: boolean;
-  isExpanded: boolean;
   isNewest: boolean;
+  diffSummary?: string;
   onSelect: () => void;
-  onToggleExpand: () => void;
   onOpenPricing: () => void;
   onCustomize: () => void;
   onOrder: () => void;
@@ -1974,11 +2021,74 @@ interface FormulaCardProps {
   onArchive: (formulaId: string) => void;
   isArchiving?: boolean;
   getIndividualIngredientDetails: (ingredientName: string) => { name: string; doseMg: number; category: string; description?: string; benefits?: string[] } | undefined;
-  expandedIndividualIngredients: Record<string, boolean>;
-  setExpandedIndividualIngredients: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
-function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onToggleExpand, onOpenPricing, onCustomize, onOrder, onRename, onArchive, isArchiving, getIndividualIngredientDetails, expandedIndividualIngredients, setExpandedIndividualIngredients }: FormulaCardProps) {
+function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onOpenPricing, onCustomize, onOrder, onRename, onArchive, isArchiving, getIndividualIngredientDetails }: FormulaCardProps) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [expandedIndividualIngredients, setExpandedIndividualIngredients] = useState<Record<string, boolean>>({});
+  const detailsBtnRef = useRef<HTMLButtonElement>(null);
+  const [overlayPos, setOverlayPos] = useState<{ top: number; left: number; width: number; maxH: number; direction: 'down' | 'up' } | null>(null);
+
+  useEffect(() => {
+    if (detailsOpen && detailsBtnRef.current) {
+      const rect = detailsBtnRef.current.getBoundingClientRect();
+      const gap = 4;
+      const maxOverlayH = Math.min(window.innerHeight * 0.6, 500);
+      const spaceBelow = window.innerHeight - rect.bottom - gap;
+      const spaceAbove = rect.top - gap;
+
+      if (spaceBelow >= Math.min(maxOverlayH, 200)) {
+        // Open downward
+        setOverlayPos({ top: rect.bottom + gap, left: rect.left, width: rect.width, maxH: Math.min(maxOverlayH, spaceBelow), direction: 'down' });
+      } else {
+        // Open upward
+        const h = Math.min(maxOverlayH, spaceAbove);
+        setOverlayPos({ top: rect.top - gap - h, left: rect.left, width: rect.width, maxH: h, direction: 'up' });
+      }
+    }
+  }, [detailsOpen]);
+
+  // Reposition on scroll/resize while open
+  useEffect(() => {
+    if (!detailsOpen) return;
+    const update = () => {
+      if (detailsBtnRef.current) {
+        const rect = detailsBtnRef.current.getBoundingClientRect();
+        const gap = 4;
+        const maxOverlayH = Math.min(window.innerHeight * 0.6, 500);
+        const spaceBelow = window.innerHeight - rect.bottom - gap;
+        const spaceAbove = rect.top - gap;
+
+        if (spaceBelow >= Math.min(maxOverlayH, 200)) {
+          setOverlayPos({ top: rect.bottom + gap, left: rect.left, width: rect.width, maxH: Math.min(maxOverlayH, spaceBelow), direction: 'down' });
+        } else {
+          const h = Math.min(maxOverlayH, spaceAbove);
+          setOverlayPos({ top: rect.top - gap - h, left: rect.left, width: rect.width, maxH: h, direction: 'up' });
+        }
+      }
+    };
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [detailsOpen]);
+
+  // Close overlay on outside click (no blocking backdrop)
+  useEffect(() => {
+    if (!detailsOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      const overlay = document.getElementById(`formula-details-${formula.id}`);
+      const btn = detailsBtnRef.current;
+      if (overlay && !overlay.contains(e.target as Node) && btn && !btn.contains(e.target as Node)) {
+        setDetailsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [detailsOpen, formula.id]);
+
   const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
   const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
   const createdDate = new Date(formula.createdAt).toLocaleDateString();
@@ -1993,288 +2103,339 @@ function FormulaCard({ formula, isSelected, isExpanded, isNewest, onSelect, onTo
 
   const tileQuote = tileQuoteData?.quote;
 
+  // Get all ingredient names for preview chips
+  const allIngredientNames = [
+    ...formula.bases.map(b => b.ingredient),
+    ...formula.additions.map(a => a.ingredient),
+    ...(formula.userCustomizations?.addedBases?.map(b => b.ingredient) || []),
+    ...(formula.userCustomizations?.addedIndividuals?.map(i => i.ingredient) || []),
+  ];
+
   return (
     <Card
-      className={`relative transition-all flex flex-col ${isSelected ? 'ring-2 ring-primary shadow-lg' : 'hover-elevate'
-        }`}
+      className={`relative transition-all duration-300 flex flex-col bg-white/90 backdrop-blur-sm border-[#054700]/8 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 ${
+        isSelected ? 'ring-2 ring-[#054700] shadow-[0_8px_32px_rgba(5,71,0,0.12)]' : ''
+      }`}
       data-testid={`card-formula-${formula.version}`}
     >
-      {/* Badges */}
-      <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end z-10">
-        {formula.userCreated && (
-          <Badge className="text-xs shadow-sm bg-purple-600 hover:bg-purple-700 text-white">
-            <Beaker className="w-3 h-3 mr-1" />
-            Custom Built
-          </Badge>
-        )}
-        {isNewest && (
-          <Badge variant="default" className="text-xs shadow-sm">
-            <Star className="w-3 h-3 mr-1" />
-            Newest
-          </Badge>
-        )}
-        {isSelected && (
-          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 shadow-sm">
-            <CheckCircle className="w-3 h-3 mr-1" />
-            Selected
-          </Badge>
-        )}
-      </div>
-
-      <CardHeader className="pb-4">
-        <div className="pr-24 min-h-[56px] flex flex-col justify-start">
-          <CardTitle className="text-lg flex items-center gap-1.5 flex-wrap">
-            <FlaskConical className="w-4 h-4 flex-shrink-0" />
-            <span className="break-words">{formula.name || `Version ${formula.version}`}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5 flex-shrink-0"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRename(formula.id, formula.name);
-              }}
-              data-testid={`button-rename-formula-${formula.version}`}
-            >
-              <Pencil className="w-3 h-3" />
-            </Button>
-          </CardTitle>
-          {formula.name ? (
-            <p className="text-xs text-muted-foreground mt-1.5">Version {formula.version}</p>
-          ) : (
-            <div className="h-[18px]" />
+      {/* Header */}
+      <CardHeader className="pb-3">
+        {/* Badges row */}
+        <div className="flex items-center gap-1.5 mb-2 min-h-[22px]">
+          {isNewest && (
+            <Badge className="text-[10px] px-2 py-0 h-5 bg-[#054700] hover:bg-[#054700] text-white shadow-sm">
+              <Star className="w-2.5 h-2.5 mr-1" />
+              Newest
+            </Badge>
+          )}
+          {isSelected && (
+            <Badge className="text-[10px] px-2 py-0 h-5 bg-[#054700]/10 text-[#054700] hover:bg-[#054700]/15 shadow-sm">
+              <CheckCircle className="w-2.5 h-2.5 mr-1" />
+              Selected
+            </Badge>
+          )}
+          {formula.userCreated && (
+            <Badge className="text-[10px] px-2 py-0 h-5 bg-purple-100 text-purple-700 hover:bg-purple-200 shadow-sm">
+              <Beaker className="w-2.5 h-2.5 mr-1" />
+              Custom
+            </Badge>
           )}
         </div>
-        <CardDescription className="text-xs mt-1.5">
-          {createdDate} • {totalIngredients} ingredients
-        </CardDescription>
-      </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col space-y-4">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col items-center justify-center p-3 bg-white/40 rounded-lg min-h-[72px]">
-            <div className="font-bold text-lg text-primary leading-none mb-1.5">
-              {formula.bases.length + (formula.userCustomizations?.addedBases?.length || 0)}
-            </div>
-            <div className="text-xs text-muted-foreground text-center leading-tight">System Supports</div>
-          </div>
-          <div className="flex flex-col items-center justify-center p-3 bg-white/40 rounded-lg min-h-[72px]">
-            <div className="font-bold text-lg text-[#5a6623] leading-none mb-1.5">
-              {formula.additions.length + (formula.userCustomizations?.addedIndividuals?.length || 0)}
-            </div>
-            <div className="text-xs text-muted-foreground text-center leading-tight">Additions</div>
+        {/* Title + rename */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-base font-semibold text-[#054700] flex items-center gap-1.5">
+              <FlaskConical className="w-4 h-4 flex-shrink-0 text-[#054700]" />
+              <span className="truncate">{formula.name || `Version ${formula.version}`}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 flex-shrink-0 text-[#5a6623]/50 hover:text-[#054700]"
+                onClick={(e) => { e.stopPropagation(); onRename(formula.id, formula.name); }}
+                data-testid={`button-rename-formula-${formula.version}`}
+              >
+                <Pencil className="w-3 h-3" />
+              </Button>
+            </CardTitle>
+            <p className="text-xs text-[#5a6623] mt-1 flex items-center gap-1.5">
+              <span>{formula.name && `Version ${formula.version} · `}{createdDate} · {totalIngredients} ingredients</span>
+              {diffSummary && (
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-[#5a6623]/50 hover:text-[#5a6623]/80 transition-colors p-1 -m-1 rounded cursor-pointer">
+                        <GitBranch className="w-3.5 h-3.5" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="start" className="text-xs max-w-[240px] leading-relaxed">
+                      <span className="font-medium">vs previous version:</span> {diffSummary}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </p>
           </div>
         </div>
+      </CardHeader>
 
-        {/* Daily Dosage */}
-        <div className="space-y-2 p-3 bg-white/30 rounded-lg">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">Daily Dosage:</span>
-            <span className="font-medium text-sm tabular-nums" data-testid={`text-formula-dosage-${formula.version}`}>
+      <CardContent className="flex-1 flex flex-col gap-3 pt-0">
+        {/* Ingredient preview chips */}
+        <div className="flex flex-wrap gap-1">
+          {allIngredientNames.slice(0, 5).map((name, i) => (
+            <span key={i} className="inline-flex items-center text-[10px] font-medium text-[#054700]/70 bg-[#054700]/[0.05] px-2 py-0.5 rounded-full">
+              {name}
+            </span>
+          ))}
+          {allIngredientNames.length > 5 && (
+            <span className="inline-flex items-center text-[10px] text-[#5a6623]/50 px-1.5 py-0.5">
+              +{allIngredientNames.length - 5}
+            </span>
+          )}
+        </div>
+
+        {/* Compact info row: dosage + price */}
+        <div className="flex items-center justify-between gap-2 bg-[#054700]/[0.03] rounded-xl px-3.5 py-2.5">
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-[#054700] tabular-nums" data-testid={`text-formula-dosage-${formula.version}`}>
               {calculateDosage(formula.totalMg, formula.targetCapsules || undefined).display}
             </span>
-          </div>
-          <div className="text-xs text-muted-foreground text-center tabular-nums">
-            {formula.targetCapsules || calculateDosage(formula.totalMg).total} capsules/day • {formula.totalMg}mg total
+            <p className="text-[10px] text-[#5a6623] tabular-nums">
+              {formula.targetCapsules || calculateDosage(formula.totalMg).total} caps/day · {formula.totalMg}mg
+            </p>
           </div>
           <button
             type="button"
             onClick={onOpenPricing}
-            className="w-full text-xs text-muted-foreground text-center tabular-nums border-t border-border/60 pt-2 hover:text-foreground hover:underline"
+            className="text-right hover:opacity-80 transition-opacity flex-shrink-0"
           >
-            {isLoadingTileQuote
-              ? `Pricing: loading...`
-              : tileQuote?.available
-                ? `8-week est (${pricingCapsuleCount} caps/day): $${((tileQuote.total ?? 0) * 0.85).toFixed(2)}`
-                : `Pricing unavailable`}
+            {isLoadingTileQuote ? (
+              <span className="text-xs text-[#5a6623]">...</span>
+            ) : tileQuote?.available ? (
+              <>
+                <span className="text-sm font-semibold text-[#054700] tabular-nums">
+                  ${((tileQuote.total ?? 0) * 0.85).toFixed(0)}
+                </span>
+                <p className="text-[10px] text-[#5a6623]">8-week est</p>
+              </>
+            ) : (
+              <span className="text-[10px] text-[#5a6623]">See pricing</span>
+            )}
           </button>
         </div>
 
-        {/* Spacer to push buttons to bottom */}
+        {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Expandable Details */}
-        <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
-          <CollapsibleTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full">
-              {isExpanded ? <ChevronUp className="w-4 h-4 mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
-              {isExpanded ? 'Hide Details' : 'View Details'}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3 space-y-3">
-            {/* System Supports */}
-            {formula.bases.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
-                  <Beaker className="w-3 h-3" />
-                  System Supports
-                </h4>
-                <div className="space-y-1">
-                  {formula.bases.map((base, idx) => (
-                    <div key={idx} className="text-xs p-2 bg-white/30 rounded">
-                      <div className="font-medium">{base.ingredient} - {base.amount}{base.unit}</div>
-                      {base.purpose && <div className="text-muted-foreground mt-1">{base.purpose}</div>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+        {/* View Details Toggle */}
+        <Button ref={detailsBtnRef} variant="outline" size="sm" className="w-full border-[#054700]/10 text-[#054700] hover:bg-[#054700]/5 rounded-lg" onClick={() => setDetailsOpen(!detailsOpen)}>
+          {detailsOpen ? <ChevronUp className="w-3.5 h-3.5 mr-1.5" /> : <Eye className="w-3.5 h-3.5 mr-1.5" />}
+          {detailsOpen ? 'Hide Details' : 'View Details'}
+        </Button>
 
-            {/* Additions */}
-            {formula.additions.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
-                  <Plus className="w-3 h-3" />
-                  Individual Ingredients
-                </h4>
-                <div className="space-y-1">
-                  {formula.additions.map((addition, idx) => (
-                    <div key={idx} className="text-xs p-2 bg-white/30 rounded">
-                      <div className="font-medium">{addition.ingredient} - {addition.amount}{addition.unit}</div>
-                      {addition.purpose && <div className="text-muted-foreground mt-1">{addition.purpose}</div>}
-                    </div>
-                  ))}
+        {/* Floating Details Overlay — rendered in portal to escape column stacking */}
+        {detailsOpen && overlayPos && createPortal(
+            <div
+              id={`formula-details-${formula.id}`}
+              className="fixed z-[9999]"
+              style={{ top: overlayPos.top, left: overlayPos.left, width: overlayPos.width }}
+            >
+              <div className="bg-background border border-border rounded-lg shadow-2xl overflow-y-auto" style={{ maxHeight: overlayPos.maxH }}>
+                <div className="sticky top-0 bg-background border-b px-4 py-3 flex items-center justify-between rounded-t-lg z-10">
+                  <div>
+                    <h3 className="font-semibold text-sm flex items-center gap-2">
+                      <FlaskConical className="w-4 h-4" />
+                      {formula.name || `Version ${formula.version}`}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {totalIngredients} ingredients · {formula.targetCapsules || calculateDosage(formula.totalMg).total} caps/day · {formula.totalMg}mg
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 -mr-1" onClick={() => setDetailsOpen(false)}>
+                    <ChevronUp className="w-4 h-4" />
+                  </Button>
                 </div>
-              </div>
-            )}
-
-            {/* User Customizations */}
-            {((formula.userCustomizations?.addedBases?.length || 0) > 0 || (formula.userCustomizations?.addedIndividuals?.length || 0) > 0) && (
-              <div>
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
-                  <Users className="w-3 h-3 text-purple-600" />
-                  <span className="text-purple-600">Your Customizations</span>
-                </h4>
-                <div className="space-y-1">
-                  {formula.userCustomizations?.addedBases?.map((base, idx) => (
-                    <div key={`base-${idx}`} className="text-xs p-2 bg-purple-50 rounded border border-purple-200">
-                      <div className="font-medium text-purple-900">{base.ingredient} - {base.amount}{base.unit}</div>
-                    </div>
-                  ))}
-                  {formula.userCustomizations?.addedIndividuals?.map((ind, idx) => {
-                    const ingredientDetails = getIndividualIngredientDetails(ind.ingredient);
-                    const expandKey = `card-ind-${formula.id}-${idx}`;
-                    return (
-                      <div key={`ind-${idx}`} className="text-xs p-2 bg-purple-50 rounded border border-purple-200">
-                        {ingredientDetails?.benefits && ingredientDetails.benefits.length > 0 ? (
-                          <Collapsible
-                            open={expandedIndividualIngredients[expandKey]}
-                            onOpenChange={(open) => {
-                              setExpandedIndividualIngredients(prev => ({ ...prev, [expandKey]: open }));
-                            }}
-                          >
-                            <CollapsibleTrigger className="w-full hover-elevate active-elevate-2 rounded p-1 -m-1">
-                              <div className="flex items-center justify-between">
-                                <div className="font-medium text-purple-900">{ind.ingredient} - {ind.amount}{ind.unit}</div>
-                                {expandedIndividualIngredients[expandKey] ? (
-                                  <ChevronUp className="w-3 h-3 text-purple-600" />
-                                ) : (
-                                  <ChevronDown className="w-3 h-3 text-purple-600" />
-                                )}
-                              </div>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="mt-2">
-                              <div className="bg-primary/5 rounded-md p-2 space-y-1">
-                                {ingredientDetails.benefits.map((benefit, bidx) => (
-                                  <div key={bidx} className="flex items-start gap-2">
-                                    <CheckCircle className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
-                                    <span className="text-xs text-muted-foreground">{benefit}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        ) : (
-                          <div className="font-medium text-purple-900">{ind.ingredient} - {ind.amount}{ind.unit}</div>
-                        )}
+                <div className="p-4 space-y-5">
+                  {/* System Supports */}
+                  {formula.bases.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Beaker className="w-4 h-4 text-primary" />
+                        System Supports
+                        <Badge variant="secondary" className="text-xs ml-auto">{formula.bases.length}</Badge>
+                      </h4>
+                      <div className="space-y-2">
+                        {formula.bases.map((base, idx) => (
+                          <div key={idx} className="p-3 bg-muted/50 rounded-lg border border-border/40">
+                            <div className="font-medium text-sm">{base.ingredient} — {base.amount}{base.unit}</div>
+                            {base.purpose && <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{base.purpose}</p>}
+                          </div>
+                        ))}
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
+
+                  {/* Individual Ingredients */}
+                  {formula.additions.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Plus className="w-4 h-4 text-[#5a6623]" />
+                        Individual Ingredients
+                        <Badge variant="secondary" className="text-xs ml-auto">{formula.additions.length}</Badge>
+                      </h4>
+                      <div className="space-y-2">
+                        {formula.additions.map((addition, idx) => (
+                          <div key={idx} className="p-3 bg-muted/50 rounded-lg border border-border/40">
+                            <div className="font-medium text-sm">{addition.ingredient} — {addition.amount}{addition.unit}</div>
+                            {addition.purpose && <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{addition.purpose}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* User Customizations */}
+                  {((formula.userCustomizations?.addedBases?.length || 0) > 0 || (formula.userCustomizations?.addedIndividuals?.length || 0) > 0) && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-purple-600" />
+                        <span className="text-purple-600">Your Customizations</span>
+                        <Badge variant="secondary" className="text-xs ml-auto bg-purple-100 text-purple-700">
+                          {(formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0)}
+                        </Badge>
+                      </h4>
+                      <div className="space-y-2">
+                        {formula.userCustomizations?.addedBases?.map((base, idx) => (
+                          <div key={`base-${idx}`} className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                            <div className="font-medium text-sm text-purple-900">{base.ingredient} — {base.amount}{base.unit}</div>
+                          </div>
+                        ))}
+                        {formula.userCustomizations?.addedIndividuals?.map((ind, idx) => {
+                          const ingredientDetails = getIndividualIngredientDetails(ind.ingredient);
+                          const expandKey = `card-ind-${formula.id}-${idx}`;
+                          return (
+                            <div key={`ind-${idx}`} className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                              {ingredientDetails?.benefits && ingredientDetails.benefits.length > 0 ? (
+                                <Collapsible
+                                  open={expandedIndividualIngredients[expandKey]}
+                                  onOpenChange={(open) => {
+                                    setExpandedIndividualIngredients(prev => ({ ...prev, [expandKey]: open }));
+                                  }}
+                                >
+                                  <CollapsibleTrigger className="w-full hover-elevate active-elevate-2 rounded p-1 -m-1">
+                                    <div className="flex items-center justify-between">
+                                      <div className="font-medium text-sm text-purple-900">{ind.ingredient} — {ind.amount}{ind.unit}</div>
+                                      {expandedIndividualIngredients[expandKey] ? (
+                                        <ChevronUp className="w-3 h-3 text-purple-600" />
+                                      ) : (
+                                        <ChevronDown className="w-3 h-3 text-purple-600" />
+                                      )}
+                                    </div>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent className="mt-2">
+                                    <div className="bg-primary/5 rounded-md p-2.5 space-y-1.5">
+                                      {ingredientDetails.benefits.map((benefit, bidx) => (
+                                        <div key={bidx} className="flex items-start gap-2">
+                                          <CheckCircle className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                                          <span className="text-xs text-muted-foreground">{benefit}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </CollapsibleContent>
+                                </Collapsible>
+                              ) : (
+                                <div className="font-medium text-sm text-purple-900">{ind.ingredient} — {ind.amount}{ind.unit}</div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rationale */}
+                  {formula.rationale && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-amber-500" />
+                        Rationale
+                      </h4>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{formula.rationale}</p>
+                    </div>
+                  )}
+
+                  {/* Warnings */}
+                  {formula.warnings && formula.warnings.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-2 flex items-center gap-2 text-orange-600">
+                        <AlertTriangle className="w-4 h-4" />
+                        Warnings
+                      </h4>
+                      <ul className="space-y-1.5">
+                        {formula.warnings.map((warning, idx) => (
+                          <li key={idx} className="text-sm text-orange-600 flex items-start gap-2">
+                            <span className="mt-1">·</span>
+                            <span>{warning}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>,
+          document.body
+        )}
 
-            {/* Rationale */}
-            {formula.rationale && (
-              <div>
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
-                  <Lightbulb className="w-3 h-3" />
-                  Rationale
-                </h4>
-                <p className="text-xs text-muted-foreground">{formula.rationale}</p>
-              </div>
-            )}
-
-            {/* Warnings */}
-            {formula.warnings && formula.warnings.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1 text-orange-600">
-                  <AlertTriangle className="w-3 h-3" />
-                  Warnings
-                </h4>
-                <ul className="space-y-1">
-                  {formula.warnings.map((warning, idx) => (
-                    <li key={idx} className="text-xs text-orange-600">• {warning}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 flex-wrap">
-          {/* Select Button */}
+        {/* Action Buttons — Order is dominant */}
+        <div className="flex gap-2">
           <Button
             size="sm"
             variant={isSelected ? "secondary" : "outline"}
-            className={isSelected ? "bg-green-100 text-green-800 hover:bg-green-200 border-green-300" : ""}
+            className={`rounded-lg ${isSelected ? "bg-[#054700]/10 text-[#054700] hover:bg-[#054700]/15 border-[#054700]/20" : "border-[#054700]/10 text-[#054700] hover:bg-[#054700]/5"}`}
             onClick={onSelect}
             data-testid={`button-select-formula-${formula.version}`}
             disabled={isSelected}
           >
-            <CheckCircle className="w-4 h-4 mr-2" />
+            <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
             {isSelected ? 'Selected' : 'Select'}
           </Button>
 
-          {/* Edit in Chat Button */}
           {formula.chatSessionId && (
             <Button
               size="sm"
               variant="outline"
+              className="border-[#054700]/10 text-[#054700] hover:bg-[#054700]/5 rounded-lg"
               asChild
               data-testid={`button-edit-formula-${formula.version}`}
             >
               <Link href={`/dashboard/consultation?session_id=${formula.chatSessionId}`}>
-                <MessageSquare className="w-4 h-4 mr-2" />
+                <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
                 Edit
               </Link>
             </Button>
           )}
 
-          {/* Order Button */}
           <Button
             size="sm"
-            className="flex-1"
+            className="flex-1 bg-[#054700] hover:bg-[#043d00] text-white rounded-lg"
             onClick={onOrder}
             data-testid={`button-order-formula-${formula.version}`}
           >
-            <ShoppingCart className="w-4 h-4 mr-2" />
+            <ShoppingCart className="w-3.5 h-3.5 mr-1.5" />
             Order
           </Button>
 
-          {/* Archive Button */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
-                className="text-muted-foreground hover:text-orange-600 hover:border-orange-300"
+                className="border-[#054700]/10 text-[#5a6623]/50 hover:text-orange-600 hover:border-orange-300 rounded-lg"
                 data-testid={`button-archive-formula-${formula.version}`}
                 disabled={isArchiving}
               >
-                <Archive className="w-4 h-4" />
+                <Archive className="w-3.5 h-3.5" />
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>

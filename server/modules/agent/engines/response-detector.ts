@@ -10,6 +10,7 @@ import OpenAI from 'openai';
 import logger from '../../../infra/logging/logger';
 import { agentRepository } from '../agent.repository';
 import { getPrAgentConfig } from '../agent-config';
+import { logResponseDetected } from '../../crm/crm-bridge';
 
 interface DetectedResponse {
   pitchId: string;
@@ -101,6 +102,9 @@ export async function detectResponses(): Promise<{
       } else if (classification === 'declined') {
         await agentRepository.updateProspectStatus(prospect.id, 'rejected');
       }
+
+      // Log to CRM timeline
+      logResponseDetected(prospect, classification, snippet.substring(0, 300)).catch(() => {});
 
       logger.info(`[response-detector] Response from "${prospect.name}": ${classification}`);
     } catch (err: any) {

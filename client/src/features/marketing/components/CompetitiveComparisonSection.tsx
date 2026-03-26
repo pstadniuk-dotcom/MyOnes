@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Check, X, Minus, Pill, FlaskConical } from "lucide-react";
 
 type FeatureValue = boolean | "partial";
@@ -190,12 +190,32 @@ function FeatureIcon({ value }: { value: FeatureValue }) {
 export default function CompetitiveComparisonSection() {
   const [activeTab, setActiveTab] = useState("supplements");
   const currentTab = tabs.find((t) => t.id === activeTab) || tabs[0];
+  const sectionRef = useRef<HTMLElement>(null);
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRevealed(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <section id="compare" className="py-24 md:py-32 bg-white scroll-mt-24">
+    <section ref={sectionRef} id="compare" className="py-24 md:py-32 bg-white scroll-mt-24">
       <div className="container mx-auto px-6 max-w-7xl">
         {/* Header */}
-        <div className="max-w-3xl mx-auto text-center mb-12">
+        <div
+          className={`max-w-3xl mx-auto text-center mb-12 transition-all duration-700 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
           <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             How We Compare
           </span>
@@ -209,7 +229,11 @@ export default function CompetitiveComparisonSection() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex justify-center mb-8">
+        <div
+          className={`flex justify-center mb-8 transition-all duration-700 delay-100 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+          }`}
+        >
           <div className="inline-flex bg-[#ede8e2] rounded-full p-1.5 gap-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -218,7 +242,7 @@ export default function CompetitiveComparisonSection() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-300 ${
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-300 cursor-pointer ${
                     isActive
                       ? "bg-[#054700] text-[#ede8e2] shadow-md"
                       : "text-[#054700]/60 hover:text-[#054700] hover:bg-white/50"
@@ -237,63 +261,76 @@ export default function CompetitiveComparisonSection() {
           {currentTab.tagline}
         </p>
 
-        {/* Comparison Table - Desktop */}
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#054700]/10">
-                <th className="text-left py-4 px-4 font-medium text-[#054700]/60">
-                  Platform
-                </th>
-                {currentTab.competitors.map((competitor, index) => (
-                  <th
-                    key={competitor.name}
-                    className={`py-4 px-4 text-center ${
-                      index === 0
-                        ? "bg-[#054700] text-[#ede8e2] rounded-t-xl"
-                        : "text-[#054700]"
-                    }`}
-                  >
-                    <div className="font-semibold">{competitor.name}</div>
+        {/* Comparison Table - Desktop — elevated ONES column */}
+        <div
+          className={`hidden lg:block transition-all duration-700 delay-200 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
+          <div className="bg-[#faf9f7] rounded-3xl border border-[#054700]/[0.06] shadow-lg shadow-[#054700]/[0.04] overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className="text-left py-5 px-6 font-medium text-[#054700]/50 text-sm tracking-wide uppercase">
+                    Feature
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {currentTab.featureLabels.map((feature, rowIndex) => (
-                <tr
-                  key={feature.key}
-                  className={rowIndex % 2 === 0 ? "bg-[#ede8e2]/50" : ""}
-                >
-                  <td className="py-4 px-4 text-[#054700]/80 font-medium">
-                    {feature.label}
-                  </td>
-                  {currentTab.competitors.map((competitor, colIndex) => (
-                    <td
-                      key={`${competitor.name}-${feature.key}`}
-                      className={`py-4 px-4 text-center ${
-                        colIndex === 0 ? "bg-[#054700]/5" : ""
+                  {currentTab.competitors.map((competitor, index) => (
+                    <th
+                      key={competitor.name}
+                      className={`py-5 px-4 text-center ${
+                        index === 0
+                          ? "bg-[#054700] text-white"
+                          : "text-[#054700]/70"
                       }`}
                     >
-                      <div className="flex justify-center">
-                        <FeatureIcon value={competitor.features[feature.key]} />
-                      </div>
-                    </td>
+                      <div className={`font-semibold ${index === 0 ? "text-base" : "text-sm"}`}>{competitor.name}</div>
+                      {index === 0 && (
+                        <div className="text-[10px] uppercase tracking-widest text-white/50 mt-1">Your Formula</div>
+                      )}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {currentTab.featureLabels.map((feature, rowIndex) => (
+                  <tr
+                    key={feature.key}
+                    className={`border-t border-[#054700]/[0.04] ${rowIndex % 2 === 0 ? "" : "bg-white/50"}`}
+                  >
+                    <td className="py-4 px-6 text-[#054700]/70 text-[15px]">
+                      {feature.label}
+                    </td>
+                    {currentTab.competitors.map((competitor, colIndex) => (
+                      <td
+                        key={`${competitor.name}-${feature.key}`}
+                        className={`py-4 px-4 text-center ${
+                          colIndex === 0 ? "bg-[#054700]/[0.03]" : ""
+                        }`}
+                      >
+                        <div className="flex justify-center">
+                          <FeatureIcon value={competitor.features[feature.key]} />
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Comparison Cards - Mobile */}
         <div className="lg:hidden space-y-4">
           {/* ONES Card - Featured */}
-          <div className="bg-[#054700] rounded-2xl p-6 text-[#ede8e2]">
+          <div
+            className={`bg-[#054700] rounded-2xl p-6 text-[#ede8e2] shadow-xl shadow-[#054700]/20 transition-all duration-700 delay-200 ${
+              revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            }`}
+          >
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-semibold">Ones</h3>
               <span className="bg-white/20 px-3 py-1 rounded-full text-xs">
-                You are here
+                Your Formula
               </span>
             </div>
             <div className="space-y-3">
@@ -307,10 +344,13 @@ export default function CompetitiveComparisonSection() {
           </div>
 
           {/* Other Competitors */}
-          {currentTab.competitors.slice(1).map((competitor) => (
+          {currentTab.competitors.slice(1).map((competitor, idx) => (
             <div
               key={competitor.name}
-              className="bg-[#ede8e2] rounded-2xl p-6"
+              className={`bg-white rounded-2xl p-6 border border-[#054700]/[0.06] transition-all duration-700 ${
+                revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+              }`}
+              style={{ transitionDelay: revealed ? `${300 + idx * 100}ms` : "0ms" }}
             >
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-[#054700]">
@@ -332,7 +372,11 @@ export default function CompetitiveComparisonSection() {
         </div>
 
         {/* Bottom CTA */}
-        <div className="mt-16 text-center">
+        <div
+          className={`mt-16 text-center transition-all duration-700 delay-500 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+          }`}
+        >
           <p className="text-xl text-[#054700]/60 mb-2">
             Why settle for generic?
           </p>

@@ -71,6 +71,35 @@ export const PRESS_QUERIES: string[] = [
   'biohacking newsletter feature guest contributor health optimization',
 ];
 
+export const INVESTOR_QUERIES: string[] = [
+  // Angel investors in health/wellness
+  `angel investor health wellness supplement startup ${yearFilter()}`,
+  `angel investor personalized nutrition DTC health brand seed funding`,
+  `health tech angel investor portfolio supplement wellness companies`,
+  `angel syndicate health wellness CPG investing seed round`,
+
+  // Seed / Series A VCs
+  `venture capital firm health wellness supplement portfolio ${yearFilter()}`,
+  `VC fund personalized nutrition health tech investment thesis`,
+  `seed stage VC health supplement DTC brand portfolio companies`,
+  `series A venture capital consumer health wellness startup`,
+  `health tech VC fund investing personalized medicine supplements`,
+
+  // DTC / CPG-focused funds
+  `DTC consumer brand venture capital fund health wellness portfolio`,
+  `CPG venture capital health food supplements investment`,
+  `consumer health brand investor fund recent investments ${yearFilter()}`,
+
+  // Health tech & biotech
+  `health tech venture fund personalized supplement nutrition investment`,
+  `biotech wellness startup investor seed series A ${yearFilter()}`,
+  `digital health investor VC fund wearable nutrition personalized`,
+
+  // Family offices & growth funds
+  `family office investing health wellness supplement brand`,
+  `growth equity health DTC consumer wellness brand portfolio`,
+];
+
 // Track which queries have been used recently (persisted per-run via runLog)
 const queryUsageHistory = new Map<string, number>(); // query hash → last used timestamp
 
@@ -79,7 +108,7 @@ const queryUsageHistory = new Map<string, number>(); // query hash → last used
  * Avoids repeating recently used queries and appends current date context.
  */
 export function getSearchQueries(
-  category: 'podcast' | 'press',
+  category: 'podcast' | 'press' | 'investor',
   count: number = 5,
   customQueries?: string[],
 ): string[] {
@@ -87,6 +116,8 @@ export function getSearchQueries(
     ? customQueries
     : category === 'podcast'
     ? PODCAST_QUERIES
+    : category === 'investor'
+    ? INVESTOR_QUERIES
     : PRESS_QUERIES;
 
   const now = Date.now();

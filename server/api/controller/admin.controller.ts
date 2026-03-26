@@ -6,6 +6,9 @@ import { logAdminAction, listAdminAuditLogs } from '../../modules/admin/admin-au
 import { listAuthAuditLogs } from '../../modules/auth/auth-audit';
 import { logger } from '../../infra/logging/logger';
 import { manufacturerPricingService } from '../../modules/formulas/manufacturer-pricing.service';
+import { ingredientCatalogRepository } from '../../modules/formulas/ingredient-catalog.repository';
+import { ingredientCatalogSyncService } from '../../modules/formulas/ingredient-catalog-sync.service';
+import { formulasRepository } from '../../modules/formulas/formulas.repository';
 import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, ALL_INGREDIENTS, SYSTEM_SUPPORT_DETAILS } from '@shared/ingredients';
 
 export class AdminController {
@@ -1259,8 +1262,8 @@ export class AdminController {
             const filters: any = {};
             if (req.query.status) filters.status = req.query.status;
             if (req.query.practiceType) filters.practiceType = req.query.practiceType;
-            const prospects = await adminService.listB2bProspects(filters);
-            res.json(prospects);
+            const result = await adminService.listB2bProspects(filters);
+            res.json(result.prospects);
         } catch (error) {
             logger.error('Error listing B2B prospects', { error });
             res.status(500).json({ error: 'Failed to list B2B prospects' });
@@ -1337,6 +1340,53 @@ export class AdminController {
         } catch (error) {
             logger.error('Error creating B2B outreach', { error });
             res.status(500).json({ error: 'Failed to create B2B outreach' });
+        }
+    }
+
+    async getIngredientSyncLogs(req: Request, res: Response) {
+        try {
+            const limit = parseInt(req.query.limit as string) || 20;
+            const logs = await ingredientCatalogRepository.getRecentSyncLogs(limit);
+            res.json(logs);
+        } catch (error) {
+            logger.error('Error fetching ingredient sync logs', { error });
+            res.status(500).json({ error: 'Failed to fetch sync logs' });
+        }
+    }
+
+    async getManufacturerIngredients(req: Request, res: Response) {
+        try {
+            const statusFilter = req.query.status as string;
+            let ingredients;
+            if (statusFilter === 'active') {
+                ingredients = await ingredientCatalogRepository.getAllActive();
+            } else {
+                ingredients = await ingredientCatalogRepository.getAll();
+            }
+            res.json(ingredients);
+        } catch (error) {
+            logger.error('Error fetching manufacturer ingredients', { error });
+            res.status(500).json({ error: 'Failed to fetch ingredients' });
+        }
+    }
+
+    async triggerIngredientSync(req: Request, res: Response) {
+        try {
+            const result = await ingredientCatalogSyncService.syncCatalog();
+            res.json(result);
+        } catch (error) {
+            logger.error('Error triggering ingredient sync', { error });
+            res.status(500).json({ error: 'Failed to trigger ingredient sync' });
+        }
+    }
+
+    async getAffectedFormulas(req: Request, res: Response) {
+        try {
+            const affected = await formulasRepository.getFormulasNeedingReformulation();
+            res.json(affected);
+        } catch (error) {
+            logger.error('Error fetching affected formulas', { error });
+            res.status(500).json({ error: 'Failed to fetch affected formulas' });
         }
     }
 }

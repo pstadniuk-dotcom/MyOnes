@@ -63,15 +63,15 @@ const ContentManagementPage = lazy(() => import("@/pages/admin/ContentManagement
 const AdminAnalyticsPage = lazy(() => import("@/pages/admin/AdminAnalyticsPage"));
 const AISettingsPage = lazy(() => import("@/pages/admin/AISettingsPage"));
 const ProductCatalogPage = lazy(() => import("@/pages/admin/ProductCatalogPage"));
-const AdminLiveChatsPage = lazy(() => import("@/pages/admin/AdminLiveChatsPage"));
-const AdminChatAnalyticsPage = lazy(() => import("@/pages/admin/AdminChatAnalyticsPage"));
+const IngredientSyncPage = lazy(() => import("@/pages/admin/IngredientSyncPage"));
+
+
 const AIUsagePage = lazy(() => import("@/pages/admin/AIUsagePage"));
 const PRAgentPage = lazy(() => import("@/pages/admin/PRAgentPage"));
-const MetaAdsPage = lazy(() => import("@/pages/admin/MetaAdsPage"));
-const AISupportAgentPage = lazy(() => import("@/pages/admin/AISupportAgentPage"));
+
 const TrafficSourcesPage = lazy(() => import("@/pages/admin/TrafficSourcesPage"));
 const InfluencerHubPage = lazy(() => import("@/pages/admin/InfluencerHubPage"));
-const B2bProspectingPage = lazy(() => import("@/pages/admin/B2bProspectingPage"));
+const SocialPostsPage = lazy(() => import("@/pages/admin/SocialPostsPage"));
 import { AdminLayout } from "@/shared/components/AdminLayout";
 
 // Import shared/public components
@@ -82,7 +82,7 @@ import CheckoutSuccessPage from "@/pages/CheckoutSuccessPage";
 // Import V2 landing page (premium design)
 import LandingPageV2 from "@/pages/LandingPageV2";
 import ScrollToTop from "./shared/components/ScrollToTop";
-import { LiveChatWidget } from "@/features/live-chat/components/LiveChatWidget";
+
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -327,6 +327,13 @@ function MainRouter() {
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
+      <Route path="/admin/products/ingredient-sync">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><IngredientSyncPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
       <Route path="/admin/products">
         <ProtectedAdminRoute>
           <AdminLayout>
@@ -341,24 +348,19 @@ function MainRouter() {
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
-      <Route path="/admin/live-chats">
-        <ProtectedAdminRoute>
-          <AdminLayout>
-            <Suspense fallback={<PageLoader />}><AdminLiveChatsPage /></Suspense>
-          </AdminLayout>
-        </ProtectedAdminRoute>
-      </Route>
-      <Route path="/admin/chat-analytics">
-        <ProtectedAdminRoute>
-          <AdminLayout>
-            <Suspense fallback={<PageLoader />}><AdminChatAnalyticsPage /></Suspense>
-          </AdminLayout>
-        </ProtectedAdminRoute>
-      </Route>
+
+
       <Route path="/admin/ai-usage">
         <ProtectedAdminRoute>
           <AdminLayout>
             <Suspense fallback={<PageLoader />}><AIUsagePage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/outreach">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><PRAgentPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
@@ -369,20 +371,7 @@ function MainRouter() {
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
-      <Route path="/admin/ai-support-agent">
-        <ProtectedAdminRoute>
-          <AdminLayout>
-            <Suspense fallback={<PageLoader />}><AISupportAgentPage /></Suspense>
-          </AdminLayout>
-        </ProtectedAdminRoute>
-      </Route>
-      <Route path="/admin/meta-ads">
-        <ProtectedAdminRoute>
-          <AdminLayout>
-            <Suspense fallback={<PageLoader />}><MetaAdsPage /></Suspense>
-          </AdminLayout>
-        </ProtectedAdminRoute>
-      </Route>
+
       <Route path="/admin/influencers">
         <ProtectedAdminRoute>
           <AdminLayout>
@@ -390,10 +379,11 @@ function MainRouter() {
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
-      <Route path="/admin/b2b">
+
+      <Route path="/admin/social">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <Suspense fallback={<PageLoader />}><B2bProspectingPage /></Suspense>
+            <Suspense fallback={<PageLoader />}><SocialPostsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
@@ -432,7 +422,7 @@ function App() {
         <Toaster />
         <ScrollToTop />
         <MainRouter />
-        <LiveChatWidget />
+
       </TooltipProvider>
     </AuthProvider>
   );

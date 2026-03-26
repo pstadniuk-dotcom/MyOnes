@@ -187,11 +187,15 @@ try {
 
 // ─── Step 5: Pricing analysis ───────────────────────────────────────────
 console.log('── Step 5: Pricing analysis ─────────────────────────────');
+const mfgSubtotal = Number(quoteData.subtotal ?? quoteData.total ?? 0);
 const mfgTotal = Number(quoteData.total ?? quoteData.subtotal ?? 0);
-const customerPrice = Math.round(mfgTotal * MARGIN * 100) / 100;
+const aliveShipping = Math.round((mfgTotal - mfgSubtotal) * 100) / 100;
+const customerPrice = Math.round(mfgSubtotal * MARGIN * 100) / 100;
 const perDay = Math.round((customerPrice / QUOTE_DAYS) * 100) / 100;
 
-console.log(`Manufacturer cost (raw from API):  $${mfgTotal.toFixed(2)}`);
+console.log(`Manufacturer subtotal (cost only): $${mfgSubtotal.toFixed(2)}`);
+console.log(`Manufacturer total (incl shipping): $${mfgTotal.toFixed(2)}`);
+console.log(`Alive shipping:                    $${aliveShipping.toFixed(2)}`);
 console.log(`Margin multiplier:                 ${MARGIN}x`);
 console.log(`Customer price (8-week supply):    $${customerPrice.toFixed(2)}`);
 console.log(`Per-day cost to customer:          $${perDay.toFixed(2)}`);

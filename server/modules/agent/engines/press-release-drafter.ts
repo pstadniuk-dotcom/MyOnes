@@ -54,7 +54,7 @@ export async function draftPressRelease(
     messages: [
       {
         role: 'system',
-        content: `You are a PR professional drafting a press release for ${profile.company}, a personalized supplement company using AI to create custom formulas.
+        content: `You are a PR professional drafting a press release for ${profile.company}, a personalized supplement company using AI to create custom supplements.
 
 COMPANY: ${profile.company} (${profile.companyUrl})
 FOUNDER: ${profile.name}, ${profile.title}

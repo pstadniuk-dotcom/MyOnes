@@ -203,6 +203,18 @@ export class AutoShipService {
       return;
     }
 
+    // 1b. Block renewal if formula has discontinued ingredients
+    if (formula.needsReformulation) {
+      logger.warn('Auto-ship renewal blocked: formula needs reformulation', {
+        autoShipId: autoShip.id,
+        userId: autoShip.userId,
+        discontinuedIngredients: formula.discontinuedIngredients,
+      });
+      await autoShipRepository.update(autoShip.id, { status: 'paused' as any });
+      await this.notifyAutoShipIssue(user, 'One or more ingredients in your formula are no longer available. Your auto-ship is paused until you update your formula. Visit your dashboard to chat with your AI practitioner for a quick update.');
+      return;
+    }
+
     // 2. Get fresh manufacturer quote
     const quote = await manufacturerPricingService.quoteFormula({
       bases: (formula.bases as any[]) || [],

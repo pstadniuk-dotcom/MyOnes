@@ -3,6 +3,7 @@ import logger from '../../infra/logging/logger';
 import { usersRepository } from '../users/users.repository';
 import { optimizeRepository } from '../optimize/optimize.repository';
 import { wearablesRepository } from '../wearables/wearables.repository';
+import { wearablesService } from '../wearables/wearables.service';
 import { sendRawSms } from '../../utils/smsService';
 import { reorderRepository } from '../reorder/reorder.repository';
 import { reorderService } from '../reorder/reorder.service';
@@ -348,6 +349,9 @@ export class WebhooksService {
             userId: user.id,
             provider: data?.provider,
         });
+
+        // Invalidate Health Pulse cache so dashboard picks up the new device immediately
+        wearablesService.invalidatePulseCache(user.id);
     }
 
     private async handleProviderDisconnected(event: any) {
@@ -360,6 +364,9 @@ export class WebhooksService {
             provider: data?.provider,
             error: data?.error,
         });
+
+        // Invalidate Health Pulse cache so dashboard reflects disconnection
+        wearablesService.invalidatePulseCache(user.id);
     }
 
     private async findUserByJunctionId(junctionUserId: string) {

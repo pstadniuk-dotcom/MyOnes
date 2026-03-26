@@ -9,6 +9,8 @@ vite.config.ts.*
 # Large media files (use CDN instead)
 # *.mov
 # *.mp4
+client/public/Ones LIfestyle Images/
+client/public/Hero Section/
  
 # Ignore environment files (never commit secrets)
 .env

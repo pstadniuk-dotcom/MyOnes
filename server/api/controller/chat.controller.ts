@@ -301,6 +301,14 @@ export class ChatController {
             });
 
             const previousMessages = await chatRepository.listMessagesBySession(chatSession.id);
+
+            // Fetch discontinued ingredients from manufacturer catalog so AI avoids them
+            const { ingredientCatalogRepository } = await import('../../modules/formulas/ingredient-catalog.repository');
+            const allManufacturerIngredients = await ingredientCatalogRepository.getAll();
+            const discontinuedIngredientNames = allManufacturerIngredients
+                .filter(i => i.status === 'discontinued')
+                .map(i => i.name);
+
             const promptContext: PromptContext = {
                 healthProfile: healthProfile as any,
                 activeFormula: activeFormula as any,
@@ -311,6 +319,7 @@ export class ChatController {
                 currentUserMessage: message,
                 isActiveMember,
                 hasOrderedFormula,
+                discontinuedIngredientNames: discontinuedIngredientNames.length > 0 ? discontinuedIngredientNames : undefined,
             };
 
             const fullSystemPrompt = buildO1MiniPrompt(promptContext);

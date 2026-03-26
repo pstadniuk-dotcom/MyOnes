@@ -677,6 +677,11 @@ class DatabaseBillingProvider implements BillingProvider {
       }
     }
 
+    // DISCONTINUED INGREDIENT GATE: Block checkout if formula needs reformulation
+    if (formula && formula.needsReformulation) {
+      throw new Error('FORMULA_NEEDS_REFORMULATION');
+    }
+
     // MEDICAL DISCLOSURE GATE: Require medication_disclosure consent before checkout
     const medDisclosureConsent = await consentsRepository.getUserConsent(userId, 'medication_disclosure');
     if (!medDisclosureConsent || !medDisclosureConsent.granted) {

@@ -1,4 +1,5 @@
 
+import { useRef, useEffect, useState } from "react";
 
 const steps = [
   {
@@ -24,8 +25,26 @@ const steps = [
 ];
 
 export default function HowItWorksSectionV2() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRevealed(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.15 }
+    );
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section 
+    <section
+      ref={sectionRef}
       id="how-it-works" 
       className="relative py-24 md:py-32 overflow-hidden scroll-mt-24"
     >
@@ -41,10 +60,14 @@ export default function HowItWorksSectionV2() {
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
       />
       {/* Light overlay to keep text readable */}
-      <div className="absolute inset-0 bg-[#ede8e2]/80 backdrop-blur-[2px] z-[1]" />
+      <div className="absolute inset-0 bg-[#ede8e2]/85 backdrop-blur-[3px] z-[1]" />
 
       <div className="relative z-10 container mx-auto px-6 max-w-6xl">
-        <div className="max-w-2xl mx-auto text-center mb-16">
+        <div
+          className={`max-w-2xl mx-auto text-center mb-16 transition-all duration-700 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
           <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             How It Works
           </span>

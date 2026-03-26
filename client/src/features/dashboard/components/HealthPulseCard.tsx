@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   TrendingDown,
   Clock,
+  Pill,
+  RotateCw,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -28,6 +30,13 @@ interface PulseDriver {
 
 type PulseState = 'optimal' | 'adapting' | 'under_recovery' | 'circadian_stress' | 'attention' | 'baseline';
 
+interface LabSnapshotData {
+  markers: Array<{ signal: string; severity: string; category: string }>;
+  reportAge: 'recent' | 'aging' | 'stale' | null;
+  reportDateLabel: string | null;
+  hasActiveOrder: boolean;
+}
+
 interface PulseIntelligence {
   state: PulseState;
   stateLabel: string;
@@ -38,6 +47,7 @@ interface PulseIntelligence {
   actions: string[];
   hasWearable: boolean;
   hasLabs: boolean;
+  labSnapshot: LabSnapshotData | null;
   providers: string[];
   lastUpdated: string;
 }
@@ -116,6 +126,12 @@ const CATEGORY_ICON: Record<string, React.ElementType> = {
   activity: Zap,
 };
 
+const REPORT_AGE_STYLE: Record<string, { opacity: string; label: string }> = {
+  recent: { opacity: 'opacity-100', label: 'Recent' },
+  aging: { opacity: 'opacity-80', label: 'Getting older' },
+  stale: { opacity: 'opacity-60', label: 'Consider retesting' },
+};
+
 // ── Components ─────────────────────────────────────────────────────────
 
 function DriverRow({ driver }: { driver: PulseDriver }) {
@@ -141,6 +157,58 @@ function ActionRow({ action, index }: { action: string; index: number }) {
         <span className="text-[10px] font-semibold text-[#054700]">{index + 1}</span>
       </span>
       <span className="text-sm text-[#054700]/80 leading-snug">{action}</span>
+    </div>
+  );
+}
+
+function LabSnapshotSection({ labSnapshot }: { labSnapshot: LabSnapshotData }) {
+  const ageStyle = labSnapshot.reportAge
+    ? REPORT_AGE_STYLE[labSnapshot.reportAge]
+    : REPORT_AGE_STYLE.recent;
+  const isStale = labSnapshot.reportAge === 'stale';
+
+  return (
+    <div className={`bg-white/40 rounded-xl border border-[#054700]/[0.05] p-3.5 ${ageStyle.opacity}`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5">
+          <FlaskConical className="w-3 h-3 text-[#5a6623]" />
+          <span className="text-[10px] font-semibold text-[#5a6623] uppercase tracking-wider">
+            Lab Snapshot
+          </span>
+        </div>
+        {labSnapshot.reportDateLabel && (
+          <span className="text-[10px] text-[#5a6623]/60 flex items-center gap-1">
+            {isStale && <RotateCw className="w-2.5 h-2.5" />}
+            Tested {labSnapshot.reportDateLabel}
+          </span>
+        )}
+      </div>
+      <div className="divide-y divide-[#054700]/5">
+        {labSnapshot.markers.map((marker, i) => {
+          const sev = SEVERITY_ICON[marker.severity] || SEVERITY_ICON.neutral;
+          const SevIcon = sev.icon;
+          return (
+            <div key={i} className="flex items-start gap-2.5 py-1.5">
+              <div className="mt-0.5 flex-shrink-0">
+                <FlaskConical className={`w-3.5 h-3.5 ${sev.color}`} />
+              </div>
+              <span className="text-sm text-[#054700]/70 leading-snug flex-1">{marker.signal}</span>
+              <SevIcon className={`w-3 h-3 mt-1 flex-shrink-0 ${sev.color} opacity-40`} />
+            </div>
+          );
+        })}
+      </div>
+      {labSnapshot.hasActiveOrder && (
+        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-600 bg-emerald-50/60 rounded-lg px-2.5 py-1.5">
+          <Pill className="w-3 h-3" />
+          <span>Being addressed in your formula</span>
+        </div>
+      )}
+      {isStale && (
+        <div className="mt-2 text-[10px] text-amber-600 bg-amber-50/60 rounded-lg px-2.5 py-1.5 text-center">
+          These results are over 3 months old — consider retesting for up-to-date insights
+        </div>
+      )}
     </div>
   );
 }
@@ -272,7 +340,7 @@ export function HealthPulseCard() {
             {data.drivers.length > 0 && (
               <div className="bg-white/60 rounded-xl border border-[#054700]/[0.06] p-3.5">
                 <div className="text-[10px] font-semibold text-[#5a6623] uppercase tracking-wider mb-1.5">
-                  Key Drivers
+                  Key Signals
                 </div>
                 <div className="divide-y divide-[#054700]/5">
                   {data.drivers.map((driver, i) => (
@@ -280,6 +348,11 @@ export function HealthPulseCard() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Lab Snapshot (separate from pulse state) */}
+            {data.labSnapshot && data.labSnapshot.markers.length > 0 && (
+              <LabSnapshotSection labSnapshot={data.labSnapshot} />
             )}
 
             {/* Actions */}

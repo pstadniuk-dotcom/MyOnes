@@ -45,6 +45,7 @@ interface CompetitorAppearance {
 export async function runCompetitorScan(options?: {
   competitors?: string[];
   maxPerCompetitor?: number;
+  runId?: string;
 }): Promise<{
   runId: string;
   appearances: CompetitorAppearance[];
@@ -56,14 +57,20 @@ export async function runCompetitorScan(options?: {
   const errors: string[] = [];
   const appearances: CompetitorAppearance[] = [];
 
-  // Create run record
-  const runId = await agentRepository.createRun({
+  // Use pre-created run record or create one
+  const runId = options?.runId || await agentRepository.createRun({
     agentName: 'competitor_scan',
     status: 'running',
   });
+  const logStep = (action: string, result: string) =>
+    agentRepository.appendRunLog(runId, { timestamp: new Date().toISOString(), action, result }).catch(() => {});
+
+  await logStep('scan_started', `Scanning ${competitors.length} competitors for media appearances`);
 
   try {
-    for (const competitor of competitors) {
+    for (let ci = 0; ci < competitors.length; ci++) {
+      const competitor = competitors[ci];
+      await logStep('scanning_competitor', `[${ci + 1}/${competitors.length}] Searching: ${competitor}`);
       try {
         // Search for podcast appearances
         const podcastQuery = `"${competitor}" podcast interview guest appearance health supplement ${new Date().getFullYear()}`;
@@ -97,10 +104,12 @@ export async function runCompetitorScan(options?: {
         await new Promise(r => setTimeout(r, 2000));
       } catch (err: any) {
         errors.push(`${competitor}: ${err.message}`);
+        await logStep('competitor_error', `Error scanning ${competitor}: ${err.message}`);
       }
     }
 
     // Deduplicate and create prospect records
+    await logStep('dedup_start', `Found ${appearances.length} total appearances — deduplicating...`);
     const seenUrls = new Set<string>();
     const newProspects: InsertOutreachProspect[] = [];
 
@@ -126,9 +135,11 @@ export async function runCompetitorScan(options?: {
     // Save to database (dedup via normalizedUrl unique constraint)
     let prospectsCreated = 0;
     if (newProspects.length > 0) {
+      await logStep('saving', `Saving ${newProspects.length} new prospects from competitor coverage...`);
       const created = await agentRepository.createProspects(newProspects);
       prospectsCreated = created.length;
     }
+    await logStep('scan_complete', `Done! ${appearances.length} appearances found, ${prospectsCreated} new prospects created`);
 
     // Update run record
     await agentRepository.updateRun(runId, {
