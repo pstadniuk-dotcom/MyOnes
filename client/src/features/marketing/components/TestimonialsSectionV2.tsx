@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ChevronDown, ChevronUp, Star, Quote } from "lucide-react";
 
 const testimonials = [
@@ -31,34 +31,66 @@ const testimonials = [
   },
 ];
 
-function TestimonialCard({ testimonial }: { testimonial: typeof testimonials[number] }) {
+function TestimonialCard({ testimonial, index, revealed }: { testimonial: typeof testimonials[number]; index: number; revealed: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const delayMs = 200 + index * 150;
 
   return (
-    <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow duration-300 relative flex flex-col">
-      {/* Quote icon */}
-      <Quote className="absolute top-6 right-6 w-8 h-8 text-[#054700]/10" />
+    <div
+      className={`bg-white rounded-2xl p-8 shadow-sm hover:shadow-xl border border-[#054700]/[0.04] transition-all duration-700 ease-out relative flex flex-col group ${
+        revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+      }`}
+      style={{ transitionDelay: revealed ? `${delayMs}ms` : "0ms" }}
+    >
+      {/* Quote icon — grows on hover */}
+      <Quote className="absolute top-6 right-6 w-8 h-8 text-[#054700]/[0.06] group-hover:text-[#054700]/10 transition-colors duration-300" />
+
+      {/* Author — moved to top with larger photo */}
+      <div className="flex items-center gap-4 mb-5">
+        {testimonial.image ? (
+          <img
+            src={testimonial.image}
+            alt={testimonial.name}
+            className="w-14 h-14 rounded-full object-cover ring-2 ring-[#054700]/[0.06] ring-offset-2"
+          />
+        ) : (
+          <div className="w-14 h-14 rounded-full bg-[#054700]/10 flex items-center justify-center">
+            <span className="text-[#054700] font-medium">
+              {testimonial.name.split(' ').map(n => n[0]).join('')}
+            </span>
+          </div>
+        )}
+        <div>
+          <div className="font-semibold text-[#054700]">{testimonial.name}</div>
+          <div className="text-sm text-[#054700]/50">{testimonial.role}</div>
+        </div>
+      </div>
 
       {/* Rating */}
-      <div className="flex gap-1 mb-4">
+      <div className="flex gap-0.5 mb-4">
         {[...Array(testimonial.rating)].map((_, i) => (
-          <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+          <Star key={i} className="w-4 h-4 fill-[#d4a843] text-[#d4a843]" />
         ))}
       </div>
 
-      {/* Text */}
+      {/* Highlight callout */}
+      <p className="text-lg font-medium text-[#054700] leading-snug mb-3 italic">
+        "{testimonial.highlight}"
+      </p>
+
+      {/* Full text */}
       <div className="flex-1">
         <p
-          className={`text-[#054700]/80 leading-relaxed mb-2 transition-all duration-300 ${
-            testimonial.expandable && !expanded ? "line-clamp-4" : ""
+          className={`text-[#054700]/60 leading-relaxed text-[15px] mb-2 transition-all duration-300 ${
+            testimonial.expandable && !expanded ? "line-clamp-3" : ""
           }`}
         >
-          "{testimonial.text}"
+          {testimonial.text}
         </p>
         {testimonial.expandable && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="inline-flex items-center gap-1 text-sm font-medium text-[#5a6623] hover:text-[#6b7528] transition-colors mb-4 cursor-pointer"
+            className="inline-flex items-center gap-1 text-sm font-medium text-[#5a6623] hover:text-[#6b7528] transition-colors mb-2 cursor-pointer"
           >
             {expanded ? (
               <>Read less <ChevronUp className="w-3.5 h-3.5" /></>
@@ -67,45 +99,44 @@ function TestimonialCard({ testimonial }: { testimonial: typeof testimonials[num
             )}
           </button>
         )}
-        {!testimonial.expandable && <div className="mb-4" />}
-      </div>
-
-      {/* Author */}
-      <div className="flex items-center gap-3 pt-4 border-t border-[#054700]/10 mt-auto">
-        {testimonial.image ? (
-          <img
-            src={testimonial.image}
-            alt={testimonial.name}
-            className="w-10 h-10 rounded-full object-cover"
-          />
-        ) : (
-          <div className="w-10 h-10 rounded-full bg-[#054700]/10 flex items-center justify-center">
-            <span className="text-[#054700] font-medium text-sm">
-              {testimonial.name.split(' ').map(n => n[0]).join('')}
-            </span>
-          </div>
-        )}
-        <div>
-          <div className="font-medium text-[#054700]">{testimonial.name}</div>
-          <div className="text-sm text-[#054700]/60">{testimonial.role}</div>
-        </div>
       </div>
     </div>
   );
 }
 
 export default function TestimonialsSectionV2() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRevealed(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section id="testimonials" className="py-24 md:py-32 bg-white">
+    <section ref={sectionRef} id="testimonials" className="py-24 md:py-32 bg-white">
       <div className="container mx-auto px-6 max-w-6xl">
         {/* Header */}
-        <div className="max-w-3xl mx-auto text-center mb-16">
+        <div
+          className={`max-w-3xl mx-auto text-center mb-16 transition-all duration-700 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
           <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             From Our Clinical Program
           </span>
           <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl text-[#054700] font-light leading-tight text-balance">
             Real people.{" "}
-<span className="text-[#8a9a2c]">Real results.</span>
+            <span className="text-[#8a9a2c]">Real results.</span>
           </h2>
           <p className="mt-6 text-lg text-[#054700]/60 leading-relaxed">
             With AI technology, we're bringing personalized supplement formulation directly to you—not just through select medical practitioners. What was once available only in high-end clinics is now accessible to everyone.
@@ -115,23 +146,31 @@ export default function TestimonialsSectionV2() {
         {/* Testimonials Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-start">
           {testimonials.map((testimonial, index) => (
-            <TestimonialCard key={index} testimonial={testimonial} />
+            <TestimonialCard key={index} testimonial={testimonial} index={index} revealed={revealed} />
           ))}
         </div>
 
-        {/* Bottom stats */}
-        <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 max-w-2xl mx-auto text-center">
-          <div>
-            <div className="text-3xl md:text-4xl font-light text-[#054700]">2,000+</div>
-            <div className="text-sm text-[#054700]/60 mt-1">Clinical Patients</div>
-          </div>
-          <div>
-            <div className="text-3xl md:text-4xl font-light text-[#054700]">8+ Years</div>
-            <div className="text-sm text-[#054700]/60 mt-1">Practitioner Experience</div>
-          </div>
-          <div>
-            <div className="text-3xl md:text-4xl font-light text-[#054700]">94%</div>
-            <div className="text-sm text-[#054700]/60 mt-1">Report Improvement</div>
+        {/* Bottom stats — in a premium container */}
+        <div
+          className={`mt-16 transition-all duration-700 delay-500 ${
+            revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
+          <div className="bg-[#054700] rounded-2xl py-10 px-8 max-w-3xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 text-center">
+              <div>
+                <div className="text-3xl md:text-4xl font-light text-white">2,000+</div>
+                <div className="text-sm text-white/50 mt-1">Clinical Patients</div>
+              </div>
+              <div className="sm:border-x sm:border-white/10">
+                <div className="text-3xl md:text-4xl font-light text-white">8+ Years</div>
+                <div className="text-sm text-white/50 mt-1">Practitioner Experience</div>
+              </div>
+              <div>
+                <div className="text-3xl md:text-4xl font-light text-white">94%</div>
+                <div className="text-sm text-white/50 mt-1">Report Improvement</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

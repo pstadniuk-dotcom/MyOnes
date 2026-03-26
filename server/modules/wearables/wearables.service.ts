@@ -1,9 +1,12 @@
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { wearablesRepository } from './wearables.repository';
 import { filesRepository } from '../files/files.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
 import { usersRepository } from '../users/users.repository';
 import logger from '../../infra/logging/logger';
+import { aiRuntimeSettings } from '../../infra/ai/ai-config';
+import { parseAiJson } from '../../utils/parseAiJson';
 import {
     getOrCreateJunctionUser,
     createJunctionUserWithClientUserId,
@@ -534,6 +537,9 @@ export class WearablesService {
         }
 
         await disconnectProvider(actualJunctionUserId, providerSlug);
+
+        // Invalidate Health Pulse cache so dashboard refreshes immediately
+        this.invalidatePulseCache(userId);
     }
 
     async getBiometricData(userId: string, startDate: string, endDate: string, provider?: string) {
@@ -619,12 +625,16 @@ export class WearablesService {
                 dataByDate.set(dateKey, { date: dateKey, provider: body.source?.slug });
             }
             const entry = dataByDate.get(dateKey);
-            entry.heart = {
-                hrvMs: body.hrv?.avgHrv || body.hrvAvg,
-                restingRate: body.heartRate?.restingHr || body.restingHeartRate,
-                averageRate: body.heartRate?.avgHr,
-                maxRate: body.heartRate?.maxHr,
-            };
+            // Merge body heart data without overwriting sleep-extracted values
+            if (!entry.heart) entry.heart = {};
+            const bodyHrv = body.hrv?.avgHrv || body.hrvAvg;
+            const bodyResting = body.heartRate?.restingHr || body.restingHeartRate;
+            const bodyAvg = body.heartRate?.avgHr;
+            const bodyMax = body.heartRate?.maxHr;
+            if (bodyHrv) entry.heart.hrvMs = bodyHrv;
+            if (bodyResting) entry.heart.restingRate = bodyResting;
+            if (bodyAvg) entry.heart.averageRate = bodyAvg;
+            if (bodyMax) entry.heart.maxRate = bodyMax;
             entry.body = {
                 weight: body.weight,
                 bodyFat: body.bodyFatPercentage,
@@ -1280,7 +1290,13 @@ export class WearablesService {
         }
 
         // Always pull 30 days so we have baseline room
-        const histResult = await this.getHistoricalData(userId, 30);
+        let histResult;
+        try {
+            histResult = await this.getHistoricalData(userId, 30);
+        } catch (err) {
+            logger.error('Weekly brief: getHistoricalData failed', { userId, error: (err as Error)?.message });
+            return { tier: 'insufficient' as const, daysOfData: 0, narrative: null, actions: [], formulaNote: null, error: 'Unable to fetch wearable data' };
+        }
         if (!histResult.success || !histResult.data) {
             return { tier: 'insufficient' as const, daysOfData: 0, narrative: null, actions: [], formulaNote: null, error: 'No wearable data available' };
         }
@@ -1493,16 +1509,19 @@ export class WearablesService {
             };
         }
 
-        // ── Fetch user's active formula (if any) ──
+        // ── Fetch user's active formula (only if they've ordered) ──
         let formulaContext: string | null = null;
         try {
-            const formula = await formulasRepository.getCurrentFormulaByUser(userId);
-            if (formula) {
-                const allIngredients = [
-                    ...(formula.bases || []).map((b: any) => `${b.ingredient} ${b.amount}${b.unit}`),
-                    ...(formula.additions || []).map((a: any) => `${a.ingredient} ${a.amount}${a.unit}`),
-                ];
-                formulaContext = allIngredients.join(', ');
+            const userOrders = await usersRepository.listOrdersByUser(userId);
+            if (userOrders.length > 0) {
+                const formula = await formulasRepository.getCurrentFormulaByUser(userId);
+                if (formula) {
+                    const allIngredients = [
+                        ...(formula.bases || []).map((b: any) => `${b.ingredient} ${b.amount}${b.unit}`),
+                        ...(formula.additions || []).map((a: any) => `${a.ingredient} ${a.amount}${a.unit}`),
+                    ];
+                    formulaContext = allIngredients.join(', ');
+                }
             }
         } catch (err) {
             logger.warn('Failed to fetch formula for weekly brief:', err);
@@ -1548,32 +1567,49 @@ Return ONLY valid JSON:
         const userMessage = `Computed health signals:\n${signalBlock}`;
 
         try {
-            const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-            const completion = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userMessage },
-                ],
-                max_tokens: 512,
-                temperature: 0.5,
-                response_format: { type: 'json_object' },
-            });
+            const aiProvider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai').toLowerCase();
+            const aiModel = aiRuntimeSettings.model || process.env.AI_MODEL || (aiProvider === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o-mini');
 
-            const raw = completion.choices?.[0]?.message?.content;
+            let raw: string | null = null;
+            if (aiProvider === 'anthropic') {
+                const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+                const msg = await anthropic.messages.create({
+                    model: aiModel,
+                    max_tokens: 512,
+                    system: systemPrompt,
+                    messages: [{ role: 'user', content: userMessage }],
+                });
+                raw = msg.content?.[0]?.type === 'text' ? msg.content[0].text : null;
+            } else {
+                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                const completion = await openai.chat.completions.create({
+                    model: aiModel,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userMessage },
+                    ],
+                    max_tokens: 512,
+                    temperature: 0.5,
+                    response_format: { type: 'json_object' },
+                });
+                raw = completion.choices?.[0]?.message?.content ?? null;
+            }
+
             let narrative = 'Your health data has been analyzed.';
             let actions: string[] = [];
             let formulaNote: string | null = null;
 
             if (raw) {
                 try {
-                    const parsed = JSON.parse(raw);
+                    const parsed = parseAiJson(raw);
                     narrative = parsed.narrative || narrative;
                     actions = Array.isArray(parsed.actions) ? parsed.actions : [];
                     formulaNote = parsed.formulaNote || null;
                 } catch (parseErr) {
-                    logger.warn('Failed to parse weekly brief AI response:', parseErr);
+                    logger.warn('Failed to parse weekly brief AI response:', parseErr, { rawSnippet: raw.substring(0, 200) });
                 }
+            } else {
+                logger.warn('Weekly brief AI returned empty response', { aiProvider, aiModel });
             }
 
             const result = {
@@ -1704,25 +1740,40 @@ Generate 3-5 insights based on which data categories are available. Only create 
         const userMessage = `Here is the user's wearable health data averaged over the last ${days} days:\n\n${JSON.stringify(dataBlock, null, 2)}`;
 
         try {
-            const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-            const completion = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userMessage },
-                ],
-                max_tokens: 1024,
-                temperature: 0.6,
-                response_format: { type: 'json_object' },
-            });
+            const aiProvider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai').toLowerCase();
+            const aiModel = aiRuntimeSettings.model || process.env.AI_MODEL || (aiProvider === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o-mini');
 
-            const raw = completion.choices?.[0]?.message?.content;
+            let raw: string | null = null;
+            if (aiProvider === 'anthropic') {
+                const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+                const msg = await anthropic.messages.create({
+                    model: aiModel,
+                    max_tokens: 1024,
+                    system: systemPrompt,
+                    messages: [{ role: 'user', content: userMessage }],
+                });
+                raw = msg.content?.[0]?.type === 'text' ? msg.content[0].text : null;
+            } else {
+                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                const completion = await openai.chat.completions.create({
+                    model: aiModel,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userMessage },
+                    ],
+                    max_tokens: 1024,
+                    temperature: 0.6,
+                    response_format: { type: 'json_object' },
+                });
+                raw = completion.choices?.[0]?.message?.content ?? null;
+            }
+
             if (!raw) {
                 logger.warn('AI analysis returned empty response');
                 return { insights: [], summary: null, error: 'AI returned empty response' };
             }
 
-            const parsed = JSON.parse(raw);
+            const parsed = parseAiJson(raw);
             const result = {
                 summary: parsed.summary || null,
                 insights: Array.isArray(parsed.insights) ? parsed.insights : [],
@@ -1778,6 +1829,11 @@ Generate 3-5 insights based on which data categories are available. Only create 
     private pulseIntelligenceCache = new Map<string, { data: any; expiresAt: number }>();
     private readonly PULSE_INTEL_TTL = 60 * 60 * 1000; // 1 hour
 
+    /** Invalidate the cached Health Pulse data so the next request recomputes fresh. */
+    invalidatePulseCache(userId: string) {
+        this.pulseIntelligenceCache.delete(userId);
+    }
+
     async getHealthPulseIntelligence(userId: string) {
         // Check cache
         const cached = this.pulseIntelligenceCache.get(userId);
@@ -1791,6 +1847,7 @@ Generate 3-5 insights based on which data categories are available. Only create 
             return result;
         } catch (err) {
             logger.error('Health Pulse Intelligence error:', err);
+            // Return fallback but do NOT cache it — next request should retry
             return this._fallbackPulseIntelligence();
         }
     }
@@ -1798,23 +1855,43 @@ Generate 3-5 insights based on which data categories are available. Only create 
     private async _computePulseIntelligence(userId: string) {
         const junctionUserId = await wearablesRepository.getJunctionUserId(userId);
 
+        if (!junctionUserId) {
+            logger.warn('[HealthPulse] No junctionUserId for user — wearable data will be empty', { userId });
+        }
+
         // Fetch 7 days wearable, lab data, and user profile in parallel
         const endDate = new Date().toISOString().split('T')[0];
         const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
         const [sleepData, activityData, bodyData, labReports, healthProfile, providers] = await Promise.all([
-            junctionUserId ? getSleepData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
-            junctionUserId ? getActivityData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
-            junctionUserId ? getBodyData(junctionUserId, startDate, endDate).catch(() => []) : Promise.resolve([]),
-            filesRepository.getLabReportsByUser(userId).catch(() => []),
+            junctionUserId ? getSleepData(junctionUserId, startDate, endDate).catch((e) => { logger.warn('[HealthPulse] Sleep data fetch failed', { error: e?.message }); return []; }) : Promise.resolve([]),
+            junctionUserId ? getActivityData(junctionUserId, startDate, endDate).catch((e) => { logger.warn('[HealthPulse] Activity data fetch failed', { error: e?.message }); return []; }) : Promise.resolve([]),
+            junctionUserId ? getBodyData(junctionUserId, startDate, endDate).catch((e) => { logger.warn('[HealthPulse] Body data fetch failed', { error: e?.message }); return []; }) : Promise.resolve([]),
+            filesRepository.getLabReportsByUser(userId).catch((e) => { logger.warn('[HealthPulse] Lab reports fetch failed', { error: e?.message }); return []; }),
             usersRepository.getHealthProfile(userId).catch(() => null),
-            junctionUserId ? getConnectedProviders(junctionUserId).catch(() => []) : Promise.resolve([]),
+            junctionUserId ? getConnectedProviders(junctionUserId).catch((e) => { logger.warn('[HealthPulse] Provider fetch failed — will show as no wearable', { error: e?.message }); return []; }) : Promise.resolve([]),
         ]);
 
-        const connectedProviders = (providers as any[])
-            .filter((p: any) => this.isProviderConnected(p))
+        // Use lenient check: any provider returned by Junction counts as "has wearable",
+        // even if in error state (e.g. token refresh failed). The wearables page shows
+        // these devices as linked, so Health Pulse should agree.
+        const allProviders = providers as any[];
+        const connectedProviders = allProviders
+            .filter((p: any) => {
+                // Exclude only explicitly deleted/revoked providers
+                const status = String(p?.status || '').toLowerCase();
+                return status !== 'deleted' && status !== 'revoked';
+            })
             .map((p: any) => this.getProviderDisplayName(p));
         const hasWearable = connectedProviders.length > 0;
+
+        logger.info('[HealthPulse] Computation result', {
+            userId,
+            junctionUserId,
+            rawProviderCount: allProviders.length,
+            connectedProviders,
+            hasWearable,
+        });
 
         // ── Step 1: Compute wearable deltas ──
         const wearableSignals = this._computeWearableSignals(sleepData as any[], activityData as any[], bodyData as any[]);
@@ -1823,14 +1900,67 @@ Generate 3-5 insights based on which data categories are available. Only create 
         const labSignals = this._computeLabSignals(labReports as any[]);
 
         // ── Step 3: Apply deterministic rules → classify state + drivers ──
-        const { state, stateLabel, drivers } = this._classifyHealthState(wearableSignals, labSignals);
+        const { state, stateLabel, drivers, labDrivers } = this._classifyHealthState(wearableSignals, labSignals);
 
         // Get user goals for context
         const userGoals = (healthProfile as any)?.healthGoals || [];
         const primaryGoal = userGoals[0] || 'overall health';
 
-        // ── Step 4: Generate AI narrative ──
-        const narrative = await this._generatePulseNarrative(state, stateLabel, drivers, labSignals.labFlags, primaryGoal);
+        // ── Step 4: Generate AI narrative (labs passed as context, not state-affecting) ──
+        const narrative = await this._generatePulseNarrative(state, stateLabel, drivers, labSignals.labFlags, primaryGoal, hasWearable, labSignals.hasLabs);
+
+        // ── Step 5: Build lab snapshot (separate from main pulse) ──
+        let labSnapshot: {
+            markers: Array<{ signal: string; severity: string; category: string }>;
+            reportAge: 'recent' | 'aging' | 'stale' | null;
+            reportDateLabel: string | null;
+            hasActiveOrder: boolean;
+        } | null = null;
+
+        if (labSignals.hasLabs && labDrivers.length > 0) {
+            // Compute report age bucket
+            let reportAge: 'recent' | 'aging' | 'stale' | null = null;
+            let reportDateLabel: string | null = null;
+
+            if (labSignals.latestReportDate) {
+                const reportDate = new Date(labSignals.latestReportDate);
+                const daysSince = Math.floor((Date.now() - reportDate.getTime()) / (1000 * 60 * 60 * 24));
+
+                // Show the actual test date (e.g., "Mar 15, 2026") instead of relative time
+                // Use timeZone: 'UTC' to prevent date-only strings parsed as UTC midnight
+                // from shifting back one day in non-UTC server timezones.
+                reportDateLabel = reportDate.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    timeZone: 'UTC',
+                });
+
+                if (daysSince <= 30) reportAge = 'recent';
+                else if (daysSince <= 90) reportAge = 'aging';
+                else reportAge = 'stale';
+            }
+
+            // Check if user has placed an order (formula is being addressed)
+            let hasActiveOrder = false;
+            try {
+                const orders = await usersRepository.listOrdersByUser(userId);
+                hasActiveOrder = orders.some((o: any) =>
+                    ['pending', 'processing', 'shipped', 'delivered'].includes(o.status)
+                );
+            } catch { /* ignore */ }
+
+            labSnapshot = {
+                markers: labDrivers.slice(0, 4).map((d: PulseDriver) => ({
+                    signal: d.signal,
+                    severity: d.severity,
+                    category: d.category,
+                })),
+                reportAge,
+                reportDateLabel,
+                hasActiveOrder,
+            };
+        }
 
         return {
             state,
@@ -1842,6 +1972,7 @@ Generate 3-5 insights based on which data categories are available. Only create 
             actions: narrative.actions.slice(0, 3),
             hasWearable,
             hasLabs: labSignals.hasLabs,
+            labSnapshot,
             providers: connectedProviders,
             lastUpdated: new Date().toISOString(),
         };
@@ -1927,7 +2058,7 @@ Generate 3-5 insights based on which data categories are available. Only create 
     }
 
     private _computeLabSignals(labReports: any[]): LabSignals {
-        const result: LabSignals = { hasLabs: false, labFlags: [], markerTrends: [] };
+        const result: LabSignals = { hasLabs: false, labFlags: [], markerTrends: [], latestReportDate: null };
 
         const extractData = (report: any): any[] => {
             const raw = report?.labReportData?.extractedData;
@@ -1941,6 +2072,14 @@ Generate 3-5 insights based on which data categories are available. Only create 
 
         if (reportsWithData.length === 0) return result;
         result.hasLabs = true;
+        // Prefer the actual test date extracted from the lab report over the upload date
+        const latestReport = reportsWithData[0];
+        const testDate = (latestReport?.labReportData as any)?.testDate;
+        result.latestReportDate = testDate
+            ? new Date(testDate).toISOString()
+            : latestReport?.uploadedAt
+                ? new Date(latestReport.uploadedAt).toISOString()
+                : null;
 
         const latestMarkers = extractData(reportsWithData[0]);
         const previousMarkers = reportsWithData.length > 1 ? extractData(reportsWithData[1]) : [];
@@ -2001,7 +2140,7 @@ Generate 3-5 insights based on which data categories are available. Only create 
     private _classifyHealthState(
         wearable: WearableSignals,
         lab: LabSignals,
-    ): { state: PulseState; stateLabel: string; drivers: PulseDriver[] } {
+    ): { state: PulseState; stateLabel: string; drivers: PulseDriver[]; labDrivers: PulseDriver[] } {
         const drivers: PulseDriver[] = [];
 
         // ── Wearable-based drivers ──
@@ -2122,10 +2261,11 @@ Generate 3-5 insights based on which data categories are available. Only create 
             }
         }
 
-        // ── Classify overall state ──
+        // ── Classify overall state (wearable-driven — labs are contextual, not state-affecting) ──
         let state: PulseState = 'optimal';
         let stateLabel = 'Performing';
 
+        // Only truly critical lab values (dangerous levels) escalate the pulse state
         if (criticalLabs.length > 0) {
             state = 'attention';
             stateLabel = 'Needs Attention';
@@ -2135,10 +2275,7 @@ Generate 3-5 insights based on which data categories are available. Only create 
         } else if (sleepIrregular && (hrvDown || sleepShort)) {
             state = 'circadian_stress';
             stateLabel = 'Circadian Stress';
-        } else if (abnormalLabs.length >= 3) {
-            state = 'attention';
-            stateLabel = 'Needs Attention';
-        } else if (hrvDown || rhrUp || sleepShort || abnormalLabs.length > 0) {
+        } else if (hrvDown || rhrUp || sleepShort) {
             state = 'adapting';
             stateLabel = 'Adapting';
         } else if (drivers.some(d => d.severity === 'positive')) {
@@ -2146,17 +2283,24 @@ Generate 3-5 insights based on which data categories are available. Only create 
             stateLabel = 'Performing';
         }
 
-        // No data at all
-        if (drivers.length === 0) {
-            state = 'baseline';
-            stateLabel = 'Baseline';
+        // No data at all (wearable drivers only — lab drivers are returned separately)
+        const wearableDrivers = drivers.filter(d => d.type === 'wearable');
+        const labDrivers = drivers.filter(d => d.type === 'lab');
+        if (wearableDrivers.length === 0 && criticalLabs.length === 0) {
+            // If there are only lab drivers but no wearable data, show baseline
+            if (labDrivers.length === 0) {
+                state = 'baseline';
+                stateLabel = 'Baseline';
+            }
+            // If we have lab data but no wearable, keep optimal (labs shown separately)
         }
 
-        // Sort: critical first, then warning, then neutral, then positive
+        // Sort wearable drivers: critical first, then warning, then neutral, then positive
         const severityOrder: Record<string, number> = { critical: 0, warning: 1, neutral: 2, positive: 3 };
-        drivers.sort((a, b) => (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2));
+        wearableDrivers.sort((a, b) => (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2));
+        labDrivers.sort((a, b) => (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2));
 
-        return { state, stateLabel, drivers };
+        return { state, stateLabel, drivers: wearableDrivers, labDrivers };
     }
 
     private _stateColor(state: PulseState): string {
@@ -2177,9 +2321,11 @@ Generate 3-5 insights based on which data categories are available. Only create 
         drivers: PulseDriver[],
         labFlags: LabFlag[],
         primaryGoal: string,
+        hasWearable: boolean = false,
+        hasLabs: boolean = false,
     ): Promise<{ headline: string; summary: string; actions: string[] }> {
-        // Fallback for no data
-        if (drivers.length === 0) {
+        // Fallback for truly no data (no wearable AND no labs)
+        if (!hasWearable && !hasLabs && drivers.length === 0) {
             return {
                 headline: 'Connect data sources to unlock your Health Pulse',
                 summary: 'Link a wearable device or upload lab results to see personalized health intelligence.',
@@ -2191,46 +2337,78 @@ Generate 3-5 insights based on which data categories are available. Only create 
             };
         }
 
+        // Data exists but no notable signals — everything is stable/optimal
+        if (drivers.length === 0) {
+            const headlines: Record<string, string> = {
+                optimal: 'Your vitals are looking strong',
+                baseline: 'Building your health baseline',
+                adapting: 'Your body is adjusting well',
+            };
+            return {
+                headline: headlines[state] || 'Your Health Pulse is steady',
+                summary: 'All signals are within healthy ranges. Keep up your current routine.',
+                actions: [
+                    'Maintain your current sleep schedule',
+                    'Stay active — consistency drives results',
+                    'Check back tomorrow for updated insights',
+                ],
+            };
+        }
+
         const structuredInput = {
             state,
             stateLabel,
-            drivers: drivers.slice(0, 4).map(d => d.signal),
-            labFlags: labFlags.slice(0, 4).map(f => `${f.name}: ${f.value} ${f.unit} (${f.status})`),
+            wearableDrivers: drivers.slice(0, 4).map(d => d.signal),
+            labContext: labFlags.slice(0, 4).map(f => `${f.name}: ${f.value} ${f.unit} (${f.status})`),
             primaryGoal,
         };
 
         try {
-            const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-            const completion = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
-                messages: [
-                    {
-                        role: 'system',
-                        content: `You are a concise health intelligence system. Given structured health signals, generate a short narrative.
+            const aiProvider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai').toLowerCase();
+            const aiModel = aiRuntimeSettings.model || process.env.AI_MODEL || (aiProvider === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o-mini');
+
+            const pulseSystemPrompt = `You are a concise health intelligence system. Given structured health signals, generate a short narrative.
+
+The pulse state is driven by WEARABLE signals (sleep, HRV, resting HR). Lab biomarkers are provided as BACKGROUND CONTEXT only — they do NOT affect the pulse color/state.
 
 RULES:
-- Headline: Max 8 words. No scores. No numbers in headline.
-- Summary: 1 sentence, max 25 words. What the signals mean together.
+- Headline: Max 8 words. No scores. No numbers in headline. Focus on wearable-driven signals.
+- Summary: 1 sentence, max 25 words. What the wearable signals mean together. If lab context exists, you may briefly reference it but don't let it dominate.
 - Actions: Exactly 3 specific, actionable steps. Max 12 words each. No supplements.
 - Tone: Premium, calm, confident. Like a private health advisor.
 - Never say "consult a doctor" as an action — these are lifestyle optimizations.
 - Match the user's primary goal when choosing actions.
+- If lab markers are flagged, at most one action can reference scheduling a retest or reviewing labs.
 
-Return JSON: { "headline": "...", "summary": "...", "actions": ["...", "...", "..."] }`
-                    },
-                    {
-                        role: 'user',
-                        content: JSON.stringify(structuredInput),
-                    },
-                ],
-                max_tokens: 256,
-                temperature: 0.6,
-                response_format: { type: 'json_object' },
-            });
+Return JSON: { "headline": "...", "summary": "...", "actions": ["...", "...", "..."] }`;
 
-            const raw = completion.choices?.[0]?.message?.content;
+            let raw: string | null = null;
+            if (aiProvider === 'anthropic') {
+                const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+                const msg = await anthropic.messages.create({
+                    model: aiModel,
+                    max_tokens: 256,
+                    system: pulseSystemPrompt,
+                    messages: [{ role: 'user', content: JSON.stringify(structuredInput) }],
+                });
+                raw = msg.content?.[0]?.type === 'text' ? msg.content[0].text : null;
+            } else {
+                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                const completion = await openai.chat.completions.create({
+                    model: aiModel,
+                    messages: [
+                        { role: 'system', content: pulseSystemPrompt },
+                        { role: 'user', content: JSON.stringify(structuredInput) },
+                    ],
+                    max_tokens: 256,
+                    temperature: 0.6,
+                    response_format: { type: 'json_object' },
+                });
+                raw = completion.choices?.[0]?.message?.content ?? null;
+            }
+
             if (raw) {
-                const parsed = JSON.parse(raw);
+                const parsed = parseAiJson(raw);
                 return {
                     headline: parsed.headline || `Health Pulse: ${stateLabel}`,
                     summary: parsed.summary || 'Your health signals are being analyzed.',
@@ -2295,6 +2473,7 @@ Return JSON: { "headline": "...", "summary": "...", "actions": ["...", "...", ".
             actions: ['Connect a wearable from the Devices page', 'Upload your latest blood work', 'Complete your health profile'],
             hasWearable: false,
             hasLabs: false,
+            labSnapshot: null,
             providers: [],
             lastUpdated: new Date().toISOString(),
         };
@@ -2334,6 +2513,7 @@ interface LabSignals {
     hasLabs: boolean;
     labFlags: LabFlag[];
     markerTrends: Array<{ name: string; direction: 'up' | 'down'; pctChange: number }>;
+    latestReportDate: string | null;
 }
 
 export const wearablesService = new WearablesService();

@@ -18,7 +18,7 @@ const ALIVE_API_TIMEOUT_MS = Number(process.env.ALIVE_API_TIMEOUT_MS || 10000);
 const QUOTE_WEEKS = 8;
 const QUOTE_DAYS = 56;
 const VALID_CAPSULE_COUNTS = [6, 9, 12] as const;
-const MARGIN_MULTIPLIER = 2.0; // 100% margin applied to manufacturer cost (shipping baked in, shown as free)
+const MARGIN_MULTIPLIER = 1.65; // 65% margin applied to manufacturer cost (shipping baked in, shown as free)
 
 type CapsuleCount = (typeof VALID_CAPSULE_COUNTS)[number];
 
@@ -178,6 +178,16 @@ class ManufacturerPricingService {
             .map((item: any) => ({ ingredient_id: item.ingredient_id, name: item.name }));
         this.cachedAt = now;
         return this.cachedIngredients || [];
+    }
+
+    /**
+     * Public access to Alive ingredient catalog for the sync service.
+     * Always fetches fresh (bypasses the 15-min cache).
+     */
+    async fetchIngredientsCatalogPublic(): Promise<ManufacturerIngredient[]> {
+        this.cachedIngredients = null;
+        this.cachedAt = 0;
+        return this.fetchIngredientsCatalog();
     }
 
     private resolveManufacturerIngredientId(name: string, catalog: ManufacturerIngredient[]): string | number | null {
@@ -360,16 +370,19 @@ class ManufacturerPricingService {
             const quoteId = typeof quote.quote_id === 'string' ? quote.quote_id : undefined;
             const quoteExpiresAt = typeof quote.expires_at === 'string' ? quote.expires_at : undefined;
 
-            // Apply margin to manufacturer cost; shipping is baked in and shown as free to the customer
-            const manufacturerTotal = Number(quote.total ?? Number(quote.subtotal ?? 0));
-            const subtotal = Math.round(manufacturerTotal * MARGIN_MULTIPLIER * 100) / 100;
+            // Apply margin to manufacturer SUBTOTAL (cost only, excludes Alive shipping).
+            // Shipping is absorbed into the margin and shown as free to the customer.
+            const aliveShipping = Number(quote.total ?? 0) - Number(quote.subtotal ?? quote.total ?? 0);
+            const manufacturerCost = Number(quote.subtotal ?? Number(quote.total ?? 0));
+            const subtotal = Math.round(manufacturerCost * MARGIN_MULTIPLIER * 100) / 100;
             const shipping = 0;
             const total = subtotal;
 
             logger.info('Formula pricing breakdown', {
                 capsuleCount,
                 totalCapsules,
-                manufacturerCost: manufacturerTotal,
+                manufacturerCost,
+                aliveShipping: Math.round(aliveShipping * 100) / 100,
                 marginMultiplier: MARGIN_MULTIPLIER,
                 customerTotal: total,
                 perDayCustomer: Math.round((total / QUOTE_DAYS) * 100) / 100,
@@ -394,7 +407,7 @@ class ManufacturerPricingService {
                 capsuleCount,
                 totalCapsules,
                 weeks: QUOTE_WEEKS,
-                manufacturerCost: manufacturerTotal,
+                manufacturerCost: manufacturerCost,
                 subtotal,
                 shipping,
                 total,

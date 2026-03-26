@@ -34,10 +34,9 @@ import {
   Bell,
   Megaphone,
   Bot,
-  Zap,
   Globe,
   Crown,
-  Building2,
+  Target,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
@@ -64,6 +63,7 @@ const navSections: { label?: string; items: NavItem[] }[] = [
         children: [
           { label: 'Catalog', href: '/admin/products' },
           { label: 'Retail Pricing', href: '/admin/retail-pricing' },
+          { label: 'Ingredient Sync', href: '/admin/products/ingredient-sync' },
         ],
       },
       { label: 'Customers', href: '/admin/users', icon: Users },
@@ -81,10 +81,9 @@ const navSections: { label?: string; items: NavItem[] }[] = [
         ],
       },
       { label: 'Membership', href: '/admin/membership', icon: Tag },
-      { label: 'PR Agent', href: '/admin/pr-agent', icon: Megaphone },
-      { label: 'Meta Ads Bot', href: '/admin/meta-ads', icon: Zap },
+      { label: 'Outreach Agent', href: '/admin/outreach', icon: Target },
       { label: 'Influencer Hub', href: '/admin/influencers', icon: Crown },
-      { label: 'B2B Prospecting', href: '/admin/b2b', icon: Building2 },
+      { label: 'Social Studio', href: '/admin/social', icon: Megaphone },
     ],
   },
   {
@@ -100,7 +99,6 @@ const navSections: { label?: string; items: NavItem[] }[] = [
     label: 'Operations',
     items: [
       { label: 'Support Tickets', href: '/admin/support-tickets', icon: HelpCircle },
-      { label: 'Live Chats', href: '/admin/live-chats', icon: MessageSquare },
       { label: 'Audit & Compliance', href: '/admin/audit-logs', icon: Shield },
       {
         label: 'Settings',
@@ -222,16 +220,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     refetchInterval: 30_000, // poll every 30s
   });
 
-  const { data: liveChatCount } = useQuery<{ count: number }>({
-    queryKey: ['/api/admin/live-chats/count'],
-    queryFn: async () => {
-      const res = await apiRequest('GET', '/api/admin/live-chats/count');
-      return res.json();
-    },
-    refetchInterval: 10_000, // poll every 10s for live chats
-  });
-
-  const totalNotifications = (notifCounts?.supportTickets || 0) + (liveChatCount?.count || 0);
+  const totalNotifications = (notifCounts?.supportTickets || 0);
 
   const userInitials = user?.name
     ?.split(' ')
@@ -245,9 +234,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     items: section.items.map((item) => {
       if (item.label === 'Support Tickets') {
         return { ...item, badge: notifCounts?.supportTickets || 0 };
-      }
-      if (item.label === 'Live Chats') {
-        return { ...item, badge: liveChatCount?.count || 0 };
       }
       return item;
     }),

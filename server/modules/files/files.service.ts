@@ -349,18 +349,38 @@ export class FilesService {
         if (fileUpload.userId !== userId) throw new Error('Unauthorized');
         if (fileUpload.type !== 'lab_report') throw new Error('Only lab reports can be re-analyzed');
 
+        const existingData = (fileUpload.labReportData as any) || {};
+
         const labData = await analyzeLabReport(
             fileUpload.objectPath,
             fileUpload.mimeType || 'text/plain',
             userId
         );
 
+        // Use explicit field picking (like the upload path) to avoid losing data
+        // when AI structuring fails and returns only { rawText }.
+        // Preserve existing extractedData if the new analysis didn't produce any.
+        // Note: [] is truthy, so we must check .length explicitly.
+        const hasNewMarkers = Array.isArray(labData.extractedData) && labData.extractedData.length > 0;
+        const newExtractedData = hasNewMarkers ? labData.extractedData : (existingData.extractedData || []);
+        const hasAnyMarkers = hasNewMarkers || (Array.isArray(existingData.extractedData) && existingData.extractedData.length > 0);
+        const analysisStatus = hasAnyMarkers ? 'completed' : 'error';
+
         await filesRepository.updateFileUpload(fileId, {
-            labReportData: { ...labData, analysisStatus: 'completed' }
+            labReportData: {
+                testDate: labData.testDate || existingData.testDate,
+                testType: labData.testType || existingData.testType,
+                labName: labData.labName || existingData.labName,
+                physicianName: labData.physicianName || existingData.physicianName,
+                overallAssessment: labData.overallAssessment || existingData.overallAssessment,
+                riskPatterns: labData.riskPatterns || existingData.riskPatterns,
+                analysisStatus,
+                extractedData: newExtractedData,
+            }
         });
 
         // Fire-and-forget: generate marker insights in background
-        void labsService.generateAllMarkerInsights(labData?.extractedData || []).then(async (markerInsights) => {
+        void labsService.generateAllMarkerInsights(newExtractedData).then(async (markerInsights) => {
             const currentData = (await filesRepository.getFileUpload(fileId))?.labReportData as any;
             if (currentData) {
                 await filesRepository.updateFileUpload(fileId, {
@@ -393,6 +413,8 @@ export class FilesService {
             analysisCompletedAt: null,
         } as any);
 
+        const existingData = (fileUpload.labReportData as any) || {};
+
         void (async () => {
             try {
                 const labData = await analyzeLabReport(
@@ -401,13 +423,31 @@ export class FilesService {
                     userId
                 );
 
+                // Use explicit field picking to avoid losing data when AI
+                // structuring fails and returns only { rawText }.
+                // Preserve existing extractedData if the new analysis didn't produce any.
+                // Note: [] is truthy, so we must check .length explicitly.
+                const hasNewMarkers = Array.isArray(labData.extractedData) && labData.extractedData.length > 0;
+                const newExtractedData = hasNewMarkers ? labData.extractedData : (existingData.extractedData || []);
+                const hasAnyMarkers = hasNewMarkers || (Array.isArray(existingData.extractedData) && existingData.extractedData.length > 0);
+                const analysisStatus = hasAnyMarkers ? 'completed' : 'error';
+
                 await filesRepository.updateFileUpload(fileId, {
-                    labReportData: { ...labData, analysisStatus: 'completed' },
+                    labReportData: {
+                        testDate: labData.testDate || existingData.testDate,
+                        testType: labData.testType || existingData.testType,
+                        labName: labData.labName || existingData.labName,
+                        physicianName: labData.physicianName || existingData.physicianName,
+                        overallAssessment: labData.overallAssessment || existingData.overallAssessment,
+                        riskPatterns: labData.riskPatterns || existingData.riskPatterns,
+                        analysisStatus,
+                        extractedData: newExtractedData,
+                    },
                     analysisCompletedAt: new Date(),
                 } as any);
 
                 // Fire-and-forget: generate marker insights in background
-                void labsService.generateAllMarkerInsights(labData?.extractedData || []).then(async (markerInsights) => {
+                void labsService.generateAllMarkerInsights(newExtractedData).then(async (markerInsights) => {
                     const currentData = (await filesRepository.getFileUpload(fileId))?.labReportData as any;
                     if (currentData) {
                         await filesRepository.updateFileUpload(fileId, {
@@ -418,7 +458,7 @@ export class FilesService {
 
                 // Send lab re-analysis notification
                 try {
-                    const markerCount = labData?.extractedData?.length || 0;
+                    const markerCount = newExtractedData?.length || 0;
                     await notificationsService.create({
                         userId,
                         type: 'system',
@@ -437,7 +477,7 @@ export class FilesService {
                 logger.error('Background re-analysis error:', error);
                 await filesRepository.updateFileUpload(fileId, {
                     labReportData: {
-                        ...((fileUpload.labReportData as any) || {}),
+                        ...existingData,
                         analysisStatus: 'error'
                     },
                     analysisCompletedAt: new Date(),

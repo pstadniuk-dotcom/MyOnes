@@ -53,6 +53,8 @@ export interface PromptContext {
   isActiveMember?: boolean;
   /** Whether the user has ever purchased/ordered a formula */
   hasOrderedFormula?: boolean;
+  /** Ingredient names currently discontinued by the manufacturer */
+  discontinuedIngredientNames?: string[];
 }
 
 /**
@@ -91,11 +93,14 @@ export function buildO1MiniPrompt(context: PromptContext): string {
 
   // Generate dynamic ingredient lists for the prompt
   // System supports now show 1x dose with option to use 2x or 3x
+  const discontinued = new Set(context.discontinuedIngredientNames?.map(n => n.toLowerCase()) ?? []);
+
   const systemSupportsList = SYSTEM_SUPPORTS.map(f => {
     const dose1x = f.doseMg;
     const dose2x = f.doseMg * 2;
     const dose3x = f.doseMg * 3;
-    return `• ${f.name} (1x=${dose1x}mg, 2x=${dose2x}mg, 3x=${dose3x}mg) - ${f.description}`;
+    const tag = discontinued.has(f.name.toLowerCase()) ? ' ⛔ DISCONTINUED — DO NOT USE' : '';
+    return `• ${f.name} (1x=${dose1x}mg, 2x=${dose2x}mg, 3x=${dose3x}mg) - ${f.description}${tag}`;
   }).join('\n');
 
   const individualIngredientsList = INDIVIDUAL_INGREDIENTS.map(ing => {
@@ -105,7 +110,8 @@ export function buildO1MiniPrompt(context: PromptContext): string {
     } else if (ing.doseMg) {
       doseInfo = `${ing.doseMg}mg fixed`;
     }
-    return `• ${ing.name} (${doseInfo}) - ${ing.type || 'general health'}`;
+    const tag = discontinued.has(ing.name.toLowerCase()) ? ' ⛔ DISCONTINUED — DO NOT USE' : '';
+    return `• ${ing.name} (${doseInfo}) - ${ing.type || 'general health'}${tag}`;
   }).join('\n');
 
   // Detect user sophistication level
@@ -1128,7 +1134,13 @@ ${systemSupportsList}
 - NO EXCEPTIONS.
 
 ${individualIngredientsList}
-
+${discontinued.size > 0 ? `
+⛔ **MANUFACTURER AVAILABILITY WARNING:**
+The following ingredients are marked ⛔ DISCONTINUED above because our manufacturer no longer supplies them.
+**You MUST NOT include any discontinued ingredient in a new or modified formula.**
+If the user's current formula contains a discontinued ingredient, inform them that it is no longer available and suggest the closest alternative from the available catalog.
+Discontinued ingredients: ${context.discontinuedIngredientNames!.join(', ')}
+` : ''}
 **Common Use Cases:**
 - Cardiovascular: Heart Support + CoQ10 + Garlic + Hawthorn Berry + Omega-3
 - Stress/Anxiety: Adrenal Support + Ashwagandha + GABA + Magnesium

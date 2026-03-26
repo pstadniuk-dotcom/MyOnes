@@ -198,12 +198,12 @@ export class DashboardService {
                     {
                         label: 'Age and gender',
                         complete: !!(healthProfile?.age && healthProfile?.sex),
-                        route: '/dashboard/profile?tab=profile'
+                        route: '/dashboard/profile?tab=health&section=basic-info'
                     },
                     {
                         label: 'Weight and height',
                         complete: !!(healthProfile?.weightLbs && healthProfile?.heightCm),
-                        route: '/dashboard/profile?tab=profile'
+                        route: '/dashboard/profile?tab=health&section=basic-info'
                     }
                 ]
             },
@@ -213,12 +213,12 @@ export class DashboardService {
                     {
                         label: 'Blood pressure',
                         complete: !!(healthProfile?.bloodPressureSystolic && healthProfile?.bloodPressureDiastolic),
-                        route: '/dashboard/profile?tab=health'
+                        route: '/dashboard/profile?tab=health&section=vital-signs'
                     },
                     {
                         label: 'Resting heart rate',
                         complete: !!healthProfile?.restingHeartRate,
-                        route: '/dashboard/profile?tab=health'
+                        route: '/dashboard/profile?tab=health&section=vital-signs'
                     }
                 ]
             },
@@ -228,27 +228,27 @@ export class DashboardService {
                     {
                         label: 'Sleep hours per night',
                         complete: !!healthProfile?.sleepHoursPerNight,
-                        route: '/dashboard/profile?tab=health'
+                        route: '/dashboard/profile?tab=health&section=lifestyle-factors'
                     },
                     {
                         label: 'Exercise frequency',
                         complete: healthProfile?.exerciseDaysPerWeek !== null && healthProfile?.exerciseDaysPerWeek !== undefined,
-                        route: '/dashboard/profile?tab=health'
+                        route: '/dashboard/profile?tab=health&section=lifestyle-factors'
                     },
                     {
                         label: 'Stress level',
                         complete: !!healthProfile?.stressLevel,
-                        route: '/dashboard/profile?tab=health'
+                        route: '/dashboard/profile?tab=health&section=lifestyle-factors'
                     },
                     {
                         label: 'Smoking status',
                         complete: !!healthProfile?.smokingStatus,
-                        route: '/dashboard/profile?tab=health'
+                        route: '/dashboard/profile?tab=health&section=risk-factors'
                     },
                     {
                         label: 'Alcohol consumption',
                         complete: healthProfile?.alcoholDrinksPerWeek !== null && healthProfile?.alcoholDrinksPerWeek !== undefined,
-                        route: '/dashboard/profile?tab=health'
+                        route: '/dashboard/profile?tab=health&section=risk-factors'
                     }
                 ]
             },
@@ -258,17 +258,17 @@ export class DashboardService {
                     {
                         label: 'Current medications',
                         complete: !!(healthProfile?.medications && Array.isArray(healthProfile.medications) && healthProfile.medications.length > 0),
-                        route: '/dashboard/profile?tab=health'
+                        route: '/dashboard/profile?tab=health&section=risk-factors'
                     },
                     {
                         label: 'Health conditions',
                         complete: !!(healthProfile?.conditions && Array.isArray(healthProfile.conditions) && healthProfile.conditions.length > 0),
-                        route: '/dashboard/profile?tab=health'
+                        route: '/dashboard/profile?tab=health&section=risk-factors'
                     },
                     {
                         label: 'Allergies',
                         complete: !!(healthProfile?.allergies && Array.isArray(healthProfile.allergies) && healthProfile.allergies.length > 0),
-                        route: '/dashboard/profile?tab=health'
+                        route: '/dashboard/profile?tab=health&section=risk-factors'
                     }
                 ]
             },

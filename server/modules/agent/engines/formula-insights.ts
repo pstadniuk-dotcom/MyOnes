@@ -67,7 +67,7 @@ export async function getPopularIngredients(limit: number = 15): Promise<Formula
  * Generate a product story angle from ingredient data
  */
 function generateIngredientStory(name: string, count: number): string {
-  return `${name} is in ${count} personalized formulas — AI-driven demand signal for this ingredient`;
+  return `${name} is in ${count} personalized supplements — AI-driven demand signal for this ingredient`;
 }
 
 /**
@@ -146,9 +146,9 @@ export async function getProductStoryBlock(): Promise<string> {
 
   const lines = [
     `PRODUCT DATA (anonymized aggregates):`,
-    `- ${stats.totalFormulas} personalized formulas created`,
+    `- ${stats.totalFormulas} personalized supplements created`,
     `- ${stats.uniqueIngredients} unique ingredients in use`,
-    ...ingredients.map(i => `- ${i.ingredientName}: used in ${i.usageCount} formulas`),
+    ...ingredients.map(i => `- ${i.ingredientName}: used in ${i.usageCount} supplements`),
   ];
 
   return `\n${lines.join('\n')}\n`;

@@ -16,6 +16,7 @@ import cron from 'node-cron';
 import logger from '../infra/logging/logger';
 import { getPrAgentConfig } from '../modules/agent/agent-config';
 import { runPrScan } from '../modules/agent/engines/pr-scan';
+import { runInvestorScan } from '../modules/agent/engines/investor-scan';
 import { batchDraftPitches } from '../modules/agent/engines/draft-pitch';
 import { processFollowUps } from '../modules/agent/engines/follow-up-scheduler';
 import { detectResponses } from '../modules/agent/engines/response-detector';
@@ -24,6 +25,7 @@ import { sendWeeklySummaryEmail } from '../modules/agent/engines/weekly-summary'
 import { checkBudgetAlert } from '../modules/agent/tools/cost-tracker';
 
 let scanTask: ReturnType<typeof cron.schedule> | null = null;
+let investorScanTask: ReturnType<typeof cron.schedule> | null = null;
 let pitchTask: ReturnType<typeof cron.schedule> | null = null;
 let followUpTask: ReturnType<typeof cron.schedule> | null = null;
 let responseTask: ReturnType<typeof cron.schedule> | null = null;
@@ -36,8 +38,8 @@ let summaryTask: ReturnType<typeof cron.schedule> | null = null;
 export function startPrAgentScheduler() {
   logger.info('[pr-scheduler] Registering PR Agent cron jobs');
 
-  // ── Scan Job (Mon+Thu 6am UTC) ──────────────────────────────────────────
-  scanTask = cron.schedule('0 6 * * 1,4', async () => {
+  // ── Scan Job (Daily 6am UTC) ────────────────────────────────────────────
+  scanTask = cron.schedule('0 6 * * *', async () => {
     try {
       const config = await getPrAgentConfig();
       if (!config.enabled) {
@@ -54,7 +56,8 @@ export function startPrAgentScheduler() {
       logger.info('[pr-scheduler] Starting scheduled prospect scan');
       const result = await runPrScan({
         categories: ['podcast', 'press'],
-        queriesPerCategory: 3,
+        queriesPerCategory: 5,
+        maxProspects: 50,
       });
 
       logger.info('[pr-scheduler] Scan complete', {
@@ -68,8 +71,39 @@ export function startPrAgentScheduler() {
     }
   });
 
-  // ── Pitch Job (Mon+Thu 7am UTC) ──────────────────────────────────────────
-  pitchTask = cron.schedule('0 7 * * 1,4', async () => {
+  // ── Investor Scan Job (Daily 6:30am UTC) ─────────────────────────────────
+  investorScanTask = cron.schedule('30 6 * * *', async () => {
+    try {
+      const config = await getPrAgentConfig();
+      if (!config.enabled) {
+        logger.info('[pr-scheduler] Investor scan skipped — PR Agent is disabled');
+        return;
+      }
+
+      const budget = await checkBudgetAlert();
+      if (budget.alert) {
+        logger.warn(`[pr-scheduler] Budget alert: ${budget.message}`);
+      }
+
+      logger.info('[pr-scheduler] Starting scheduled investor scan');
+      const result = await runInvestorScan({
+        queriesCount: 5,
+        maxProspects: 50,
+      });
+
+      logger.info('[pr-scheduler] Investor scan complete', {
+        prospectsFound: result.prospectsFound,
+        prospectsNew: result.prospectsNew,
+        duplicates: result.prospectsDuplicate,
+        errors: result.errors.length,
+      });
+    } catch (err: any) {
+      logger.error('[pr-scheduler] Investor scan failed', { error: err.message });
+    }
+  });
+
+  // ── Pitch Job (Daily 7am UTC) ────────────────────────────────────────────
+  pitchTask = cron.schedule('0 7 * * *', async () => {
     try {
       const config = await getPrAgentConfig();
       if (!config.enabled) {
@@ -81,11 +115,13 @@ export function startPrAgentScheduler() {
 
       const podcastResult = await batchDraftPitches({ category: 'podcast' });
       const pressResult = await batchDraftPitches({ category: 'press' });
+      const investorResult = await batchDraftPitches({ category: 'investor' });
 
       logger.info('[pr-scheduler] Pitch batch complete', {
         podcastPitches: podcastResult.pitched.length,
         pressPitches: pressResult.pitched.length,
-        errors: [...podcastResult.errors, ...pressResult.errors].length,
+        investorPitches: investorResult.pitched.length,
+        errors: [...podcastResult.errors, ...pressResult.errors, ...investorResult.errors].length,
       });
     } catch (err: any) {
       logger.error('[pr-scheduler] Pitch batch failed', { error: err.message });
@@ -160,15 +196,15 @@ export function startPrAgentScheduler() {
     }
   });
 
-  logger.info('[pr-scheduler] Cron jobs registered: scan(Mon+Thu 6am), pitch(Mon+Thu 7am), follow-up(daily 9am), responses(every 4h), competitors(Sun 8am), summary(Fri 5pm)');
-  return { scanTask, pitchTask, followUpTask, responseTask, competitorTask, summaryTask };
+  logger.info('[pr-scheduler] Cron jobs registered: scan(daily 6am), investor-scan(daily 6:30am), pitch(daily 7am), follow-up(daily 9am), responses(every 4h), competitors(Sun 8am), summary(Fri 5pm)');
+  return { scanTask, investorScanTask, pitchTask, followUpTask, responseTask, competitorTask, summaryTask };
 }
 
 export function stopPrAgentScheduler() {
-  const tasks = [scanTask, pitchTask, followUpTask, responseTask, competitorTask, summaryTask];
+  const tasks = [scanTask, investorScanTask, pitchTask, followUpTask, responseTask, competitorTask, summaryTask];
   for (const task of tasks) {
     if (task) task.stop();
   }
-  scanTask = pitchTask = followUpTask = responseTask = competitorTask = summaryTask = null;
+  scanTask = investorScanTask = pitchTask = followUpTask = responseTask = competitorTask = summaryTask = null;
   logger.info('[pr-scheduler] Stopped');
 }

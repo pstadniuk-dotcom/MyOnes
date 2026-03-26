@@ -166,7 +166,7 @@ export default function HeroSectionV2() {
             <Link href="/signup" className="w-full sm:w-auto">
               <Button
                 size="lg"
-                className="w-full sm:w-auto bg-[#074700] hover:bg-[#053600] text-[#ede8e2] px-8 py-6 text-lg rounded-full shadow-lg transition-all hover:shadow-xl group"
+                className="w-full sm:w-auto bg-[#054700] hover:bg-[#043800] text-[#ede8e2] px-8 py-6 text-lg rounded-full shadow-lg transition-all hover:shadow-xl group"
               >
                 Start Your Formula
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />

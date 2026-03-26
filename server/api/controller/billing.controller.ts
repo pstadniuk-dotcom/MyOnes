@@ -76,11 +76,23 @@ export class BillingController {
           code: 'SAFETY_WARNINGS_NOT_ACKNOWLEDGED',
         });
       }
+      if (error?.message === 'MEDICAL_DISCLOSURE_NOT_ACKNOWLEDGED') {
+        return res.status(403).json({
+          error: 'You must confirm your medical disclosure before proceeding to checkout.',
+          code: 'MEDICAL_DISCLOSURE_NOT_ACKNOWLEDGED',
+        });
+      }
       if (error?.message === 'FORMULA_ID_REQUIRED') {
         return res.status(400).json({ error: 'Formula ID is required for non-membership checkout' });
       }
       if (error?.message === 'FORMULA_PRICING_UNAVAILABLE') {
         return res.status(409).json({ error: 'Formula pricing is currently unavailable' });
+      }
+      if (error?.message === 'FORMULA_NEEDS_REFORMULATION') {
+        return res.status(409).json({
+          error: 'Your formula contains ingredients that are no longer available. Please chat with your AI practitioner to update your formula.',
+          code: 'FORMULA_NEEDS_REFORMULATION',
+        });
       }
       if (error?.message === 'USER_NOT_FOUND') {
         return res.status(404).json({ error: 'User not found' });

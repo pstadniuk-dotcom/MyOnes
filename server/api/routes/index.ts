@@ -20,6 +20,4 @@ export { default as billingRoutes } from './billing.routes';
 export { default as reorderRoutes } from './reorder.routes';
 export { default as labsRoutes } from './labs.routes';
 export { default as blogRoutes } from './blog.routes';
-export { default as liveChatRoutes } from './live-chat.routes';
 export { default as agentRoutes } from './agent.routes';
-export { default as aiSupportAgentRoutes } from './ai-support-agent.routes';

@@ -25,6 +25,7 @@ export const prAgentConfigSchema = z.object({
   searchQueries: z.object({
     podcast: z.array(z.string()).optional(),
     press: z.array(z.string()).optional(),
+    investor: z.array(z.string()).optional(),
   }).optional(),
 
   // Pitch settings
@@ -59,6 +60,7 @@ export interface PrAgentConfig {
   searchQueries: {
     podcast?: string[];
     press?: string[];
+    investor?: string[];
   };
 
   // Pitch settings
@@ -85,7 +87,7 @@ const DEFAULT_CONFIG: PrAgentConfig = {
   scanCron: '0 6 * * 1,4',      // Monday + Thursday at 6 AM
   pitchCron: '0 7 * * 1,4',     // 1 hour after scan
 
-  maxProspectsPerRun: 20,
+  maxProspectsPerRun: 50,
   minRelevanceScore: 60,
   minAudienceSize: 5000,     // skip prospects below 5K followers/listeners
   searchQueries: {
@@ -102,6 +104,13 @@ const DEFAULT_CONFIG: PrAgentConfig = {
       'supplement industry expert source journalist',
       'custom supplement AI technology press',
       'biohacking personalized nutrition press coverage',
+    ],
+    investor: [
+      'angel investor health wellness supplement startup',
+      'venture capital personalized nutrition DTC health brand',
+      'health tech investor portfolio supplement companies',
+      'DTC consumer brand venture capital fund health wellness',
+      'seed stage VC health supplement wellness startup',
     ],
   },
 

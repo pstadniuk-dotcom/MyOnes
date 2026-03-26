@@ -1,4 +1,4 @@
-﻿import { useRef } from "react";
+import { useRef } from "react";
 import { Moon, TestTube, HeartPulse, Activity, Leaf, Zap, ArrowRight } from "lucide-react";
 import { motion, useInView } from "framer-motion";
 import { useLocation } from "wouter";
@@ -90,9 +90,9 @@ export default function InterventionSection() {
 
   return (
     <>
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* ═══════════════════════════════════════════════════
           SECTION 1: THE PROBLEM
-          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          ═══════════════════════════════════════════════════ */}
       <section ref={problemRef} id="the-problem" className="py-24 md:py-32 bg-white overflow-hidden scroll-mt-24">
         <div className="container mx-auto px-6 max-w-5xl">
           <motion.div
@@ -117,17 +117,17 @@ export default function InterventionSection() {
               <span className="font-semibold text-[#5a6623]">But who gives you a solution?</span>
             </motion.h2>
 
-            {/* The typical journey â€” photo card layout */}
+            {/* The typical journey � photo card layout */}
             {(() => {
               const tiles = [
                 { src: "/problem section/your labs.png",        label: "Your labs",      sub: "100+ biomarkers",    connector: "+" },
-                { src: "/problem section/wearables.jpg",        label: "Your wearables", sub: "Sleep, HRV, strain", connector: "â†’" },
-                { src: "/problem section/generic advice 2.png", label: "Generic advice", sub: "Charts & reports",   connector: "â†’" },
+                { src: "/problem section/wearables.jpg",        label: "Your wearables", sub: "Sleep, HRV, strain", connector: "?" },
+                { src: "/problem section/generic advice 2.png", label: "Generic advice", sub: "Charts & reports",   connector: "?" },
                 { src: "/problem section/now what.png",         label: "Now what?",      sub: "No clear action",    connector: null },
               ];
               return (
                 <motion.div variants={fadeUp} className="mt-14">
-                  {/* Mobile: 2Ã—2 grid, no connectors */}
+                  {/* Mobile: 2×2 grid, no connectors */}
                   <div className="grid grid-cols-2 gap-4 sm:hidden">
                     {tiles.map((tile, i) => (
                       <div key={i} className="flex flex-col items-center">
@@ -181,9 +181,9 @@ export default function InterventionSection() {
         </div>
       </section>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* ═══════════════════════════════════════════════════
           SECTION 2: THE ONES DIFFERENCE
-          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          ═══════════════════════════════════════════════════ */}
       <section ref={solutionRef} id="the-difference" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
         <div className="container mx-auto px-6 max-w-7xl">
           {/* Headline */}
@@ -213,7 +213,7 @@ export default function InterventionSection() {
               variants={fadeUp}
               className="mt-6 text-lg text-black/60 leading-relaxed max-w-xl mx-auto"
             >
-              Your blood tests, your wearable data, your conversation with our AI â€” turned into one custom formula that ships to your door.
+              Your blood tests, your wearable data, your conversation with our AI — turned into one custom formula that ships to your door.
             </motion.p>
           </motion.div>
 
@@ -223,7 +223,7 @@ export default function InterventionSection() {
             animate={solutionInView ? "visible" : "hidden"}
             variants={stagger}
           >
-            {/* â”€â”€ Mobile Layout â”€â”€ */}
+            {/* ── Mobile Layout ── */}
             <div className="md:hidden">
               <motion.div variants={scaleIn} className="flex justify-center mb-8">
                 <div className="relative w-full max-w-sm">
@@ -267,7 +267,7 @@ export default function InterventionSection() {
               </div>
             </div>
 
-            {/* â”€â”€ Desktop Layout: 5-column grid [cards | gap | video | gap | cards] â”€â”€ */}
+            {/* ── Desktop Layout: 5-column grid [cards | gap | video | gap | cards] ── */}
             <div className="hidden md:grid md:grid-cols-[1fr_2rem_1.4fr_2rem_1fr] items-center max-w-6xl mx-auto">
 
               {/* Left Cards (3) */}
@@ -436,7 +436,7 @@ export function OnesDifferenceSection() {
               variants={fadeUp}
               className="mt-6 text-lg text-black/60 leading-relaxed max-w-xl mx-auto"
             >
-              Your blood tests, your wearable data, your conversation with our AI â€” turned into one custom formula that ships to your door.
+              Your blood tests, your wearable data, your conversation with our AI — turned into one custom formula that ships to your door.
             </motion.p>
           </motion.div>
 
@@ -446,10 +446,12 @@ export function OnesDifferenceSection() {
             animate={solutionInView ? "visible" : "hidden"}
             variants={stagger}
           >
-            {/* â”€â”€ Mobile Layout â”€â”€ */}
+            {/* ── Mobile Layout ── */}
             <div className="md:hidden">
               <motion.div variants={scaleIn} className="flex justify-center mb-8">
                 <div className="relative w-full max-w-sm">
+                  {/* Radial glow behind video */}
+                  <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)]" />
                   <video
                     src="/capsule-formation.mp4"
                     autoPlay
@@ -472,10 +474,10 @@ export function OnesDifferenceSection() {
                         transition: { duration: 0.4, delay: 0.3 + i * 0.08 },
                       },
                     }}
-                    className="bg-white/70 backdrop-blur-sm rounded-xl p-3.5 border border-[#5a6623]/30"
+                    className="bg-white/90 backdrop-blur-xl rounded-2xl p-3.5 border border-white/60 shadow-[0_1px_16px_rgba(0,0,0,0.04)]"
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="w-7 h-7 rounded-full bg-[#054700]/[0.07] flex items-center justify-center text-[#054700]">
+                      <div className="w-7 h-7 rounded-full bg-[#054700]/10 flex items-center justify-center text-[#054700]">
                         {callout.icon}
                       </div>
                       <span className="text-[10px] text-[#5a6623] font-medium uppercase tracking-wide leading-tight line-clamp-2">
@@ -491,8 +493,9 @@ export function OnesDifferenceSection() {
               </div>
             </div>
 
-            {/* â”€â”€ Desktop Layout â”€â”€ */}
-            <div className="hidden md:grid md:grid-cols-[1fr_2rem_1.4fr_2rem_1fr] items-center max-w-6xl mx-auto">
+            {/* ── Desktop Layout ── */}
+            <div className="hidden md:grid md:grid-cols-[1fr_2.5rem_1.4fr_2.5rem_1fr] items-center max-w-6xl mx-auto">
+              {/* Left Cards */}
               <div className="flex flex-col justify-center gap-5">
                 {callouts.filter((c) => c.position === "left").map((callout, index) => (
                   <motion.div
@@ -501,38 +504,47 @@ export function OnesDifferenceSection() {
                       hidden: { opacity: 0, x: -24 },
                       visible: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.4 + index * 0.12, ease: [0.25, 0.46, 0.45, 0.94] } },
                     }}
-                    className="bg-white/70 backdrop-blur-sm rounded-xl p-5 border border-[#5a6623]/30 hover:shadow-md transition-shadow duration-300"
+                    className="bg-white/90 backdrop-blur-xl rounded-2xl p-5 border border-white/60 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#054700]/[0.07] flex items-center justify-center text-[#054700]">{callout.icon}</div>
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#054700]/10 ring-1 ring-[#054700]/[0.06] flex items-center justify-center text-[#054700]">{callout.icon}</div>
                       <div>
-                        <p className="text-xs text-[#5a6623] font-medium uppercase tracking-wide mb-1">{callout.dataSource}</p>
+                        <p className="text-[11px] text-[#5a6623]/80 font-medium uppercase tracking-wider mb-1">{callout.dataSource}</p>
                         <p className="text-base font-semibold text-[#054700]">{callout.ingredient}</p>
-                        <p className="text-sm text-[#054700]/45">{callout.dose}</p>
+                        <p className="text-sm text-[#054700]/40 font-light">{callout.dose}</p>
                       </div>
                     </div>
                   </motion.div>
                 ))}
               </div>
+
+              {/* Left connectors */}
               <div className="flex flex-col justify-center items-center gap-5 h-full">
                 {[0, 1, 2].map((i) => (
                   <div key={i} className="flex-1 flex items-center w-full">
-                    <div className="w-full h-px bg-gradient-to-r from-transparent via-[#5a6623]/30 to-[#5a6623]/50" />
-                    <div className="w-2 h-2 rounded-full bg-[#5a6623] flex-shrink-0 mr-3" />
+                    <div className="w-full h-px bg-gradient-to-r from-transparent via-[#054700]/10 to-[#054700]/20" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#054700]/30 flex-shrink-0 mr-3" />
                   </div>
                 ))}
               </div>
+
+              {/* Center Video with glow */}
               <motion.div variants={scaleIn} className="relative flex items-center justify-center">
-                <video src="/capsule-formation.mp4" autoPlay loop muted playsInline preload="auto" className="relative w-full h-auto rounded-2xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.12)]" />
+                <div className="absolute inset-0 -inset-x-12 -inset-y-12 bg-[radial-gradient(circle,_rgba(138,154,44,0.1)_0%,_transparent_65%)]" />
+                <video src="/capsule-formation.mp4" autoPlay loop muted playsInline preload="auto" className="relative w-full h-auto rounded-3xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.15),_0_0_0_1px_rgba(255,255,255,0.3)]" />
               </motion.div>
+
+              {/* Right connectors */}
               <div className="flex flex-col justify-center items-center gap-5 h-full">
                 {[0, 1, 2].map((i) => (
                   <div key={i} className="flex-1 flex items-center w-full">
-                    <div className="w-2 h-2 rounded-full bg-[#5a6623] flex-shrink-0 ml-3" />
-                    <div className="w-full h-px bg-gradient-to-r from-[#5a6623]/50 via-[#5a6623]/30 to-transparent" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#054700]/30 flex-shrink-0 ml-3" />
+                    <div className="w-full h-px bg-gradient-to-r from-[#054700]/20 via-[#054700]/10 to-transparent" />
                   </div>
                 ))}
               </div>
+
+              {/* Right Cards */}
               <div className="flex flex-col justify-center gap-5">
                 {callouts.filter((c) => c.position === "right").map((callout, index) => (
                   <motion.div
@@ -541,14 +553,14 @@ export function OnesDifferenceSection() {
                       hidden: { opacity: 0, x: 24 },
                       visible: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.4 + index * 0.12, ease: [0.25, 0.46, 0.45, 0.94] } },
                     }}
-                    className="bg-white/70 backdrop-blur-sm rounded-xl p-5 border border-[#5a6623]/30 hover:shadow-md transition-shadow duration-300"
+                    className="bg-white/90 backdrop-blur-xl rounded-2xl p-5 border border-white/60 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#054700]/[0.07] flex items-center justify-center text-[#054700]">{callout.icon}</div>
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#054700]/10 ring-1 ring-[#054700]/[0.06] flex items-center justify-center text-[#054700]">{callout.icon}</div>
                       <div>
-                        <p className="text-xs text-[#5a6623] font-medium uppercase tracking-wide mb-1">{callout.dataSource}</p>
+                        <p className="text-[11px] text-[#5a6623]/80 font-medium uppercase tracking-wider mb-1">{callout.dataSource}</p>
                         <p className="text-base font-semibold text-[#054700]">{callout.ingredient}</p>
-                        <p className="text-sm text-[#054700]/45">{callout.dose}</p>
+                        <p className="text-sm text-[#054700]/40 font-light">{callout.dose}</p>
                       </div>
                     </div>
                   </motion.div>
@@ -567,7 +579,7 @@ export function OnesDifferenceSection() {
             <motion.button
               variants={fadeUp}
               onClick={() => navigate("/signup")}
-              className="inline-flex items-center gap-2 bg-[#054700] text-[#ede8e2] px-8 py-4 rounded-full text-base font-medium hover:bg-[#053600] transition-colors duration-300 shadow-lg shadow-[#054700]/20"
+              className="inline-flex items-center gap-2 bg-[#054700] text-[#ede8e2] px-8 py-4 rounded-full text-base font-medium hover:bg-[#053600] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 shadow-lg shadow-[#054700]/20"
             >
               Start Your Formula
               <ArrowRight className="w-4 h-4" />

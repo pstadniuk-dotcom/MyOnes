@@ -15,7 +15,7 @@ import { startBlogGenerationScheduler } from "./utils/blogGenerationScheduler";
 import { startPrAgentScheduler } from "./utils/prAgentScheduler";
 import { startAutoShipScheduler } from "./utils/autoShipScheduler";
 import { startSmartReorderScheduler } from "./utils/smartReorderScheduler";
-import { startAiSupportAgentScheduler } from "./utils/aiSupportAgentScheduler";
+import { startIngredientCatalogSyncScheduler } from "./utils/ingredientCatalogSyncScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
 import { testEncryption } from "./infra/security/fieldEncryption";
@@ -300,6 +300,17 @@ app.get('/api/health', (_req, res) => {
         logger.warn('Failed to recover stale processing records', { error: err });
       }
 
+      // Mark any agent runs left in 'running' state as failed (orphaned after restart)
+      try {
+        const { agentRepository } = await import('./modules/agent/agent.repository');
+        const orphaned = await agentRepository.cleanupOrphanedRuns();
+        if (orphaned > 0) {
+          logger.info(`Cleaned up ${orphaned} orphaned agent run(s) from previous server instance`);
+        }
+      } catch (err) {
+        logger.warn('Failed to cleanup orphaned agent runs', { error: err });
+      }
+
       // Start all schedulers with error isolation — a failing scheduler must not prevent others from starting
       const schedulers: Array<{ name: string; start: () => void }> = [
         { name: 'SmsReminder', start: startSmsReminderScheduler },
@@ -308,7 +319,7 @@ app.get('/api/health', (_req, res) => {
         { name: 'SmartReorder', start: startSmartReorderScheduler },
         { name: 'BlogGeneration', start: startBlogGenerationScheduler },
         { name: 'PrAgent', start: startPrAgentScheduler },
-        { name: 'AiSupportAgent', start: startAiSupportAgentScheduler },
+        { name: 'IngredientCatalogSync', start: startIngredientCatalogSyncScheduler },
       ];
 
       for (const { name, start } of schedulers) {

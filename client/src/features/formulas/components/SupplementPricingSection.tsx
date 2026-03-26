@@ -63,11 +63,11 @@ export default function SupplementPricingSection() {
           <span className="text-[#5a6623] font-medium tracking-wider text-sm uppercase">
             Supplement Pricing
           </span>
-          <h2 className="mt-4 text-4xl md:text-5xl text-[#074700] font-light leading-tight">
+          <h2 className="mt-4 text-4xl md:text-5xl text-[#054700] font-light leading-tight">
             Your supplements.{" "}
             <span className="font-medium">Priced honestly.</span>
           </h2>
-          <p className="mt-6 text-lg text-[#074700]/60 leading-relaxed">
+          <p className="mt-6 text-lg text-[#054700]/60 leading-relaxed">
             Your formula cost depends on what your body needs, not what we want to charge you.
           </p>
         </div>
@@ -79,13 +79,13 @@ export default function SupplementPricingSection() {
               key={index}
               className="text-center p-8 rounded-2xl bg-[#ede8e2]"
             >
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-[#074700]/10 mb-6">
-                <factor.icon className="w-7 h-7 text-[#074700]" />
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-[#054700]/10 mb-6">
+                <factor.icon className="w-7 h-7 text-[#054700]" />
               </div>
-              <h3 className="text-xl font-medium text-[#074700] mb-3">
+              <h3 className="text-xl font-medium text-[#054700] mb-3">
                 {factor.title}
               </h3>
-              <p className="text-[#074700]/60 leading-relaxed">
+              <p className="text-[#054700]/60 leading-relaxed">
                 {factor.description}
               </p>
             </div>
@@ -94,7 +94,7 @@ export default function SupplementPricingSection() {
 
         {/* Price Range */}
         <div className="max-w-2xl mx-auto">
-          <div className="bg-[#074700] rounded-2xl p-8 md:p-10 text-center">
+          <div className="bg-[#054700] rounded-2xl p-8 md:p-10 text-center">
             <p className="text-white/70 text-sm uppercase tracking-wider mb-4">
               Typical Monthly Cost (in addition to membership)
             </p>
@@ -111,9 +111,9 @@ export default function SupplementPricingSection() {
 
         {/* Transparency note */}
         <div className="mt-12 text-center">
-          <p className="text-lg text-[#074700]/60">
+          <p className="text-lg text-[#054700]/60">
             Typically{" "}
-            <span className="text-[#074700] font-medium">15% cheaper</span>{" "}
+            <span className="text-[#054700] font-medium">15% cheaper</span>{" "}
             than buying each ingredient separately—with better quality control.
           </p>
         </div>

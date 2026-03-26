@@ -8,7 +8,7 @@
 export interface PitchTemplate {
   id: string;
   name: string;
-  category: 'podcast' | 'press';
+  category: 'podcast' | 'press' | 'investor';
   subType: string;
   systemPrompt: string;
   exampleSubjectLines: string[];
@@ -35,7 +35,7 @@ STRUCTURE:
    
    **Problem 2 — The Generic One-Size-Fits-All:** On the other side, companies like AG1 or daily multivitamins offer a single generic blend. "Just trust us." Zero customization, nothing personalized to the individual. It's convenient but it's designed for an "average person" that doesn't exist.
    
-   **Ones solves both:** Our AI analyzes your actual blood work, health data, and wearable metrics to design one custom formula from over 150 ingredients at research-backed doses. No more guessing with a stack of bottles, no more settling for a generic blend that wasn't built for you. And the AI adapts your formula as your health data changes.
+   **Ones solves both:** Our AI analyzes your actual blood work, health data, and wearable metrics to design one custom supplement from over 150 ingredients at research-backed doses. No more guessing with a stack of bottles, no more settling for a generic blend that wasn't built for you. And the AI adapts your supplement as your health data changes.
    
    Name BOTH problems clearly. Frame it personally: "something I struggled with" or "something I dealt with." Then show how Ones eliminates both.
 3. **Brief intro + ask** (1-2 sentences): Who you are (one line), then a low-pressure ask. "If that sounds like a fit, I'd love to explore it."
@@ -50,7 +50,7 @@ RULES:
 - Frame it personally: "something I struggled with" or "something I dealt with," not "your listeners deal with"
 - NEVER say "listeners" or "your audience" in the pitch body. Talk directly to the host about the problem as something real people (including you) face
 - NEVER use em dashes (—). Use commas, periods, or just start a new sentence instead
-- Show how Ones eliminates both problems with one AI-designed formula built from your actual health data
+- Show how Ones eliminates both problems with one AI-designed supplement built from your actual health data
 - Always mention the AI: it's the engine that analyzes health data and selects the right ingredients at the right doses
 - Be genuinely curious about their show, not just pitching
 - Use the host's first name
@@ -109,31 +109,35 @@ export const PRODUCT_REVIEW_TEMPLATE: PitchTemplate = {
   name: 'Product Review Request',
   category: 'press',
   subType: 'product_review',
-  systemPrompt: `You are pitching a product for review to a health/wellness publication.
+  systemPrompt: `You are writing a short, direct email from Pete, founder of Ones, to a publication's editorial team pitching a product review.
 
 STRUCTURE:
-1. **Why their readers would care** (2-3 sentences): Their readers face one of two problems. Either they're buying 10+ different supplement bottles, guessing at what they need, often getting lower quality ingredients, overdosing on some things and underdosing on others. Or they've gone the AG1 / daily multivitamin route, convenient but completely generic, zero customization, designed for an "average person" that doesn't exist. Neither is built for their individual body.
-2. **What makes it different** (2-3 sentences): Ones solves both problems. Our AI analyzes each person's blood work, health data, and wearable metrics to design one custom formula from over 150 ingredients at research-backed doses. No more guessing with a stack of bottles, no more settling for a generic blend. The AI adapts the formula as health data changes. Keep it factual.
-3. **The offer** (1-2 sentences): Happy to send a sample or give their reviewer access to try it.
-4. **Low-pressure close** (1 sentence): "If this isn't a fit for your editorial calendar, totally understand."
+1. **Opening** (1 sentence): One genuine, specific reference to their publication. Short.
+2. **What Ones is** (2-3 sentences): People are stuck between two bad options: buying 10 different bottles and guessing, or settling for a generic one-size-fits-all like AG1. Ones uses AI to analyze your blood work and health data to design one custom supplement from 150+ ingredients at research-backed doses. It adapts as your health changes. Say it plainly.
+3. **The offer** (1 sentence): Happy to send a sample or give their reviewer access.
+4. **Sign-off**: Just "Pete" or "Best, Pete"
 
 RULES:
-- Don't oversell — be factual and let the product speak for itself
-- Never say "disrupting" or "revolutionizing" or "game-changing"
-- Don't claim to be better than competitors — just explain the approach
-- Name both problems: the DIY stacker AND the generic one-size-fits-all
-- Mention that each formula is genuinely different per person
-- Keep under 180 words`,
+- 80-100 words MAX for the body. SHORT.
+- Write like Pete actually wrote this between meetings
+- Do NOT use multi-paragraph structured pitches
+- Lead with what Ones IS, not why their readers would care (they'll figure that out)
+- NEVER use "disrupt", "revolutionize", "game-changing", or "groundbreaking"
+- NEVER use em dashes
+- NEVER use emojis
+- One short paragraph, maybe two. That's it.
+- Each person's supplement is different, built from their own data
+- Don't claim to be better than competitors, just explain what it is`,
 
   exampleSubjectLines: [
-    'Would this be interesting for a review? Custom supplements from blood work',
-    'Product for consideration: personalized supplement formulas',
-    'Quick note — supplements tailored to individual lab results',
+    'Quick intro — would love to send a sample',
+    'Thought this might be worth a look',
+    '{publication} — custom supplements from blood work',
   ],
 
-  toneGuidance: 'Professional, understated, factual. Think "here\'s something interesting we\'re doing, if you\'d like to take a look" — not "you NEED to cover this."',
+  toneGuidance: 'Direct, casual, confident. Like a founder who knows what they built is good but doesn\'t need to oversell. Zero fluff. If it reads like a PR email, rewrite it.',
 
-  maxLength: 180,
+  maxLength: 100,
 };
 
 export const GUEST_ARTICLE_TEMPLATE: PitchTemplate = {
@@ -141,39 +145,38 @@ export const GUEST_ARTICLE_TEMPLATE: PitchTemplate = {
   name: 'Guest Article Pitch',
   category: 'press',
   subType: 'guest_article',
-  systemPrompt: `You are pitching a guest article to a health/wellness/tech publication.
+  systemPrompt: `You are writing a short, direct email from Pete, founder of Ones, to a publication's editorial team.
+
+This is NOT a freelance writer pitching article ideas. This is a founder reaching out to introduce what they're building and why their readers should know about it.
 
 STRUCTURE:
-1. **Opening**: Brief specific note about their content, then the pitch
-2. **Article concept**: Proposed title + 3-4 key points it would cover. Focus on genuinely useful, educational content — not a product pitch.
-3. **Why you**: What firsthand experience makes you qualified to write this (keep it brief, not boastful)
-4. **Fit**: Why this article would work for their specific audience
-5. **Flexibility**: Word count flexibility, timeline, happy to adjust scope
-
-Article topic ideas to choose from (pick the most relevant):
-- "What Your Blood Work Can Tell You About Your Supplement Routine" (practical/educational)
-- "Why Your Supplement Cabinet Is Probably Wrong for Your Body" (the problem with one-size-fits-all)
-- "The Gap Between Generic Supplements and What Your Body Actually Needs" (informational)
-- "Stop Guessing: How to Know If Your Supplements Are Actually Right for You" (consumer education)
-- "How Wearable Data Could Change the Way We Think About Nutrition" (forward-looking)
-- "Questions to Ask Before You Buy Another Supplement" (consumer education)
+1. **Opening** (1 sentence): One specific, genuine reference to their publication. Short.
+2. **The pitch** (3-5 sentences): Introduce Ones directly. People are stuck between two bad options: buying 10 different supplement bottles and guessing, or settling for a generic one-size-fits-all like AG1. Ones uses AI to analyze your blood work and health data to design one custom supplement from 150+ ingredients at research-backed doses. The supplement adapts as your health changes. This is the future of supplements. Say it plainly.
+3. **The ask** (1 sentence): "Would love to chat if this is on your radar." That's it.
+4. **Sign-off**: Just "Pete" or "Best, Pete"
 
 RULES:
-- Focus on educational value for readers, not promoting your product
-- Offer exclusive content (not published elsewhere)
-- Keep pitch under 180 words
-- Suggest 2-3 article concepts so they can choose
-- Never use "disrupt", "revolutionize", or "game-changing"`,
+- This email should be 80-100 words MAX. Not 180. SHORT.
+- Do NOT propose article ideas or numbered lists
+- Do NOT say "I'd be happy to write an article" or offer word count flexibility
+- Do NOT position yourself as a contributor or freelancer
+- Lead with what Ones IS and why it matters, not with article concepts
+- Write like a real human texting a colleague, not a PR pitch
+- NEVER use "disrupt", "revolutionize", "game-changing", or "groundbreaking"
+- NEVER use em dashes
+- NEVER use emojis
+- One short paragraph, maybe two. That's it.
+- Sound like Pete actually wrote this on his phone between meetings`,
 
   exampleSubjectLines: [
-    'Guest article idea: what blood work tells you about supplements',
-    'Article pitch for {publication}: practical guide to supplement personalization',
-    'Contributor pitch: honest take on building health tech with AI',
+    'Quick intro — personalized supplements from blood work',
+    'Thought this might be on your radar',
+    '{publication} + Ones',
   ],
 
-  toneGuidance: 'Knowledgeable but humble. You have real experience to share, not marketing to push. Think "I\'ve learned some things your readers might find useful" not "I\'m an expert and you should publish me."',
+  toneGuidance: 'Direct, casual, confident. Like a founder who knows what they built is important but doesn\'t need to oversell it. Zero fluff. If it feels like a PR email, rewrite it.',
 
-  maxLength: 180,
+  maxLength: 100,
 };
 
 export const FOUNDER_FEATURE_TEMPLATE: PitchTemplate = {
@@ -181,29 +184,32 @@ export const FOUNDER_FEATURE_TEMPLATE: PitchTemplate = {
   name: 'Founder Feature/Profile',
   category: 'press',
   subType: 'founder_feature',
-  systemPrompt: `You are pitching a founder profile/feature story.
+  systemPrompt: `You are writing a short, direct email from Pete, founder of Ones, pitching his story to a publication.
 
 STRUCTURE:
-1. **The story** (2-3 sentences): The human story. Pete was stuck in the same trap as everyone else. He was buying 10 different supplement bottles, guessing at what he needed, overdosing on some things, underdosing on others. He looked at the AG1 / multivitamin route but that was just a generic blend with zero customization. Neither option was actually built for his body. So he started building something different.
-2. **What Ones does** (2-3 sentences): Ones uses AI to analyze your blood work, health data, and wearable metrics to design one custom formula from over 150 ingredients at research-backed doses, solving both the "stack of bottles" problem and the "generic one-size-fits-all" problem. The AI adapts the formula as new health data comes in. Don't oversell.
-3. **Why now** (1-2 sentences): What makes this story timely or relevant to their readers?
-4. **Openness** (1-2 sentences): Available for interview/Q&A, happy to share more if it's a fit. No pressure.
+1. **Opening** (1 sentence): One specific, genuine reference to their publication. Short.
+2. **The story** (3-5 sentences): Pete was stuck like everyone else. Buying 10 different bottles and guessing, or looking at generic blends like AG1 that aren't built for anyone specifically. So he built Ones. The AI analyzes your blood work and health data to design one custom supplement from 150+ ingredients. It adapts as your health changes. That's the short version.
+3. **The ask** (1 sentence): "Happy to share more if this is a fit." Done.
+4. **Sign-off**: Just "Pete" or "Best, Pete"
 
 RULES:
-- Lead with the human story, not product features
-- Don't use grandiose language ("disrupting", "revolutionizing", "challenging the industry")
-- Be honest and relatable — this is a person building something, not a conqueror
-- Keep under 180 words`,
+- 80-100 words MAX. SHORT.
+- Lead with the personal story, not product features
+- Write like Pete actually wrote this, not a PR agency
+- NEVER use "disrupt", "revolutionize", "game-changing", or "groundbreaking"
+- NEVER use em dashes
+- NEVER use emojis
+- One short paragraph, maybe two. That's it.`,
 
   exampleSubjectLines: [
-    'Founder story: building personalized supplements from health data',
-    'Would this be interesting? A different approach to vitamins',
-    'Quick pitch: founder making custom supplement formulas from blood work',
+    'Quick intro — building custom supplements from blood work',
+    'Thought this might be interesting for {publication}',
+    'Founder story — a different approach to supplements',
   ],
 
-  toneGuidance: 'Human, honest, grounded. This is someone sharing their story, not proving their importance. Think "here\'s what I\'m working on and why" not "here\'s why I\'m changing the world."',
+  toneGuidance: 'Human, honest, grounded. A person sharing what they\'re building, not proving their importance. Zero fluff.',
 
-  maxLength: 180,
+  maxLength: 100,
 };
 
 export const EXPERT_SOURCE_TEMPLATE: PitchTemplate = {
@@ -211,29 +217,28 @@ export const EXPERT_SOURCE_TEMPLATE: PitchTemplate = {
   name: 'Expert Source for Journalists',
   category: 'press',
   subType: 'expert_source',
-  systemPrompt: `You are offering a founder as an expert source for journalists covering health/tech/supplements.
+  systemPrompt: `You are writing a short email from Pete, founder of Ones, offering himself as an expert source for a journalist.
 
 STRUCTURE:
-1. **Who You Are** (1-2 sentences): Quick intro — founder of Ones, personalized supplement platform
-2. **Topics Available For** (bullet list of 3-5 topics): What subjects can this founder speak authoritatively about?
-3. **Why Credible** (1-2 sentences): What backs up the expertise?
-4. **Availability** (1 sentence): Quick turnaround, available for phone/email/Zoom quotes
+1. **Who you are** (1 sentence): Pete, founder of Ones. We use AI to design custom supplements from blood work and health data.
+2. **What you can speak to** (1-2 sentences): List 2-3 specific topics. Personalized nutrition, AI in health, the supplement industry's transparency problem, wearable data and health optimization.
+3. **Availability** (1 sentence): Available for quick quotes, phone, email, whatever works.
 
 RULES:
-- Keep it short — journalists are busy
-- Be specific about expertise areas
-- Don't pitch the product — offer the expertise
-- Under 150 words`,
+- 60-80 words MAX. Journalists are busy.
+- Don't pitch the product, offer the expertise
+- NEVER use "disrupt", "revolutionize", "game-changing"
+- NEVER use em dashes or emojis`,
 
   exampleSubjectLines: [
-    'Expert source: personalized supplements & AI health',
-    'Available for comment: supplement industry + personalization',
-    'Source: health tech founder on {topic}',
+    'Expert source: personalized supplements + AI health',
+    'Available for comment on {topic}',
+    'Source: health tech founder',
   ],
 
-  toneGuidance: 'Concise, professional, no-nonsense. Think press release meets LinkedIn DM.',
+  toneGuidance: 'Concise, professional, no-nonsense. Think helpful text, not press release.',
 
-  maxLength: 150,
+  maxLength: 80,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -270,6 +275,106 @@ RULES:
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  INVESTOR TEMPLATES
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export const INVESTOR_ANGEL_TEMPLATE: PitchTemplate = {
+  id: 'investor_angel',
+  name: 'Angel Investor Intro',
+  category: 'investor',
+  subType: 'angel',
+  systemPrompt: `You are drafting a warm investor outreach email from a health tech founder.
+
+STRUCTURE:
+1. **Opening** (1 sentence): Reference their investment thesis or a specific portfolio company in health/wellness. Show you did real research.
+2. **The Problem** (2-3 sentences): The supplement industry is broken in two ways. People either buy 8-12 random bottles hoping they guessed right, or they settle for a one-size-fits-all blend like AG1 that wasn't designed for them. Nobody is using actual health data to personalize what goes in the capsule.
+3. **What we built** (2-3 sentences): Ones uses AI to analyze blood work, health data, and wearable metrics to design one custom supplement from 150+ ingredients at research-backed doses. The AI adapts as your data changes. We handle formulation, manufacturing, and fulfillment.
+4. **Traction hint** (1 sentence): Brief signal of momentum without overinflating — early customers, revenue, retention, or waitlist.
+5. **Ask** (1 sentence): Light ask. "Would you be open to a quick call to see if this fits your thesis?"
+
+RULES:
+- NEVER say "disrupt", "revolutionize", "game-changing", "unicorn"
+- NEVER claim to be the first, the best, or the only
+- Don't oversell traction — be honest and specific
+- Frame the problem from personal experience when possible
+- Name BOTH sides: the DIY stacker AND the generic one-size-fits-all
+- Keep under 120 words
+- Sound like a founder who knows their space, not a pitch deck`,
+
+  exampleSubjectLines: [
+    'Quick intro — personalized supplements via health data',
+    '{investor_name} — would this fit your health thesis?',
+    'Ones: AI-personalized supplements (quick intro)',
+  ],
+
+  toneGuidance: 'Direct, knowledgeable, humble. You respect their time. You know the space deeply but you\re not overselling. Think founder-to-investor peer conversation.',
+
+  maxLength: 120,
+};
+
+export const INVESTOR_VC_TEMPLATE: PitchTemplate = {
+  id: 'investor_vc',
+  name: 'VC Fund Intro',
+  category: 'investor',
+  subType: 'seed_vc',
+  systemPrompt: `You are drafting a VC outreach email from a health tech founder.
+
+STRUCTURE:
+1. **Opening** (1 sentence): Reference their fund\'s thesis, a recent investment in consumer health, or a blog post/tweet from a partner about health tech. Be specific.
+2. **Market context** (1-2 sentences): The supplement market is $50B+ and growing but still stuck between two bad options: people guessing with a stack of bottles, or generic one-size-fits-all blends. Nobody is using real health data.
+3. **What we built** (2-3 sentences): Ones uses AI + blood work + wearable data to design one personalized supplement per customer. 150+ ingredients, research-backed doses, updated as health data changes. Full-stack: AI formulation, manufacturing, DTC fulfillment.
+4. **Why now** (1 sentence): Wearable adoption, consumer health data awareness, and AI capabilities have all converged.
+5. **Ask** (1 sentence): "Happy to send a brief deck or jump on a 15-min call — whatever works."
+
+RULES:
+- NEVER say "disrupt", "revolutionize", "game-changing"
+- Don't oversell — let the business speak
+- Reference their fund\'s thesis or portfolio where possible
+- Frame it as a large market with a clear wedge
+- Keep under 150 words
+- Sound like a founder who understands their business, not a cold email template`,
+
+  exampleSubjectLines: [
+    '{firm_name} + Ones — personalized supplements via AI',
+    'Quick intro: AI-personalized supplements ($50B market)',
+    'Ones — health data meets supplement formulation',
+  ],
+
+  toneGuidance: 'Professional but human. You\'ve done your homework on their fund. Confident without being arrogant. Concise — every sentence earns its place.',
+
+  maxLength: 150,
+};
+
+export const INVESTOR_FAMILY_OFFICE_TEMPLATE: PitchTemplate = {
+  id: 'investor_family_office',
+  name: 'Family Office / Growth',
+  category: 'investor',
+  subType: 'family_office',
+  systemPrompt: `You are drafting an outreach email to a family office or growth investor from a health tech founder.
+
+STRUCTURE:
+1. **Opening** (1 sentence): Reference their health/wellness investments or their principal\'s known interests.
+2. **What we do** (2-3 sentences): Ones builds AI-personalized supplements using blood work, health data, and wearable metrics. One custom formulation per customer, 150+ ingredients, adapted over time. Full-stack model: formulation, manufacturing, fulfillment.
+3. **Business model** (1-2 sentences): Subscription-based, high LTV, strong retention dynamics since the supplement evolves with the customer\'s health data.
+4. **Ask** (1 sentence): "Would love to share more if this aligns with what you\'re looking at."
+
+RULES:
+- NEVER use buzzwords or hype language
+- Family offices care about fundamentals: unit economics, retention, market size
+- Keep under 120 words
+- Sound like a real person, not a cold outreach template`,
+
+  exampleSubjectLines: [
+    'Ones — AI-personalized supplements (intro)',
+    'Quick intro: personalized health + subscription model',
+  ],
+
+  toneGuidance: 'Mature, business-focused, respectful. Family offices value substance over flash. Lead with the business, not the sizzle.',
+
+  maxLength: 120,
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  TEMPLATE REGISTRY
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -281,13 +386,16 @@ export const ALL_TEMPLATES: PitchTemplate[] = [
   FOUNDER_FEATURE_TEMPLATE,
   EXPERT_SOURCE_TEMPLATE,
   FOLLOW_UP_TEMPLATE,
+  INVESTOR_ANGEL_TEMPLATE,
+  INVESTOR_VC_TEMPLATE,
+  INVESTOR_FAMILY_OFFICE_TEMPLATE,
 ];
 
 /**
  * Get the best template for a given prospect
  */
 export function getTemplateForProspect(
-  category: 'podcast' | 'press',
+  category: 'podcast' | 'press' | 'investor',
   subType?: string | null,
 ): PitchTemplate {
   if (subType) {
@@ -295,6 +403,7 @@ export function getTemplateForProspect(
     if (match) return match;
   }
   // Default by category
+  if (category === 'investor') return INVESTOR_VC_TEMPLATE;
   return category === 'podcast' ? PODCAST_GUEST_TEMPLATE : PRODUCT_REVIEW_TEMPLATE;
 }
 

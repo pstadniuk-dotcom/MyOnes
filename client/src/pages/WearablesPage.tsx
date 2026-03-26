@@ -39,7 +39,7 @@ import {
   Pill,
   LucideIcon,
 } from 'lucide-react';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { METRIC_CATALOG, METRIC_MAP, DEFAULT_VISIBLE_METRICS, metricsByPillar, type MetricDefinition } from '@shared/metricCatalog';
 
 interface WearableConnection {
@@ -369,7 +369,11 @@ function CustomizeMetricsModal({
   const [saving, setSaving] = useState(false);
 
   // Sync local state when modal opens or prefs change
-  useState(() => { setSelected(visibleMetricIds); });
+  useEffect(() => {
+    if (open) {
+      setSelected(visibleMetricIds);
+    }
+  }, [open, visibleMetricIds]);
 
   const toggle = (id: string) => {
     setSelected(prev =>
@@ -517,7 +521,7 @@ export default function WearablesPage() {
   });
 
   // Fetch Weekly Brief (tiered health analysis)
-  const { data: weeklyBrief, isLoading: briefLoading } = useQuery<{
+  const { data: weeklyBrief, isLoading: briefLoading, isError: briefError } = useQuery<{
     tier: 'insufficient' | 'snapshot' | 'early_trends' | 'weekly' | 'full';
     daysOfData: number;
     narrative: string | null;
@@ -871,7 +875,7 @@ export default function WearablesPage() {
       )}
 
       {/* ── ONES Weekly Brief (connected only, hide when no data) ── */}
-      {activeConnections.length > 0 && (briefLoading || weeklyBrief) && (
+      {activeConnections.length > 0 && (briefLoading || weeklyBrief || briefError) && (
         <Card className="border-[#5a6623]/10 shadow-2xl overflow-hidden">
           <CardHeader className="pb-1">
             <div className="flex items-center justify-between gap-3">
@@ -946,7 +950,7 @@ export default function WearablesPage() {
                 <Clock className="h-4 w-4 text-[#5a6623]" />
                 <span>{weeklyBrief.narrative || 'Wear your device for a few more days to unlock your first health brief.'}</span>
               </div>
-            ) : weeklyBrief?.error ? (
+            ) : weeklyBrief?.error || briefError ? (
               <div className="flex items-center gap-2 text-sm text-[#5a6623] py-2">
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                 <span>Unable to generate your weekly brief right now. Check back later.</span>

@@ -22,7 +22,8 @@ import logger from '../../infra/logging/logger';
 export type NotificationTopic =
     | 'formula_drift'       // autoOptimizeScheduler (formula review)
     | 'reorder_review'      // smartReorderScheduler (AI reorder nudge)
-    | 'renewal_reminder';   // smsReminderScheduler (generic renewal SMS)
+    | 'renewal_reminder'    // smsReminderScheduler (generic renewal SMS)
+    | 'ingredient_discontinued'; // ingredient catalog sync (formula needs reformulation)
 
 export type NotificationChannel = 'email' | 'sms' | 'in_app';
 
@@ -31,6 +32,7 @@ const CHANNEL_COOLDOWN_DAYS: Record<NotificationTopic, number> = {
     formula_drift:    4, // only 1 drift notification per 4 days
     reorder_review:   6, // only 1 reorder review per 6 days (8-week cycle)
     renewal_reminder: 5, // only 1 generic renewal SMS per 5 days
+    ingredient_discontinued: 7, // only 1 discontinued alert per 7 days
 };
 
 /** Max renewal-related notifications per user per calendar day (all channels) */

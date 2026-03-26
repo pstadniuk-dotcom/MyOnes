@@ -8,6 +8,7 @@ import { systemRepository } from '../system/system.repository';
 import { manufacturerPricingService } from '../formulas/manufacturer-pricing.service';
 import { usersRepository } from '../users/users.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
+import { wearablesService } from '../wearables/wearables.service';
 
 const VALID_ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
 
@@ -59,9 +60,27 @@ export class AdminService {
     async getUserTimeline(userId: string) {
         const timeline = await adminRepository.getUserTimeline(userId);
         const { password, ...sanitizedUser } = timeline.user as any;
+
+        // Fetch wearable connections from Junction (source of truth) instead of empty local DB table
+        let wearableDevices = timeline.wearableDevices;
+        try {
+            const junctionConnections = await wearablesService.getConnections(userId);
+            if (junctionConnections.length > 0) {
+                wearableDevices = junctionConnections.map((c: any) => ({
+                    provider: c.provider,
+                    status: c.status,
+                    connectedAt: c.connectedAt || null,
+                    lastSyncAt: c.lastSyncedAt || null,
+                }));
+            }
+        } catch (error) {
+            logger.warn('Failed to fetch Junction wearable connections for admin timeline', { userId, error });
+        }
+
         return {
             ...timeline,
-            user: sanitizedUser
+            user: sanitizedUser,
+            wearableDevices,
         };
     }
 

@@ -2179,22 +2179,32 @@ export class AdminRepository {
         return result.length > 0;
     }
 
-    async getB2bStats(): Promise<{ total: number; byStatus: Array<{ status: string; count: number }>; byType: Array<{ type: string; count: number }>; avgLeadScore: number }> {
+    async getB2bStats(): Promise<{ totalProspects: number; newThisMonth: number; qualified: number; contacted: number; converted: number; avgLeadScore: number }> {
         try {
             const [total] = await db.select({ count: count() }).from(b2bProspects);
+
+            // Count new prospects created this month
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const [newThisMonthResult] = await db.select({ count: count() }).from(b2bProspects)
+                .where(sql`${b2bProspects.createdAt} >= ${startOfMonth}`);
+
             const byStatus = await db.select({ status: b2bProspects.status, count: count() }).from(b2bProspects).groupBy(b2bProspects.status);
-            const byType = await db.select({ type: b2bProspects.practiceType, count: count() }).from(b2bProspects).groupBy(b2bProspects.practiceType);
+            const statusMap = Object.fromEntries(byStatus.map(s => [s.status, Number(s.count)]));
+
             const [avgScore] = await db.select({ avg: sql<number>`COALESCE(AVG(lead_score), 0)` }).from(b2bProspects);
 
             return {
-                total: Number(total?.count || 0),
-                byStatus: byStatus.map(s => ({ status: s.status, count: Number(s.count) })),
-                byType: byType.map(t => ({ type: t.type, count: Number(t.count) })),
+                totalProspects: Number(total?.count || 0),
+                newThisMonth: Number(newThisMonthResult?.count || 0),
+                qualified: statusMap['qualified'] || 0,
+                contacted: statusMap['contacted'] || 0,
+                converted: (statusMap['won'] || 0),
                 avgLeadScore: Math.round(Number(avgScore?.avg || 0)),
             };
         } catch (error) {
             logger.error('Error getting B2B stats', { error });
-            return { total: 0, byStatus: [], byType: [], avgLeadScore: 0 };
+            return { totalProspects: 0, newThisMonth: 0, qualified: 0, contacted: 0, converted: 0, avgLeadScore: 0 };
         }
     }
 

@@ -44,7 +44,7 @@ class AgentRepository {
   }
 
   async listProspects(filters: {
-    category?: 'podcast' | 'press';
+    category?: 'podcast' | 'press' | 'investor';
     status?: string;
     minScore?: number;
     limit?: number;
@@ -136,7 +136,7 @@ class AgentRepository {
   }
 
   async listPitches(filters: {
-    category?: 'podcast' | 'press';
+    category?: 'podcast' | 'press' | 'investor';
     status?: string;
     prospectId?: string;
     limit?: number;
@@ -174,8 +174,52 @@ class AgentRepository {
     }).where(eq(outreachPitches.id, id));
   }
 
+  /**
+   * Pipeline view: ALL prospects with their latest pitch (if any), grouped by prospect status.
+   * Returns flat array — client groups by status for Kanban columns.
+   */
+  async getPipelineView(): Promise<Array<{
+    prospect: OutreachProspect;
+    latestPitch: OutreachPitch | null;
+    pitchCount: number;
+  }>> {
+    // Subquery: latest pitch per prospect
+    const latestPitchSq = db
+      .select({
+        prospectId: outreachPitches.prospectId,
+        maxCreatedAt: sql<Date>`max(${outreachPitches.createdAt})`.as('max_created_at'),
+        pitchCount: count().as('pitch_count'),
+      })
+      .from(outreachPitches)
+      .groupBy(outreachPitches.prospectId)
+      .as('lp');
+
+    const rows = await db
+      .select({
+        prospect: outreachProspects,
+        latestPitch: outreachPitches,
+        pitchCount: latestPitchSq.pitchCount,
+      })
+      .from(outreachProspects)
+      .leftJoin(latestPitchSq, eq(outreachProspects.id, latestPitchSq.prospectId))
+      .leftJoin(
+        outreachPitches,
+        and(
+          eq(outreachPitches.prospectId, outreachProspects.id),
+          eq(outreachPitches.createdAt, latestPitchSq.maxCreatedAt),
+        ),
+      )
+      .orderBy(desc(outreachProspects.relevanceScore));
+
+    return rows.map(r => ({
+      prospect: r.prospect,
+      latestPitch: r.latestPitch || null,
+      pitchCount: Number(r.pitchCount) || 0,
+    }));
+  }
+
   async getPitchesWithProspects(filters: {
-    category?: 'podcast' | 'press';
+    category?: 'podcast' | 'press' | 'investor';
     status?: string;
     limit?: number;
     offset?: number;
@@ -233,6 +277,13 @@ class AgentRepository {
     await db.update(agentRuns).set(data).where(eq(agentRuns.id, id));
   }
 
+  /** Atomically append a log entry to a run's runLog JSON array */
+  async appendRunLog(id: string, entry: { timestamp: string; action: string; result: string; details?: any }): Promise<void> {
+    await db.execute(
+      sql`UPDATE agent_runs SET run_log = (COALESCE(run_log::jsonb, '[]'::jsonb) || ${JSON.stringify([entry])}::jsonb)::json WHERE id = ${id}`
+    );
+  }
+
   async getLatestRuns(agentName?: string, limit = 20): Promise<AgentRun[]> {
     const conditions = agentName ? eq(agentRuns.agentName, agentName) : undefined;
     return db.select().from(agentRuns)
@@ -244,6 +295,19 @@ class AgentRepository {
   async getRunById(id: string): Promise<AgentRun | null> {
     const [run] = await db.select().from(agentRuns).where(eq(agentRuns.id, id)).limit(1);
     return run || null;
+  }
+
+  /** Mark any runs still in 'running' state as 'failed' (orphaned after server restart) */
+  async cleanupOrphanedRuns(): Promise<number> {
+    const result = await db.update(agentRuns)
+      .set({
+        status: 'failed',
+        completedAt: new Date(),
+        errorMessage: 'Server restarted while scan was running',
+      })
+      .where(eq(agentRuns.status, 'running'))
+      .returning({ id: agentRuns.id });
+    return result.length;
   }
 
   // ── Config (app_settings) ────────────────────────────────────────────
@@ -268,6 +332,7 @@ class AgentRepository {
     totalProspects: number;
     podcastProspects: number;
     pressProspects: number;
+    investorProspects: number;
     pendingPitches: number;
     sentPitches: number;
     responses: number;
@@ -277,6 +342,7 @@ class AgentRepository {
     const [totalP] = await db.select({ count: count() }).from(outreachProspects);
     const [podcastP] = await db.select({ count: count() }).from(outreachProspects).where(eq(outreachProspects.category, 'podcast'));
     const [pressP] = await db.select({ count: count() }).from(outreachProspects).where(eq(outreachProspects.category, 'press'));
+    const [investorP] = await db.select({ count: count() }).from(outreachProspects).where(eq(outreachProspects.category, 'investor'));
     const [pendingPitches] = await db.select({ count: count() }).from(outreachPitches).where(eq(outreachPitches.status, 'pending_review'));
     const [sentPitches] = await db.select({ count: count() }).from(outreachPitches).where(eq(outreachPitches.status, 'sent'));
     const [responses] = await db.select({ count: count() }).from(outreachPitches).where(eq(outreachPitches.responseReceived, true));
@@ -288,6 +354,7 @@ class AgentRepository {
       totalProspects: totalP.count,
       podcastProspects: podcastP.count,
       pressProspects: pressP.count,
+      investorProspects: investorP.count,
       pendingPitches: pendingPitches.count,
       sentPitches: sentPitches.count,
       responses: responses.count,

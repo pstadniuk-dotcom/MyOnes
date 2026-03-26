@@ -18,6 +18,7 @@ import { getSearchQueries } from '../queries/search-queries';
 import logger from '../../../infra/logging/logger';
 import type { InsertOutreachProspect } from '@shared/schema';
 import OpenAI from 'openai';
+import { isHunterConfigured, findBestEmail, verifyEmail } from '../tools/hunter';
 
 /** Valid sub-type enum values — must match the outreach_sub_type PG enum */
 const VALID_SUB_TYPES = new Set([
@@ -59,21 +60,51 @@ function parseAudienceSize(estimate: string | null | undefined): number {
 }
 
 /**
- * Contact enrichment — when initial scrape finds no contact info,
- * do a targeted OpenAI web search for the prospect's contact/submit page.
+ * Contact enrichment — find a real, verified email for a prospect.
+ *
+ * Strategy:
+ * 1. Hunter.io domain search (reliable, verified emails from their database)
+ * 2. OpenAI web search fallback (scrapes web for emails if Hunter has nothing)
+ * 3. Hunter.io email verification on whatever we find
+ *
+ * Only returns emails that pass verification.
  */
 async function enrichContact(prospectName: string, prospectUrl: string, category: string): Promise<{
   email: string | null;
   formUrl: string | null;
 }> {
-  try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const domain = new URL(prospectUrl).hostname.replace(/^www\./, '');
-    const query = category === 'podcast'
-      ? `"${prospectName}" OR site:${domain} contact email submit guest application pitch`
-      : `"${prospectName}" OR site:${domain} contact email editorial submissions pitch press`;
+  const domain = new URL(prospectUrl).hostname.replace(/^www\./, '');
 
-    logger.info(`[contact-enrich] Searching: "${query.substring(0, 60)}..."`);
+  // ── Pass 1: Hunter.io domain search (fast, reliable) ──
+  if (isHunterConfigured()) {
+    try {
+      const preferredRoles = category === 'podcast'
+        ? ['host', 'producer', 'booking']
+        : ['editor', 'writer', 'reporter', 'journalist', 'health', 'supplements', 'wellness'];
+
+      const hunterResult = await findBestEmail(domain, preferredRoles);
+      if (hunterResult) {
+        logger.info(`[contact-enrich] Hunter.io found verified email for "${prospectName}": ${hunterResult.email} (${hunterResult.position || 'unknown role'}, confidence: ${hunterResult.confidence})`);
+        return { email: hunterResult.email, formUrl: null };
+      }
+      logger.info(`[contact-enrich] Hunter.io has no emails for ${domain} — trying web search fallback`);
+    } catch (err: any) {
+      logger.warn(`[contact-enrich] Hunter.io failed for ${domain}: ${err.message}`);
+    }
+  }
+
+  // ── Pass 2: OpenAI web search fallback ──
+  try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 90_000 });
+
+    const emailQuery = category === 'podcast'
+      ? `"${prospectName}" site:${domain} email contact "@" pitch booking guest`
+      : `"${prospectName}" site:${domain} email contact "@" editorial submissions press`;
+
+    logger.info(`[contact-enrich] OpenAI web search: "${emailQuery.substring(0, 60)}..."`);
+
+    const controller = new AbortController();
+    const queryTimeout = setTimeout(() => controller.abort(), 90_000);
 
     const response = await openai.responses.create({
       model: 'gpt-4o',
@@ -81,14 +112,16 @@ async function enrichContact(prospectName: string, prospectUrl: string, category
       input: [
         {
           role: 'system',
-          content: `You are finding the contact email or guest submission form for "${prospectName}". Return ONLY a JSON object: {"email": "found@email.com", "formUrl": "https://..."} — use null for any you can't find. Only return REAL emails/URLs you find in search results.`,
+          content: `You are finding an email address for "${prospectName}". Your PRIMARY goal is to find a real email address. Look at their contact page, about page, footer, social bios, LinkedIn, and any directories. Return ONLY a JSON object: {"email": "found@email.com", "formUrl": "https://..."} — use null for any you can't find. Only return REAL emails you find in search results. Do NOT make up emails. Do NOT return generic noreply@ addresses.`,
         },
         {
           role: 'user',
-          content: `Find the contact email address or guest pitch / submission form URL for: ${prospectName} (${prospectUrl}).\n\nSearch query: ${query}`,
+          content: `Find the email address for: ${prospectName} (${prospectUrl}). Check their contact page, about page, social media bios, and any podcast/press directories they're listed on. An email is STRONGLY preferred over a form URL.\n\nSearch: ${emailQuery}`,
         },
       ],
-    });
+    }, { signal: controller.signal });
+
+    clearTimeout(queryTimeout);
 
     let textOutput = '';
     for (const item of response.output) {
@@ -105,11 +138,24 @@ async function enrichContact(prospectName: string, prospectUrl: string, category
     const jsonMatch = textOutput.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, textOutput];
     const parsed = JSON.parse(jsonMatch[1]?.trim() || '{}');
 
-    const email = parsed.email && parsed.email.includes('@') ? parsed.email : null;
+    let email = parsed.email && parsed.email.includes('@') && !parsed.email.includes('noreply') ? parsed.email : null;
     const formUrl = parsed.formUrl && parsed.formUrl.startsWith('http') ? parsed.formUrl : null;
 
-    if (email || formUrl) {
-      logger.info(`[contact-enrich] Found for "${prospectName}": email=${email || 'none'}, form=${formUrl ? 'yes' : 'none'}`);
+    // ── Pass 3: Verify any email we found (Hunter or web search) ──
+    if (email && isHunterConfigured()) {
+      const verification = await verifyEmail(email);
+      if (verification && verification.result === 'undeliverable') {
+        logger.info(`[contact-enrich] Rejecting undeliverable email for "${prospectName}": ${email}`);
+        email = null;
+      } else if (verification) {
+        logger.info(`[contact-enrich] Verified email for "${prospectName}": ${email} (${verification.result}, score: ${verification.score})`);
+      }
+    }
+
+    if (email) {
+      logger.info(`[contact-enrich] Found email for "${prospectName}": ${email}`);
+    } else if (formUrl) {
+      logger.info(`[contact-enrich] Only found form for "${prospectName}" (no email) — form-only prospects will be skipped`);
     } else {
       logger.info(`[contact-enrich] No contact info found for "${prospectName}"`);
     }
@@ -138,14 +184,15 @@ export async function runPrScan(options: {
   categories?: ('podcast' | 'press')[];
   queriesPerCategory?: number;
   maxProspects?: number;
+  runId?: string;
 } = {}): Promise<ScanResult> {
   const config = await getPrAgentConfig();
   const categories = options.categories || ['podcast', 'press'];
   const queriesPerCategory = options.queriesPerCategory || 3;
   const maxProspects = options.maxProspects || config.maxProspectsPerRun;
 
-  // Create run record
-  const runId = await agentRepository.createRun({
+  // Use pre-created run record or create one
+  const runId = options.runId || await agentRepository.createRun({
     agentName: 'pr_scan',
     status: 'running',
   });
@@ -154,6 +201,10 @@ export async function runPrScan(options: {
   let allResults: WebSearchResult[] = [];
 
   logger.info(`[pr-scan] Starting scan: categories=${categories.join(',')}, queries=${queriesPerCategory}`);
+  const logStep = (action: string, result: string) =>
+    agentRepository.appendRunLog(runId, { timestamp: new Date().toISOString(), action, result }).catch(() => {});
+
+  await logStep('scan_started', `Searching ${categories.join(' & ')} with ${queriesPerCategory} queries each`);
 
   try {
     // ── Step 1: Web Search ──────────────────────────────────────────────
@@ -165,13 +216,16 @@ export async function runPrScan(options: {
       );
 
       for (const query of queries) {
+        await logStep('web_search', `Searching: "${query.substring(0, 80)}"`);
         try {
-          const { results } = await executeWebSearch(query, category, 5);
+          const { results } = await executeWebSearch(query, category, 10);
           allResults.push(...results);
+          await logStep('search_results', `Found ${results.length} results for ${category}`);
         } catch (err: any) {
           const msg = `Search failed for "${query.substring(0, 50)}...": ${err.message}`;
           errors.push(msg);
           logger.warn(`[pr-scan] ${msg}`);
+          await logStep('search_error', msg);
         }
 
         // Brief pause between searches to avoid rate limits
@@ -180,6 +234,7 @@ export async function runPrScan(options: {
     }
 
     logger.info(`[pr-scan] Raw search results: ${allResults.length}`);
+    await logStep('search_complete', `Web search complete — ${allResults.length} raw results`);
 
     // ── Step 2: Deduplicate ─────────────────────────────────────────────
     // Deduplicate by normalized URL within this batch
@@ -214,14 +269,18 @@ export async function runPrScan(options: {
     const duplicateCount = allResults.length - newResults.length;
 
     logger.info(`[pr-scan] After dedup: ${newResults.length} new, ${duplicateCount} duplicates`);
+    await logStep('dedup_complete', `After dedup: ${newResults.length} new prospects, ${duplicateCount} duplicates removed`);
 
     // Limit to maxProspects
     const toProcess = newResults.slice(0, maxProspects);
+    await logStep('processing_start', `Processing ${toProcess.length} prospects (scoring, scraping, contact enrichment)`);
 
     // ── Step 3: Deep Scrape + Score ──────────────────────────────────────
     const prospects: InsertOutreachProspect[] = [];
 
-    for (const result of toProcess) {
+    for (let i = 0; i < toProcess.length; i++) {
+      const result = toProcess[i];
+      await logStep('processing_prospect', `[${i + 1}/${toProcess.length}] Processing: ${result.name}`);
       try {
         // Deep scrape for additional contact info
         let scrapeResult: DeepScrapeResult | null = null;
@@ -248,6 +307,7 @@ export async function runPrScan(options: {
         const finalScore = scoreResult?.relevanceScore ?? result.relevanceScore;
         if (finalScore < config.minRelevanceScore) {
           logger.info(`[pr-scan] Skipping "${result.name}" (score ${finalScore} < ${config.minRelevanceScore})`);
+          await logStep('prospect_skipped', `Skipped "${result.name}" — score ${finalScore} below threshold`);
           continue;
         }
 
@@ -267,43 +327,42 @@ export async function runPrScan(options: {
         if (contactEmail) contactMethod = 'email';
         else if (contactFormUrl || scrapeResult?.hasGuestForm) contactMethod = 'form';
 
-        // ── Contact Enrichment ── If no contact found, try a targeted search
-        if (contactMethod === 'unknown') {
-          logger.info(`[pr-scan] No contact for "${result.name}" — running enrichment search...`);
+        // ── Contact Enrichment ── If no email found, try a targeted search
+        if (!contactEmail) {
+          logger.info(`[pr-scan] No email for "${result.name}" — running enrichment search...`);
+          await logStep('email_search', `Finding email for "${result.name}"...`);
           const enriched = await enrichContact(result.name, result.url, result.category);
           if (enriched.email) {
             contactEmail = enriched.email;
             contactMethod = 'email';
-          } else if (enriched.formUrl) {
-            contactFormUrl = enriched.formUrl;
-            contactMethod = 'form';
-            // Deep scrape the form URL to get fields
-            try {
-              const formScrape = await executeDeepScrape(enriched.formUrl);
-              if (formScrape?.formFields?.length) {
-                scrapeResult = { ...scrapeResult!, formFields: formScrape.formFields, formUrl: enriched.formUrl };
-              }
-            } catch { /* proceed without form fields */ }
           }
           await sleep(1000); // rate limit
         }
 
-        // Skip prospects with no actionable contact method —
-        // no point saving a lead we can't actually reach
-        if (contactMethod === 'unknown') {
-          logger.info(`[pr-scan] Skipping "${result.name}" — no contact found even after enrichment`);
-          continue;
-        }
-
-        // For "form" contacts, ensure we actually found interactive form fields
-        // (not just a guidelines/instructions page with no submission mechanism)
-        if (contactMethod === 'form' && !contactEmail) {
-          const hasRealForm = scrapeResult?.formFields && scrapeResult.formFields.length > 0;
-          if (!hasRealForm) {
-            logger.info(`[pr-scan] Skipping "${result.name}" — form URL found but no actual submission fields detected (likely a guidelines page)`);
-            continue;
+        // Verify emails scraped from websites (not Hunter-verified yet)
+        if (contactEmail && isHunterConfigured() && !contactEmail.includes('hunter-verified')) {
+          try {
+            const verification = await verifyEmail(contactEmail);
+            if (verification && verification.result === 'undeliverable') {
+              logger.info(`[pr-scan] Rejecting undeliverable email for "${result.name}": ${contactEmail}`);
+              contactEmail = null;
+              contactMethod = 'unknown';
+            }
+          } catch {
+            // Verification failed — keep the email but it's unverified
           }
         }
+
+        // Skip prospects without an email address.
+        // Form-only and DM-only prospects are not actionable for automated outreach.
+        // The agent needs a real email to send pitches.
+        if (!contactEmail) {
+          logger.info(`[pr-scan] Skipping "${result.name}" — no email found (contactMethod: ${contactMethod}). Only prospects with email addresses are saved.`);
+          await logStep('prospect_skipped', `Skipped "${result.name}" — no email found`);
+          continue;
+        }
+        await logStep('prospect_ready', `"${result.name}" scored ${finalScore} — email found`);
+        contactMethod = 'email';
 
         prospects.push({
           name: result.name,
@@ -337,9 +396,11 @@ export async function runPrScan(options: {
     // ── Step 4: Save to Database ─────────────────────────────────────────
     let savedProspects: any[] = [];
     if (prospects.length > 0) {
+      await logStep('saving', `Saving ${prospects.length} qualified prospects to database...`);
       savedProspects = await agentRepository.createProspects(prospects);
       logger.info(`[pr-scan] Saved ${savedProspects.length} new prospects`);
     }
+    await logStep('scan_complete', `Done! Found ${savedProspects.length} new prospects (${duplicateCount} duplicates skipped)`);
 
     // Clean up browser
     await closeBrowser();

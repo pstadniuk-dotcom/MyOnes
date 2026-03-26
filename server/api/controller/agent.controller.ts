@@ -11,6 +11,7 @@
  *   pitch quality scoring, weekly summary
  */
 import type { Request, Response } from 'express';
+import crypto from 'crypto';
 import { existsSync } from 'fs';
 import { resolve, basename } from 'path';
 import { z } from 'zod';
@@ -18,7 +19,8 @@ import { agentRepository } from '../../modules/agent/agent.repository';
 import { getPrAgentConfig, savePrAgentConfig, getDefaultConfig, prAgentConfigSchema } from '../../modules/agent/agent-config';
 import { getFounderProfile, saveFounderProfile, getDefaultProfile } from '../../modules/agent/founder-context';
 import { runPrScan } from '../../modules/agent/engines/pr-scan';
-import { draftPitch, batchDraftPitches, draftFollowUp, rewritePitch } from '../../modules/agent/engines/draft-pitch';
+import { runInvestorScan } from '../../modules/agent/engines/investor-scan';
+import { draftPitch, batchDraftPitches, draftFollowUp, rewritePitch, batchRedraftPitches } from '../../modules/agent/engines/draft-pitch';
 import { sendPitchEmail, sendApprovedPitches } from '../../modules/agent/engines/gmail-sender';
 import { detectAndFillForm } from '../../modules/agent/tools/form-filler';
 import { ALL_TEMPLATES } from '../../modules/agent/templates/pitch-templates';
@@ -76,6 +78,16 @@ export async function getAgentDashboard(req: Request, res: Response) {
 }
 
 // ── Prospects ────────────────────────────────────────────────────────────────
+
+export async function getPipelineView(req: Request, res: Response) {
+  try {
+    const data = await agentRepository.getPipelineView();
+    res.json(data);
+  } catch (err: any) {
+    logger.error('[agent-api] Pipeline view error', { error: err.message });
+    res.status(500).json({ error: 'Failed to load pipeline' });
+  }
+}
 
 export async function listProspects(req: Request, res: Response) {
   try {
@@ -233,11 +245,14 @@ export async function triggerScan(req: Request, res: Response) {
     const { categories, queriesPerCategory, maxProspects } = req.body;
     scanRunning = true;
 
-    // Start scan and capture runId
+    // Pre-create run record so we can return the runId immediately
+    const runId = await agentRepository.createRun({ agentName: 'pr_scan', status: 'running' });
+
     const promise = runPrScan({
       categories: categories || ['podcast', 'press'],
-      queriesPerCategory: queriesPerCategory || 3,
-      maxProspects: maxProspects || 20,
+      queriesPerCategory: queriesPerCategory || 5,
+      maxProspects: maxProspects || 50,
+      runId,
     });
 
     promise.then(result => {
@@ -248,11 +263,6 @@ export async function triggerScan(req: Request, res: Response) {
       logger.error('[agent-api] Manual scan failed', { error: err.message });
     });
 
-    // Return immediately — frontend can poll /runs for progress
-    // We return a best-effort runId by querying the latest running scan
-    const latestRuns = await agentRepository.getLatestRuns('pr_scan', 1);
-    const runId = latestRuns[0]?.id || null;
-
     res.json({
       message: 'Scan started. Check the Runs tab for progress.',
       status: 'running',
@@ -261,6 +271,47 @@ export async function triggerScan(req: Request, res: Response) {
   } catch (err: any) {
     scanRunning = false;
     res.status(500).json({ error: 'Failed to start scan' });
+  }
+}
+
+// ── Investor Scan ────────────────────────────────────────────────────────────
+
+let investorScanRunning = false;
+
+export async function triggerInvestorScan(req: Request, res: Response) {
+  if (investorScanRunning) {
+    return res.status(409).json({ error: 'An investor scan is already running.' });
+  }
+
+  try {
+    const { queriesCount, maxProspects } = req.body;
+    investorScanRunning = true;
+
+    // Pre-create run record so we can return the runId immediately
+    const runId = await agentRepository.createRun({ agentName: 'investor_scan', status: 'running' });
+
+    const promise = runInvestorScan({
+      queriesCount: queriesCount || 5,
+      maxProspects: maxProspects || 50,
+      runId,
+    });
+
+    promise.then(result => {
+      investorScanRunning = false;
+      logger.info('[agent-api] Investor scan complete', { prospectsNew: result.prospectsNew, runId: result.runId });
+    }).catch(err => {
+      investorScanRunning = false;
+      logger.error('[agent-api] Investor scan failed', { error: err.message });
+    });
+
+    res.json({
+      message: 'Investor scan started. Check the Runs tab for progress.',
+      status: 'running',
+      runId,
+    });
+  } catch (err: any) {
+    investorScanRunning = false;
+    res.status(500).json({ error: 'Failed to start investor scan' });
   }
 }
 
@@ -297,6 +348,19 @@ export async function triggerPitchBatch(req: Request, res: Response) {
   }
 }
 
+export async function triggerRedraftAll(req: Request, res: Response) {
+  try {
+    const result = await batchRedraftPitches();
+    res.json({
+      message: `Redraft complete: deleted ${result.deleted} old pitches, created ${result.redrafted} new ones`,
+      ...result,
+    });
+  } catch (err: any) {
+    logger.error('[agent-api] Redraft failed', { error: err.message });
+    res.status(500).json({ error: `Failed to redraft: ${err.message}` });
+  }
+}
+
 export async function triggerDraftPitch(req: Request, res: Response) {
   try {
     const prospect = await agentRepository.getProspectById(req.params.prospectId);
@@ -305,6 +369,7 @@ export async function triggerDraftPitch(req: Request, res: Response) {
     const result = await draftPitch(prospect);
     res.json(result);
   } catch (err: any) {
+    console.error('[triggerDraftPitch] ERROR:', err.message, err.stack);
     res.status(500).json({ error: `Failed to draft pitch: ${err.message}` });
   }
 }
@@ -315,6 +380,13 @@ export async function triggerSendPitch(req: Request, res: Response) {
     if (!pitch) return res.status(404).json({ error: 'Pitch not found' });
     const prospect = await agentRepository.getProspectById(pitch.prospectId);
     if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+
+    // Require a valid contact email for email-based sends
+    if (prospect.contactMethod !== 'form' && (!prospect.contactEmail || prospect.contactEmail === 'null')) {
+      return res.status(400).json({
+        error: `No contact email for "${prospect.name}". Add an email address in the prospect details before sending.`,
+      });
+    }
 
     // Route form-based prospects to the form filler instead of email
     if (prospect.contactMethod === 'form') {
@@ -511,7 +583,11 @@ export async function deleteProspectContact(req: Request, res: Response) {
 export async function triggerCompetitorScan(req: Request, res: Response) {
   try {
     const { competitors, maxPerCompetitor } = req.body;
-    const promise = runCompetitorScan({ competitors, maxPerCompetitor });
+
+    // Pre-create run record so we can return the runId immediately
+    const runId = await agentRepository.createRun({ agentName: 'competitor_scan', status: 'running' });
+
+    const promise = runCompetitorScan({ competitors, maxPerCompetitor, runId });
 
     promise.then(result => {
       logger.info('[agent-api] Competitor scan complete', { prospectsCreated: result.prospectsCreated });
@@ -519,7 +595,7 @@ export async function triggerCompetitorScan(req: Request, res: Response) {
       logger.error('[agent-api] Competitor scan failed', { error: err.message });
     });
 
-    res.json({ message: 'Competitor scan started.', status: 'running' });
+    res.json({ message: 'Competitor scan started.', status: 'running', runId });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to start competitor scan' });
   }
@@ -867,6 +943,121 @@ export async function listTemplates(req: Request, res: Response) {
     res.json(ALL_TEMPLATES);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to list templates' });
+  }
+}
+
+// ── Custom Email Templates (canned templates stored in app_settings) ─────────
+
+const CUSTOM_TEMPLATES_KEY = 'custom_email_templates';
+
+interface CustomEmailTemplate {
+  id: string;
+  name: string;
+  category: string;
+  subject: string;
+  body: string;
+  isFavorite: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function listCustomTemplates(req: Request, res: Response) {
+  try {
+    const data = await agentRepository.getAgentConfig(CUSTOM_TEMPLATES_KEY);
+    const templates: CustomEmailTemplate[] = data?.templates ?? [];
+    res.json(templates);
+  } catch (err: any) {
+    logger.error('[agent-api] List custom templates error', { error: err.message });
+    res.status(500).json({ error: 'Failed to list custom templates' });
+  }
+}
+
+export async function createCustomTemplate(req: Request, res: Response) {
+  try {
+    const schema = z.object({
+      name: z.string().min(1).max(200),
+      category: z.string().min(1).max(50),
+      subject: z.string().min(1).max(500),
+      body: z.string().min(1).max(10000),
+      isFavorite: z.boolean().optional(),
+    });
+    const parsed = schema.parse(req.body);
+
+    const data = await agentRepository.getAgentConfig(CUSTOM_TEMPLATES_KEY);
+    const templates: CustomEmailTemplate[] = data?.templates ?? [];
+
+    const newTemplate: CustomEmailTemplate = {
+      id: crypto.randomUUID(),
+      name: parsed.name,
+      category: parsed.category,
+      subject: parsed.subject,
+      body: parsed.body,
+      isFavorite: parsed.isFavorite ?? false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    templates.push(newTemplate);
+    await agentRepository.saveAgentConfig(CUSTOM_TEMPLATES_KEY, { templates }, (req as any).userId);
+
+    logger.info(`[agent-api] Custom template created: ${newTemplate.name}`);
+    res.status(201).json(newTemplate);
+  } catch (err: any) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid template data', details: err.errors });
+    }
+    logger.error('[agent-api] Create custom template error', { error: err.message });
+    res.status(500).json({ error: 'Failed to create custom template' });
+  }
+}
+
+export async function updateCustomTemplate(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const schema = z.object({
+      name: z.string().min(1).max(200).optional(),
+      category: z.string().min(1).max(50).optional(),
+      subject: z.string().min(1).max(500).optional(),
+      body: z.string().min(1).max(10000).optional(),
+      isFavorite: z.boolean().optional(),
+    });
+    const parsed = schema.parse(req.body);
+
+    const data = await agentRepository.getAgentConfig(CUSTOM_TEMPLATES_KEY);
+    const templates: CustomEmailTemplate[] = data?.templates ?? [];
+    const idx = templates.findIndex(t => t.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Template not found' });
+
+    templates[idx] = { ...templates[idx], ...parsed, updatedAt: new Date().toISOString() };
+    await agentRepository.saveAgentConfig(CUSTOM_TEMPLATES_KEY, { templates }, (req as any).userId);
+
+    logger.info(`[agent-api] Custom template updated: ${templates[idx].name}`);
+    res.json(templates[idx]);
+  } catch (err: any) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid template data', details: err.errors });
+    }
+    logger.error('[agent-api] Update custom template error', { error: err.message });
+    res.status(500).json({ error: 'Failed to update custom template' });
+  }
+}
+
+export async function deleteCustomTemplate(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const data = await agentRepository.getAgentConfig(CUSTOM_TEMPLATES_KEY);
+    const templates: CustomEmailTemplate[] = data?.templates ?? [];
+    const idx = templates.findIndex(t => t.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Template not found' });
+
+    const removed = templates.splice(idx, 1)[0];
+    await agentRepository.saveAgentConfig(CUSTOM_TEMPLATES_KEY, { templates }, (req as any).userId);
+
+    logger.info(`[agent-api] Custom template deleted: ${removed.name}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error('[agent-api] Delete custom template error', { error: err.message });
+    res.status(500).json({ error: 'Failed to delete custom template' });
   }
 }
 

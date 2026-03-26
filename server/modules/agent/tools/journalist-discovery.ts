@@ -11,6 +11,7 @@
  */
 import OpenAI from 'openai';
 import logger from '../../../infra/logging/logger';
+import { isHunterConfigured, findAndVerifyPersonEmail, domainSearch } from './hunter';
 
 export interface DiscoveredJournalist {
   name: string;
@@ -142,6 +143,28 @@ Return up to 5 journalists as a JSON array. Only include people you found real e
       j.name && j.name !== 'Unknown' && j.name.length > 2 &&
       j.confidenceScore >= 30
     );
+
+    // Use Hunter.io to find/verify emails for discovered journalists
+    if (isHunterConfigured() && journalists.length > 0) {
+      logger.info(`[journalist-discovery] Running Hunter.io email lookup for ${journalists.length} journalists at ${domain}`);
+      for (const journalist of journalists) {
+        const nameParts = journalist.name.trim().split(/\s+/);
+        if (nameParts.length < 2) continue;
+        const firstName = nameParts[0];
+        const lastName = nameParts[nameParts.length - 1];
+
+        try {
+          const result = await findAndVerifyPersonEmail(domain, firstName, lastName);
+          if (result) {
+            journalist.email = result.email;
+            journalist.confidenceScore = Math.max(journalist.confidenceScore, result.confidence);
+            logger.info(`[journalist-discovery] Hunter found email for ${journalist.name}: ${result.email} (verified: ${result.verified})`);
+          }
+        } catch (err: any) {
+          logger.debug(`[journalist-discovery] Hunter lookup failed for ${journalist.name}: ${err.message}`);
+        }
+      }
+    }
 
     logger.info(`[journalist-discovery] Found ${journalists.length} journalists at "${publicationName}"`);
     return { journalists, searchQuery };

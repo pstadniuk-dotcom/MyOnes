@@ -14,6 +14,7 @@ import { getPitchStatsBlock } from '../tools/platform-stats';
 import { scorePitchQuality } from '../tools/pitch-quality';
 import { trackTokens, finalizeRunCost } from '../tools/cost-tracker';
 import type { OutreachProspect, InsertOutreachPitch } from '@shared/schema';
+import { logPitchActivity } from '../../crm/crm-bridge';
 
 export interface DraftPitchResult {
   pitchId: string;
@@ -21,7 +22,7 @@ export interface DraftPitchResult {
   subject: string;
   body: string;
   templateUsed: string;
-  category: 'podcast' | 'press';
+  category: 'podcast' | 'press' | 'investor';
 }
 
 /**
@@ -104,7 +105,7 @@ CRITICAL TONE RULES:
 """
 Subject: 🚀 Disrupting the $50B Supplement Industry with AI
 
-Hey! 🎉 Pete here from ONES — we're revolutionizing personalized nutrition with cutting-edge AI technology! We've built the world's first AI health practitioner that creates custom supplement formulas. I'd LOVE to come on your show and share how we're changing the game. Our clinical-grade platform is truly groundbreaking and I think your audience would be blown away! Let me know when works for you!
+Hey! 🎉 Pete here from ONES — we're revolutionizing personalized nutrition with cutting-edge AI technology! We've built the world's first AI health practitioner that creates custom supplements. I'd LOVE to come on your show and share how we're changing the game. Our clinical-grade platform is truly groundbreaking and I think your audience would be blown away! Let me know when works for you!
 """
 ^ This is terrible because: emojis, "disrupting", "revolutionizing", "cutting-edge", "world's first", "$50B", demands coverage, self-congratulatory, generic, no audience value.
 
@@ -118,7 +119,7 @@ I caught your recent episode with Dr. Patel on gut health — really appreciated
 
 Here's something I struggled with and I think a lot of people deal with: you're either buying 10 different supplement bottles, guessing at what you need, overdosing on some things, underdosing on others, spending a fortune without knowing if any of it is right. Or you go the AG1 or daily multivitamin route, which is convenient but completely generic. Zero customization, just "trust us." Neither option is actually built for your body.
 
-I built Ones to solve both of those problems. Our AI analyzes your blood work, health data, and wearable metrics to design one custom formula from over 150 ingredients at research-backed doses, built specifically for you. And the AI adapts it as your health changes, so it's not a static product.
+I built Ones to solve both of those problems. Our AI analyzes your blood work, health data, and wearable metrics to design one custom supplement from over 150 ingredients at research-backed doses, built specifically for you. And the AI adapts it as your health changes, so it's not a static product.
 
 I'm Pete, the founder. If that sounds like something your audience would dig, I'd love to chat. No pressure either way.
 
@@ -174,6 +175,9 @@ OUTPUT FORMAT: Return a JSON object with exactly two keys:
     // Update prospect status
     await agentRepository.updateProspectStatus(prospect.id, 'pitched');
 
+    // Log to CRM timeline
+    logPitchActivity(prospect, pitch as any, 'pitch_drafted').catch(() => {});
+
     logger.info(`[draft-pitch] Drafted pitch for "${prospect.name}" (template: ${template.id}, quality: ${qualityResult.score}/100)`);
 
     return {
@@ -194,7 +198,7 @@ OUTPUT FORMAT: Return a JSON object with exactly two keys:
  * Draft a follow-up pitch for a previously sent pitch
  */
 export async function draftFollowUp(
-  originalPitch: { id: string; prospectId: string; subject: string; body: string; category: 'podcast' | 'press'; pitchType: string },
+  originalPitch: { id: string; prospectId: string; subject: string; body: string; category: 'podcast' | 'press' | 'investor'; pitchType: string },
   prospect: OutreachProspect,
 ): Promise<DraftPitchResult> {
   const config = await getPrAgentConfig();
@@ -210,6 +214,21 @@ export async function draftFollowUp(
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+  // Fetch enriched contacts for personalization
+  const contacts = await agentRepository.getContactsByProspectId(prospect.id);
+  const primaryContact = contacts.find(c => c.isPrimary) || contacts[0];
+
+  // Build rich prospect context for follow-ups
+  const prospectDetails = [
+    prospect.url ? `Website: ${prospect.url}` : null,
+    prospect.publicationName ? `Publication/Company: ${prospect.publicationName}` : null,
+    prospect.topics?.length ? `Topics they cover: ${prospect.topics.join(', ')}` : null,
+    prospect.notes ? `Notes: ${prospect.notes}` : null,
+    primaryContact ? `Contact: ${primaryContact.name}${primaryContact.role ? ` (${primaryContact.role})` : ''}` : null,
+    primaryContact?.beat ? `Covers: ${primaryContact.beat}` : null,
+    primaryContact?.recentArticles?.length ? `Recent articles: ${primaryContact.recentArticles.join('; ')}` : null,
+  ].filter(Boolean).join('\n');
+
   try {
     const response = await openai.chat.completions.create({
       model: config.model,
@@ -224,18 +243,22 @@ RULES:
 - Keep under 100 words
 - Reference the original pitch briefly
 - Sound like a real person, not automation
+- Use the prospect details below to add something SPECIFIC and personal
 
 ORIGINAL PITCH SUBJECT: ${originalPitch.subject}
 ORIGINAL PITCH BODY (first 200 chars): ${originalPitch.body.substring(0, 200)}
 
 PROSPECT: ${prospect.name} (${prospect.category})
 HOST: ${prospect.hostName || 'Unknown'}
+${prospectDetails}
+
+FOUNDER: ${profile.name}, ${profile.title} at ${profile.company}
 
 OUTPUT FORMAT: JSON with "subject" and "body" keys.`,
         },
         {
           role: 'user',
-          content: `Write a brief, high-value follow-up email. Add something new — a stat, a timely angle, or a simplified ask.`,
+          content: `Write a brief, high-value follow-up email. Add something new — a stat, a timely angle, or a simplified ask. Personalize it to their recent coverage or topics if possible.`,
         },
       ],
       temperature: config.temperature,
@@ -258,6 +281,9 @@ OUTPUT FORMAT: JSON with "subject" and "body" keys.`,
       status: 'pending_review',
     });
 
+    // Log to CRM timeline
+    logPitchActivity(prospect, pitch as any, 'pitch_drafted').catch(() => {});
+
     logger.info(`[draft-pitch] Drafted follow-up #${followUpNum} for "${prospect.name}"`);
 
     return {
@@ -278,7 +304,7 @@ OUTPUT FORMAT: JSON with "subject" and "body" keys.`,
  * Batch draft pitches for uncontacted prospects
  */
 export async function batchDraftPitches(options: {
-  category?: 'podcast' | 'press';
+  category?: 'podcast' | 'press' | 'investor';
   maxPitches?: number;
 } = {}): Promise<{
   runId: string;
@@ -301,17 +327,11 @@ export async function batchDraftPitches(options: {
     limit: maxPitches,
   });
 
-  // Filter out prospects with no actionable contact method — 
-  // don't waste AI credits drafting pitches we can never send
+  // Only draft pitches for prospects with an actual email address.
+  // Form-only prospects can't be sent automatically and waste AI credits.
   const contactableProspects = prospects.filter(p => {
-    // No contact method at all
-    if (p.contactMethod === 'unknown' && !p.contactEmail && !p.contactFormUrl) {
-      logger.info(`[draft-pitch] Skipping "${p.name}" — no email or form (contactMethod: unknown)`);
-      return false;
-    }
-    // Has a "form" but no email and no actual form fields (likely a guidelines page)
-    if (p.contactMethod === 'form' && !p.contactEmail && (!p.formFields || p.formFields.length === 0)) {
-      logger.info(`[draft-pitch] Skipping "${p.name}" — form URL but no submission fields detected`);
+    if (!p.contactEmail) {
+      logger.info(`[draft-pitch] Skipping "${p.name}" — no email address`);
       return false;
     }
     return true;
@@ -360,6 +380,98 @@ export async function batchDraftPitches(options: {
 }
 
 /**
+ * Batch Redraft — delete all pending_review pitches and re-draft them
+ * with the current templates. Use after template changes.
+ */
+export async function batchRedraftPitches(): Promise<{
+  deleted: number;
+  redrafted: number;
+  errors: string[];
+}> {
+  // Get all pending_review pitches
+  const { pitches } = await agentRepository.listPitches({ status: 'pending_review', limit: 500 });
+
+  if (pitches.length === 0) {
+    return { deleted: 0, redrafted: 0, errors: [] };
+  }
+
+  // Collect prospect IDs and delete old pitches
+  const prospectIds = new Set<string>();
+  for (const pitch of pitches) {
+    prospectIds.add(pitch.prospectId);
+    await agentRepository.deletePitch(pitch.id);
+  }
+
+  logger.info(`[draft-pitch] Redraft: deleted ${pitches.length} pending pitches for ${prospectIds.size} prospects`);
+
+  // Re-draft for each prospect
+  const redrafted: DraftPitchResult[] = [];
+  const errors: string[] = [];
+
+  for (const prospectId of prospectIds) {
+    try {
+      const prospect = await agentRepository.getProspectById(prospectId);
+      if (!prospect) {
+        errors.push(`Prospect ${prospectId} not found`);
+        continue;
+      }
+      if (!prospect.contactEmail) {
+        logger.info(`[draft-pitch] Redraft: skipping "${prospect.name}" — no email`);
+        continue;
+      }
+
+      // Reset prospect status to 'new' so it can be re-pitched
+      await agentRepository.updateProspectStatus(prospectId, 'new');
+
+      const result = await draftPitch(prospect);
+      redrafted.push(result);
+
+      // Brief pause between API calls
+      await new Promise(r => setTimeout(r, 1000));
+    } catch (err: any) {
+      errors.push(`${prospectId}: ${err.message}`);
+    }
+  }
+
+  logger.info(`[draft-pitch] Redraft complete: ${redrafted.length} new pitches, ${errors.length} errors`);
+  return { deleted: pitches.length, redrafted: redrafted.length, errors };
+}
+
+/**
+ * Lightweight URL scrape — fetches a prospect's website and extracts text for AI context.
+ * Returns up to maxChars of clean text content.
+ */
+async function scrapeProspectUrl(url: string, maxChars = 2000): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(6000),
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; OnesBot/1.0)',
+        'Accept': 'text/html',
+      },
+    });
+    if (!response.ok) return '';
+    const html = await response.text();
+
+    // Strip script/style tags, then all HTML tags, collapse whitespace
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
+      .replace(/<header[\s\S]*?<\/header>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&[a-z]+;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return text.substring(0, maxChars);
+  } catch {
+    return '';
+  }
+}
+
+/**
  * AI Rewrite — takes existing pitch + user instructions and rewrites it
  */
 export async function rewritePitch(
@@ -373,42 +485,107 @@ export async function rewritePitch(
   const prospect = await agentRepository.getProspectById(pitch.prospectId);
   if (!prospect) throw new Error('Prospect not found');
 
+  // Fetch enriched contacts for personalization
+  const contacts = await agentRepository.getContactsByProspectId(pitch.prospectId);
+  const primaryContact = contacts.find(c => c.isPrimary) || contacts[0];
+
   const profile = await getFounderProfile();
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  // Live-scrape the prospect's website for fresh context
+  let websiteContext = '';
+  if (prospect.url) {
+    const scraped = await scrapeProspectUrl(prospect.url);
+    if (scraped) {
+      websiteContext = `\nLIVE WEBSITE CONTENT (scraped just now from ${prospect.url}):\n${scraped}`;
+      logger.info(`[draft-pitch] Scraped ${scraped.length} chars from ${prospect.url} for rewrite context`);
+    }
+  }
+
+  // Build rich prospect context
+  const prospectContext = [
+    `Name: ${prospect.name}`,
+    `Category: ${prospect.category}${prospect.subType ? ` (${prospect.subType})` : ''}`,
+    prospect.url ? `Website: ${prospect.url}` : null,
+    prospect.publicationName ? `Publication/Company: ${prospect.publicationName}` : null,
+    prospect.hostName ? `Host/Contact: ${prospect.hostName}` : null,
+    prospect.contactEmail ? `Email: ${prospect.contactEmail}` : null,
+    prospect.audienceEstimate ? `Audience: ${prospect.audienceEstimate}` : null,
+    prospect.topics?.length ? `Topics they cover: ${prospect.topics.join(', ')}` : null,
+    prospect.notes ? `Notes: ${prospect.notes}` : null,
+    prospect.relevanceScore ? `Relevance score: ${prospect.relevanceScore}/100` : null,
+  ].filter(Boolean).join('\n');
+
+  // Add enriched contact info
+  const contactContext = primaryContact
+    ? [
+        `\nPRIMARY CONTACT:`,
+        `Name: ${primaryContact.name}`,
+        primaryContact.role ? `Role: ${primaryContact.role}` : null,
+        primaryContact.email ? `Email: ${primaryContact.email}` : null,
+        primaryContact.beat ? `Covers: ${primaryContact.beat}` : null,
+        primaryContact.recentArticles?.length ? `Recent articles: ${primaryContact.recentArticles.join('; ')}` : null,
+      ].filter(Boolean).join('\n')
+    : '';
+
+  // Add enrichment data if available
+  const enrichmentContext = prospect.enrichmentData
+    ? `\nENRICHMENT DATA:\n${JSON.stringify(prospect.enrichmentData, null, 0).substring(0, 800)}`
+    : '';
+
+  // Extract portfolio companies / known connections for investors
+  const portfolioCompanies = prospect.enrichmentData && typeof prospect.enrichmentData === 'object' && 'socialLinks' in (prospect.enrichmentData as any)
+    ? (prospect.enrichmentData as any).socialLinks?.filter((s: string) => s && !s.includes('linkedin.com') && !s.includes('twitter.com'))
+    : [];
 
   const response = await openai.chat.completions.create({
     model: config.model,
     messages: [
       {
         role: 'system',
-        content: `You are a PR pitch editor for a health-tech startup. You will receive an existing pitch email and instructions from the founder on what to change. Rewrite the pitch according to their instructions while keeping the core message and personalization intact.
+        content: `You help Pete (founder of Ones) rewrite pitch emails. You MUST produce a substantially different email — not a light rephrase.
 
-IMPORTANT TONE RULES:
-- NEVER use words like "disrupt", "revolutionize", "game-changing", "groundbreaking"
-- Lead with value for the recipient's audience, not self-promotion
-- Be warm, human, and low-pressure
-- Frame outreach as exploring interest, not demanding coverage
-- NEVER use emojis
-- NEVER start with "Hey!" — use "Hi [Name]," or just "[Name],"
+=== USER INSTRUCTIONS (your #1 priority) ===
+Do EXACTLY what the user asks. Their instructions override ALL rules below. If they ask to personalize, you MUST reference specific facts about this company from the research below — portfolio companies, investment thesis, recent news, team members, anything concrete.
 
-❌ NEGATIVE EXAMPLE — AVOID this style at all costs:
-"Hey! 🎉 Pete here from ONES — we're revolutionizing personalized nutrition with cutting-edge AI technology! Our clinical-grade platform is truly groundbreaking!"
+=== PROSPECT RESEARCH ===
+${prospectContext}${contactContext}${enrichmentContext}${websiteContext}
 
-PROSPECT: ${prospect.name} (${prospect.category})
-FOUNDER: ${profile.name}, ${profile.title} at ${profile.company}
+=== PERSONALIZATION MATERIAL ===
+Use at least 2-3 of these specific details in the rewrite:
+${prospect.notes ? `• Company description: ${prospect.notes}` : ''}
+${portfolioCompanies.length ? `• Portfolio/partner companies: ${portfolioCompanies.join(', ')}` : ''}
+${primaryContact?.beat ? `• Contact covers: ${primaryContact.beat}` : ''}
+${primaryContact?.recentArticles?.length ? `• Recent articles: ${primaryContact.recentArticles.join('; ')}` : ''}
+${prospect.topics?.length ? `• Focus topics: ${prospect.topics.join(', ')}` : ''}
+${!prospect.notes && !portfolioCompanies.length ? `• No stored data — use the LIVE WEBSITE CONTENT above to find specific details about this company` : ''}
 
-OUTPUT FORMAT: Return a JSON object:
-{
-  "subject": "The updated subject line",
-  "body": "The updated email body (plain text)"
-}`,
+=== ABOUT ONES ===
+AI that analyzes blood work + health data to design one custom supplement from 150+ ingredients. Pete is the founder.
+
+=== WRITING RULES (secondary to user instructions) ===
+- 100-200 words. Casual, like Pete typed it on his phone
+- "Hi [Name]," opener. "Pete" sign-off
+- No buzzwords (disrupt, revolutionize, game-changing), no em dashes, no emojis, no numbered lists
+- The rewritten email MUST be noticeably different from the original — change the opening, the hook, the framing. Don't just swap synonyms.
+
+OUTPUT: JSON with "subject" and "body" keys only.`,
       },
       {
         role: 'user',
-        content: `CURRENT SUBJECT: ${pitch.subject}\n\nCURRENT BODY:\n${pitch.body}\n\nINSTRUCTIONS: ${instructions}`,
+        content: `Current pitch to rewrite:
+
+SUBJECT: ${pitch.subject}
+BODY:
+${pitch.body}
+
+---
+MY INSTRUCTIONS: ${instructions}
+
+IMPORTANT: I want this email to feel like it was written specifically for ${prospect.name}. Use the company research above. Mention their portfolio companies, their investment focus, recent news — anything that shows I actually know who they are. Do NOT just rephrase the same generic pitch with different words.`,
       },
     ],
-    temperature: config.temperature,
+    temperature: Math.max(config.temperature, 0.85),
     response_format: { type: 'json_object' },
   });
 
