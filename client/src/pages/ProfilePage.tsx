@@ -857,13 +857,13 @@ export default function ProfilePage() {
                         )}
                       </div>
                       <div className="">
-                        <Label>Height</Label>
+                        {/* <Label>Height</Label> */}
                         {healthLoading ? (
                           <Skeleton className="h-10 w-full" />
                         ) : (
                           <div className="flex gap-2">
                             <div className="flex-1">
-                              <Label htmlFor="height-feet" className="text-xs text-muted-foreground">Feet</Label>
+                              <Label htmlFor="height-feet" className="">{`Height (Feet)`}</Label>
                               <Input
                                 id="height-feet"
                                 type="number"
@@ -876,7 +876,7 @@ export default function ProfilePage() {
                               />
                             </div>
                             <div className="flex-1">
-                              <Label htmlFor="height-inches" className="text-xs text-muted-foreground">Inches</Label>
+                              <Label htmlFor="height-inches" className="">{`Height (Inches)`}</Label>
                               <Input
                                 id="height-inches"
                                 type="number"

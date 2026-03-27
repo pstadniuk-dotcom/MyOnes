@@ -6,6 +6,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Separator } from '@/shared/components/ui/separator';
 import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
@@ -39,6 +40,7 @@ import { SmartReorderCard } from '@/shared/components/SmartReorderCard';
 import { calculateDosage, VALID_CAPSULE_COUNTS, type CapsuleCount } from '@/shared/lib/utils';
 import type { ResearchCitation } from '@shared/schema';
 import { generateFormulaPDF, type FormulaForPDF } from '@shared/pdf-generator';
+import { AddressAutocomplete } from '@/shared/components/address/AddressAutocomplete';
 
 // Types for Formula data matching backend schema
 interface FormulaIngredient {
@@ -196,6 +198,15 @@ export default function MyFormulaPage() {
   const [pricingCapsuleCount, setPricingCapsuleCount] = useState<CapsuleCount>(9);
   const [pendingPricingFocusFormulaId, setPendingPricingFocusFormulaId] = useState<string | null>(null);
   const pricingCardRef = useRef<HTMLDivElement | null>(null);
+  const [addressMode, setAddressMode] = useState<'profile' | 'new'>('profile');
+  const [shippingAddress, setShippingAddress] = useState({
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: 'US',
+  });
 
   // Hooks
   const { user } = useAuth();
@@ -203,11 +214,13 @@ export default function MyFormulaPage() {
   const queryClient = useQueryClient();
 
   // Fresh user data from server (AuthContext can be stale after profile edits)
-  const { data: freshUserData } = useQuery<{ user: { phone: string | null } }>({
+  const { data: freshUserData } = useQuery<{ user: { phone: string | null; addressLine1?: string | null; addressLine2?: string | null; city?: string | null; state?: string | null; postalCode?: string | null; country?: string | null } }>({
     queryKey: ['/api/auth/me'],
     enabled: !!user?.id,
   });
   const userPhone = freshUserData?.user?.phone ?? user?.phone ?? null;
+  const profileAddress = freshUserData?.user;
+  const hasProfileAddress = !!(profileAddress?.addressLine1?.trim());
 
   // Queries - using default queryFn pattern with proper typing
   const { data: currentFormulaData, isLoading: isLoadingCurrent, error: currentError } = useQuery<CurrentFormulaResponse>({
@@ -673,6 +686,15 @@ export default function MyFormulaPage() {
       setMedDisclosureAcknowledged(false);
       setIncludeMembershipAtCheckout(true);
       setEnableAutoShip(true);
+      setAddressMode('profile');
+      setShippingAddress({
+        addressLine1: '',
+        addressLine2: '',
+        city: '',
+        state: '',
+        postalCode: '',
+        country: 'US',
+      });
       return;
     }
 
@@ -686,7 +708,14 @@ export default function MyFormulaPage() {
       // enableAutoShip will be dynamically controlled: false if adding membership, true otherwise
       setEnableAutoShip(true);
     }
-  }, [showOrderConfirmation, hasActiveMembership]);
+
+    // Default to profile address if available, otherwise new address
+    if (hasProfileAddress) {
+      setAddressMode('profile');
+    } else {
+      setAddressMode('new');
+    }
+  }, [showOrderConfirmation, hasActiveMembership, hasProfileAddress]);
 
   // When user toggles membership on/off at checkout, sync enableAutoShip accordingly:
   // Members / users adding membership → Smart Re-Order (enableAutoShip=false, no Stripe sub)
@@ -1767,6 +1796,158 @@ export default function MyFormulaPage() {
                         </p>
                       </div>
                     )}
+                  </div>
+
+                  {/* Shipping Address Section */}
+                  <div className="rounded-lg border overflow-hidden">
+                    <div className="bg-muted/30 px-4 py-3 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Package className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">Shipping Address</p>
+                        <p className="text-xs text-muted-foreground">Where should we deliver your formula?</p>
+                      </div>
+                    </div>
+                    <div className="px-4 py-3 space-y-3">
+                      {/* Address mode toggle */}
+                      <div className="flex rounded-lg border overflow-hidden">
+                        <button
+                          type="button"
+                          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                            addressMode === 'profile'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
+                          }`}
+                          onClick={() => setAddressMode('profile')}
+                          disabled={!hasProfileAddress}
+                          data-testid="button-use-profile-address"
+                        >
+                          Use profile address
+                        </button>
+                        <button
+                          type="button"
+                          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                            addressMode === 'new'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
+                          }`}
+                          onClick={() => setAddressMode('new')}
+                          data-testid="button-enter-new-address"
+                        >
+                          Enter new address
+                        </button>
+                      </div>
+
+                      {/* Profile address display */}
+                      {addressMode === 'profile' && hasProfileAddress && (
+                        <div className="rounded-md border bg-muted/20 p-3 text-sm" data-testid="profile-address-display">
+                          <p className="font-medium">{profileAddress?.addressLine1}</p>
+                          {profileAddress?.addressLine2 && <p>{profileAddress.addressLine2}</p>}
+                          <p className="text-muted-foreground">
+                            {[
+                              profileAddress?.city,
+                              profileAddress?.state,
+                              profileAddress?.postalCode,
+                            ].filter(Boolean).join(', ')}
+                            {profileAddress?.country ? ` ${profileAddress.country}` : ''}
+                          </p>
+                          <button
+                            type="button"
+                            className="text-xs text-primary underline mt-1 cursor-pointer"
+                            onClick={() => setAddressMode('new')}
+                          >
+                            Use a different address instead
+                          </button>
+                        </div>
+                      )}
+
+                      {/* New address form */}
+                      {addressMode === 'new' && (
+                        <div className="space-y-3" data-testid="new-address-form">
+                          <div>
+                            <Label htmlFor="shipping-address-line1" className="text-xs">Street Address</Label>
+                            <AddressAutocomplete
+                              id="shipping-address-line1"
+                              value={shippingAddress.addressLine1}
+                              onChange={(val) => setShippingAddress(prev => ({ ...prev, addressLine1: val }))}
+                              placeholder="123 Main Street"
+                              countryCode={shippingAddress.country}
+                              onSelectAddress={(fields) =>
+                                setShippingAddress((prev) => ({
+                                  ...prev,
+                                  addressLine1: fields.addressLine1 ?? prev.addressLine1,
+                                  city: fields.city ?? prev.city,
+                                  state: fields.state ?? prev.state,
+                                  postalCode: fields.postalCode ?? prev.postalCode,
+                                  country: fields.country ?? prev.country,
+                                }))
+                              }
+                              data-testid="input-shipping-address-line1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="shipping-address-line2" className="text-xs">Apartment, Suite, etc. (Optional)</Label>
+                            <Input
+                              id="shipping-address-line2"
+                              value={shippingAddress.addressLine2}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, addressLine2: e.target.value }))}
+                              placeholder="Apt 4B"
+                              className="h-8 text-sm"
+                              data-testid="input-shipping-address-line2"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label htmlFor="shipping-city" className="text-xs">City</Label>
+                              <Input
+                                id="shipping-city"
+                                value={shippingAddress.city}
+                                onChange={(e) => setShippingAddress(prev => ({ ...prev, city: e.target.value }))}
+                                placeholder="New York"
+                                className="h-8 text-sm"
+                                data-testid="input-shipping-city"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="shipping-state" className="text-xs">State</Label>
+                              <Input
+                                id="shipping-state"
+                                value={shippingAddress.state}
+                                onChange={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value }))}
+                                placeholder="NY"
+                                className="h-8 text-sm"
+                                data-testid="input-shipping-state"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label htmlFor="shipping-postal-code" className="text-xs">Postal Code</Label>
+                              <Input
+                                id="shipping-postal-code"
+                                value={shippingAddress.postalCode}
+                                onChange={(e) => setShippingAddress(prev => ({ ...prev, postalCode: e.target.value }))}
+                                placeholder="10001"
+                                className="h-8 text-sm"
+                                data-testid="input-shipping-postal-code"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="shipping-country" className="text-xs">Country</Label>
+                              <Input
+                                id="shipping-country"
+                                value={shippingAddress.country}
+                                onChange={(e) => setShippingAddress(prev => ({ ...prev, country: e.target.value }))}
+                                placeholder="US"
+                                className="h-8 text-sm"
+                                data-testid="input-shipping-country"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
