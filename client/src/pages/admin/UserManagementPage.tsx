@@ -38,8 +38,13 @@ import {
   SlidersHorizontal,
   X,
   ArrowUpDown,
-  DollarSign
+  DollarSign,
+  Ban,
+  UserX,
+  AlertCircle
 } from 'lucide-react';
+import { cn } from "@/shared/lib/utils";
+
 import { format } from 'date-fns';
 
 // Types
@@ -52,6 +57,8 @@ interface User {
   isAdmin: boolean;
   aiCostCents?: number;
   aiCallCount?: number;
+  deletedAt?: string;
+  suspendedAt?: string;
 }
 
 function formatCost(cents: number): string {
@@ -542,8 +549,8 @@ export default function UserManagementPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Email</TableHead>
                         <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
                         <TableHead
                           className="cursor-pointer select-none"
@@ -563,15 +570,19 @@ export default function UserManagementPage() {
                       {users.map((user) => (
                         <TableRow
                           key={user.id}
-                          className="cursor-pointer hover-elevate"
+                          className={cn(
+                            "cursor-pointer hover-elevate transition-all",
+                            user.deletedAt && "opacity-60 grayscale bg-muted/30",
+                            user.suspendedAt && !user.deletedAt && "bg-orange-50/30"
+                          )}
                           onClick={() => handleUserClick(user.id)}
                           data-testid={`row-user-${user.id}`}
                         >
-                          <TableCell className="font-medium" data-testid={`cell-email-${user.id}`}>
-                            {user.email}
-                          </TableCell>
                           <TableCell data-testid={`cell-name-${user.id}`}>
                             {user.name}
+                          </TableCell>
+                          <TableCell className="font-medium" data-testid={`cell-email-${user.id}`}>
+                            {user.email}
                           </TableCell>
                           <TableCell data-testid={`cell-phone-${user.id}`}>
                             {user.phone || '-'}
@@ -592,12 +603,31 @@ export default function UserManagementPage() {
                             {format(new Date(user.createdAt), 'MMM dd, yyyy')}
                           </TableCell>
                           <TableCell data-testid={`cell-status-${user.id}`}>
-                            {user.isAdmin && (
-                              <Badge variant="default" className="gap-1" data-testid={`badge-admin-${user.id}`}>
-                                <Shield className="h-3 w-3" />
-                                Admin
-                              </Badge>
-                            )}
+                            <div className="flex flex-wrap gap-1">
+                              {user.isAdmin && (
+                                <Badge variant="default" className="gap-1 h-5" data-testid={`badge-admin-${user.id}`}>
+                                  <Shield className="h-3 w-3" />
+                                  Admin
+                                </Badge>
+                              )}
+                              {user.deletedAt ? (
+                                <Badge variant="destructive" className="gap-1 h-5" data-testid={`badge-deleted-${user.id}`}>
+                                  <UserX className="h-3 w-3" />
+                                  Deleted
+                                </Badge>
+                              ) : user.suspendedAt ? (
+                                <Badge variant="outline" className="gap-1 h-5 border-orange-200 bg-orange-50 text-orange-700" data-testid={`badge-suspended-${user.id}`}>
+                                  <Ban className="h-3 w-3" />
+                                  Suspended
+                                </Badge>
+                              ) : (
+                                !user.isAdmin && (
+                                  <Badge variant="secondary" className="h-5 text-[10px] uppercase font-bold tracking-wider opacity-70" data-testid={`badge-active-${user.id}`}>
+                                    Active
+                                  </Badge>
+                                )
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

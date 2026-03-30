@@ -820,7 +820,7 @@ export default function ProfilePage() {
                       <span className="text-sm font-normal text-[#5a6623]">Essential details for health calculations</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                  <AccordionContent className="pt-4 pb-6 px-1 space-y-6">
                     <div className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label htmlFor="age">Age</Label>
@@ -924,7 +924,7 @@ export default function ProfilePage() {
                       <span className="text-sm font-normal text-[#5a6623]">Current measurements for accurate health scoring</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                  <AccordionContent className="pt-4 pb-6 px-1 space-y-6">
                     <div className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label htmlFor="bpSystolic">Blood Pressure - Systolic</Label>
@@ -978,7 +978,7 @@ export default function ProfilePage() {
                       <span className="text-sm font-normal text-[#5a6623]">Help us understand your daily habits</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                  <AccordionContent className="pt-4 pb-6 px-1 space-y-6">
                     <div className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label htmlFor="sleep">Sleep Hours per Night</Label>
@@ -1032,7 +1032,7 @@ export default function ProfilePage() {
                       <span className="text-sm font-normal text-[#5a6623]">Important for personalized recommendations</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                  <AccordionContent className="pt-4 pb-6 px-1 space-y-6">
                     <div className="grid gap-4 md:grid-cols-2">
                       <div>
                         <Label htmlFor="smoking">Smoking Status</Label>

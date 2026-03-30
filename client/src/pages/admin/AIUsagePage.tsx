@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { Link } from 'wouter';
+import { subDays } from 'date-fns';
+import { DateRangePicker } from '@/shared/components/ui/date-range-picker';
 
 interface UsageSummary {
   totalCostCents: number;
@@ -66,7 +68,12 @@ function featureLabel(feature: string): string {
 }
 
 export default function AIUsagePage() {
-  const [days, setDays] = useState(30);
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
+
+  const days = Math.max(1, Math.round((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)));
 
   const { data, isLoading } = useQuery<UsageSummary>({
     queryKey: ['/api/admin/ai-usage', days],
@@ -145,28 +152,17 @@ export default function AIUsagePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/admin">
+          {/* <Link href="/admin">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4 mr-1" /> Back
             </Button>
-          </Link>
+          </Link> */}
           <div>
             <h1 className="text-2xl font-bold">AI Usage & Costs</h1>
             <p className="text-sm text-muted-foreground">Monitor API spending per user, model, and feature</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          {[7, 30, 90].map((d) => (
-            <Button
-              key={d}
-              variant={days === d ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setDays(d)}
-            >
-              {d}d
-            </Button>
-          ))}
-        </div>
+        <DateRangePicker value={dateRange} onChange={setDateRange} />
       </div>
 
       {isLoading ? (
