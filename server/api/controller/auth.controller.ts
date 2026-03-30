@@ -164,8 +164,21 @@ export class AuthController {
     }
 
     async logout(req: Request, res: Response) {
-        const userId = (req as any).userId;
-        logAuthEvent(req, { userId, email: 'n/a', action: 'logout', provider: 'email', success: true });
+        const userId = req.userId;
+        let email = 'n/a';
+        
+        if (userId) {
+            try {
+                const user = await usersRepository.getUser(userId);
+                if (user) {
+                    email = user.email;
+                }
+            } catch (error) {
+                logger.error('Failed to fetch user email for logout audit', { userId, error });
+            }
+        }
+
+        logAuthEvent(req, { userId, email, action: 'logout', provider: 'email', success: true });
         res.json({ message: 'Logged out successfully' });
     }
 

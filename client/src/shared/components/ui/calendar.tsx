@@ -20,8 +20,9 @@ function Calendar({
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
+        caption: "flex justify-center pt-1 relative items-center px-8",
+        caption_label: cn("text-sm font-medium", props.captionLayout?.includes("dropdown") && "hidden"),
+        caption_dropdowns: "flex justify-center gap-1",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
@@ -52,12 +53,22 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        IconLeft: ({ className, ...props }) => (
-          <ChevronLeft className={cn("h-4 w-4", className)} {...props} />
+        IconLeft: ({ ...props }) => (
+          <ChevronLeft className="h-4 w-4" {...props} />
         ),
-        IconRight: ({ className, ...props }) => (
-          <ChevronRight className={cn("h-4 w-4", className)} {...props} />
+        IconRight: ({ ...props }) => (
+          <ChevronRight className="h-4 w-4" {...props} />
         ),
+        Dropdown: ({ children, ...props }) => {
+          return (
+            <select
+              className="bg-transparent text-sm font-medium focus:outline-none cursor-pointer hover:text-primary transition-colors appearance-none"
+              {...props}
+            >
+              {children}
+            </select>
+          );
+        },
       }}
       {...props}
     />

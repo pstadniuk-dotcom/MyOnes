@@ -294,7 +294,7 @@ export default function ProductCatalogPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-4">
-          <Card>
+          <Card onClick={() => setCategoryFilter('system_support')} className='cursor-pointer' >
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <Layers className="h-4 w-4" /> System Supports
@@ -305,7 +305,7 @@ export default function ProductCatalogPage() {
               <p className="text-xs text-gray-400">Proprietary mixes (fixed dose)</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card onClick={() => setCategoryFilter('individual')} className='cursor-pointer' >
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <Pill className="h-4 w-4" /> Individual Ingredients
@@ -316,7 +316,7 @@ export default function ProductCatalogPage() {
               <p className="text-xs text-gray-400">Flexible dosing ingredients</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card onClick={() => setCategoryFilter('all')} className='cursor-pointer' >
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <FlaskConical className="h-4 w-4" /> Total Products

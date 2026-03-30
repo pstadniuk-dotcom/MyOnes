@@ -105,7 +105,7 @@ export default function TrafficSourcesPage() {
   const [createDialog, setCreateDialog] = useState(false);
   const [newCampaign, setNewCampaign] = useState({ name: '', channel: 'email', utmCampaign: '', status: 'draft', notes: '' });
 
-  const days = Math.max(1, Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)));
+  const days = Math.max(1, Math.round((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)));
 
   const { data: sources, isLoading: sourcesLoading } = useQuery<TrafficSource[]>({
     queryKey: [`/api/admin/analytics/traffic-sources?days=${days}`],

@@ -11,6 +11,8 @@ interface DateRangePickerProps {
   value: { from: Date; to: Date };
   onChange: (range: { from: Date; to: Date }) => void;
   className?: string;
+  fromYear?: number;
+  toYear?: number;
 }
 
 const presets = [
@@ -21,7 +23,13 @@ const presets = [
   { label: 'YTD', days: 0 },
 ] as const;
 
-export function DateRangePicker({ value, onChange, className }: DateRangePickerProps) {
+export function DateRangePicker({ 
+  value, 
+  onChange, 
+  className,
+  fromYear = 2020,
+  toYear = new Date().getFullYear()
+}: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false);
 
   const handlePreset = (preset: typeof presets[number]) => {
@@ -30,26 +38,30 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
     if (preset.days === 0) {
       from = startOfYear(to);
     } else {
-      from = subDays(to, preset.days - 1);
+      from = subDays(to, preset.days);
     }
     onChange({ from, to });
   };
 
   const handleCalendarSelect = (range: DateRange | undefined) => {
     if (range?.from && range?.to) {
-      onChange({ from: range.from, to: range.to });
+      const from = new Date(range.from);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(range.to);
+      to.setHours(23, 59, 59, 999);
+      onChange({ from, to });
       setOpen(false);
     }
   };
 
-  const daysDiff = Math.ceil((value.to.getTime() - value.from.getTime()) / (1000 * 60 * 60 * 24));
+  const daysDiff = Math.round((value.to.getTime() - value.from.getTime()) / (1000 * 60 * 60 * 24));
 
   return (
     <div className={cn('flex items-center gap-1.5', className)}>
       {presets.map((preset) => {
         const isActive = preset.days > 0
-          ? daysDiff === preset.days - 1 || daysDiff === preset.days
-          : value.from.getTime() === startOfYear(new Date()).getTime();
+          ? daysDiff === preset.days
+          : value.from.getTime() === startOfYear(new Date()).setHours(0,0,0,0);
         return (
           <Button
             key={preset.label}
@@ -77,6 +89,9 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
             onSelect={handleCalendarSelect}
             numberOfMonths={2}
             disabled={{ after: new Date() }}
+            captionLayout="dropdown-buttons"
+            fromYear={fromYear}
+            toYear={toYear}
           />
         </PopoverContent>
       </Popover>

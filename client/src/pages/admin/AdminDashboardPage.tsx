@@ -28,6 +28,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { Button } from '@/shared/components/ui/button';
+import { getAuthHeaders } from '@/shared/lib/queryClient';
 
 interface EnhancedStats {
   totalUsers: number;
@@ -219,16 +220,56 @@ export default function AdminDashboardPage() {
   const { data: activityFeed } = useQuery<Array<{ type: string; message: string; timestamp: string; metadata?: any }>>({
     queryKey: ['/api/admin/activity-feed?limit=8'],
   });
-
   useEffect(() => {
     if (enhancedError) {
       toast({
         title: "Error loading dashboard",
-        description: enhancedError?.message || "Please try again.",
+        description: (enhancedError as any)?.message || "Please try again.",
         variant: "destructive"
       });
     }
   }, [enhancedError, toast]);
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch('/api/admin/export/users', {
+        headers: {
+          ...getAuthHeaders(),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Export failed' }));
+        throw new Error(errorData.error || 'Export failed');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `users-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Export successful",
+        description: "Your user data has been exported.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Export failed",
+        description: error.message || "Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-US', {
@@ -259,8 +300,14 @@ export default function AdminDashboardPage() {
         <h1 className="text-xl font-semibold text-gray-900">
           Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, let's get started.
         </h1>
-        <Button variant="outline" size="sm" onClick={() => window.open('/api/admin/export/users', '_blank')}>
-          <Download className="h-4 w-4 mr-1.5" /> Export
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleExport}
+          disabled={isExporting}
+        >
+          <Download className="h-4 w-4 mr-1.5" /> 
+          {isExporting ? 'Exporting...' : 'Export'}
         </Button>
       </div>
 
@@ -420,7 +467,7 @@ export default function AdminDashboardPage() {
             {[
               { label: 'Traffic', icon: Globe, href: '/admin/traffic' },
               { label: 'Influencers', icon: Crown, href: '/admin/influencers' },
-              { label: 'B2B Prospects', icon: Building2, href: '/admin/b2b' },
+              // { label: 'B2B Prospects', icon: Building2, href: '/admin/b2b' },
               { label: 'Conversations', icon: MessageSquare, href: '/admin/conversations' },
             ].map((link) => (
               <button
