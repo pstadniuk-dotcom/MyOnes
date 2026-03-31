@@ -485,8 +485,20 @@ export default function AdminDashboardPage() {
         {/* Activity Feed */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium">Recent Activity</CardTitle>
-            <CardDescription>Latest events across your platform</CardDescription>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-base font-medium">Recent Activity (Customers)</CardTitle>
+                <CardDescription>Latest events across your platform</CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation('/admin/users')}
+                className="text-[#054700]"
+              >
+                View All <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {!activityFeed || activityFeed.length === 0 ? (
