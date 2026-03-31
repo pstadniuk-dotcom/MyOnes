@@ -253,7 +253,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         {navWithBadges.map((section, i) => (
           <div key={i}>
             {section.label && (
-              <p className="px-3 mb-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider">
+              <p className="px-3 mb-1.5 text-xs font-bold text-primary uppercase tracking-wider">
                 {section.label}
               </p>
             )}

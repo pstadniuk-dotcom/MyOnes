@@ -467,7 +467,7 @@ export default function AdminDashboardPage() {
             {[
               { label: 'Traffic', icon: Globe, href: '/admin/traffic' },
               { label: 'Influencers', icon: Crown, href: '/admin/influencers' },
-              // { label: 'B2B Prospects', icon: Building2, href: '/admin/b2b' },
+              { label: 'B2B Prospects', icon: Building2, href: '/admin/b2b' },
               { label: 'Conversations', icon: MessageSquare, href: '/admin/conversations' },
             ].map((link) => (
               <button

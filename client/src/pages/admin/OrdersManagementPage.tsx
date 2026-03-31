@@ -381,14 +381,14 @@ export default function OrdersManagementPage() {
                           Amount <SortIcon field="amountCents" current={sortField} dir={sortDir} />
                         </button>
                       </TableHead>
-                      <TableHead>Supply</TableHead>
+                      <TableHead>Supply (Days)</TableHead>
                       <TableHead>
                         <button className="flex items-center hover:text-gray-900" onClick={() => handleSort('placedAt')}>
-                          Placed <SortIcon field="placedAt" current={sortField} dir={sortDir} />
+                          Placed At <SortIcon field="placedAt" current={sortField} dir={sortDir} />
                         </button>
                       </TableHead>
-                      <TableHead>Shipped</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>Shipped At</TableHead>
+                      <TableHead>Tracking URL</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

@@ -656,16 +656,21 @@ Return ONLY valid JSON.`;
 
     async exportOrders(startDate?: Date, endDate?: Date, status?: string) {
         const orders = await adminRepository.exportOrders(startDate, endDate, status);
-        const headers = ['Order ID', 'User Name', 'User Email', 'Status', 'Amount', 'Supply (Days)', 'Placed At', 'Shipped At'];
+        const csvEscape = (value: unknown) => {
+            const str = value === null || value === undefined ? '' : String(value);
+            return `"${str.replace(/"/g, '""')}"`;
+        };
+
+        const headers = ['Order ID', 'Customer', 'Status', 'Amount', 'Supply (Days)', 'Placed At', 'Shipped At', 'Tracking URL'];
         const rows = orders.map(o => [
-            o.id,
-            `"${(o.userName || '').replace(/"/g, '""')}"`,
-            o.userEmail,
-            o.status,
-            `$${(o.amountCents / 100).toFixed(2)}`,
-            o.supplyMonths ? o.supplyMonths * 30 : 90,
-            o.placedAt,
-            o.shippedAt || ''
+            csvEscape(o.id),
+            csvEscape(o.userEmail ? `${o.userName} (${o.userEmail})` : o.userName),
+            csvEscape(o.status),
+            csvEscape(o.amountCents === null || o.amountCents === undefined ? '-' : `$${(Number(o.amountCents) / 100).toFixed(2)}`),
+            csvEscape(`${o.supplyMonths ? o.supplyMonths * 30 : 90} days`),
+            csvEscape(o.placedAt),
+            csvEscape(o.shippedAt || ''),
+            csvEscape(o.trackingUrl || ''),
         ].join(','));
         return [headers.join(','), ...rows].join('\n');
     }

@@ -1852,7 +1852,17 @@ export class AdminRepository {
 
             return await Promise.all(orderList.map(async (order) => {
                 const [user] = await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, order.userId));
-                return { id: order.id, userName: user?.name || 'Unknown', userEmail: user?.email || 'Unknown', status: order.status, amountCents: order.amountCents || 0, supplyMonths: order.supplyMonths, placedAt: order.placedAt.toISOString(), shippedAt: order.shippedAt?.toISOString() || null };
+                return {
+                    id: order.id,
+                    userName: user?.name || 'Unknown',
+                    userEmail: user?.email || 'Unknown',
+                    status: order.status,
+                    amountCents: order.amountCents,
+                    supplyMonths: order.supplyMonths,
+                    placedAt: order.placedAt.toISOString(),
+                    shippedAt: order.shippedAt?.toISOString() || null,
+                    trackingUrl: order.trackingUrl || null,
+                };
             }));
         } catch (error) {
             logger.error('Error exporting orders', { error });
