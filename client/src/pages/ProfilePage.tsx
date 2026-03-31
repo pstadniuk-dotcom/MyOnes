@@ -820,7 +820,7 @@ export default function ProfilePage() {
                       <span className="text-sm font-normal text-[#5a6623]">Essential details for health calculations</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                  <AccordionContent className="pt-4 pb-6 px-1 space-y-6">
                     <div className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label htmlFor="age">Age</Label>
@@ -857,13 +857,13 @@ export default function ProfilePage() {
                         )}
                       </div>
                       <div className="">
-                        <Label>Height</Label>
+                        {/* <Label>Height</Label> */}
                         {healthLoading ? (
                           <Skeleton className="h-10 w-full" />
                         ) : (
                           <div className="flex gap-2">
                             <div className="flex-1">
-                              <Label htmlFor="height-feet" className="text-xs text-muted-foreground">Feet</Label>
+                              <Label htmlFor="height-feet" className="">{`Height (Feet)`}</Label>
                               <Input
                                 id="height-feet"
                                 type="number"
@@ -876,7 +876,7 @@ export default function ProfilePage() {
                               />
                             </div>
                             <div className="flex-1">
-                              <Label htmlFor="height-inches" className="text-xs text-muted-foreground">Inches</Label>
+                              <Label htmlFor="height-inches" className="">{`Height (Inches)`}</Label>
                               <Input
                                 id="height-inches"
                                 type="number"
@@ -924,7 +924,7 @@ export default function ProfilePage() {
                       <span className="text-sm font-normal text-[#5a6623]">Current measurements for accurate health scoring</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                  <AccordionContent className="pt-4 pb-6 px-1 space-y-6">
                     <div className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label htmlFor="bpSystolic">Blood Pressure - Systolic</Label>
@@ -978,7 +978,7 @@ export default function ProfilePage() {
                       <span className="text-sm font-normal text-[#5a6623]">Help us understand your daily habits</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                  <AccordionContent className="pt-4 pb-6 px-1 space-y-6">
                     <div className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label htmlFor="sleep">Sleep Hours per Night</Label>
@@ -1032,7 +1032,7 @@ export default function ProfilePage() {
                       <span className="text-sm font-normal text-[#5a6623]">Important for personalized recommendations</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-4 pb-6 space-y-6">
+                  <AccordionContent className="pt-4 pb-6 px-1 space-y-6">
                     <div className="grid gap-4 md:grid-cols-2">
                       <div>
                         <Label htmlFor="smoking">Smoking Status</Label>

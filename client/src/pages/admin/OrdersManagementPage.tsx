@@ -46,7 +46,7 @@ import {
   DialogTitle,
 } from '@/shared/components/ui/dialog';
 import { useToast } from '@/shared/hooks/use-toast';
-import { apiRequest } from '@/shared/lib/queryClient';
+import { apiRequest, getAuthHeaders } from '@/shared/lib/queryClient';
 
 interface Order {
   id: string;
@@ -102,6 +102,7 @@ export default function OrdersManagementPage() {
     trackingUrl: ''
   });
   const [bulkDialog, setBulkDialog] = useState<{ open: boolean; newStatus: string }>({ open: false, newStatus: '' });
+  const [isExporting, setIsExporting] = useState(false);
 
   const limit = 20;
 
@@ -161,10 +162,46 @@ export default function OrdersManagementPage() {
     }
   }, [sortField]);
 
-  const handleExport = () => {
-    const params = new URLSearchParams();
-    if (statusFilter !== 'all') params.append('status', statusFilter);
-    window.open(`/api/admin/export/orders?${params.toString()}`, '_blank');
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      
+      const response = await fetch(`/api/admin/export/orders?${params.toString()}`, {
+        headers: {
+          ...getAuthHeaders(),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Export failed' }));
+        throw new Error(errorData.error || 'Export failed');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `orders-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Export successful",
+        description: "Your order data has been exported.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Export failed",
+        description: error.message || "Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleStatusChange = (order: Order, newStatus: string) => {
@@ -240,9 +277,13 @@ export default function OrdersManagementPage() {
               View and manage all orders (90-day supply cycles)
             </p>
           </div>
-          <Button variant="outline" onClick={handleExport}>
+          <Button 
+            variant="outline" 
+            onClick={handleExport}
+            disabled={isExporting}
+          >
             <Download className="h-4 w-4 mr-2" />
-            Export CSV
+            {isExporting ? 'Exporting...' : 'Export CSV'}
           </Button>
         </div>
 
@@ -340,14 +381,14 @@ export default function OrdersManagementPage() {
                           Amount <SortIcon field="amountCents" current={sortField} dir={sortDir} />
                         </button>
                       </TableHead>
-                      <TableHead>Supply</TableHead>
+                      <TableHead>Supply (Days)</TableHead>
                       <TableHead>
                         <button className="flex items-center hover:text-gray-900" onClick={() => handleSort('placedAt')}>
-                          Placed <SortIcon field="placedAt" current={sortField} dir={sortDir} />
+                          Placed At <SortIcon field="placedAt" current={sortField} dir={sortDir} />
                         </button>
                       </TableHead>
-                      <TableHead>Shipped</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>Shipped At</TableHead>
+                      <TableHead>Tracking URL</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

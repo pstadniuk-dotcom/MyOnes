@@ -364,7 +364,6 @@ function SupportTicketList() {
       apiRequest('POST', '/api/admin/support-tickets/bulk-update', payload),
     onSuccess: () => {
       toast({ title: 'Tickets updated' });
-      setSelectedIds(new Set());
       invalidateTickets(queryClient);
     },
   });
@@ -590,7 +589,7 @@ function SupportTicketList() {
 
             {/* Bulk Status */}
             <Select onValueChange={handleBulkStatus}>
-              <SelectTrigger className="w-[120px] h-8 bg-slate-700 border-slate-600 text-white text-xs">
+              <SelectTrigger className="w-[120px] h-8 bg-white/10 border-white/20 text-white text-xs hover:bg-white/20 transition-all hover:border-white/40 [&>span]:text-slate-100 [&_svg]:text-white/80">
                 <SelectValue placeholder="Set status" />
               </SelectTrigger>
               <SelectContent>
@@ -603,7 +602,7 @@ function SupportTicketList() {
 
             {/* Bulk Priority */}
             <Select onValueChange={handleBulkPriority}>
-              <SelectTrigger className="w-[120px] h-8 bg-slate-700 border-slate-600 text-white text-xs">
+              <SelectTrigger className="w-[120px] h-8 bg-white/10 border-white/20 text-white text-xs hover:bg-white/20 transition-all hover:border-white/40 [&>span]:text-slate-100 [&_svg]:text-white/80">
                 <SelectValue placeholder="Set priority" />
               </SelectTrigger>
               <SelectContent>
@@ -617,7 +616,7 @@ function SupportTicketList() {
             {/* Bulk Assign */}
             {filterOptions?.admins && filterOptions.admins.length > 0 && (
               <Select onValueChange={handleBulkAssign}>
-                <SelectTrigger className="w-[130px] h-8 bg-slate-700 border-slate-600 text-white text-xs">
+                <SelectTrigger className="w-[130px] h-8 bg-white/10 border-white/20 text-white text-xs hover:bg-white/20 transition-all hover:border-white/40 [&>span]:text-slate-100 [&_svg]:text-white/80">
                   <SelectValue placeholder="Assign to" />
                 </SelectTrigger>
                 <SelectContent>

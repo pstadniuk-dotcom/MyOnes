@@ -44,8 +44,12 @@ import {
   DollarSign,
   TrendingUp,
   Clock,
-  Eye
+  Eye,
+  Ban,
+  UserX,
+  RotateCcw
 } from 'lucide-react';
+
 import { format } from 'date-fns';
 import { UserAdminNotes } from '@/features/admin/components/UserAdminNotes';
 import { apiRequest } from '@/shared/lib/queryClient';
@@ -64,6 +68,9 @@ interface UserDetail {
   state: string | null;
   postalCode: string | null;
   country: string | null;
+  deletedAt?: string;
+  suspendedAt?: string;
+  suspendedReason?: string | null;
 }
 
 interface HealthProfile {
@@ -283,6 +290,58 @@ export default function UserDetailPage() {
     }
   });
 
+  // Suspend user mutation
+  const suspendUserMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      const response = await apiRequest('PATCH', `/api/admin/users/${userId}/suspend`, { reason });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to suspend user');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User suspended",
+        description: `${user?.name} has been suspended.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users', userId] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error suspending user",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Unsuspend user mutation
+  const unsuspendUserMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('PATCH', `/api/admin/users/${userId}/unsuspend`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to unsuspend user');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User unsuspended",
+        description: `${user?.name} has been unsuspended.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users', userId] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error unsuspending user",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
   // Show error toast
   useEffect(() => {
     if (userError || timelineError) {
@@ -374,6 +433,18 @@ export default function UserDetailPage() {
                   Admin
                 </Badge>
               )}
+              {user.deletedAt && (
+                <Badge variant="destructive" className="gap-1" data-testid="badge-deleted">
+                  <UserX className="h-3 w-3" />
+                  Deleted
+                </Badge>
+              )}
+              {user.suspendedAt && !user.deletedAt && (
+                <Badge variant="outline" className="gap-1 border-orange-200 bg-orange-50 text-orange-700" data-testid="badge-suspended">
+                  <Ban className="h-3 w-3" />
+                  Suspended
+                </Badge>
+              )}
             </h1>
             <p className="text-muted-foreground">
               User ID: {user.id}
@@ -428,8 +499,54 @@ export default function UserDetailPage() {
               </AlertDialogContent>
             </AlertDialog>
 
-            {/* Delete User Button - only show for non-admin users */}
-            {!user.isAdmin && (
+            {/* Suspend / Unsuspend Button */}
+            {!user.isAdmin && !user.deletedAt && (
+              user.suspendedAt ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => unsuspendUserMutation.mutate()}
+                  disabled={unsuspendUserMutation.isPending}
+                  data-testid="button-unsuspend-user"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Unsuspend User
+                </Button>
+              ) : (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-testid="button-suspend-user"
+                    >
+                      <Ban className="h-4 w-4 mr-2" />
+                      Suspend User
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Suspend User</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to suspend <strong>{user.name}</strong>? They will be unable to log in or use the platform until unsuspended.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => suspendUserMutation.mutate('Suspended by admin')}
+                        disabled={suspendUserMutation.isPending}
+                      >
+                        {suspendUserMutation.isPending ? 'Suspending...' : 'Suspend User'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )
+            )}
+
+            {/* Delete User Button - only show for non-admin users who are not already deleted */}
+            {!user.isAdmin && !user.deletedAt && (
               <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogTrigger asChild>
                   <Button

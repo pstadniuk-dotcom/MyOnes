@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { subDays } from 'date-fns';
+import { isSameDay, subDays } from 'date-fns';
 import {
   Globe,
   Users,
@@ -105,7 +105,10 @@ export default function TrafficSourcesPage() {
   const [createDialog, setCreateDialog] = useState(false);
   const [newCampaign, setNewCampaign] = useState({ name: '', channel: 'email', utmCampaign: '', status: 'draft', notes: '' });
 
-  const days = Math.max(1, Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)));
+  const days = Math.max(1, Math.round((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)));
+  const now = new Date();
+  const isTodayLabel = days === 1 && isSameDay(dateRange.to, now);
+  const rangeLabel = isTodayLabel ? 'Today' : `Last ${days} ${days === 1 ? 'day' : 'days'}`;
 
   const { data: sources, isLoading: sourcesLoading } = useQuery<TrafficSource[]>({
     queryKey: [`/api/admin/analytics/traffic-sources?days=${days}`],
@@ -187,11 +190,11 @@ export default function TrafficSourcesPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-5 pb-4">
-            <p className="text-sm text-gray-500 flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Total Signups</p>
-            <p className="text-2xl font-semibold mt-1">{totalSignups}</p>
-            <p className="text-xs text-gray-400">Last {days} days</p>
-          </CardContent>
-        </Card>
+             <p className="text-sm text-gray-500 flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Total Signups</p>
+             <p className="text-2xl font-semibold mt-1">{totalSignups}</p>
+             <p className="text-xs text-gray-400">{rangeLabel}</p>
+           </CardContent>
+         </Card>
         <Card>
           <CardContent className="pt-5 pb-4">
             <p className="text-sm text-gray-500 flex items-center gap-1.5"><DollarSign className="h-3.5 w-3.5" /> Attributed Revenue</p>
@@ -220,7 +223,7 @@ export default function TrafficSourcesPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Signups by Channel</CardTitle>
-            <CardDescription>Last {days} days</CardDescription>
+            <CardDescription>{rangeLabel}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-72">

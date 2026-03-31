@@ -154,7 +154,7 @@ export default function HomePage() {
               Long live {userName}.
             </h1>
           </div>
-          <img src="/ones-logo-icon.svg" alt="" className="hidden md:block w-8 h-8 opacity-[0.08]" />
+          <img src="/ones-logo-icon.svg" alt="" className="hidden md:block w-8 h-8 " />
         </div>
       </div>
 

@@ -253,7 +253,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         {navWithBadges.map((section, i) => (
           <div key={i}>
             {section.label && (
-              <p className="px-3 mb-1.5 text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <p className="px-3 mb-1.5 text-xs font-bold text-primary uppercase tracking-wider">
                 {section.label}
               </p>
             )}
@@ -275,7 +275,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       <div className="border-t border-gray-200 p-3">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2 px-3 py-2 text-sm text-[#666] hover:text-[#054700] hover:bg-[#054700]/5 rounded-md transition-colors"
+          className="flex items-center gap-2 px-3 py-2 text-sm text-[#054700] bg-[#054700]/20 hover:text-[#054700] hover:bg-[#054700]/5 rounded-md transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Dashboard

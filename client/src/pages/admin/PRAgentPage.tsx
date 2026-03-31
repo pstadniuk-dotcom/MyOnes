@@ -706,15 +706,34 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' | 'investor'
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [draftingIds, setDraftingIds] = useState<Set<string>>(new Set());
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+
+  async function deleteProspect(prospectId: string) {
+    await apiRequest('DELETE', `/api/agent/prospects/${prospectId}`);
+  }
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest('DELETE', `/api/agent/prospects/${id}`),
+    mutationFn: (id: string) => deleteProspect(id),
+    onMutate: (id: string) => {
+      setDeletingIds(prev => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+    },
     onSuccess: () => {
       toast({ title: 'Prospect deleted' });
       queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
     },
     onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+    onSettled: (_data, _error, id) => {
+      setDeletingIds(prev => {
+        const next = new Set(prev);
+        if (id) next.delete(id);
+        return next;
+      });
+    },
   });
 
   const draftPitchMutation = useMutation({
@@ -751,6 +770,37 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' | 'investor'
     });
   }
 
+  async function batchDeleteProspects() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Delete ${ids.length} prospect${ids.length !== 1 ? 's' : ''}?`)) return;
+
+    let succeeded = 0;
+    let failed = 0;
+    setDeletingIds(new Set(ids));
+    if (selectedProspect && ids.includes(selectedProspect.id)) setSelectedProspect(null);
+
+    for (const id of ids) {
+      try {
+        await deleteProspect(id);
+        succeeded++;
+      } catch {
+        failed++;
+      } finally {
+        setDeletingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      }
+    }
+
+    setSelectedIds(new Set());
+    queryClient.invalidateQueries({ queryKey: ['/api/agent/prospects'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/agent/dashboard'] });
+    toast({
+      title: `Deleted ${succeeded} prospect${succeeded !== 1 ? 's' : ''}`,
+      description: failed > 0 ? `${failed} failed` : undefined,
+      variant: failed > 0 ? 'destructive' : 'default',
+    });
+  }
+
   if (isLoading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
@@ -772,6 +822,7 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' | 'investor'
   const allSelected = prospects.length > 0 && prospects.every(p => selectedIds.has(p.id));
   const someSelected = prospects.some(p => selectedIds.has(p.id));
   const isDrafting = draftingIds.size > 0;
+  const isDeleting = deletingIds.size > 0;
 
   function toggleSelectAll() {
     if (allSelected) {
@@ -866,11 +917,23 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' | 'investor'
             <Button
               size="sm"
               onClick={batchDraftPitches}
-              disabled={isDrafting}
+              disabled={isDrafting || isDeleting}
               className="h-8 gap-1"
             >
               {isDrafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Edit className="h-3.5 w-3.5" />}
               Draft {selectedIds.size} Pitch{selectedIds.size !== 1 ? 'es' : ''}
+            </Button>
+          )}
+          {selectedIds.size > 0 && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={batchDeleteProspects}
+              disabled={isDrafting || isDeleting}
+              className="h-8 gap-1"
+            >
+              {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Delete {selectedIds.size}
             </Button>
           )}
           <p className="text-sm text-muted-foreground">
@@ -888,6 +951,7 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' | 'investor'
                   checked={allSelected}
                   onCheckedChange={toggleSelectAll}
                   aria-label="Select all"
+                  disabled={isDrafting || isDeleting}
                   className={someSelected && !allSelected ? 'opacity-60' : ''}
                 />
               </TableHead>
@@ -912,8 +976,10 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' | 'investor'
                     checked={selectedIds.has(p.id)}
                     onCheckedChange={() => toggleSelect(p.id)}
                     aria-label={`Select ${p.name}`}
+                    disabled={isDrafting || isDeleting}
                   />
                   {draftingIds.has(p.id) && <Loader2 className="h-3 w-3 animate-spin inline ml-1" />}
+                  {deletingIds.has(p.id) && <Loader2 className="h-3 w-3 animate-spin inline ml-1" />}
                 </TableCell>
                 <TableCell>
                   <div>
@@ -963,9 +1029,15 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' | 'investor'
                       size="sm"
                       variant="ghost"
                       className="text-red-500 h-7 w-7 p-0"
-                      onClick={(e) => { e.stopPropagation(); if (confirm('Delete this prospect?')) deleteMutation.mutate(p.id); }}
+                      disabled={isDrafting || isDeleting}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('Delete this prospect?')) deleteMutation.mutate(p.id);
+                      }}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      {deletingIds.has(p.id)
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <Trash2 className="h-3.5 w-3.5" />}
                     </Button>
                   </div>
                 </TableCell>

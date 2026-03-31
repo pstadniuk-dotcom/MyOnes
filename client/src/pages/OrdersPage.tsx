@@ -33,6 +33,17 @@ interface Subscription extends BaseSubscription {
   membershipTier?: string | null;
   membershipPriceCents?: number | null;
 }
+
+interface AutoShipData {
+  id: string;
+  status: 'active' | 'paused' | 'cancelled';
+  nextShipmentDate: string | null;
+}
+
+interface AutoShipResponse {
+  enabled: boolean;
+  autoShip: AutoShipData | null;
+}
 import {
   Package,
   CreditCard,
@@ -47,6 +58,7 @@ import {
   Download,
   Pause,
   Play,
+  XCircle,
   RotateCcw,
   FileText,
   Loader2
@@ -156,6 +168,7 @@ function PreReorderReviewGate() {
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState('subscription');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showCancelNextOrderDialog, setShowCancelNextOrderDialog] = useState(false);
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<BillingInvoice | null>(null);
   const [isFetchingInvoice, setIsFetchingInvoice] = useState<string | null>(null);
@@ -180,6 +193,11 @@ export default function OrdersPage() {
 
   const { data: billingHistory, isLoading: isLoadingBilling, error: billingError } = useQuery<BillingRecord[]>({
     queryKey: ['/api/users/me/billing-history'],
+    enabled: !!user?.id
+  });
+
+  const { data: autoShipStatus, isLoading: isLoadingAutoShip, error: autoShipError } = useQuery<AutoShipResponse>({
+    queryKey: ['/api/billing/auto-ship'],
     enabled: !!user?.id
   });
 
@@ -238,6 +256,25 @@ export default function OrdersPage() {
     }
   });
 
+  const cancelNextOrderMutation = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/billing/auto-ship/skip-next').then(res => res.json()),
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/billing/auto-ship'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/me/orders'] });
+      toast({
+        title: 'Next order cancelled',
+        description: result?.message || 'Your next upcoming order has been cancelled.'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error cancelling next order',
+        description: error.message || 'Failed to cancel next upcoming order',
+        variant: 'destructive'
+      });
+    }
+  });
+
   const deletePaymentMethodMutation = useMutation({
     mutationFn: (paymentMethodId: string) =>
       apiRequest('DELETE', `/api/users/me/payment-methods/${paymentMethodId}`).then(res => res.json()),
@@ -276,16 +313,17 @@ export default function OrdersPage() {
     const hasOrdersError = ordersError && !isNonCriticalError(ordersError);
     const hasPaymentsError = paymentsError && !isNonCriticalError(paymentsError);
     const hasBillingError = billingError && !isNonCriticalError(billingError);
+    const hasAutoShipError = autoShipError && !isNonCriticalError(autoShipError);
 
-    if (hasSubscriptionError || hasOrdersError || hasPaymentsError || hasBillingError) {
-      const errorMessage = subscriptionError?.message || ordersError?.message || paymentsError?.message || billingError?.message;
+    if (hasSubscriptionError || hasOrdersError || hasPaymentsError || hasBillingError || hasAutoShipError) {
+      const errorMessage = subscriptionError?.message || ordersError?.message || paymentsError?.message || billingError?.message || autoShipError?.message;
       toast({
         title: 'Error loading data',
         description: errorMessage || 'Please refresh the page to try again.',
         variant: 'destructive',
       });
     }
-  }, [subscriptionError, ordersError, paymentsError, billingError, toast]);
+  }, [subscriptionError, ordersError, paymentsError, billingError, autoShipError, toast]);
 
   // Loading skeleton component
   const OrdersSkeleton = () => (
@@ -301,7 +339,7 @@ export default function OrdersPage() {
   );
 
   // Show loading state
-  const isLoading = isLoadingSubscription || isLoadingOrders || isLoadingPayments || isLoadingBilling;
+  const isLoading = isLoadingSubscription || isLoadingOrders || isLoadingPayments || isLoadingBilling || isLoadingAutoShip;
   if (isLoading) {
     return (
       <div className="space-y-6" data-testid="page-orders">
@@ -368,6 +406,9 @@ export default function OrdersPage() {
     }
   };
 
+  const expectedDeliveryDate = autoShipStatus?.autoShip?.nextShipmentDate || subscription?.renewsAt || null;
+  const canCancelNextOrder = autoShipStatus?.autoShip?.status === 'active' && !!autoShipStatus?.autoShip?.nextShipmentDate;
+
   return (
     <div className="space-y-6" data-testid="page-orders">
       {/* Cancel Subscription Confirmation Dialog */}
@@ -392,6 +433,30 @@ export default function OrdersPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Yes, Cancel Subscription
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Next Order Confirmation Dialog */}
+      <AlertDialog open={showCancelNextOrderDialog} onOpenChange={setShowCancelNextOrderDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel next upcoming order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will cancel your next upcoming auto-order. Future auto-orders will continue as scheduled after that.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Next Order</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                cancelNextOrderMutation.mutate();
+                setShowCancelNextOrderDialog(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelNextOrderMutation.isPending ? 'Cancelling...' : 'Yes, Cancel Next Order'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -545,14 +610,29 @@ export default function OrdersPage() {
                   <div>
                     <p className="font-medium text-[#1B4332]">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Supply</p>
                     <p className="text-sm text-[#52796F]">
-                      Expected delivery: {subscription?.renewsAt ? new Date(subscription.renewsAt).toLocaleDateString() : 'N/A'}
+                      Expected delivery: {expectedDeliveryDate ? new Date(expectedDeliveryDate).toLocaleDateString() : 'N/A'}
                     </p>
                     <p className="text-sm text-[#52796F]">
                       Current Formula • ${subscription?.plan === 'monthly' ? '89.99' : subscription?.plan === 'quarterly' ? '239.99' : subscription?.plan === 'annual' ? '899.99' : '0.00'}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right space-y-2">
                     <Badge variant="outline" className="border-[#D4A574] text-[#D4A574]">Scheduled</Badge>
+                    {canCancelNextOrder && (
+                      <div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          data-testid="button-cancel-next-order"
+                          onClick={() => setShowCancelNextOrderDialog(true)}
+                          disabled={cancelNextOrderMutation.isPending}
+                          className="border-destructive text-destructive hover:bg-destructive hover:text-white"
+                        >
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Cancel Next Order
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

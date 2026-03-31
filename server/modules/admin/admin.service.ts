@@ -9,10 +9,43 @@ import { manufacturerPricingService } from '../formulas/manufacturer-pricing.ser
 import { usersRepository } from '../users/users.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
 import { wearablesService } from '../wearables/wearables.service';
+import { getFrontendUrl } from '../../utils/urlHelper';
+import { escapeHtml } from '../../utils/sanitize';
 
 const VALID_ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
 
 export class AdminService {
+    private async sendUserAccountActionEmail(opts: {
+        to: string | null | undefined;
+        subject: string;
+        title: string;
+        contentHtml: string;
+        actionUrl?: string;
+        actionText?: string;
+        userId?: string;
+        action: string;
+    }): Promise<void> {
+        try {
+            if (!opts.to) return;
+            await sendNotificationEmail({
+                to: opts.to,
+                subject: opts.subject,
+                title: opts.title,
+                content: opts.contentHtml,
+                actionUrl: opts.actionUrl,
+                actionText: opts.actionText,
+                type: 'system',
+            });
+        } catch (error) {
+            logger.error('Failed to send user account action email', {
+                error,
+                to: opts.to,
+                userId: opts.userId,
+                action: opts.action,
+            });
+        }
+    }
+
     async getStats() {
         return await adminRepository.getAdminStats();
     }
@@ -103,6 +136,23 @@ export class AdminService {
             throw new Error('Cannot delete admin accounts');
         }
 
+        const name = escapeHtml(userToDelete.name || 'there');
+        const supportUrl = `${getFrontendUrl()}/dashboard/support`;
+        await this.sendUserAccountActionEmail({
+            to: userToDelete.email,
+            subject: 'Your Ones account has been deactivated',
+            title: 'Account Deactivated',
+            contentHtml: `
+                <p>Hi ${name},</p>
+                <p>Your account has been deactivated by an administrator. You will no longer be able to log in.</p>
+                <p>If you believe this is a mistake, please contact support.</p>
+            `,
+            actionUrl: supportUrl,
+            actionText: 'Contact Support',
+            userId,
+            action: 'user_delete',
+        });
+
         // Soft-delete: set deletedAt timestamp instead of hard DELETE
         return await adminRepository.updateUser(userId, {
             deletedAt: new Date(),
@@ -122,6 +172,26 @@ export class AdminService {
             suspendedReason: reason || null,
         });
         if (!updated) throw new Error('Failed to suspend user');
+
+        const name = escapeHtml(user.name || 'there');
+        const reasonText = reason ? escapeHtml(reason) : null;
+        const supportUrl = `${getFrontendUrl()}/dashboard/support`;
+        await this.sendUserAccountActionEmail({
+            to: user.email,
+            subject: 'Your Ones account has been suspended',
+            title: 'Account Suspended',
+            contentHtml: `
+                <p>Hi ${name},</p>
+                <p>Your account has been suspended by an administrator. You will be unable to log in until it is restored.</p>
+                ${reasonText ? `<p><strong>Reason:</strong> ${reasonText}</p>` : ''}
+                <p>If you believe this is a mistake, please contact support.</p>
+            `,
+            actionUrl: supportUrl,
+            actionText: 'Contact Support',
+            userId,
+            action: 'user_suspend',
+        });
+
         const { password, ...sanitized } = updated as any;
         return sanitized;
     }
@@ -136,6 +206,23 @@ export class AdminService {
             suspendedReason: null,
         });
         if (!updated) throw new Error('Failed to unsuspend user');
+
+        const name = escapeHtml(user.name || 'there');
+        const loginUrl = `${getFrontendUrl()}/login`;
+        await this.sendUserAccountActionEmail({
+            to: user.email,
+            subject: 'Your Ones account has been restored',
+            title: 'Account Restored',
+            contentHtml: `
+                <p>Hi ${name},</p>
+                <p>Your account suspension has been lifted by an administrator. You can log in again.</p>
+            `,
+            actionUrl: loginUrl,
+            actionText: 'Log In',
+            userId,
+            action: 'user_unsuspend',
+        });
+
         const { password, ...sanitized } = updated as any;
         return sanitized;
     }
@@ -150,6 +237,24 @@ export class AdminService {
 
         const updatedUser = await adminRepository.updateUser(userId, { isAdmin });
         if (!updatedUser) throw new Error('Failed to update user');
+
+        const name = escapeHtml(userToUpdate.name || 'there');
+        const dashboardUrl = `${getFrontendUrl()}/dashboard`;
+        await this.sendUserAccountActionEmail({
+            to: userToUpdate.email,
+            subject: isAdmin ? 'You have been granted admin access' : 'Your admin access has been revoked',
+            title: isAdmin ? 'Admin Access Granted' : 'Admin Access Revoked',
+            contentHtml: `
+                <p>Hi ${name},</p>
+                <p>Your account privileges were updated by an administrator.</p>
+                <p><strong>Admin access:</strong> ${isAdmin ? 'Enabled' : 'Disabled'}</p>
+                <p>If you believe this change is unexpected, please contact support.</p>
+            `,
+            actionUrl: dashboardUrl,
+            actionText: 'Go to Dashboard',
+            userId,
+            action: isAdmin ? 'user_admin_grant' : 'user_admin_revoke',
+        });
 
         const { password, ...sanitizedUser } = updatedUser as any;
         return sanitizedUser;
@@ -656,16 +761,21 @@ Return ONLY valid JSON.`;
 
     async exportOrders(startDate?: Date, endDate?: Date, status?: string) {
         const orders = await adminRepository.exportOrders(startDate, endDate, status);
-        const headers = ['Order ID', 'User Name', 'User Email', 'Status', 'Amount', 'Supply (Days)', 'Placed At', 'Shipped At'];
+        const csvEscape = (value: unknown) => {
+            const str = value === null || value === undefined ? '' : String(value);
+            return `"${str.replace(/"/g, '""')}"`;
+        };
+
+        const headers = ['Order ID', 'Customer', 'Status', 'Amount', 'Supply (Days)', 'Placed At', 'Shipped At', 'Tracking URL'];
         const rows = orders.map(o => [
-            o.id,
-            `"${(o.userName || '').replace(/"/g, '""')}"`,
-            o.userEmail,
-            o.status,
-            `$${(o.amountCents / 100).toFixed(2)}`,
-            o.supplyMonths ? o.supplyMonths * 30 : 90,
-            o.placedAt,
-            o.shippedAt || ''
+            csvEscape(o.id),
+            csvEscape(o.userEmail ? `${o.userName} (${o.userEmail})` : o.userName),
+            csvEscape(o.status),
+            csvEscape(o.amountCents === null || o.amountCents === undefined ? '-' : `$${(Number(o.amountCents) / 100).toFixed(2)}`),
+            csvEscape(`${o.supplyMonths ? o.supplyMonths * 30 : 90} days`),
+            csvEscape(o.placedAt),
+            csvEscape(o.shippedAt || ''),
+            csvEscape(o.trackingUrl || ''),
         ].join(','));
         return [headers.join(','), ...rows].join('\n');
     }
