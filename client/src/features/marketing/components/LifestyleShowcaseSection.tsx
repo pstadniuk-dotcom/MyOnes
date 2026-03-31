@@ -47,18 +47,60 @@ const allIngredients = [
     benefit: "Cognitive & memory support",
     src: "/Ones%20LIfestyle%20Images/Ingredients/rosemary.png",
   },
+  {
+    name: "Chaga Mushroom",
+    benefit: "Immune & antioxidant boost",
+    src: "/Ones%20LIfestyle%20Images/Ingredients/chaga%20mushroom.png",
+  },
+  {
+    name: "Garlic",
+    benefit: "Heart & immune health",
+    src: "/Ones%20LIfestyle%20Images/Ingredients/garlic.png",
+  },
+  {
+    name: "Ginkgo Biloba",
+    benefit: "Brain & circulation support",
+    src: "/Ones%20LIfestyle%20Images/Ingredients/ginko%20biloba.png",
+  },
+  {
+    name: "Hawthorne Berry",
+    benefit: "Cardiovascular support",
+    src: "/Ones%20LIfestyle%20Images/Ingredients/hawthorne%20berry.png",
+  },
+  {
+    name: "Maca Root",
+    benefit: "Energy & hormonal balance",
+    src: "/Ones%20LIfestyle%20Images/Ingredients/maca%20root.png",
+  },
+  {
+    name: "Milk Thistle",
+    benefit: "Liver detox & protection",
+    src: "/Ones%20LIfestyle%20Images/Ingredients/milk%20thistle.png",
+  },
+  {
+    name: "Sage",
+    benefit: "Memory & cognitive clarity",
+    src: "/Ones%20LIfestyle%20Images/Ingredients/sage.png",
+  },
 ];
 
 const ROTATE_INTERVAL = 3500;
 
+// Fisher-Yates shuffle, returns a new array
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export default function LifestyleShowcaseSection() {
   const sectionRef = useRef<HTMLElement>(null);
   const [revealed, setRevealed] = useState(false);
-  const [rotateOffset, setRotateOffset] = useState(0);
-
-  // Visible ingredients: 4 at a time, cycling through all 8
-  const visibleIngredients = Array.from({ length: 4 }, (_, i) =>
-    allIngredients[(rotateOffset + i) % allIngredients.length]
+  const [visibleIngredients, setVisibleIngredients] = useState(() =>
+    shuffleArray(allIngredients).slice(0, 4)
   );
 
   useEffect(() => {
@@ -75,11 +117,19 @@ export default function LifestyleShowcaseSection() {
     return () => observer.disconnect();
   }, []);
 
-  // Rotate one ingredient at a time
+  // Swap all 4 to a new random set each cycle
   useEffect(() => {
     if (!revealed) return;
     const timer = setInterval(() => {
-      setRotateOffset((prev) => (prev + 1) % allIngredients.length);
+      setVisibleIngredients((prev) => {
+        const prevNames = new Set(prev.map((p) => p.name));
+        const remaining = allIngredients.filter((ing) => !prevNames.has(ing.name));
+        // Pick 4 from remaining if possible, otherwise shuffle all
+        if (remaining.length >= 4) {
+          return shuffleArray(remaining).slice(0, 4);
+        }
+        return shuffleArray(allIngredients).slice(0, 4);
+      });
     }, ROTATE_INTERVAL);
     return () => clearInterval(timer);
   }, [revealed]);

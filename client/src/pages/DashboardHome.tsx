@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Progress } from '@/shared/components/ui/progress';
@@ -158,75 +158,74 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Quick Stats — mobile horizontal scroll, desktop grid */}
-      <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory -mx-4 px-4 md:mx-0 md:px-0 md:grid md:grid-cols-3 md:overflow-visible md:pb-0">
+      {/* Quick Stats — stacked on mobile, 3-col grid on desktop */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {/* Profile Completeness — primary action card */}
         <Card
           data-testid="card-profile-completeness"
-          className="min-w-[70%] snap-start md:min-w-0 border-[#054700]/15 bg-gradient-to-br from-[#054700]/[0.03] to-transparent shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer ring-1 ring-[#054700]/[0.06]"
+          className="border-[#054700]/15 bg-gradient-to-br from-[#054700]/[0.03] to-transparent shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer ring-1 ring-[#054700]/[0.06]"
           onClick={() => setShowProfileDialog(true)}
         >
-          <CardHeader className="space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#5a6623]">Profile Completeness</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-semibold text-[#054700] mb-1">
-              {metrics?.profileCompleteness || 0}%
+          <CardContent className="p-4 md:pt-5 md:px-6">
+            <div className="flex items-center justify-between gap-4 md:flex-col md:items-start">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-[#5a6623] mb-1">Profile Completeness</p>
+                <div className="text-2xl md:text-3xl font-semibold text-[#054700]">
+                  {metrics?.profileCompleteness || 0}%
+                </div>
+              </div>
+              <p className="text-xs text-[#5a6623] hidden md:block">
+                {metrics?.nextAction || 'Complete your profile'}
+              </p>
             </div>
-            <p className="text-xs text-[#5a6623]">
-              {metrics?.nextAction || 'Complete your profile'}
-            </p>
-            <Progress value={metrics?.profileCompleteness || 0} className="mt-2 h-1.5 bg-[#054700]/10" />
+            <Progress value={metrics?.profileCompleteness || 0} className="mt-3 h-1.5 bg-[#054700]/10" />
           </CardContent>
         </Card>
 
         {/* Formula Version */}
-        <Card data-testid="card-formula-version" className="min-w-[70%] snap-start md:min-w-0 border-[#054700]/8 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer" onClick={() => navigate(currentFormula ? '/dashboard/formula' : '/dashboard/chat?new=true')}>
-          <CardHeader className="space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#5a6623]">Current Formula</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card data-testid="card-formula-version" className="border-[#054700]/8 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer" onClick={() => navigate(currentFormula ? '/dashboard/formula' : '/dashboard/chat?new=true')}>
+          <CardContent className="p-4 md:pt-5 md:px-6">
             {currentFormula ? (
-              <>
-                <div className="text-3xl font-semibold text-[#054700] mb-1">
-                  {currentFormula.name || `Version ${currentFormula.version}`}
+              <div className="flex items-center justify-between gap-3 md:flex-col md:items-start">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-[#5a6623] mb-1">Current Formula</p>
+                  <p className="text-base md:text-lg font-semibold text-[#054700] truncate">
+                    {currentFormula.name || `Version ${currentFormula.version}`}
+                  </p>
+                  <p className="text-xs text-[#5a6623] mt-0.5">
+                    {currentFormula.name && `v${currentFormula.version} · `}
+                    {currentFormula.bases.length + (currentFormula.additions?.length || 0)} ingredients
+                  </p>
                 </div>
-                <p className="text-xs text-[#5a6623]">
-                  {currentFormula.name && `Version ${currentFormula.version} • `}
-                  {currentFormula.bases.length + (currentFormula.additions?.length || 0)} ingredients
-                </p>
-                <div className="mt-2">
-                  <Badge className="text-xs gap-1 bg-[#054700]/10 text-[#054700] hover:bg-[#054700]/20">
-                    <Shield className="w-3 h-3" />
-                    Active
-                  </Badge>
-                </div>
-              </>
+                <Badge className="text-xs gap-1 bg-[#054700]/10 text-[#054700] hover:bg-[#054700]/20 flex-shrink-0">
+                  <Shield className="w-3 h-3" />
+                  Active
+                </Badge>
+              </div>
             ) : (
-              <>
-                <div className="text-2xl font-semibold mb-1 text-[#5a6623]">
-                  Not created
-                </div>
-                <p className="text-xs text-[#5a6623]">
-                  Start consultation
-                </p>
-              </>
+              <div>
+                <p className="text-xs font-medium text-[#5a6623] mb-1">Current Formula</p>
+                <p className="text-lg font-semibold text-[#5a6623]">Not created</p>
+                <p className="text-xs text-[#5a6623] mt-0.5">Start consultation</p>
+              </div>
             )}
           </CardContent>
         </Card>
 
         {/* Consultations */}
-        <Card data-testid="card-consultations" className="min-w-[70%] snap-start md:min-w-0 border-[#054700]/8 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer" onClick={() => navigate('/dashboard/chat?new=true')}>
-          <CardHeader className="space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#5a6623]">Consultations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-semibold text-[#054700] mb-1">
-              {metrics?.consultationsSessions || 0}
+        <Card data-testid="card-consultations" className="border-[#054700]/8 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer" onClick={() => navigate('/dashboard/chat?new=true')}>
+          <CardContent className="p-4 md:pt-5 md:px-6">
+            <div className="flex items-center justify-between gap-4 md:flex-col md:items-start">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-[#5a6623] mb-1">Consultations</p>
+                <div className="text-2xl md:text-3xl font-semibold text-[#054700]">
+                  {metrics?.consultationsSessions || 0}
+                </div>
+              </div>
+              <p className="text-xs text-[#5a6623] hidden md:block">
+                {(metrics?.consultationsSessions || 0) > 0 ? 'Start new session' : 'Start your first consultation'}
+              </p>
             </div>
-            <p className="text-xs text-[#5a6623]">
-              {(metrics?.consultationsSessions || 0) > 0 ? 'Start new session' : 'Start your first consultation'}
-            </p>
           </CardContent>
         </Card>
       </div>
@@ -355,21 +354,23 @@ export default function HomePage() {
       {currentFormula && (
         <Card data-testid="card-formula-preview" className="border-[#054700]/8 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] transition-all duration-300">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-[#054700]">
-                  <FlaskConical className="w-5 h-5 text-[#054700]" />
-                  {currentFormula.name || `Version ${currentFormula.version}`}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <CardTitle className="flex items-center gap-2 text-[#054700] text-base">
+                  <FlaskConical className="w-4 h-4 text-[#054700] flex-shrink-0" />
+                  <span className="truncate">{currentFormula.name || `Version ${currentFormula.version}`}</span>
                 </CardTitle>
-                <CardDescription className="text-[#5a6623] mt-1">
-                  {currentFormula.name && `Version ${currentFormula.version} • `}
-                  <span data-testid="text-dosage-display">
+                <div className="mt-1.5 space-y-1">
+                  <p className="text-xs text-[#5a6623]">
+                    {currentFormula.name && `Version ${currentFormula.version} · `}
+                    {currentFormula.bases.length + (currentFormula.additions?.length || 0)} ingredients · {currentFormula.totalMg}mg
+                  </p>
+                  <p className="text-xs text-[#5a6623]/70" data-testid="text-dosage-display">
                     {calculateDosage(currentFormula.totalMg, currentFormula.targetCapsules || undefined).display}
-                  </span>
-                  {' '}• {currentFormula.totalMg}mg total
-                </CardDescription>
+                  </p>
+                </div>
               </div>
-              <Button asChild variant="outline" size="sm" className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white rounded-full" data-testid="button-view-full">
+              <Button asChild variant="outline" size="sm" className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white rounded-full flex-shrink-0" data-testid="button-view-full">
                 <Link href="/dashboard/formula">View Full</Link>
               </Button>
             </div>
@@ -422,29 +423,29 @@ export default function HomePage() {
 
       {/* Quick Actions — compact inline bar */}
       {!isNewUser && currentFormula && (
-        <div className="bg-white/50 backdrop-blur-sm rounded-2xl border border-[#054700]/6 shadow-[0_1px_12px_rgba(0,0,0,0.03)] p-1.5 flex gap-1.5">
+        <div className="bg-white/50 backdrop-blur-sm rounded-2xl border border-[#054700]/6 shadow-[0_1px_12px_rgba(0,0,0,0.03)] p-1.5 flex flex-col gap-1.5 md:flex-row">
           <Link href="/dashboard/lab-reports" className="flex-1" data-testid="card-upload-labs">
-            <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-white/80 transition-colors cursor-pointer">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/80 transition-colors cursor-pointer">
               <div className="w-8 h-8 rounded-lg bg-[#054700]/[0.07] flex items-center justify-center flex-shrink-0">
                 <Upload className="w-4 h-4 text-[#054700]" />
               </div>
-              <div className="min-w-0">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[#054700]">Upload Labs</p>
-                <p className="text-xs text-[#5a6623] truncate">Optimize your formula</p>
+                <p className="text-xs text-[#5a6623]">Optimize your formula</p>
               </div>
-              <ArrowRight className="w-3.5 h-3.5 text-[#054700]/30 ml-auto flex-shrink-0" />
+              <ArrowRight className="w-3.5 h-3.5 text-[#054700]/30 flex-shrink-0" />
             </div>
           </Link>
           <Link href="/dashboard/orders" className="flex-1" data-testid="card-view-orders">
-            <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-white/80 transition-colors cursor-pointer">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/80 transition-colors cursor-pointer">
               <div className="w-8 h-8 rounded-lg bg-[#054700]/[0.07] flex items-center justify-center flex-shrink-0">
                 <Package className="w-4 h-4 text-[#054700]" />
               </div>
-              <div className="min-w-0">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[#054700]">Orders</p>
-                <p className="text-xs text-[#5a6623] truncate">Track shipping status</p>
+                <p className="text-xs text-[#5a6623]">Track shipping status</p>
               </div>
-              <ArrowRight className="w-3.5 h-3.5 text-[#054700]/30 ml-auto flex-shrink-0" />
+              <ArrowRight className="w-3.5 h-3.5 text-[#054700]/30 flex-shrink-0" />
             </div>
           </Link>
         </div>

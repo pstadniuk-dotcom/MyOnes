@@ -143,7 +143,7 @@ export default function MembershipPricingSection() {
           {/* ═══ Left — Hero Membership Card ═══ */}
           <div className="bg-white/70 backdrop-blur-sm rounded-3xl overflow-hidden shadow-xl shadow-[#054700]/5 border border-[#054700]/[0.06] flex flex-col">
             {/* Header — green strip with price + urgency */}
-            <div className="bg-[#054700] px-8 md:px-10 py-8">
+            <div className="bg-[#054700] px-5 sm:px-8 md:px-10 py-8">
               <div className="flex items-center justify-between mb-5">
                 <div className="inline-flex items-center gap-2 bg-white/10 px-3.5 py-1.5 rounded-full">
                   <span className="text-sm">🎉</span>
@@ -157,7 +157,7 @@ export default function MembershipPricingSection() {
               </div>
 
               <div className="flex items-baseline gap-2">
-                <span className="text-5xl md:text-6xl font-light text-white tracking-tight">${activeTier.priceMonthly}</span>
+                <span className="text-4xl sm:text-5xl md:text-6xl font-light text-white tracking-tight">${activeTier.priceMonthly}</span>
                 <span className="text-white/50 text-lg">/month forever</span>
               </div>
 
@@ -185,7 +185,7 @@ export default function MembershipPricingSection() {
 
 
             {/* Features — single column, left-aligned */}
-            <div className="px-8 md:px-10 pt-8 pb-6 flex-1 flex items-center">
+            <div className="px-5 sm:px-8 md:px-10 pt-8 pb-6 flex-1 flex items-center">
               <ul className="space-y-4">
                 {[
                   "Unlimited AI health consultations",
@@ -206,7 +206,7 @@ export default function MembershipPricingSection() {
             </div>
 
             {/* CTA */}
-            <div className="px-8 md:px-10 pt-4 pb-8">
+            <div className="px-5 sm:px-8 md:px-10 pt-4 pb-8">
               <Link href={ctaHref}>
                 <Button className="w-full bg-[#054700] hover:bg-[#053600] text-[#ede8e2] py-6 text-lg rounded-full font-medium group">
                   Claim Your {activeTier.name} Spot
@@ -222,7 +222,7 @@ export default function MembershipPricingSection() {
           {/* ═══ Right — Supplement Pricing (Supporting) ═══ */}
           <div className="bg-white/60 backdrop-blur-sm rounded-3xl border border-[#054700]/[0.06] overflow-hidden flex flex-col">
             {/* Header — lighter treatment, not competing */}
-            <div className="px-8 pt-8 pb-6">
+            <div className="px-5 sm:px-8 pt-8 pb-6">
               <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-[#054700]/40 mb-3">
                 Your Supplements
               </p>
@@ -234,10 +234,10 @@ export default function MembershipPricingSection() {
               <p className="text-sm text-[#054700]/40 mt-2">/month based on your formula</p>
             </div>
 
-            <div className="mx-8 border-t border-[#054700]/[0.06]" />
+            <div className="mx-5 sm:mx-8 border-t border-[#054700]/[0.06]" />
 
             {/* Factors — compact */}
-            <div className="px-8 py-6 flex-1">
+            <div className="px-5 sm:px-8 py-6 flex-1">
               <p className="text-sm text-[#054700]/50 mb-5 leading-relaxed">
                 Your cost depends on what your body needs, not what we want to charge you.
               </p>
@@ -257,7 +257,7 @@ export default function MembershipPricingSection() {
             </div>
 
             {/* Bottom note */}
-            <div className="px-8 pb-8">
+            <div className="px-5 sm:px-8 pb-8">
               <div className="bg-[#054700]/[0.04] rounded-xl px-5 py-4 text-center">
                 <p className="text-sm text-[#054700]/60">
                   Typically{" "}

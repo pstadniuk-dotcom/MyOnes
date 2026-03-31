@@ -2091,7 +2091,7 @@ export default function ConsultationPage() {
 
   return (
     // <div className="flex h-full min-h-[calc(100dvh-8rem)] md:min-h-dvh md:max-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary/5 via-background to-secondary/5" data-testid="page-consultation">
-    <div className="rounded-lg overflow-hidden flex flex-row h-[calc(100vh-7.5rem)]" data-testid="page-consultation">
+    <div className="rounded-lg overflow-hidden flex flex-row h-[calc(100dvh-10rem)] md:h-[calc(100vh-7.5rem)]" data-testid="page-consultation">
       {/* History Sidebar - Hidden on mobile, shown on desktop */}
       {showHistory && (
         <div className="hidden md:flex w-80 border-r bg-background/80 backdrop-blur-sm flex-col">
@@ -2218,20 +2218,31 @@ export default function ConsultationPage() {
                   <h1 className="text-lg md:text-xl font-semibold text-[#054700] flex items-center gap-2" data-testid="text-consultation-title">
                     <span className="hidden sm:inline">Ones Consultation</span>
                     <span className="sm:hidden">AI Consultation</span>
+                    {/* Inline indicators — visible on mobile next to title */}
+                    <span className="sm:hidden flex items-center gap-1.5 ml-0.5">
+                      {isConnected && (
+                        <span className="w-1.5 h-1.5 bg-[#054700] rounded-full animate-pulse" />
+                      )}
+                      {hasConnectedWearable && (
+                        <Link href="/wearables">
+                          <Watch className="w-3.5 h-3.5 text-[#054700]/50" />
+                        </Link>
+                      )}
+                    </span>
                   </h1>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs md:text-sm text-[#5a6623] hidden sm:block">Your personalized supplement consultant</p>
+                  <div className="hidden sm:flex items-center gap-2">
+                    <p className="text-xs md:text-sm text-[#5a6623]">Your personalized supplement consultant</p>
                     {isConnected && (
                       <div className="flex items-center gap-1 text-xs text-[#054700]">
                         <div className="w-1.5 h-1.5 bg-[#054700] rounded-full animate-pulse" />
-                        <span className="hidden sm:inline">Live</span>
+                        <span>Live</span>
                       </div>
                     )}
                     {hasConnectedWearable && (
                       <Link href="/wearables">
                         <div className="flex items-center gap-1 text-xs text-[#054700]/70 hover:text-[#054700] transition-colors cursor-pointer" title="Wearable data active — click to manage">
                           <Watch className="w-3 h-3" />
-                          <span className="hidden sm:inline">Wearable</span>
+                          <span>Wearable</span>
                         </div>
                       </Link>
                     )}

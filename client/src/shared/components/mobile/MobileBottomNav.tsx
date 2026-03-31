@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageSquare, FlaskConical, Sparkles, ClipboardList, Menu, Home, User, Settings, FileText, Activity, ChevronUp, X, Watch, LogOut } from 'lucide-react';
+import { MessageSquare, FlaskConical, Sparkles, ClipboardList, Menu, Home, User, Settings, FileText, Activity, ChevronUp, X, Watch, LogOut, Shield } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/shared/lib/utils';
 import {
@@ -56,7 +56,7 @@ function filterByFeature<T extends { requiresFeature: string | null }>(items: T[
 export function MobileBottomNav() {
   const [location, navigate] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   // Filter nav items based on feature flags
@@ -211,6 +211,41 @@ export function MobileBottomNav() {
                 </button>
               );
             })}
+
+            {/* Admin Panel - only for admin users */}
+            {user?.isAdmin && (
+              <button
+                onClick={() => handleMenuItemClick('/admin')}
+                className={cn(
+                  "w-full flex items-center gap-4 p-4 rounded-xl transition-all",
+                  "touch-feedback text-left",
+                  location.startsWith('/admin')
+                    ? "bg-[#054700]/10 text-[#054700]"
+                    : "hover:bg-[#054700]/5 text-[#054700]/80"
+                )}
+              >
+                <div className={cn(
+                  "h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0",
+                  location.startsWith('/admin') ? "bg-[#054700] text-white" : "bg-[#054700]/10 text-[#5a6623]"
+                )}>
+                  <Shield className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={cn(
+                    "font-semibold text-base",
+                    location.startsWith('/admin') && "text-[#054700]"
+                  )}>
+                    Admin Panel
+                  </p>
+                  <p className="text-sm text-[#5a6623] truncate">
+                    Manage users & settings
+                  </p>
+                </div>
+                {location.startsWith('/admin') && (
+                  <div className="h-2 w-2 rounded-full bg-[#054700] flex-shrink-0" />
+                )}
+              </button>
+            )}
 
             {/* Sign Out Button */}
             <button
