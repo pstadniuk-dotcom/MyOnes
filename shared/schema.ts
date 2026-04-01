@@ -261,6 +261,13 @@ export const messages = pgTable("messages", {
   role: messageRoleEnum("role").notNull(),
   content: text("content").notNull(),
   model: text("model"), // Track which AI model responded (gpt-4, gpt-5, etc.)
+  attachments: json("attachments").$type<Array<{
+    id: string;
+    name: string;
+    url?: string;
+    type: string;
+    size: number;
+  }>>(),
   formula: json("formula").$type<{
     bases: Array<{ name: string, dose: string, purpose?: string }>;
     additions: Array<{ name: string, dose: string, purpose?: string }>;

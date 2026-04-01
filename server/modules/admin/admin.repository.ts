@@ -1333,7 +1333,11 @@ export class AdminRepository {
                     name: sessionWithUser.userName,
                     email: sessionWithUser.userEmail
                 },
-                messages: sessionMessages.map(m => ({ ...m, content: decryptMessageContent(m.content) }))
+                messages: sessionMessages.map(m => ({
+                    ...m,
+                    content: decryptMessageContent(m.content),
+                    attachments: Array.isArray((m as any).attachments) ? (m as any).attachments : []
+                }))
             };
         } catch (error) {
             logger.error('Error getting conversation details', { error });

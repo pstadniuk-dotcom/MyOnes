@@ -348,6 +348,7 @@ export class AdminController {
     async getConversationDetails(req: Request, res: Response) {
         try {
             const result = await adminService.getConversationDetails(req.params.sessionId);
+             console.log('res................................',result)
             if (!result) {
                 return res.status(404).json({ error: 'Conversation not found' });
             }

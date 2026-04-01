@@ -131,6 +131,15 @@ export class ChatController {
                 sessionId: chatSession.id,
                 role: 'user',
                 content: message,
+                attachments: Array.isArray(files) && files.length > 0
+                    ? files.map((file: any) => ({
+                        id: file.id,
+                        name: file.name,
+                        url: file.url,
+                        type: file.type,
+                        size: file.size
+                    }))
+                    : undefined,
                 model: null,
                 formula: undefined
             });

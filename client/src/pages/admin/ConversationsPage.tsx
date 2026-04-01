@@ -27,6 +27,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Minus,
+  Paperclip,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -56,6 +57,13 @@ interface ConversationMessage {
   content: string;
   model?: string;
   formula?: object;
+  attachments?: Array<{
+    id: string;
+    name: string;
+    url?: string;
+    type: string;
+    size: number;
+  }>;
   createdAt: string;
 }
 
@@ -112,6 +120,8 @@ function BrowseTab() {
     },
     enabled: !!selectedConversation
   });
+
+  console.log('conversationDetails', conversationDetails);
 
   const filtered = useMemo(() => {
     let list = conversationsData?.conversations || [];
@@ -247,6 +257,22 @@ function BrowseTab() {
                         <div className={cn('text-sm text-gray-700 whitespace-pre-wrap rounded-lg p-3', isUser ? 'bg-[#054700]/5' : 'bg-gray-50')}>
                           {isLong && !isExpanded ? message.content.slice(0, 400) + '...' : message.content}
                         </div>
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            {message.attachments.map((attachment) => (
+                              <div
+                                key={attachment.id}
+                                className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600"
+                              >
+                                <Paperclip className="h-3.5 w-3.5 text-gray-400" />
+                                <span className="truncate font-medium text-gray-700">{attachment.name}</span>
+                                <span className="text-gray-400">
+                                  {attachment.size ? `(${Math.round(attachment.size / 1024)} KB)` : ''}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {isLong && (
                           <button onClick={() => toggleMessage(message.id)} className="text-xs text-[#054700] hover:underline mt-1 flex items-center gap-1">
                             {isExpanded ? <><ChevronUp className="h-3 w-3" /> Show less</> : <><ChevronDown className="h-3 w-3" /> Show more</>}
