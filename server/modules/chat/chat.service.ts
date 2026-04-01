@@ -309,6 +309,8 @@ export class ChatService {
                 sender: msg.role === 'assistant' ? 'ai' : 'user',
                 timestamp: msg.createdAt,
                 sessionId: msg.sessionId,
+                fileAttachment: Array.isArray(msg.attachments) && msg.attachments.length > 0 ? msg.attachments[0] : undefined,
+                fileAttachments: Array.isArray(msg.attachments) ? msg.attachments : undefined,
                 formula: msg.formula || undefined
             }));
         });
@@ -354,6 +356,8 @@ export class ChatService {
                 sender: msg.role === 'assistant' ? 'ai' : 'user',
                 timestamp: msg.createdAt,
                 sessionId: msg.sessionId,
+                fileAttachment: Array.isArray(msg.attachments) && msg.attachments.length > 0 ? msg.attachments[0] : undefined,
+                fileAttachments: Array.isArray(msg.attachments) ? msg.attachments : undefined,
                 formula: msg.formula || undefined
             }))
         };
