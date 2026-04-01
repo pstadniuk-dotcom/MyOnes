@@ -30,7 +30,27 @@ export function DateRangePicker({
   fromYear = 2020,
   toYear = new Date().getFullYear()
 }: DateRangePickerProps) {
+  
   const [open, setOpen] = React.useState(false);
+
+  const [fromMonth, setFromMonth] = React.useState<Date>(value.from);
+const [toMonth, setToMonth] = React.useState<Date>(value.to);
+
+// keep fromMonth always behind toMonth
+const handleFromMonthChange = (month: Date) => {
+  setFromMonth(month);
+  // if user pushes from-month past to-month, nudge to-month forward
+  if (month >= toMonth) {
+    setToMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1));
+  }
+};
+
+const handleToMonthChange = (month: Date) => {
+  setToMonth(month);
+  if (month <= fromMonth) {
+    setFromMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1));
+  }
+};
 
   const handlePreset = (preset: typeof presets[number]) => {
     const to = new Date();
@@ -44,6 +64,7 @@ export function DateRangePicker({
   };
 
   const handleCalendarSelect = (range: DateRange | undefined) => {
+    console.log('hit', range)
     if (range?.from && range?.to) {
       const from = new Date(range.from);
       from.setHours(0, 0, 0, 0);
@@ -83,7 +104,7 @@ export function DateRangePicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
-          <Calendar
+          {/* <Calendar
             mode="range"
             selected={{ from: value.from, to: value.to }}
             onSelect={handleCalendarSelect}
@@ -93,6 +114,34 @@ export function DateRangePicker({
             fromYear={fromYear}
             toYear={toYear}
           />
+           */}
+           <div className="flex divide-x">
+  <Calendar
+    mode="range"
+    selected={{ from: value.from, to: value.to }}
+    onSelect={handleCalendarSelect}
+    numberOfMonths={1}
+    month={fromMonth}
+    onMonthChange={handleFromMonthChange}
+    disabled={{ after: new Date() }}
+    captionLayout="dropdown-buttons"
+    fromYear={fromYear}
+    toYear={toYear}
+  />
+  <Calendar
+    mode="range"
+    selected={{ from: value.from, to: value.to }}
+    onSelect={handleCalendarSelect}
+    numberOfMonths={1}
+    month={toMonth}
+    onMonthChange={handleToMonthChange}
+    disabled={{ after: new Date() }}
+    captionLayout="dropdown-buttons"
+    fromYear={fromYear}
+    toYear={toYear}
+  />
+</div>
+
         </PopoverContent>
       </Popover>
     </div>

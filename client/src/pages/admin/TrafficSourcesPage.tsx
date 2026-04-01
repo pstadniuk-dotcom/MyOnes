@@ -106,6 +106,7 @@ export default function TrafficSourcesPage() {
   const [newCampaign, setNewCampaign] = useState({ name: '', channel: 'email', utmCampaign: '', status: 'draft', notes: '' });
 
   const days = Math.max(1, Math.round((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)));
+  console.log('checking', days, dateRange.to, dateRange.from)
   const now = new Date();
   const isTodayLabel = days === 1 && isSameDay(dateRange.to, now);
   const rangeLabel = isTodayLabel ? 'Today' : `Last ${days} ${days === 1 ? 'day' : 'days'}`;
