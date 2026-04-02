@@ -787,12 +787,12 @@ Return ONLY valid JSON.`;
     }
 
     // Traffic & Attribution
-    async getTrafficSources(days?: number) {
-        return await adminRepository.getTrafficSourceBreakdown(days);
+    async getTrafficSources(days?: number, startDate?: Date, endDate?: Date) {
+        return await adminRepository.getTrafficSourceBreakdown(days, startDate, endDate);
     }
 
-    async getUtmCampaigns(days?: number) {
-        return await adminRepository.getUtmCampaignBreakdown(days);
+    async getUtmCampaigns(days?: number, startDate?: Date, endDate?: Date) {
+        return await adminRepository.getUtmCampaignBreakdown(days, startDate, endDate);
     }
 
     async getReferralStats() {
