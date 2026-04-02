@@ -711,8 +711,13 @@ export class AdminController {
     async listFaqItems(req: Request, res: Response) {
         try {
             const category = req.query.category as string | undefined;
-            // Admin sees all FAQ items including unpublished
-            const items = await supportRepository.listFaqItems(category);
+            const requestedStatus = req.query.status as string | undefined;
+            const status = requestedStatus === 'published' || requestedStatus === 'deleted' || requestedStatus === 'all'
+                ? requestedStatus
+                : 'all';
+
+            // Admin sees all non-deleted items by default, and can explicitly filter status.
+            const items = await supportRepository.listFaqItems(category, { includeUnpublished: true, status });
             res.json(items);
         } catch (error) {
             logger.error('Error fetching FAQ items', { error });
@@ -764,10 +769,22 @@ export class AdminController {
             const deleted = await supportRepository.deleteFaqItem(req.params.id);
             if (!deleted) return res.status(404).json({ error: 'FAQ item not found' });
             await logAdminAction(req, 'faq_delete', 'faq', req.params.id);
-            res.json({ success: true });
+            res.json({ success: true, softDeleted: true });
         } catch (error) {
             logger.error('Error deleting FAQ item', { error });
             res.status(500).json({ error: 'Failed to delete FAQ item' });
+        }
+    }
+
+    async restoreFaqItem(req: Request, res: Response) {
+        try {
+            const item = await supportRepository.restoreFaqItem(req.params.id);
+            if (!item) return res.status(404).json({ error: 'FAQ item not found' });
+            await logAdminAction(req, 'faq_update', 'faq', req.params.id, { restored: true });
+            res.json(item);
+        } catch (error) {
+            logger.error('Error restoring FAQ item', { error });
+            res.status(500).json({ error: 'Failed to restore FAQ item' });
         }
     }
 
@@ -776,7 +793,12 @@ export class AdminController {
     async listHelpArticles(req: Request, res: Response) {
         try {
             const category = req.query.category as string | undefined;
-            const articles = await supportRepository.listHelpArticles(category);
+            const requestedStatus = req.query.status as string | undefined;
+            const status = requestedStatus === 'published' || requestedStatus === 'deleted' || requestedStatus === 'all'
+                ? requestedStatus
+                : 'all';
+
+            const articles = await supportRepository.listHelpArticles(category, { includeUnpublished: true, status });
             res.json(articles);
         } catch (error) {
             logger.error('Error fetching help articles', { error });
@@ -828,10 +850,22 @@ export class AdminController {
             const deleted = await supportRepository.deleteHelpArticle(req.params.id);
             if (!deleted) return res.status(404).json({ error: 'Help article not found' });
             await logAdminAction(req, 'help_article_delete', 'help_article', req.params.id);
-            res.json({ success: true });
+            res.json({ success: true, softDeleted: true });
         } catch (error) {
             logger.error('Error deleting help article', { error });
             res.status(500).json({ error: 'Failed to delete help article' });
+        }
+    }
+
+    async restoreHelpArticle(req: Request, res: Response) {
+        try {
+            const article = await supportRepository.restoreHelpArticle(req.params.id);
+            if (!article) return res.status(404).json({ error: 'Help article not found' });
+            await logAdminAction(req, 'help_article_update', 'help_article', req.params.id, { restored: true });
+            res.json(article);
+        } catch (error) {
+            logger.error('Error restoring help article', { error });
+            res.status(500).json({ error: 'Failed to restore help article' });
         }
     }
 

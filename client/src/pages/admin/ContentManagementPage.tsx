@@ -12,7 +12,7 @@ import { apiRequest } from '@/shared/lib/queryClient';
 import { useState } from 'react';
 import {
   HelpCircle, BookOpen, Plus, Pencil, Trash2, Loader2, Eye, EyeOff, GripVertical,
-  AlertTriangle,
+  AlertTriangle, RotateCcw,
 } from 'lucide-react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -30,6 +30,8 @@ interface FaqItem {
   question: string;
   answer: string;
   isPublished: boolean;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
   displayOrder: number;
   createdAt: string;
 }
@@ -40,12 +42,15 @@ interface HelpArticle {
   title: string;
   content: string;
   isPublished: boolean;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
   viewCount: number;
   displayOrder: number;
   createdAt: string;
 }
 
 type EditMode = 'list' | 'create' | 'edit';
+type ContentStatusFilter = 'all' | 'published' | 'deleted';
 
 const FAQ_CATEGORIES = ['general', 'supplements', 'ordering', 'shipping', 'billing', 'account', 'safety', 'ingredients'];
 const ARTICLE_CATEGORIES = ['getting-started', 'supplements', 'account', 'billing', 'integrations', 'privacy', 'troubleshooting'];
@@ -55,11 +60,15 @@ function FaqManager() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<EditMode>('list');
   const [editingItem, setEditingItem] = useState<FaqItem | null>(null);
+  const [statusFilter, setStatusFilter] = useState<ContentStatusFilter>('all');
   const [form, setForm] = useState({ category: 'general', question: '', answer: '', isPublished: true, displayOrder: 0 });
 
   const { data: items, isLoading } = useQuery<FaqItem[]>({
-    queryKey: ['/api/admin/faq'],
-    queryFn: async () => { const res = await apiRequest('GET', '/api/admin/faq'); return res.json(); },
+    queryKey: ['/api/admin/faq', statusFilter],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/admin/faq?status=${statusFilter}`);
+      return res.json();
+    },
   });
 
   const createMutation = useMutation({
@@ -98,8 +107,20 @@ function FaqManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/faq'] });
-      toast({ title: 'FAQ Deleted' });
+      toast({ title: 'FAQ moved to deleted' });
     },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('POST', `/api/admin/faq/${id}/restore`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/faq'] });
+      toast({ title: 'FAQ restored' });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to restore FAQ', variant: 'destructive' }),
   });
 
   const resetForm = () => setForm({ category: 'general', question: '', answer: '', isPublished: true, displayOrder: 0 });
@@ -169,11 +190,22 @@ function FaqManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-3 flex-wrap">
         <p className="text-sm text-slate-500">{items?.length || 0} FAQ items</p>
-        <Button onClick={() => { resetForm(); setMode('create'); }}>
-          <Plus className="h-4 w-4 mr-2" /> Add FAQ
-        </Button>
+        <div className="flex items-center gap-2">
+          <select
+            className="px-3 py-2 border rounded-md text-sm"
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as ContentStatusFilter)}
+          >
+            <option value="all">All</option>
+            <option value="published">Published</option>
+            <option value="deleted">Deleted</option>
+          </select>
+          <Button onClick={() => { resetForm(); setMode('create'); }}>
+            <Plus className="h-4 w-4 mr-2" /> Add FAQ
+          </Button>
+        </div>
       </div>
       <Table>
         <TableHeader>
@@ -195,7 +227,9 @@ function FaqManager() {
               </TableCell>
               <TableCell><Badge variant="outline">{item.category}</Badge></TableCell>
               <TableCell>
-                {item.isPublished ? (
+                {item.isDeleted ? (
+                  <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" /> Deleted</Badge>
+                ) : item.isPublished ? (
                   <Badge className="bg-emerald-100 text-emerald-700"><Eye className="h-3 w-3 mr-1" /> Published</Badge>
                 ) : (
                   <Badge variant="secondary"><EyeOff className="h-3 w-3 mr-1" /> Draft</Badge>
@@ -203,26 +237,39 @@ function FaqManager() {
               </TableCell>
               <TableCell>
                 <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => startEdit(item)}>
+                  <Button size="sm" variant="ghost" onClick={() => startEdit(item)} disabled={!!item.isDeleted}>
                     <Pencil className="h-3 w-3" />
                   </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="ghost" className="text-destructive">
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete FAQ?</AlertDialogTitle>
-                        <AlertDialogDescription>This will permanently delete this FAQ item.</AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => deleteMutation.mutate(item.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  {item.isDeleted ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-emerald-600 hover:text-emerald-700"
+                      disabled={restoreMutation.isPending}
+                      onClick={() => restoreMutation.mutate(item.id)}
+                      title="Restore"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                  ) : (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="ghost" className="text-destructive">
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete FAQ?</AlertDialogTitle>
+                          <AlertDialogDescription>This will move this FAQ item to Deleted status.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteMutation.mutate(item.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
@@ -245,11 +292,15 @@ function HelpArticleManager() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<EditMode>('list');
   const [editingItem, setEditingItem] = useState<HelpArticle | null>(null);
+  const [statusFilter, setStatusFilter] = useState<ContentStatusFilter>('all');
   const [form, setForm] = useState({ category: 'getting-started', title: '', content: '', isPublished: true, displayOrder: 0 });
 
   const { data: articles, isLoading } = useQuery<HelpArticle[]>({
-    queryKey: ['/api/admin/help-articles'],
-    queryFn: async () => { const res = await apiRequest('GET', '/api/admin/help-articles'); return res.json(); },
+    queryKey: ['/api/admin/help-articles', statusFilter],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/admin/help-articles?status=${statusFilter}`);
+      return res.json();
+    },
   });
 
   const createMutation = useMutation({
@@ -288,8 +339,20 @@ function HelpArticleManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/help-articles'] });
-      toast({ title: 'Article Deleted' });
+      toast({ title: 'Article moved to deleted' });
     },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('POST', `/api/admin/help-articles/${id}/restore`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/help-articles'] });
+      toast({ title: 'Article restored' });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to restore article', variant: 'destructive' }),
   });
 
   const resetForm = () => setForm({ category: 'getting-started', title: '', content: '', isPublished: true, displayOrder: 0 });
@@ -360,11 +423,22 @@ function HelpArticleManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-3 flex-wrap">
         <p className="text-sm text-slate-500">{articles?.length || 0} help articles</p>
-        <Button onClick={() => { resetForm(); setMode('create'); }}>
-          <Plus className="h-4 w-4 mr-2" /> Add Article
-        </Button>
+        <div className="flex items-center gap-2">
+          <select
+            className="px-3 py-2 border rounded-md text-sm"
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as ContentStatusFilter)}
+          >
+            <option value="all">All</option>
+            <option value="published">Published</option>
+            <option value="deleted">Deleted</option>
+          </select>
+          <Button onClick={() => { resetForm(); setMode('create'); }}>
+            <Plus className="h-4 w-4 mr-2" /> Add Article
+          </Button>
+        </div>
       </div>
       <Table>
         <TableHeader>
@@ -388,7 +462,9 @@ function HelpArticleManager() {
               <TableCell><Badge variant="outline">{article.category}</Badge></TableCell>
               <TableCell>{article.viewCount}</TableCell>
               <TableCell>
-                {article.isPublished ? (
+                {article.isDeleted ? (
+                  <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" /> Deleted</Badge>
+                ) : article.isPublished ? (
                   <Badge className="bg-emerald-100 text-emerald-700"><Eye className="h-3 w-3 mr-1" /> Published</Badge>
                 ) : (
                   <Badge variant="secondary"><EyeOff className="h-3 w-3 mr-1" /> Draft</Badge>
@@ -396,26 +472,39 @@ function HelpArticleManager() {
               </TableCell>
               <TableCell>
                 <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => startEdit(article)}>
+                  <Button size="sm" variant="ghost" onClick={() => startEdit(article)} disabled={!!article.isDeleted}>
                     <Pencil className="h-3 w-3" />
                   </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="ghost" className="text-destructive">
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Article?</AlertDialogTitle>
-                        <AlertDialogDescription>This will permanently delete this help article.</AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => deleteMutation.mutate(article.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  {article.isDeleted ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-emerald-600 hover:text-emerald-700"
+                      disabled={restoreMutation.isPending}
+                      onClick={() => restoreMutation.mutate(article.id)}
+                      title="Restore"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                  ) : (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="ghost" className="text-destructive">
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Article?</AlertDialogTitle>
+                          <AlertDialogDescription>This will move this help article to Deleted status.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteMutation.mutate(article.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
