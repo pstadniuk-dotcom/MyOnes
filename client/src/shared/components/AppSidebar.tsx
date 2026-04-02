@@ -50,7 +50,7 @@ const healthJourneyItems = [
   },
   {
     title: 'Consultation',
-    url: '/dashboard/chat?new=true',
+    url: '/dashboard/chat',
     icon: MessageSquare,
   },
   {
