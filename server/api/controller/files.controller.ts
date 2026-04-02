@@ -3,6 +3,32 @@ import { filesService } from '../../modules/files/files.service';
 import logger from '../../infra/logging/logger';
 
 export class FilesController {
+    async previewFile(req: Request, res: Response) {
+        try {
+            const auditInfo = {
+                ipAddress: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+                userAgent: req.headers['user-agent']
+            };
+            const result = await filesService.downloadFile(req.params.fileId, req.userId!, auditInfo);
+            res.setHeader('Content-Type', result.mimeType);
+            res.setHeader('Content-Disposition', `inline; filename="${result.originalFileName}"`);
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            res.send(result.buffer);
+        } catch (error) {
+            logger.error('File preview error:', error);
+            const message = error instanceof Error ? error.message : 'Failed to preview file';
+            if (message === 'File not found') {
+                res.status(404).json({ error: message });
+            } else if (message === 'Access denied') {
+                res.status(403).json({ error: message });
+            } else {
+                res.status(500).json({ error: message });
+            }
+        }
+    }
+
     async downloadFile(req: Request, res: Response) {
         try {
             const auditInfo = {

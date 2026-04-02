@@ -121,6 +121,7 @@ interface Message {
     url: string;
     type: 'lab_report' | 'medical_document' | 'prescription' | 'other';
     size: number;
+    mimeType?: string;
   };
   fileAttachments?: {
     id: string;
@@ -128,6 +129,7 @@ interface Message {
     url: string;
     type: 'lab_report' | 'medical_document' | 'prescription' | 'other';
     size: number;
+    mimeType?: string;
   }[];
   formula?: {
     bases: { name: string; dose: string; purpose: string }[];
@@ -205,7 +207,32 @@ interface UploadedFile {
   type: string;
   size: number;
   uploadedAt: Date;
+  mimeType?: string;
 }
+
+const normalizeAttachment = (attachment: any) => {
+  if (!attachment || typeof attachment !== 'object') return undefined;
+
+  const id = attachment.id || attachment.fileId;
+  const name = attachment.name || attachment.fileName || attachment.originalFileName;
+  const url = attachment.url || attachment.objectPath;
+  const type = attachment.type || 'other';
+  const size = typeof attachment.size === 'number'
+    ? attachment.size
+    : (typeof attachment.fileSize === 'number' ? attachment.fileSize : 0);
+  const mimeType = typeof attachment.mimeType === 'string' ? attachment.mimeType : undefined;
+
+  if (!name) return undefined;
+
+  return {
+    id,
+    name,
+    url,
+    type,
+    size,
+    mimeType,
+  };
+};
 
 interface SuggestedPrompt {
   id: string;
@@ -255,7 +282,7 @@ export default function ConsultationPage() {
   const [editingContent, setEditingContent] = useState('');
 
   // File preview state (for opening uploaded PDFs/images in a popup)
-  const [previewFile, setPreviewFile] = useState<{ id: string; name: string; type: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ id?: string; name: string; type: string; url?: string; previewUrl?: string } | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
@@ -414,6 +441,7 @@ export default function ConsultationPage() {
       if (!activeSessionId) return false;
 
       const sessionMessages = data.messages[activeSessionId] || [];
+    
       if (sessionMessages.length === 0) {
         // Session exists but has no messages loaded yet; keep polling briefly.
         return 2000;
@@ -540,10 +568,16 @@ export default function ConsultationPage() {
               sender = msg.role === 'assistant' ? 'ai' : msg.role === 'user' ? 'user' : msg.role === 'system' ? 'system' : 'ai';
             }
 
+            const normalizedAttachments = Array.isArray(msg.fileAttachments)
+              ? msg.fileAttachments.map((a: any) => normalizeAttachment(a)).filter(Boolean)
+              : (msg.fileAttachment ? [normalizeAttachment(msg.fileAttachment)].filter(Boolean) : []);
+
             return {
               ...msg,
               sender,
-              timestamp: new Date(msg.timestamp)
+              timestamp: new Date(msg.timestamp),
+              fileAttachment: normalizedAttachments.length > 0 ? normalizedAttachments[0] as any : undefined,
+              fileAttachments: normalizedAttachments.length > 0 ? normalizedAttachments as any : undefined,
             };
           });
 
@@ -590,10 +624,16 @@ export default function ConsultationPage() {
         sender = msg.role === 'assistant' ? 'ai' : msg.role === 'user' ? 'user' : msg.role === 'system' ? 'system' : 'ai';
       }
 
+      const normalizedAttachments = Array.isArray(msg.fileAttachments)
+        ? msg.fileAttachments.map((a: any) => normalizeAttachment(a)).filter(Boolean)
+        : (msg.fileAttachment ? [normalizeAttachment(msg.fileAttachment)].filter(Boolean) : []);
+
       return {
         ...msg,
         sender,
-        timestamp: new Date(msg.timestamp)
+        timestamp: new Date(msg.timestamp),
+        fileAttachment: normalizedAttachments.length > 0 ? normalizedAttachments[0] as any : undefined,
+        fileAttachments: normalizedAttachments.length > 0 ? normalizedAttachments as any : undefined,
       };
     });
 
@@ -946,7 +986,8 @@ export default function ConsultationPage() {
         name: attachedFiles[0].name,
         url: attachedFiles[0].url,
         type: attachedFiles[0].type as any,
-        size: attachedFiles[0].size
+        size: attachedFiles[0].size,
+        mimeType: attachedFiles[0].mimeType,
       } : undefined,
       fileAttachments: attachedFiles && attachedFiles.length > 0
         ? attachedFiles.map(f => ({
@@ -954,7 +995,8 @@ export default function ConsultationPage() {
             name: f.name,
             url: f.url,
             type: f.type as any,
-            size: f.size
+            size: f.size,
+            mimeType: f.mimeType,
           }))
         : undefined
     };
@@ -1004,7 +1046,8 @@ export default function ConsultationPage() {
           name: file.name,
           url: file.url,
           type: file.type,
-          size: file.size
+          size: file.size,
+          mimeType: file.mimeType,
         })) || []
       };
 
@@ -1364,7 +1407,8 @@ export default function ConsultationPage() {
           url: uploadResult.url,
           type: file.type,
           size: file.size,
-          uploadedAt: new Date()
+          uploadedAt: new Date(),
+          mimeType: uploadResult.mimeType || file.type,
         };
 
         newUploadedFiles.push(uploadedFile);
@@ -1465,10 +1509,16 @@ export default function ConsultationPage() {
           sender = msg.role === 'assistant' ? 'ai' : msg.role === 'user' ? 'user' : msg.role === 'system' ? 'system' : 'ai';
         }
 
+        const normalizedAttachments = Array.isArray(msg.fileAttachments)
+          ? msg.fileAttachments.map((a: any) => normalizeAttachment(a)).filter(Boolean)
+          : (msg.fileAttachment ? [normalizeAttachment(msg.fileAttachment)].filter(Boolean) : []);
+
         return {
           ...msg,
           sender,
-          timestamp: new Date(msg.timestamp)
+          timestamp: new Date(msg.timestamp),
+          fileAttachment: normalizedAttachments.length > 0 ? normalizedAttachments[0] as any : undefined,
+          fileAttachments: normalizedAttachments.length > 0 ? normalizedAttachments as any : undefined,
         };
       });
 
@@ -1662,18 +1712,63 @@ export default function ConsultationPage() {
   }, []);
 
   // Open file preview popup — fetches the file from the server and displays in a dialog
-  const handlePreviewFile = useCallback(async (file: { id: string; name: string; type: string }) => {
+  const handlePreviewFile = useCallback(async (file: { id?: string; name: string; type: string; url?: string }) => {
     // Clean up previous blob URL
     if (previewBlobUrl) {
       URL.revokeObjectURL(previewBlobUrl);
       setPreviewBlobUrl(null);
     }
 
-    setPreviewFile(file);
+    const inferredMimeType =
+      file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf')
+        ? 'application/pdf'
+        : file.type;
+
+    setPreviewFile({
+      ...file,
+      type: inferredMimeType,
+      previewUrl: file.id ? buildApiUrl(`/api/files/${file.id}/preview`) : undefined,
+    });
     setPreviewLoading(true);
 
     try {
-      const response = await fetch(buildApiUrl(`/api/files/${file.id}/download`), {
+      let resolvedFileId = file.id;
+
+      if (!resolvedFileId && user?.id) {
+        try {
+          const listResponse = await fetch(buildApiUrl(`/api/files/user/${user.id}/all`), {
+            headers: getAuthHeaders(),
+            credentials: 'include'
+          });
+
+          if (listResponse.ok) {
+            const userFiles = await listResponse.json();
+            const matched = Array.isArray(userFiles)
+              ? userFiles.find((f: any) => {
+                  const sameName = (f.originalFileName || f.name) === file.name;
+                  return sameName;
+                })
+              : null;
+
+            if (matched?.id) {
+              resolvedFileId = matched.id;
+              setPreviewFile(prev => prev ? { ...prev, id: matched.id, previewUrl: buildApiUrl(`/api/files/${matched.id}/preview`) } : prev);
+            }
+          }
+        } catch (resolveError) {
+          console.warn('Could not resolve missing file ID for preview', resolveError);
+        }
+      }
+
+      const previewUrl = resolvedFileId
+        ? buildApiUrl(`/api/files/${resolvedFileId}/preview`)
+        : file.url;
+
+      if (!previewUrl) {
+        throw new Error('No file source available for preview');
+      }
+
+      const response = await fetch(previewUrl, {
         headers: getAuthHeaders(),
         credentials: 'include'
       });
@@ -1682,6 +1777,11 @@ export default function ConsultationPage() {
 
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
+      const resolvedType = blob.type && blob.type !== 'application/octet-stream'
+        ? blob.type
+        : file.type;
+
+      setPreviewFile(prev => prev ? { ...prev, type: resolvedType } : { ...file, type: resolvedType });
       setPreviewBlobUrl(blobUrl);
     } catch (error) {
       console.error('File preview error:', error);
@@ -1694,7 +1794,7 @@ export default function ConsultationPage() {
     } finally {
       setPreviewLoading(false);
     }
-  }, [previewBlobUrl, toast]);
+  }, [previewBlobUrl, toast, user?.id]);
 
   // Close file preview and clean up blob URL
   const handleClosePreview = useCallback(() => {
@@ -2508,7 +2608,7 @@ export default function ConsultationPage() {
                             {message.fileAttachments.map((file, idx) => (
                               <button
                                 key={idx}
-                                onClick={() => handlePreviewFile({ id: file.id, name: file.name, type: file.type })}
+                                onClick={() => handlePreviewFile({ id: file.id, name: file.name, type: file.type, url: file.url })}
                                 className="w-full p-3 bg-muted/30 rounded border-dashed border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer text-left group"
                               >
                                 <div className="flex items-center gap-2">
@@ -2526,7 +2626,7 @@ export default function ConsultationPage() {
                           </div>
                         ) : message.fileAttachment && (
                           <button
-                            onClick={() => handlePreviewFile({ id: message.fileAttachment!.id, name: message.fileAttachment!.name, type: message.fileAttachment!.type })}
+                            onClick={() => handlePreviewFile({ id: message.fileAttachment!.id, name: message.fileAttachment!.name, type: message.fileAttachment!.type, url: message.fileAttachment!.url })}
                             className="w-full mt-3 p-3 bg-muted/30 rounded border-dashed border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer text-left group"
                           >
                             <div className="flex items-center gap-2">
@@ -2886,9 +2986,10 @@ export default function ConsultationPage() {
             ) : previewBlobUrl ? (
               previewFile?.type === 'application/pdf' || previewFile?.name?.toLowerCase().endsWith('.pdf') ? (
                 <iframe
+                  key={previewBlobUrl}
                   src={previewBlobUrl}
-                  className="w-full h-full border-0"
                   title={`Preview: ${previewFile?.name}`}
+                  className="w-full h-full min-h-[72vh] border-0"
                 />
               ) : previewFile?.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(previewFile?.name || '') ? (
                 <div className="flex items-center justify-center h-full p-4">

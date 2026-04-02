@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/middleware';
 
 const router = Router();
 
+router.get('/:fileId/preview', requireAuth, filesController.previewFile);
 router.get('/:fileId/download', requireAuth, filesController.downloadFile);
 router.get('/user/:userId/:type', requireAuth, filesController.getUserFiles);
 router.post('/upload', requireAuth, filesController.uploadFile);
