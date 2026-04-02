@@ -162,7 +162,12 @@ export default function AIUsagePage() {
             <p className="text-sm text-muted-foreground">Monitor API spending per user, model, and feature</p>
           </div>
         </div>
-        <DateRangePicker value={dateRange} onChange={setDateRange} />
+        <DateRangePicker
+          value={dateRange}
+          onChange={setDateRange}
+          requireConfirm
+          confirmLabel="Apply"
+        />
       </div>
 
       {isLoading ? (
