@@ -133,7 +133,7 @@ export function DateRangePicker({
             (value.from.getMonth() === 0 && value.from.getDate() === 1) ? 'bg-[#054700] text-primary-foreground hover:bg-[#054700]/90 border-transparent' : ''
           )}
         >
-          <SelectValue placeholder="Year" />
+          <SelectValue placeholder="YTD" />
         </SelectTrigger>
         <SelectContent>
           {Array.from({ length: new Date().getFullYear() - fromYear + 1 }, (_, i) => new Date().getFullYear() - i).map((year) => (
