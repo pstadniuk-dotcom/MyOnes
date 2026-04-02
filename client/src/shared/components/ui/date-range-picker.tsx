@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { CalendarIcon } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { differenceInCalendarDays, endOfDay, format, startOfDay, subDays } from 'date-fns';
 import { Button } from '@/shared/components/ui/button';
 import { Calendar } from '@/shared/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/components/ui/popover';
@@ -82,8 +82,8 @@ export function DateRangePicker({
   };
 
   const handlePreset = (preset: typeof presets[number]) => {
-    const to = new Date();
-    const from = subDays(to, preset.days);
+    const to = endOfDay(new Date());
+    const from = startOfDay(subDays(to, preset.days - 1));
     onChange({ from, to });
   };
 
@@ -99,12 +99,12 @@ export function DateRangePicker({
   const selectedRange = requireConfirm ? draftRange : { from: value.from, to: value.to };
   const canConfirm = Boolean(draftRange?.from && draftRange?.to);
 
-  const daysDiff = Math.round((value.to.getTime() - value.from.getTime()) / (1000 * 60 * 60 * 24));
+  const selectedDays = Math.max(1, differenceInCalendarDays(value.to, value.from) + 1);
 
   return (
     <div className={cn('flex items-center gap-1.5', className)}>
       {presets.map((preset) => {
-        const isActive = daysDiff === preset.days;
+        const isActive = selectedDays === preset.days;
         return (
           <Button
             key={preset.label}
@@ -122,8 +122,8 @@ export function DateRangePicker({
         value={value.from.getMonth() === 0 && value.from.getDate() === 1 ? value.from.getFullYear().toString() : undefined}
         onValueChange={(yearStr) => {
           const year = parseInt(yearStr, 10);
-          const to = new Date();
-          const from = new Date(year, 0, 1);
+          const to = endOfDay(new Date());
+          const from = startOfDay(new Date(year, 0, 1));
           onChange({ from, to });
         }}
       >
@@ -179,10 +179,7 @@ export function DateRangePicker({
             />
           </div>
           {requireConfirm && (
-            <div className="flex items-center justify-between border-t px-3 py-2">
-              <p className="text-xs text-muted-foreground">
-                {canConfirm ? 'Confirm this range to update data.' : 'Select both dates to continue.'}
-              </p>
+            <div className="flex items-center justify-end border-t px-3 py-2">
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"

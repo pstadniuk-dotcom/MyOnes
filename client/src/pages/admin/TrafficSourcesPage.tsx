@@ -109,10 +109,23 @@ export default function TrafficSourcesPage() {
   const startDateParam = formatISO(dateRange.from);
   const endDateParam = formatISO(dateRange.to);
   const now = new Date();
+  const endsToday = isSameDay(dateRange.to, now);
   const isTodayLabel = days === 1 && isSameDay(dateRange.to, now);
+  const isPresetTodayRange = endsToday && days === 1;
+  const isPreset7dRange = endsToday && days === 7;
+  const isPreset30dRange = endsToday && days === 30;
+  const isPreset90dRange = endsToday && days === 90;
+  const isYtdRange =
+    endsToday &&
+    dateRange.from.getMonth() === 0 &&
+    dateRange.from.getDate() === 1;
   const rangeLabel = isTodayLabel
     ? 'Today'
     : `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
+  const signupsByChannelLabel =
+    (isPresetTodayRange || isPreset7dRange || isPreset30dRange || isPreset90dRange || isYtdRange)
+      ? `${days} day${days === 1 ? '' : 's'}`
+      : rangeLabel;
 
   const { data: sources, isLoading: sourcesLoading } = useQuery<TrafficSource[]>({
     queryKey: ['/api/admin/analytics/traffic-sources', startDateParam, endDateParam],
@@ -246,7 +259,7 @@ export default function TrafficSourcesPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Signups by Channel</CardTitle>
-            <CardDescription>{rangeLabel}</CardDescription>
+            <CardDescription>{signupsByChannelLabel}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-72">
