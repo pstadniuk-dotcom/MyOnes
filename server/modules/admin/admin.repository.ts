@@ -1892,13 +1892,22 @@ export class AdminRepository {
 
     // ---- Traffic Source & Attribution Analytics ----
 
-    async getTrafficSourceBreakdown(days?: number): Promise<Array<{ channel: string; count: number; paidCount: number; revenue: number }>> {
+    async getTrafficSourceBreakdown(
+        days?: number,
+        startDate?: Date,
+        endDate?: Date,
+    ): Promise<Array<{ channel: string; count: number; paidCount: number; revenue: number }>> {
         try {
             const conditions = [];
-            if (days) {
+            if (startDate) {
+                conditions.push(gte(users.createdAt, startDate));
+            } else if (days) {
                 const startDate = new Date();
                 startDate.setDate(startDate.getDate() - days);
                 conditions.push(gte(users.createdAt, startDate));
+            }
+            if (endDate) {
+                conditions.push(lte(users.createdAt, endDate));
             }
 
             const channelData = await db
@@ -1951,13 +1960,22 @@ export class AdminRepository {
         }
     }
 
-    async getUtmCampaignBreakdown(days?: number): Promise<Array<{ campaign: string; source: string; medium: string; signups: number; orders: number; revenue: number }>> {
+    async getUtmCampaignBreakdown(
+        days?: number,
+        startDate?: Date,
+        endDate?: Date,
+    ): Promise<Array<{ campaign: string; source: string; medium: string; signups: number; orders: number; revenue: number }>> {
         try {
             const conditions = [isNotNull(users.utmCampaign)];
-            if (days) {
+            if (startDate) {
+                conditions.push(gte(users.createdAt, startDate));
+            } else if (days) {
                 const startDate = new Date();
                 startDate.setDate(startDate.getDate() - days);
                 conditions.push(gte(users.createdAt, startDate));
+            }
+            if (endDate) {
+                conditions.push(lte(users.createdAt, endDate));
             }
 
             const campaigns = await db

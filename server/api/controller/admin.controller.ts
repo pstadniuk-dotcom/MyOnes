@@ -1098,7 +1098,9 @@ export class AdminController {
     async getTrafficSources(req: Request, res: Response) {
         try {
             const days = req.query.days ? Math.min(Math.max(parseInt(req.query.days as string), 1), 365) : undefined;
-            const sources = await adminService.getTrafficSources(days);
+            const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+            const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+            const sources = await adminService.getTrafficSources(days, startDate, endDate);
             res.json(sources);
         } catch (error) {
             logger.error('Error fetching traffic sources', { error });
@@ -1109,7 +1111,9 @@ export class AdminController {
     async getUtmCampaigns(req: Request, res: Response) {
         try {
             const days = req.query.days ? Math.min(Math.max(parseInt(req.query.days as string), 1), 365) : undefined;
-            const campaigns = await adminService.getUtmCampaigns(days);
+            const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+            const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+            const campaigns = await adminService.getUtmCampaigns(days, startDate, endDate);
             res.json(campaigns);
         } catch (error) {
             logger.error('Error fetching UTM campaigns', { error });
