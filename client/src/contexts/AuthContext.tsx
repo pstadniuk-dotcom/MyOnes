@@ -219,7 +219,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+        const errorMessage = data.error || data.message || 'Login failed';
+        console.error('Login failed:', { status: response.status, error: errorMessage });
+        throw new Error(errorMessage);
       }
 
       // Store auth data
@@ -246,10 +248,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
     } catch (error: any) {
-      console.error('Login error:', error);
+      const errorMessage = error?.message || error?.toString() || "Unable to log in. Please check your credentials and try again.";
+      console.error('Login error caught:', errorMessage, error);
+      
       toast({
         title: "Login Failed",
-        description: error.message || "Unable to log in. Please check your credentials and try again.",
+        description: errorMessage,
         variant: "destructive"
       });
       throw error;

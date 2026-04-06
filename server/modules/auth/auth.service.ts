@@ -226,6 +226,22 @@ export class AuthService {
             throw new Error('Invalid email or password');
         }
 
+        // Check if user is deleted
+        if (user.deletedAt) {
+            logger.warn('Login attempt with deleted account', { email: validatedData.email, deletedAt: user.deletedAt });
+            throw new Error('This account has been deleted and cannot be accessed.');
+        }
+
+        // Check if user is suspended
+        if (user.suspendedAt) {
+            logger.warn('Login attempt with suspended account', { email: validatedData.email, suspendedAt: user.suspendedAt });
+            let suspensionMsg = 'This account has been suspended.';
+            if (user.suspendedReason) {
+                suspensionMsg += ` Reason: ${user.suspendedReason}`;
+            }
+            throw new Error(suspensionMsg);
+        }
+
         // Check account lockout
         if (user.lockedUntil && new Date() < user.lockedUntil) {
             const remainingMs = user.lockedUntil.getTime() - Date.now();

@@ -83,18 +83,40 @@ export class AuthController {
                 refreshToken,
             });
         } catch (error: any) {
-            logger.error('Login error', { error: error.message });
+            const errorMsg = error?.message || error?.toString() || 'Unknown error';
+            logger.error('Login error caught', { error: errorMsg, errorType: error?.name });
             const attemptedEmail = req.body?.email || 'unknown';
-            logAuthEvent(req, { email: attemptedEmail, action: 'login_failed', provider: 'email', success: false, failureReason: error.message });
+            logAuthEvent(req, { email: attemptedEmail, action: 'login_failed', provider: 'email', success: false, failureReason: errorMsg });
+            
+            // Validation errors
             if (error.name === 'ZodError') {
                 return res.status(400).json({ error: 'Validation failed', details: error.errors });
             }
-            if (error.message === 'Invalid email or password') {
-                return res.status(401).json({ error: error.message });
+            
+            // Invalid credentials
+            if (errorMsg === 'Invalid email or password') {
+                return res.status(401).json({ error: errorMsg });
             }
-            if (error.message.startsWith('Account locked')) {
-                return res.status(423).json({ error: error.message });
+            
+            // Account locked due to failed attempts
+            if (errorMsg.includes('Account locked')) {
+                return res.status(423).json({ error: errorMsg });
             }
+            
+            // Deleted account
+            if (errorMsg.includes('deleted') && errorMsg.includes('cannot be accessed')) {
+                logger.warn('Login attempt with deleted account', { email: attemptedEmail });
+                return res.status(403).json({ error: errorMsg });
+            }
+            
+            // Suspended account
+            if (errorMsg.includes('suspended')) {
+                logger.warn('Login attempt with suspended account', { email: attemptedEmail });
+                return res.status(403).json({ error: errorMsg });
+            }
+            
+            // Catch-all for unexpected errors
+            logger.error('Unhandled login error', { error: error, message: errorMsg, stack: error?.stack });
             res.status(500).json({ error: 'Login failed' });
         }
     }
