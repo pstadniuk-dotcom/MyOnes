@@ -148,7 +148,11 @@ const NotificationCard = ({
   );
 };
 
-export default function NotificationsPage() {
+interface NotificationsPageProps {
+  embedded?: boolean;
+}
+
+export default function NotificationsPage({ embedded = false }: NotificationsPageProps) {
   const [, setLocation] = useLocation();
   const [filter, setFilter] = useState<FilterType>('all');
   const queryClient = useQueryClient();
@@ -211,23 +215,27 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="container max-w-4xl mx-auto py-6 px-4">
+    <div className={embedded ? "space-y-4" : "container max-w-4xl mx-auto py-6 px-4"}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setLocation('/dashboard')}
-            className="h-9 w-9"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          {!embedded && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation('/dashboard')}
+              className="h-9 w-9"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Bell className="h-6 w-6" />
-              Notifications
-            </h1>
+            {!embedded && (
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <Bell className="h-6 w-6" />
+                Notifications
+              </h1>
+            )}
             <p className="text-sm text-muted-foreground">
               {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}` : 'All caught up!'}
             </p>
