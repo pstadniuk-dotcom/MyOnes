@@ -55,7 +55,7 @@ export default function CTASectionV3() {
     >
       {/* Background lifestyle image */}
       <img
-        src="/Ones%20LIfestyle%20Images/16X9%20YOGA.png"
+        src="/Ones%20LIfestyle%20Images/5th6qh9gh6V8CW4OG6KH1_0dIX8QwH.png"
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
         loading="lazy"
