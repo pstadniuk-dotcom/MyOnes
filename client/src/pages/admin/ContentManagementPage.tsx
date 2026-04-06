@@ -237,7 +237,12 @@ function FaqManager() {
               </TableCell>
               <TableCell>
                 <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => startEdit(item)} disabled={!!item.isDeleted}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => startEdit(item)}
+                    disabled={!!item.isDeleted || (deleteMutation.isPending && deleteMutation.variables === item.id) || (restoreMutation.isPending && restoreMutation.variables === item.id)}
+                  >
                     <Pencil className="h-3 w-3" />
                   </Button>
                   {item.isDeleted ? (
@@ -245,17 +250,30 @@ function FaqManager() {
                       size="sm"
                       variant="ghost"
                       className="text-emerald-600 hover:text-emerald-700"
-                      disabled={restoreMutation.isPending}
+                      disabled={restoreMutation.isPending || deleteMutation.isPending}
                       onClick={() => restoreMutation.mutate(item.id)}
                       title="Restore"
                     >
-                      <RotateCcw className="h-3 w-3" />
+                      {restoreMutation.isPending && restoreMutation.variables === item.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="h-3 w-3" />
+                      )}
                     </Button>
                   ) : (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="ghost" className="text-destructive">
-                          <Trash2 className="h-3 w-3" />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          disabled={deleteMutation.isPending || restoreMutation.isPending}
+                        >
+                          {deleteMutation.isPending && deleteMutation.variables === item.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3 w-3" />
+                          )}
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
@@ -264,8 +282,13 @@ function FaqManager() {
                           <AlertDialogDescription>This will move this FAQ item to Deleted status.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteMutation.mutate(item.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                          <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteMutation.mutate(item.id)} disabled={deleteMutation.isPending} className="bg-destructive text-destructive-foreground">
+                            {deleteMutation.isPending && deleteMutation.variables === item.id ? (
+                              <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                            ) : null}
+                            Delete
+                          </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
@@ -472,7 +495,12 @@ function HelpArticleManager() {
               </TableCell>
               <TableCell>
                 <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => startEdit(article)} disabled={!!article.isDeleted}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => startEdit(article)}
+                    disabled={!!article.isDeleted || (deleteMutation.isPending && deleteMutation.variables === article.id) || (restoreMutation.isPending && restoreMutation.variables === article.id)}
+                  >
                     <Pencil className="h-3 w-3" />
                   </Button>
                   {article.isDeleted ? (
@@ -480,17 +508,30 @@ function HelpArticleManager() {
                       size="sm"
                       variant="ghost"
                       className="text-emerald-600 hover:text-emerald-700"
-                      disabled={restoreMutation.isPending}
+                      disabled={restoreMutation.isPending || deleteMutation.isPending}
                       onClick={() => restoreMutation.mutate(article.id)}
                       title="Restore"
                     >
-                      <RotateCcw className="h-3 w-3" />
+                      {restoreMutation.isPending && restoreMutation.variables === article.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="h-3 w-3" />
+                      )}
                     </Button>
                   ) : (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="ghost" className="text-destructive">
-                          <Trash2 className="h-3 w-3" />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          disabled={deleteMutation.isPending || restoreMutation.isPending}
+                        >
+                          {deleteMutation.isPending && deleteMutation.variables === article.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3 w-3" />
+                          )}
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
@@ -499,8 +540,13 @@ function HelpArticleManager() {
                           <AlertDialogDescription>This will move this help article to Deleted status.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteMutation.mutate(article.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                          <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteMutation.mutate(article.id)} disabled={deleteMutation.isPending} className="bg-destructive text-destructive-foreground">
+                            {deleteMutation.isPending && deleteMutation.variables === article.id ? (
+                              <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                            ) : null}
+                            Delete
+                          </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>

@@ -32,7 +32,7 @@ export class SupportRepository {
                 ? eq(faqItems.isDeleted, true)
                 : status === 'published'
                     ? and(eq(faqItems.isPublished, true), eq(faqItems.isDeleted, false))
-                    : eq(faqItems.isDeleted, false);
+                    : undefined;
 
         return await db
             .select()
@@ -99,7 +99,7 @@ export class SupportRepository {
                 ? eq(helpArticles.isDeleted, true)
                 : status === 'published'
                     ? and(eq(helpArticles.isPublished, true), eq(helpArticles.isDeleted, false))
-                    : eq(helpArticles.isDeleted, false);
+                    : undefined;
 
         return await db
             .select()
