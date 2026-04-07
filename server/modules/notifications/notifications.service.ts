@@ -1,10 +1,21 @@
-import { notificationsRepository } from './notifications.repository';
+import { notificationsRepository, type NotificationFilter, type NotificationCounts } from './notifications.repository';
 import { type Notification, type InsertNotification, type NotificationPref, type InsertNotificationPref } from '@shared/schema';
 import { logger } from '../../infra/logging/logger';
 
 export class NotificationsService {
     async getUserNotifications(userId: string, limit?: number): Promise<Notification[]> {
         return await notificationsRepository.listNotificationsByUser(userId, limit);
+    }
+
+    async getUserNotificationsWithPagination(userId: string, page: number, limit: number, filter: NotificationFilter = 'all'): Promise<{
+        notifications: Notification[];
+        totalCount: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+        counts: NotificationCounts;
+    }> {
+        return await notificationsRepository.listNotificationsByUserWithPagination(userId, page, limit, filter);
     }
 
     async getUnreadCount(userId: string): Promise<number> {

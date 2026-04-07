@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
@@ -9,21 +9,33 @@ import {
   Beaker,
   Calendar,
   Info,
-  Filter,
-  Trash2,
-  ArrowLeft
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Card, CardContent } from '@/shared/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
-import { Separator } from '@/shared/components/ui/separator';
 import { apiRequest } from '@/shared/lib/queryClient';
 import { useLocation } from 'wouter';
 import type { Notification } from '@shared/schema';
 
+interface NotificationCounts {
+  all: number;
+  unread: number;
+  formula_update: number;
+  order_update: number;
+  system: number;
+}
+
 interface NotificationResponse {
   notifications: Notification[];
+  totalCount: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  counts: NotificationCounts;
 }
 
 interface UnreadCountResponse {
@@ -31,6 +43,31 @@ interface UnreadCountResponse {
 }
 
 type FilterType = 'all' | 'unread' | 'formula_update' | 'order_update' | 'system';
+
+const getPaginationItems = (currentPage: number, totalPages: number): Array<number | 'ellipsis-left' | 'ellipsis-right'> => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const items: Array<number | 'ellipsis-left' | 'ellipsis-right'> = [1];
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(totalPages - 1, currentPage + 1);
+
+  if (start > 2) {
+    items.push('ellipsis-left');
+  }
+
+  for (let page = start; page <= end; page += 1) {
+    items.push(page);
+  }
+
+  if (end < totalPages - 1) {
+    items.push('ellipsis-right');
+  }
+
+  items.push(totalPages);
+  return items;
+};
 
 const NotificationIcon = ({ type, metadata }: { type: string; metadata?: any }) => {
   const iconProps = { className: "h-5 w-5" };
@@ -148,16 +185,32 @@ const NotificationCard = ({
   );
 };
 
-export default function NotificationsPage() {
+interface NotificationsPageProps {
+  embedded?: boolean;
+}
+
+export default function NotificationsPage({ embedded = false }: NotificationsPageProps) {
   const [, setLocation] = useLocation();
   const [filter, setFilter] = useState<FilterType>('all');
+  const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
+  
+  const ITEMS_PER_PAGE = 5;
 
-  // Fetch all notifications
+  // Fetch notifications with server-side pagination + filtering
   const { data: notificationsData, isLoading } = useQuery<NotificationResponse>({
-    queryKey: ['/api/notifications'],
+    queryKey: ['/api/notifications', currentPage, ITEMS_PER_PAGE, filter],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(ITEMS_PER_PAGE),
+        filter,
+      });
+      const response = await apiRequest('GET', `/api/notifications?${params.toString()}`);
+      return response.json();
+    },
   });
-
+console.log('notificationsData', notificationsData);
   // Fetch unread count
   const { data: unreadCountData } = useQuery<UnreadCountResponse>({
     queryKey: ['/api/notifications/unread-count'],
@@ -185,23 +238,16 @@ export default function NotificationsPage() {
 
   const notifications = notificationsData?.notifications || [];
   const unreadCount = unreadCountData?.count || 0;
-
-  // Filter notifications based on selected tab
-  const filteredNotifications = notifications.filter(notification => {
-    switch (filter) {
-      case 'unread':
-        return !notification.isRead;
-      case 'formula_update':
-        return notification.type === 'formula_update';
-      case 'order_update':
-        return notification.type === 'order_update';
-      case 'system':
-        return notification.type === 'system' || notification.type === 'consultation_reminder';
-      default:
-        return true;
-    }
-  });
-
+  const counts = notificationsData?.counts;
+  const allCount = counts?.all ?? 0;
+  const formulaCount = counts?.formula_update ?? 0;
+  const orderCount = counts?.order_update ?? 0;
+  const systemCount = counts?.system ?? 0;
+  const totalPages = notificationsData?.totalPages ?? 0;
+  const hasNextPage = currentPage < totalPages;
+  const hasPrevPage = currentPage > 1;
+  const paginationItems = useMemo(() => getPaginationItems(currentPage, totalPages), [currentPage, totalPages]);
+console.log(paginationItems, 'paginationItems');
   const handleMarkAsRead = (notificationId: string) => {
     markAsReadMutation.mutate(notificationId);
   };
@@ -210,24 +256,40 @@ export default function NotificationsPage() {
     markAllAsReadMutation.mutate();
   };
 
+  // Handle filter change and reset to page 1
+  const handleFilterChange = (value: string) => {
+    setFilter(value as FilterType);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   return (
-    <div className="container max-w-4xl mx-auto py-6 px-4">
+    <div className={embedded ? "space-y-4" : "container max-w-4xl mx-auto py-6 px-4"}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setLocation('/dashboard')}
-            className="h-9 w-9"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          {!embedded && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation('/dashboard')}
+              className="h-9 w-9"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Bell className="h-6 w-6" />
-              Notifications
-            </h1>
+            {!embedded && (
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <Bell className="h-6 w-6" />
+                Notifications
+              </h1>
+            )}
             <p className="text-sm text-muted-foreground">
               {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}` : 'All caught up!'}
             </p>
@@ -248,12 +310,12 @@ export default function NotificationsPage() {
       </div>
 
       {/* Filter Tabs */}
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)} className="mb-6">
+      <Tabs value={filter} onValueChange={handleFilterChange} className="mb-6">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="all" className="text-xs sm:text-sm">
             All
             <Badge variant="secondary" className="ml-1.5 text-xs">
-              {notifications.length}
+              {allCount}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="unread" className="text-xs sm:text-sm">
@@ -267,14 +329,29 @@ export default function NotificationsPage() {
           <TabsTrigger value="formula_update" className="text-xs sm:text-sm">
             <Beaker className="h-3 w-3 mr-1 hidden sm:inline" />
             Formula
+            {formulaCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-xs">
+                {formulaCount}
+              </Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="order_update" className="text-xs sm:text-sm">
             <Package className="h-3 w-3 mr-1 hidden sm:inline" />
             Orders
+            {orderCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-xs">
+                {orderCount}
+              </Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="system" className="text-xs sm:text-sm">
             <Info className="h-3 w-3 mr-1 hidden sm:inline" />
             System
+            {systemCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-xs">
+                {systemCount}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -284,15 +361,64 @@ export default function NotificationsPage() {
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      ) : filteredNotifications.length > 0 ? (
-        <div className="space-y-3">
-          {filteredNotifications.map((notification) => (
-            <NotificationCard
-              key={notification.id}
-              notification={notification}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          ))}
+      ) : notifications.length > 0 ? (
+        <div className="space-y-4">
+          {/* Notifications */}
+          <div className="space-y-3">
+            {notifications.map((notification) => (
+              <NotificationCard
+                key={notification.id}
+                notification={notification}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!hasPrevPage}
+                  onClick={() => setCurrentPage(prev => prev - 1)}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                {paginationItems.map((item, index) =>
+                  typeof item === 'number' ? (
+                    <Button
+                      key={item}
+                      variant={item === currentPage ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setCurrentPage(item)}
+                      className="min-w-9"
+                    >
+                      {item}
+                    </Button>
+                  ) : (
+                    <span key={`${item}-${index}`} className="px-1 text-muted-foreground text-sm">
+                      ...
+                    </span>
+                  )
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!hasNextPage}
+                  onClick={() => setCurrentPage(next => next + 1)}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <Card className="border-dashed">
@@ -322,7 +448,7 @@ export default function NotificationsPage() {
       )}
 
       {/* Footer hint */}
-      {notifications.length > 0 && (
+      {allCount > 0 && (
         <p className="text-xs text-muted-foreground text-center mt-6">
           Notifications are kept for 30 days. Manage notification preferences in{' '}
           <Button
