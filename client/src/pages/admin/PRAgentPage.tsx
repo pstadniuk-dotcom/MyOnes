@@ -694,11 +694,25 @@ function OverviewTab({ dashboard, isLoading, onNavigate, addActiveScan }: { dash
 function ProspectsTab({ category }: { category: 'podcast' | 'press' | 'investor' }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  type ProspectPitchRow = { pitch: { prospectId: string; status: string } };
+
   const { data, isLoading } = useQuery<{ prospects: Prospect[]; total: number }>({
     queryKey: ['/api/agent/prospects', category],
     queryFn: () => apiRequest('GET', `/api/agent/prospects?category=${category}&limit=100`).then(r => r.json()),
   });
 
+  const { data: draftPitches = [] } = useQuery<ProspectPitchRow[]>({
+    queryKey: ['/api/agent/pitches', category, 'pending_review'],
+    queryFn: () =>
+      apiRequest('GET', `/api/agent/pitches?category=${category}&status=pending_review&limit=100`).then(r => r.json()),
+  });
+
+  const { data: rawDraftPitches = [] } = useQuery<ProspectPitchRow[]>({
+    queryKey: ['/api/agent/pitches', category, 'draft'],
+    queryFn: () =>
+      apiRequest('GET', `/api/agent/pitches?category=${category}&status=draft&limit=100`).then(r => r.json()),
+  });
+console.log(draftPitches, rawDraftPitches);
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -756,6 +770,12 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' | 'investor'
   }
 
   const allProspects = data?.prospects || [];
+  const draftProspectIds = new Set([
+    ...draftPitches.map(row => row.pitch.prospectId),
+    ...rawDraftPitches.map(row => row.pitch.prospectId),
+  ]);
+  const draftsCount = allProspects.filter(p => draftProspectIds.has(p.id)).length;
+
   // Filter by search term, status, and contact method
   const prospects = allProspects.filter(p => {
     const matchesSearch = !searchTerm || 
@@ -764,7 +784,11 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' | 'investor'
       (p.contactEmail && p.contactEmail.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (p.topics && p.topics.some(t => t.toLowerCase().includes(searchTerm.toLowerCase())));
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-    const matchesContact = contactFilter === 'all' || p.contactMethod === contactFilter;
+    const matchesContact = contactFilter === 'all'
+      ? true
+      : contactFilter === 'drafts'
+        ? draftProspectIds.has(p.id)
+        : p.contactMethod === contactFilter;
     const matchesTier = tierFilter === 'all' || (tierFilter === 'unrated' ? !p.leadTier : p.leadTier === tierFilter);
     return matchesSearch && matchesStatus && matchesContact && matchesTier;
   });
@@ -827,6 +851,7 @@ function ProspectsTab({ category }: { category: 'podcast' | 'press' | 'investor'
               { key: 'all', label: 'All', icon: null, count: allProspects.length },
               { key: 'email', label: 'Email', icon: <Mail className="h-3 w-3" />, count: emailCount },
               { key: 'form', label: 'Form', icon: <FileText className="h-3 w-3" />, count: formCount },
+              { key: 'drafts', label: 'Drafts', icon: <Edit className="h-3 w-3" />, count: draftsCount },
             ].map(f => (
               <Button
                 key={f.key}
