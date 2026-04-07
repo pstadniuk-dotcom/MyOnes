@@ -2,13 +2,24 @@ import { Request, Response } from 'express';
 import { notificationsService } from '../../modules/notifications/notifications.service';
 import { logger } from '../../infra/logging/logger';
 
+type NotificationFilter = 'all' | 'unread' | 'formula_update' | 'order_update' | 'system';
+
 export class NotificationsController {
     async getNotifications(req: Request, res: Response) {
+
+        console.log(req.query, 'req in getNotifications controller');
         try {
             const userId = req.userId!;
-            const limit = parseInt(req.query.limit as string) || 10;
-            const notifications = await notificationsService.getUserNotifications(userId, limit);
-            res.json({ notifications });
+            const page = Math.max(1, parseInt(req.query.page as string) || 1);
+            const limit = Math.max(1, Math.min(50, parseInt(req.query.limit as string) || 5));
+            const requestedFilter = (req.query.filter as string) || 'all';
+            const validFilters: NotificationFilter[] = ['all', 'unread', 'formula_update', 'order_update', 'system'];
+            const filter: NotificationFilter = validFilters.includes(requestedFilter as NotificationFilter)
+                ? (requestedFilter as NotificationFilter)
+                : 'all';
+
+            const result = await notificationsService.getUserNotificationsWithPagination(userId, page, limit, filter);
+            res.json(result);
         } catch (error) {
             logger.error('Error fetching notifications controller', { error });
             res.status(500).json({ error: 'Failed to fetch notifications' });
