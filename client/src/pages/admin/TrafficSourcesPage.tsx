@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { isSameDay, subDays } from 'date-fns';
+import { differenceInCalendarDays, endOfDay, format, formatISO, isSameDay, startOfDay, subDays } from 'date-fns';
 import {
   Globe,
   Users,
@@ -99,23 +99,54 @@ export default function TrafficSourcesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState({
-    from: subDays(new Date(), 30),
-    to: new Date(),
+    from: startOfDay(subDays(new Date(), 30)),
+    to: endOfDay(new Date()),
   });
   const [createDialog, setCreateDialog] = useState(false);
   const [newCampaign, setNewCampaign] = useState({ name: '', channel: 'email', utmCampaign: '', status: 'draft', notes: '' });
 
-  const days = Math.max(1, Math.round((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)));
+  const days = Math.max(1, differenceInCalendarDays(dateRange.to, dateRange.from) + 1);
+  const startDateParam = formatISO(dateRange.from);
+  const endDateParam = formatISO(dateRange.to);
   const now = new Date();
+  const endsToday = isSameDay(dateRange.to, now);
   const isTodayLabel = days === 1 && isSameDay(dateRange.to, now);
-  const rangeLabel = isTodayLabel ? 'Today' : `Last ${days} ${days === 1 ? 'day' : 'days'}`;
+  const isPresetTodayRange = endsToday && days === 1;
+  const isPreset7dRange = endsToday && days === 7;
+  const isPreset30dRange = endsToday && days === 30;
+  const isPreset90dRange = endsToday && days === 90;
+  const isYtdRange =
+    endsToday &&
+    dateRange.from.getMonth() === 0 &&
+    dateRange.from.getDate() === 1;
+  const rangeLabel = isTodayLabel
+    ? 'Today'
+    : `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
+  const signupsByChannelLabel =
+    (isPresetTodayRange || isPreset7dRange || isPreset30dRange || isPreset90dRange || isYtdRange)
+      ? `${days} day${days === 1 ? '' : 's'}`
+      : rangeLabel;
 
   const { data: sources, isLoading: sourcesLoading } = useQuery<TrafficSource[]>({
-    queryKey: [`/api/admin/analytics/traffic-sources?days=${days}`],
+    queryKey: ['/api/admin/analytics/traffic-sources', startDateParam, endDateParam],
+    queryFn: async () => {
+      const res = await apiRequest(
+        'GET',
+        `/api/admin/analytics/traffic-sources?startDate=${encodeURIComponent(startDateParam)}&endDate=${encodeURIComponent(endDateParam)}`
+      );
+      return res.json();
+    },
   });
 
   const { data: utmCampaigns } = useQuery<UtmCampaign[]>({
-    queryKey: [`/api/admin/analytics/utm-campaigns?days=${days}`],
+    queryKey: ['/api/admin/analytics/utm-campaigns', startDateParam, endDateParam],
+    queryFn: async () => {
+      const res = await apiRequest(
+        'GET',
+        `/api/admin/analytics/utm-campaigns?startDate=${encodeURIComponent(startDateParam)}&endDate=${encodeURIComponent(endDateParam)}`
+      );
+      return res.json();
+    },
   });
 
   const { data: referralStats } = useQuery<ReferralStats>({
@@ -183,7 +214,12 @@ export default function TrafficSourcesPage() {
             Understand where your users come from and which channels drive revenue.
           </p>
         </div>
-        <DateRangePicker value={dateRange} onChange={setDateRange} />
+        <DateRangePicker
+          value={dateRange}
+          onChange={setDateRange}
+          requireConfirm
+          confirmLabel="Apply"
+        />
       </div>
 
       {/* Summary Cards */}
@@ -223,7 +259,7 @@ export default function TrafficSourcesPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Signups by Channel</CardTitle>
-            <CardDescription>{rangeLabel}</CardDescription>
+            <CardDescription>{signupsByChannelLabel}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-72">

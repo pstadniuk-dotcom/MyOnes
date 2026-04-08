@@ -104,12 +104,14 @@ router.get('/faq', requireAdmin, adminController.listFaqItems);
 router.post('/faq', requireAdmin, adminController.createFaqItem);
 router.patch('/faq/:id', requireAdmin, adminController.updateFaqItem);
 router.delete('/faq/:id', requireAdmin, adminController.deleteFaqItem);
+router.post('/faq/:id/restore', requireAdmin, adminController.restoreFaqItem);
 
 // Help Article Management
 router.get('/help-articles', requireAdmin, adminController.listHelpArticles);
 router.post('/help-articles', requireAdmin, adminController.createHelpArticle);
 router.patch('/help-articles/:id', requireAdmin, adminController.updateHelpArticle);
 router.delete('/help-articles/:id', requireAdmin, adminController.deleteHelpArticle);
+router.post('/help-articles/:id/restore', requireAdmin, adminController.restoreHelpArticle);
 
 // Newsletter Subscribers
 router.get('/newsletter', requireAdmin, adminController.listNewsletterSubscribers);

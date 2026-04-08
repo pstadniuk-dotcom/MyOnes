@@ -1,6 +1,16 @@
 import { db } from '../../infra/db/db';
 import { notifications, notificationPrefs, type Notification, type InsertNotification, type NotificationPref, type InsertNotificationPref } from '@shared/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
+
+export type NotificationFilter = 'all' | 'unread' | 'formula_update' | 'order_update' | 'system';
+
+export interface NotificationCounts {
+    all: number;
+    unread: number;
+    formula_update: number;
+    order_update: number;
+    system: number;
+}
 
 // Helper to handle metadata normalization if needed
 const normalizeNotificationMetadata = (metadata: any) => {
@@ -9,6 +19,40 @@ const normalizeNotificationMetadata = (metadata: any) => {
 };
 
 export class NotificationsRepository {
+    private buildFilterCondition(userId: string, filter: NotificationFilter) {
+        switch (filter) {
+            case 'unread':
+                return and(eq(notifications.userId, userId), eq(notifications.isRead, false));
+            case 'formula_update':
+                return and(eq(notifications.userId, userId), eq(notifications.type, 'formula_update'));
+            case 'order_update':
+                return and(eq(notifications.userId, userId), eq(notifications.type, 'order_update'));
+            case 'system':
+                return and(eq(notifications.userId, userId), inArray(notifications.type, ['system', 'consultation_reminder']));
+            case 'all':
+            default:
+                return eq(notifications.userId, userId);
+        }
+    }
+
+    async getNotificationCountsByUser(userId: string): Promise<NotificationCounts> {
+        const [allRows, unreadRows, formulaRows, orderRows, systemRows] = await Promise.all([
+            db.select({ id: notifications.id }).from(notifications).where(eq(notifications.userId, userId)),
+            db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false))),
+            db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.type, 'formula_update'))),
+            db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.type, 'order_update'))),
+            db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.userId, userId), inArray(notifications.type, ['system', 'consultation_reminder']))),
+        ]);
+
+        return {
+            all: allRows.length,
+            unread: unreadRows.length,
+            formula_update: formulaRows.length,
+            order_update: orderRows.length,
+            system: systemRows.length,
+        };
+    }
+
     // Notification Preferences operations
     async getNotificationPrefs(userId: string): Promise<NotificationPref | undefined> {
         const [prefs] = await db.select().from(notificationPrefs).where(eq(notificationPrefs.userId, userId));
@@ -52,6 +96,46 @@ export class NotificationsRepository {
             return await query.limit(limit);
         }
         return await query;
+    }
+
+    async listNotificationsByUserWithPagination(userId: string, page: number, limit: number, filter: NotificationFilter = 'all'): Promise<{
+        notifications: Notification[];
+        totalCount: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+        counts: NotificationCounts;
+    }> {
+        const offset = (page - 1) * limit;
+        const filterCondition = this.buildFilterCondition(userId, filter);
+        
+        // Get total count
+        const countResult = await db
+            .select()
+            .from(notifications)
+            .where(filterCondition);
+        const totalCount = countResult.length;
+        const counts = await this.getNotificationCountsByUser(userId);
+        
+        // Get paginated results
+        const notificationsList = await db
+            .select()
+            .from(notifications)
+            .where(filterCondition)
+            .orderBy(desc(notifications.createdAt))
+            .limit(limit)
+            .offset(offset);
+        
+        const totalPages = Math.ceil(totalCount / limit);
+        
+        return {
+            notifications: notificationsList,
+            totalCount,
+            page,
+            limit,
+            totalPages,
+            counts,
+        };
     }
 
     async getUnreadNotificationCount(userId: string): Promise<number> {

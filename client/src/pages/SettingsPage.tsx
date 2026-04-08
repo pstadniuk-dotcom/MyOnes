@@ -6,13 +6,15 @@ import { Label } from '@/shared/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Switch } from '@/shared/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/shared/components/ui/accordion';
 import { useToast } from '@/shared/hooks/use-toast';
-import { Lock, Bell, Shield, Clock, Pill, Globe, Dumbbell, Salad, Heart, Eye, EyeOff } from 'lucide-react';
+import { Lock, Bell, Shield, Clock, Pill, Globe, Dumbbell, Salad, Heart, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/shared/lib/queryClient';
 import { getCurrentTimezone } from '@/shared/hooks/use-timezone';
 import { useAuth } from '@/contexts/AuthContext';
 import { PasswordRequirements } from '@/shared/components/auth/PasswordRequirements';
+import NotificationsPage from '@/pages/NotificationsPage';
 
 // Time slot options for each notification type
 const TIME_SLOT_OPTIONS = [
@@ -37,6 +39,7 @@ export default function SettingsPage() {
   // Check URL hash on mount to determine initial tab
   const initialTab = window.location.hash === '#notifications' ? 'notifications' : 'account';
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [openNotificationSection, setOpenNotificationSection] = useState<string | undefined>('notification-center');
 
   // Account settings state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -389,11 +392,40 @@ export default function SettingsPage() {
                 Choose what updates you want to receive
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {isLoadingPrefs ? (
-                <div className="text-center py-8 text-muted-foreground">Loading preferences...</div>
-              ) : (
-                <>
+            <CardContent className="space-y-2">
+              <Accordion
+                type="single"
+                collapsible
+                value={openNotificationSection}
+                onValueChange={setOpenNotificationSection}
+                className="w-full"
+              >
+                <AccordionItem value="notification-center" className="border-[#5a6623]/10">
+                  <AccordionTrigger className="hover:no-underline py-4 justify-start items-start gap-3 [&>svg:last-child]:hidden">
+                    <ChevronDown className="mt-1 h-4 w-4 shrink-0 transition-transform duration-200 text-[#054700]" />
+                    <div className="flex flex-col items-start text-left">
+                      <span className="text-lg font-semibold text-[#054700]">Notifications</span>
+                      <span className="text-sm font-normal text-[#5a6623]">See all recent alerts and updates</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 pb-6 px-1">
+                    <NotificationsPage embedded />
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="notification-preferences" className="border-[#5a6623]/10">
+                  <AccordionTrigger className="hover:no-underline py-4 justify-start items-start gap-3 [&>svg:last-child]:hidden">
+                    <ChevronDown className="mt-1 h-4 w-4 shrink-0 transition-transform duration-200 text-[#054700]" />
+                    <div className="flex flex-col items-start text-left">
+                      <span className="text-lg font-semibold text-[#054700]">Notification Preferences</span>
+                      <span className="text-sm font-normal text-[#5a6623]">Control channels, reminders, and schedule</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 pb-6 px-1 space-y-6">
+                    {isLoadingPrefs ? (
+                      <div className="text-center py-8 text-muted-foreground">Loading preferences...</div>
+                    ) : (
+                      <>
                   <div className="space-y-6">
                     {/* Formula & Consultation Updates */}
                     <div className="space-y-3">
@@ -779,8 +811,11 @@ export default function SettingsPage() {
                   >
                     {saveNotificationsMutation.isPending ? 'Saving...' : 'Save Notification Settings'}
                   </Button>
-                </>
-              )}
+                      </>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </CardContent>
           </Card>
         </TabsContent>

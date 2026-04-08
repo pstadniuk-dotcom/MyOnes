@@ -7,6 +7,7 @@ import type {
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
+const MAX_TOAST_UI_DURATION = 2000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -140,7 +141,12 @@ function dispatch(action: Action) {
 type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
+  console.log(props)
   const id = genId()
+  const duration =
+    typeof props.duration === "number"
+      ? Math.min(props.duration, MAX_TOAST_UI_DURATION)
+      : MAX_TOAST_UI_DURATION
 
   const update = (props: ToasterToast) =>
     dispatch({
@@ -153,6 +159,7 @@ function toast({ ...props }: Toast) {
     type: "ADD_TOAST",
     toast: {
       ...props,
+      duration,
       id,
       open: true,
       onOpenChange: (open) => {

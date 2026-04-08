@@ -8,20 +8,38 @@ import {
 } from '@shared/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 
+type ContentStatusFilter = 'all' | 'published' | 'deleted';
+
 export class SupportRepository {
     // FAQ operations
     async getFaqItem(id: string): Promise<FaqItem | undefined> {
-        const [item] = await db.select().from(faqItems).where(eq(faqItems.id, id));
+        const [item] = await db
+            .select()
+            .from(faqItems)
+            .where(and(eq(faqItems.id, id), eq(faqItems.isDeleted, false)));
         return item || undefined;
     }
 
-    async listFaqItems(category?: string): Promise<FaqItem[]> {
+    async listFaqItems(
+        category?: string,
+        options: { includeUnpublished?: boolean; status?: ContentStatusFilter } = {}
+    ): Promise<FaqItem[]> {
+        const includeUnpublished = options.includeUnpublished ?? false;
+        const status = options.status ?? (includeUnpublished ? 'all' : 'published');
+
+        const statusFilter =
+            status === 'deleted'
+                ? eq(faqItems.isDeleted, true)
+                : status === 'published'
+                    ? and(eq(faqItems.isPublished, true), eq(faqItems.isDeleted, false))
+                    : undefined;
+
         return await db
             .select()
             .from(faqItems)
             .where(
                 and(
-                    eq(faqItems.isPublished, true),
+                    statusFilter,
                     category ? eq(faqItems.category, category) : undefined
                 )
             )
@@ -43,23 +61,52 @@ export class SupportRepository {
     }
 
     async deleteFaqItem(id: string): Promise<boolean> {
-        const result = await db.delete(faqItems).where(eq(faqItems.id, id)).returning();
+        const result = await db
+            .update(faqItems)
+            .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
+            .where(eq(faqItems.id, id))
+            .returning();
         return result.length > 0;
+    }
+
+    async restoreFaqItem(id: string): Promise<FaqItem | undefined> {
+        const [item] = await db
+            .update(faqItems)
+            .set({ isDeleted: false, deletedAt: null, updatedAt: new Date() })
+            .where(eq(faqItems.id, id))
+            .returning();
+        return item || undefined;
     }
 
     // Help Article operations
     async getHelpArticle(id: string): Promise<HelpArticle | undefined> {
-        const [article] = await db.select().from(helpArticles).where(eq(helpArticles.id, id));
+        const [article] = await db
+            .select()
+            .from(helpArticles)
+            .where(and(eq(helpArticles.id, id), eq(helpArticles.isDeleted, false)));
         return article || undefined;
     }
 
-    async listHelpArticles(category?: string): Promise<HelpArticle[]> {
+    async listHelpArticles(
+        category?: string,
+        options: { includeUnpublished?: boolean; status?: ContentStatusFilter } = {}
+    ): Promise<HelpArticle[]> {
+        const includeUnpublished = options.includeUnpublished ?? false;
+        const status = options.status ?? (includeUnpublished ? 'all' : 'published');
+
+        const statusFilter =
+            status === 'deleted'
+                ? eq(helpArticles.isDeleted, true)
+                : status === 'published'
+                    ? and(eq(helpArticles.isPublished, true), eq(helpArticles.isDeleted, false))
+                    : undefined;
+
         return await db
             .select()
             .from(helpArticles)
             .where(
                 and(
-                    eq(helpArticles.isPublished, true),
+                    statusFilter,
                     category ? eq(helpArticles.category, category) : undefined
                 )
             )
@@ -81,15 +128,28 @@ export class SupportRepository {
     }
 
     async deleteHelpArticle(id: string): Promise<boolean> {
-        const result = await db.delete(helpArticles).where(eq(helpArticles.id, id)).returning();
+        const result = await db
+            .update(helpArticles)
+            .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
+            .where(eq(helpArticles.id, id))
+            .returning();
         return result.length > 0;
+    }
+
+    async restoreHelpArticle(id: string): Promise<HelpArticle | undefined> {
+        const [article] = await db
+            .update(helpArticles)
+            .set({ isDeleted: false, deletedAt: null, updatedAt: new Date() })
+            .where(eq(helpArticles.id, id))
+            .returning();
+        return article || undefined;
     }
 
     async incrementHelpArticleViewCount(id: string): Promise<boolean> {
         const result = await db
             .update(helpArticles)
             .set({ viewCount: sql`${helpArticles.viewCount} + 1` })
-            .where(eq(helpArticles.id, id))
+            .where(and(eq(helpArticles.id, id), eq(helpArticles.isDeleted, false)))
             .returning();
         return result.length > 0;
     }

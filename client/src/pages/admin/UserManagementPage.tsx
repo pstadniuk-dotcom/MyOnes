@@ -33,6 +33,7 @@ import {
   Search as SearchIcon,
   ChevronLeft,
   ChevronRight,
+  Eye,
   Users,
   Shield,
   SlidersHorizontal,
@@ -564,6 +565,7 @@ export default function UserManagementPage() {
                         </TableHead>
                         <TableHead>Created Date</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -571,11 +573,10 @@ export default function UserManagementPage() {
                         <TableRow
                           key={user.id}
                           className={cn(
-                            "cursor-pointer hover-elevate transition-all",
+                            "hover-elevate transition-all",
                             user.deletedAt && "opacity-60 grayscale bg-muted/30",
                             user.suspendedAt && !user.deletedAt && "bg-orange-50/30"
                           )}
-                          onClick={() => handleUserClick(user.id)}
                           data-testid={`row-user-${user.id}`}
                         >
                           <TableCell data-testid={`cell-name-${user.id}`}>
@@ -628,6 +629,19 @@ export default function UserManagementPage() {
                                 )
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleUserClick(user.id)}
+                              aria-label={`View details for ${user.name}`}
+                              data-testid={`button-view-user-${user.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}

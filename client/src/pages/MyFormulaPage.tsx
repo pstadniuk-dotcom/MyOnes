@@ -2362,14 +2362,14 @@ function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onO
 
       <CardContent className="flex-1 flex flex-col gap-3 pt-0">
         {/* Ingredient preview chips */}
-        <div className="flex flex-wrap gap-1">
+        <div className="flex items-center gap-1 overflow-hidden">
           {allIngredientNames.slice(0, 5).map((name, i) => (
-            <span key={i} className="inline-flex items-center text-[10px] font-medium text-[#054700]/70 bg-[#054700]/[0.05] px-2 py-0.5 rounded-full">
+            <span key={i} className="inline-flex min-w-0 max-w-[110px] items-center truncate whitespace-nowrap text-[10px] font-medium text-[#054700]/70 bg-[#054700]/[0.05] px-2 py-0.5 rounded-full">
               {name}
             </span>
           ))}
           {allIngredientNames.length > 5 && (
-            <span className="inline-flex items-center text-[10px] text-[#5a6623]/50 px-1.5 py-0.5">
+            <span className="inline-flex shrink-0 items-center whitespace-nowrap text-[10px] text-[#5a6623]/50 px-1.5 py-0.5">
               +{allIngredientNames.length - 5}
             </span>
           )}

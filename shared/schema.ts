@@ -261,6 +261,13 @@ export const messages = pgTable("messages", {
   role: messageRoleEnum("role").notNull(),
   content: text("content").notNull(),
   model: text("model"), // Track which AI model responded (gpt-4, gpt-5, etc.)
+  attachments: json("attachments").$type<Array<{
+    id: string;
+    name: string;
+    url?: string;
+    type: string;
+    size: number;
+  }>>(),
   formula: json("formula").$type<{
     bases: Array<{ name: string, dose: string, purpose?: string }>;
     additions: Array<{ name: string, dose: string, purpose?: string }>;
@@ -1371,6 +1378,8 @@ export const faqItems = pgTable("faq_items", {
   question: text("question").notNull(),
   answer: text("answer").notNull(),
   isPublished: boolean("is_published").default(true).notNull(),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  deletedAt: timestamp("deleted_at"),
   displayOrder: integer("display_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1432,6 +1441,8 @@ export const helpArticles = pgTable("help_articles", {
   title: text("title").notNull(),
   content: text("content").notNull(),
   isPublished: boolean("is_published").default(true).notNull(),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  deletedAt: timestamp("deleted_at"),
   viewCount: integer("view_count").default(0).notNull(),
   displayOrder: integer("display_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
