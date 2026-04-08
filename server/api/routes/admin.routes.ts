@@ -190,13 +190,13 @@ router.post('/social/generate-ideas', requireAdmin, async (req, res) => {
 
 router.post('/social/generate-image', requireAdmin, async (req, res) => {
   try {
-    const { visualConcept, platform } = req.body;
+    const { visualConcept, platform, modelId } = req.body;
     if (!visualConcept || typeof visualConcept !== 'string') {
       return res.status(400).json({ error: 'visualConcept is required' });
     }
     const validPlatforms = ['instagram', 'twitter', 'linkedin', 'facebook', 'tiktok', 'threads'];
     const safePlatform = validPlatforms.includes(platform) ? platform : 'instagram';
-    const imageUrl = await generateSocialImage({ visualConcept, platform: safePlatform });
+    const imageUrl = await generateSocialImage({ visualConcept, platform: safePlatform, modelId });
     return res.json({ success: true, imageUrl });
   } catch (err: any) {
     logger.error('[social-gen] generate-image error', { error: err.message });

@@ -2654,3 +2654,234 @@ export type ManufacturerIngredient = typeof manufacturerIngredients.$inferSelect
 export type InsertManufacturerIngredient = z.infer<typeof insertManufacturerIngredientSchema>;
 export type ManufacturerCatalogSyncLog = typeof manufacturerCatalogSyncLogs.$inferSelect;
 export type InsertManufacturerCatalogSyncLog = z.infer<typeof insertManufacturerCatalogSyncLogSchema>;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UGC Ad Studio — AI-powered UGC video ad creation pipeline
+// ═══════════════════════════════════════════════════════════════════════════
+
+// UGC Campaigns — top-level container for each ad creation project
+export const ugcCampaigns = pgTable("ugc_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  status: text("status").default('research').notNull(), // research, scripting, characters, video, complete, archived
+  productName: text("product_name").notNull(),
+  productDescription: text("product_description"),
+  productUrls: json("product_urls").$type<string[]>(), // listing URLs (Amazon, Shopify, etc.)
+  productBenefits: json("product_benefits").$type<string[]>(), // key selling points
+  targetAudience: text("target_audience"), // free-form description
+  adGoal: text("ad_goal"), // awareness, conversion, retargeting, etc.
+  notes: text("notes"),
+  assembledVideoUrl: text("assembled_video_url"), // final concatenated video with all scenes + lip-sync + optional music
+  assembledAt: timestamp("assembled_at"), // when the final video was last assembled
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("ugc_campaigns_status_idx").on(table.status),
+  index("ugc_campaigns_created_at_idx").on(table.createdAt),
+]);
+
+// UGC Market Research — AI-generated product & market analysis
+export const ugcResearch = pgTable("ugc_research", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => ugcCampaigns.id, { onDelete: "cascade" }),
+  researchType: text("research_type").notNull(), // product_analysis, market_research, competitor_analysis
+  status: text("status").default('generating').notNull(), // generating, complete, failed
+  errorMessage: text("error_message"),
+  title: text("title").notNull(),
+  content: json("content").$type<{
+    summary?: string;
+    customerPersona?: { demographics?: string; lifestyle?: string; painPoints?: string[]; desires?: string[] };
+    customerLanguage?: string[]; // actual phrases customers use
+    objections?: string[];
+    positiveReactions?: string[]; // what surprised/delighted buyers
+    competitorInsights?: string;
+    rawFindings?: string;
+  }>(),
+  sources: json("sources").$type<{ url: string; title: string }[]>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("ugc_research_campaign_idx").on(table.campaignId),
+  index("ugc_research_type_idx").on(table.researchType),
+]);
+
+// UGC Viral Hooks — library of hooks from viral content
+export const ugcHooks = pgTable("ugc_hooks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => ugcCampaigns.id, { onDelete: "set null" }), // null = global library
+  hookText: text("hook_text").notNull(),
+  source: text("source"), // tiktok, instagram, youtube, manual
+  sourceUrl: text("source_url"),
+  sourceCreator: text("source_creator"), // @handle of original creator
+  viewCount: integer("view_count"),
+  style: text("style"), // curiosity, problem_solution, storytelling, shock, transformation, social_proof
+  category: text("category"), // health, beauty, fitness, supplement, general
+  speakingTone: text("speaking_tone"), // casual, excited, skeptical_then_convinced, deadpan, confessional
+  structureNotes: text("structure_notes"), // how the full video was structured
+  isFavorite: boolean("is_favorite").default(false).notNull(),
+  isArchived: boolean("is_archived").default(false).notNull(),
+  tags: json("tags").$type<string[]>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("ugc_hooks_campaign_idx").on(table.campaignId),
+  index("ugc_hooks_style_idx").on(table.style),
+  index("ugc_hooks_favorite_idx").on(table.isFavorite),
+]);
+
+// UGC Scripts — AI-generated ad scripts with scene breakdowns
+export const ugcScripts = pgTable("ugc_scripts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => ugcCampaigns.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  status: text("status").default('draft').notNull(), // draft, approved, rejected, archived
+  scriptType: text("script_type").default('testimonial').notNull(), // testimonial, problem_solution, before_after, day_in_life, unboxing
+  hookInspirationIds: json("hook_inspiration_ids").$type<string[]>(), // which hooks inspired this
+  scenes: json("scenes").$type<{
+    sceneNumber: number;
+    visualDescription: string;
+    dialogue: string;
+    durationSeconds: number;
+    cameraAngle?: string;
+    action?: string;
+    notes?: string;
+  }[]>(),
+  totalDurationSeconds: integer("total_duration_seconds"),
+  totalScenes: integer("total_scenes"),
+  rationale: text("rationale"), // why AI developed this script
+  toneNotes: text("tone_notes"), // speaking style guidance
+  bannedPhrases: json("banned_phrases").$type<string[]>(), // phrases to avoid
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("ugc_scripts_campaign_idx").on(table.campaignId),
+  index("ugc_scripts_status_idx").on(table.status),
+]);
+
+// UGC Characters — AI influencer personas with reference images
+export const ugcCharacters = pgTable("ugc_characters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => ugcCampaigns.id, { onDelete: "set null" }), // null = reusable across campaigns
+  name: text("name").notNull(),
+  demographics: text("demographics"), // age range, ethnicity, body type
+  styleDescription: text("style_description"), // clothing, hair, overall vibe
+  settingDescription: text("setting_description"), // environment (cozy apartment, kitchen, gym, etc.)
+  personalityNotes: text("personality_notes"), // how they come across on camera
+  referenceImageUrl: text("reference_image_url"), // approved face reference for identity-consistent generation (PuLID)
+  referenceImageId: varchar("reference_image_id"), // FK to ugcGeneratedImages — the approved image used as face reference
+  status: text("status").default('draft').notNull(), // draft, generating, approved, archived
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("ugc_characters_campaign_idx").on(table.campaignId),
+  index("ugc_characters_status_idx").on(table.status),
+]);
+
+// UGC Generated Images — all fal.ai image generations with review workflow
+export const ugcGeneratedImages = pgTable("ugc_generated_images", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  characterId: varchar("character_id").references(() => ugcCharacters.id, { onDelete: "cascade" }),
+  campaignId: varchar("campaign_id").references(() => ugcCampaigns.id, { onDelete: "set null" }),
+  imageUrl: text("image_url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  promptUsed: text("prompt_used").notNull(), // exact prompt sent to fal.ai
+  negativePrompt: text("negative_prompt"),
+  modelUsed: text("model_used").notNull(), // fal-ai/flux-pro, fal-ai/nano-banana-2, etc.
+  imageType: text("image_type").notNull(), // front_view, side_view, usage_view, product_closeup, lifestyle, b_roll
+  aspectRatio: text("aspect_ratio").default('9:16').notNull(),
+  status: text("status").default('pending').notNull(), // pending, approved, rejected, revision_requested
+  revisionNotes: text("revision_notes"), // user feedback for regeneration
+  generationParams: json("generation_params").$type<{
+    seed?: number;
+    guidance_scale?: number;
+    num_inference_steps?: number;
+    [key: string]: unknown;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("ugc_images_character_idx").on(table.characterId),
+  index("ugc_images_campaign_idx").on(table.campaignId),
+  index("ugc_images_status_idx").on(table.status),
+  index("ugc_images_type_idx").on(table.imageType),
+]);
+
+// UGC Video Scenes — Kling 3.0 video generation prompts & outputs
+export const ugcVideoScenes = pgTable("ugc_video_scenes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => ugcCampaigns.id, { onDelete: "cascade" }),
+  scriptId: varchar("script_id").references(() => ugcScripts.id, { onDelete: "set null" }),
+  characterId: varchar("character_id").references(() => ugcCharacters.id, { onDelete: "set null" }),
+  startFrameImageId: varchar("start_frame_image_id").references(() => ugcGeneratedImages.id, { onDelete: "set null" }),
+  batchNumber: integer("batch_number").notNull(), // generation batch (each batch = up to 3 scenes, 15s)
+  sceneNumber: integer("scene_number").notNull(), // scene within batch
+  sceneType: text("scene_type").default('dialogue').notNull(), // dialogue, b_roll, product_closeup, transition
+  prompt: text("prompt").notNull(), // the Kling 3.0 prompt (30-50 words)
+  negativePrompt: text("negative_prompt"),
+  dialogue: text("dialogue"), // spoken text for this scene
+  shotType: text("shot_type"), // medium_shot, close_up, wide_shot, tight_closeup, low_angle
+  cameraMotion: text("camera_motion"), // static, slow_push_in, subtle_sway, pan_left, etc.
+  cameraMotionScale: integer("camera_motion_scale"), // 1-10
+  durationSeconds: integer("duration_seconds").default(5).notNull(),
+  videoUrl: text("video_url"), // generated video URL (silent)
+  audioUrl: text("audio_url"), // TTS voiceover audio URL
+  mergedVideoUrl: text("merged_video_url"), // final video with audio merged
+  voiceId: text("voice_id").default('nova'), // OpenAI TTS voice: alloy, echo, fable, onyx, nova, shimmer
+  status: text("status").default('draft').notNull(), // draft, generating, generated, approved, rejected, failed
+  generationParams: json("generation_params").$type<{
+    cfg_scale?: number;
+    resolution?: string;
+    aspect_ratio?: string;
+    model?: string;
+    [key: string]: unknown;
+  }>(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("ugc_video_campaign_idx").on(table.campaignId),
+  index("ugc_video_script_idx").on(table.scriptId),
+  index("ugc_video_batch_idx").on(table.batchNumber),
+  index("ugc_video_status_idx").on(table.status),
+]);
+
+// UGC Brand Assets — product photos, logos, reference materials for image gen
+export const ugcBrandAssets = pgTable("ugc_brand_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => ugcCampaigns.id, { onDelete: "set null" }), // null = global
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  assetType: text("asset_type").notNull(), // product_photo, logo, bottle_shot, label, lifestyle_ref, color_palette
+  description: text("description"),
+  tags: json("tags").$type<string[]>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("ugc_brand_assets_campaign_idx").on(table.campaignId),
+  index("ugc_brand_assets_type_idx").on(table.assetType),
+]);
+
+// Insert schemas
+export const insertUgcCampaignSchema = createInsertSchema(ugcCampaigns).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertUgcResearchSchema = createInsertSchema(ugcResearch).omit({ id: true, createdAt: true });
+export const insertUgcHookSchema = createInsertSchema(ugcHooks).omit({ id: true, createdAt: true });
+export const insertUgcScriptSchema = createInsertSchema(ugcScripts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertUgcCharacterSchema = createInsertSchema(ugcCharacters).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertUgcGeneratedImageSchema = createInsertSchema(ugcGeneratedImages).omit({ id: true, createdAt: true });
+export const insertUgcVideoSceneSchema = createInsertSchema(ugcVideoScenes).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertUgcBrandAssetSchema = createInsertSchema(ugcBrandAssets).omit({ id: true, createdAt: true });
+
+// Types
+export type UgcCampaign = typeof ugcCampaigns.$inferSelect;
+export type InsertUgcCampaign = z.infer<typeof insertUgcCampaignSchema>;
+export type UgcResearch = typeof ugcResearch.$inferSelect;
+export type InsertUgcResearch = z.infer<typeof insertUgcResearchSchema>;
+export type UgcHook = typeof ugcHooks.$inferSelect;
+export type InsertUgcHook = z.infer<typeof insertUgcHookSchema>;
+export type UgcScript = typeof ugcScripts.$inferSelect;
+export type InsertUgcScript = z.infer<typeof insertUgcScriptSchema>;
+export type UgcCharacter = typeof ugcCharacters.$inferSelect;
+export type InsertUgcCharacter = z.infer<typeof insertUgcCharacterSchema>;
+export type UgcGeneratedImage = typeof ugcGeneratedImages.$inferSelect;
+export type InsertUgcGeneratedImage = z.infer<typeof insertUgcGeneratedImageSchema>;
+export type UgcVideoScene = typeof ugcVideoScenes.$inferSelect;
+export type InsertUgcVideoScene = z.infer<typeof insertUgcVideoSceneSchema>;
+export type UgcBrandAsset = typeof ugcBrandAssets.$inferSelect;
+export type InsertUgcBrandAsset = z.infer<typeof insertUgcBrandAssetSchema>;

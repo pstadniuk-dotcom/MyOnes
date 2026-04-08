@@ -72,6 +72,9 @@ const PRAgentPage = lazy(() => import("@/pages/admin/PRAgentPage"));
 const TrafficSourcesPage = lazy(() => import("@/pages/admin/TrafficSourcesPage"));
 const InfluencerHubPage = lazy(() => import("@/pages/admin/InfluencerHubPage"));
 const SocialPostsPage = lazy(() => import("@/pages/admin/SocialPostsPage"));
+const UgcStudioPage = lazy(() => import("@/pages/admin/UgcStudioPage"));
+const MetaAdsPage = lazy(() => import("@/pages/admin/MetaAdsPage"));
+const BrandStudioPage = lazy(() => import("@/pages/admin/BrandStudioPage"));
 import { AdminLayout } from "@/shared/components/AdminLayout";
 
 // Import shared/public components
@@ -384,6 +387,30 @@ function MainRouter() {
         <ProtectedAdminRoute>
           <AdminLayout>
             <Suspense fallback={<PageLoader />}><SocialPostsPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+
+      <Route path="/admin/ugc-studio">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><UgcStudioPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+
+      <Route path="/admin/meta-ads">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><MetaAdsPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+
+      <Route path="/admin/brand-studio">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><BrandStudioPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>

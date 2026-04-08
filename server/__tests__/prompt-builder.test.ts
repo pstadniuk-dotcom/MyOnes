@@ -212,7 +212,7 @@ describe('Prompt Context with Health Profile', () => {
     expect(prompt).toContain('DO NOT recommend Ovary Uterus Support');
   });
 
-  it('should include high stress guidance', () => {
+  it('should include stress level in health profile data', () => {
     const context = createTestContext({
       healthProfile: createTestHealthProfile({
         stressLevel: 9,
@@ -221,12 +221,11 @@ describe('Prompt Context with Health Profile', () => {
 
     const prompt = buildO1MiniPrompt(context);
 
-    // Should flag high stress
-    expect(prompt).toContain('HIGH STRESS');
-    expect(prompt).toContain('Ashwagandha');
+    // Should include stress data for the AI to reason about clinically
+    expect(prompt).toContain('Stress Level: 9');
   });
 
-  it('should include sleep deficiency guidance', () => {
+  it('should include sleep data in health profile', () => {
     const context = createTestContext({
       healthProfile: createTestHealthProfile({
         sleepHoursPerNight: 4,
@@ -235,8 +234,8 @@ describe('Prompt Context with Health Profile', () => {
 
     const prompt = buildO1MiniPrompt(context);
 
-    // Should flag sleep deficiency
-    expect(prompt).toContain('SLEEP DEFICIENCY');
+    // Should include sleep data for the AI to reason about clinically
+    expect(prompt).toContain('Sleep: 4');
   });
 });
 

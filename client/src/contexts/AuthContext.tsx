@@ -234,12 +234,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Clear any stale cached data from previous sessions so fresh data is loaded
       queryClient.clear();
 
-      toast({
-        title: "Welcome back!",
-        description: `Logged in as ${data.user.name}`,
-        variant: "default"
-      });
-
       // Redirect to appropriate page
       if (!data.user.emailVerified) {
         setLocation('/verify-email');
@@ -290,12 +284,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Clear any stale cached data from previous sessions so fresh data is loaded
       queryClient.clear();
 
-      toast({
-        title: "Welcome back!",
-        description: `Logged in with Google as ${data.user.name}`,
-        variant: "default"
-      });
-
       // Redirect to appropriate page
       if (!data.user.emailVerified) {
         setLocation('/verify-email');
@@ -343,12 +331,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Clear any stale cached data from previous sessions so fresh data is loaded
       queryClient.clear();
-
-      toast({
-        title: "Welcome back!",
-        description: `Logged in with Facebook as ${data.user.name}`,
-        variant: "default"
-      });
 
       // Redirect to dashboard
       setLocation('/dashboard');
@@ -466,12 +448,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.removeItem('user');
       localStorage.removeItem('consultation_draft');
       localStorage.removeItem('consultation_current_session');
-
-      toast({
-        title: "Logged Out",
-        description: "You have been logged out successfully.",
-        variant: "default"
-      });
 
       // Redirect to home page
       setLocation('/');

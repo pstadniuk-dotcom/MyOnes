@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getAuthHeaders } from '@/shared/lib/queryClient';
 import { buildApiUrl } from '@/shared/lib/api';
@@ -102,6 +102,7 @@ interface ContentIdea {
   angle: string;
   targetAudience: string;
   suggestedVisual: string;
+  imageUrl?: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -130,6 +131,16 @@ const TONES = [
   { value: 'authoritative and data-driven', label: 'Authoritative & Data-Driven' },
   { value: 'inspirational', label: 'Inspirational & Motivating' },
   { value: 'conversational', label: 'Conversational & Friendly' },
+] as const;
+
+const IMAGE_MODEL_OPTIONS = [
+  { value: '', label: 'Auto (Nano Banana 2)', description: 'Fast, affordable — uses brand assets when available' },
+  { value: 'fal-ai/flux-pro/v1.1', label: 'FLUX Pro 1.1', description: 'Premium photorealism for hero shots' },
+  { value: 'fal-ai/ideogram/v3', label: 'Ideogram v3', description: 'Best text rendering — logos, quotes, branded graphics' },
+  { value: 'fal-ai/recraft-v3', label: 'Recraft v3', description: 'Illustrations, icons, ingredient art' },
+  { value: 'fal-ai/seedream-3', label: 'Seedream 3', description: 'Editorial and stylized imagery' },
+  { value: 'fal-ai/gpt-image-1', label: 'GPT Image 1', description: 'Strong prompt adherence and photorealism' },
+  { value: 'fal-ai/flux/dev', label: 'FLUX.1 Dev', description: 'Good all-rounder, open-weight' },
 ] as const;
 
 // ── Utility Components ────────────────────────────────────────────────────────
@@ -263,12 +274,16 @@ function PostResultCard({
   index,
   onGenerateImage,
   isGeneratingImage,
+  onUpdateCaption,
 }: {
   post: GeneratedPost;
   index: number;
   onGenerateImage: (index: number) => void;
   isGeneratingImage: boolean;
+  onUpdateCaption: (index: number, caption: string) => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(post.caption);
   const normalizeTag = (h: string) => `#${h.replace(/^#+/, '')}`;
   const fullText = post.caption + (post.hashtags?.length ? '\n\n' + post.hashtags.map(normalizeTag).join(' ') : '');
 
@@ -317,11 +332,38 @@ function PostResultCard({
                 <Type className="h-3.5 w-3.5 text-blue-500" />
                 <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Caption</span>
               </div>
-              <CopyButton text={post.caption} />
+              <div className="flex items-center gap-1">
+                {isEditing ? (
+                  <>
+                    <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-green-600 hover:text-green-700" onClick={() => { onUpdateCaption(index, editValue); setIsEditing(false); }}>
+                      <Check className="h-3 w-3" /> Save
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => { setEditValue(post.caption); setIsEditing(false); }}>
+                      <X className="h-3 w-3" /> Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => { setEditValue(post.caption); setIsEditing(true); }}>
+                      <PenTool className="h-3 w-3" /> Edit
+                    </Button>
+                    <CopyButton text={post.caption} />
+                  </>
+                )}
+              </div>
             </div>
-            <div className="text-sm whitespace-pre-wrap leading-relaxed bg-white border rounded-lg p-3 max-h-[180px] overflow-y-auto">
-              {post.caption}
-            </div>
+            {isEditing ? (
+              <textarea
+                className="w-full text-sm leading-relaxed bg-white border-2 border-blue-300 rounded-lg p-3 min-h-[120px] max-h-[220px] resize-y focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                autoFocus
+              />
+            ) : (
+              <div className="text-sm whitespace-pre-wrap leading-relaxed bg-white border rounded-lg p-3 max-h-[180px] overflow-y-auto cursor-pointer hover:border-gray-300 transition-colors" onClick={() => { setEditValue(post.caption); setIsEditing(true); }} title="Click to edit">
+                {post.caption}
+              </div>
+            )}
           </div>
 
           {/* Hashtags */}
@@ -372,7 +414,19 @@ function PostResultCard({
 
 // ── Content Calendar Idea Card ──────────────────────────────────────────────
 
-function IdeaCard({ idea, index }: { idea: ContentIdea; index: number }) {
+function IdeaCard({
+  idea,
+  index,
+  onGenerateImage,
+  isGeneratingImage,
+  onCreatePost,
+}: {
+  idea: ContentIdea;
+  index: number;
+  onGenerateImage: (index: number) => void;
+  isGeneratingImage: boolean;
+  onCreatePost?: (idea: ContentIdea) => void;
+}) {
   return (
     <div className="flex gap-4 items-start">
       {/* Day marker */}
@@ -387,7 +441,16 @@ function IdeaCard({ idea, index }: { idea: ContentIdea; index: number }) {
       <Card className="flex-1 mb-3">
         <CardContent className="p-4 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">{idea.day}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">{idea.day}</span>
+              <span className="text-[10px] text-muted-foreground/60">
+                {(() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + index);
+                  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                })()}
+              </span>
+            </div>
             <div className="flex gap-1.5">
               <Badge className={cn('text-[10px] px-2 py-0.5', platformColor(idea.platform))}>
                 {idea.platform}
@@ -399,6 +462,22 @@ function IdeaCard({ idea, index }: { idea: ContentIdea; index: number }) {
           </div>
           <h4 className="font-semibold text-sm">{idea.title}</h4>
           <p className="text-sm text-muted-foreground leading-relaxed">{idea.description}</p>
+
+          {/* Generated image display */}
+          {idea.imageUrl && (
+            <div className="relative rounded-lg overflow-hidden border bg-gray-50">
+              <img src={idea.imageUrl} alt={idea.title} className="w-full h-48 object-cover" />
+              <a
+                href={idea.imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute bottom-2 right-2 flex items-center gap-1 text-xs bg-white/90 backdrop-blur px-2 py-1 rounded-md text-blue-600 hover:text-blue-700 shadow-sm"
+              >
+                <Download className="h-3 w-3" /> Download
+              </a>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
             <div className="bg-gray-50 rounded p-2">
               <span className="font-semibold text-gray-500 block mb-0.5">Angle</span>
@@ -408,11 +487,41 @@ function IdeaCard({ idea, index }: { idea: ContentIdea; index: number }) {
               <span className="font-semibold text-gray-500 block mb-0.5">Audience</span>
               <span className="text-gray-700">{idea.targetAudience}</span>
             </div>
-            <div className="bg-gray-50 rounded p-2">
-              <span className="font-semibold text-gray-500 block mb-0.5">Visual</span>
-              <span className="text-gray-700">{idea.suggestedVisual}</span>
+            <div className="bg-gray-50 rounded p-2 flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-500 block mb-0.5">Visual</span>
+                <span className="text-gray-700">{idea.suggestedVisual}</span>
+              </div>
+              <Button
+                size="sm"
+                variant={idea.imageUrl ? 'outline' : 'default'}
+                className="shrink-0 gap-1 text-[10px] h-7 px-2 mt-1"
+                onClick={() => onGenerateImage(index)}
+                disabled={isGeneratingImage}
+              >
+                {isGeneratingImage ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <ImageIcon className="h-3 w-3" />
+                )}
+                {isGeneratingImage ? 'Generating...' : idea.imageUrl ? 'Regenerate' : 'Generate'}
+              </Button>
             </div>
           </div>
+
+          {/* Bridge to Create Post */}
+          {onCreatePost && (
+            <div className="pt-2 border-t mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-1.5 text-xs h-8"
+                onClick={() => onCreatePost(idea)}
+              >
+                <Sparkles className="h-3 w-3" /> Generate Full Post from This Idea
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -431,15 +540,39 @@ export default function SocialPostsPage() {
   const [contentType, setContentType] = useState('educational');
   const [postCount, setPostCount] = useState(3);
   const [includeHashtags, setIncludeHashtags] = useState(true);
-  const [generatedPosts, setGeneratedPosts] = useState<GeneratedPost[]>([]);
+  const [generatedPosts, setGeneratedPosts] = useState<GeneratedPost[]>(() => {
+    try {
+      const stored = sessionStorage.getItem('social-generated-posts');
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+
+  // Image model selection
+  const [imageModel, setImageModel] = useState<string>('');
 
   // Image generation tracking per post index
   const [generatingImageIdx, setGeneratingImageIdx] = useState<number | null>(null);
 
-  // Calendar state
+  // Calendar state — persisted to sessionStorage so it survives re-renders / token refresh
   const [daysAhead, setDaysAhead] = useState(7);
-  const [weekTheme, setWeekTheme] = useState('');
-  const [ideas, setIdeas] = useState<ContentIdea[]>([]);
+  const [weekTheme, setWeekTheme] = useState(() => {
+    try { return sessionStorage.getItem('social-calendar-theme') || ''; } catch { return ''; }
+  });
+  const [ideas, setIdeas] = useState<ContentIdea[]>(() => {
+    try {
+      const stored = sessionStorage.getItem('social-calendar-ideas');
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+
+  // Sync all generated content to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('social-calendar-theme', weekTheme);
+      sessionStorage.setItem('social-calendar-ideas', JSON.stringify(ideas));
+      sessionStorage.setItem('social-generated-posts', JSON.stringify(generatedPosts));
+    } catch { /* storage full or unavailable */ }
+  }, [weekTheme, ideas, generatedPosts]);
 
   // Brand Kit state
   const [uploadCategory, setUploadCategory] = useState<string>('social_post');
@@ -582,6 +715,7 @@ export default function SocialPostsPage() {
       const res = await apiRequest('POST', '/api/admin/social/generate-image', {
         visualConcept: post.imageOverlay.visualConcept,
         platform: post.platform,
+        modelId: imageModel || undefined,
       });
       return res.json();
     },
@@ -612,6 +746,40 @@ export default function SocialPostsPage() {
     imageMutation.mutate({ index });
   };
 
+  // Batch image generation for all posts without images
+  const [batchGeneratingPosts, setBatchGeneratingPosts] = useState(false);
+  const generateAllPostImages = useCallback(async () => {
+    const postsNeedingImages = generatedPosts.map((p, i) => ({ post: p, index: i })).filter(({ post }) => !post.imageUrl);
+    if (postsNeedingImages.length === 0) { toast({ title: 'All posts already have images' }); return; }
+
+    setBatchGeneratingPosts(true);
+    let completed = 0;
+    for (const { post, index } of postsNeedingImages) {
+      setGeneratingImageIdx(index);
+      try {
+        const res = await apiRequest('POST', '/api/admin/social/generate-image', {
+          visualConcept: post.imageOverlay.visualConcept,
+          platform: post.platform,
+          modelId: imageModel || undefined,
+        });
+        const data = await res.json();
+        if (data.imageUrl) {
+          setGeneratedPosts(prev => {
+            const updated = [...prev];
+            updated[index] = { ...updated[index], imageUrl: data.imageUrl };
+            return updated;
+          });
+          completed++;
+        }
+      } catch (err: any) {
+        toast({ title: `Image ${index + 1} failed`, description: err.message, variant: 'destructive' });
+      }
+    }
+    setGeneratingImageIdx(null);
+    setBatchGeneratingPosts(false);
+    if (completed > 0) toast({ title: `${completed} image${completed > 1 ? 's' : ''} generated!` });
+  }, [generatedPosts, imageModel, toast]);
+
   const ideasMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', '/api/admin/social/generate-ideas', { daysAhead });
@@ -620,7 +788,7 @@ export default function SocialPostsPage() {
     onSuccess: (data) => {
       setWeekTheme(data.weekTheme || '');
       setIdeas(data.ideas || []);
-      toast({ title: `${(data.ideas || []).length}-day content plan ready` });
+      toast({ title: `${(data.ideas || []).length}-day content plan ready`, description: 'Click "Generate" on any idea to create a brand-matched image.' });
     },
     onError: (err: Error) => {
       const msg = err.message;
@@ -631,9 +799,94 @@ export default function SocialPostsPage() {
     },
   });
 
+  // Calendar image generation
+  const [generatingCalendarImageIdx, setGeneratingCalendarImageIdx] = useState<number | null>(null);
+
+  const calendarImageMutation = useMutation({
+    mutationFn: async ({ index }: { index: number }) => {
+      const idea = ideas[index];
+      const res = await apiRequest('POST', '/api/admin/social/generate-image', {
+        visualConcept: idea.suggestedVisual,
+        platform: idea.platform,
+        modelId: imageModel || undefined,
+      });
+      return res.json();
+    },
+    onSuccess: (data, vars) => {
+      if (data.imageUrl) {
+        setIdeas(prev => {
+          const updated = [...prev];
+          updated[vars.index] = { ...updated[vars.index], imageUrl: data.imageUrl };
+          return updated;
+        });
+        toast({ title: 'Image generated!' });
+      }
+    },
+    onError: (err: Error) => {
+      const msg = err.message;
+      const friendly = msg.includes('FAL_KEY')
+        ? 'FAL_KEY not set — add it to your environment to enable image generation.'
+        : msg.includes('429') || msg.includes('quota')
+        ? 'Image generation quota exceeded — check your fal.ai billing.'
+        : msg;
+      toast({ title: 'Image generation failed', description: friendly, variant: 'destructive' });
+    },
+    onSettled: () => setGeneratingCalendarImageIdx(null),
+  });
+
+  const handleCalendarGenerateImage = (index: number) => {
+    setGeneratingCalendarImageIdx(index);
+    calendarImageMutation.mutate({ index });
+  };
+
+  // Batch image generation for all calendar ideas without images
+  const [batchGeneratingCalendar, setBatchGeneratingCalendar] = useState(false);
+  const generateAllCalendarImages = useCallback(async () => {
+    const ideasNeedingImages = ideas.map((idea, i) => ({ idea, index: i })).filter(({ idea }) => !idea.imageUrl);
+    if (ideasNeedingImages.length === 0) { toast({ title: 'All ideas already have images' }); return; }
+
+    setBatchGeneratingCalendar(true);
+    let completed = 0;
+    for (const { idea, index } of ideasNeedingImages) {
+      setGeneratingCalendarImageIdx(index);
+      try {
+        const res = await apiRequest('POST', '/api/admin/social/generate-image', {
+          visualConcept: idea.suggestedVisual,
+          platform: idea.platform,
+          modelId: imageModel || undefined,
+        });
+        const data = await res.json();
+        if (data.imageUrl) {
+          setIdeas(prev => {
+            const updated = [...prev];
+            updated[index] = { ...updated[index], imageUrl: data.imageUrl };
+            return updated;
+          });
+          completed++;
+        }
+      } catch (err: any) {
+        toast({ title: `Image ${index + 1} failed`, description: err.message, variant: 'destructive' });
+      }
+    }
+    setGeneratingCalendarImageIdx(null);
+    setBatchGeneratingCalendar(false);
+    if (completed > 0) toast({ title: `${completed} image${completed > 1 ? 's' : ''} generated!` });
+  }, [ideas, imageModel, toast]);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const [activeTab, setActiveTab] = useState('create');
   const selectedPlatform = PLATFORMS.find(p => p.value === platform)!;
+
+  // Bridge: take a calendar idea and pre-fill the Create Post form
+  const handleCreatePostFromIdea = useCallback((idea: ContentIdea) => {
+    setPlatform(idea.platform);
+    setTopic(idea.title + ' — ' + idea.angle);
+    setContentType(idea.contentType as any);
+    setPostCount(1);
+    setActiveTab('create');
+    toast({ title: 'Idea loaded!', description: 'Topic and platform pre-filled from your calendar idea. Hit Generate.' });
+  }, [toast]);
 
   return (
     <div className="space-y-6">
@@ -645,7 +898,7 @@ export default function SocialPostsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="create" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-muted/50 p-1">
           <TabsTrigger value="create" className="gap-1.5 data-[state=active]:bg-white">
             <PenTool className="h-4 w-4" />
@@ -780,6 +1033,22 @@ export default function SocialPostsPage() {
 
                 <div className="flex-1" />
 
+                {/* Brand profile status indicator */}
+                {brandProfile ? (
+                  <div className="flex items-center gap-1.5 text-xs text-violet-600 bg-violet-50 border border-violet-200 rounded-lg px-3 h-10">
+                    <PaletteIcon className="h-3.5 w-3.5" />
+                    <span className="font-medium">Brand style active</span>
+                    {brandProfile.colorPalette.slice(0, 3).map((color, i) => (
+                      <div key={i} className="w-3.5 h-3.5 rounded-full border border-white shadow-sm" style={{ backgroundColor: color }} />
+                    ))}
+                  </div>
+                ) : brandAssets.length > 0 ? (
+                  <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 h-10">
+                    <PaletteIcon className="h-3.5 w-3.5" />
+                    <span>Assets uploaded — <button className="underline font-medium" onClick={() => analyzeBrandMutation.mutate()}>analyze brand style</button></span>
+                  </div>
+                ) : null}
+
                 <Button
                   size="lg"
                   onClick={() => generateMutation.mutate()}
@@ -808,11 +1077,37 @@ export default function SocialPostsPage() {
 
           {generatedPosts.length > 0 && !generateMutation.isPending && (
             <div className="space-y-5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <h2 className="text-lg font-bold">{generatedPosts.length} Post{generatedPosts.length > 1 ? 's' : ''} Generated</h2>
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => generateMutation.mutate()}>
-                  <RefreshCw className="h-3.5 w-3.5" /> Regenerate All
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select
+                    value={imageModel}
+                    onChange={(e) => setImageModel(e.target.value)}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    title="Select which AI model to use for image generation"
+                  >
+                    {IMAGE_MODEL_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  {generatedPosts.some(p => !p.imageUrl) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={generateAllPostImages}
+                      disabled={batchGeneratingPosts}
+                    >
+                      {batchGeneratingPosts ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                      {batchGeneratingPosts ? 'Generating...' : `Generate All Images (${generatedPosts.filter(p => !p.imageUrl).length})`}
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => generateMutation.mutate()}>
+                    <RefreshCw className="h-3.5 w-3.5" /> Regenerate All
+                  </Button>
+                </div>
               </div>
               {generatedPosts.map((post, i) => (
                 <PostResultCard
@@ -821,6 +1116,13 @@ export default function SocialPostsPage() {
                   index={i}
                   onGenerateImage={handleGenerateImage}
                   isGeneratingImage={generatingImageIdx === i}
+                  onUpdateCaption={(idx, caption) => {
+                    setGeneratedPosts(prev => {
+                      const updated = [...prev];
+                      updated[idx] = { ...updated[idx], caption };
+                      return updated;
+                    });
+                  }}
                 />
               ))}
             </div>
@@ -879,6 +1181,38 @@ export default function SocialPostsPage() {
 
           {ideas.length > 0 && !ideasMutation.isPending && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h2 className="text-lg font-bold">{ideas.length}-Day Content Plan</h2>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select
+                    value={imageModel}
+                    onChange={(e) => setImageModel(e.target.value)}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    title="Select which AI model to use for image generation"
+                  >
+                    {IMAGE_MODEL_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  {ideas.some(i => !i.imageUrl) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={generateAllCalendarImages}
+                      disabled={batchGeneratingCalendar}
+                    >
+                      {batchGeneratingCalendar ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                      {batchGeneratingCalendar ? 'Generating...' : `Generate All Images (${ideas.filter(i => !i.imageUrl).length})`}
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => ideasMutation.mutate()}>
+                    <RefreshCw className="h-3.5 w-3.5" /> Regenerate Plan
+                  </Button>
+                </div>
+              </div>
               {weekTheme && (
                 <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
                   <CardContent className="p-4 flex items-center gap-3">
@@ -894,7 +1228,14 @@ export default function SocialPostsPage() {
               )}
               <div>
                 {ideas.map((idea, i) => (
-                  <IdeaCard key={i} idea={idea} index={i} />
+                  <IdeaCard
+                    key={i}
+                    idea={idea}
+                    index={i}
+                    onGenerateImage={handleCalendarGenerateImage}
+                    isGeneratingImage={generatingCalendarImageIdx === i}
+                    onCreatePost={handleCreatePostFromIdea}
+                  />
                 ))}
               </div>
             </div>

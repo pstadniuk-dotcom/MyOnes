@@ -1,4 +1,5 @@
 import "./env";
+// force reload
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -50,7 +51,7 @@ const cspDirectives = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: https: blob: https://platform-lookaside.fbsbx.com",
-  "media-src 'self' data: blob:",
+  "media-src 'self' data: blob: https://*.supabase.co https://supabase.co",
   "connect-src 'self' https://api.openai.com https://api.anthropic.com https://accounts.google.com/gsi/ https://www.facebook.com https://web.facebook.com https://graph.facebook.com https://facebook.com wss: ws:",
   "frame-src 'self' https://www.youtube.com https://youtube.com https://accounts.google.com/ https://www.facebook.com https://web.facebook.com",
   "frame-ancestors 'none'",
@@ -73,6 +74,7 @@ app.use(helmet({
         "https://www.ones.health",
         ...(!isDevMode ? [] : ["http://localhost:5000", "http://127.0.0.1:5000"]),
       ],
+      mediaSrc: ["'self'", "data:", "blob:", "https://*.supabase.co", "https://supabase.co"],
       connectSrc: ["'self'", "https://api.openai.com", "https://api.anthropic.com", "https://accounts.google.com/gsi/", "https://www.facebook.com", "https://web.facebook.com", "https://graph.facebook.com", "https://facebook.com","https://maps.googleapis.com",  "https://maps.gstatic.com", "https://places.googleapis.com", "wss:", "ws:"],
       frameSrc: ["'self'", "blob:", "https://www.youtube.com", "https://youtube.com", "https://accounts.google.com/", "https://www.facebook.com", "https://web.facebook.com"],
       frameAncestors: ["'none'"],

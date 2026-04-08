@@ -1733,7 +1733,7 @@ export default function LabReportsPage() {
             {/* Filters */}
             <div className="flex flex-wrap gap-2 mt-3">
               {/* Search */}
-              <div className="relative flex-1 min-w-[200px]">
+              <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#5a6623]" />
                 <input
                   type="text"

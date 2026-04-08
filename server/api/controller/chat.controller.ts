@@ -301,7 +301,7 @@ export class ChatController {
             model = normalizeModel(aiProvider, model) || model;
 
             // Analyze query intent to determine scope
-            const queryIntent = await analyzeQueryIntent(message);
+            const queryIntent = analyzeQueryIntent(message);
             sendSSE({
                 type: 'thinking_step',
                 step: 'understand_query',

@@ -107,6 +107,15 @@ const CATEGORIES = [
 
 const TONES = ['informative', 'educational', 'authoritative', 'conversational', 'motivational'];
 
+const BLOG_IMAGE_MODEL_OPTIONS = [
+  { value: '', label: 'Auto (Nano Banana 2)', description: 'Fast, photorealistic — $0.01/image' },
+  { value: 'fal-ai/flux-pro/v1.1', label: 'FLUX Pro 1.1', description: 'Premium editorial photography' },
+  { value: 'fal-ai/ideogram/v3', label: 'Ideogram v3', description: 'Great text rendering in images' },
+  { value: 'fal-ai/recraft-v3', label: 'Recraft v3', description: 'Illustrations and artistic style' },
+  { value: 'fal-ai/seedream-3', label: 'Seedream 3', description: 'Stylized editorial imagery' },
+  { value: 'fal-ai/gpt-image-1', label: 'GPT Image 1', description: 'Strong photorealism' },
+];
+
 // ──────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────
@@ -496,6 +505,7 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
     secondaryKeywords: '',
     category: '',
     tone: 'informative',
+    imageModel: '',
   });
 
   const generateMutation = useMutation({
@@ -518,7 +528,7 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
         secondaryKeywords: Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.join(', ') : (genForm.secondaryKeywords || ''),
         metaTitle: g.metaTitle ?? '',
         metaDescription: g.metaDescription ?? '',
-        featuredImage: '',
+        featuredImage: g.featuredImage ?? '',
         authorName: g.authorName ?? 'Ones Editorial Team',
         isPublished: false,
         readTimeMinutes: String(g.readTimeMinutes ?? 8),
@@ -624,6 +634,27 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
                 onChange={e => setGenForm(f => ({ ...f, secondaryKeywords: e.target.value }))}
               />
               <p className="text-xs text-gray-400">Used as H2 subheadings — drives long-tail ranking</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Featured Image Model</Label>
+              <Select
+                value={genForm.imageModel || '__default'}
+                onValueChange={v => setGenForm(f => ({ ...f, imageModel: v === '__default' ? '' : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Auto (Nano Banana 2)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {BLOG_IMAGE_MODEL_OPTIONS.map(m => (
+                    <SelectItem key={m.value || '__default'} value={m.value || '__default'}>
+                      <span>{m.label}</span>
+                      <span className="ml-2 text-xs text-gray-400">{m.description}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-400">Which AI model generates the featured image</p>
             </div>
 
             <Button

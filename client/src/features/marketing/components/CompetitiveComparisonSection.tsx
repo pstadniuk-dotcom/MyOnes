@@ -234,7 +234,7 @@ export default function CompetitiveComparisonSection() {
             revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
           }`}
         >
-          <div className="inline-flex bg-[#ede8e2] rounded-full p-1.5 gap-1">
+          <div className="inline-flex bg-[#ede8e2] rounded-full p-1.5 gap-1 max-w-full overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -242,13 +242,13 @@ export default function CompetitiveComparisonSection() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                  className={`flex items-center gap-2 px-3 py-2 sm:px-5 sm:py-2.5 rounded-full transition-all duration-300 cursor-pointer whitespace-nowrap ${
                     isActive
                       ? "bg-[#054700] text-[#ede8e2] shadow-md"
                       : "text-[#054700]/60 hover:text-[#054700] hover:bg-white/50"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-4 h-4 flex-shrink-0" />
                   <span className="font-medium text-sm">{tab.label}</span>
                 </button>
               );

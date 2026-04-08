@@ -37,6 +37,9 @@ import {
   Globe,
   Crown,
   Target,
+  Video,
+  Tv,
+  Palette,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
@@ -84,6 +87,9 @@ const navSections: { label?: string; items: NavItem[] }[] = [
       { label: 'Outreach Agent', href: '/admin/outreach', icon: Target },
       { label: 'Influencer Hub', href: '/admin/influencers', icon: Crown },
       { label: 'Social Studio', href: '/admin/social', icon: Megaphone },
+      { label: 'UGC Studio', href: '/admin/ugc-studio', icon: Video },
+      { label: 'Meta Ads', href: '/admin/meta-ads', icon: Tv },
+      { label: 'Brand Studio', href: '/admin/brand-studio', icon: Palette },
     ],
   },
   {
