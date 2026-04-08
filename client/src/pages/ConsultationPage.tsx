@@ -49,11 +49,11 @@ function deriveCapsuleRecommendationFromMessage(content: string): CapsuleRecomme
           recommendedCapsules,
           reasoning: typeof parsed?.summary === 'string' && parsed.summary.trim().length > 0
             ? parsed.summary
-            : 'Select your preferred DAILY capsule count and I’ll create your formula immediately.',
+            : "Select your preferred DAILY capsule count and I'll create your formula immediately.",
           priorities: Array.isArray(parsed?.signals)
             ? parsed.signals.filter((signal: unknown) => typeof signal === 'string').slice(0, 6)
             : [],
-          estimatedAmazonCost: 0,
+
         };
       }
     } catch {
@@ -66,15 +66,14 @@ function deriveCapsuleRecommendationFromMessage(content: string): CapsuleRecomme
     const parsed = Number(persistedTokenMatch[1]) as CapsuleCount;
     return {
       recommendedCapsules: parsed,
-      reasoning: 'Select your preferred DAILY capsule count and I’ll create your formula immediately. We recommend higher daily counts only when clinically needed.',
+      reasoning: "Select your preferred DAILY capsule count and I'll create your formula immediately. We recommend higher daily counts only when clinically needed.",
       priorities: [],
-      estimatedAmazonCost: 0,
     };
   }
 
   const asksForCapsuleSelection =
     normalized.includes('select your preferred daily capsule count') ||
-    normalized.includes('select your preferred capsule count and i’ll create your formula immediately') ||
+    normalized.includes("select your preferred capsule count and i'll create your formula immediately") ||
     normalized.includes('select your preferred capsule count and i\'ll create your formula immediately') ||
     normalized.includes('select your daily protocol');
 
@@ -94,9 +93,8 @@ function deriveCapsuleRecommendationFromMessage(content: string): CapsuleRecomme
 
   return {
     recommendedCapsules: parsed,
-    reasoning: 'Select your preferred DAILY capsule count and I’ll create your formula immediately. We recommend higher daily counts only when clinically needed.',
+    reasoning: "Select your preferred DAILY capsule count and I'll create your formula immediately. We recommend higher daily counts only when clinically needed.",
     priorities: [],
-    estimatedAmazonCost: 0,
   };
 }
 
@@ -104,7 +102,6 @@ interface CapsuleRecommendation {
   recommendedCapsules: CapsuleCount;
   reasoning: string;
   priorities: string[];
-  estimatedAmazonCost: number;
 }
 
 interface Message {

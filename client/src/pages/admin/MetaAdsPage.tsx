@@ -83,6 +83,11 @@ export default function MetaAdsPage() {
   const [uploadBase64, setUploadBase64] = useState<string | null>(null);
   const [uploadMimeType, setUploadMimeType] = useState<string>('');
   const [brandContext, setBrandContext] = useState('');
+
+  // AI creative generation state
+  const [creativePrompt, setCreativePrompt] = useState('');
+  const [creativeModel, setCreativeModel] = useState('fal-ai/flux-pro/v1.1');
+  const [creativeAspectRatio, setCreativeAspectRatio] = useState('1:1');
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [selectedDraft, setSelectedDraft] = useState<AdDraft | null>(null);
   const [editingVariant, setEditingVariant] = useState<{
@@ -129,6 +134,36 @@ export default function MetaAdsPage() {
     },
     onError: (err: Error) => {
       toast({ title: 'Generation failed', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  const generateCreativeMutation = useMutation({
+    mutationFn: async (data: { prompt: string; modelId: string; aspectRatio: string }) => {
+      const res = await apiRequest('POST', '/api/admin/meta-ads/generate-creative', data);
+      return await res.json() as { success: boolean; imageUrl: string; modelUsed: string };
+    },
+    onSuccess: async (data: { success: boolean; imageUrl: string; modelUsed: string }) => {
+      toast({ title: 'Creative generated!', description: `Model: ${data.modelUsed}` });
+      // Set the generated image as the upload preview so the copy generation flow works
+      setUploadPreview(data.imageUrl);
+      // Fetch image and convert to base64 for the generate-copy endpoint
+      try {
+        const resp = await fetch(data.imageUrl);
+        const blob = await resp.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          setUploadBase64(result.split(',')[1]);
+          setUploadMimeType(blob.type || 'image/jpeg');
+        };
+        reader.readAsDataURL(blob);
+      } catch {
+        // If base64 conversion fails, user can still see the preview
+        setUploadMimeType('image/jpeg');
+      }
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Creative generation failed', description: err.message, variant: 'destructive' });
     },
   });
 
@@ -379,6 +414,83 @@ export default function MetaAdsPage() {
               <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Generating ad copy...</>
             ) : (
               <><Sparkles className="h-4 w-4 mr-2" /> Generate Ad Copy</>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* AI Creative Generation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            Generate Creative with AI
+          </CardTitle>
+          <CardDescription>
+            Describe the ad creative you want and AI will generate it. The image will be loaded into the upload area above.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="creativePrompt" className="text-sm">Creative description</Label>
+            <Textarea
+              id="creativePrompt"
+              placeholder="e.g., 'A serene morning scene with supplement capsules on a marble countertop next to a smoothie, warm golden light'"
+              value={creativePrompt}
+              onChange={(e) => setCreativePrompt(e.target.value)}
+              className="mt-1"
+              rows={3}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm">Model</Label>
+              <Select value={creativeModel} onValueChange={setCreativeModel}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fal-ai/flux-pro/v1.1">FLUX Pro 1.1</SelectItem>
+                  <SelectItem value="fal-ai/ideogram/v3">Ideogram v3</SelectItem>
+                  <SelectItem value="fal-ai/recraft-v3">Recraft v3</SelectItem>
+                  <SelectItem value="fal-ai/nano-banana-2">Nano Banana 2</SelectItem>
+                  <SelectItem value="fal-ai/gpt-image-1">GPT Image 1</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm">Aspect Ratio</Label>
+              <Select value={creativeAspectRatio} onValueChange={setCreativeAspectRatio}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1:1">1:1 (Square)</SelectItem>
+                  <SelectItem value="16:9">16:9 (Landscape)</SelectItem>
+                  <SelectItem value="9:16">9:16 (Portrait / Story)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Button
+            className="w-full"
+            size="lg"
+            variant="outline"
+            disabled={!creativePrompt.trim() || generateCreativeMutation.isPending}
+            onClick={() => {
+              generateCreativeMutation.mutate({
+                prompt: creativePrompt,
+                modelId: creativeModel,
+                aspectRatio: creativeAspectRatio,
+              });
+            }}
+          >
+            {generateCreativeMutation.isPending ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Generating image...</>
+            ) : (
+              <><Sparkles className="h-4 w-4 mr-2" /> Generate Creative</>
             )}
           </Button>
         </CardContent>

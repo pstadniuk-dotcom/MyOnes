@@ -651,9 +651,10 @@ export function validateAndCorrectIngredientNames(formula: any) {
 }
 
 /**
- * Comprehensive rule-based medication–supplement interaction checker.
- * Covers 19 drug categories plus antiplatelet stacking detection.
- * Acts as a deterministic safety net on top of AI-generated warnings.
+ * @deprecated Use validateFormulaSafety from safety-validator.ts instead.
+ * This function is superseded by the structured SafetyWarning system which provides
+ * severity-tiered enforcement (critical/serious/informational) and sub-ingredient expansion.
+ * Kept as dead code reference — safe to remove entirely.
  */
 export async function validateSupplementInteractions(formula: any, userMedications: string[]): Promise<string[]> {
     const warnings: string[] = [];

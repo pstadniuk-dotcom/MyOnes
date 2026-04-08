@@ -369,7 +369,7 @@ Please revise the article content accordingly.`;
 /** POST /api/blog/admin/generate — generate a new article with AI */
 export async function adminAiGenerate(req: Request, res: Response) {
   try {
-    const { title, topic, keywords, category, tone = 'informative', secondaryKeywords = '' } = req.body;
+    const { title, topic, keywords, category, tone = 'informative', secondaryKeywords = '', imageModel } = req.body;
     if (!title && !topic) {
       return res.status(400).json({ error: 'title or topic is required' });
     }
@@ -542,6 +542,7 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
         generated.featuredImage = await generateBlogImage(
           generated.title ?? title ?? topic,
           imgSlug,
+          imageModel || undefined,
         );
       } catch (imgErr: any) {
         logger.error('[blog] Image generation failed, continuing without image', { error: imgErr.message });

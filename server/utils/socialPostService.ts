@@ -9,8 +9,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import { fal } from '@fal-ai/client';
 import { jsonrepair } from 'jsonrepair';
 import { logger } from '../infra/logging/logger';
+import { logFalAiUsage } from '../modules/ai-usage/ai-usage.service';
 import { getBrandPromptPrefix, listBrandAssets, type BrandAsset } from './brandAssetService';
 import { aiRuntimeSettings } from '../infra/ai/ai-config';
+import { generateImage as falGenerateImage, IMAGE_MODELS, type ImageModelId, uploadGeneratedAsset } from './falAiService';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,6 +48,7 @@ export interface GeneratedPost {
 export interface GenerateImageInput {
   visualConcept: string;
   platform: 'instagram' | 'twitter' | 'linkedin' | 'facebook' | 'tiktok' | 'threads';
+  modelId?: string; // optional model override — routes to centralized falAiService
 }
 
 export interface IdeaBatch {
@@ -188,10 +191,13 @@ Brand voice:
 Key product facts to reference naturally:
 - AI health practitioner analyzes blood work, wearable data, and health history
 - Custom capsule formulas from 200+ clinically validated ingredients
+- Product form: capsules in a bottle — NOT packets, NOT sachets, NOT powder bags
 - System Blends: Adrenal Support, Liver Support, Heart Support, Thyroid Support, etc.
 - Popular ingredients: Ashwagandha (KSM-66 600mg), Omega-3, Vitamin D3+K2, Magnesium Glycinate, CoQ10, NAC, NMN
 - Available in 6, 9, or 12-capsule daily plans
 - Competitors to compare against: Viome, Thorne, Ritual, Function Health (never mention Care/Of — shut down 2023)
+
+IMPORTANT for visual concepts: When suggesting visuals, NEVER describe packets, sachets, or powder bags. The product is capsules. Reference the brand kit images for accurate product representation.
 
 Platform-specific rules:
 - Instagram: Visual-first, 2200 char max, 20-30 hashtags, carousel/reel CTA
@@ -302,6 +308,27 @@ export async function generateSocialImage(input: GenerateImageInput): Promise<st
 
   let falUrl: string;
 
+  // ── Model override: use centralized service ────────────────────────
+  if (input.modelId && !input.modelId.includes('nano-banana')) {
+    const modelInfo = IMAGE_MODELS[input.modelId as ImageModelId];
+    if (!modelInfo) throw new Error(`Unknown model: ${input.modelId}`);
+
+    const prompt = `${brandPrefix}Professional social media photography. ${visualConcept}. Shot on mirrorless camera, natural lighting, magazine quality, vibrant but natural colors, clean modern aesthetic. No text, no watermarks, no logos in the image.`;
+
+    const result = await falGenerateImage({
+      modelId: input.modelId as ImageModelId,
+      prompt,
+      negativePrompt: 'text, words, letters, watermark, logo, banner, overlay, packet, sachet, powder bag, illustration, cartoon, drawing, 3d render, digital art, painting, sketch, anime, blurry, low quality, deformed',
+      imageSize: imageSize,
+      aspectRatio: aspectRatio,
+      referenceImageUrls: modelInfo.supportsReferenceImages && brandAssets.length > 0
+        ? brandAssets.slice(0, 5).map(a => a.url)
+        : undefined,
+    });
+
+    return uploadGeneratedAsset(result.url, 'social-images', 'social', 'image/jpeg');
+  }
+
   if (brandAssets.length > 0) {
     // ── Use nano-banana-2/edit with brand reference images ──────────
     // Prioritize: logos first, then social posts/ads for style, then others
@@ -314,12 +341,10 @@ export async function generateSocialImage(input: GenerateImageInput): Promise<st
     const referenceUrls = prioritized.slice(0, 5).map(a => a.url);
 
     const prompt =
-      `Create a new professional social media image for a premium health & wellness brand called "Ones". ` +
-      `Use the visual style, colors, branding elements, and aesthetic from the provided reference images. ` +
+      `Create a new social media image matching the exact visual style, colors, and aesthetic of the provided reference images. ` +
       `${brandPrefix}` +
       `The scene: ${visualConcept}. ` +
-      `Magazine quality, vibrant but natural colors, clean modern design. ` +
-      `Incorporate the brand's logo and visual identity from the reference images.`;
+      `Magazine quality, vibrant but natural colors, clean modern design.`;
 
     logger.info(`[social-img] Generating ${aspectRatio} image for ${platform} with ${referenceUrls.length} brand ref(s): "${visualConcept.substring(0, 80)}..."`);
 
@@ -339,7 +364,7 @@ export async function generateSocialImage(input: GenerateImageInput): Promise<st
   } else {
     // ── Fallback: text-to-image without reference images ──────────
     const prompt =
-      `${brandPrefix}Professional social media photography for a premium health & wellness brand. ` +
+      `${brandPrefix}Professional social media photography. ` +
       `${visualConcept}. ` +
       `Shot on mirrorless camera, natural lighting, magazine quality, vibrant but natural colors, ` +
       `clean modern aesthetic. No text, no watermarks, no logos in the image.`;
@@ -349,7 +374,7 @@ export async function generateSocialImage(input: GenerateImageInput): Promise<st
     const result = await fal.subscribe('fal-ai/nano-banana-2', {
       input: {
         prompt,
-        negative_prompt: 'text, words, letters, watermark, logo, banner, overlay, illustration, cartoon, drawing, 3d render, digital art, painting, sketch, anime, blurry, low quality, deformed',
+        negative_prompt: 'text, words, letters, watermark, logo, banner, overlay, packet, sachet, powder bag, supplement packet, illustration, cartoon, drawing, 3d render, digital art, painting, sketch, anime, blurry, low quality, deformed',
         image_size: imageSize,
         num_images: 1,
         num_inference_steps: 28,

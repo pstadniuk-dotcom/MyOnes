@@ -91,9 +91,9 @@ export const SYSTEM_SUPPORTS: IngredientInfo[] = [
   },
   {
     name: 'Kidney & Bladder Support',
-    doseMg: 400,
-    doseRangeMin: 400,
-    doseRangeMax: 1200,
+    doseMg: 565,
+    doseRangeMin: 565,
+    doseRangeMax: 1695,
     category: 'base',
     description: 'Supports kidney and bladder function. May improve blood pressure and blood sugar; helps flush kidney stones and stop inflammatory diseases of the urinary tract.',
   },
@@ -715,6 +715,7 @@ export const INDIVIDUAL_INGREDIENTS: IngredientInfo[] = [
 
 // ============================================================================
 // DETAILED BREAKDOWN OF SYSTEM SUPPORTS
+// Updated from manufacturer (Alive Innovations) data — April 2026
 // ============================================================================
 
 export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
@@ -761,198 +762,181 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
         description: 'entire plant',
         benefits: ['Rich in iodine for thyroid support', 'Supports metabolism', 'Provides trace minerals']
       },
-      {
-        name: 'Rhodiola',
-        amount: '20mg',
-        benefits: ['Adaptogen for stress resilience', 'Supports mental clarity', 'May reduce fatigue']
-      },
     ]
   },
   {
     name: 'Beta Max',
-    doseMg: 2500,
+    doseMg: 650,
     systemSupported: 'Liver, Gallbladder, Pancreas',
     suggestedDosage: '1-3x daily',
     description: 'Helps support liver, gallbladder, and pancreas. Regulates hepatic functions such as lipid and carbohydrate metabolism.',
     activeIngredients: [
       {
         name: 'Calcium',
-        amount: '220mg',
+        amount: '23.16mg',
         description: 'as dicalcium phosphate',
         benefits: ['Supports bone health', 'Aids muscle function', 'Essential for cellular signaling']
       },
       {
         name: 'Niacin',
-        amount: '10mg',
+        amount: '2.48mg',
         description: 'as niacinamide',
         benefits: ['Supports energy metabolism', 'Aids liver function', 'Helps maintain healthy cholesterol']
       },
       {
         name: 'Phosphorus',
-        amount: '164mg',
+        amount: '30.81mg',
         description: 'as dicalcium phosphate',
         benefits: ['Supports bone and teeth health', 'Aids energy production', 'Essential for cellular function']
       },
       {
         name: 'Choline Bitartrate',
-        amount: '1664mg',
+        amount: '413.46mg',
         benefits: ['Supports liver fat metabolism', 'Aids brain and nerve function', 'Essential for cell membrane health']
       },
       {
         name: 'Inositol',
-        amount: '160mg',
+        amount: '39.76mg',
         benefits: ['Supports liver health', 'Aids cellular signaling', 'May help with mood regulation']
       },
       {
         name: 'Betaine HCl',
-        amount: '76mg',
+        amount: '18.88mg',
         benefits: ['Supports digestive function', 'Aids protein digestion', 'Helps maintain stomach pH']
       },
       {
         name: 'Lecithin',
-        amount: '76mg',
+        amount: '18.88mg',
         description: 'soy',
         benefits: ['Supports fat metabolism', 'Aids liver function', 'Helps with cholesterol processing']
       },
       {
         name: 'Artichoke',
-        amount: '50mg',
+        amount: '12.42mg',
         benefits: ['Supports bile production', 'Aids liver detoxification', 'May help lower cholesterol']
       },
       {
         name: 'Dandelion',
-        amount: '50mg',
+        amount: '12.42mg',
         description: 'herb',
         benefits: ['Supports liver and kidney function', 'Natural diuretic properties', 'Aids digestion']
       },
       {
         name: 'Milk Thistle',
-        amount: '50mg',
+        amount: '12.42mg',
         description: 'seed',
         benefits: ['Protects liver cells', 'Supports detoxification', 'May regenerate liver tissue']
       },
       {
         name: 'Turmeric',
-        amount: '50mg',
+        amount: '12.42mg',
         description: 'root',
         benefits: ['Powerful anti-inflammatory', 'Supports liver health', 'Rich in antioxidants']
       },
       {
         name: 'DL-Methionine',
-        amount: '30mg',
+        amount: '7.45mg',
         benefits: ['Essential amino acid', 'Supports liver detoxification', 'Aids in fat metabolism']
       },
     ]
   },
   {
     name: 'C Boost',
-    doseMg: 1680,
+    doseMg: 598,
     systemSupported: 'Immune system',
     suggestedDosage: '1-3x daily',
     description: 'Vitamin C and bioflavonoids blend. Bioflavonoids enhance action and absorption of vitamin C. Used for antioxidant and anti-inflammatory properties.',
     activeIngredients: [
       {
         name: 'Vitamin C',
-        amount: '80mg',
+        amount: '61.89mg',
         description: 'as Ascorbic Acid',
         benefits: ['Powerful antioxidant', 'Supports immune function', 'May reduce risk of chronic diseases']
       },
       {
-        name: 'Citrus bioflavonoid Complex',
-        amount: '1100mg',
+        name: 'Citrus Bioflavonoid Complex',
+        amount: '348.12mg',
         benefits: ['Enhances vitamin C absorption', 'Supports cardiovascular health', 'Provides antioxidant protection']
       },
       {
-        name: 'Camu Camu Berry extract',
-        amount: '500mg',
+        name: 'Camu Camu',
+        amount: '187.99mg',
+        description: 'berry extract',
         benefits: ['Rich in vitamin C', 'Helps fight inflammation', 'Supports immune system']
-      },
-    ]
-  },
-  // NOTE: "Chaga Mix" exists here in SYSTEM_SUPPORT_DETAILS but is NOT in SYSTEM_SUPPORTS.
-  // It cannot be used in formulas. If this is a planned product, add it to SYSTEM_SUPPORTS as well.
-  {
-    name: 'Chaga Mix',
-    doseMg: 3600,
-    systemSupported: 'Immune system',
-    suggestedDosage: '1 daily',
-    description: 'Chaga mushrooms may lower cholesterol, slow cancer growth, support immune function, and reduce blood pressure.',
-    activeIngredients: [
-      {
-        name: 'Chaga mushroom',
-        amount: '3600mg',
-        benefits: ['May help lower cholesterol levels', 'Supports immune function', 'Rich in antioxidants', 'May help manage blood pressure']
       },
     ]
   },
   {
     name: 'Endocrine Support',
-    doseMg: 350,
+    doseMg: 335,
     systemSupported: 'Endocrine',
     suggestedDosage: '1-3x daily',
-    description: 'Supports endocrine system. Helps utilize vitamins, improve energy production and ensure proper liver function. Pantothenic acid supports health and function of adrenal glands.',
+    description: 'Supports endocrine system and pancreatic health. Helps utilize vitamins, improve energy production and ensure proper liver function.',
     activeIngredients: [
       {
         name: 'Pantothenic Acid',
-        amount: '4.5mg',
-        description: 'as Ca Pantothenate',
+        amount: '11.17mg',
+        description: 'as Calcium Pantothenate',
         benefits: ['Supports adrenal function', 'Essential for energy metabolism', 'Aids stress hormone production']
       },
       {
         name: 'Zinc',
-        amount: '5.3mg',
-        description: 'as Amino Acid Chelate',
+        amount: '11.17mg',
+        description: 'as Zinc Oxide',
         benefits: ['Supports immune function', 'Essential for hormone production', 'Aids cellular metabolism']
       },
       {
         name: 'Manganese',
-        amount: '1.8mg',
-        description: 'as Sulfate',
+        amount: '11.17mg',
+        description: 'as Manganese Sulfate',
         benefits: ['Supports bone health', 'Essential for enzyme function', 'Aids metabolism']
       },
       {
-        name: 'Ovary & Adrenal',
-        amount: 'proprietary',
-        description: 'of bovine source-not an extract',
+        name: 'Adrenal',
+        amount: '111.67mg',
+        description: 'of bovine source, not an extract',
         benefits: ['Supports hormonal balance', 'Provides glandular support', 'Aids endocrine function']
       },
       {
-        name: 'Goldenseal',
-        amount: 'proprietary',
-        description: 'leaf',
-        benefits: ['Supports immune function', 'Natural antimicrobial properties', 'Aids digestive health']
+        name: 'Pancreas',
+        amount: '44.67mg',
+        description: 'of bovine source',
+        benefits: ['Supports pancreatic function', 'Aids digestive enzyme production', 'Supports blood sugar regulation']
       },
       {
-        name: 'Kelp',
-        amount: 'proprietary',
-        description: 'entire plant',
+        name: 'Atlantic Sea Kelp',
+        amount: '33.5mg',
         benefits: ['Rich in iodine for thyroid support', 'Supports metabolism', 'Provides essential minerals']
       },
       {
         name: 'Pituitary',
-        amount: 'proprietary',
+        amount: '33.5mg',
+        description: 'of bovine source',
         benefits: ['Supports master gland function', 'Aids hormone regulation', 'Promotes endocrine balance']
       },
       {
         name: 'Hypothalamus',
-        amount: 'proprietary',
+        amount: '33.5mg',
+        description: 'of bovine source',
         benefits: ['Supports hormonal control center', 'Aids body temperature regulation', 'Promotes metabolic balance']
       },
       {
         name: 'Dulse',
-        amount: 'proprietary',
+        amount: '33.5mg',
+        description: 'leaf',
         benefits: ['Rich in minerals and iodine', 'Supports thyroid function', 'Provides trace nutrients']
       },
       {
-        name: 'Yarrow Flower',
-        amount: 'proprietary',
+        name: 'Yarrow',
+        amount: '11.17mg',
+        description: 'flower',
         benefits: ['Anti-inflammatory properties', 'Supports digestive health', 'Aids circulation']
       },
     ]
   },
   {
     name: 'Heart Support',
-    doseMg: 450,
+    doseMg: 689,
     systemSupported: 'Heart',
     suggestedDosage: '1-3x daily',
     description: 'Supports heart function. Combining magnesium, l-carnitine and l-taurine aids in blood pressure, nervous system, heart failure, oxidative stress, and myocardial contractions.',
@@ -965,13 +949,13 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
       },
       {
         name: 'Heart',
-        amount: 'proprietary',
+        amount: '168mg',
         description: 'of bovine source, not an extract',
         benefits: ['Supports cardiovascular function', 'Provides cardiac tissue support', 'Aids heart muscle health']
       },
       {
         name: 'Inulin',
-        amount: 'proprietary',
+        amount: '42mg',
         description: 'from Chicory',
         benefits: ['Supports gut health', 'Prebiotic fiber benefits', 'Aids mineral absorption']
       },
@@ -986,9 +970,14 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
         benefits: ['Supports heart muscle contractions', 'Aids cardiovascular health', 'May help regulate blood pressure']
       },
       {
-        name: 'Coenzyme Q10',
-        amount: '21mg',
+        name: 'CoEnzyme Q10',
+        amount: '10mg',
         benefits: ['Supports heart energy production', 'Powerful antioxidant', 'May improve heart function']
+      },
+      {
+        name: 'Phosphatidylcholine',
+        amount: '11mg',
+        benefits: ['Supports cell membrane health', 'Aids cardiovascular function', 'Supports fat metabolism']
       },
       {
         name: 'Sumac',
@@ -999,229 +988,222 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
   },
   {
     name: 'Histamine Support',
-    doseMg: 190,
+    doseMg: 200,
     systemSupported: 'Immune, Histamine control',
     suggestedDosage: '1-3x daily',
-    description: 'Important for immune system when compromised by environmental or intrinsic factors. Helps stabilize mast cell membranes and reduce histamine reactions.',
+    description: 'Supports immune system and normal levels of histamine. Helps stabilize mast cell membranes and reduce histamine reactions.',
     activeIngredients: [
       {
         name: 'Calcium',
-        amount: '38mg',
+        amount: '20.99mg',
         description: 'as dicalcium phosphate',
         benefits: ['Supports bone health', 'Aids cellular signaling', 'Essential for nerve function']
       },
       {
         name: 'Iron',
-        amount: '1.95mg',
+        amount: '1.76mg',
         description: 'as Ferrous Fumarate',
         benefits: ['Essential for blood health', 'Supports oxygen transport', 'Aids energy production']
       },
       {
-        name: 'Vitamin B12 Methylcobalamin',
-        amount: '10mcg',
-        description: 'as cyanocobalamin',
+        name: 'Vitamin B12',
+        amount: '0.009mg',
+        description: 'as Methylcobalamin',
         benefits: ['Supports nerve function', 'Essential for red blood cell formation', 'Aids energy metabolism']
       },
       {
         name: 'Phosphorus',
-        amount: '29mg',
+        amount: '27.93mg',
         description: 'as dicalcium phosphate',
         benefits: ['Supports bone and teeth health', 'Aids energy production', 'Essential for cellular function']
       },
       {
         name: 'Chromium',
-        amount: '1mcg',
+        amount: '0.0009mg',
         description: 'as polynicotinate',
         benefits: ['Supports blood sugar regulation', 'Aids metabolism', 'May help with insulin sensitivity']
       },
       {
         name: 'Liver',
-        amount: '80mg',
+        amount: '72.09mg',
         description: 'of bovine source, not an extract',
         benefits: ['Supports liver function', 'Rich in nutrients', 'Provides glandular support']
       },
       {
         name: 'Bovine liver fat extract',
-        amount: '40mg',
+        amount: '36.04mg',
         benefits: ['Provides fat-soluble nutrients', 'Supports cellular health', 'Aids nutrient absorption']
       },
     ]
   },
   {
     name: 'Immune-C',
-    doseMg: 430,
+    doseMg: 358,
     systemSupported: 'Immune',
     suggestedDosage: '1-3x daily',
     description: 'Powerful formulation with Graviola, vitamin C, Camu Camu berry, and Cats Claw. Combined to offer great support to immune system.',
     activeIngredients: [
       {
         name: 'Vitamin C',
-        amount: '8.4mg',
+        amount: '8.39mg',
         description: 'from Camu Camu',
         benefits: ['Powerful antioxidant', 'Supports immune function', 'Aids collagen production']
       },
       {
+        name: 'Camu Camu',
+        amount: '69.92mg',
+        description: 'berry',
+        benefits: ['Extremely high in vitamin C', 'Helps fight inflammation', 'Supports immune function']
+      },
+      {
         name: 'Soursop (Graviola)',
-        amount: '70mg',
+        amount: '69.92mg',
         description: 'leaf',
         benefits: ['Rich in antioxidants', 'Supports immune system', 'Anti-inflammatory properties']
       },
       {
         name: 'Cats Claw',
-        amount: '70mg',
+        amount: '69.92mg',
         description: 'bark',
         benefits: ['Supports immune health', 'Anti-inflammatory properties', 'Exhibits antibacterial effects']
       },
       {
         name: 'Dragon\'s Blood Croton',
-        amount: '70mg',
+        amount: '69.92mg',
         description: 'sap',
         benefits: ['Wound healing properties', 'Anti-inflammatory effects', 'Supports immune function']
       },
       {
         name: 'Astragalus',
-        amount: '70mg',
+        amount: '69.92mg',
         description: 'root',
         benefits: ['Supports immune system', 'Antioxidant properties', 'May help protect organs']
-      },
-      {
-        name: 'Camu Camu',
-        amount: '70mg',
-        description: 'berry',
-        benefits: ['Extremely high in vitamin C', 'Helps fight inflammation', 'Supports immune function']
       },
     ]
   },
   {
     name: 'Kidney & Bladder Support',
-    doseMg: 400,
+    doseMg: 565,
     systemSupported: 'Kidneys, Bladder',
     suggestedDosage: '1-3x daily',
     description: 'Designed for kidney and bladder support. May improve blood pressure and blood sugar; helps flush kidney stones and stop inflammatory diseases of urinary tract.',
     activeIngredients: [
       {
-        name: 'Raw Kidney concentrate',
-        amount: 'proprietary',
+        name: 'Kidney',
+        amount: '99.82mg',
         description: 'of bovine source, not an extract',
         benefits: ['Supports kidney function', 'Provides glandular support', 'Aids urinary health']
       },
       {
         name: 'Raw Liver Concentrate',
-        amount: 'proprietary',
+        amount: '99.82mg',
         description: 'of bovine source, not an extract',
         benefits: ['Supports liver function', 'Rich in nutrients', 'Aids detoxification']
       },
       {
         name: 'Uva-Ursi',
-        amount: 'proprietary',
+        amount: '112.8mg',
         description: 'leaf',
         benefits: ['Supports urinary tract health', 'Natural diuretic properties', 'Antimicrobial effects']
       },
       {
         name: 'Echinacea purpurea',
-        amount: 'proprietary',
-        description: 'root',
+        amount: '112.8mg',
+        description: 'extract',
         benefits: ['Supports immune function', 'Anti-inflammatory properties', 'Aids infection resistance']
       },
       {
         name: 'Goldenrod',
-        amount: 'proprietary',
+        amount: '99.82mg',
         description: 'aerial parts (Solidago)',
         benefits: ['Supports kidney function', 'Natural diuretic', 'Anti-inflammatory effects']
       },
       {
-        name: 'Disodium Phosphate',
-        amount: 'proprietary',
-        benefits: ['Supports pH balance', 'Aids mineral absorption', 'Buffering agent']
-      },
-      {
         name: 'Juniper',
-        amount: 'proprietary',
+        amount: '39.93mg',
         description: 'berry',
         benefits: ['Supports urinary health', 'Natural diuretic', 'Antioxidant properties']
-      },
-      {
-        name: 'Dicalcium phosphate',
-        amount: 'proprietary',
-        benefits: ['Provides calcium and phosphorus', 'Supports bone health', 'Aids mineral balance']
       },
     ]
   },
   {
     name: 'Ligament Support',
-    doseMg: 400,
+    doseMg: 130,
     systemSupported: 'Muscles, Connective Tissues',
     suggestedDosage: '1-3x daily',
-    description: 'Supports muscles and connective tissue. Ideal to help improve stiffness, inflammation, arthritis, joint support, and soreness.',
+    description: 'Supports ligaments, disc, muscles, and tendon health. Helps improve stiffness, inflammation, arthritis, joint support, and soreness.',
     activeIngredients: [
       {
         name: 'Calcium',
-        amount: '4mg',
+        amount: '10.23mg',
         description: 'as Lactate, Dicalcium Phosphate',
         benefits: ['Supports bone health', 'Aids muscle contraction', 'Essential for connective tissue']
       },
       {
         name: 'Phosphorus',
-        amount: '29mg',
+        amount: '13.67mg',
         description: 'as Dicalcium Phosphate',
         benefits: ['Supports bone and teeth health', 'Aids energy production', 'Essential for cellular function']
       },
       {
         name: 'Magnesium',
-        amount: '2mg',
+        amount: '1.76mg',
         description: 'as Citrate',
         benefits: ['Supports muscle function', 'Aids nerve transmission', 'Helps reduce muscle cramping']
       },
       {
         name: 'Manganese',
-        amount: '11mg',
+        amount: '9.7mg',
         description: 'as Sulfate',
         benefits: ['Supports bone formation', 'Aids connective tissue health', 'Essential for cartilage production']
       },
       {
         name: 'Citrus Bioflavonoids',
-        amount: '50mg',
+        amount: '44.1mg',
         benefits: ['Supports collagen synthesis', 'Antioxidant properties', 'Aids tissue repair']
       },
       {
-        name: 'Pancreatin (8X)',
-        amount: '12mg',
+        name: 'Pancreatin (8x)',
+        amount: '10.58mg',
         benefits: ['Aids protein digestion', 'Supports nutrient absorption', 'Anti-inflammatory effects']
       },
       {
         name: 'L-Lysine',
-        amount: '5mg',
+        amount: '4.41mg',
         benefits: ['Essential for collagen formation', 'Supports tissue repair', 'Aids calcium absorption']
       },
       {
         name: 'Ox Bile',
-        amount: '5mg',
+        amount: '4.41mg',
+        description: 'Bovine Source',
         benefits: ['Aids fat digestion', 'Supports nutrient absorption', 'Helps process fat-soluble vitamins']
       },
       {
-        name: 'Spleen (Bovine)',
-        amount: '5mg',
+        name: 'Spleen',
+        amount: '4.41mg',
+        description: 'Bovine',
         benefits: ['Supports immune function', 'Provides glandular support', 'Rich in nutrients']
       },
       {
-        name: 'Thymus (Bovine)',
-        amount: '5mg',
+        name: 'Thymus',
+        amount: '4.41mg',
+        description: 'Bovine Source',
         benefits: ['Supports immune system', 'Aids tissue health', 'Provides glandular support']
       },
       {
-        name: 'Betaine HCI',
-        amount: '2mg',
+        name: 'Betaine HCl',
+        amount: '1.76mg',
         benefits: ['Supports digestion', 'Aids protein breakdown', 'Helps maintain stomach pH']
       },
       {
         name: 'Boron',
-        amount: '100mcg',
+        amount: '0.09mg',
         description: 'as Amino Acid Chelate',
         benefits: ['Supports bone health', 'Aids calcium metabolism', 'May reduce joint inflammation']
       },
       {
         name: 'Bromelain',
-        amount: '0.3mg',
+        amount: '0.26mg',
         description: '600 GDU/mg',
         benefits: ['Anti-inflammatory enzyme', 'Supports joint health', 'Aids protein digestion']
       },
@@ -1229,151 +1211,170 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
   },
   {
     name: 'Liver Support',
-    doseMg: 480,
+    doseMg: 530,
     systemSupported: 'Liver',
     suggestedDosage: '1-3x daily',
-    description: 'For individuals experiencing decreased liver functions. May reduce fatty necrosis, reduce stress on liver, support bile production, and improve liver function.',
+    description: 'Supports liver health. Helps reduce fatty necrosis, reduce stress on liver, support bile production, and improve liver function.',
     activeIngredients: [
       {
         name: 'Vitamin A',
-        amount: '1,000 IU',
-        description: '100% as Beta-Carotene',
+        amount: '0.54mg',
+        description: 'as Beta-Carotene',
         benefits: ['Supports vision health', 'Aids immune function', 'Essential for cellular growth']
       },
       {
         name: 'Liver',
-        amount: '350mg',
+        amount: '349.64mg',
         description: 'of bovine source, not an extract',
         benefits: ['Supports liver function', 'Rich in nutrients and vitamins', 'Provides glandular support']
       },
       {
         name: 'Dandelion',
-        amount: '50mg',
+        amount: '49.95mg',
         description: 'root',
         benefits: ['Supports liver detoxification', 'Natural diuretic properties', 'Aids digestion']
       },
       {
         name: 'Oregon Grape',
-        amount: '50mg',
+        amount: '49.95mg',
         description: 'root',
         benefits: ['Supports liver function', 'Antimicrobial properties', 'Aids bile production']
       },
       {
         name: 'Barberry',
-        amount: '50mg',
+        amount: '49.95mg',
         description: 'root',
         benefits: ['Supports digestive health', 'Antimicrobial effects', 'Aids liver function']
       },
       {
         name: 'Choline Bitartrate',
-        amount: '10mg',
+        amount: '9.99mg',
         benefits: ['Supports liver fat metabolism', 'Aids brain function', 'Essential for cell membranes']
       },
       {
         name: 'Inositol',
-        amount: '10mg',
+        amount: '9.99mg',
         benefits: ['Supports liver health', 'Aids cellular signaling', 'May help with mood regulation']
       },
       {
         name: 'Betaine HCl',
-        amount: '10mg',
+        amount: '9.99mg',
         benefits: ['Supports digestion', 'Aids protein breakdown', 'Helps maintain stomach pH']
-      },
-      {
-        name: 'Disodium Phosphate',
-        amount: 'proprietary',
-        benefits: ['Supports pH balance', 'Aids mineral absorption', 'Buffering agent']
-      },
-      {
-        name: 'Calcium',
-        amount: 'proprietary',
-        benefits: ['Supports bone health', 'Aids muscle function', 'Essential for cellular signaling']
       },
     ]
   },
   {
     name: 'Lung Support',
-    doseMg: 250,
+    doseMg: 242,
     systemSupported: 'Lungs, Immune',
     suggestedDosage: '1-3x daily',
-    description: 'Supports lungs and immune system. Combination of vitamins and antioxidants support lungs, lymph nodes and thymus.',
+    description: 'Supports lung and immune system health. Combination of vitamins and antioxidants support lungs, lymph nodes and thymus.',
     activeIngredients: [
       {
         name: 'Vitamin A',
-        amount: '8,000 IU',
+        amount: '2.38mg',
         description: 'as palmitate',
         benefits: ['Supports respiratory health', 'Aids immune function', 'Maintains healthy mucous membranes']
       },
       {
         name: 'Vitamin C',
-        amount: '16mg',
-        description: 'Ascorbic Acid',
+        amount: '15.84mg',
+        description: 'as Ascorbic Acid',
         benefits: ['Powerful antioxidant', 'Supports immune function', 'Aids respiratory health']
       },
       {
         name: 'Vitamin B',
-        amount: '15mg',
+        amount: '14.85mg',
         description: 'as Calcium Pantothenate',
         benefits: ['Supports energy metabolism', 'Aids adrenal function', 'Essential for stress response']
       },
       {
         name: 'Lung',
-        amount: '75mg',
+        amount: '74.26mg',
         description: 'of bovine source, not from extract',
         benefits: ['Supports lung function', 'Provides respiratory tissue support', 'Aids breathing capacity']
       },
       {
         name: 'Adrenal',
-        amount: '55mg',
+        amount: '54.46mg',
         description: 'of bovine source, not from extract',
         benefits: ['Supports stress response', 'Aids hormone balance', 'Provides glandular support']
       },
       {
         name: 'Lymph',
-        amount: '30mg',
+        amount: '29.71mg',
         description: 'of bovine source, not from extract',
         benefits: ['Supports immune system', 'Aids lymphatic drainage', 'Provides tissue support']
       },
       {
         name: 'Eucalyptus',
-        amount: '30mg',
+        amount: '29.71mg',
         benefits: ['Supports respiratory health', 'Natural decongestant', 'Antimicrobial properties']
       },
       {
         name: 'Thymus',
-        amount: '20mg',
+        amount: '19.8mg',
         benefits: ['Supports immune function', 'Aids T-cell production', 'Provides glandular support']
       },
       {
         name: 'Psyllium husk',
-        amount: '1mg',
+        amount: '0.99mg',
         benefits: ['Supports digestive health', 'Provides fiber', 'Aids detoxification']
       },
     ]
   },
   {
     name: 'MG/K',
-    doseMg: 540,
+    doseMg: 90,
     systemSupported: 'Autonomic Nervous System, Adrenal Glands, Muscles, Blood Sugar, Bone and DNA',
-    suggestedDosage: '2 capsules daily',
-    description: 'Concentrated blend of seven forms of magnesium ingeniously bound in potassium. Provides enhanced support for cells promoting overall cellular health.',
+    suggestedDosage: '1-3x daily',
+    description: 'Concentrated blend of multiple forms of magnesium bound in potassium. Provides enhanced support for cells promoting overall cellular health.',
     activeIngredients: [
       {
-        name: 'Magnesium',
-        amount: '500mg',
-        description: 'from Aspartate, Taurate, Orotate, Glycinate, Malate, Chelate, Citrate',
-        benefits: ['Supports muscle and nerve function', 'Aids energy production', 'Essential for bone health', 'Helps regulate blood sugar']
+        name: 'Magnesium Aspartate',
+        amount: '7.18mg',
+        benefits: ['Supports muscle and nerve function', 'Aids energy production']
       },
       {
         name: 'Potassium',
-        amount: '39mg',
-        description: 'from Potassium Aspartate Complex',
+        amount: '19.56mg',
+        description: 'as Aspartate',
         benefits: ['Supports heart function', 'Aids muscle contractions', 'Helps regulate blood pressure']
       },
       {
-        name: 'Colostrum',
-        amount: '40mg',
-        benefits: ['Supports immune function', 'Aids gut health', 'Rich in growth factors']
+        name: 'Magnesium Taurate',
+        amount: '1.5mg',
+        benefits: ['Supports cardiovascular health', 'Calming effect on nervous system']
+      },
+      {
+        name: 'Magnesium Orotate',
+        amount: '2.1mg',
+        benefits: ['Supports heart health', 'Aids cellular energy production']
+      },
+      {
+        name: 'Magnesium Glycinate',
+        amount: '1.8mg',
+        benefits: ['Highly bioavailable form', 'Supports sleep and relaxation']
+      },
+      {
+        name: 'Magnesium Malate',
+        amount: '5.24mg',
+        benefits: ['Supports energy production', 'Aids muscle function']
+      },
+      {
+        name: 'Magnesium Chelate',
+        amount: '11.97mg',
+        benefits: ['Highly absorbable form', 'Supports overall magnesium levels']
+      },
+      {
+        name: 'Magnesium Citrate',
+        amount: '1.14mg',
+        benefits: ['Supports digestive health', 'Well-absorbed form']
+      },
+      {
+        name: 'Magnesium L-Threonate',
+        amount: '39.52mg',
+        benefits: ['Crosses blood-brain barrier', 'Supports cognitive function and memory', 'Supports brain health']
       },
     ]
   },
@@ -1385,8 +1386,9 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
     description: 'Detoxification of molds. Oregano, Chaga, Sage and other ingredients produce powerful antifungal, antibacterial and anti-inflammatory effect against mold.',
     activeIngredients: [
       {
-        name: 'Wild oregano extract',
+        name: 'Wild Oregano',
         amount: '200mg',
+        description: 'extract',
         benefits: ['Powerful antifungal properties', 'Antibacterial effects', 'Supports immune function']
       },
       {
@@ -1398,6 +1400,7 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
       {
         name: 'Chaga Mushroom',
         amount: '75mg',
+        description: 'extract',
         benefits: ['Rich in antioxidants', 'Supports immune function', 'Anti-inflammatory properties']
       },
       {
@@ -1413,142 +1416,136 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
       {
         name: 'Stinging Nettle',
         amount: '50mg',
+        description: 'extract',
         benefits: ['Anti-inflammatory effects', 'Supports detoxification', 'Rich in nutrients']
-      },
-      {
-        name: 'Oxbile',
-        amount: '25mg',
-        benefits: ['Aids fat digestion', 'Supports detoxification', 'Helps process toxins']
-      },
-      {
-        name: 'Fulvic/Humic',
-        amount: '35mg',
-        benefits: ['Supports detoxification', 'Aids nutrient absorption', 'May help remove heavy metals']
       },
     ]
   },
   {
     name: 'Ovary Uterus Support',
-    doseMg: 300,
+    doseMg: 253,
     systemSupported: 'Female Reproductive System',
     suggestedDosage: '1-3x daily',
-    description: 'Supports female reproductive system. Helps regulate women\'s cycles, alleviate muscle spasms and may reduce risk for certain cancers.',
+    description: 'Supports female reproductive system health. Helps regulate women\'s cycles, alleviate muscle spasms and may reduce risk for certain cancers.',
     activeIngredients: [
       {
         name: 'Calcium',
-        amount: '26mg',
+        amount: '19.26mg',
         description: 'as Dicalcium Phosphate',
         benefits: ['Supports bone health', 'Aids muscle function', 'Essential for reproductive health']
       },
       {
         name: 'Phosphorus',
-        amount: '21mg',
+        amount: '25.63mg',
         description: 'as Dicalcium Phosphate',
         benefits: ['Supports bone health', 'Aids energy production', 'Essential for cellular function']
       },
       {
         name: 'Zinc',
-        amount: '5mg',
+        amount: '4.13mg',
         description: 'as Citrate',
         benefits: ['Supports hormone production', 'Aids immune function', 'Essential for reproductive health']
       },
       {
-        name: 'Ovary (Bovine)',
-        amount: '100mg',
+        name: 'Ovary',
+        amount: '82.68mg',
+        description: 'Bovine Source',
         benefits: ['Supports ovarian function', 'Provides glandular support', 'Aids hormonal balance']
       },
       {
-        name: 'Uterus (Bovine)',
-        amount: '100mg',
+        name: 'Uterus',
+        amount: '82.68mg',
+        description: 'Bovine Source',
         benefits: ['Supports uterine health', 'Provides tissue support', 'Aids reproductive function']
       },
       {
         name: 'Blue Cohosh Root',
-        amount: '1mg',
+        amount: '0.83mg',
         benefits: ['Supports menstrual health', 'May help with muscle spasms', 'Traditional women\'s health herb']
       },
     ]
   },
   {
     name: 'Para X',
-    doseMg: 500,
+    doseMg: 523,
     systemSupported: 'Detox - Parasites',
     suggestedDosage: '1-3x daily',
-    description: 'Eliminates parasites from body through detox. Black walnut and wormwood treat parasitic worm infections naturally.',
+    description: 'Supports intestinal health when exposed to parasites. Black walnut and wormwood treat parasitic worm infections naturally.',
     activeIngredients: [
       {
         name: 'Black Walnut',
-        amount: '100mg',
+        amount: '91.27mg',
         description: 'hull',
         benefits: ['Traditional antiparasitic', 'Supports digestive health', 'Antimicrobial properties']
       },
       {
         name: 'Pumpkin Powder',
-        amount: '100mg',
+        amount: '91.27mg',
         description: 'seed',
         benefits: ['Natural antiparasitic', 'Rich in nutrients', 'Supports digestive health']
       },
       {
         name: 'Wormwood Powder',
-        amount: '100mg',
+        amount: '91.27mg',
         description: 'aerial parts',
         benefits: ['Traditional antiparasitic', 'Supports digestive function', 'Antimicrobial effects']
       },
       {
         name: 'Hyssop Powder',
-        amount: '50mg',
+        amount: '45.64mg',
         description: 'aerial parts',
         benefits: ['Supports digestive health', 'Antimicrobial properties', 'Anti-inflammatory effects']
       },
       {
         name: 'Thyme',
-        amount: '50mg',
+        amount: '45.64mg',
         description: 'leaf',
         benefits: ['Antimicrobial properties', 'Supports immune function', 'Aids digestive health']
       },
       {
+        name: 'Neem Powder',
+        amount: '45.64mg',
+        benefits: ['Traditional antiparasitic', 'Antimicrobial properties', 'Supports immune health']
+      },
+      {
         name: 'Pancreatin',
-        amount: '31mg',
+        amount: '28.29mg',
         benefits: ['Aids protein digestion', 'Supports nutrient absorption', 'Helps break down parasites']
       },
       {
         name: 'L-Lysine',
-        amount: '25mg',
+        amount: '22.82mg',
         benefits: ['Essential amino acid', 'Supports immune function', 'Aids protein synthesis']
       },
       {
         name: 'Ox Bile',
-        amount: '25mg',
+        amount: '22.82mg',
+        description: 'Bovine Source',
         benefits: ['Aids fat digestion', 'Supports detoxification', 'Helps absorb nutrients']
       },
       {
+        name: 'Bromelain',
+        amount: '20.99mg',
+        benefits: ['Anti-inflammatory enzyme', 'Aids protein digestion', 'Supports immune function']
+      },
+      {
         name: 'Pepsin',
-        amount: '17mg',
+        amount: '15.52mg',
         benefits: ['Aids protein digestion', 'Supports stomach function', 'Helps break down food']
       },
       {
         name: 'Cellulase',
-        amount: '2mg',
+        amount: '1.83mg',
         benefits: ['Breaks down plant fibers', 'Aids digestion', 'Supports nutrient absorption']
-      },
-      {
-        name: 'Bromelain',
-        amount: '84 MCU',
-        benefits: ['Anti-inflammatory enzyme', 'Aids protein digestion', 'Supports immune function']
-      },
-      {
-        name: 'Neem leaf powder',
-        amount: '50mg',
-        benefits: ['Traditional antiparasitic', 'Antimicrobial properties', 'Supports immune health']
       },
     ]
   },
   {
     name: 'Prostate Support',
-    doseMg: 300,
+    doseMg: 202,
     systemSupported: 'Prostate',
     suggestedDosage: '1-3x daily',
-    description: 'Supports prostate and male reproductive systems. Encourages anti-inflammation and proper function.',
+    description: 'Supports general prostate health. Encourages anti-inflammation and proper function.',
     activeIngredients: [
       {
         name: 'Magnesium',
@@ -1558,82 +1555,84 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
       },
       {
         name: 'Zinc',
-        amount: '15mg',
+        amount: '14.98mg',
         description: 'as Amino Acid Chelate',
         benefits: ['Essential for prostate health', 'Supports immune function', 'Aids hormone production']
       },
       {
         name: 'Molybdenum',
-        amount: '50mcg',
+        amount: '0.05mg',
         description: 'as Amino Acid Chelate',
         benefits: ['Supports enzyme function', 'Aids detoxification', 'Essential trace mineral']
       },
       {
         name: 'Potassium',
-        amount: '4mg',
+        amount: '3.99mg',
         description: 'as Aspartate',
         benefits: ['Supports heart function', 'Aids muscle contractions', 'Helps regulate fluid balance']
       },
       {
         name: 'Boron',
-        amount: '250mcg',
+        amount: '0.25mg',
         description: 'as Amino Acid Chelate',
         benefits: ['Supports bone health', 'May help regulate hormones', 'Aids mineral metabolism']
       },
       {
-        name: 'Prostate (Bovine)',
-        amount: '90mg',
+        name: 'Prostate',
+        amount: '89.87mg',
+        description: 'Bovine Source',
         benefits: ['Supports prostate function', 'Provides glandular support', 'Aids reproductive health']
       },
       {
         name: 'Juniper Berry',
-        amount: '50mg',
+        amount: '49.93mg',
         benefits: ['Supports urinary health', 'Natural diuretic', 'Antioxidant properties']
       },
       {
         name: 'Chaga Mushroom',
-        amount: '20mg',
+        amount: '19.97mg',
+        description: 'extract',
         benefits: ['Rich in antioxidants', 'Anti-inflammatory properties', 'Supports immune function']
       },
       {
-        name: 'Betaine HCI',
-        amount: '5mg',
+        name: 'Betaine HCl',
+        amount: '4.99mg',
         benefits: ['Supports digestion', 'Aids protein breakdown', 'Helps maintain stomach pH']
       },
       {
         name: 'Saw Palmetto Berry',
-        amount: '15mg',
+        amount: '14.98mg',
         benefits: ['Supports prostate health', 'May help with urinary function', 'Anti-inflammatory effects']
       },
     ]
   },
   {
     name: 'Spleen Support',
-    doseMg: 400,
+    doseMg: 203,
     systemSupported: 'Lymphatic, Blood',
     suggestedDosage: '1x daily',
-    description: 'Supports liver, kidney, and spleen. Dandelion and nettle help the endocrine system including the spleen.',
+    description: 'Supports spleen and lymphatic system health. Dandelion and nettle help the endocrine system including the spleen.',
     activeIngredients: [
       {
         name: 'Vitamin E',
-        amount: '75 IU',
+        amount: '52.56mg',
         description: 'as dl-alpha Tocopheryl Acetate',
         benefits: ['Powerful antioxidant', 'Supports cellular health', 'Aids immune function']
       },
       {
         name: 'Bovine Spleen Concentrate',
-        amount: '250mcg',
+        amount: '0.25mg',
         benefits: ['Supports spleen function', 'Aids immune system', 'Provides glandular support']
       },
       {
         name: 'Dandelion',
-        amount: '75mg',
-        description: 'aerial parts',
+        amount: '75.09mg',
+        description: 'extract',
         benefits: ['Supports liver and kidney function', 'Natural diuretic properties', 'Aids digestion']
       },
       {
         name: 'Nettle',
-        amount: '75mg',
+        amount: '75.09mg',
         description: 'root',
         benefits: ['Anti-inflammatory effects', 'Supports urinary health', 'Rich in nutrients']
       },
@@ -1641,21 +1640,21 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
   },
   {
     name: 'Thyroid Support',
-    doseMg: 470,
+    doseMg: 291,
     systemSupported: 'Thyroid, Adrenal Glands',
     suggestedDosage: '1-3x daily',
     description: 'Provides necessary nutrients for proper thyroid function. Combines iodine and glandular concentrates.',
     activeIngredients: [
       {
         name: 'Iodine',
-        amount: '900mcg',
+        amount: '1mg',
         description: 'from Kelp',
         benefits: ['Essential for thyroid hormone production', 'Supports metabolism', 'Aids energy regulation']
       },
       {
-        name: 'Raw Bovine Thyroid Concentrate',
+        name: 'Thyroid',
         amount: '60mg',
-        description: 'Thyroxine free',
+        description: 'Bovine Source',
         benefits: ['Supports thyroid function', 'Provides glandular support', 'Aids metabolic balance']
       },
       {
@@ -1664,13 +1663,15 @@ export const SYSTEM_SUPPORT_DETAILS: SystemSupportDetails[] = [
         benefits: ['Supports adrenal function', 'Aids stress response', 'Provides glandular support']
       },
       {
-        name: 'Raw Bovine Pituitary Concentrate',
+        name: 'Pituitary',
         amount: '10mg',
+        description: 'Bovine Source',
         benefits: ['Supports master gland function', 'Aids hormone regulation', 'Provides endocrine support']
       },
       {
-        name: 'Raw Porcine Spleen Concentrate',
+        name: 'Spleen',
         amount: '10mg',
+        description: 'Bovine Source',
         benefits: ['Supports immune function', 'Aids blood health', 'Provides glandular support']
       },
       {

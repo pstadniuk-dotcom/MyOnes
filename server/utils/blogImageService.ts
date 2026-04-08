@@ -11,6 +11,7 @@
 import OpenAI from 'openai';
 import { fal } from '@fal-ai/client';
 import logger from '../infra/logging/logger';
+import { generateImage as falGenerateImage, type ImageModelId, uploadGeneratedAsset } from './falAiService';
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -130,14 +131,32 @@ async function downloadImage(url: string): Promise<Buffer> {
  * Generate a unique AI image for a blog article and host it on Supabase Storage.
  * Returns the permanent public URL.
  */
-export async function generateBlogImage(title: string, slug: string): Promise<string> {
+export async function generateBlogImage(title: string, slug: string, modelId?: string): Promise<string> {
   logger.info(`[blogImage] Generating image for "${title}" …`);
 
   // 1) Extract visual keywords from the title
   const keywords = await extractVisualKeywords(title);
   logger.info(`[blogImage] Keywords: "${keywords}"`);
 
-  // 2) Generate photorealistic image with fal.ai Nano Banana 2
+  // Model override: use centralized service when a non-default model is requested
+  if (modelId && modelId !== 'fal-ai/nano-banana-2') {
+    const prompt = buildPrompt(keywords);
+    logger.info(`[blogImage] Using model ${modelId} for "${title}"`);
+
+    const result = await falGenerateImage({
+      modelId: modelId as ImageModelId,
+      prompt,
+      negativePrompt: 'illustration, cartoon, drawing, 3d render, digital art, painting, sketch, anime, text, watermark, logo, blurry, low quality',
+      imageSize: 'landscape_16_9',
+    });
+
+    // Upload to Supabase
+    const publicUrl = await uploadGeneratedAsset(result.url, BUCKET, slug, 'image/jpeg');
+    logger.info(`[blogImage] Generated with ${modelId}`, { publicUrl });
+    return publicUrl;
+  }
+
+  // 2) Generate photorealistic image with fal.ai Nano Banana 2 (default)
   const falImageUrl = await generateImage(keywords);
   logger.info(`[blogImage] Got fal.ai image URL`);
 

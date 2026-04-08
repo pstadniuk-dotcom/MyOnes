@@ -21,6 +21,7 @@
 
 import type { SafetyWarning, SafetyValidationResult } from '@shared/safety-types';
 import { getContraindication } from '@shared/ingredient-contraindications';
+import { SYSTEM_SUPPORT_DETAILS } from '@shared/ingredients';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 export interface SafetyValidationInput {
@@ -52,18 +53,55 @@ const matchingIngr = (allIngredients: string[], keywords: string[]) => {
   return [...matches];
 };
 
+// ── System Support Sub-Ingredient Expansion ────────────────────────────────
+// System supports (e.g. "Adrenal Support") are pre-blended complexes containing
+// multiple active ingredients. The safety validator needs to see INSIDE them to
+// catch drug interactions with sub-ingredients like Licorice, Echinacea, etc.
+function expandSystemSupportSubIngredients(ingredientName: string): string[] {
+  const detail = SYSTEM_SUPPORT_DETAILS.find(
+    d => d.name.toLowerCase() === ingredientName.toLowerCase()
+  );
+  if (!detail) return [];
+  return detail.activeIngredients.map(sub => sub.name.toLowerCase());
+}
+
 // ── Main Validation Function ────────────────────────────────────────────────
 export function validateFormulaSafety(input: SafetyValidationInput): SafetyValidationResult {
   const warnings: SafetyWarning[] = [];
-  const allIngredients = [
+
+  // Build the base ingredient lists from formula
+  const directIngredients = [
     ...(input.formula.bases || []),
     ...(input.formula.additions || []),
   ].map(i => (i.ingredient || '').toLowerCase());
 
-  const allIngredientNames = [
+  const directIngredientNames = [
     ...(input.formula.bases || []),
     ...(input.formula.additions || []),
   ].map(i => i.ingredient || '');
+
+  // Expand system supports into their sub-ingredients for interaction checking.
+  // This ensures hidden ingredients (e.g. Licorice inside Adrenal Support,
+  // Echinacea inside Kidney & Bladder Support) are visible to drug checks.
+  const expandedSubIngredients: string[] = [];
+  for (const name of directIngredients) {
+    const subs = expandSystemSupportSubIngredients(name);
+    expandedSubIngredients.push(...subs);
+  }
+
+  // allIngredients includes both direct formula ingredients AND expanded sub-ingredients
+  const allIngredients = [...directIngredients, ...expandedSubIngredients];
+
+  // allIngredientNames keeps the original casing for display in warning messages
+  const allIngredientNames = [...directIngredientNames];
+  for (const name of directIngredientNames) {
+    const detail = SYSTEM_SUPPORT_DETAILS.find(
+      d => d.name.toLowerCase() === name.toLowerCase()
+    );
+    if (detail) {
+      allIngredientNames.push(...detail.activeIngredients.map(sub => `${sub.name} (in ${name})`));
+    }
+  }
 
   const medsLower = (input.userMedications || []).map(m => m.toLowerCase());
   const conditionsLower = (input.userConditions || []).map(c => c.toLowerCase());
@@ -502,6 +540,39 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
         category: 'chemo_condition_block',
         severity: 'critical',
         message: 'BLOCKED: You indicated active cancer treatment. Supplements may interfere with chemotherapy or radiation. An oncologist must review and approve any supplement use during active treatment.',
+      });
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 3v. IODINE / KELP STACKING CHECK
+  // Thyroid Support alone contains 1mg (1000mcg) iodine — 91% of the NIH
+  // Tolerable Upper Limit (1100mcg). Combining with other kelp-containing
+  // supports (Adrenal Support, Endocrine Support) may exceed the UL.
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    const iodineKelpKeywords = ['thyroid support', 'iodine', 'kelp', 'atlantic sea kelp'];
+    const iodineKelpHits = allIngredients.filter(i => iodineKelpKeywords.some(k => i.includes(k)));
+    // Count distinct system supports that contain kelp/iodine
+    const kelpSources = directIngredients.filter(name => {
+      const detail = SYSTEM_SUPPORT_DETAILS.find(d => d.name.toLowerCase() === name);
+      if (!detail) return false;
+      return detail.activeIngredients.some(sub =>
+        sub.name.toLowerCase().includes('kelp') || sub.name.toLowerCase().includes('iodine')
+      );
+    });
+
+    if (kelpSources.length >= 2) {
+      const sourceNames = kelpSources.map(n => {
+        // Find the original-cased name
+        const orig = directIngredientNames.find(d => d.toLowerCase() === n);
+        return orig || n;
+      });
+      warnings.push({
+        category: 'iodine_stacking',
+        severity: 'serious',
+        message: `Your formula combines ${sourceNames.join(' + ')}, which each contain kelp/iodine. Thyroid Support alone provides 1000mcg iodine (91% of the 1100mcg daily upper limit). Stacking these may exceed safe iodine intake — consult your physician, especially if you have thyroid conditions.`,
+        ingredients: sourceNames,
       });
     }
   }

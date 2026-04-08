@@ -24,14 +24,6 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
-/* Hide browser video overlay controls (speed badges, PiP, etc.) */
-video::-webkit-media-controls {
-  display: none !important;
-}
-video::-webkit-media-controls-enclosure {
-  display: none !important;
-}
-
 /* LIGHT MODE - Premium Earthy Green Theme */
 :root {
   --button-outline: rgba(0, 0, 0, .08);

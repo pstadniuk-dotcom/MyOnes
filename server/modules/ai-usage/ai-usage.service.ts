@@ -51,6 +51,29 @@ const MODEL_PRICING: Record<string, ModelPricing> = {
   'claude-opus-4-1-20250805':   { inputPer1M: 15.00, outputPer1M: 75.00 },
 };
 
+// ── fal.ai (per-call pricing, stored as cents in estimatedCostCents) ──
+// fal.ai charges per generation, not per token. We store the cost in cents directly.
+// These are approximate costs per generation call.
+const FAL_PRICING_CENTS: Record<string, number> = {
+  'fal-ai/nano-banana-2':              1,    // ~$0.01
+  'fal-ai/nano-banana-2/edit':         2,    // ~$0.02
+  'fal-ai/flux/dev':                   3,    // ~$0.03
+  'fal-ai/flux-pro/v1.1':             5,    // ~$0.05
+  'fal-ai/flux-pro/kontext':          5,    // ~$0.05
+  'fal-ai/ideogram/v3':               8,    // ~$0.08
+  'fal-ai/recraft-v3':                5,    // ~$0.05
+  'fal-ai/seedream-3':                4,    // ~$0.04
+  'fal-ai/gpt-image-1':              10,    // ~$0.10
+  'fal-ai/pulid':                      4,    // ~$0.04
+  'fal-ai/kling-video/v2.1/master/image-to-video': 50, // ~$0.50
+  'fal-ai/kling-video/v3/pro/image-to-video':      75, // ~$0.75
+  'fal-ai/minimax-video/image-to-video':            40, // ~$0.40
+  'fal-ai/wan/v2.1/image-to-video':                 30, // ~$0.30
+  'fal-ai/sync-lipsync':             20,    // ~$0.20
+  'fal-ai/creative-upscaler':         5,    // ~$0.05
+  'fal-ai/bria/background/remove':     2,    // ~$0.02
+};
+
 // Fallback pricing for unknown models
 const DEFAULT_PRICING: ModelPricing = { inputPer1M: 3.00, outputPer1M: 15.00 };
 
@@ -107,6 +130,37 @@ export async function logAiUsage(params: {
   } catch (err) {
     // Never let usage logging break the main flow
     logger.error('Failed to log AI usage', { error: err, params });
+  }
+}
+
+/**
+ * Log a fal.ai generation event (image, video, upscale, etc.)
+ * fal.ai doesn't use tokens — we log a fixed cost per model per call.
+ */
+export async function logFalAiUsage(params: {
+  model: string;
+  feature: string;       // 'social_image' | 'blog_image' | 'ad_creative' | 'ugc_image' | 'ugc_video' | 'brand_studio' | 'ugc_lipsync' | 'upscale' | 'bg_removal'
+  durationMs?: number;
+  metadata?: Record<string, any>;
+}): Promise<void> {
+  try {
+    const costCents = FAL_PRICING_CENTS[params.model] || 5; // default 5 cents
+
+    await db.insert(aiUsageLogs).values({
+      userId: null,
+      provider: 'fal.ai',
+      model: params.model,
+      feature: params.feature,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      estimatedCostCents: costCents,
+      durationMs: params.durationMs || null,
+      sessionId: null,
+      metadata: params.metadata || null,
+    });
+  } catch (err) {
+    logger.error('Failed to log fal.ai usage', { error: err, params });
   }
 }
 

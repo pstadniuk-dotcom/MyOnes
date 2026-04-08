@@ -1,18 +1,10 @@
-import OpenAI from 'openai';
-import { aiRuntimeSettings } from '../infra/ai/ai-config';
-import "dotenv/config";
 import { logger } from '../infra/logging/logger';
-let _openai: OpenAI | null = null;
-function getOpenAI() {
-    if (!_openai) {
-        _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-tests' });
-    }
-    return _openai;
-}
 
 /**
  * Query Intent Analyzer
- * Determines the scope and intent of user queries to enable focused AI responses
+ * Determines the scope and intent of user queries to enable focused AI responses.
+ * Uses fast regex-based analysis only — the main consultation model handles
+ * nuanced intent detection naturally through its clinical reasoning.
  */
 
 export interface QueryIntent {
@@ -53,50 +45,7 @@ const SPECIFIC_REQUEST_PATTERNS = [
 ];
 
 /**
- * Analyzes user query using AI for maximum robustness
- */
-async function analyzeWithAI(userMessage: string): Promise<QueryIntent> {
-    try {
-        const response = await getOpenAI().chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-                {
-                    role: "system",
-                    content: `Analyze the user's focus for a personalized supplement consultation. 
-          Determine if they are making a specific request for a particular health area or if it's a general query.
-          Available health areas: cardiovascular, metabolic, digestive, cognitive, energy, immune, skin, joint, sleep, stress, hormonal, liver, kidney, respiratory.
-          
-          Respond ONLY with a JSON object in this format:
-          {
-            "isSpecificRequest": boolean, // true if they want to focus ONLY on specific areas
-            "requestedAreas": string[], // array of health areas mentioned
-            "scope": "specific" | "general" | "followup",
-            "explanation": "brief reasoning"
-          }`
-                },
-                { role: "user", content: userMessage }
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0,
-            max_tokens: 150
-        });
-
-        const result = JSON.parse(response.choices[0].message.content || '{}');
-        return {
-            isSpecificRequest: result.isSpecificRequest || false,
-            requestedAreas: result.requestedAreas || [],
-            scope: result.scope || 'general',
-            keywords: [], // AI doesn't need explicit keywords
-            explanation: result.explanation
-        };
-    } catch (error) {
-        logger.error('AI Intent analysis failed, falling back to logic', { error });
-        return fallbackLogicAnalysis(userMessage);
-    }
-}
-
-/**
- * Pure logic analysis (used as fallback or fast-pass)
+ * Fast regex-based intent analysis
  */
 function fallbackLogicAnalysis(userMessage: string): QueryIntent {
     const messageLower = userMessage.toLowerCase();
@@ -121,19 +70,11 @@ function fallbackLogicAnalysis(userMessage: string): QueryIntent {
 }
 
 /**
- * Main analysis entry point - uses fast-pass logic then AI fallback for better accuracy
+ * Main analysis entry point — regex-based only.
+ * The main consultation model handles nuanced intent naturally.
  */
-export async function analyzeQueryIntent(userMessage: string): Promise<QueryIntent> {
-    // 1. Try fast logic analysis first
-    const fastResult = fallbackLogicAnalysis(userMessage);
-
-    // 2. If it seems specific or targeted, use AI to confirm intent and catch nuances/misspellings
-    // or if the message is complex (> 10 words)
-    if (fastResult.requestedAreas.length > 0 || userMessage.split(' ').length > 10) {
-        return analyzeWithAI(userMessage);
-    }
-
-    return fastResult;
+export function analyzeQueryIntent(userMessage: string): QueryIntent {
+    return fallbackLogicAnalysis(userMessage);
 }
 
 /**
