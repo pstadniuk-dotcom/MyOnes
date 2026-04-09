@@ -16,6 +16,7 @@ import { startBlogGenerationScheduler } from "./utils/blogGenerationScheduler";
 import { startPrAgentScheduler } from "./utils/prAgentScheduler";
 import { startAutoShipScheduler } from "./utils/autoShipScheduler";
 import { startSmartReorderScheduler } from "./utils/smartReorderScheduler";
+import { startRenewalScheduler } from './utils/renewalScheduler';
 import { startIngredientCatalogSyncScheduler } from "./utils/ingredientCatalogSyncScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
@@ -47,7 +48,7 @@ app.disable('x-powered-by');
 const isDevMode = process.env.NODE_ENV !== 'production';
 const cspDirectives = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDevMode ? " 'unsafe-eval'" : ''} https://cdn.jsdelivr.net https://accounts.google.com/gsi/client https://connect.facebook.net`,
+  `script-src 'self' 'unsafe-inline'${isDevMode ? " 'unsafe-eval'" : ''} https://cdn.jsdelivr.net https://accounts.google.com/gsi/client https://connect.facebook.net https://secure.easypaydirectgateway.com`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: https: blob: https://platform-lookaside.fbsbx.com",
@@ -63,7 +64,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net","https://maps.googleapis.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net","https://maps.googleapis.com", "https://secure.easypaydirectgateway.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:", "https://platform-lookaside.fbsbx.com", "https://maps.googleapis.com"],
@@ -75,8 +76,8 @@ app.use(helmet({
         ...(!isDevMode ? [] : ["http://localhost:5000", "http://127.0.0.1:5000"]),
       ],
       mediaSrc: ["'self'", "data:", "blob:", "https://*.supabase.co", "https://supabase.co"],
-      connectSrc: ["'self'", "https://api.openai.com", "https://api.anthropic.com", "https://accounts.google.com/gsi/", "https://www.facebook.com", "https://web.facebook.com", "https://graph.facebook.com", "https://facebook.com","https://maps.googleapis.com",  "https://maps.gstatic.com", "https://places.googleapis.com", "wss:", "ws:"],
-      frameSrc: ["'self'", "blob:", "https://www.youtube.com", "https://youtube.com", "https://accounts.google.com/", "https://www.facebook.com", "https://web.facebook.com"],
+      connectSrc: ["'self'", "https://api.openai.com", "https://api.anthropic.com", "https://accounts.google.com/gsi/", "https://www.facebook.com", "https://web.facebook.com", "https://graph.facebook.com", "https://facebook.com","https://maps.googleapis.com",  "https://maps.gstatic.com", "https://places.googleapis.com", "https://secure.easypaydirectgateway.com", "wss:", "ws:"],
+      frameSrc: ["'self'", "blob:", "https://www.youtube.com", "https://youtube.com", "https://accounts.google.com/", "https://www.facebook.com", "https://web.facebook.com", "https://secure.easypaydirectgateway.com"],
       frameAncestors: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
@@ -142,7 +143,6 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('/api/billing/webhooks/stripe', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -326,6 +326,7 @@ app.get('/api/health', (_req, res) => {
         { name: 'AutoOptimize', start: startAutoOptimizeScheduler },
         { name: 'AutoShip', start: startAutoShipScheduler },
         { name: 'SmartReorder', start: startSmartReorderScheduler },
+        { name: 'Renewal', start: startRenewalScheduler },
         { name: 'BlogGeneration', start: startBlogGenerationScheduler },
         { name: 'PrAgent', start: startPrAgentScheduler },
         { name: 'IngredientCatalogSync', start: startIngredientCatalogSyncScheduler },

@@ -1,30 +1,33 @@
 /**
- * AutoShip Service
+ * AutoShip Service — EasyPayDirect Integration
  * ────────────────────────────────────────────────────────────────
  * Manages recurring formula shipments (every 8 weeks).
  *
+ * All recurring billing is managed internally (no external subscription IDs).
+ * The auto-ship scheduler checks for due shipments daily and charges via
+ * EPD Customer Vault.
+ *
  * Flow:
  *  1. After first formula purchase → createAutoShip()
- *     Creates a Stripe subscription with an 8-week trial (no immediate charge)
- *     so the first auto-shipment charge happens 8 weeks after initial purchase.
- *  2. invoice.paid webhook → processAutoShipRenewal()
- *     Gets fresh manufacturer quote, creates order, triggers fulfillment.
+ *     Creates DB record with nextShipmentDate = now + 8 weeks.
+ *  2. Scheduler → processAutoShipRenewal(autoShipId)
+ *     Gets fresh manufacturer quote, charges vault, creates order.
  *  3. Formula change → syncFormulaPrice()
- *     Fetches new quote, updates Stripe subscription price.
+ *     Fetches new quote, updates DB record price.
  *  4. Scheduler (10 days pre-renewal) → refreshPreRenewalQuote()
- *     Ensures quote is fresh before Stripe charges.
- *  5. User controls → pause / resume / cancel / skipNext
+ *     Ensures quote is fresh before charge.
+ *  5. User controls → pause / resume / cancel / skipNext (all DB-only)
  * ────────────────────────────────────────────────────────────────
  */
 
-import Stripe from 'stripe';
 import { autoShipRepository } from './autoship.repository';
 import { usersRepository } from '../users/users.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
 import { consentsRepository } from '../consents/consents.repository';
-import { manufacturerPricingService } from '../formulas/manufacturer-pricing.service';
+import { manufacturerPricingService, type ManufacturerOrderCustomerInfo } from '../formulas/manufacturer-pricing.service';
 import { notificationsService } from '../notifications/notifications.service';
 import { sendNotificationEmail } from '../../utils/emailService';
+import { epdGateway, isApproved } from './epd-gateway';
 import logger from '../../infra/logging/logger';
 import type { AutoShipSubscription } from '@shared/schema';
 
@@ -32,11 +35,6 @@ const SUPPLY_WEEKS = 8;
 const MEMBER_DISCOUNT = 0.85; // 15% discount for members
 
 export class AutoShipService {
-  private getStripeClient(): Stripe {
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) throw new Error('STRIPE_SECRET_KEY not configured');
-    return new Stripe(key);
-  }
 
   // ──────────────────────────────────────────────────────────────
   // 1. CREATE AUTO-SHIP (after first formula checkout)
@@ -51,7 +49,6 @@ export class AutoShipService {
     quoteId?: string;
     quoteExpiresAt?: string;
   }): Promise<AutoShipSubscription> {
-    const stripe = this.getStripeClient();
     const user = await usersRepository.getUser(opts.userId);
     if (!user) throw new Error('USER_NOT_FOUND');
 
@@ -66,63 +63,15 @@ export class AutoShipService {
       });
     }
 
-    // Ensure we have a Stripe customer
-    let customerId = user.stripeCustomerId;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: user.name || undefined,
-        metadata: { userId: user.id },
-      });
-      customerId = customer.id;
-      await usersRepository.updateUser(user.id, { stripeCustomerId: customerId });
-    }
+    // Next shipment date = 8 weeks from now
+    const nextShipmentDate = new Date();
+    nextShipmentDate.setDate(nextShipmentDate.getDate() + SUPPLY_WEEKS * 7);
 
-    // Create a Stripe Product for auto-ship formulae
-    const product = await stripe.products.create({
-      name: `Ones Formula Auto-Ship`,
-      metadata: { userId: opts.userId, type: 'auto_ship' },
-    });
-
-    // Create recurring price (8-week cycle)
-    const price = await stripe.prices.create({
-      product: product.id,
-      currency: 'usd',
-      unit_amount: opts.priceCents,
-      recurring: {
-        interval: 'week',
-        interval_count: SUPPLY_WEEKS,
-      },
-    });
-
-    // Create subscription with trial_end = 8 weeks (first auto-charge happens then)
-    const trialEnd = Math.floor(Date.now() / 1000) + (SUPPLY_WEEKS * 7 * 24 * 60 * 60);
-    const nextShipmentDate = new Date(trialEnd * 1000);
-
-    const subscription = await stripe.subscriptions.create({
-      customer: customerId,
-      items: [{ price: price.id }],
-      trial_end: trialEnd,
-      payment_behavior: 'default_incomplete',
-      payment_settings: {
-        save_default_payment_method: 'on_subscription',
-      },
-      metadata: {
-        type: 'auto_ship',
-        userId: opts.userId,
-        formulaId: opts.formulaId,
-        formulaVersion: String(opts.formulaVersion),
-      },
-    });
-
-    // Save to database
+    // Save to database (no external subscription — managed internally)
     const autoShip = await autoShipRepository.create({
       userId: opts.userId,
       formulaId: opts.formulaId,
       formulaVersion: opts.formulaVersion,
-      stripeSubscriptionId: subscription.id,
-      stripeProductId: product.id,
-      stripePriceId: price.id,
       status: 'active',
       priceCents: opts.priceCents,
       manufacturerCostCents: opts.manufacturerCostCents,
@@ -137,7 +86,6 @@ export class AutoShipService {
       autoShipId: autoShip.id,
       userId: opts.userId,
       formulaId: opts.formulaId,
-      stripeSubscriptionId: subscription.id,
       priceCents: opts.priceCents,
       nextShipmentDate: nextShipmentDate.toISOString(),
     });
@@ -178,44 +126,50 @@ export class AutoShipService {
   }
 
   // ──────────────────────────────────────────────────────────────
-  // 2. PROCESS RENEWAL (called from invoice.paid webhook)
+  // 2. PROCESS RENEWAL (called by scheduler when nextShipmentDate is due)
   // ──────────────────────────────────────────────────────────────
-  async processAutoShipRenewal(stripeSubscriptionId: string, invoiceAmountCents: number): Promise<void> {
-    const autoShip = await autoShipRepository.getByStripeSubscriptionId(stripeSubscriptionId);
-    if (!autoShip) {
-      logger.warn('Auto-ship renewal for unknown subscription', { stripeSubscriptionId });
+  async processAutoShipRenewal(autoShipId: string): Promise<void> {
+    const autoShip = await autoShipRepository.getById(autoShipId);
+    if (!autoShip || autoShip.status !== 'active') {
+      logger.warn('Auto-ship renewal skipped — not active', { autoShipId });
       return;
     }
 
     const user = await usersRepository.getUser(autoShip.userId);
     if (!user) {
-      logger.error('Auto-ship renewal for missing user', { autoShipId: autoShip.id, userId: autoShip.userId });
+      logger.error('Auto-ship renewal for missing user', { autoShipId, userId: autoShip.userId });
       return;
     }
 
-    // 1. Resolve current active formula
+    // ── Check payment method ──
+    const vaultId = user.paymentVaultId;
+    if (!vaultId) {
+      logger.error('Auto-ship renewal: no payment vault ID', { autoShipId, userId: autoShip.userId });
+      await autoShipRepository.update(autoShip.id, { status: 'paused' as any });
+      await this.notifyAutoShipIssue(user, 'We couldn\'t process your auto-ship because no payment method is on file. Please update your payment method from your dashboard.');
+      return;
+    }
+
+    // ── Resolve current active formula ──
     const formula = await formulasRepository.getCurrentFormulaByUser(autoShip.userId);
     if (!formula) {
-      logger.error('Auto-ship renewal: no active formula found', { userId: autoShip.userId, autoShipId: autoShip.id });
-      // Still mark the auto-ship as needing attention
+      logger.error('Auto-ship renewal: no active formula found', { userId: autoShip.userId, autoShipId });
       await autoShipRepository.update(autoShip.id, { status: 'paused' as any });
       await this.notifyAutoShipIssue(user, 'No active formula found for your auto-ship. We\'ve paused it until you set up a formula.');
       return;
     }
 
-    // 1b. Block renewal if formula has discontinued ingredients
+    // ── Block renewal if formula has discontinued ingredients ──
     if (formula.needsReformulation) {
       logger.warn('Auto-ship renewal blocked: formula needs reformulation', {
-        autoShipId: autoShip.id,
-        userId: autoShip.userId,
-        discontinuedIngredients: formula.discontinuedIngredients,
+        autoShipId, userId: autoShip.userId, discontinuedIngredients: formula.discontinuedIngredients,
       });
       await autoShipRepository.update(autoShip.id, { status: 'paused' as any });
       await this.notifyAutoShipIssue(user, 'One or more ingredients in your formula are no longer available. Your auto-ship is paused until you update your formula. Visit your dashboard to chat with your AI practitioner for a quick update.');
       return;
     }
 
-    // 2. Get fresh manufacturer quote
+    // ── Get fresh manufacturer quote ──
     const quote = await manufacturerPricingService.quoteFormula({
       bases: (formula.bases as any[]) || [],
       additions: (formula.additions as any[]) || [],
@@ -224,16 +178,52 @@ export class AutoShipService {
 
     if (!quote.available || !quote.total || !quote.quoteId) {
       logger.error('Auto-ship renewal: manufacturer quote failed', {
-        autoShipId: autoShip.id,
-        userId: autoShip.userId,
-        quoteAvailable: quote.available,
-        reason: (quote as any).reason,
+        autoShipId, userId: autoShip.userId, quoteAvailable: quote.available, reason: (quote as any).reason,
       });
       await this.notifyAutoShipIssue(user, 'We couldn\'t get a pricing quote for your formula. Our team has been notified and will follow up.');
       return;
     }
 
-    // 3. Build consent snapshot
+    // ── Calculate charge amount ──
+    const isActiveMember = !!(user.membershipTier && !user.membershipCancelledAt);
+    const rawCents = Math.round(quote.total * 100);
+    const chargeCents = isActiveMember ? Math.round(rawCents * MEMBER_DISCOUNT) : rawCents;
+    const chargeAmount = (chargeCents / 100).toFixed(2);
+
+    // ── Charge via EPD Customer Vault ──
+    let transactionId: string | undefined;
+    try {
+      const result = await epdGateway.chargeVault({
+        customer_vault_id: vaultId,
+        amount: chargeAmount,
+        orderid: `ones-autoship-${autoShip.id.slice(0, 8)}-${Date.now()}`,
+        orderdescription: `ONES Auto-Ship - Formula v${formula.version}`,
+        stored_credential_indicator: 'used',
+        initiated_by: 'merchant',
+        initial_transaction_id: user.initialTransactionId || undefined,
+        billing_method: 'recurring',
+        customer_receipt: 'true',
+      });
+
+      if (!isApproved(result)) {
+        logger.warn('Auto-ship renewal payment declined', {
+          autoShipId, userId: autoShip.userId,
+          responsetext: result.responsetext, response_code: result.response_code,
+        });
+        // Mark as past_due but don't cancel — scheduler will retry
+        await autoShipRepository.update(autoShip.id, { status: 'past_due' as any });
+        await this.notifyAutoShipIssue(user, `Your auto-ship payment was declined: ${result.responsetext}. Please update your payment method.`);
+        return;
+      }
+
+      transactionId = result.transactionid;
+    } catch (err) {
+      logger.error('Auto-ship EPD charge error', { autoShipId, userId: autoShip.userId, error: err });
+      await autoShipRepository.update(autoShip.id, { status: 'past_due' as any });
+      return;
+    }
+
+    // ── Build consent snapshot ──
     let consentSnapshot: any = null;
     try {
       const allConsents = await consentsRepository.getUserConsents(autoShip.userId);
@@ -257,34 +247,67 @@ export class AutoShipService {
       logger.warn('Auto-ship: failed to build consent snapshot', { userId: autoShip.userId, error: err });
     }
 
-    // 4. Create order
+    // ── Create order ──
     const order = await usersRepository.createOrder({
       userId: autoShip.userId,
       formulaId: formula.id,
       formulaVersion: formula.version,
       status: 'processing',
-      amountCents: invoiceAmountCents,
+      amountCents: chargeCents,
       manufacturerCostCents: Math.round((quote.manufacturerCost ?? 0) * 100),
       supplyWeeks: SUPPLY_WEEKS,
       manufacturerQuoteId: quote.quoteId,
       manufacturerQuoteExpiresAt: quote.quoteExpiresAt ? new Date(quote.quoteExpiresAt) : null,
       autoShipSubscriptionId: autoShip.id,
+      gatewayTransactionId: transactionId,
       consentSnapshot,
     });
 
     logger.info('Auto-ship order created', {
-      orderId: order.id,
-      autoShipId: autoShip.id,
-      userId: autoShip.userId,
-      formulaId: formula.id,
-      formulaVersion: formula.version,
-      amountCents: invoiceAmountCents,
-      quoteId: quote.quoteId,
+      orderId: order.id, autoShipId, userId: autoShip.userId,
+      formulaId: formula.id, formulaVersion: formula.version,
+      amountCents: chargeCents, quoteId: quote.quoteId, transactionId,
     });
 
-    // 5. Place manufacturer production order
+    // ── Place manufacturer production order ──
     if (quote.quoteId) {
-      const mfrResult = await manufacturerPricingService.placeManufacturerOrder(quote.quoteId);
+      let customerInfo: ManufacturerOrderCustomerInfo | undefined;
+      const shippingAddresses = await usersRepository.listAddressesByUser(autoShip.userId, 'shipping');
+      const billingAddresses = await usersRepository.listAddressesByUser(autoShip.userId, 'billing');
+      const shippingAddr = shippingAddresses[0];
+      const billingAddr = billingAddresses[0] || shippingAddr;
+
+      const addrLine1 = shippingAddr?.line1 || user.addressLine1;
+      const addrCity = shippingAddr?.city || user.city;
+      const addrZip = shippingAddr?.postalCode || user.postalCode;
+
+      if (addrLine1 && addrCity && addrZip) {
+        customerInfo = {
+          customerName: user.name || 'Customer',
+          email: user.email,
+          phone: user.phone || undefined,
+          billingAddress: {
+            line1: billingAddr?.line1 || addrLine1,
+            line2: billingAddr?.line2 || undefined,
+            city: billingAddr?.city || addrCity,
+            state: billingAddr?.state || user.state || undefined,
+            zip: billingAddr?.postalCode || addrZip,
+            country: billingAddr?.country || user.country || 'US',
+          },
+          shippingAddress: {
+            line1: addrLine1,
+            line2: shippingAddr?.line2 || user.addressLine2 || undefined,
+            city: addrCity,
+            state: shippingAddr?.state || user.state || undefined,
+            zip: addrZip,
+            country: shippingAddr?.country || user.country || 'US',
+          },
+        };
+      } else {
+        logger.warn('Auto-ship: no shipping address available for manufacturer order', { userId: autoShip.userId });
+      }
+
+      const mfrResult = await manufacturerPricingService.placeManufacturerOrder(quote.quoteId, customerInfo);
       if (mfrResult.success) {
         await usersRepository.updateOrder(order.id, {
           manufacturerOrderId: mfrResult.orderId || null,
@@ -293,15 +316,13 @@ export class AutoShipService {
         logger.info('Auto-ship manufacturer order placed', { orderId: order.id, manufacturerOrderId: mfrResult.orderId });
       } else {
         logger.error('Auto-ship manufacturer order failed — admin can retry', {
-          orderId: order.id,
-          quoteId: quote.quoteId,
-          error: mfrResult.error,
+          orderId: order.id, quoteId: quote.quoteId, error: mfrResult.error,
         });
         await usersRepository.updateOrder(order.id, { manufacturerOrderStatus: 'failed' });
       }
     }
 
-    // 6. Update auto-ship record
+    // ── Update auto-ship record ──
     const nextDate = new Date();
     nextDate.setDate(nextDate.getDate() + SUPPLY_WEEKS * 7);
     await autoShipRepository.update(autoShip.id, {
@@ -311,9 +332,10 @@ export class AutoShipService {
       lastQuoteExpiresAt: quote.quoteExpiresAt ? new Date(quote.quoteExpiresAt) : null,
       nextShipmentDate: nextDate,
       manufacturerCostCents: Math.round((quote.manufacturerCost ?? 0) * 100),
+      priceCents: chargeCents,
     });
 
-    // 7. Send renewal notification
+    // ── Send renewal notification ──
     try {
       const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
 
@@ -326,7 +348,7 @@ export class AutoShipService {
           content: `
             <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
             <p>Your formula (v${formula.version}) has been re-ordered and is being prepared for shipment.</p>
-            <p>Order total: <strong>$${(invoiceAmountCents / 100).toFixed(2)}</strong></p>
+            <p>Order total: <strong>$${chargeAmount}</strong></p>
             <p>Next auto-ship: <strong>${nextDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong></p>
           `,
           actionUrl: `${frontendUrl}/dashboard/orders`,
@@ -338,20 +360,19 @@ export class AutoShipService {
         userId: autoShip.userId,
         type: 'order_update',
         title: 'Auto-Ship Order Placed',
-        content: `Formula v${formula.version} re-ordered — $${(invoiceAmountCents / 100).toFixed(2)}. Next shipment in ${SUPPLY_WEEKS} weeks.`,
+        content: `Formula v${formula.version} re-ordered — $${chargeAmount}. Next shipment in ${SUPPLY_WEEKS} weeks.`,
         metadata: { actionUrl: '/dashboard/orders', icon: 'package', priority: 'medium' },
       });
     } catch (err) {
       logger.warn('Failed to send auto-ship renewal notification', { userId: autoShip.userId, error: err });
     }
 
-    // 8. Send membership upgrade nudge for non-members
-    const isActiveMember = !!(user.membershipTier && !user.membershipCancelledAt);
+    // ── Membership upgrade nudge for non-members ──
     if (!isActiveMember) {
       try {
         const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
-        const savingsCents = Math.round(invoiceAmountCents * (1 - MEMBER_DISCOUNT));
-        const memberPriceDollars = ((invoiceAmountCents * MEMBER_DISCOUNT) / 100).toFixed(2);
+        const savingsCents = Math.round(chargeCents * (1 - MEMBER_DISCOUNT));
+        const memberPriceDollars = ((chargeCents * MEMBER_DISCOUNT) / 100).toFixed(2);
         const savingsDollars = (savingsCents / 100).toFixed(2);
         const annualSavings = ((savingsCents / 100) * (52 / SUPPLY_WEEKS)).toFixed(2);
 
@@ -363,7 +384,7 @@ export class AutoShipService {
             type: 'order_update',
             content: `
               <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
-              <p>You just paid <strong>$${(invoiceAmountCents / 100).toFixed(2)}</strong> for your formula auto-ship.
+              <p>You just paid <strong>$${chargeAmount}</strong> for your formula auto-ship.
                  As a Ones member, that would have been <strong>$${memberPriceDollars}</strong> — 
                  saving you <strong>$${savingsDollars}</strong> this cycle alone.</p>
               <p>That's up to <strong>$${annualSavings}/year</strong> in savings.</p>
@@ -416,115 +437,56 @@ export class AutoShipService {
     const newPriceCents = applyDiscount ? Math.round(rawCents * MEMBER_DISCOUNT) : rawCents;
     const oldPriceCents = autoShip.priceCents;
 
-    // Update Stripe subscription price if it changed
-    if (newPriceCents !== oldPriceCents && autoShip.stripeSubscriptionId && autoShip.stripeProductId) {
-      const stripe = this.getStripeClient();
+    // Notify user of price change
+    if (oldPriceCents !== newPriceCents) {
+      try {
+        const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
+        const priceDiff = ((newPriceCents - oldPriceCents) / 100).toFixed(2);
+        const direction = newPriceCents > oldPriceCents ? 'increased' : 'decreased';
 
-      // Create new price
-      const newPrice = await stripe.prices.create({
-        product: autoShip.stripeProductId,
-        currency: 'usd',
-        unit_amount: newPriceCents,
-        recurring: {
-          interval: 'week',
-          interval_count: SUPPLY_WEEKS,
-        },
-      });
-
-      // Get current subscription items
-      const sub = await stripe.subscriptions.retrieve(autoShip.stripeSubscriptionId);
-      const currentItem = sub.items.data[0];
-      if (currentItem) {
-        await stripe.subscriptions.update(autoShip.stripeSubscriptionId, {
-          items: [{
-            id: currentItem.id,
-            price: newPrice.id,
-          }],
-          proration_behavior: 'none', // Don't prorate — next charge uses new price
-          metadata: {
-            ...sub.metadata,
-            formulaId: opts.formulaId,
-            formulaVersion: String(opts.formulaVersion),
-          },
-        });
-      }
-
-      // Archive old price
-      if (autoShip.stripePriceId) {
-        try {
-          await stripe.prices.update(autoShip.stripePriceId, { active: false });
-        } catch (err) {
-          logger.warn('Failed to deactivate old Stripe price', { priceId: autoShip.stripePriceId, error: err });
-        }
-      }
-
-      logger.info('Auto-ship price updated on Stripe', {
-        autoShipId: autoShip.id,
-        userId: opts.userId,
-        oldPriceCents,
-        newPriceCents,
-        newStripePriceId: newPrice.id,
-      });
-
-      // Notify user of price change
-      if (oldPriceCents !== newPriceCents) {
-        try {
-          const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
-          const priceDiff = ((newPriceCents - oldPriceCents) / 100).toFixed(2);
-          const direction = newPriceCents > oldPriceCents ? 'increased' : 'decreased';
-
-          if (await notificationsService.shouldSendEmail(opts.userId, 'billing')) {
-            await sendNotificationEmail({
-              to: user.email,
-              subject: `Your Ones auto-ship price has ${direction}`,
-              title: 'Auto-Ship Price Update',
-              type: 'order_update',
-              content: `
-                <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
-                <p>Your formula has been updated (v${opts.formulaVersion}), and your auto-ship price has ${direction} by $${Math.abs(Number(priceDiff))}.</p>
-                <p>New price: <strong>$${(newPriceCents / 100).toFixed(2)}</strong>/shipment${applyDiscount ? ' (member price)' : ''}</p>
-                <p>This will take effect on your next auto-ship.</p>
-              `,
-              actionUrl: `${frontendUrl}/dashboard/formula`,
-              actionText: 'View Details',
-            });
-          }
-
-          await notificationsService.create({
-            userId: opts.userId,
-            type: 'formula_update',
-            title: 'Auto-Ship Price Updated',
-            content: `Your formula changed — new auto-ship price: $${(newPriceCents / 100).toFixed(2)}/shipment.`,
-            metadata: { actionUrl: '/dashboard/formula', icon: 'dollar-sign', priority: 'medium' },
+        if (await notificationsService.shouldSendEmail(opts.userId, 'billing')) {
+          await sendNotificationEmail({
+            to: user.email,
+            subject: `Your Ones auto-ship price has ${direction}`,
+            title: 'Auto-Ship Price Update',
+            type: 'order_update',
+            content: `
+              <p>Hi ${user.name?.split(' ')[0] || 'there'},</p>
+              <p>Your formula has been updated (v${opts.formulaVersion}), and your auto-ship price has ${direction} by $${Math.abs(Number(priceDiff))}.</p>
+              <p>New price: <strong>$${(newPriceCents / 100).toFixed(2)}</strong>/shipment${applyDiscount ? ' (member price)' : ''}</p>
+              <p>This will take effect on your next auto-ship.</p>
+            `,
+            actionUrl: `${frontendUrl}/dashboard/formula`,
+            actionText: 'View Details',
           });
-        } catch (err) {
-          logger.warn('Failed to send price change notification', { userId: opts.userId, error: err });
         }
+
+        await notificationsService.create({
+          userId: opts.userId,
+          type: 'formula_update',
+          title: 'Auto-Ship Price Updated',
+          content: `Your formula changed — new auto-ship price: $${(newPriceCents / 100).toFixed(2)}/shipment.`,
+          metadata: { actionUrl: '/dashboard/formula', icon: 'dollar-sign', priority: 'medium' },
+        });
+      } catch (err) {
+        logger.warn('Failed to send price change notification', { userId: opts.userId, error: err });
       }
-
-      // Update DB record
-      const updated = await autoShipRepository.update(autoShip.id, {
-        formulaId: opts.formulaId,
-        formulaVersion: opts.formulaVersion,
-        priceCents: newPriceCents,
-        manufacturerCostCents: Math.round((quote.manufacturerCost ?? 0) * 100),
-        stripePriceId: newPrice.id,
-        lastQuoteId: quote.quoteId || null,
-        lastQuoteExpiresAt: quote.quoteExpiresAt ? new Date(quote.quoteExpiresAt) : null,
-        memberDiscountApplied: applyDiscount,
-      });
-
-      return updated!;
     }
 
-    // Price unchanged — just update formula reference + quote
+    // Update DB record
     const updated = await autoShipRepository.update(autoShip.id, {
       formulaId: opts.formulaId,
       formulaVersion: opts.formulaVersion,
+      priceCents: newPriceCents,
+      manufacturerCostCents: Math.round((quote.manufacturerCost ?? 0) * 100),
       lastQuoteId: quote.quoteId || null,
       lastQuoteExpiresAt: quote.quoteExpiresAt ? new Date(quote.quoteExpiresAt) : null,
-      manufacturerCostCents: Math.round((quote.manufacturerCost ?? 0) * 100),
-      memberDiscountApplied: isActiveMember,
+      memberDiscountApplied: applyDiscount,
+    });
+
+    logger.info('Auto-ship price synced', {
+      autoShipId: autoShip.id, userId: opts.userId,
+      oldPriceCents, newPriceCents,
     });
 
     return updated!;
@@ -556,7 +518,7 @@ export class AutoShipService {
   }
 
   // ──────────────────────────────────────────────────────────────
-  // 5. USER CONTROLS
+  // 5. USER CONTROLS (all DB-only — no external API calls)
   // ──────────────────────────────────────────────────────────────
 
   async getAutoShip(userId: string): Promise<AutoShipSubscription | undefined> {
@@ -569,15 +531,7 @@ export class AutoShipService {
       throw new Error('NO_ACTIVE_AUTO_SHIP');
     }
 
-    if (autoShip.stripeSubscriptionId) {
-      const stripe = this.getStripeClient();
-      await stripe.subscriptions.update(autoShip.stripeSubscriptionId, {
-        pause_collection: { behavior: 'void' },
-      });
-    }
-
     const updated = await autoShipRepository.update(autoShip.id, { status: 'paused' as any });
-
     logger.info('Auto-ship paused', { autoShipId: autoShip.id, userId });
 
     try {
@@ -597,21 +551,9 @@ export class AutoShipService {
 
   async resumeAutoShip(userId: string): Promise<AutoShipSubscription> {
     const autoShip = await autoShipRepository.getByUserId(userId);
-    if (!autoShip) {
-      throw new Error('NO_AUTO_SHIP_FOUND');
-    }
-    if (autoShip.status !== 'paused') {
-      throw new Error('AUTO_SHIP_NOT_PAUSED');
-    }
+    if (!autoShip) throw new Error('NO_AUTO_SHIP_FOUND');
+    if (autoShip.status !== 'paused') throw new Error('AUTO_SHIP_NOT_PAUSED');
 
-    if (autoShip.stripeSubscriptionId) {
-      const stripe = this.getStripeClient();
-      await stripe.subscriptions.update(autoShip.stripeSubscriptionId, {
-        pause_collection: '' as any, // Stripe clears pause when set to empty
-      });
-    }
-
-    // Calculate next shipment date from now
     const nextShipmentDate = new Date();
     nextShipmentDate.setDate(nextShipmentDate.getDate() + SUPPLY_WEEKS * 7);
 
@@ -641,15 +583,6 @@ export class AutoShipService {
     const autoShip = await autoShipRepository.getByUserId(userId);
     if (!autoShip || autoShip.status === 'cancelled') {
       throw new Error('NO_AUTO_SHIP_TO_CANCEL');
-    }
-
-    if (autoShip.stripeSubscriptionId) {
-      const stripe = this.getStripeClient();
-      try {
-        await stripe.subscriptions.cancel(autoShip.stripeSubscriptionId);
-      } catch (err) {
-        logger.warn('Failed to cancel Stripe auto-ship subscription', { stripeSubscriptionId: autoShip.stripeSubscriptionId, error: err });
-      }
     }
 
     const updated = await autoShipRepository.update(autoShip.id, {
@@ -701,48 +634,34 @@ export class AutoShipService {
       throw new Error('NO_ACTIVE_AUTO_SHIP');
     }
 
-    if (autoShip.stripeSubscriptionId) {
-      const stripe = this.getStripeClient();
-      // Pause for one cycle: resume at next-shipment-date + 8 weeks
-      const currentNext = autoShip.nextShipmentDate || new Date();
-      const resumeAt = new Date(currentNext);
-      resumeAt.setDate(resumeAt.getDate() + SUPPLY_WEEKS * 7);
+    // Push the next shipment date forward by one cycle
+    const currentNext = autoShip.nextShipmentDate || new Date();
+    const resumeAt = new Date(currentNext);
+    resumeAt.setDate(resumeAt.getDate() + SUPPLY_WEEKS * 7);
 
-      await stripe.subscriptions.update(autoShip.stripeSubscriptionId, {
-        pause_collection: {
-          behavior: 'void',
-          resumes_at: Math.floor(resumeAt.getTime() / 1000),
-        },
-      });
+    const updated = await autoShipRepository.update(autoShip.id, {
+      nextShipmentDate: resumeAt,
+    });
 
-      // Update next shipment date to the resumed date
-      const updated = await autoShipRepository.update(autoShip.id, {
-        nextShipmentDate: resumeAt,
-      });
+    logger.info('Auto-ship next shipment skipped', {
+      autoShipId: autoShip.id, userId,
+      skippedDate: currentNext.toISOString(),
+      resumesAt: resumeAt.toISOString(),
+    });
 
-      logger.info('Auto-ship next shipment skipped', {
-        autoShipId: autoShip.id,
+    try {
+      await notificationsService.create({
         userId,
-        skippedDate: currentNext.toISOString(),
-        resumesAt: resumeAt.toISOString(),
+        type: 'order_update',
+        title: 'Next Shipment Skipped',
+        content: `Your next auto-ship has been skipped. Resuming ${resumeAt.toLocaleDateString()}.`,
+        metadata: { actionUrl: '/dashboard/formula', icon: 'skip-forward', priority: 'low' },
       });
-
-      try {
-        await notificationsService.create({
-          userId,
-          type: 'order_update',
-          title: 'Next Shipment Skipped',
-          content: `Your next auto-ship has been skipped. Resuming ${resumeAt.toLocaleDateString()}.`,
-          metadata: { actionUrl: '/dashboard/formula', icon: 'skip-forward', priority: 'low' },
-        });
-      } catch (err) {
-        logger.warn('Failed to send skip notification', { userId, error: err });
-      }
-
-      return updated!;
+    } catch (err) {
+      logger.warn('Failed to send skip notification', { userId, error: err });
     }
 
-    throw new Error('AUTO_SHIP_NOT_LINKED_TO_STRIPE');
+    return updated!;
   }
 
   // ──────────────────────────────────────────────────────────────

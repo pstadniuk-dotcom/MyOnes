@@ -5,12 +5,13 @@ import { sendNotificationEmail } from '../../utils/emailService';
 import { INDIVIDUAL_INGREDIENTS, SYSTEM_SUPPORTS } from '@shared/ingredients';
 import { aiRuntimeSettings, ALLOWED_MODELS, normalizeModel } from 'server/infra/ai/ai-config';
 import { systemRepository } from '../system/system.repository';
-import { manufacturerPricingService } from '../formulas/manufacturer-pricing.service';
+import { manufacturerPricingService, type ManufacturerOrderCustomerInfo } from '../formulas/manufacturer-pricing.service';
 import { usersRepository } from '../users/users.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
 import { wearablesService } from '../wearables/wearables.service';
 import { getFrontendUrl } from '../../utils/urlHelper';
 import { escapeHtml } from '../../utils/sanitize';
+import { epdGateway, isApproved } from '../billing/epd-gateway';
 
 const VALID_ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
 
@@ -717,8 +718,44 @@ Return ONLY valid JSON.`;
             });
         }
 
-        // Place the manufacturer order
-        const result = await manufacturerPricingService.placeManufacturerOrder(quoteId);
+        // Place the manufacturer order — build customer info from user profile
+        const user = await usersRepository.getUser(order.userId);
+        let customerInfo: ManufacturerOrderCustomerInfo | undefined;
+        if (user) {
+            const shippingAddresses = await usersRepository.listAddressesByUser(order.userId, 'shipping');
+            const billingAddresses = await usersRepository.listAddressesByUser(order.userId, 'billing');
+            const shippingAddr = shippingAddresses[0];
+            const billingAddr = billingAddresses[0] || shippingAddr;
+            const addrLine1 = shippingAddr?.line1 || user.addressLine1;
+            const addrCity = shippingAddr?.city || user.city;
+            const addrZip = shippingAddr?.postalCode || user.postalCode;
+
+            if (addrLine1 && addrCity && addrZip) {
+                customerInfo = {
+                    customerName: user.name || 'Customer',
+                    email: user.email,
+                    phone: user.phone || undefined,
+                    billingAddress: {
+                        line1: billingAddr?.line1 || addrLine1,
+                        line2: billingAddr?.line2 || undefined,
+                        city: billingAddr?.city || addrCity,
+                        state: billingAddr?.state || user.state || undefined,
+                        zip: billingAddr?.postalCode || addrZip,
+                        country: billingAddr?.country || user.country || 'US',
+                    },
+                    shippingAddress: {
+                        line1: addrLine1,
+                        line2: shippingAddr?.line2 || user.addressLine2 || undefined,
+                        city: addrCity,
+                        state: shippingAddr?.state || user.state || undefined,
+                        zip: addrZip,
+                        country: shippingAddr?.country || user.country || 'US',
+                    },
+                };
+            }
+        }
+
+        const result = await manufacturerPricingService.placeManufacturerOrder(quoteId, customerInfo);
         if (result.success) {
             await usersRepository.updateOrder(orderId, {
                 manufacturerOrderId: result.orderId || null,
@@ -956,7 +993,7 @@ Return ONLY valid JSON.`;
 
     // B2B Medical Prospecting
     async listB2bProspects(filters?: { status?: string; practiceType?: string }) {
-        return await adminRepository.listB2bProspects(filters?.status);
+        return await adminRepository.listB2bProspects(filters?.status, filters?.practiceType);
     }
 
     async getB2bProspect(id: string) {
@@ -985,6 +1022,110 @@ Return ONLY valid JSON.`;
 
     async createB2bOutreach(data: any) {
         return await adminRepository.createB2bOutreach(data);
+    }
+
+    // ── Order Detail ─────────────────────────────────────────────────
+
+    async getOrderDetail(orderId: string): Promise<any> {
+        const order = await usersRepository.getOrder(orderId);
+        if (!order) return null;
+
+        const user = await usersRepository.getUser(order.userId);
+        const formula = order.formulaId ? await formulasRepository.getFormula(order.formulaId) : null;
+        const addresses = await usersRepository.listAddressesByUser(order.userId, 'shipping');
+
+        return {
+            ...order,
+            user: user ? { id: user.id, name: user.name, email: user.email, phone: user.phone } : null,
+            formula: formula ? {
+                id: formula.id,
+                version: formula.version,
+                name: formula.name,
+                bases: formula.bases,
+                additions: formula.additions,
+                targetCapsules: formula.targetCapsules,
+            } : null,
+            shippingAddress: addresses[0] || null,
+        };
+    }
+
+    // ── Refund Order ─────────────────────────────────────────────────
+
+    async refundOrder(orderId: string, amountCents?: number, reason?: string): Promise<{
+        success: boolean;
+        refundTransactionId?: string;
+        refundedAmountCents?: number;
+        error?: string;
+    }> {
+        const order = await usersRepository.getOrder(orderId);
+        if (!order) return { success: false, error: 'Order not found' };
+
+        if (!order.gatewayTransactionId) {
+            return { success: false, error: 'No gateway transaction ID — cannot refund. This order may not have been charged.' };
+        }
+
+        if (order.status === 'cancelled') {
+            return { success: false, error: 'Order is already cancelled' };
+        }
+
+        const orderAmountCents = order.amountCents || 0;
+        const refundCents = amountCents ?? orderAmountCents; // Full refund if no amount specified
+
+        if (refundCents <= 0) {
+            return { success: false, error: 'Refund amount must be greater than zero' };
+        }
+        if (refundCents > orderAmountCents) {
+            return { success: false, error: `Refund amount ($${(refundCents / 100).toFixed(2)}) exceeds order total ($${(orderAmountCents / 100).toFixed(2)})` };
+        }
+
+        const refundDollars = (refundCents / 100).toFixed(2);
+
+        try {
+            const result = await epdGateway.refund(order.gatewayTransactionId, refundDollars);
+
+            if (!isApproved(result)) {
+                logger.warn('EPD refund declined', {
+                    orderId, transactionId: order.gatewayTransactionId,
+                    responsetext: result.responsetext, response_code: result.response_code,
+                });
+                return { success: false, error: `Refund declined: ${result.responsetext}` };
+            }
+
+            // Update order status to cancelled
+            await adminRepository.updateOrderStatus(orderId, 'cancelled');
+
+            logger.info('Order refunded via EPD', {
+                orderId, refundCents, transactionId: order.gatewayTransactionId,
+                refundTransactionId: result.transactionid, reason,
+            });
+
+            // Notify user via email
+            const user = await usersRepository.getUser(order.userId);
+            if (user?.email) {
+                try {
+                    await sendNotificationEmail({
+                        to: user.email,
+                        subject: 'Your ONES Order Has Been Refunded',
+                        title: 'Refund Processed',
+                        content: `<p>A refund of <strong>$${refundDollars}</strong> has been issued for your order.</p>
+                            <p>Please allow 5-10 business days for the refund to appear on your statement.</p>
+                            ${reason ? `<p><strong>Reason:</strong> ${escapeHtml(reason)}</p>` : ''}`,
+                        type: 'order_update',
+                    });
+                } catch (emailErr) {
+                    logger.warn('Failed to send refund email', { orderId, error: emailErr });
+                }
+            }
+
+            return {
+                success: true,
+                refundTransactionId: result.transactionid,
+                refundedAmountCents: refundCents,
+            };
+        } catch (err) {
+            logger.error('EPD refund request failed', { orderId, error: err });
+            return { success: false, error: 'Payment gateway error — please try again or refund via EPD console.' };
+        }
     }
 }
 

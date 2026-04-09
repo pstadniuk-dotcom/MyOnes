@@ -45,10 +45,17 @@ export async function registerRoutes(app: Express, rateLimiters?: { authLimiter?
   }
 
   // Use Express built-in JSON middleware (stable and reliable)
+  // For webhook routes, also capture the raw body for signature verification
   app.use('/api', express.json({
     limit: '10mb',
     strict: true,
-    type: 'application/json'
+    type: 'application/json',
+    verify: (req: any, _res, buf) => {
+      // Preserve raw body for webhook signature verification
+      if (req.originalUrl?.startsWith('/api/webhooks/')) {
+        req.rawBody = buf.toString('utf-8');
+      }
+    },
   }));
 
   // Security headers for all API routes (HIPAA & Security Compliance)

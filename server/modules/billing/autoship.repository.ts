@@ -15,14 +15,6 @@ export class AutoShipRepository {
     return row || undefined;
   }
 
-  async getByStripeSubscriptionId(stripeSubscriptionId: string): Promise<AutoShipSubscription | undefined> {
-    const [row] = await db
-      .select()
-      .from(autoShipSubscriptions)
-      .where(eq(autoShipSubscriptions.stripeSubscriptionId, stripeSubscriptionId));
-    return row || undefined;
-  }
-
   async getById(id: string): Promise<AutoShipSubscription | undefined> {
     const [row] = await db
       .select()

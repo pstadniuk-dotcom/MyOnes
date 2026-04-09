@@ -170,7 +170,7 @@ export class UsersService {
     }
 
     async addPaymentMethod(userId: string, paymentMethodData: {
-        stripePaymentMethodId: string;
+        paymentVaultId: string;
         brand: string;
         last4: string;
     }) {

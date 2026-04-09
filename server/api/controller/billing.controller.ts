@@ -1,6 +1,28 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import logger from '../../infra/logging/logger';
 import { billingService } from '../../modules/billing/billing.service';
+
+const addressSchema = z.object({
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  line1: z.string().min(1).max(200),
+  line2: z.string().max(200).optional(),
+  city: z.string().min(1).max(100),
+  state: z.string().min(1).max(50),
+  zip: z.string().min(3).max(20),
+  country: z.string().max(5).optional(),
+});
+
+const checkoutPayloadSchema = z.object({
+  paymentToken: z.string().min(1).max(500),
+  formulaId: z.string().uuid().optional(),
+  includeMembership: z.boolean().optional(),
+  plan: z.enum(['monthly', 'quarterly', 'annual']).optional(),
+  enableAutoShip: z.boolean().optional(),
+  shippingAddress: addressSchema.optional(),
+  billingAddress: addressSchema.optional(),
+});
 
 export class BillingController {
   async getEquivalentStack(req: Request, res: Response) {
@@ -52,15 +74,16 @@ export class BillingController {
     }
   }
 
-  async createCheckoutSession(req: Request, res: Response) {
+  async processCheckout(req: Request, res: Response) {
     try {
       const userId = req.userId!;
-      const session = await billingService.createCheckoutSession(userId, req.body || {}, req);
-      return res.json(session);
-    } catch (error: any) {
-      if (error?.message === 'STRIPE_SECRET_KEY_NOT_CONFIGURED') {
-        return res.status(500).json({ error: 'Billing is not configured' });
+      const parsed = checkoutPayloadSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid checkout data', details: parsed.error.flatten().fieldErrors });
       }
+      const result = await billingService.processCheckout(userId, parsed.data, req);
+      return res.json(result);
+    } catch (error: any) {
       if (error?.message === 'ALREADY_ACTIVE_MEMBER') {
         return res.status(409).json({ error: 'User already has an active membership' });
       }
@@ -82,6 +105,9 @@ export class BillingController {
           code: 'MEDICAL_DISCLOSURE_NOT_ACKNOWLEDGED',
         });
       }
+      if (error?.message === 'PAYMENT_TOKEN_REQUIRED') {
+        return res.status(400).json({ error: 'Payment token is required' });
+      }
       if (error?.message === 'FORMULA_ID_REQUIRED') {
         return res.status(400).json({ error: 'Formula ID is required for non-membership checkout' });
       }
@@ -94,11 +120,17 @@ export class BillingController {
           code: 'FORMULA_NEEDS_REFORMULATION',
         });
       }
+      if (error?.message === 'PAYMENT_PROCESSING_ERROR') {
+        return res.status(502).json({ error: 'Payment processing error. Please try again.' });
+      }
+      if (typeof error?.message === 'string' && error.message.startsWith('PAYMENT_DECLINED:')) {
+        return res.status(402).json({ error: error.message.replace('PAYMENT_DECLINED: ', ''), code: 'PAYMENT_DECLINED' });
+      }
       if (error?.message === 'USER_NOT_FOUND') {
         return res.status(404).json({ error: 'User not found' });
       }
-      logger.error('Error creating checkout session', { error });
-      res.status(500).json({ error: 'Failed to create checkout session' });
+      logger.error('Error processing checkout', { error });
+      res.status(500).json({ error: 'Failed to process checkout' });
     }
   }
 
@@ -109,9 +141,6 @@ export class BillingController {
       const result = await billingService.cancelSubscription(userId, subscriptionId);
       return res.json(result);
     } catch (error: any) {
-      if (error?.message === 'STRIPE_SECRET_KEY_NOT_CONFIGURED') {
-        return res.status(500).json({ error: 'Billing is not configured' });
-      }
       if (error?.message === 'USER_NOT_FOUND') {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -130,9 +159,6 @@ export class BillingController {
       const result = await billingService.resumeSubscription(userId, subscriptionId);
       return res.json(result);
     } catch (error: any) {
-      if (error?.message === 'STRIPE_SECRET_KEY_NOT_CONFIGURED') {
-        return res.status(500).json({ error: 'Billing is not configured' });
-      }
       if (error?.message === 'USER_NOT_FOUND') {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -141,31 +167,6 @@ export class BillingController {
       }
       logger.error('Error resuming subscription', { error });
       res.status(500).json({ error: 'Failed to resume subscription' });
-    }
-  }
-
-  async stripeWebhook(req: Request, res: Response) {
-    try {
-      const signature = req.headers['stripe-signature'];
-      if (!Buffer.isBuffer(req.body)) {
-        logger.error('Stripe webhook received non-Buffer body — express.raw() middleware may not be applied to this route');
-        return res.status(500).json({ error: 'Webhook body parsing misconfigured' });
-      }
-      const rawBody = req.body;
-      await billingService.handleStripeWebhook(
-        typeof signature === 'string' ? signature : undefined,
-        rawBody
-      );
-      return res.status(200).json({ received: true });
-    } catch (error: any) {
-      if (['STRIPE_WEBHOOK_SECRET_NOT_CONFIGURED', 'STRIPE_SECRET_KEY_NOT_CONFIGURED'].includes(error?.message)) {
-        return res.status(500).json({ error: 'Billing webhook is not configured' });
-      }
-      if (error?.message === 'MISSING_STRIPE_SIGNATURE') {
-        return res.status(400).json({ error: 'Missing stripe-signature header' });
-      }
-      logger.error('Stripe webhook processing failed', { error: error?.message || error });
-      return res.status(400).json({ error: 'Invalid webhook payload' });
     }
   }
 }

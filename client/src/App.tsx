@@ -81,6 +81,7 @@ import { AdminLayout } from "@/shared/components/AdminLayout";
 import SharedFormulaPage from "@/pages/SharedFormulaPage";
 import MembershipPage from "@/pages/MembershipPage";
 import CheckoutSuccessPage from "@/pages/CheckoutSuccessPage";
+const CheckoutPage = lazy(() => import("@/pages/CheckoutPage"));
 
 // Import V2 landing page (premium design)
 import LandingPageV2 from "@/pages/LandingPageV2";
@@ -415,7 +416,12 @@ function MainRouter() {
         </ProtectedAdminRoute>
       </Route>
 
-      {/* Membership & Checkout */}
+      {/* Checkout & Membership */}
+      <Route path="/checkout">
+        <ProtectedRoute>
+          <Suspense fallback={<PageLoader />}><CheckoutPage /></Suspense>
+        </ProtectedRoute>
+      </Route>
       <Route path="/membership/success">
         <ProtectedRoute>
           <CheckoutSuccessPage />

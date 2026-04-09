@@ -46,8 +46,8 @@ interface B2bStats {
   avgLeadScore: number;
 }
 
-type ProspectStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-type PracticeType = 'dermatology' | 'med_spa' | 'functional_medicine' | 'naturopathic' | 'integrative' | 'chiropractic' | 'wellness_center' | 'other';
+type ProspectStatus = 'new' | 'contacted' | 'responded' | 'meeting_scheduled' | 'sample_sent' | 'trial' | 'active_partner' | 'churned' | 'rejected';
+type PracticeType = 'naturopathic' | 'integrative' | 'functional_medicine' | 'sports_medicine' | 'chiropractic' | 'wellness_clinic' | 'pharmacy' | 'other';
 
 interface Prospect {
   id: string;
@@ -69,12 +69,12 @@ interface Prospect {
   providerCount: number | null;
   notes: string | null;
   status: ProspectStatus;
-  lastActivity: string | null;
+  lastActivityAt: string | null;
   createdAt: string;
 }
 
-type OutreachType = 'email' | 'call' | 'meeting' | 'demo' | 'proposal';
-type OutreachOutcome = 'no_response' | 'interested' | 'not_interested' | 'follow_up' | 'scheduled_demo' | 'closed_won' | 'closed_lost';
+type OutreachType = 'email' | 'call' | 'meeting' | 'sample_sent' | 'follow_up';
+type OutreachOutcome = 'positive' | 'negative' | 'no_response' | 'meeting_booked';
 
 interface OutreachEntry {
   id: string;
@@ -95,43 +95,47 @@ const STATUS_OPTIONS: { value: ProspectStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All Statuses' },
   { value: 'new', label: 'New' },
   { value: 'contacted', label: 'Contacted' },
-  { value: 'qualified', label: 'Qualified' },
-  { value: 'proposal', label: 'Proposal' },
-  { value: 'negotiation', label: 'Negotiation' },
-  { value: 'won', label: 'Won' },
-  { value: 'lost', label: 'Lost' },
+  { value: 'responded', label: 'Responded' },
+  { value: 'meeting_scheduled', label: 'Meeting Scheduled' },
+  { value: 'sample_sent', label: 'Sample Sent' },
+  { value: 'trial', label: 'Trial' },
+  { value: 'active_partner', label: 'Active Partner' },
+  { value: 'churned', label: 'Churned' },
+  { value: 'rejected', label: 'Rejected' },
 ];
 
 const STATUS_COLORS: Record<ProspectStatus, string> = {
   new: 'bg-blue-100 text-blue-700',
   contacted: 'bg-yellow-100 text-yellow-700',
-  qualified: 'bg-purple-100 text-purple-700',
-  proposal: 'bg-indigo-100 text-indigo-700',
-  negotiation: 'bg-orange-100 text-orange-700',
-  won: 'bg-green-100 text-green-700',
-  lost: 'bg-red-100 text-red-700',
+  responded: 'bg-purple-100 text-purple-700',
+  meeting_scheduled: 'bg-indigo-100 text-indigo-700',
+  sample_sent: 'bg-orange-100 text-orange-700',
+  trial: 'bg-cyan-100 text-cyan-700',
+  active_partner: 'bg-green-100 text-green-700',
+  churned: 'bg-gray-100 text-gray-700',
+  rejected: 'bg-red-100 text-red-700',
 };
 
 const PRACTICE_TYPE_OPTIONS: { value: PracticeType | 'all'; label: string }[] = [
   { value: 'all', label: 'All Practice Types' },
-  { value: 'dermatology', label: 'Dermatology' },
-  { value: 'med_spa', label: 'Med Spa' },
-  { value: 'functional_medicine', label: 'Functional Medicine' },
   { value: 'naturopathic', label: 'Naturopathic' },
   { value: 'integrative', label: 'Integrative' },
+  { value: 'functional_medicine', label: 'Functional Medicine' },
+  { value: 'sports_medicine', label: 'Sports Medicine' },
   { value: 'chiropractic', label: 'Chiropractic' },
-  { value: 'wellness_center', label: 'Wellness Center' },
+  { value: 'wellness_clinic', label: 'Wellness Clinic' },
+  { value: 'pharmacy', label: 'Pharmacy' },
   { value: 'other', label: 'Other' },
 ];
 
 const PRACTICE_TYPE_LABELS: Record<PracticeType, string> = {
-  dermatology: 'Dermatology',
-  med_spa: 'Med Spa',
-  functional_medicine: 'Functional Medicine',
   naturopathic: 'Naturopathic',
   integrative: 'Integrative',
+  functional_medicine: 'Functional Medicine',
+  sports_medicine: 'Sports Medicine',
   chiropractic: 'Chiropractic',
-  wellness_center: 'Wellness Center',
+  wellness_clinic: 'Wellness Clinic',
+  pharmacy: 'Pharmacy',
   other: 'Other',
 };
 
@@ -148,25 +152,22 @@ const OUTREACH_TYPE_OPTIONS = [
   { value: 'email', label: 'Email' },
   { value: 'call', label: 'Call' },
   { value: 'meeting', label: 'Meeting' },
-  { value: 'demo', label: 'Demo' },
-  { value: 'proposal', label: 'Proposal' },
+  { value: 'sample_sent', label: 'Sample Sent' },
+  { value: 'follow_up', label: 'Follow Up' },
 ];
 
 const OUTCOME_OPTIONS = [
   { value: 'no_response', label: 'No Response' },
-  { value: 'interested', label: 'Interested' },
-  { value: 'not_interested', label: 'Not Interested' },
-  { value: 'follow_up', label: 'Follow Up' },
-  { value: 'scheduled_demo', label: 'Scheduled Demo' },
-  { value: 'closed_won', label: 'Closed Won' },
-  { value: 'closed_lost', label: 'Closed Lost' },
+  { value: 'positive', label: 'Positive' },
+  { value: 'negative', label: 'Negative' },
+  { value: 'meeting_booked', label: 'Meeting Booked' },
 ];
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const emptyProspectForm = (): Omit<Prospect, 'id' | 'lastActivity' | 'createdAt'> => ({
+const emptyProspectForm = (): Omit<Prospect, 'id' | 'lastActivityAt' | 'createdAt'> => ({
   practiceName: '',
   practiceType: 'other' as PracticeType,
   specialty: '',
@@ -191,7 +192,7 @@ const emptyOutreachForm = () => ({
   type: 'email' as OutreachType,
   subject: '',
   body: '',
-  outcome: '' as string,
+  outcome: null as string | null,
   notes: '',
 });
 
@@ -547,7 +548,7 @@ export default function B2bProspectingPage() {
               </div>
               <div>
                 <Label>Outcome</Label>
-                <Select value={outreachForm.outcome} onValueChange={(v) => setOutreachForm({ ...outreachForm, outcome: v })}>
+                <Select value={outreachForm.outcome || undefined} onValueChange={(v) => setOutreachForm({ ...outreachForm, outcome: v })}>
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Select outcome..." /></SelectTrigger>
                   <SelectContent>
                     {OUTCOME_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
@@ -889,7 +890,7 @@ export default function B2bProspectingPage() {
                       <TableCell>
                         <Badge className={STATUS_COLORS[p.status]}>{p.status}</Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-gray-500">{formatDate(p.lastActivity)}</TableCell>
+                      <TableCell className="text-sm text-gray-500">{formatDate(p.lastActivityAt)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button variant="ghost" size="sm" onClick={() => openEditDialog(p)}>

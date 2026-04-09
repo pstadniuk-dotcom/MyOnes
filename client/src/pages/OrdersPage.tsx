@@ -251,7 +251,7 @@ export default function OrdersPage() {
       });
     },
     onError: (error: any) => {
-      // Fallback to internal update if billing API fails (e.g. stripe not configured)
+      // Fallback to internal update if billing API fails (e.g. payment gateway not configured)
       updateSubscriptionMutation.mutate({ status: 'cancelled' });
     }
   });
@@ -368,8 +368,8 @@ export default function OrdersPage() {
   };
 
   const confirmCancelSubscription = () => {
-    if (subscription?.stripeSubscriptionId) {
-      cancelSubscriptionActionMutation.mutate(subscription.stripeSubscriptionId);
+    if (subscription?.id) {
+      cancelSubscriptionActionMutation.mutate(subscription.id);
     } else {
       updateSubscriptionMutation.mutate({ status: 'cancelled' });
     }
@@ -377,8 +377,8 @@ export default function OrdersPage() {
   };
 
   const handleResumeSubscription = () => {
-    if (subscription?.stripeSubscriptionId) {
-      resumeSubscriptionMutation.mutate(subscription.stripeSubscriptionId);
+    if (subscription?.id) {
+      resumeSubscriptionMutation.mutate(subscription.id);
     } else {
       updateSubscriptionMutation.mutate({ status: 'active' });
     }

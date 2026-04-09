@@ -4,7 +4,7 @@
  * Runs daily at 8am UTC (before the review scheduler at 9am).
  * For auto-ship subscriptions renewing in the next 10 days:
  *  - Refreshes the manufacturer quote (gets fresh price from Alive)
- *  - If the price changed, updates Stripe subscription and notifies user
+ *  - If the price changed, updates the auto-ship record and notifies user
  *
  * This ensures users are always charged the correct, up-to-date price
  * and have time to review any price changes before their card is charged.

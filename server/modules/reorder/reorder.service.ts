@@ -487,14 +487,15 @@ export const reorderService = {
    * Called by the scheduler after schedules move to 'approved' status.
    */
   async chargeApprovedOrders(): Promise<number> {
+    const { epdGateway, isApproved } = await import('../billing/epd-gateway');
     const approved = await reorderRepository.getApprovedSchedulesReadyToCharge();
     let charged = 0;
 
     for (const schedule of approved) {
       try {
         const user = await usersRepository.getUser(schedule.userId);
-        if (!user?.stripeCustomerId) {
-          logger.error('[ReorderService] No Stripe customer for user', { userId: schedule.userId });
+        if (!user?.paymentVaultId) {
+          logger.error('[ReorderService] No payment vault ID for user', { userId: schedule.userId });
           continue;
         }
 
@@ -504,7 +505,6 @@ export const reorderService = {
         if (recommendation && recommendation.recommendsChanges) {
           const analysis = recommendation.analysisJson as AIReorderDecision;
           if (analysis?.suggestedChanges && analysis.suggestedChanges.length > 0) {
-            // If an adjusted formula was created and linked, use it
             if ((recommendation as any).adjustedFormulaId) {
               chargeFormulaId = (recommendation as any).adjustedFormulaId;
               logger.info('[ReorderService] Using adjusted formula for reorder', {
@@ -530,40 +530,21 @@ export const reorderService = {
         // Apply member discount (15%)
         const MEMBER_DISCOUNT = 0.85;
         const priceCents = Math.round(quoteResult.quote.total * 100 * MEMBER_DISCOUNT);
+        const chargeAmount = (priceCents / 100).toFixed(2);
 
-        // Charge via Stripe PaymentIntent (off_session)
-        const stripe = (await import('stripe')).default;
-        const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY!);
-
-        // Get default payment method
-        const customer = await stripeClient.customers.retrieve(user.stripeCustomerId);
-        const defaultPaymentMethod = (customer as any).invoice_settings?.default_payment_method
-          || (customer as any).default_source;
-
-        if (!defaultPaymentMethod) {
-          logger.error('[ReorderService] No payment method on file for user', { userId: schedule.userId });
-          // TODO: Send "update payment method" email
-          continue;
-        }
-
-        const paymentIntent = await stripeClient.paymentIntents.create({
-          amount: priceCents,
-          currency: 'usd',
-          customer: user.stripeCustomerId,
-          payment_method: defaultPaymentMethod,
-          off_session: true,
-          confirm: true,
-          description: `ONES Smart Re-Order - Formula V${schedule.formulaVersion}`,
-          metadata: {
-            userId: schedule.userId,
-            formulaId: chargeFormulaId,
-            formulaVersion: String(schedule.formulaVersion),
-            scheduleId: schedule.id,
-            orderType: 'smart_reorder',
-          },
+        // Charge via EPD Customer Vault
+        const result = await epdGateway.chargeVault({
+          customer_vault_id: user.paymentVaultId,
+          amount: chargeAmount,
+          orderid: `ones-reorder-${schedule.id.slice(0, 8)}-${Date.now()}`,
+          orderdescription: `ONES Smart Re-Order - Formula V${schedule.formulaVersion}`,
+          stored_credential_indicator: 'used',
+          initiated_by: 'merchant',
+          initial_transaction_id: user.initialTransactionId || undefined,
+          billing_method: 'recurring',
         });
 
-        if (paymentIntent.status === 'succeeded') {
+        if (isApproved(result)) {
           // Create order record
           const order = await usersRepository.createOrder({
             userId: schedule.userId,
@@ -572,14 +553,14 @@ export const reorderService = {
             status: 'pending',
             amountCents: priceCents,
             supplyWeeks: SUPPLY_WEEKS,
-            stripeSessionId: paymentIntent.id,
-            autoShipSubscriptionId: schedule.id, // Link to schedule
+            gatewayTransactionId: result.transactionid,
+            autoShipSubscriptionId: schedule.id,
           });
 
           // Update schedule as charged
           await reorderRepository.updateSchedule(schedule.id, {
             status: 'charged',
-            stripePaymentIntentId: paymentIntent.id,
+            gatewayTransactionId: result.transactionid,
             chargedAt: new Date(),
             chargePriceCents: priceCents,
             orderId: order.id,
@@ -590,7 +571,7 @@ export const reorderService = {
             schedule.userId,
             schedule.formulaId,
             schedule.formulaVersion,
-            new Date(), // Supply starts now (will be updated to actual ship date)
+            new Date(),
           );
 
           charged++;
@@ -601,7 +582,7 @@ export const reorderService = {
               userId: schedule.userId,
               type: 'order_update',
               title: 'Reorder Placed',
-              content: `Your Formula V${schedule.formulaVersion} reorder has been placed ($${(priceCents / 100).toFixed(2)}).`,
+              content: `Your Formula V${schedule.formulaVersion} reorder has been placed ($${chargeAmount}).`,
               metadata: {
                 actionUrl: '/dashboard/formula',
                 icon: 'package',
@@ -609,39 +590,27 @@ export const reorderService = {
               },
             });
           } catch { /* non-critical */ }
-        }
-      } catch (err: any) {
-        logger.error('[ReorderService] Charge failed', {
-          scheduleId: schedule.id,
-          userId: schedule.userId,
-          error: err?.message || err,
-          stripeCode: err?.code,
-        });
-
-        if (err?.code === 'authentication_required' || err?.code === 'card_declined') {
+        } else {
+          // Payment declined
           const currentAttempts = (schedule as any).paymentAttempts ?? 0;
           const nextAttempts = currentAttempts + 1;
 
           if (nextAttempts < 3) {
-            // Retry: increment attempts but keep schedule in approved state
             await reorderRepository.updateSchedule(schedule.id, {
               paymentAttempts: nextAttempts,
             } as any);
-            logger.warn('[ReorderService] Payment attempt failed, will retry', {
-              scheduleId: schedule.id,
-              userId: schedule.userId,
-              attempt: nextAttempts,
-              maxAttempts: 3,
+            logger.warn('[ReorderService] Payment declined, will retry', {
+              scheduleId: schedule.id, userId: schedule.userId,
+              attempt: nextAttempts, maxAttempts: 3,
+              responsetext: result.responsetext,
             });
           } else {
-            // Final attempt failed — mark as skipped and notify user
             await reorderRepository.updateSchedule(schedule.id, {
               status: 'skipped',
               paymentAttempts: nextAttempts,
             } as any);
             logger.error('[ReorderService] Payment failed after 3 attempts — marking schedule as skipped', {
-              scheduleId: schedule.id,
-              userId: schedule.userId,
+              scheduleId: schedule.id, userId: schedule.userId,
             });
 
             try {
@@ -650,15 +619,15 @@ export const reorderService = {
                 type: 'order_update',
                 title: 'Reorder Payment Failed',
                 content: `We were unable to process payment for your reorder after multiple attempts. Please update your payment method to continue.`,
-                metadata: {
-                  actionUrl: '/dashboard/billing',
-                  icon: 'alert-triangle',
-                  priority: 'high',
-                },
+                metadata: { actionUrl: '/dashboard/billing', icon: 'alert-triangle', priority: 'high' },
               });
             } catch { /* non-critical */ }
           }
         }
+      } catch (err: any) {
+        logger.error('[ReorderService] Charge failed', {
+          scheduleId: schedule.id, userId: schedule.userId, error: err?.message || err,
+        });
       }
     }
 

@@ -155,7 +155,7 @@ describe('Plan pricing math', () => {
     });
   });
 
-  describe('Stripe amount calculation (server)', () => {
+  describe('Charge amount calculation (server)', () => {
     it('monthly charge = priceCents × 1', () => {
       const { intervalCount } = resolvePlan('monthly');
       expect(900 * intervalCount).toBe(900);

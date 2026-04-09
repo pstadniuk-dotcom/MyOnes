@@ -64,8 +64,21 @@ router.get('/activity-feed', requireAdmin, adminController.getActivityFeed);
 // Order Management
 router.get('/orders/today', requireAdmin, adminController.getTodaysOrders);
 router.get('/orders', requireAdmin, adminController.listOrders);
+router.get('/orders/:id', requireAdmin, adminController.getOrderDetail);
 router.patch('/orders/:id/status', requireAdmin, adminController.updateOrderStatus);
+router.post('/orders/:id/refund', requireAdmin, adminController.refundOrder);
 router.post('/orders/:id/retry-manufacturer', requireAdmin, adminController.retryManufacturerOrder);
+router.post('/orders/:id/tracking', requireAdmin, adminController.updateOrderTracking);
+
+// EPD Gateway — Payments Dashboard (Query API)
+router.get('/gateway/transactions', requireAdmin, adminController.getGatewayTransactions);
+router.get('/gateway/transactions/pending', requireAdmin, adminController.getGatewayPendingSettlement);
+router.get('/gateway/transactions/:transactionId', requireAdmin, adminController.getGatewayTransaction);
+router.get('/gateway/vault', requireAdmin, adminController.getGatewayVault);
+router.get('/gateway/subscriptions', requireAdmin, adminController.getGatewaySubscriptions);
+router.get('/gateway/plans', requireAdmin, adminController.getGatewayPlans);
+router.post('/gateway/plans', requireAdmin, adminController.createGatewayPlan);
+router.delete('/gateway/subscriptions/:subscriptionId', requireAdmin, adminController.deleteGatewaySubscription);
 
 // Export
 router.get('/export/users', requireAdmin, adminController.exportUsers);

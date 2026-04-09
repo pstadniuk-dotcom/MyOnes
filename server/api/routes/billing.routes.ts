@@ -1,18 +1,27 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { requireAuth } from '../middleware/middleware';
 import { billingController } from '../controller/billing.controller';
 import { autoShipController } from '../controller/autoship.controller';
 
 const router = Router();
 
+// Checkout-specific rate limit: 5 attempts per 15 minutes per IP
+const checkoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many checkout attempts. Please wait a few minutes and try again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 router.get('/history', requireAuth, billingController.getHistory);
 router.get('/invoices/:invoiceId', requireAuth, billingController.getInvoice);
 router.get('/equivalent-stack', requireAuth, billingController.getEquivalentStack);
 
-router.post('/checkout/session', requireAuth, billingController.createCheckoutSession);
+router.post('/checkout', requireAuth, checkoutLimiter, billingController.processCheckout);
 router.post('/subscriptions/:subscriptionId/cancel', requireAuth, billingController.cancelSubscription);
 router.post('/subscriptions/:subscriptionId/resume', requireAuth, billingController.resumeSubscription);
-router.post('/webhooks/stripe', billingController.stripeWebhook);
 
 // Auto-ship routes
 router.get('/auto-ship', requireAuth, autoShipController.getStatus);

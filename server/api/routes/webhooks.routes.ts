@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { webhooksController } from '../controller/webhooks.controller';
+import { epdWebhooksController } from '../controller/epd-webhooks.controller';
 
 const router = Router();
 
@@ -16,5 +17,12 @@ router.post('/twilio/sms', webhooksController.handleTwilioSms);
  * @access  Public (Signature verification included)
  */
 router.post('/junction', webhooksController.handleJunctionWebhook);
+
+/**
+ * @route   POST /api/webhooks/epd
+ * @desc    EasyPayDirect payment gateway webhooks
+ * @access  Public (HMAC-SHA256 signature verification)
+ */
+router.post('/epd', epdWebhooksController.handleEpdWebhook);
 
 export default router;

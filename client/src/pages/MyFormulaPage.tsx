@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
@@ -172,6 +173,7 @@ interface MyMembershipPayload {
 }
 
 export default function MyFormulaPage() {
+  const [, navigate] = useLocation();
   // State management
   const [activeTab, setActiveTab] = useState('formulas');
   const [searchTerm, setSearchTerm] = useState('');
@@ -199,14 +201,6 @@ export default function MyFormulaPage() {
   const [pendingPricingFocusFormulaId, setPendingPricingFocusFormulaId] = useState<string | null>(null);
   const pricingCardRef = useRef<HTMLDivElement | null>(null);
   const [addressMode, setAddressMode] = useState<'profile' | 'new'>('profile');
-  const [shippingAddress, setShippingAddress] = useState({
-    addressLine1: '',
-    addressLine2: '',
-    city: '',
-    state: '',
-    postalCode: '',
-    country: 'US',
-  });
 
   // Hooks
   const { user } = useAuth();
@@ -462,52 +456,9 @@ export default function MyFormulaPage() {
     },
   });
 
-  const checkoutSessionMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedFormula?.id) {
-        throw new Error('No formula selected for checkout.');
-      }
-
-      const includeMembership = membershipUpsellAvailable ? includeMembershipAtCheckout : false;
-      const smsParam = smsOptInAtFirstPurchase ? '&sms=1' : '';
-      const successUrl = `${window.location.origin}/membership/success?session_id={CHECKOUT_SESSION_ID}&membership=${includeMembership ? '1' : '0'}${smsParam}`;
-
-      const response = await apiRequest('POST', '/api/billing/checkout/session', {
-        formulaId: selectedFormula.id,
-        includeMembership,
-        enableAutoShip,
-        plan: 'monthly',
-        successUrl,
-      });
-
-      return response.json() as Promise<{ checkoutUrl: string; sessionId: string; expiresAt: string }>;
-    },
-    onSuccess: ({ checkoutUrl }) => {
-      window.location.href = checkoutUrl;
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.message || 'Please try again in a moment.';
-      // Handle safety acknowledgment error specifically
-      if (errorMessage.includes('safety warnings') || errorMessage.includes('SAFETY_WARNINGS_NOT_ACKNOWLEDGED')) {
-        toast({
-          title: 'Safety Acknowledgment Required',
-          description: 'Please review and acknowledge the safety warnings for this formula before proceeding.',
-          variant: 'destructive',
-        });
-      } else if (errorMessage.includes('MEDICAL_DISCLOSURE_NOT_ACKNOWLEDGED')) {
-        toast({
-          title: 'Medical Disclosure Required',
-          description: 'Please confirm that you have disclosed all medications, conditions, and allergies before proceeding.',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Unable to continue to checkout',
-          description: errorMessage,
-          variant: 'destructive',
-        });
-      }
-    },
+  // Payment is now handled by the /checkout page
+  const [shippingAddress, setShippingAddress] = useState({
+    firstName: '', lastName: '', line1: '', line2: '', city: '', state: '', zip: '', country: 'US',
   });
 
   // Acknowledge safety warnings before checkout
@@ -688,19 +639,14 @@ export default function MyFormulaPage() {
       setEnableAutoShip(true);
       setAddressMode('profile');
       setShippingAddress({
-        addressLine1: '',
-        addressLine2: '',
-        city: '',
-        state: '',
-        postalCode: '',
-        country: 'US',
+        firstName: '', lastName: '', line1: '', line2: '', city: '', state: '', zip: '', country: 'US',
       });
       return;
     }
 
     if (hasActiveMembership) {
       setIncludeMembershipAtCheckout(false);
-      // Active members use Smart Re-Order (server-side) — don't create a Stripe auto-ship subscription
+      // Active members use Smart Re-Order (server-side) — don't create an auto-ship subscription
       setEnableAutoShip(false);
     } else {
       setIncludeMembershipAtCheckout(true);
@@ -718,7 +664,7 @@ export default function MyFormulaPage() {
   }, [showOrderConfirmation, hasActiveMembership, hasProfileAddress]);
 
   // When user toggles membership on/off at checkout, sync enableAutoShip accordingly:
-  // Members / users adding membership → Smart Re-Order (enableAutoShip=false, no Stripe sub)
+  // Members / users adding membership → Smart Re-Order (enableAutoShip=false, no auto-ship sub)
   // Non-members without membership → classic auto-refill toggle available
   useEffect(() => {
     if (!showOrderConfirmation) return;
@@ -1489,7 +1435,7 @@ export default function MyFormulaPage() {
                       ? discountedFormulaPrice
                       : oneTimeFormulaPrice;
                     const supplyWeeks = formulaQuoteData?.quote?.weeks ?? 8;
-                    const onesMonthly = effectiveOnesCost > 0 ? Math.round(effectiveOnesCost / (supplyWeeks / 4.33)) : 0;
+                    const onesMonthly = effectiveOnesCost > 0 ? Math.round(effectiveOnesCost / (supplyWeeks / 4)) : 0;
                     const savingsMonthly = retailCost > 0 && onesMonthly > 0 ? Math.round(((retailCost - onesMonthly) / retailCost) * 100) : null;
                     const retailCapsules = equivalentStackData.capsulesPerDay ?? 0;
                     const onesCapsules = pricingCapsuleCount;
@@ -1869,17 +1815,17 @@ export default function MyFormulaPage() {
                             <Label htmlFor="shipping-address-line1" className="text-xs">Street Address</Label>
                             <AddressAutocomplete
                               id="shipping-address-line1"
-                              value={shippingAddress.addressLine1}
-                              onChange={(val) => setShippingAddress(prev => ({ ...prev, addressLine1: val }))}
+                              value={shippingAddress.line1}
+                              onChange={(val) => setShippingAddress(prev => ({ ...prev, line1: val }))}
                               placeholder="123 Main Street"
                               countryCode={shippingAddress.country}
                               onSelectAddress={(fields) =>
                                 setShippingAddress((prev) => ({
                                   ...prev,
-                                  addressLine1: fields.addressLine1 ?? prev.addressLine1,
+                                  line1: fields.addressLine1 ?? prev.line1,
                                   city: fields.city ?? prev.city,
                                   state: fields.state ?? prev.state,
-                                  postalCode: fields.postalCode ?? prev.postalCode,
+                                  zip: fields.postalCode ?? prev.zip,
                                   country: fields.country ?? prev.country,
                                 }))
                               }
@@ -1890,8 +1836,8 @@ export default function MyFormulaPage() {
                             <Label htmlFor="shipping-address-line2" className="text-xs">Apartment, Suite, etc. (Optional)</Label>
                             <Input
                               id="shipping-address-line2"
-                              value={shippingAddress.addressLine2}
-                              onChange={(e) => setShippingAddress(prev => ({ ...prev, addressLine2: e.target.value }))}
+                              value={shippingAddress.line2}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, line2: e.target.value }))}
                               placeholder="Apt 4B"
                               className="h-8 text-sm"
                               data-testid="input-shipping-address-line2"
@@ -1926,8 +1872,8 @@ export default function MyFormulaPage() {
                               <Label htmlFor="shipping-postal-code" className="text-xs">Postal Code</Label>
                               <Input
                                 id="shipping-postal-code"
-                                value={shippingAddress.postalCode}
-                                onChange={(e) => setShippingAddress(prev => ({ ...prev, postalCode: e.target.value }))}
+                                value={shippingAddress.zip}
+                                onChange={(e) => setShippingAddress(prev => ({ ...prev, zip: e.target.value }))}
                                 placeholder="10001"
                                 className="h-8 text-sm"
                                 data-testid="input-shipping-postal-code"
@@ -2099,12 +2045,18 @@ export default function MyFormulaPage() {
                     });
                   }
                   await purchaseSmsOptInMutation.mutateAsync();
-                  await checkoutSessionMutation.mutateAsync();
+                  // Navigate to full checkout page
+                  const params = new URLSearchParams({
+                    formulaId: selectedFormula!.id,
+                    membership: (includeMembershipAtCheckout && membershipUpsellAvailable) ? '1' : '0',
+                    autoship: enableAutoShip ? '1' : '0',
+                  });
+                  navigate(`/checkout?${params.toString()}`);
                 } catch {
                   // Errors are handled in mutation onError
                 }
               }}
-              disabled={purchaseSmsOptInMutation.isPending || checkoutSessionMutation.isPending || !medDisclosureAcknowledged || (smsOptInAtFirstPurchase && !userPhone && !checkoutPhone.trim()) || !!selectedFormula?.needsReformulation || (() => {
+              disabled={purchaseSmsOptInMutation.isPending || !medDisclosureAcknowledged || (smsOptInAtFirstPurchase && !userPhone && !checkoutPhone.trim()) || !!selectedFormula?.needsReformulation || (() => {
                 // Block checkout if formula has serious warnings that haven't been acknowledged
                 if (!selectedFormula) return false;
                 const sv = (selectedFormula as any)?.safetyValidation;
@@ -2118,13 +2070,13 @@ export default function MyFormulaPage() {
               <ArrowRight className="w-4 h-4 mr-2" />
               {purchaseSmsOptInMutation.isPending
                 ? 'Saving...'
-                : checkoutSessionMutation.isPending
-                  ? 'Opening checkout...'
-                  : 'Proceed to Checkout'}
+                : 'Proceed to Payment'}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Payment is now handled by /checkout page */}
 
       {/* Customization Dialog — hidden for now */}
 

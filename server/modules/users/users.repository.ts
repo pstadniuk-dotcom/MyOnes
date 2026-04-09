@@ -41,13 +41,8 @@ export class UsersRepository {
         return user || undefined;
     }
 
-    async getUserByStripeCustomerId(stripeCustomerId: string): Promise<User | undefined> {
-        const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, stripeCustomerId));
-        return user || undefined;
-    }
-
-    async getUserByStripeSubscriptionId(stripeSubscriptionId: string): Promise<User | undefined> {
-        const [user] = await db.select().from(users).where(eq(users.stripeSubscriptionId, stripeSubscriptionId));
+    async getUserByPaymentVaultId(paymentVaultId: string): Promise<User | undefined> {
+        const [user] = await db.select().from(users).where(eq(users.paymentVaultId, paymentVaultId));
         return user || undefined;
     }
 
@@ -239,11 +234,11 @@ export class UsersRepository {
         return subscription || undefined;
     }
 
-    async getSubscriptionByStripeSubscriptionId(stripeSubscriptionId: string): Promise<Subscription | undefined> {
+    async getSubscriptionByPaymentVaultId(paymentVaultId: string): Promise<Subscription | undefined> {
         const [subscription] = await db
             .select()
             .from(subscriptions)
-            .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId));
+            .where(eq(subscriptions.paymentVaultId, paymentVaultId));
         return subscription || undefined;
     }
 
@@ -261,14 +256,14 @@ export class UsersRepository {
         return subscription || undefined;
     }
 
-    async updateSubscriptionByStripeSubscriptionId(
-        stripeSubscriptionId: string,
+    async updateSubscriptionByPaymentVaultId(
+        paymentVaultId: string,
         updates: Partial<InsertSubscription>
     ): Promise<Subscription | undefined> {
         const [subscription] = await db
             .update(subscriptions)
             .set(updates)
-            .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId))
+            .where(eq(subscriptions.paymentVaultId, paymentVaultId))
             .returning();
         return subscription || undefined;
     }
@@ -308,8 +303,8 @@ export class UsersRepository {
         return order || undefined;
     }
 
-    async getOrderByStripeSessionId(sessionId: string): Promise<Order | undefined> {
-        const [order] = await db.select().from(orders).where(eq(orders.stripeSessionId, sessionId));
+    async getOrderByGatewayTransactionId(transactionId: string): Promise<Order | undefined> {
+        const [order] = await db.select().from(orders).where(eq(orders.gatewayTransactionId, transactionId));
         return order || undefined;
     }
 
@@ -443,8 +438,8 @@ export class UsersRepository {
     // Streak Rewards operations
 
     /**
-     * @deprecated Not wired to checkout — discount is calculated but never applied as a Stripe coupon
-     * or line-item adjustment during payment. Should be removed or integrated as Stripe coupons.
+     * @deprecated Not wired to checkout — discount is calculated but never applied as a
+     * line-item adjustment during payment. Should be removed or integrated with EPD pricing.
      */
     private calculateDiscountTier(streakDays: number): { discount: number; tier: string } {
         if (streakDays >= 90) return { discount: 20, tier: 'Champion' };
@@ -550,8 +545,8 @@ export class UsersRepository {
     }
 
     /**
-     * @deprecated Not wired to checkout — discount is calculated but never applied as a Stripe coupon
-     * or line-item adjustment during payment. Should be removed or integrated as Stripe coupons.
+     * @deprecated Not wired to checkout — discount is calculated but never applied as a
+     * line-item adjustment during payment. Should be removed or integrated with EPD pricing.
      */
     async applyStreakDiscount(userId: string, orderId: string): Promise<number> {
         try {
