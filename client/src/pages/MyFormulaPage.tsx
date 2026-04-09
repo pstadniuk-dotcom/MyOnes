@@ -3640,7 +3640,7 @@ function ActionsSection({ formula, onOrderClick, hasActiveMembership }: { formul
 
   const handleDownload = async () => {
     try {
-      console.log('Starting PDF download...');
+      console.log('Starting PDF download....');
       const pdfMake = (await import('pdfmake/build/pdfmake')).default;
       const pdfFonts = (await import('pdfmake/build/vfs_fonts')).default as any;
 
