@@ -17,4 +17,11 @@ router.post('/twilio/sms', webhooksController.handleTwilioSms);
  */
 router.post('/junction', webhooksController.handleJunctionWebhook);
 
+/**
+ * @route   POST /api/webhooks/alive/order-status
+ * @desc    Alive manufacturer order status webhook
+ * @access  Public (header secret verification supported)
+ */
+router.post('/alive/order-status', webhooksController.handleAliveOrderStatusWebhook);
+
 export default router;

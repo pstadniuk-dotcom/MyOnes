@@ -568,7 +568,7 @@ export default function MyFormulaPage() {
     enabled: !!user?.id && !!selectedFormula?.id,
     queryFn: () => apiRequest('GET', `/api/users/me/formula/${selectedFormula!.id}/quote?capsuleCount=${pricingCapsuleCount}`).then(res => res.json()),
   });
-
+console.log('quoteeeeeeeeeeeeeeeeeee', formulaQuoteData)
   const { data: currentMembershipTier } = useQuery<MembershipTierPayload | null>({
     queryKey: ['/api/membership/current-tier'],
     enabled: !!user?.id,
@@ -615,6 +615,10 @@ export default function MyFormulaPage() {
 
   const hasActiveMembership = !!myMembership?.hasMembership && !myMembership?.isCancelled;
   const membershipUpsellAvailable = !hasActiveMembership && !!currentMembershipTier;
+  const isQuoteExplicitlyUnavailable =
+    !!selectedFormula?.id &&
+    !isLoadingFormulaQuote &&
+    formulaQuoteData?.quote?.available === false;
   const oneTimeFormulaPrice = formulaQuoteData?.quote?.available ? (formulaQuoteData.quote.total ?? 0) : 0;
   const membershipMonthlyPrice = currentMembershipTier ? currentMembershipTier.priceCents / 100 : 0;
   // Always compute the 15% savings so we can show savings regardless of toggle state
@@ -2090,6 +2094,15 @@ export default function MyFormulaPage() {
               className="bg-primary hover:bg-primary/90"
               onClick={async () => {
                 try {
+                  if (isQuoteExplicitlyUnavailable) {
+                    toast({
+                      title: 'Pricing unavailable',
+                      description: formulaQuoteData?.quote?.reason || 'Formula pricing is currently unavailable. Please try again shortly.',
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
+
                   // Record medical disclosure consent before checkout
                   if (medDisclosureAcknowledged) {
                     await apiRequest('POST', '/api/consents/grant', {
@@ -2104,7 +2117,7 @@ export default function MyFormulaPage() {
                   // Errors are handled in mutation onError
                 }
               }}
-              disabled={purchaseSmsOptInMutation.isPending || checkoutSessionMutation.isPending || !medDisclosureAcknowledged || (smsOptInAtFirstPurchase && !userPhone && !checkoutPhone.trim()) || !!selectedFormula?.needsReformulation || (() => {
+              disabled={purchaseSmsOptInMutation.isPending || checkoutSessionMutation.isPending || !medDisclosureAcknowledged || (smsOptInAtFirstPurchase && !userPhone && !checkoutPhone.trim()) || !!selectedFormula?.needsReformulation || isQuoteExplicitlyUnavailable || (() => {
                 // Block checkout if formula has serious warnings that haven't been acknowledged
                 if (!selectedFormula) return false;
                 const sv = (selectedFormula as any)?.safetyValidation;

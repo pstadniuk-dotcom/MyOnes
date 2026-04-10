@@ -15,7 +15,7 @@ const {
   mockUpsertSubscriptionForUser,
   mockGetAvailableMembershipTier, mockGetMembershipTier,
   mockAssignUserMembership, mockCancelUserMembership,
-  mockCustomersCreate, mockCheckoutSessionsCreate,
+  mockCustomersCreate, mockCustomersRetrieve, mockCheckoutSessionsCreate,
   mockSubscriptionsCancel, mockSubscriptionsUpdate, mockSubscriptionsRetrieve, mockWebhooksConstructEvent,
   mockGetUserConsent,
 } = vi.hoisted(() => ({
@@ -33,6 +33,7 @@ const {
   mockAssignUserMembership: vi.fn(),
   mockCancelUserMembership: vi.fn(),
   mockCustomersCreate: vi.fn(),
+  mockCustomersRetrieve: vi.fn(),
   mockCheckoutSessionsCreate: vi.fn(),
   mockSubscriptionsCancel: vi.fn(),
   mockSubscriptionsUpdate: vi.fn(),
@@ -72,7 +73,7 @@ vi.mock('../modules/consents/consents.repository', () => ({
 
 vi.mock('stripe', () => ({
   default: class {
-    public customers = { create: mockCustomersCreate };
+    public customers = { create: mockCustomersCreate, retrieve: mockCustomersRetrieve };
     public checkout = { sessions: { create: mockCheckoutSessionsCreate } };
     public subscriptions = { cancel: mockSubscriptionsCancel, update: mockSubscriptionsUpdate, retrieve: mockSubscriptionsRetrieve };
     public webhooks = { constructEvent: mockWebhooksConstructEvent };
@@ -328,6 +329,7 @@ describe('createCheckoutSession', () => {
     mockGetUser.mockResolvedValue(makeUser());
     mockGetAvailableMembershipTier.mockResolvedValue(makeTier());
     mockCustomersCreate.mockResolvedValue({ id: 'cus_new' });
+    mockCustomersRetrieve.mockResolvedValue({ id: 'cus_existing', deleted: false });
     mockUpdateUser.mockResolvedValue({});
     mockCheckoutSessionsCreate.mockResolvedValue(makeStripeSession());
     // Default: medication disclosure consent is granted
