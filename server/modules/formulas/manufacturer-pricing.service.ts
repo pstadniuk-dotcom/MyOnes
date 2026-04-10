@@ -4,7 +4,9 @@ const ALIVE_API_BASE_URL = (process.env.ALIVE_API_BASE_URL || "https://dev.alive
 const ALIVE_API_INGREDIENTS_URL = process.env.ALIVE_API_INGREDIENTS_URL || `${ALIVE_API_BASE_URL}/ingredients`;
 const ALIVE_API_GET_QUOTE_URL = process.env.ALIVE_API_GET_QUOTE_URL || `${ALIVE_API_BASE_URL}/get-quote`;
 const ALIVE_API_MIX_PRODUCT_URL = process.env.ALIVE_API_MIX_PRODUCT_URL || `${ALIVE_API_BASE_URL}/mix-product`;
+const ALIVE_API_EXTERNAL_ORDER_URL = process.env.ALIVE_API_EXTERNAL_ORDER_URL || `${ALIVE_API_BASE_URL}/external-order`;
 const ALIVE_API_KEY = process.env.ALIVE_API_KEY || "";
+const ALIVE_API_ORIGIN = process.env.ALIVE_API_ORIGIN || "";
 
 // ── Production safety: warn if Alive API is pointing at dev URL in production ──
 if (process.env.NODE_ENV === 'production' && ALIVE_API_BASE_URL.includes('dev.aliveinnovations.com')) {
@@ -58,6 +60,18 @@ type ManufacturerOrderResult = {
     success: boolean;
     orderId?: string;
     error?: string;
+};
+
+type OrderCustomerData = {
+    customerName?: string;
+    email?: string;
+    phone?: string;
+    billingCity?: string;
+    billingZip?: string;
+    billingLine1?: string;
+    shippingCity?: string;
+    shippingZip?: string;
+    shippingLine1?: string;
 };
 
 const NAME_ALIASES: Record<string, string> = {
@@ -134,9 +148,14 @@ class ManufacturerPricingService {
     private readonly cacheMs = 15 * 60 * 1000;
 
     private buildAuthHeaders(): Record<string, string> {
-        return {
+        const headers: Record<string, string> = {
             [ALIVE_API_HEADER_NAME]: ALIVE_API_KEY,
         };
+        if (ALIVE_API_ORIGIN) {
+            headers.Origin = ALIVE_API_ORIGIN;
+            headers.Referer = `${ALIVE_API_ORIGIN.replace(/\/$/, "")}/`;
+        }
+        return headers;
     }
 
     private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
@@ -440,8 +459,9 @@ class ManufacturerPricingService {
     /**
      * Place a production order with Alive using a previously obtained quote_id.
      * Called after Stripe payment succeeds.
+     * Uses the /external-order endpoint with full customer and address data.
      */
-    async placeManufacturerOrder(quoteId: string): Promise<ManufacturerOrderResult> {
+    async placeManufacturerOrder(quoteId: string, customerData?: OrderCustomerData): Promise<ManufacturerOrderResult> {
         if (!ALIVE_API_KEY) {
             return { success: false, error: 'Manufacturer API key not configured.' };
         }
@@ -453,14 +473,48 @@ class ManufacturerPricingService {
         try {
             logger.info('Placing manufacturer order with Alive', { quoteId });
 
-            const response = await this.fetchWithTimeout(ALIVE_API_MIX_PRODUCT_URL, {
+            // Build the external-order payload with customer data
+            const payload: Record<string, any> = {
+                external_quote_id: quoteId,
+            };
+
+            if (customerData?.customerName) {
+                payload.customer_name = customerData.customerName;
+            }
+            if (customerData?.email) {
+                payload.email = customerData.email;
+            }
+            if (customerData?.phone) {
+                payload.phone = customerData.phone;
+            }
+
+            // Billing address
+            if (customerData?.billingLine1 || customerData?.billingCity || customerData?.billingZip) {
+                payload.billing_address = {};
+                if (customerData.billingLine1) payload.billing_address.line1 = customerData.billingLine1;
+                if (customerData.billingCity) payload.billing_address.city = customerData.billingCity;
+                if (customerData.billingZip) payload.billing_address.zip = customerData.billingZip;
+            }
+
+            // Shipping address (default to billing if not provided)
+            if (customerData?.shippingLine1 || customerData?.shippingCity || customerData?.shippingZip) {
+                payload.shipping_address = {};
+                if (customerData.shippingLine1) payload.shipping_address.line1 = customerData.shippingLine1;
+                if (customerData.shippingCity) payload.shipping_address.city = customerData.shippingCity;
+                if (customerData.shippingZip) payload.shipping_address.zip = customerData.shippingZip;
+            } else if (payload.billing_address) {
+                // Use billing address as default if no shipping address provided
+                payload.shipping_address = { ...payload.billing_address };
+            }
+
+            const response = await this.fetchWithTimeout(ALIVE_API_EXTERNAL_ORDER_URL, {
                 method: 'POST',
                 headers: {
                     ...this.buildAuthHeaders(),
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ quote_id: quoteId }),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {

@@ -9,6 +9,27 @@ import { reorderRepository } from '../reorder/reorder.repository';
 import { reorderService } from '../reorder/reorder.service';
 
 export class WebhooksService {
+    private mapAliveStatusToOrderStatus(status: string): 'processing' | 'shipped' | 'delivered' | 'cancelled' | undefined {
+        switch (status) {
+            case 'submitted':
+            case 'accepted':
+            case 'queued':
+            case 'in_production':
+            case 'processing':
+                return 'processing';
+            case 'shipped':
+                return 'shipped';
+            case 'delivered':
+                return 'delivered';
+            case 'cancelled':
+            case 'canceled':
+            case 'failed':
+                return 'cancelled';
+            default:
+                return undefined;
+        }
+    }
+
     /**
      * Handle Twilio SMS reply
      */
@@ -212,6 +233,91 @@ export class WebhooksService {
             default:
                 logger.info('Unhandled webhook event type', { eventType: event.event_type });
         }
+    }
+
+    /**
+     * Handle Alive external-order status events and sync internal order status.
+     */
+    async handleAliveOrderStatusWebhook(payload: any) {
+        const manufacturerOrderId =
+            payload?.order_id ||
+            payload?.manufacturer_order_id ||
+            payload?.external_order_id ||
+            payload?.id ||
+            null;
+
+        const manufacturerQuoteId =
+            payload?.external_quote_id ||
+            payload?.quote_id ||
+            null;
+
+        const normalizedStatus = String(
+            payload?.status || payload?.order_status || payload?.state || ''
+        ).trim().toLowerCase();
+
+        const trackingUrl =
+            payload?.tracking_url ||
+            payload?.trackingUrl ||
+            payload?.carrier_tracking_url ||
+            undefined;
+
+        const shippedAtValue = payload?.shipped_at || payload?.shippedAt;
+        const shippedAt = shippedAtValue ? new Date(shippedAtValue) : undefined;
+
+        let order = manufacturerOrderId
+            ? await usersRepository.getOrderByManufacturerOrderId(String(manufacturerOrderId))
+            : undefined;
+
+        if (!order && manufacturerQuoteId) {
+            order = await usersRepository.getMostRecentOrderByManufacturerQuoteId(String(manufacturerQuoteId));
+        }
+
+        if (!order) {
+            logger.warn('Alive webhook did not match any order', {
+                manufacturerOrderId,
+                manufacturerQuoteId,
+                normalizedStatus,
+            });
+            return;
+        }
+
+        const updates: Record<string, any> = {};
+
+        if (manufacturerOrderId && !order.manufacturerOrderId) {
+            updates.manufacturerOrderId = String(manufacturerOrderId);
+        }
+        if (normalizedStatus) {
+            updates.manufacturerOrderStatus = normalizedStatus;
+            const mappedOrderStatus = this.mapAliveStatusToOrderStatus(normalizedStatus);
+            if (mappedOrderStatus) {
+                updates.status = mappedOrderStatus;
+            }
+        }
+        if (trackingUrl) {
+            updates.trackingUrl = String(trackingUrl);
+        }
+        if (shippedAt && !Number.isNaN(shippedAt.getTime())) {
+            updates.shippedAt = shippedAt;
+        } else if (normalizedStatus === 'shipped') {
+            updates.shippedAt = new Date();
+        }
+
+        if (Object.keys(updates).length === 0) {
+            logger.info('Alive webhook received but no order fields changed', {
+                orderId: order.id,
+                manufacturerOrderId,
+                manufacturerQuoteId,
+            });
+            return;
+        }
+
+        await usersRepository.updateOrder(order.id, updates as any);
+        logger.info('Alive webhook order sync complete', {
+            orderId: order.id,
+            manufacturerOrderId: updates.manufacturerOrderId || order.manufacturerOrderId,
+            manufacturerOrderStatus: updates.manufacturerOrderStatus || order.manufacturerOrderStatus,
+            status: updates.status || order.status,
+        });
     }
 
     private async handleSleepData(event: any) {

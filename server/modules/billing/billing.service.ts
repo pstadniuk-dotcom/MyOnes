@@ -290,7 +290,17 @@ class DatabaseBillingProvider implements BillingProvider {
 
       // Place production order with Alive if we have a quote
       if (quoteId) {
-        const mfrResult = await manufacturerPricingService.placeManufacturerOrder(quoteId);
+        const mfrResult = await manufacturerPricingService.placeManufacturerOrder(quoteId, {
+          customerName: user.name,
+          email: user.email,
+          phone: user.phone || undefined,
+          billingLine1: user.addressLine1 || undefined,
+          billingCity: user.city || undefined,
+          billingZip: user.postalCode || undefined,
+          shippingLine1: user.addressLine1 || undefined,
+          shippingCity: user.city || undefined,
+          shippingZip: user.postalCode || undefined,
+        });
         if (mfrResult.success) {
           await usersRepository.updateOrder(order.id, {
             manufacturerOrderId: mfrResult.orderId || null,
@@ -738,12 +748,39 @@ class DatabaseBillingProvider implements BillingProvider {
     }
 
     let customerId = user.stripeCustomerId || null;
+    if (customerId) {
+      try {
+        const existingCustomer = await stripe.customers.retrieve(customerId);
+        if ((existingCustomer as Stripe.DeletedCustomer).deleted) {
+          customerId = null;
+        }
+      } catch (error: any) {
+        // Common when local DB has a customer ID from a different Stripe mode/account.
+        if (error?.code === 'resource_missing' || error?.statusCode === 404) {
+          logger.warn('Stored Stripe customer not found; creating a new customer', {
+            userId: user.id,
+            stripeCustomerId: user.stripeCustomerId,
+            code: error?.code,
+          });
+          customerId = null;
+        } else {
+          throw error;
+        }
+      }
+    }
+
     if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: user.name,
+      const customerPayload: Stripe.CustomerCreateParams = {
         metadata: { userId: user.id },
-      });
+      };
+      if (typeof user.email === 'string' && user.email.trim().length > 0) {
+        customerPayload.email = user.email.trim();
+      }
+      if (typeof user.name === 'string' && user.name.trim().length > 0) {
+        customerPayload.name = user.name.trim();
+      }
+
+      const customer = await stripe.customers.create(customerPayload);
       customerId = customer.id;
       await usersRepository.updateUser(user.id, { stripeCustomerId: customerId });
     }
