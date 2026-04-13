@@ -70,7 +70,7 @@ export default function HeroSectionV2() {
       {/* ═══════════════════════════════════════════════════
           LEFT HALF — Copy on cream with pill outlines
           ═══════════════════════════════════════════════════ */}
-      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-8 md:px-16 lg:px-16 xl:px-20 py-10 lg:py-16 overflow-hidden">
+      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-4 sm:px-6 md:px-10 lg:px-12 xl:px-16 2xl:px-20 py-8 sm:py-10 md:py-12 lg:py-16 overflow-hidden">
         {/* Decorative pill outlines with faint traveling glow */}
         <svg
           aria-hidden="true"
@@ -130,32 +130,32 @@ export default function HeroSectionV2() {
           <use href="#heroCapsule" transform="translate(750, 700) rotate(-30, 60, 144)" fill="none" stroke="url(#metallicGreen)" strokeWidth="3" strokeLinecap="round" filter="url(#metallicGlow)" opacity="0.55" strokeDasharray="59 800"><animate attributeName="stroke-dashoffset" values="0;-859" dur="15s" repeatCount="indefinite"/></use>
         </svg>
 
-        <div className="relative z-10 max-w-xl space-y-8 text-center lg:text-left mx-auto lg:mx-0">
+        <div className="relative z-10 w-full max-w-xl xl:max-w-2xl space-y-6 sm:space-y-8 text-center lg:text-left mx-auto lg:mx-0">
           {/* Pill labels */}
-          <div className="inline-flex items-center gap-8 border border-[#c5c5c5] rounded-full px-6 py-3 mx-auto lg:mx-0">
-            <span className="flex items-center gap-2 text-sm text-[#757575] font-light tracking-wide">
+          <div className="inline-flex flex-wrap sm:flex-nowrap items-center justify-center lg:justify-start gap-x-4 gap-y-2 sm:gap-6 border border-[#c5c5c5] rounded-[24px] sm:rounded-full px-4 sm:px-6 py-2.5 sm:py-3 mx-auto lg:mx-0 max-w-full">
+            <span className="flex items-center gap-2 text-xs sm:text-sm text-[#757575] font-light tracking-wide whitespace-nowrap">
               <span className="w-1.5 h-1.5 bg-[#5a6623] rounded-full" />
               Blood Data
             </span>
-            <span className="flex items-center gap-2 text-sm text-[#757575] font-light tracking-wide">
+            <span className="flex items-center gap-2 text-xs sm:text-sm text-[#757575] font-light tracking-wide whitespace-nowrap">
               <span className="w-1.5 h-1.5 bg-[#5a6623] rounded-full" />
               Wearables
             </span>
-            <span className="flex items-center gap-2 text-sm text-[#757575] font-light tracking-wide">
+            <span className="flex items-center gap-2 text-xs sm:text-sm text-[#757575] font-light tracking-wide whitespace-nowrap">
               <span className="w-1.5 h-1.5 bg-[#5a6623] rounded-full" />
               Your Capsule
             </span>
           </div>
 
           {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] leading-[1.05] tracking-[-0.02em]">
+          <h1 className="text-[clamp(2.1rem,7vw,3.75rem)] leading-[1.05] tracking-[-0.02em]">
             <span className="block font-light text-[#054700]">One formula.</span>
             <span className="block font-light text-[#054700]">Built for you.</span>
             <span className="block font-light text-[#8a9a2c]">Always evolving.</span>
           </h1>
 
           {/* Subhead */}
-          <p className="text-lg md:text-xl text-[rgba(0,0,0,0.75)] font-light leading-relaxed max-w-lg">
+          <p className="text-base sm:text-lg md:text-xl text-[rgba(0,0,0,0.75)] font-light leading-relaxed max-w-lg mx-auto lg:mx-0">
             ONES uses your bloodwork, wearable data, and habits to build a
             personalized daily supplement, designed uniquely for your body and
             updated as your biology changes.
@@ -185,7 +185,7 @@ export default function HeroSectionV2() {
           </div>
 
           {/* Mini Progression */}
-          <div className="flex items-center justify-center lg:justify-start gap-x-1.5 pt-4 text-xs sm:text-sm overflow-hidden">
+          <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-1.5 gap-y-1.5 pt-2 sm:pt-4 text-xs sm:text-sm">
             <span className="text-[#054700] font-medium whitespace-nowrap">Consultation</span>
             <span className="text-[#054700]/40">&bull;</span>
             <span className="text-[#054700] font-medium whitespace-nowrap">Upload Labs</span>
@@ -200,7 +200,7 @@ export default function HeroSectionV2() {
       {/* ═══════════════════════════════════════════════════
           RIGHT HALF — Nature photo + frosted glass chat with video
           ═══════════════════════════════════════════════════ */}
-      <div className="flex relative w-full lg:w-1/2 min-h-[70vh] lg:min-h-[92vh] items-center justify-center">
+      <div className="flex relative w-full lg:w-1/2 min-h-[58svh] sm:min-h-[62svh] md:min-h-[68svh] lg:min-h-[86vh] xl:min-h-[92vh] items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 py-6 sm:py-8 lg:py-10">
         {/* Background video cycle */}
         {/* {heroVideos.map((src, idx) => (
           <video
@@ -237,7 +237,7 @@ export default function HeroSectionV2() {
         <div className="absolute inset-0 bg-black/20 z-[1]" />
 
         {/* Frosted glass chat widget */}
-        <div className="relative z-10 w-full max-w-[380px] mx-auto px-4 sm:px-0 sm:max-w-[420px] backdrop-blur-[24px] bg-[rgba(32,40,31,0.36)] rounded-[32px] p-2 shadow-2xl">
+        <div className="relative z-10 w-full max-w-[360px] sm:max-w-[400px] md:max-w-[420px] lg:max-w-[460px] mx-auto backdrop-blur-[24px] bg-[rgba(32,40,31,0.36)] rounded-[24px] sm:rounded-[28px] lg:rounded-[32px] p-2 sm:p-2.5 shadow-2xl">
           {/* Widget header */}
           <div className="relative py-5">
             {/* Separator line aligned to center of widget (tab divider) */}
@@ -278,7 +278,7 @@ export default function HeroSectionV2() {
           {/* Video content area — plays inside the chat widget */}
           {/* <div className="bg-[#f8f8f8] rounded-b-[24px] overflow-hidden"> */}
           <div className="bg-[#f1f1f1] rounded-b-[24px] overflow-hidden">
-            <div className="relative h-[340px] sm:h-[380px]">
+            <div className="relative h-[300px] sm:h-[360px] md:h-[400px] lg:h-[440px]">
               {personas.map((persona, idx) => (
                 <video
                   key={persona.name}

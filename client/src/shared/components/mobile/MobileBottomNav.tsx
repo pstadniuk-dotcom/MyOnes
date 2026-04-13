@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageSquare, FlaskConical, Sparkles, ClipboardList, Menu, Home, User, Settings, FileText, Activity, ChevronUp, X, Watch, LogOut, Shield } from 'lucide-react';
+import { MessageSquare, FlaskConical, Sparkles, ClipboardList, Menu, Home, User, Settings, FileText, Activity, X, Watch, LogOut, Shield, Package, HelpCircle } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/shared/lib/utils';
 import {
@@ -39,6 +39,8 @@ const allMenuItems = [
   { href: '/dashboard/optimize/tracking', icon: Activity, label: 'Daily Log', description: 'Track your progress', requiresFeature: 'TRACKING_PAGE' as const },
   { href: '/dashboard/wearables', icon: Watch, label: 'Wearables', description: 'Connect fitness trackers', requiresFeature: null },
   { href: '/dashboard/lab-reports', icon: FileText, label: 'Lab Results', description: 'Upload and analyze labs', requiresFeature: null },
+  { href: '/dashboard/orders', icon: Package, label: 'Orders', description: 'Track your shipments', requiresFeature: null },
+  { href: '/dashboard/support', icon: HelpCircle, label: 'Support', description: 'Get help and contact support', requiresFeature: null },
   { href: '/dashboard/profile', icon: User, label: 'Profile', description: 'Your health profile', requiresFeature: null },
   { href: '/dashboard/settings', icon: Settings, label: 'Settings', description: 'App preferences', requiresFeature: null },
 ];
