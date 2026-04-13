@@ -86,8 +86,6 @@ const CheckoutPage = lazy(() => import("@/pages/CheckoutPage"));
 
 // Import V2 landing page (premium design)
 import LandingPageV2 from "@/pages/LandingPageV2";
-// Import V3 landing page (premium visual upgrade for comparison)
-import LandingPageV3 from "@/pages/LandingPageV3";
 import ScrollToTop from "./shared/components/ScrollToTop";
 
 
@@ -102,7 +100,6 @@ function MainRouter() {
   return (
     <Switch>
       <Route path="/" component={LandingPageV2} />
-      <Route path="/v2" component={LandingPageV3} />
       <Route path="/science" component={SciencePage} />
       <Route path="/signup" component={SignupPage} />
       <Route path="/login" component={LoginPage} />

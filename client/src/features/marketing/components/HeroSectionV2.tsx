@@ -33,28 +33,38 @@ function useTypewriter(phrases: string[], typingSpeed = 70, deletingSpeed = 40, 
   const [text, setText] = useState("");
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [delay, setDelay] = useState(typingSpeed);
 
   useEffect(() => {
     const currentPhrase = phrases[phraseIndex];
 
     const timeout = setTimeout(() => {
       if (!isDeleting) {
-        setText(currentPhrase.slice(0, text.length + 1));
-        if (text.length === currentPhrase.length) {
-          setTimeout(() => setIsDeleting(true), pauseDuration);
-          return;
+        const nextText = currentPhrase.slice(0, text.length + 1);
+        setText(nextText);
+
+        if (nextText === currentPhrase) {
+          setDelay(pauseDuration);
+          setIsDeleting(true);
+        } else {
+          setDelay(typingSpeed);
         }
       } else {
-        setText(currentPhrase.slice(0, text.length - 1));
-        if (text.length === 0) {
+        const nextText = currentPhrase.slice(0, text.length - 1);
+        setText(nextText);
+
+        if (nextText.length === 0) {
           setIsDeleting(false);
           setPhraseIndex((prev) => (prev + 1) % phrases.length);
+          setDelay(typingSpeed);
+        } else {
+          setDelay(deletingSpeed);
         }
       }
-    }, isDeleting ? deletingSpeed : typingSpeed);
+    }, delay);
 
     return () => clearTimeout(timeout);
-  }, [text, isDeleting, phraseIndex, phrases, typingSpeed, deletingSpeed, pauseDuration]);
+  }, [text, isDeleting, phraseIndex, phrases, typingSpeed, deletingSpeed, pauseDuration, delay]);
 
   return text;
 }
@@ -121,11 +131,13 @@ export default function HeroSectionV2() {
           </div>
 
           {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] leading-[1.12] tracking-[-0.02em]">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] leading-[1.24] tracking-[-0.02em]">
             <span className="block font-light text-[#054700]">One formula.</span>
-            <span className="block font-light text-[#054700] whitespace-nowrap sm:whitespace-normal lg:whitespace-nowrap">Built from{" "}
-              <span className="text-gradient-green font-light inline-block min-w-[3ch]">{typewriterText}</span>
-              <span className="typewriter-cursor" />
+            <span className="block font-light text-[#054700] whitespace-nowrap sm:whitespace-normal lg:whitespace-nowrap min-h-[1.25em]">Built from{" "}
+              <span className="relative inline-grid min-w-[14ch] align-baseline leading-[1.2]">
+                <span className="invisible col-start-1 row-start-1">your wearables</span>
+                <span className="text-gradient-green font-light col-start-1 row-start-1">{typewriterText}</span>
+              </span>
             </span>
             <span className="block font-light pb-1 text-gradient-green">
               Always evolving.
