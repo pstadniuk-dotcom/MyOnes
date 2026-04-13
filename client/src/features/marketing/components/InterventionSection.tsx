@@ -59,7 +59,7 @@ const callouts: IngredientCallout[] = [
 const stagger = {
   hidden: {},
   visible: {
-    transition: { staggerChildren: 0.15, delayChildren: 0.2 },
+    transition: { staggerChildren: 0.1, delayChildren: 0.1 },
   },
 };
 
@@ -68,7 +68,7 @@ const fadeUp = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
+    transition: { duration: 0.45, ease: [0.25, 0.46, 0.45, 0.94] },
   },
 };
 
@@ -77,7 +77,7 @@ const scaleIn = {
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] },
+    transition: { duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] },
   },
 };
 
@@ -245,7 +245,7 @@ export default function InterventionSection() {
                       hidden: { opacity: 0, y: 12 },
                       visible: {
                         opacity: 1, y: 0,
-                        transition: { duration: 0.4, delay: 0.3 + i * 0.08 },
+                        transition: { duration: 0.3, delay: 0.2 + i * 0.06 },
                       },
                     }}
                     className="bg-white/70 backdrop-blur-sm rounded-xl p-3.5 border border-[#5a6623]/30"
@@ -281,7 +281,7 @@ export default function InterventionSection() {
                         hidden: { opacity: 0, x: -24 },
                         visible: {
                           opacity: 1, x: 0,
-                          transition: { duration: 0.5, delay: 0.4 + index * 0.12, ease: [0.25, 0.46, 0.45, 0.94] },
+                          transition: { duration: 0.4, delay: 0.3 + index * 0.09, ease: [0.25, 0.46, 0.45, 0.94] },
                         },
                       }}
                       className="bg-white/70 backdrop-blur-sm rounded-xl p-5 border border-[#5a6623]/30 hover:shadow-md transition-shadow duration-300"
@@ -352,7 +352,7 @@ export default function InterventionSection() {
                         hidden: { opacity: 0, x: 24 },
                         visible: {
                           opacity: 1, x: 0,
-                          transition: { duration: 0.5, delay: 0.4 + index * 0.12, ease: [0.25, 0.46, 0.45, 0.94] },
+                          transition: { duration: 0.4, delay: 0.3 + index * 0.09, ease: [0.25, 0.46, 0.45, 0.94] },
                         },
                       }}
                       className="bg-white/70 backdrop-blur-sm rounded-xl p-5 border border-[#5a6623]/30 hover:shadow-md transition-shadow duration-300"
@@ -471,7 +471,7 @@ export function OnesDifferenceSection() {
                       hidden: { opacity: 0, y: 12 },
                       visible: {
                         opacity: 1, y: 0,
-                        transition: { duration: 0.4, delay: 0.3 + i * 0.08 },
+                        transition: { duration: 0.3, delay: 0.2 + i * 0.06 },
                       },
                     }}
                     className="bg-white/90 backdrop-blur-xl rounded-2xl p-3.5 border border-white/60 shadow-[0_1px_16px_rgba(0,0,0,0.04)]"
@@ -502,7 +502,7 @@ export function OnesDifferenceSection() {
                     key={index}
                     variants={{
                       hidden: { opacity: 0, x: -24 },
-                      visible: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.4 + index * 0.12, ease: [0.25, 0.46, 0.45, 0.94] } },
+                      visible: { opacity: 1, x: 0, transition: { duration: 0.4, delay: 0.3 + index * 0.09, ease: [0.25, 0.46, 0.45, 0.94] } },
                     }}
                     className="bg-white/90 backdrop-blur-xl rounded-2xl p-5 border border-white/60 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300"
                   >
@@ -551,7 +551,7 @@ export function OnesDifferenceSection() {
                     key={index}
                     variants={{
                       hidden: { opacity: 0, x: 24 },
-                      visible: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.4 + index * 0.12, ease: [0.25, 0.46, 0.45, 0.94] } },
+                      visible: { opacity: 1, x: 0, transition: { duration: 0.4, delay: 0.3 + index * 0.09, ease: [0.25, 0.46, 0.45, 0.94] } },
                     }}
                     className="bg-white/90 backdrop-blur-xl rounded-2xl p-5 border border-white/60 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300"
                   >

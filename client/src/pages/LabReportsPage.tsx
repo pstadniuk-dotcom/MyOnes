@@ -2086,29 +2086,31 @@ export default function LabReportsPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-[#054700] truncate">{report.originalFileName}</p>
-                            <div className="flex items-center gap-2 text-xs text-[#5a6623]">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#5a6623] pr-2">
                               <span>{new Date(report.uploadedAt).toLocaleDateString()}</span>
                               {testDate && <span>• Test: {fmtDate(testDate)}</span>}
                               {labName && <span>• {labName}</span>}
                               {markerCount > 0 && <span>• {markerCount} markers</span>}
                             </div>
+                            <div className="mt-1.5">
+                              {status === 'processing' || status === 'pending' ? (
+                                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />Processing
+                                </Badge>
+                              ) : status === 'completed' ? (
+                                <Badge variant="outline" className="text-xs border-emerald-300 text-emerald-700 bg-emerald-50">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />Analyzed
+                                </Badge>
+                              ) : status === 'error' ? (
+                                <Badge variant="outline" className="text-xs border-red-300 text-red-700 bg-red-50">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />Error
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs">Uploaded</Badge>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            {status === 'processing' || status === 'pending' ? (
-                              <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />Processing
-                              </Badge>
-                            ) : status === 'completed' ? (
-                              <Badge variant="outline" className="text-xs border-emerald-300 text-emerald-700 bg-emerald-50">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />Analyzed
-                              </Badge>
-                            ) : status === 'error' ? (
-                              <Badge variant="outline" className="text-xs border-red-300 text-red-700 bg-red-50">
-                                <AlertTriangle className="h-3 w-3 mr-1" />Error
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-xs">Uploaded</Badge>
-                            )}
+                          <div className="flex items-center gap-1 flex-shrink-0 self-start">
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleViewFile(report.id)} disabled={loadingFiles.has(report.id)} title="View">
                               {loadingFiles.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#054700]" /> : <Eye className="h-3.5 w-3.5 text-[#054700]" />}
                             </Button>
@@ -2167,33 +2169,35 @@ export default function LabReportsPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-[#054700] truncate">{report.originalFileName}</p>
-                            <div className="flex items-center gap-2 text-xs text-[#5a6623]">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#5a6623] pr-2">
                               <span>{new Date(report.uploadedAt).toLocaleDateString()}</span>
                               {markerCount > 0 && <span>• {markerCount} markers extracted</span>}
                             </div>
-                          </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            {status === 'processing' || status === 'pending' ? (
-                              <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />Processing
-                              </Badge>
-                            ) : status === 'completed' ? (
-                              markerCount > 0 ? (
-                                <Badge variant="outline" className="text-xs border-emerald-300 text-emerald-700 bg-emerald-50">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />Analyzed
+                            <div className="mt-1.5">
+                              {status === 'processing' || status === 'pending' ? (
+                                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />Processing
+                                </Badge>
+                              ) : status === 'completed' ? (
+                                markerCount > 0 ? (
+                                  <Badge variant="outline" className="text-xs border-emerald-300 text-emerald-700 bg-emerald-50">
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />Analyzed
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs border-gray-300 text-gray-600 bg-gray-50">
+                                    Image
+                                  </Badge>
+                                )
+                              ) : status === 'error' ? (
+                                <Badge variant="outline" className="text-xs border-red-300 text-red-700 bg-red-50">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />Error
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className="text-xs border-gray-300 text-gray-600 bg-gray-50">
-                                  Image
-                                </Badge>
-                              )
-                            ) : status === 'error' ? (
-                              <Badge variant="outline" className="text-xs border-red-300 text-red-700 bg-red-50">
-                                <AlertTriangle className="h-3 w-3 mr-1" />Error
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-xs">Uploaded</Badge>
-                            )}
+                                <Badge variant="outline" className="text-xs">Uploaded</Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0 self-start">
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleViewFile(report.id)} disabled={loadingFiles.has(report.id)} title="View">
                               {loadingFiles.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#054700]" /> : <Eye className="h-3.5 w-3.5 text-[#054700]" />}
                             </Button>
