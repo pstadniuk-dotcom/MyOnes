@@ -5,7 +5,7 @@ import { OnesDifferenceSection } from "@/features/marketing/components/Intervent
 import LifestyleShowcaseSection from "@/features/marketing/components/LifestyleShowcaseSection";
 import CompetitiveComparisonSection from "@/features/marketing/components/CompetitiveComparisonSection";
 import HowItWorksSectionV3 from "@/features/marketing/components/HowItWorksSectionV3";
-import MembershipPricingSection from "@/features/marketing/components/MembershipPricingSection";
+import MembershipPricingSectionV4 from "@/features/marketing/components/v3/MembershipPricingSectionV4";
 import TestimonialsSectionV3 from "@/features/marketing/components/TestimonialsSectionV3";
 import FAQSectionV3 from "@/features/marketing/components/FAQSectionV3";
 import CTASectionV3 from "@/features/marketing/components/CTASectionV3";
@@ -25,7 +25,7 @@ export default function LandingPageV2() {
         <LifestyleShowcaseSection />
         <CompetitiveComparisonSection />
         <HowItWorksSectionV3 />
-        <MembershipPricingSection />
+        <MembershipPricingSectionV4 />
         <TestimonialsSectionV3 />
         <FAQSectionV3 />
         <CTASectionV3 />

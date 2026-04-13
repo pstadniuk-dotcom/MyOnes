@@ -28,9 +28,41 @@ const personas = [
   },
 ];
 
+// Typewriter hook — cycles through phrases with type/delete animation
+function useTypewriter(phrases: string[], typingSpeed = 70, deletingSpeed = 40, pauseDuration = 2200) {
+  const [text, setText] = useState("");
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const currentPhrase = phrases[phraseIndex];
+
+    const timeout = setTimeout(() => {
+      if (!isDeleting) {
+        setText(currentPhrase.slice(0, text.length + 1));
+        if (text.length === currentPhrase.length) {
+          setTimeout(() => setIsDeleting(true), pauseDuration);
+          return;
+        }
+      } else {
+        setText(currentPhrase.slice(0, text.length - 1));
+        if (text.length === 0) {
+          setIsDeleting(false);
+          setPhraseIndex((prev) => (prev + 1) % phrases.length);
+        }
+      }
+    }, isDeleting ? deletingSpeed : typingSpeed);
+
+    return () => clearTimeout(timeout);
+  }, [text, isDeleting, phraseIndex, phrases, typingSpeed, deletingSpeed, pauseDuration]);
+
+  return text;
+}
+
 export default function HeroSectionV2() {
   const [activeTab, setActiveTab] = useState(0);
   const [activeBgVideo, setActiveBgVideo] = useState(0);
+  const typewriterText = useTypewriter(["your bloodwork", "your wearables", "your biology", "your lifestyle"]);
   const bgVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
@@ -70,66 +102,7 @@ export default function HeroSectionV2() {
       {/* ═══════════════════════════════════════════════════
           LEFT HALF — Copy on cream with pill outlines
           ═══════════════════════════════════════════════════ */}
-      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-8 md:px-16 lg:px-16 xl:px-20 py-10 lg:py-16 overflow-hidden">
-        {/* Decorative pill outlines with faint traveling glow */}
-        <svg
-          aria-hidden="true"
-          className="absolute pointer-events-none select-none z-0"
-          style={{ width: '1628px', height: '1121px', right: '-520px', top: '-216px' }}
-          viewBox="0 0 960 905"
-          fill="none"
-          overflow="visible"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            {/* Metallic shiny glow filter — specular highlight + blur */}
-            <filter id="metallicGlow" x="-80%" y="-80%" width="260%" height="260%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
-              <feSpecularLighting in="blur" surfaceScale="8" specularConstant="1.8" specularExponent="28" result="spec">
-                <fePointLight x="200" y="100" z="300" />
-              </feSpecularLighting>
-              <feComposite in="spec" in2="SourceGraphic" operator="in" result="specClip" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="specClip" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-            {/* Metallic green gradient for the glow traces */}
-            <linearGradient id="metallicGreen" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#b8cc50" />
-              <stop offset="35%" stopColor="#d4e87a" />
-              <stop offset="50%" stopColor="#f0ffc0" />
-              <stop offset="65%" stopColor="#d4e87a" />
-              <stop offset="100%" stopColor="#7a8c28" />
-            </linearGradient>
-            {/* Double-size capsule shape — 120×288px */}
-            <path id="heroCapsule" d="M60,0 C93.2,0 120,26.8 120,60 L120,228 C120,261.2 93.2,288 60,288 C26.8,288 0,261.2 0,228 L0,60 C0,26.8 26.8,0 60,0 Z"/>
-          </defs>
-
-          {/* Static capsule outlines — sage/olive whispers */}
-          <g opacity="0.20">
-            <use href="#heroCapsule" transform="translate(320, 120) rotate(15, 60, 144)" fill="none" stroke="#b5b87a" strokeWidth="1"/>
-            <use href="#heroCapsule" transform="translate(700, 50) rotate(-40, 60, 144)" fill="none" stroke="#b5b87a" strokeWidth="1"/>
-            <use href="#heroCapsule" transform="translate(10, 300) rotate(20, 60, 144)" fill="none" stroke="#b5b87a" strokeWidth="1"/>
-            <use href="#heroCapsule" transform="translate(550, 320) rotate(-10, 60, 144)" fill="none" stroke="#b5b87a" strokeWidth="1"/>
-            <use href="#heroCapsule" transform="translate(820, 380) rotate(35, 60, 144)" fill="none" stroke="#b5b87a" strokeWidth="1"/>
-            <use href="#heroCapsule" transform="translate(100, 580) rotate(-15, 60, 144)" fill="none" stroke="#b5b87a" strokeWidth="1"/>
-            <use href="#heroCapsule" transform="translate(430, 650) rotate(40, 60, 144)" fill="none" stroke="#b5b87a" strokeWidth="1"/>
-            <use href="#heroCapsule" transform="translate(750, 700) rotate(-30, 60, 144)" fill="none" stroke="#b5b87a" strokeWidth="1"/>
-          </g>
-
-          {/* Animated metallic glow traces */}
-          <use href="#heroCapsule" transform="translate(320, 120) rotate(15, 60, 144)" fill="none" stroke="url(#metallicGreen)" strokeWidth="3" strokeLinecap="round" filter="url(#metallicGlow)" opacity="0.55" strokeDasharray="55 800"><animate attributeName="stroke-dashoffset" values="0;-855" dur="11s" repeatCount="indefinite"/></use>
-          <use href="#heroCapsule" transform="translate(700, 50) rotate(-40, 60, 144)" fill="none" stroke="url(#metallicGreen)" strokeWidth="3" strokeLinecap="round" filter="url(#metallicGlow)" opacity="0.55" strokeDasharray="58 800"><animate attributeName="stroke-dashoffset" values="0;-858" dur="8s" repeatCount="indefinite"/></use>
-          <use href="#heroCapsule" transform="translate(10, 300) rotate(20, 60, 144)" fill="none" stroke="url(#metallicGreen)" strokeWidth="3" strokeLinecap="round" filter="url(#metallicGlow)" opacity="0.55" strokeDasharray="62 800"><animate attributeName="stroke-dashoffset" values="0;-862" dur="13s" repeatCount="indefinite"/></use>
-          <use href="#heroCapsule" transform="translate(550, 320) rotate(-10, 60, 144)" fill="none" stroke="url(#metallicGreen)" strokeWidth="3" strokeLinecap="round" filter="url(#metallicGlow)" opacity="0.55" strokeDasharray="56 800"><animate attributeName="stroke-dashoffset" values="0;-856" dur="12s" repeatCount="indefinite"/></use>
-          <use href="#heroCapsule" transform="translate(820, 380) rotate(35, 60, 144)" fill="none" stroke="url(#metallicGreen)" strokeWidth="3" strokeLinecap="round" filter="url(#metallicGlow)" opacity="0.55" strokeDasharray="54 800"><animate attributeName="stroke-dashoffset" values="0;-854" dur="7s" repeatCount="indefinite"/></use>
-          <use href="#heroCapsule" transform="translate(100, 580) rotate(-15, 60, 144)" fill="none" stroke="url(#metallicGreen)" strokeWidth="3" strokeLinecap="round" filter="url(#metallicGlow)" opacity="0.55" strokeDasharray="60 800"><animate attributeName="stroke-dashoffset" values="0;-860" dur="10s" repeatCount="indefinite"/></use>
-          <use href="#heroCapsule" transform="translate(430, 650) rotate(40, 60, 144)" fill="none" stroke="url(#metallicGreen)" strokeWidth="3" strokeLinecap="round" filter="url(#metallicGlow)" opacity="0.55" strokeDasharray="57 800"><animate attributeName="stroke-dashoffset" values="0;-857" dur="14s" repeatCount="indefinite"/></use>
-          <use href="#heroCapsule" transform="translate(750, 700) rotate(-30, 60, 144)" fill="none" stroke="url(#metallicGreen)" strokeWidth="3" strokeLinecap="round" filter="url(#metallicGlow)" opacity="0.55" strokeDasharray="59 800"><animate attributeName="stroke-dashoffset" values="0;-859" dur="15s" repeatCount="indefinite"/></use>
-        </svg>
-
+      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-8 md:px-16 lg:px-16 xl:px-20 py-10 lg:py-16">
         <div className="relative z-10 max-w-xl space-y-8 text-center lg:text-left mx-auto lg:mx-0">
           {/* Pill labels */}
           <div className="inline-flex items-center gap-8 border border-[#c5c5c5] rounded-full px-6 py-3 mx-auto lg:mx-0">
@@ -148,10 +121,15 @@ export default function HeroSectionV2() {
           </div>
 
           {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] leading-[1.05] tracking-[-0.02em]">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] leading-[1.12] tracking-[-0.02em]">
             <span className="block font-light text-[#054700]">One formula.</span>
-            <span className="block font-light text-[#054700]">Built for you.</span>
-            <span className="block font-light text-[#8a9a2c]">Always evolving.</span>
+            <span className="block font-light text-[#054700] whitespace-nowrap sm:whitespace-normal lg:whitespace-nowrap">Built from{" "}
+              <span className="text-gradient-green font-light inline-block min-w-[3ch]">{typewriterText}</span>
+              <span className="typewriter-cursor" />
+            </span>
+            <span className="block font-light pb-1 text-gradient-green">
+              Always evolving.
+            </span>
           </h1>
 
           {/* Subhead */}
@@ -220,15 +198,12 @@ export default function HeroSectionV2() {
 
           <video
             key={"6d9efde5ac45418c979e43130ecc6e77"}
-            // ref={(el) => { bgVideoRefs.current[0] = el; }}
             src={"/6d9efde5ac45418c979e43130ecc6e77.mp4"}
             muted
-            // playsInline
+            playsInline
             autoPlay
             loop
             disablePictureInPicture
-            // controlsList="noplaybackrate nodownload"
-            // onEnded={handleBgVideoEnded}
             className={`absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-1000`}
           />
 

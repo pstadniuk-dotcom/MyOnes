@@ -24,3 +24,4 @@ export { default as agentRoutes } from './agent.routes';
 export { default as ugcRoutes } from './ugc.routes';
 export { default as metaAdsRoutes } from './meta-ads.routes';
 export { default as brandStudioRoutes } from './brand-studio.routes';
+export { default as seoRoutes } from './seo.routes';

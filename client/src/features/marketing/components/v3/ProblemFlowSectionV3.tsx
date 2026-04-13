@@ -41,7 +41,7 @@ const tiles = [
   },
 ];
 
-export default function ProblemFlowSection() {
+export default function ProblemFlowSectionV3() {
   const [active, setActive] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [entranceDone, setEntranceDone] = useState(false);
@@ -111,28 +111,24 @@ export default function ProblemFlowSection() {
     setProgress(0);
   };
 
-  // ── 3D tilt handlers (desktop/hover devices only) ──
-  const canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches;
-
+  // ── 3D tilt handlers ──
   const handleTilt = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!canHover) return;
     const card = e.currentTarget;
     const rect = card.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
-    const rotateY = ((x - centerX) / centerX) * 8;
+    const rotateY = ((x - centerX) / centerX) * 8; // max 8 degrees
     const rotateX = ((centerY - y) / centerY) * 8;
     card.style.transform = `perspective(800px) rotateY(${rotateY}deg) rotateX(${rotateX}deg) scale(1.02)`;
     card.style.transition = "transform 0.15s ease-out";
-  }, [canHover]);
+  }, []);
 
   const handleTiltReset = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!canHover) return;
     e.currentTarget.style.transform = "perspective(800px) rotateY(0deg) rotateX(0deg) scale(1)";
     e.currentTarget.style.transition = "transform 0.5s ease-out";
-  }, [canHover]);
+  }, []);
 
   return (
     <section
@@ -158,7 +154,10 @@ export default function ProblemFlowSection() {
         >
           More data than ever.
           <br />
-          <span className="text-[#8a9a2c]">Still no&nbsp;solution.</span>
+          <span className="text-gradient-green font-bold" style={{ color: "#8a9a2c" }}>
+            Still no
+          </span>{" "}
+          solution.
         </h2>
 
         {/* ── Cards row — active card expands ── */}
@@ -187,100 +186,103 @@ export default function ProblemFlowSection() {
                     perspective: "800px",
                   }}
                 >
-                <button
-                  onClick={() => changeTile(i)}
-                  onMouseEnter={() => handleMouseEnter(i)}
-                  onMouseMove={handleTilt}
-                  onMouseLeave={(e) => {
-                    handleTiltReset(e);
-                    handleMouseLeave();
-                  }}
-                  className="relative w-full h-full rounded-2xl overflow-hidden focus:outline-none cursor-pointer"
-                  style={{
-                    transformStyle: "preserve-3d",
-                    transition: "transform 0.15s ease-out",
-                  }}
-                  aria-label={t.label}
-                >
-                  {/* Photo */}
-                  <img
-                    src={t.src}
-                    alt={t.label}
-                    className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${
-                      isActive ? "scale-100" : "scale-105"
-                    } ${t.problem ? "grayscale" : ""}`}
-                  />
+                  <button
+                    onClick={() => changeTile(i)}
+                    onMouseEnter={() => handleMouseEnter(i)}
+                    onMouseMove={handleTilt}
+                    onMouseLeave={(e) => {
+                      handleTiltReset(e);
+                      handleMouseLeave();
+                    }}
+                    className="relative w-full h-full rounded-2xl overflow-hidden focus:outline-none cursor-pointer"
+                    style={{
+                      transformStyle: "preserve-3d",
+                      transition: "transform 0.15s ease-out",
+                    }}
+                    aria-label={t.label}
+                  >
+                    {/* Photo */}
+                    <img
+                      src={t.src}
+                      alt={t.label}
+                      className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${
+                        isActive ? "scale-100" : "scale-105"
+                      } ${t.problem ? "grayscale" : ""}`}
+                    />
 
-                  {/* Gradient overlay */}
-                  <div
-                    className={`absolute inset-0 transition-opacity duration-500 ${
-                      t.problem
-                        ? "bg-gradient-to-t from-red-950/80 via-red-950/30 to-black/10"
-                        : "bg-gradient-to-t from-[#021f00]/80 via-[#021f00]/25 to-black/5"
-                    }`}
-                  />
-
-                  {/* Problem badge */}
-                  {t.problem && (
-                    <div className="absolute top-4 right-4 w-7 h-7 rounded-full bg-red-500/90 flex items-center justify-center z-10">
-                      <span className="text-white text-sm font-bold leading-none">
-                        ?
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Content — bottom aligned */}
-                  <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-10">
-                    {/* Label — always visible */}
-                    <p className="text-white font-semibold text-sm md:text-base">
-                      {t.label}
-                    </p>
-                    <p className="text-white/40 text-xs mt-0.5">
-                      {t.sublabel}
-                    </p>
-
-                    {/* Expanded description — only on active card */}
+                    {/* Gradient overlay */}
                     <div
-                      className={`transition-all duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                        isActive
-                          ? "max-h-40 opacity-100 mt-4"
-                          : "max-h-0 opacity-0 mt-0"
+                      className={`absolute inset-0 transition-opacity duration-500 ${
+                        t.problem
+                          ? "bg-gradient-to-t from-red-950/80 via-red-950/30 to-black/10"
+                          : "bg-gradient-to-t from-[#021f00]/80 via-[#021f00]/25 to-black/5"
                       }`}
-                    >
-                      <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/10" style={{ willChange: 'opacity' }}>
-                        <p
-                          className={`text-sm font-medium leading-snug mb-1.5 ${
-                            t.problem ? "text-red-300" : "text-white/90"
-                          }`}
+                    />
+
+                    {/* Problem badge */}
+                    {t.problem && (
+                      <div className="absolute top-4 right-4 w-7 h-7 rounded-full bg-red-500/90 flex items-center justify-center z-10">
+                        <span className="text-white text-sm font-bold leading-none">
+                          ?
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Content — bottom aligned */}
+                    <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-10">
+                      {/* Label — always visible */}
+                      <p className="text-white font-semibold text-sm md:text-base">
+                        {t.label}
+                      </p>
+                      <p className="text-white/40 text-xs mt-0.5">
+                        {t.sublabel}
+                      </p>
+
+                      {/* Expanded description — only on active card */}
+                      <div
+                        className={`transition-all duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                          isActive
+                            ? "max-h-40 opacity-100 mt-4"
+                            : "max-h-0 opacity-0 mt-0"
+                        }`}
+                      >
+                        <div
+                          className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/10"
+                          style={{ willChange: "opacity" }}
                         >
-                          {t.headline}
-                        </p>
-                        <p className="text-white/60 text-xs leading-relaxed">
-                          {t.description}
-                        </p>
+                          <p
+                            className={`text-sm font-medium leading-snug mb-1.5 ${
+                              t.problem ? "text-red-300" : "text-white/90"
+                            }`}
+                          >
+                            {t.headline}
+                          </p>
+                          <p className="text-white/60 text-xs leading-relaxed">
+                            {t.description}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Progress bar */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[3px] z-20">
-                    <div
-                      className={`h-full transition-all duration-100 ease-linear ${
-                        t.problem ? "bg-red-400" : "bg-white/80"
-                      }`}
-                      style={{
-                        width: isActive ? `${progress * 100}%` : "0%",
-                        opacity: isActive ? 1 : 0,
-                      }}
-                    />
-                  </div>
-                </button>
+                    {/* Progress bar */}
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px] z-20">
+                      <div
+                        className={`h-full transition-all duration-100 ease-linear ${
+                          t.problem ? "bg-red-400" : "bg-white/80"
+                        }`}
+                        style={{
+                          width: isActive ? `${progress * 100}%` : "0%",
+                          opacity: isActive ? 1 : 0,
+                        }}
+                      />
+                    </div>
+                  </button>
                 </div>
               );
             })}
           </div>
 
-          {/* Mobile: 2×2 grid — tapping reveals description */}
+          {/* Mobile: 2x2 grid — tapping reveals description */}
           <div className="md:hidden grid grid-cols-2 gap-3">
             {tiles.map((t, i) => {
               const isActive = active === i;
@@ -296,65 +298,72 @@ export default function ProblemFlowSection() {
                   }`}
                   style={{
                     transitionDelay: entranceDone ? "0ms" : revealed ? `${delayMs}ms` : "0ms",
+                    perspective: "800px",
                   }}
                 >
-                <button
-                  onClick={() => changeTile(i)}
-                  className={`group relative rounded-2xl overflow-hidden aspect-[3/4] w-full focus:outline-none cursor-pointer ${
-                    isActive
-                      ? "ring-2 shadow-xl z-10"
-                      : "shadow-md"
-                  } ${
-                    isActive && t.problem
-                      ? "ring-red-400/40"
-                      : isActive
-                      ? "ring-[#054700]/20"
-                      : ""
-                  }`}
-                  aria-label={t.label}
-                >
-                  <img
-                    src={t.src}
-                    alt={t.label}
-                    className={`absolute inset-0 w-full h-full object-cover ${
-                      t.problem ? "grayscale" : ""
+                  <button
+                    onClick={() => changeTile(i)}
+                    onMouseMove={handleTilt}
+                    onMouseLeave={handleTiltReset}
+                    className={`group relative rounded-2xl overflow-hidden aspect-[3/4] w-full focus:outline-none cursor-pointer ${
+                      isActive
+                        ? "ring-2 shadow-xl z-10"
+                        : "shadow-md"
+                    } ${
+                      isActive && t.problem
+                        ? "ring-red-400/40"
+                        : isActive
+                        ? "ring-[#054700]/20"
+                        : ""
                     }`}
-                  />
-                  <div
-                    className={`absolute inset-0 ${
-                      t.problem
-                        ? "bg-gradient-to-t from-red-950/75 via-transparent to-black/5"
-                        : "bg-gradient-to-t from-[#021f00]/70 via-transparent to-black/5"
-                    }`}
-                  />
-                  {t.problem && (
-                    <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-red-500/90 flex items-center justify-center">
-                      <span className="text-white text-xs font-bold leading-none">
-                        ?
-                      </span>
-                    </div>
-                  )}
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <p className="text-white font-semibold text-sm">
-                      {t.label}
-                    </p>
-                    <p className="text-white/40 text-[11px] mt-0.5">
-                      {t.sublabel}
-                    </p>
-                  </div>
-                  {/* Mobile progress bar */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[3px]">
-                    <div
-                      className={`h-full transition-all duration-100 ease-linear ${
-                        t.problem ? "bg-red-400" : "bg-white/80"
+                    style={{
+                      transformStyle: "preserve-3d",
+                      transition: "transform 0.15s ease-out",
+                    }}
+                    aria-label={t.label}
+                  >
+                    <img
+                      src={t.src}
+                      alt={t.label}
+                      className={`absolute inset-0 w-full h-full object-cover ${
+                        t.problem ? "grayscale" : ""
                       }`}
-                      style={{
-                        width: isActive ? `${progress * 100}%` : "0%",
-                        opacity: isActive ? 1 : 0,
-                      }}
                     />
-                  </div>
-                </button>
+                    <div
+                      className={`absolute inset-0 ${
+                        t.problem
+                          ? "bg-gradient-to-t from-red-950/75 via-transparent to-black/5"
+                          : "bg-gradient-to-t from-[#021f00]/70 via-transparent to-black/5"
+                      }`}
+                    />
+                    {t.problem && (
+                      <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-red-500/90 flex items-center justify-center">
+                        <span className="text-white text-xs font-bold leading-none">
+                          ?
+                        </span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 left-0 right-0 p-4">
+                      <p className="text-white font-semibold text-sm">
+                        {t.label}
+                      </p>
+                      <p className="text-white/40 text-[11px] mt-0.5">
+                        {t.sublabel}
+                      </p>
+                    </div>
+                    {/* Mobile progress bar */}
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px]">
+                      <div
+                        className={`h-full transition-all duration-100 ease-linear ${
+                          t.problem ? "bg-red-400" : "bg-white/80"
+                        }`}
+                        style={{
+                          width: isActive ? `${progress * 100}%` : "0%",
+                          opacity: isActive ? 1 : 0,
+                        }}
+                      />
+                    </div>
+                  </button>
                 </div>
               );
             })}
@@ -388,4 +397,3 @@ export default function ProblemFlowSection() {
     </section>
   );
 }
-

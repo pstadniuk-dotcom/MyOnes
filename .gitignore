@@ -17,7 +17,6 @@ client/public/Hero Section/
 .env.*
 server/.env
 server/.env.local
-server/.env.example
 client/.env
 client/.env.local
 

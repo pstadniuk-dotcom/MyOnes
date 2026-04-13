@@ -79,7 +79,8 @@ const navSections: { label?: string; items: NavItem[] }[] = [
         label: 'Marketing',
         icon: FileText,
         children: [
-          { label: 'Blog & SEO', href: '/admin/blog' },
+          { label: 'Blog', href: '/admin/blog' },
+          { label: 'SEO Dashboard', href: '/admin/seo' },
           { label: 'Content', href: '/admin/content' },
         ],
       },
