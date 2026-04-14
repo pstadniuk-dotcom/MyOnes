@@ -73,8 +73,8 @@ declare global {
 // ── Constants ──────────────────────────────────────────────────────────
 
 const TOKENIZATION_KEY = import.meta.env.VITE_EPD_TOKENIZATION_KEY;
-console.log('hi', TOKENIZATION_KEY)
-const COLLECTJS_URL = 'https://secure.easypaydirectgateway.com/collect/v1/collectjs.js';
+console.log("Using EPD Tokenization Key:", TOKENIZATION_KEY);
+const COLLECTJS_URL = `https://secure.easypaydirectgateway.com/collect/v1/collectjs.js?tokenizationkey=${TOKENIZATION_KEY}`
 
 const US_STATES = [
   'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
@@ -224,28 +224,58 @@ export default function CheckoutPage() {
 
   // ── Collect.js Loading ─────────────────────────────────────────────
 
-  useEffect(() => {
-    if (!TOKENIZATION_KEY) {
-      setScriptError('Payment system not configured. Please contact support.');
-      return;
-    }
-    if (window.CollectJS) {
-      setScriptLoaded(true);
-      return;
-    }
-    const existing = document.querySelector(`script[src*="collectjs.js"]`);
-    if (existing) {
-      existing.addEventListener('load', () => setScriptLoaded(true));
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = COLLECTJS_URL;
-    script.setAttribute('data-tokenization-key', TOKENIZATION_KEY);
-    script.async = true;
-    script.onload = () => setScriptLoaded(true);
-    script.onerror = () => setScriptError('Failed to load payment form. Please refresh.');
-    document.head.appendChild(script);
-  }, []);
+  // useEffect(() => {
+  //   console.log('Loading Collect.js with tokenization key')
+  //   if (!TOKENIZATION_KEY) {
+  //     setScriptError('Payment system not configured. Please contact support.');
+  //     return;
+  //   }
+  //   if (window.CollectJS) {
+  //     setScriptLoaded(true);
+  //     return;
+  //   }
+  //   const existing = document.querySelector(`script[src*="collectjs.js"]`);
+  //   if (existing) {
+  //     const existingKey = existing.getAttribute('data-tokenization-key');
+  //     if (existingKey === TOKENIZATION_KEY) {
+  //       existing.addEventListener('load', () => setScriptLoaded(true));
+  //       return;
+  //     } else {
+  //       // Remove the old script if key doesn't match
+  //       existing.remove();
+  //     }
+  //   }
+  //   const script = document.createElement('script');
+  //   script.src = COLLECTJS_URL;
+  //   script.setAttribute('data-tokenization-key', TOKENIZATION_KEY);
+  //   script.async = true;
+  //   script.onload = () => setScriptLoaded(true);
+  //   script.onerror = () => setScriptError('Failed to load payment form. Please refresh.');
+  //   document.head.appendChild(script);
+  // }, []);
+
+
+useEffect(() => {
+  if (!TOKENIZATION_KEY) {
+    setScriptError('Payment system not configured. Please contact support.');
+    return;
+  }
+
+  if (window.CollectJS) {
+    setScriptLoaded(true);
+    return;
+  }
+
+  const existing = document.querySelector(`script[src*="collectjs.js"]`);
+  if (existing) existing.remove(); // always remove and reload fresh
+
+  const script = document.createElement('script');
+  script.src = `https://secure.easypaydirectgateway.com/collect/v1/collectjs.js?tokenizationkey=${TOKENIZATION_KEY}`;
+  script.async = true;
+  script.onload = () => setScriptLoaded(true);
+  script.onerror = () => setScriptError('Failed to load payment form. Please refresh.');
+  document.head.appendChild(script);
+}, []);
 
   useEffect(() => {
     if (!scriptLoaded || !window.CollectJS || configuredRef.current) return;
