@@ -308,6 +308,24 @@ export class UsersRepository {
         return order || undefined;
     }
 
+    async getOrderByManufacturerOrderId(manufacturerOrderId: string): Promise<Order | undefined> {
+        const [order] = await db
+            .select()
+            .from(orders)
+            .where(eq(orders.manufacturerOrderId, manufacturerOrderId));
+        return order || undefined;
+    }
+
+    async getMostRecentOrderByManufacturerQuoteId(manufacturerQuoteId: string): Promise<Order | undefined> {
+        const [order] = await db
+            .select()
+            .from(orders)
+            .where(eq(orders.manufacturerQuoteId, manufacturerQuoteId))
+            .orderBy(desc(orders.placedAt))
+            .limit(1);
+        return order || undefined;
+    }
+
     async createOrder(order: InsertOrder): Promise<Order> {
         const [created] = await db.insert(orders).values([order] as any).returning();
         return created;
