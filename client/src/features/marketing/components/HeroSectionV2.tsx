@@ -112,7 +112,6 @@ export default function HeroSectionV2() {
       {/* ═══════════════════════════════════════════════════
           LEFT HALF — Copy on cream with pill outlines
           ═══════════════════════════════════════════════════ */}
-<<<<<<< HEAD
       <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-4 sm:px-6 md:px-10 lg:px-12 xl:px-16 2xl:px-20 py-8 sm:py-10 md:py-12 lg:py-16 overflow-hidden">
         {/* Decorative pill outlines with faint traveling glow */}
         <svg
@@ -174,10 +173,6 @@ export default function HeroSectionV2() {
         </svg>
 
         <div className="relative z-10 w-full max-w-xl xl:max-w-2xl space-y-6 sm:space-y-8 text-center lg:text-left mx-auto lg:mx-0">
-=======
-      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-8 md:px-16 lg:px-16 xl:px-20 py-10 lg:py-16">
-        <div className="relative z-10 max-w-xl space-y-8 text-center lg:text-left mx-auto lg:mx-0">
->>>>>>> 0bc809e249e8a6b0269e57abf0cbb4d40d4aeb91
           {/* Pill labels */}
           <div className="inline-flex flex-wrap sm:flex-nowrap items-center justify-center lg:justify-start gap-x-4 gap-y-2 sm:gap-6 border border-[#c5c5c5] rounded-[24px] sm:rounded-full px-4 sm:px-6 py-2.5 sm:py-3 mx-auto lg:mx-0 max-w-full">
             <span className="flex items-center gap-2 text-xs sm:text-sm text-[#757575] font-light tracking-wide whitespace-nowrap">
@@ -195,11 +190,7 @@ export default function HeroSectionV2() {
           </div>
 
           {/* Headline */}
-<<<<<<< HEAD
           <h1 className="text-[clamp(2.1rem,7vw,3.75rem)] leading-[1.05] tracking-[-0.02em]">
-=======
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] leading-[1.24] tracking-[-0.02em]">
->>>>>>> 0bc809e249e8a6b0269e57abf0cbb4d40d4aeb91
             <span className="block font-light text-[#054700]">One formula.</span>
             <span className="block font-light text-[#054700] whitespace-nowrap sm:whitespace-normal lg:whitespace-nowrap min-h-[1.25em]">Built from{" "}
               <span className="relative inline-grid min-w-[14ch] align-baseline leading-[1.2]">
