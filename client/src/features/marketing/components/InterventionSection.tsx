@@ -81,6 +81,29 @@ const scaleIn = {
   },
 };
 
+/* ── 3D perspective tilt handlers (desktop/hover devices only) ── */
+const canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches;
+
+const handleTilt = (e: React.MouseEvent<HTMLDivElement>) => {
+  if (!canHover) return;
+  const card = e.currentTarget;
+  const rect = card.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+  const rotateY = ((x - centerX) / centerX) * 10;
+  const rotateX = ((centerY - y) / centerY) * 10;
+  card.style.transform = `perspective(800px) rotateY(${rotateY}deg) rotateX(${rotateX}deg) scale(1.03)`;
+  card.style.transition = 'transform 0.1s ease-out';
+};
+
+const handleTiltReset = (e: React.MouseEvent<HTMLDivElement>) => {
+  if (!canHover) return;
+  e.currentTarget.style.transform = 'perspective(800px) rotateY(0deg) rotateX(0deg) scale(1)';
+  e.currentTarget.style.transition = 'transform 0.5s ease-out';
+};
+
 export default function InterventionSection() {
   const problemRef = useRef<HTMLElement>(null);
   const solutionRef = useRef<HTMLElement>(null);
@@ -504,7 +527,9 @@ export function OnesDifferenceSection() {
                       hidden: { opacity: 0, x: -24 },
                       visible: { opacity: 1, x: 0, transition: { duration: 0.4, delay: 0.3 + index * 0.09, ease: [0.25, 0.46, 0.45, 0.94] } },
                     }}
-                    className="bg-white/90 backdrop-blur-xl rounded-2xl p-5 border border-white/60 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300"
+                    onMouseMove={handleTilt}
+                    onMouseLeave={handleTiltReset}
+                    className="bg-white/90 backdrop-blur-xl rounded-2xl p-5 border border-white/60 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-shadow duration-300 will-change-transform"
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#054700]/10 ring-1 ring-[#054700]/[0.06] flex items-center justify-center text-[#054700]">{callout.icon}</div>
@@ -553,7 +578,9 @@ export function OnesDifferenceSection() {
                       hidden: { opacity: 0, x: 24 },
                       visible: { opacity: 1, x: 0, transition: { duration: 0.4, delay: 0.3 + index * 0.09, ease: [0.25, 0.46, 0.45, 0.94] } },
                     }}
-                    className="bg-white/90 backdrop-blur-xl rounded-2xl p-5 border border-white/60 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300"
+                    onMouseMove={handleTilt}
+                    onMouseLeave={handleTiltReset}
+                    className="bg-white/90 backdrop-blur-xl rounded-2xl p-5 border border-white/60 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-shadow duration-300 will-change-transform"
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#054700]/10 ring-1 ring-[#054700]/[0.06] flex items-center justify-center text-[#054700]">{callout.icon}</div>

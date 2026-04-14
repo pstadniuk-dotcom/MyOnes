@@ -110,8 +110,8 @@ export const users = pgTable("users", {
   membershipPriceCents: integer("membership_price_cents"), // Price locked at signup (e.g., 900 = $9 founding)
   membershipLockedAt: timestamp("membership_locked_at"), // When they locked in their tier
   membershipCancelledAt: timestamp("membership_cancelled_at"), // If they cancelled
-  stripeCustomerId: text("stripe_customer_id"), // Stripe customer ID for billing
-  stripeSubscriptionId: text("stripe_subscription_id"), // Stripe subscription ID
+  paymentVaultId: text("payment_vault_id"), // EPD customer vault ID for recurring charges
+  initialTransactionId: text("initial_transaction_id"), // EPD initial transaction ID (for credential-on-file)
 
   emailVerified: boolean("email_verified").default(false).notNull(),
 
@@ -155,7 +155,7 @@ export const users = pgTable("users", {
 }, (table) => [
   index("users_email_idx").on(table.email),
   index("users_phone_idx").on(table.phone),
-  index("users_stripe_customer_idx").on(table.stripeCustomerId),
+  index("users_payment_vault_idx").on(table.paymentVaultId),
   index("users_created_at_idx").on(table.createdAt),
   index("users_referral_code_idx").on(table.referralCode),
   index("users_utm_source_idx").on(table.utmSource),
@@ -235,6 +235,9 @@ export const healthProfiles = pgTable("health_profiles", {
 
   // Health goals (e.g., "gut health", "brain optimization", "energy", "sleep")
   healthGoals: json("health_goals").$type<string[]>().default([]),
+
+  // Current supplements the user is already taking (for consolidation into ONES formula)
+  currentSupplements: json("current_supplements").$type<string[]>().default([]),
 
   // Medication safety disclosure — null means never answered, timestamp means disclosed
   medicationDisclosedAt: timestamp("medication_disclosed_at"),
@@ -383,14 +386,13 @@ export const formulaVersionChanges = pgTable("formula_version_changes", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Subscriptions with Stripe integration
+// Membership subscriptions (managed internally, charged via EPD vault)
 export const subscriptions = pgTable("subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   plan: subscriptionPlanEnum("plan").notNull(),
   status: subscriptionStatusEnum("status").default('active').notNull(),
-  stripeCustomerId: varchar("stripe_customer_id"),
-  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  paymentVaultId: varchar("payment_vault_id"),
   renewsAt: timestamp("renews_at"),
   pausedUntil: timestamp("paused_until"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -402,9 +404,7 @@ export const autoShipSubscriptions = pgTable("auto_ship_subscriptions", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   formulaId: varchar("formula_id").references(() => formulas.id, { onDelete: "set null" }),
   formulaVersion: integer("formula_version").notNull(),
-  stripeSubscriptionId: varchar("stripe_subscription_id"),  // Stripe recurring subscription for formula
-  stripeProductId: varchar("stripe_product_id"),              // Stripe product used for price line item
-  stripePriceId: varchar("stripe_price_id"),                  // Current Stripe price object
+  // No external subscription IDs — auto-ship is managed internally via scheduler + EPD vault charges
   status: autoShipStatusEnum("status").default('active').notNull(),
   priceCents: integer("price_cents").notNull(),               // Customer-facing price per shipment
   manufacturerCostCents: integer("manufacturer_cost_cents"),   // Raw Alive cost
@@ -432,7 +432,7 @@ export const orders = pgTable("orders", {
   manufacturerQuoteExpiresAt: timestamp("manufacturer_quote_expires_at"), // When the Alive quote expires
   manufacturerOrderId: text("manufacturer_order_id"), // Alive order reference from /mix-product
   manufacturerOrderStatus: text("manufacturer_order_status"), // Status from Alive (e.g., 'submitted', 'in_production', 'shipped')
-  stripeSessionId: text("stripe_session_id"), // Stripe checkout session that created this order
+  gatewayTransactionId: text("gateway_transaction_id"), // EPD transaction ID that funded this order
   autoShipSubscriptionId: varchar("auto_ship_subscription_id"), // Set when order created by auto-ship
   trackingUrl: text("tracking_url"),
   placedAt: timestamp("placed_at").defaultNow().notNull(),
@@ -471,7 +471,7 @@ export const orders = pgTable("orders", {
   index("orders_user_id_idx").on(table.userId),
   index("orders_status_idx").on(table.status),
   index("orders_placed_at_idx").on(table.placedAt),
-  index("orders_stripe_session_idx").on(table.stripeSessionId),
+  index("orders_gateway_transaction_idx").on(table.gatewayTransactionId),
 ]);
 
 // Ingredient pricing reference for equivalent stack estimates
@@ -501,11 +501,11 @@ export const addresses = pgTable("addresses", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Stripe payment method references
+// Payment method references (EPD vault)
 export const paymentMethodRefs = pgTable("payment_method_refs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  stripePaymentMethodId: varchar("stripe_payment_method_id").notNull(),
+  paymentVaultId: varchar("payment_vault_id").notNull(),
   brand: text("brand"),
   last4: text("last4"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -753,7 +753,7 @@ export const reorderSchedules = pgTable("reorder_schedules", {
   delayCount: integer("delay_count").default(0).notNull(),     // Max 1 per cycle
 
   // Charge tracking
-  stripePaymentIntentId: varchar("stripe_payment_intent_id"),  // Set when auto-charge fires
+  gatewayTransactionId: varchar("gateway_transaction_id"),  // EPD transaction ID when auto-charge fires
   chargedAt: timestamp("charged_at"),
   chargePriceCents: integer("charge_price_cents"),             // Actual amount charged
   orderId: varchar("order_id").references(() => orders.id, { onDelete: "set null" }),  // Created order

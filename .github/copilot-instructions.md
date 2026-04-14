@@ -180,7 +180,7 @@ DELETE FROM formulas WHERE user_id = 'user-uuid';
 - **OpenAI API:** Required for GPT-4o/GPT-5 (key in `OPENAI_API_KEY`)
 - **Anthropic API:** Optional for Claude models (`ANTHROPIC_API_KEY`)
 - **Google Cloud Storage:** File uploads (`@google-cloud/storage`)
-- **Stripe:** Payment processing (referenced but not fully implemented)
+- **EasyPayDirect:** Payment processing via Payment API + Collect.js tokenization
 - **SendGrid:** Transactional emails (`@sendgrid/mail`)
 - **Twilio:** SMS notifications (`twilio`)
 

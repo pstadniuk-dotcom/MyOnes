@@ -1,8 +1,8 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 
 /**
  * How-It-Works — Clean numbered step cards over a single lifestyle image bg.
- * Frosted glassmorphism cards with step numbers and readable headline overlay.
+ * Frosted glassmorphism cards with step numbers, 3D tilt, and mouse-following glow.
  */
 
 const steps = [
@@ -35,6 +35,7 @@ const steps = [
 export default function HowItWorksSectionV3() {
   const sectionRef = useRef<HTMLElement>(null);
   const [revealed, setRevealed] = useState(false);
+  const [hoveredCard, setHoveredCard] = useState<number | null>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -50,15 +51,57 @@ export default function HowItWorksSectionV3() {
     return () => observer.disconnect();
   }, []);
 
+  // Only enable tilt/glow on devices with a hover pointer (not touch)
+  const canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches;
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>, index: number) => {
+      if (!canHover) return;
+      const card = e.currentTarget;
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      card.style.setProperty("--mouse-x", `${x}px`);
+      card.style.setProperty("--mouse-y", `${y}px`);
+      setHoveredCard(index);
+    },
+    [canHover]
+  );
+
+  const handleTilt = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!canHover) return;
+      const card = e.currentTarget;
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const rotateY = ((x - centerX) / centerX) * 8;
+      const rotateX = ((centerY - y) / centerY) * 8;
+      card.style.transform = `perspective(800px) rotateY(${rotateY}deg) rotateX(${rotateX}deg) scale(1.02)`;
+    },
+    [canHover]
+  );
+
+  const handleTiltReset = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!canHover) return;
+      e.currentTarget.style.transform = "perspective(800px) rotateY(0deg) rotateX(0deg) scale(1)";
+      setHoveredCard(null);
+    },
+    [canHover]
+  );
+
   return (
     <section
       ref={sectionRef}
       id="how-it-works"
       className="relative py-24 md:py-32 overflow-hidden scroll-mt-24"
     >
-      {/* Lifestyle background image — soft, atmospheric */}
+      {/* Lifestyle background image — landscape */}
       <img
-        src="/Ones%20LIfestyle%20Images/LLCl6KjWLmo0RlYJ9GZE6_vUxvLlpD.png"
+        src="/hero-nature.jpg"
         alt=""
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
         loading="lazy"
@@ -90,6 +133,7 @@ export default function HowItWorksSectionV3() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {steps.map((step, index) => {
             const delayMs = 200 + index * 120;
+            const isHovered = hoveredCard === index;
 
             return (
               <div
@@ -101,22 +145,47 @@ export default function HowItWorksSectionV3() {
                 }`}
                 style={{
                   transitionDelay: revealed ? `${delayMs}ms` : "0ms",
+                  perspective: "800px",
                 }}
               >
-                {/* Glassmorphism card */}
-                <div className="bg-white/60 backdrop-blur-md rounded-2xl p-6 md:p-7 border border-white/80 shadow-sm group-hover:shadow-lg group-hover:bg-white/80 transition-all duration-300 h-full">
+                {/* Glassmorphism card with tilt + glow */}
+                <div
+                  className="relative bg-white/60 backdrop-blur-md rounded-2xl p-6 md:p-7 border border-white/80 shadow-sm group-hover:shadow-lg group-hover:bg-white/80 transition-all duration-300 h-full"
+                  style={{
+                    transformStyle: "preserve-3d",
+                    transition: "transform 0.15s ease-out, box-shadow 0.5s ease-out",
+                  }}
+                  onMouseMove={(e) => {
+                    handleMouseMove(e, index);
+                    handleTilt(e);
+                  }}
+                  onMouseLeave={(e) => {
+                    handleTiltReset(e);
+                  }}
+                >
+                  {/* Mouse-following glow */}
+                  <div
+                    className="pointer-events-none absolute inset-0 rounded-2xl z-0 transition-opacity duration-300"
+                    style={{
+                      background: isHovered
+                        ? `radial-gradient(120px circle at var(--mouse-x) var(--mouse-y), rgba(138,154,44,0.15), transparent 60%)`
+                        : "none",
+                      opacity: isHovered ? 1 : 0,
+                    }}
+                  />
+
                   {/* Step number */}
-                  <div className="text-3xl md:text-4xl font-light leading-none text-[#054700]/15 select-none mb-4">
+                  <div className="relative z-10 text-3xl md:text-4xl font-light leading-none text-[#054700]/15 select-none mb-4">
                     {step.number}
                   </div>
 
                   {/* Title */}
-                  <h3 className="text-lg font-medium text-[#054700] mb-3">
+                  <h3 className="relative z-10 text-lg font-medium text-[#054700] mb-3">
                     {step.title}
                   </h3>
 
                   {/* Description */}
-                  <p className="text-[#054700]/55 leading-relaxed text-[15px] font-light">
+                  <p className="relative z-10 text-[#054700]/55 leading-relaxed text-[15px] font-light">
                     {step.description}
                   </p>
                 </div>

@@ -6,7 +6,7 @@
 ⚠️ **Hosting**: Need to deploy to Railway (backend) + Vercel (frontend)
 
 ### Local Environment Setup
-1. Copy `server/.env.example` to `server/.env` (or `server/.env.local`).
+1. Create or update `server/.env` (or `server/.env.local`).
 2. Fill in real secrets (Supabase URL, JWT secret, API keys). **Never** commit the populated file.
 3. Restart `npm run dev` so the new vars load.
 

@@ -8,7 +8,7 @@
  *  - If needsReview = true → sends a single "review recommended" notification
  *    that includes the number of days until their next renewal
  *
- * Uses the subscriptions.renewsAt column (populated from Stripe's current_period_end)
+ * Uses the subscriptions.renewsAt column (populated when subscription is created/renewed)
  * so notifications are naturally tied to the billing cycle.
  *
  * Dedup: uses the centralized notification gate (notification_log table)

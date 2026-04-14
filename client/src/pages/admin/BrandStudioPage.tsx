@@ -26,13 +26,16 @@ import { cn } from '@/shared/lib/utils';
 // ── Model Options ───────────────────────────────────────────────────────────
 
 const IMAGE_MODEL_OPTIONS = [
-  { value: 'fal-ai/flux-pro/v1.1', label: 'FLUX Pro 1.1', description: 'Premium photorealism — hero shots, lifestyle, editorial' },
-  { value: 'fal-ai/ideogram/v3', label: 'Ideogram v3', description: 'Best text rendering — logos, branded graphics, quotes' },
-  { value: 'fal-ai/recraft-v3', label: 'Recraft v3', description: 'Illustrations, icons, ingredient art, infographics' },
-  { value: 'fal-ai/nano-banana-2', label: 'Nano Banana 2', description: 'Fast and affordable — quick drafts, social media' },
-  { value: 'fal-ai/seedream-3', label: 'Seedream 3', description: 'Editorial and stylized imagery' },
-  { value: 'fal-ai/gpt-image-1', label: 'GPT Image 1', description: 'Strong prompt adherence and photorealism' },
-  { value: 'fal-ai/flux/dev', label: 'FLUX.1 Dev', description: 'Good all-rounder, open-weight' },
+  { value: 'fal-ai/flux-pro/v1.1', label: 'FLUX Pro 1.1', description: 'Premium photorealism — hero shots, lifestyle, editorial', supportsRef: false },
+  { value: 'fal-ai/flux-pro/kontext', label: 'FLUX Kontext', description: 'Edit/restyle with a reference image — brand consistency, mockups', supportsRef: true },
+  { value: 'fal-ai/ideogram/v3', label: 'Ideogram v3', description: 'Best text rendering — logos, branded graphics, quotes', supportsRef: false },
+  { value: 'fal-ai/recraft-v3', label: 'Recraft v3', description: 'Illustrations, icons, ingredient art, infographics', supportsRef: false },
+  { value: 'fal-ai/nano-banana-2', label: 'Nano Banana 2', description: 'Fast and affordable — quick drafts, social media', supportsRef: false },
+  { value: 'fal-ai/nano-banana-2/edit', label: 'Nano Banana 2 Edit', description: 'Style transfer — match reference image style cheaply', supportsRef: true },
+  { value: 'fal-ai/pulid', label: 'PuLID', description: 'Face-consistent generation — preserves facial identity', supportsRef: true },
+  { value: 'fal-ai/seedream-3', label: 'Seedream 3', description: 'Editorial and stylized imagery', supportsRef: false },
+  { value: 'fal-ai/gpt-image-1', label: 'GPT Image 1', description: 'Strong prompt adherence and photorealism', supportsRef: false },
+  { value: 'fal-ai/flux/dev', label: 'FLUX.1 Dev', description: 'Good all-rounder, open-weight', supportsRef: false },
 ];
 
 const ASSET_CATEGORIES = [
@@ -133,6 +136,8 @@ export default function BrandStudioPage() {
   const [genSize, setGenSize] = useState('landscape_16_9');
   const [genCategory, setGenCategory] = useState('other');
   const [genResult, setGenResult] = useState<GeneratedAsset | null>(null);
+  const [selectedRefImages, setSelectedRefImages] = useState<string[]>([]);
+  const [showRefPicker, setShowRefPicker] = useState(false);
 
   // Upload state
   const [uploadCategory, setUploadCategory] = useState('other');
@@ -165,7 +170,7 @@ export default function BrandStudioPage() {
   // ── Mutations ───────────────────────────────────────────────────────────
 
   const generateMutation = useMutation({
-    mutationFn: async (params: { prompt: string; modelId: string; imageSize: string }) => {
+    mutationFn: async (params: { prompt: string; modelId: string; imageSize: string; referenceImageUrls?: string[] }) => {
       const res = await apiRequest('POST', '/api/admin/brand-studio/generate', params);
       return res.json();
     },
@@ -271,7 +276,12 @@ export default function BrandStudioPage() {
       toast({ title: 'Enter a prompt', variant: 'destructive' });
       return;
     }
-    generateMutation.mutate({ prompt: genPrompt, modelId: genModel, imageSize: genSize });
+    generateMutation.mutate({
+      prompt: genPrompt,
+      modelId: genModel,
+      imageSize: genSize,
+      ...(selectedRefImages.length > 0 && { referenceImageUrls: selectedRefImages }),
+    });
   };
 
   const handlePreset = (preset: typeof GENERATION_PRESETS[0]) => {
@@ -380,7 +390,7 @@ export default function BrandStudioPage() {
                     className="mt-1 w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
                   >
                     {IMAGE_MODEL_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      <option key={opt.value} value={opt.value}>{opt.label}{opt.supportsRef ? ' ✦ ref' : ''}</option>
                     ))}
                   </select>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -415,6 +425,98 @@ export default function BrandStudioPage() {
                   </select>
                 </div>
               </div>
+
+              {/* Reference Images from Asset Library */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Reference Images</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowRefPicker(!showRefPicker)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {showRefPicker ? 'Hide' : 'Choose from library'}
+                  </button>
+                </div>
+                {selectedRefImages.length > 0 && (
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {selectedRefImages.map((url) => {
+                      const asset = assets.find((a: BrandAsset) => a.url === url);
+                      return (
+                        <div key={url} className="relative group">
+                          <img
+                            src={url}
+                            alt={asset?.filename || 'Reference'}
+                            className="h-16 w-16 object-cover rounded-md border-2 border-primary"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRefImages(prev => prev.filter(u => u !== url))}
+                            className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {selectedRefImages.length === 0 && !showRefPicker && (
+                  <p className="text-xs text-muted-foreground mt-1">Optional — select assets to guide style, composition, or face consistency</p>
+                )}
+                {showRefPicker && (
+                  <div className="mt-2 rounded-md border bg-muted/30 p-3 max-h-52 overflow-y-auto">
+                    {assets.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-4">No assets in library yet. Upload some in the Asset Library tab.</p>
+                    ) : (
+                      <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                        {assets.map((asset: BrandAsset) => {
+                          const isSelected = selectedRefImages.includes(asset.url);
+                          return (
+                            <button
+                              key={asset.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedRefImages(prev =>
+                                  isSelected
+                                    ? prev.filter(u => u !== asset.url)
+                                    : [...prev, asset.url]
+                                );
+                              }}
+                              className={cn(
+                                'relative rounded-md overflow-hidden border-2 transition-all aspect-square',
+                                isSelected ? 'border-primary ring-1 ring-primary' : 'border-transparent hover:border-muted-foreground/50'
+                              )}
+                            >
+                              <img
+                                src={asset.url}
+                                alt={asset.filename}
+                                className="w-full h-full object-cover"
+                              />
+                              {isSelected && (
+                                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                  <div className="h-5 w-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+                                    {selectedRefImages.indexOf(asset.url) + 1}
+                                  </div>
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {selectedRefImages.length > 0 && !IMAGE_MODEL_OPTIONS.find(o => o.value === genModel)?.supportsRef && (
+                <div className="rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                  <strong>{IMAGE_MODEL_OPTIONS.find(o => o.value === genModel)?.label}</strong> doesn't use reference images.
+                  Switch to <button type="button" onClick={() => setGenModel('fal-ai/flux-pro/kontext')} className="font-semibold underline">FLUX Kontext</button>,{' '}
+                  <button type="button" onClick={() => setGenModel('fal-ai/nano-banana-2/edit')} className="font-semibold underline">Nano Banana Edit</button>, or{' '}
+                  <button type="button" onClick={() => setGenModel('fal-ai/pulid')} className="font-semibold underline">PuLID</button> to use your selected references.
+                </div>
+              )}
 
               <button
                 onClick={handleGenerate}

@@ -744,7 +744,7 @@ export class FormulasService {
     }
 
     /**
-     * If the user has an active auto-ship, sync the formula price on Stripe.
+     * If the user has an active auto-ship, sync the formula price.
      * Called after any formula creation/modification. Non-blocking — failures
      * are logged but don't break the primary flow.
      */

@@ -369,7 +369,7 @@ Please revise the article content accordingly.`;
 /** POST /api/blog/admin/generate — generate a new article with AI */
 export async function adminAiGenerate(req: Request, res: Response) {
   try {
-    const { title, topic, keywords, category, tone = 'informative', secondaryKeywords = '', imageModel } = req.body;
+    const { title, topic, keywords, category, tone = 'informative', secondaryKeywords = '', imageModel, textModel } = req.body;
     if (!title && !topic) {
       return res.status(400).json({ error: 'title or topic is required' });
     }
@@ -441,7 +441,7 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
     if (process.env.ANTHROPIC_API_KEY) {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5',
+        model: textModel || 'claude-sonnet-4-5',
         max_tokens: 12000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],

@@ -28,9 +28,51 @@ const personas = [
   },
 ];
 
+// Typewriter hook — cycles through phrases with type/delete animation
+function useTypewriter(phrases: string[], typingSpeed = 70, deletingSpeed = 40, pauseDuration = 2200) {
+  const [text, setText] = useState("");
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [delay, setDelay] = useState(typingSpeed);
+
+  useEffect(() => {
+    const currentPhrase = phrases[phraseIndex];
+
+    const timeout = setTimeout(() => {
+      if (!isDeleting) {
+        const nextText = currentPhrase.slice(0, text.length + 1);
+        setText(nextText);
+
+        if (nextText === currentPhrase) {
+          setDelay(pauseDuration);
+          setIsDeleting(true);
+        } else {
+          setDelay(typingSpeed);
+        }
+      } else {
+        const nextText = currentPhrase.slice(0, text.length - 1);
+        setText(nextText);
+
+        if (nextText.length === 0) {
+          setIsDeleting(false);
+          setPhraseIndex((prev) => (prev + 1) % phrases.length);
+          setDelay(typingSpeed);
+        } else {
+          setDelay(deletingSpeed);
+        }
+      }
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [text, isDeleting, phraseIndex, phrases, typingSpeed, deletingSpeed, pauseDuration, delay]);
+
+  return text;
+}
+
 export default function HeroSectionV2() {
   const [activeTab, setActiveTab] = useState(0);
   const [activeBgVideo, setActiveBgVideo] = useState(0);
+  const typewriterText = useTypewriter(["your bloodwork", "your wearables", "your biology", "your lifestyle"]);
   const bgVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
@@ -150,8 +192,15 @@ export default function HeroSectionV2() {
           {/* Headline */}
           <h1 className="text-[clamp(2.1rem,7vw,3.75rem)] leading-[1.05] tracking-[-0.02em]">
             <span className="block font-light text-[#054700]">One formula.</span>
-            <span className="block font-light text-[#054700]">Built for you.</span>
-            <span className="block font-light text-[#8a9a2c]">Always evolving.</span>
+            <span className="block font-light text-[#054700] whitespace-nowrap sm:whitespace-normal lg:whitespace-nowrap min-h-[1.25em]">Built from{" "}
+              <span className="relative inline-grid min-w-[14ch] align-baseline leading-[1.2]">
+                <span className="invisible col-start-1 row-start-1">your wearables</span>
+                <span className="text-gradient-green font-light col-start-1 row-start-1">{typewriterText}</span>
+              </span>
+            </span>
+            <span className="block font-light pb-1 text-gradient-green">
+              Always evolving.
+            </span>
           </h1>
 
           {/* Subhead */}
@@ -220,15 +269,12 @@ export default function HeroSectionV2() {
 
           <video
             key={"6d9efde5ac45418c979e43130ecc6e77"}
-            // ref={(el) => { bgVideoRefs.current[0] = el; }}
             src={"/6d9efde5ac45418c979e43130ecc6e77.mp4"}
             muted
-            // playsInline
+            playsInline
             autoPlay
             loop
             disablePictureInPicture
-            // controlsList="noplaybackrate nodownload"
-            // onEnded={handleBgVideoEnded}
             className={`absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-1000`}
           />
 

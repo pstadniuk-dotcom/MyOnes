@@ -145,12 +145,14 @@ export default function ProfilePage() {
     conditions: [] as string[],
     medications: [] as string[],
     allergies: [] as string[],
+    currentSupplements: [] as string[],
   });
 
   // State for pending inputs
   const [conditionInput, setConditionInput] = useState('');
   const [medicationInput, setMedicationInput] = useState('');
   const [allergyInput, setAllergyInput] = useState('');
+  const [supplementInput, setSupplementInput] = useState('');
   const [medicationDisclosureChecked, setMedicationDisclosureChecked] = useState(false);
 
   // Enforce min/max on numeric health input fields at the onChange level
@@ -246,6 +248,7 @@ export default function ProfilePage() {
         conditions: healthProfile.conditions || [],
         medications: healthProfile.medications || [],
         allergies: healthProfile.allergies || [],
+        currentSupplements: (healthProfile as any).currentSupplements || [],
       });
     }
   }, [healthProfile]);
@@ -1211,6 +1214,50 @@ export default function ProfilePage() {
                                 }
                               }}
                               data-testid="input-allergies"
+                            />
+                          </>
+                        )}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="currentSupplements">Current Vitamins & Supplements</Label>
+                        <p className="text-xs text-muted-foreground mb-2">What are you currently taking? Your ONES formula will be designed to replace these.</p>
+                        {healthLoading ? (
+                          <Skeleton className="h-20 w-full" />
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {healthData.currentSupplements.map((supplement, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-sm">
+                                  {supplement}
+                                  <button
+                                    className="ml-2 text-muted-foreground hover:text-destructive"
+                                    onClick={() => {
+                                      const newSupplements = healthData.currentSupplements.filter((_, i) => i !== idx);
+                                      setHealthData({ ...healthData, currentSupplements: newSupplements });
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                            <Input
+                              id="currentSupplements"
+                              value={supplementInput}
+                              onChange={(e) => setSupplementInput(e.target.value)}
+                              placeholder="e.g., Vitamin D 5000IU, Fish Oil, Magnesium..."
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const value = supplementInput.trim();
+                                  if (value && !healthData.currentSupplements.includes(value)) {
+                                    setHealthData({ ...healthData, currentSupplements: [...healthData.currentSupplements, value] });
+                                    setSupplementInput('');
+                                  }
+                                }
+                              }}
+                              data-testid="input-current-supplements"
                             />
                           </>
                         )}

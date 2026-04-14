@@ -27,7 +27,8 @@ import {
   agentRoutes,
   ugcRoutes,
   metaAdsRoutes,
-  brandStudioRoutes
+  brandStudioRoutes,
+  seoRoutes
 } from "./api/routes";
 import { initializeAiSettings } from "./infra/ai/ai-config";
 import logger from "./infra/logging/logger";
@@ -45,10 +46,17 @@ export async function registerRoutes(app: Express, rateLimiters?: { authLimiter?
   }
 
   // Use Express built-in JSON middleware (stable and reliable)
+  // For webhook routes, also capture the raw body for signature verification
   app.use('/api', express.json({
     limit: '10mb',
     strict: true,
-    type: 'application/json'
+    type: 'application/json',
+    verify: (req: any, _res, buf) => {
+      // Preserve raw body for webhook signature verification
+      if (req.originalUrl?.startsWith('/api/webhooks/')) {
+        req.rawBody = buf.toString('utf-8');
+      }
+    },
   }));
 
   // Security headers for all API routes (HIPAA & Security Compliance)
@@ -96,6 +104,7 @@ export async function registerRoutes(app: Express, rateLimiters?: { authLimiter?
   app.use('/api/reorder', reorderRoutes);
   app.use('/api/labs', labsRoutes);
   app.use('/api/blog', blogRoutes);
+  app.use('/api/seo', seoRoutes);
   // PR Agent (admin-only)
   app.use('/api/agent', agentRoutes);
 

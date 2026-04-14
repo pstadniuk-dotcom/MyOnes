@@ -91,13 +91,13 @@ export class UgcController {
       const [campaign] = await db.select().from(ugcCampaigns).where(eq(ugcCampaigns.id, req.params.id));
       if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
 
-      // Fetch all related data
+      // Fetch all related data (include null-campaignId records for reusable characters/images/hooks)
       const [research, hooks, scripts, characters, images, videos, assets] = await Promise.all([
         db.select().from(ugcResearch).where(eq(ugcResearch.campaignId, campaign.id)).orderBy(desc(ugcResearch.createdAt)),
-        db.select().from(ugcHooks).where(eq(ugcHooks.campaignId, campaign.id)).orderBy(desc(ugcHooks.createdAt)),
+        db.select().from(ugcHooks).where(or(eq(ugcHooks.campaignId, campaign.id), isNull(ugcHooks.campaignId))).orderBy(desc(ugcHooks.createdAt)),
         db.select().from(ugcScripts).where(eq(ugcScripts.campaignId, campaign.id)).orderBy(desc(ugcScripts.createdAt)),
-        db.select().from(ugcCharacters).where(eq(ugcCharacters.campaignId, campaign.id)).orderBy(desc(ugcCharacters.createdAt)),
-        db.select().from(ugcGeneratedImages).where(eq(ugcGeneratedImages.campaignId, campaign.id)).orderBy(desc(ugcGeneratedImages.createdAt)),
+        db.select().from(ugcCharacters).where(or(eq(ugcCharacters.campaignId, campaign.id), isNull(ugcCharacters.campaignId))).orderBy(desc(ugcCharacters.createdAt)),
+        db.select().from(ugcGeneratedImages).where(or(eq(ugcGeneratedImages.campaignId, campaign.id), isNull(ugcGeneratedImages.campaignId))).orderBy(desc(ugcGeneratedImages.createdAt)),
         db.select().from(ugcVideoScenes).where(eq(ugcVideoScenes.campaignId, campaign.id)).orderBy(ugcVideoScenes.batchNumber, ugcVideoScenes.sceneNumber),
         db.select().from(ugcBrandAssets).where(or(eq(ugcBrandAssets.campaignId, campaign.id), isNull(ugcBrandAssets.campaignId))).orderBy(desc(ugcBrandAssets.createdAt)),
       ]);

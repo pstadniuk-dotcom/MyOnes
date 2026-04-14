@@ -22,7 +22,7 @@ const router = Router();
 
 router.post('/generate', requireAdmin, async (req, res) => {
   try {
-    const { prompt, modelId, imageSize } = req.body;
+    const { prompt, modelId, imageSize, referenceImageUrls } = req.body;
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: 'prompt is required' });
     }
@@ -45,6 +45,7 @@ router.post('/generate', requireAdmin, async (req, res) => {
         : imageSize === 'portrait_9_16' ? '9:16'
         : imageSize === 'landscape_4_3' ? '4:3'
         : '16:9',
+      ...(Array.isArray(referenceImageUrls) && referenceImageUrls.length > 0 && { referenceImageUrls }),
     });
 
     // Upload to permanent storage

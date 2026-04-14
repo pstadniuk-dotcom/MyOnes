@@ -21,6 +21,7 @@ export interface HealthProfile {
   medications?: string[];
   allergies?: string[];
   healthGoals?: string[];
+  currentSupplements?: string[];
   updatedAt: Date;
 }
 
@@ -224,9 +225,10 @@ The capsule-recommendation block should ONLY be output AFTER:
 ✅ Advisory lifestyle tips (e.g., "drink more water") CAN appear alongside capsule-recommendation
 
 **RULE C-EXCEPTION: When user explicitly asks to BUILD/CREATE a formula:**
-- If they have COMPLETE data (profile + labs + no safety questions) → Output capsule-recommendation IMMEDIATELY
+- If they have COMPLETE data (profile + labs + no safety questions) → Output capsule-recommendation block IMMEDIATELY so they can SELECT their capsule count
 - If you STILL need safety information (allergies, conditions, medications) → Ask those questions FIRST, no capsule-recommendation yet
 - The user MUST answer your questions BEFORE you show capsule selection
+- 🚨 **NEVER skip the capsule selection step!** Even if the user says "create my formula", you MUST output the capsule-recommendation block and WAIT for them to select before creating the formula JSON. The user ALWAYS chooses their capsule count — you do NOT choose for them.
 
 **RULE C-2: 🔄 WHEN USER ASKS TO SEE CAPSULE OPTIONS AGAIN**
 
@@ -260,7 +262,7 @@ If in doubt, INCLUDE THE BLOCK.
 
 **RULE D: 🚨 WHEN USER SELECTS CAPSULES - IMMEDIATELY CREATE FORMULA 🚨**
 
-🚨🚨🚨 **CRITICAL: EXTRACT THE EXACT CAPSULE COUNT FROM USER'S MESSAGE!** 🚨🚨🚨
+🚨 **You may ONLY create a formula (output \`\`\`json block) AFTER the user has selected their capsule count.** The capsule-recommendation block triggers an interactive selector in the app — the user clicks their choice, and their selection appears as a message. Until that happens, DO NOT create a formula. DO NOT default to 6 capsules. DO NOT guess.
 
 When the user says "I'll take X capsules" or "I've selected X capsules":
 1. **FIRST: Identify the number they said** - If they say "9 capsules", use targetCapsules: 9
@@ -1206,6 +1208,10 @@ WRONG: Keep all 4000mg + add more ingredients = exceeds budget ❌
     }
     if (profile.allergies && profile.allergies.length > 0) {
       prompt += `Allergies: ${JSON.stringify(profile.allergies)}\n`;
+    }
+    if (profile.currentSupplements && profile.currentSupplements.length > 0) {
+      prompt += `Current Supplements (already taking): ${JSON.stringify(profile.currentSupplements)}\n`;
+      prompt += `→ The ONES formula should consolidate and replace these. Address each one in your formula rationale.\n`;
     }
 
     if (profile.sleepHoursPerNight) prompt += `Sleep: ${profile.sleepHoursPerNight} hours/night\n`;

@@ -106,7 +106,7 @@ export class AutoShipController {
       if (error?.message === 'NO_ACTIVE_AUTO_SHIP') {
         return res.status(404).json({ error: 'No active auto-ship found' });
       }
-      if (error?.message === 'AUTO_SHIP_NOT_LINKED_TO_STRIPE') {
+      if (error?.message === 'AUTO_SHIP_NOT_LINKED') {
         return res.status(400).json({ error: 'Auto-ship is not linked to a payment method' });
       }
       logger.error('Error skipping next shipment', { error });

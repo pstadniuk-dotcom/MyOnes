@@ -888,7 +888,8 @@ export class ChatController {
                         'bloodPressureSystolic', 'bloodPressureDiastolic', 'restingHeartRate',
                         'sleepHoursPerNight', 'exerciseDaysPerWeek', 'stressLevel',
                         'smokingStatus', 'alcoholDrinksPerWeek',
-                        'conditions', 'medications', 'allergies', 'healthGoals'
+                        'conditions', 'medications', 'allergies', 'healthGoals',
+                        'currentSupplements'
                     ]);
 
                     const validatedHealthData: Record<string, any> = {};
@@ -916,6 +917,16 @@ export class ChatController {
                                     .filter((item: unknown) => typeof item === 'string' && item.length <= 200)
                                     .slice(0, 50); // Cap at 50 items max
                             }
+                        }
+                    }
+
+                    // Validate non-safety array fields (healthGoals, currentSupplements)
+                    const NON_SAFETY_ARRAY_FIELDS = ['healthGoals', 'currentSupplements'] as const;
+                    for (const field of NON_SAFETY_ARRAY_FIELDS) {
+                        if (field in validatedHealthData && Array.isArray(validatedHealthData[field])) {
+                            validatedHealthData[field] = validatedHealthData[field]
+                                .filter((item: unknown) => typeof item === 'string' && item.length <= 200)
+                                .slice(0, 50);
                         }
                     }
 

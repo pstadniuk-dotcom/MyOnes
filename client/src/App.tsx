@@ -57,6 +57,7 @@ const ConversationsPage = lazy(() => import("@/pages/admin/ConversationsPage"));
 const OrdersManagementPage = lazy(() => import("@/pages/admin/OrdersManagementPage"));
 const AuditLogsPage = lazy(() => import("@/pages/admin/AuditLogsPage"));
 const AdminBlogPage = lazy(() => import("@/pages/admin/AdminBlogPage"));
+const AdminSeoPage = lazy(() => import("@/pages/admin/AdminSeoPage"));
 const RetailComparisonPricingPage = lazy(() => import("@/pages/admin/RetailComparisonPricingPage"));
 const MembershipAdminPage = lazy(() => import("@/pages/admin/MembershipAdminPage"));
 const ContentManagementPage = lazy(() => import("@/pages/admin/ContentManagementPage"));
@@ -81,6 +82,7 @@ import { AdminLayout } from "@/shared/components/AdminLayout";
 import SharedFormulaPage from "@/pages/SharedFormulaPage";
 import MembershipPage from "@/pages/MembershipPage";
 import CheckoutSuccessPage from "@/pages/CheckoutSuccessPage";
+const CheckoutPage = lazy(() => import("@/pages/CheckoutPage"));
 
 // Import V2 landing page (premium design)
 import LandingPageV2 from "@/pages/LandingPageV2";
@@ -286,6 +288,13 @@ function MainRouter() {
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
+      <Route path="/admin/seo">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><AdminSeoPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
       <Route path="/admin/retail-pricing">
         <ProtectedAdminRoute>
           <AdminLayout>
@@ -415,7 +424,12 @@ function MainRouter() {
         </ProtectedAdminRoute>
       </Route>
 
-      {/* Membership & Checkout */}
+      {/* Checkout & Membership */}
+      <Route path="/checkout">
+        <ProtectedRoute>
+          <Suspense fallback={<PageLoader />}><CheckoutPage /></Suspense>
+        </ProtectedRoute>
+      </Route>
       <Route path="/membership/success">
         <ProtectedRoute>
           <CheckoutSuccessPage />

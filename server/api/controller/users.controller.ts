@@ -258,14 +258,14 @@ export class UsersController {
     async addPaymentMethod(req: Request, res: Response) {
         try {
             const userId = req.userId!;
-            const { stripePaymentMethodId, brand, last4 } = req.body;
+            const { paymentVaultId, brand, last4 } = req.body;
 
-            if (!stripePaymentMethodId || !brand || !last4) {
+            if (!paymentVaultId || !brand || !last4) {
                 return res.status(400).json({ error: 'Missing required payment method data' });
             }
 
             const paymentMethod = await usersService.addPaymentMethod(userId, {
-                stripePaymentMethodId,
+                paymentVaultId,
                 brand,
                 last4
             });

@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { Check, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest } from '@/shared/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
+import CollectJSCheckout from '@/components/checkout/CollectJSCheckout';
 
 interface MembershipTier {
   id: string;
@@ -29,6 +32,8 @@ export default function MembershipPage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const [showPayment, setShowPayment] = useState(false);
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
 
   const { data: tiers, isLoading, error } = useQuery<MembershipTier[]>({
     queryKey: ['/api/membership/tiers'],
@@ -40,15 +45,22 @@ export default function MembershipPage() {
   const activeTier = tiers?.find(t => t.currentCount < t.maxCapacity) ?? tiers?.[tiers.length - 1];
 
   const checkoutMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/billing/checkout/session', { plan: 'monthly' });
+    mutationFn: async (paymentToken: string) => {
+      const res = await apiRequest('POST', '/api/billing/checkout', {
+        paymentToken,
+        includeMembership: true,
+        plan: 'monthly',
+      });
       const data = await res.json();
-      return data as { checkoutUrl: string; sessionId: string; expiresAt: string };
+      return data as { success: boolean; orderId?: string; membershipActivated?: boolean; error?: string };
     },
-    onSuccess: ({ checkoutUrl }) => {
-      window.location.href = checkoutUrl;
+    onSuccess: (data) => {
+      setShowPayment(false);
+      setPaymentSubmitting(false);
+      navigate(`/membership/success?membership=1&order_id=${data.orderId || ''}`);
     },
     onError: (err: any) => {
+      setPaymentSubmitting(false);
       const msg = err?.message || '';
       if (msg.includes('already has an active membership')) {
         navigate('/dashboard');
@@ -58,7 +70,11 @@ export default function MembershipPage() {
         toast({ title: 'No spots available', description: 'All membership tiers are currently full.', variant: 'destructive' });
         return;
       }
-      toast({ title: 'Something went wrong', description: 'Unable to start checkout. Please try again.', variant: 'destructive' });
+      if (msg.includes('PAYMENT_DECLINED')) {
+        toast({ title: 'Payment Declined', description: msg.replace('PAYMENT_DECLINED: ', ''), variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Something went wrong', description: 'Unable to process payment. Please try again.', variant: 'destructive' });
     },
   });
 
@@ -131,16 +147,33 @@ export default function MembershipPage() {
           </ul>
 
           <Button
-            onClick={() => checkoutMutation.mutate()}
+            onClick={() => setShowPayment(true)}
             disabled={checkoutMutation.isPending}
             className="w-full bg-[#054700] hover:bg-[#043d00] text-white py-6 text-base rounded-full group"
           >
-            {checkoutMutation.isPending ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Redirecting to checkout…</>
-            ) : (
-              <>Continue to checkout <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
-            )}
+            Continue to checkout <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Button>
+
+          <Dialog open={showPayment} onOpenChange={setShowPayment}>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Complete Membership</DialogTitle>
+                <DialogDescription>
+                  Enter your payment details to activate your {activeTier?.name || 'Founding'} membership at ${monthlyPrice}/mo.
+                </DialogDescription>
+              </DialogHeader>
+              <CollectJSCheckout
+                onToken={(token) => {
+                  setPaymentSubmitting(true);
+                  checkoutMutation.mutate(token);
+                }}
+                loading={paymentSubmitting}
+                showShipping={false}
+                buttonText="Activate Membership"
+                totalAmount={String(monthlyPrice)}
+              />
+            </DialogContent>
+          </Dialog>
 
           <div className="mt-5 pt-5 border-t border-[#054700]/10 text-center space-y-1">
             <p className="text-xs text-[#5a6623]">Cancel anytime. Rejoin within 3 months to keep your rate.</p>
@@ -150,7 +183,7 @@ export default function MembershipPage() {
       </div>
 
       <p className="mt-6 text-xs text-[#5a6623]">
-        Secure checkout powered by Stripe
+        Secure checkout
       </p>
     </div>
   );

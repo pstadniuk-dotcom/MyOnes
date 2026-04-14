@@ -370,7 +370,7 @@ When you're running low, simply log in and place a new order. You decide when an
 
 PAYMENT METHODS
 
-We accept all major credit cards and debit cards. Payments are processed securely through Stripe.
+We accept all major credit cards and debit cards. Payments are processed securely through our payment gateway.
 
 Your payment information is encrypted and never stored on our servers.
 

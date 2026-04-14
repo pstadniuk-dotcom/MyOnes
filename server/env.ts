@@ -30,7 +30,7 @@ const REQUIRED_ENV_VARS = [
 // Additional vars required in production to prevent silent misconfiguration
 const PROD_REQUIRED_ENV_VARS = [
 	"FRONTEND_URL",
-	"STRIPE_SECRET_KEY",
+	"EPD_SECURITY_KEY",
 ];
 
 if (process.env.NODE_ENV === "production") {

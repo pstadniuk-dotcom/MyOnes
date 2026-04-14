@@ -10,6 +10,8 @@ import { ingredientCatalogRepository } from '../../modules/formulas/ingredient-c
 import { ingredientCatalogSyncService } from '../../modules/formulas/ingredient-catalog-sync.service';
 import { formulasRepository } from '../../modules/formulas/formulas.repository';
 import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, ALL_INGREDIENTS, SYSTEM_SUPPORT_DETAILS } from '@shared/ingredients';
+import { epdQueryService } from '../../modules/billing/epd-query.service';
+import { epdGateway } from '../../modules/billing/epd-gateway';
 
 export class AdminController {
     async getStats(req: Request, res: Response) {
@@ -1374,7 +1376,14 @@ export class AdminController {
 
     async createB2bOutreach(req: Request, res: Response) {
         try {
-            const outreach = await adminService.createB2bOutreach(req.body);
+            const prospectId = req.params.id;
+            if (!prospectId) return res.status(400).json({ error: 'prospectId is required' });
+
+            const outreach = await adminService.createB2bOutreach({ ...req.body, prospectId });
+
+            // Update the prospect's lastActivityAt timestamp
+            await adminService.updateB2bProspect(prospectId, { lastActivityAt: new Date() } as any);
+
             res.status(201).json(outreach);
         } catch (error) {
             logger.error('Error creating B2B outreach', { error });
@@ -1426,6 +1435,243 @@ export class AdminController {
         } catch (error) {
             logger.error('Error fetching affected formulas', { error });
             res.status(500).json({ error: 'Failed to fetch affected formulas' });
+        }
+    }
+
+    async getOrderDetail(req: Request, res: Response) {
+        try {
+            const order = await adminService.getOrderDetail(req.params.id);
+            if (!order) return res.status(404).json({ error: 'Order not found' });
+            res.json(order);
+        } catch (error) {
+            logger.error('Error fetching order detail', { error });
+            res.status(500).json({ error: 'Failed to fetch order detail' });
+        }
+    }
+
+    async refundOrder(req: Request, res: Response) {
+        try {
+            const { amountCents, reason } = req.body || {};
+            const parsedAmount = typeof amountCents === 'number' && amountCents > 0 ? amountCents : undefined;
+            const parsedReason = typeof reason === 'string' ? reason.slice(0, 500) : undefined;
+
+            const result = await adminService.refundOrder(req.params.id, parsedAmount, parsedReason);
+            if (!result.success) {
+                return res.status(400).json({ error: result.error });
+            }
+            await logAdminAction(req, 'order_refund', 'order', req.params.id, {
+                refundedAmountCents: result.refundedAmountCents,
+                refundTransactionId: result.refundTransactionId,
+                reason: parsedReason,
+            });
+            res.json(result);
+        } catch (error) {
+            logger.error('Error refunding order', { error });
+            res.status(500).json({ error: 'Failed to process refund' });
+        }
+    }
+
+    // ── EPD Gateway Payments Dashboard ─────────────────────────────────
+
+    async getGatewayTransactions(req: Request, res: Response) {
+        try {
+            const {
+                startDate, endDate, condition, actionType,
+                email, orderId, transactionId, firstName, lastName,
+                limit, page, order,
+            } = req.query;
+
+            const result = await epdQueryService.searchTransactions({
+                startDate: typeof startDate === 'string' ? startDate : undefined,
+                endDate: typeof endDate === 'string' ? endDate : undefined,
+                condition: typeof condition === 'string' ? condition : undefined,
+                actionType: typeof actionType === 'string' ? actionType : undefined,
+                email: typeof email === 'string' ? email : undefined,
+                orderId: typeof orderId === 'string' ? orderId : undefined,
+                transactionId: typeof transactionId === 'string' ? transactionId : undefined,
+                firstName: typeof firstName === 'string' ? firstName : undefined,
+                lastName: typeof lastName === 'string' ? lastName : undefined,
+                limit: typeof limit === 'string' ? parseInt(limit) || 50 : 50,
+                page: typeof page === 'string' ? parseInt(page) || 0 : 0,
+                order: order === 'standard' ? 'standard' : 'reverse',
+            });
+
+            res.json(result);
+        } catch (error) {
+            logger.error('Error querying EPD transactions', { error });
+            res.status(500).json({ error: 'Failed to query gateway transactions' });
+        }
+    }
+
+    async getGatewayTransaction(req: Request, res: Response) {
+        try {
+            const { transactionId } = req.params;
+            if (!transactionId) {
+                return res.status(400).json({ error: 'transactionId is required' });
+            }
+            const txn = await epdQueryService.getTransaction(transactionId);
+            if (!txn) {
+                return res.status(404).json({ error: 'Transaction not found' });
+            }
+            res.json(txn);
+        } catch (error) {
+            logger.error('Error querying EPD transaction', { error });
+            res.status(500).json({ error: 'Failed to query transaction' });
+        }
+    }
+
+    async getGatewayPendingSettlement(req: Request, res: Response) {
+        try {
+            const transactions = await epdQueryService.getPendingSettlement();
+            res.json({ transactions });
+        } catch (error) {
+            logger.error('Error querying pending settlement', { error });
+            res.status(500).json({ error: 'Failed to query pending settlement' });
+        }
+    }
+
+    async getGatewayVault(req: Request, res: Response) {
+        try {
+            const { vaultId } = req.query;
+            const records = await epdQueryService.queryVault(
+                typeof vaultId === 'string' ? vaultId : undefined,
+            );
+            res.json({ records });
+        } catch (error) {
+            logger.error('Error querying EPD vault', { error });
+            res.status(500).json({ error: 'Failed to query customer vault' });
+        }
+    }
+
+    async getGatewaySubscriptions(req: Request, res: Response) {
+        try {
+            const { subscriptionId } = req.query;
+            const subscriptions = await epdQueryService.querySubscriptions(
+                typeof subscriptionId === 'string' ? subscriptionId : undefined,
+            );
+            res.json({ subscriptions });
+        } catch (error) {
+            logger.error('Error querying EPD subscriptions', { error });
+            res.status(500).json({ error: 'Failed to query subscriptions' });
+        }
+    }
+
+    async getGatewayPlans(req: Request, res: Response) {
+        try {
+            const plans = await epdQueryService.queryPlans();
+            res.json({ plans });
+        } catch (error) {
+            logger.error('Error querying EPD plans', { error });
+            res.status(500).json({ error: 'Failed to query plans' });
+        }
+    }
+
+    // ── EPD Transaction Update (tracking) ──────────────────────────────
+
+    async updateOrderTracking(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { trackingNumber, carrier } = req.body;
+
+            if (!trackingNumber || typeof trackingNumber !== 'string') {
+                return res.status(400).json({ error: 'trackingNumber is required' });
+            }
+
+            const validCarriers = ['ups', 'fedex', 'dhl', 'usps'] as const;
+            if (carrier && !validCarriers.includes(carrier)) {
+                return res.status(400).json({ error: `carrier must be one of: ${validCarriers.join(', ')}` });
+            }
+
+            // Get order to find gateway transaction ID
+            const order = await adminService.getOrderDetail(id);
+            if (!order) {
+                return res.status(404).json({ error: 'Order not found' });
+            }
+            if (!order.gatewayTransactionId) {
+                return res.status(400).json({ error: 'Order has no gateway transaction to update' });
+            }
+
+            // Update EPD transaction with tracking info
+            const result = await epdGateway.updateTransaction(order.gatewayTransactionId, {
+                tracking_number: trackingNumber,
+                shipping_carrier: carrier || undefined,
+                shipping_date: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
+            });
+
+            await logAdminAction(req, 'order_update' as any, 'order', id, {
+                trackingNumber,
+                carrier,
+                epdResponse: result.responsetext,
+            });
+
+            res.json({
+                success: true,
+                message: 'Tracking info sent to payment gateway',
+                trackingNumber,
+                carrier,
+            });
+        } catch (error) {
+            logger.error('Error updating order tracking', { error });
+            res.status(500).json({ error: 'Failed to update tracking info' });
+        }
+    }
+
+    // ── EPD Recurring Plan Management ──────────────────────────────────
+
+    async createGatewayPlan(req: Request, res: Response) {
+        try {
+            const { planId, planName, planAmount, planPayments, monthFrequency, dayOfMonth } = req.body;
+
+            if (!planId || !planName || !planAmount) {
+                return res.status(400).json({ error: 'planId, planName, and planAmount are required' });
+            }
+
+            const result = await epdGateway.addPlan({
+                plan_id: planId,
+                plan_name: planName,
+                plan_amount: planAmount,
+                plan_payments: planPayments || '0',
+                month_frequency: monthFrequency,
+                day_of_month: dayOfMonth,
+            });
+
+            if (result.response !== '1') {
+                return res.status(400).json({ error: result.responsetext || 'Failed to create plan' });
+            }
+
+            await logAdminAction(req, 'settings_update' as any, 'plan', planId, {
+                action: 'create_recurring_plan',
+                planName,
+                planAmount,
+            });
+
+            res.json({ success: true, message: `Plan "${planName}" created`, planId });
+        } catch (error) {
+            logger.error('Error creating EPD plan', { error });
+            res.status(500).json({ error: 'Failed to create recurring plan' });
+        }
+    }
+
+    async deleteGatewaySubscription(req: Request, res: Response) {
+        try {
+            const { subscriptionId } = req.params;
+            if (!subscriptionId) {
+                return res.status(400).json({ error: 'subscriptionId is required' });
+            }
+
+            const result = await epdGateway.deleteSubscription(subscriptionId);
+            if (result.response !== '1') {
+                return res.status(400).json({ error: result.responsetext || 'Failed to delete subscription' });
+            }
+
+            await logAdminAction(req, 'settings_update' as any, 'subscription', subscriptionId, {
+                action: 'delete_gateway_subscription',
+            });
+
+            res.json({ success: true, message: 'Subscription deleted from gateway' });
+        } catch (error) {
+            logger.error('Error deleting EPD subscription', { error });
+            res.status(500).json({ error: 'Failed to delete subscription' });
         }
     }
 }

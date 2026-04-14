@@ -6,7 +6,7 @@ const ALIVE_API_GET_QUOTE_URL = process.env.ALIVE_API_GET_QUOTE_URL || `${ALIVE_
 const ALIVE_API_MIX_PRODUCT_URL = process.env.ALIVE_API_MIX_PRODUCT_URL || `${ALIVE_API_BASE_URL}/mix-product`;
 const ALIVE_API_EXTERNAL_ORDER_URL = process.env.ALIVE_API_EXTERNAL_ORDER_URL || `${ALIVE_API_BASE_URL}/external-order`;
 const ALIVE_API_KEY = process.env.ALIVE_API_KEY || "";
-const ALIVE_API_ORIGIN = process.env.ALIVE_API_ORIGIN || "";
+const ALIVE_API_ORIGIN = process.env.ALIVE_API_ORIGIN || "https://myones.onrender.com";
 
 // ── Production safety: warn if Alive API is pointing at dev URL in production ──
 if (process.env.NODE_ENV === 'production' && ALIVE_API_BASE_URL.includes('dev.aliveinnovations.com')) {
@@ -46,6 +46,9 @@ type QuoteResult = {
     totalCapsules: number;
     weeks: number;
     manufacturerCost?: number;  // raw Alive cost before margin (for internal use)
+    manufacturerDiscount?: number; // Alive practitioner-level discount amount
+    manufacturerShipping?: number; // Alive shipping cost
+    manufacturerRetailPrice?: number; // Alive retail_price (with practitioner markup)
     subtotal?: number;
     shipping?: number;
     total?: number;
@@ -62,16 +65,26 @@ type ManufacturerOrderResult = {
     error?: string;
 };
 
-type OrderCustomerData = {
-    customerName?: string;
-    email?: string;
+export type ManufacturerOrderCustomerInfo = {
+    customerName: string;
+    email: string;
     phone?: string;
-    billingCity?: string;
-    billingZip?: string;
-    billingLine1?: string;
-    shippingCity?: string;
-    shippingZip?: string;
-    shippingLine1?: string;
+    billingAddress: {
+        line1: string;
+        line2?: string;
+        city: string;
+        state?: string;
+        zip: string;
+        country?: string;
+    };
+    shippingAddress: {
+        line1: string;
+        line2?: string;
+        city: string;
+        state?: string;
+        zip: string;
+        country?: string;
+    };
 };
 
 const NAME_ALIASES: Record<string, string> = {
@@ -150,6 +163,7 @@ class ManufacturerPricingService {
     private buildAuthHeaders(): Record<string, string> {
         const headers: Record<string, string> = {
             [ALIVE_API_HEADER_NAME]: ALIVE_API_KEY,
+            'Origin': ALIVE_API_ORIGIN,
         };
         if (ALIVE_API_ORIGIN) {
             headers.Origin = ALIVE_API_ORIGIN;
@@ -389,10 +403,21 @@ class ManufacturerPricingService {
             const quoteId = typeof quote.quote_id === 'string' ? quote.quote_id : undefined;
             const quoteExpiresAt = typeof quote.expires_at === 'string' ? quote.expires_at : undefined;
 
-            // Apply margin to manufacturer SUBTOTAL (cost only, excludes Alive shipping).
-            // Shipping is absorbed into the margin and shown as free to the customer.
-            const aliveShipping = Number(quote.total ?? 0) - Number(quote.subtotal ?? quote.total ?? 0);
-            const manufacturerCost = Number(quote.subtotal ?? Number(quote.total ?? 0));
+            // ── Parse Alive's new pricing response fields ──
+            // subtotal = raw ingredient cost, discount = practitioner-level discount,
+            // shipping_cost = Alive shipping, retail_price = with practitioner markup,
+            // total = subtotal - discount + shipping (what we actually pay Alive)
+            const aliveSubtotal = Number(quote.subtotal ?? 0);
+            const aliveDiscount = Number(quote.discount ?? 0);
+            const aliveShippingCost = Number(quote.shipping_cost ?? 0);
+            const aliveRetailPrice = Number(quote.retail_price ?? 0);
+            const aliveTotal = Number(quote.total ?? 0);
+
+            // Our cost basis is what Alive charges us (total = subtotal - discount + shipping)
+            // If the new fields aren't present, fall back to the raw total
+            const manufacturerCost = aliveTotal > 0 ? aliveTotal : aliveSubtotal;
+
+            // Apply our margin on top of the manufacturer cost (shipping absorbed, shown as free)
             const subtotal = Math.round(manufacturerCost * MARGIN_MULTIPLIER * 100) / 100;
             const shipping = 0;
             const total = subtotal;
@@ -400,8 +425,12 @@ class ManufacturerPricingService {
             logger.info('Formula pricing breakdown', {
                 capsuleCount,
                 totalCapsules,
+                aliveSubtotal,
+                aliveDiscount,
+                aliveShippingCost,
+                aliveRetailPrice,
+                aliveTotal,
                 manufacturerCost,
-                aliveShipping: Math.round(aliveShipping * 100) / 100,
                 marginMultiplier: MARGIN_MULTIPLIER,
                 customerTotal: total,
                 perDayCustomer: Math.round((total / QUOTE_DAYS) * 100) / 100,
@@ -426,7 +455,10 @@ class ManufacturerPricingService {
                 capsuleCount,
                 totalCapsules,
                 weeks: QUOTE_WEEKS,
-                manufacturerCost: manufacturerCost,
+                manufacturerCost,
+                manufacturerDiscount: aliveDiscount || undefined,
+                manufacturerShipping: aliveShippingCost || undefined,
+                manufacturerRetailPrice: aliveRetailPrice || undefined,
                 subtotal,
                 shipping,
                 total,
@@ -457,11 +489,11 @@ class ManufacturerPricingService {
         }
     }
     /**
-     * Place a production order with Alive using a previously obtained quote_id.
-     * Called after Stripe payment succeeds.
-     * Uses the /external-order endpoint with full customer and address data.
+     * Place a production order with Alive using the external-order API.
+     * Requires the quote_id from a previous /get-quote call plus customer/shipping details.
+     * Called after payment succeeds.
      */
-    async placeManufacturerOrder(quoteId: string, customerData?: OrderCustomerData): Promise<ManufacturerOrderResult> {
+    async placeManufacturerOrder(quoteId: string, customerInfo?: ManufacturerOrderCustomerInfo): Promise<ManufacturerOrderResult> {
         if (!ALIVE_API_KEY) {
             return { success: false, error: 'Manufacturer API key not configured.' };
         }
@@ -470,42 +502,48 @@ class ManufacturerPricingService {
             return { success: false, error: 'No quote_id provided.' };
         }
 
-        try {
-            logger.info('Placing manufacturer order with Alive', { quoteId });
+        // Use the new /external-order endpoint if customer info is available,
+        // otherwise fall back to the legacy /mix-product endpoint
+        if (customerInfo) {
+            return this.placeExternalOrder(quoteId, customerInfo);
+        }
 
-            // Build the external-order payload with customer data
-            const payload: Record<string, any> = {
+        return this.placeLegacyMixProductOrder(quoteId);
+    }
+
+    /**
+     * New external-order API: POST /api/external-order
+     */
+    private async placeExternalOrder(quoteId: string, customer: ManufacturerOrderCustomerInfo): Promise<ManufacturerOrderResult> {
+        try {
+            const payload = {
                 external_quote_id: quoteId,
+                customer_name: customer.customerName,
+                email: customer.email,
+                phone: customer.phone || '',
+                billing_address: {
+                    line1: customer.billingAddress.line1,
+                    ...(customer.billingAddress.line2 ? { line2: customer.billingAddress.line2 } : {}),
+                    city: customer.billingAddress.city,
+                    ...(customer.billingAddress.state ? { state: customer.billingAddress.state } : {}),
+                    zip: customer.billingAddress.zip,
+                    ...(customer.billingAddress.country ? { country: customer.billingAddress.country } : {}),
+                },
+                shipping_address: {
+                    line1: customer.shippingAddress.line1,
+                    ...(customer.shippingAddress.line2 ? { line2: customer.shippingAddress.line2 } : {}),
+                    city: customer.shippingAddress.city,
+                    ...(customer.shippingAddress.state ? { state: customer.shippingAddress.state } : {}),
+                    zip: customer.shippingAddress.zip,
+                    ...(customer.shippingAddress.country ? { country: customer.shippingAddress.country } : {}),
+                },
             };
 
-            if (customerData?.customerName) {
-                payload.customer_name = customerData.customerName;
-            }
-            if (customerData?.email) {
-                payload.email = customerData.email;
-            }
-            if (customerData?.phone) {
-                payload.phone = customerData.phone;
-            }
-
-            // Billing address
-            if (customerData?.billingLine1 || customerData?.billingCity || customerData?.billingZip) {
-                payload.billing_address = {};
-                if (customerData.billingLine1) payload.billing_address.line1 = customerData.billingLine1;
-                if (customerData.billingCity) payload.billing_address.city = customerData.billingCity;
-                if (customerData.billingZip) payload.billing_address.zip = customerData.billingZip;
-            }
-
-            // Shipping address (default to billing if not provided)
-            if (customerData?.shippingLine1 || customerData?.shippingCity || customerData?.shippingZip) {
-                payload.shipping_address = {};
-                if (customerData.shippingLine1) payload.shipping_address.line1 = customerData.shippingLine1;
-                if (customerData.shippingCity) payload.shipping_address.city = customerData.shippingCity;
-                if (customerData.shippingZip) payload.shipping_address.zip = customerData.shippingZip;
-            } else if (payload.billing_address) {
-                // Use billing address as default if no shipping address provided
-                payload.shipping_address = { ...payload.billing_address };
-            }
+            logger.info('Placing manufacturer external order with Alive', {
+                quoteId,
+                customerName: customer.customerName,
+                email: customer.email,
+            });
 
             const response = await this.fetchWithTimeout(ALIVE_API_EXTERNAL_ORDER_URL, {
                 method: 'POST',
@@ -519,18 +557,17 @@ class ManufacturerPricingService {
 
             if (!response.ok) {
                 const text = await response.text().catch(() => '');
-                logger.error('Manufacturer order API failed', { quoteId, status: response.status, body: text });
-                return { success: false, error: `Manufacturer order API returned ${response.status}` };
+                logger.error('Manufacturer external-order API failed', { quoteId, status: response.status, body: text });
+                return { success: false, error: `Manufacturer external-order API returned ${response.status}` };
             }
 
             const result: any = await response.json();
-            logger.info('Manufacturer order response', { quoteId, result });
+            logger.info('Manufacturer external-order response', { quoteId, result });
 
-            // Alive may return an order_id, confirmation, etc.
             const orderId = result?.order_id || result?.id || quoteId;
             return { success: true, orderId: String(orderId) };
         } catch (error: any) {
-            logger.error('Failed to place manufacturer order', {
+            logger.error('Failed to place manufacturer external order', {
                 quoteId,
                 error: error?.message || error,
                 isAbort: error?.name === 'AbortError',
@@ -543,6 +580,50 @@ class ManufacturerPricingService {
             };
         }
     }
+
+    /**
+     * Legacy /mix-product fallback (used when customer info is not available)
+     */
+    private async placeLegacyMixProductOrder(quoteId: string): Promise<ManufacturerOrderResult> {
+        try {
+            logger.info('Placing manufacturer order with Alive (legacy mix-product)', { quoteId });
+
+            const response = await this.fetchWithTimeout(ALIVE_API_MIX_PRODUCT_URL, {
+                method: 'POST',
+                headers: {
+                    ...this.buildAuthHeaders(),
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ quote_id: quoteId }),
+            });
+
+            if (!response.ok) {
+                const text = await response.text().catch(() => '');
+                logger.error('Manufacturer mix-product API failed', { quoteId, status: response.status, body: text });
+                return { success: false, error: `Manufacturer order API returned ${response.status}` };
+            }
+
+            const result: any = await response.json();
+            logger.info('Manufacturer mix-product response', { quoteId, result });
+
+            const orderId = result?.order_id || result?.id || quoteId;
+            return { success: true, orderId: String(orderId) };
+        } catch (error: any) {
+            logger.error('Failed to place manufacturer order (legacy)', {
+                quoteId,
+                error: error?.message || error,
+                isAbort: error?.name === 'AbortError',
+            });
+            return {
+                success: false,
+                error: error?.name === 'AbortError'
+                    ? 'Manufacturer order request timed out.'
+                    : `Manufacturer order failed: ${error?.message || 'unknown error'}`,
+            };
+        }
+    }
+
 }
 
 export const manufacturerPricingService = new ManufacturerPricingService();

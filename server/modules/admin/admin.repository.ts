@@ -2178,9 +2178,10 @@ export class AdminRepository {
 
     // ---- B2B Medical Prospecting ----
 
-    async listB2bProspects(status?: string, limit = 50, offset = 0): Promise<{ prospects: B2bProspect[]; total: number }> {
+    async listB2bProspects(status?: string, practiceType?: string, limit = 50, offset = 0): Promise<{ prospects: B2bProspect[]; total: number }> {
         const conditions = [];
         if (status && status !== 'all') conditions.push(eq(b2bProspects.status, status));
+        if (practiceType && practiceType !== 'all') conditions.push(eq(b2bProspects.practiceType, practiceType));
 
         const [totalResult] = await db.select({ count: count() }).from(b2bProspects).where(conditions.length > 0 ? and(...conditions) : undefined);
         const prospects = await db.select().from(b2bProspects)

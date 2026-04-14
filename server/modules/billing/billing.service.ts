@@ -1,15 +1,29 @@
-import Stripe from 'stripe';
+/**
+ * Billing Service — EasyPayDirect Integration
+ * ─────────────────────────────────────────────────────────────
+ * Handles checkout, subscriptions, billing history, and invoices.
+ *
+ * Flow:
+ *   1. Client collects card via Collect.js → payment_token
+ *   2. POST /api/billing/checkout with token + order details
+ *   3. Server validates, quotes, charges via EPD, vaults card
+ *   4. Creates order + places manufacturer order synchronously
+ *   5. Membership renewals handled by scheduler calling processMembershipRenewal()
+ */
+
 import { Request } from 'express';
 import { usersRepository } from '../users/users.repository';
 import { membershipRepository } from '../membership/membership.repository';
 import { formulasRepository } from '../formulas/formulas.repository';
-import { manufacturerPricingService } from '../formulas/manufacturer-pricing.service';
+import { manufacturerPricingService, type ManufacturerOrderCustomerInfo } from '../formulas/manufacturer-pricing.service';
 import { consentsRepository } from '../consents/consents.repository';
 import { db } from '../../infra/db/db';
 import { ingredientPricing, users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import logger from '../../infra/logging/logger';
-import { getBaseUrl } from '../../utils/urlHelper';
+import { epdGateway, isApproved, type EpdTransactionResponse } from './epd-gateway';
+import { sendNotificationEmail } from '../../utils/emailService';
+import { getFrontendUrl } from '../../utils/urlHelper';
 
 type InternalSubscriptionStatus = 'active' | 'paused' | 'cancelled' | 'past_due';
 
@@ -40,6 +54,42 @@ type BillingInvoice = {
   }>;
 };
 
+export interface CheckoutPayload {
+  paymentToken: string;
+  formulaId?: string;
+  includeMembership?: boolean;
+  plan?: string;
+  enableAutoShip?: boolean;
+  shippingAddress?: {
+    firstName: string;
+    lastName: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    zip: string;
+    country?: string;
+  };
+  billingAddress?: {
+    firstName: string;
+    lastName: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    zip: string;
+    country?: string;
+  };
+}
+
+export interface CheckoutResult {
+  success: boolean;
+  orderId?: string;
+  transactionId?: string;
+  membershipActivated?: boolean;
+  error?: string;
+}
+
 export interface BillingProvider {
   listBillingHistory(userId: string): Promise<BillingHistoryItem[]>;
   getInvoice(userId: string, invoiceId: string): Promise<BillingInvoice | null>;
@@ -50,62 +100,26 @@ export interface BillingProvider {
     coveragePct: number;
     missingIngredients: string[];
   }>;
-  createCheckoutSession(_userId: string, _payload: Record<string, any>, _req?: Request): Promise<{
-    checkoutUrl: string;
-    sessionId: string;
-    expiresAt: string;
-  }>;
-  cancelSubscription(_userId: string, _subscriptionId: string): Promise<{
+  processCheckout(userId: string, payload: CheckoutPayload, req?: Request): Promise<CheckoutResult>;
+  cancelSubscription(userId: string, subscriptionId: string): Promise<{
     cancelledAt?: string;
     expiresAt?: string;
     status: 'cancelled';
   }>;
-  resumeSubscription(_userId: string, _subscriptionId: string): Promise<{
+  resumeSubscription(userId: string, subscriptionId: string): Promise<{
     resumedAt: string;
     status: 'active';
   }>;
-  handleStripeWebhook(_signature: string | undefined, _rawBody: Buffer): Promise<void>;
+  processMembershipRenewal(userId: string): Promise<{ success: boolean; error?: string }>;
 }
 
 class DatabaseBillingProvider implements BillingProvider {
-  private readonly stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-  private readonly stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  private getStripeClient(): Stripe {
-    if (!this.stripeSecretKey) {
-      throw new Error('STRIPE_SECRET_KEY_NOT_CONFIGURED');
-    }
-    return new Stripe(this.stripeSecretKey);
-  }
 
   private resolvePlan(plan: string | undefined): { plan: 'monthly' | 'quarterly' | 'annual'; intervalCount: number } {
     const normalized = String(plan || 'monthly').toLowerCase();
-    if (normalized === 'quarterly') {
-      return { plan: 'quarterly', intervalCount: 3 };
-    }
-    if (normalized === 'annual') {
-      return { plan: 'annual', intervalCount: 12 };
-    }
+    if (normalized === 'quarterly') return { plan: 'quarterly', intervalCount: 3 };
+    if (normalized === 'annual') return { plan: 'annual', intervalCount: 12 };
     return { plan: 'monthly', intervalCount: 1 };
-  }
-
-  private mapStripeStatus(status: Stripe.Subscription.Status): InternalSubscriptionStatus {
-    if (status === 'active' || status === 'trialing') return 'active';
-    if (status === 'past_due' || status === 'unpaid' || status === 'incomplete' || status === 'incomplete_expired') return 'past_due';
-    if (status === 'paused') return 'paused';
-    return 'cancelled';
-  }
-
-  /**
-   * In Stripe SDK v18+, `current_period_end` lives on SubscriptionItem,
-   * not on Subscription directly. Extract it from the first item.
-   */
-  private getCurrentPeriodEnd(sub: Stripe.Subscription): Date | null {
-    const item = sub.items?.data?.[0];
-    if (item && typeof item.current_period_end === 'number') {
-      return new Date(item.current_period_end * 1000);
-    }
-    return null;
   }
 
   private normalizeIngredientKey(name: string): string {
@@ -121,8 +135,7 @@ class DatabaseBillingProvider implements BillingProvider {
     values: {
       plan: 'monthly' | 'quarterly' | 'annual';
       status: InternalSubscriptionStatus;
-      stripeCustomerId?: string | null;
-      stripeSubscriptionId?: string | null;
+      paymentVaultId?: string | null;
       renewsAt?: Date | null;
       pausedUntil?: Date | null;
     }
@@ -131,573 +144,48 @@ class DatabaseBillingProvider implements BillingProvider {
       userId,
       plan: values.plan,
       status: values.status,
-      stripeCustomerId: values.stripeCustomerId ?? null,
-      stripeSubscriptionId: values.stripeSubscriptionId ?? null,
+      paymentVaultId: values.paymentVaultId ?? null,
       renewsAt: values.renewsAt ?? null,
       pausedUntil: values.pausedUntil ?? null,
     });
   }
 
-  private async handleCheckoutCompleted(event: Stripe.Event) {
-    const session = event.data.object as Stripe.Checkout.Session;
+  // ── Checkout ──────────────────────────────────────────────────────────
 
-    const metadata = session.metadata || {};
-    const userId = metadata.userId;
-    if (!userId) {
-      logger.warn('Stripe checkout.session.completed missing userId metadata', { eventId: event.id });
-      return;
-    }
-
+  async processCheckout(userId: string, payload: CheckoutPayload, req?: Request): Promise<CheckoutResult> {
     const user = await usersRepository.getUser(userId);
-    if (!user) {
-      logger.warn('Stripe checkout.session.completed user not found', { userId, eventId: event.id });
-      return;
-    }
+    if (!user) throw new Error('USER_NOT_FOUND');
 
-    const stripeCustomerId = typeof session.customer === 'string' ? session.customer : null;
+    const includeMembership = payload.includeMembership !== false;
+    const formulaId = typeof payload.formulaId === 'string' ? payload.formulaId : undefined;
+    const { plan, intervalCount } = this.resolvePlan(payload.plan);
+    const paymentToken = payload.paymentToken;
 
-    await usersRepository.updateUser(userId, {
-      stripeCustomerId: stripeCustomerId || user.stripeCustomerId,
-    });
+    if (!paymentToken) throw new Error('PAYMENT_TOKEN_REQUIRED');
 
-    // ── Handle subscription (membership) ──────────────────────────────
-    if (session.mode === 'subscription') {
-      const stripeSubscriptionId = typeof session.subscription === 'string' ? session.subscription : null;
-      const plan = this.resolvePlan(metadata.plan).plan;
-
-      await usersRepository.updateUser(userId, {
-        stripeSubscriptionId: stripeSubscriptionId || user.stripeSubscriptionId,
-      });
-
-      if (stripeSubscriptionId) {
-        const stripe = this.getStripeClient();
-        const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-        const currentPeriodEnd = this.getCurrentPeriodEnd(stripeSub);
-        const pausedUntil =
-          typeof stripeSub.pause_collection?.resumes_at === 'number'
-            ? new Date(stripeSub.pause_collection.resumes_at * 1000)
-            : null;
-        await this.upsertInternalSubscription(userId, {
-          plan,
-          status: this.mapStripeStatus(stripeSub.status),
-          stripeCustomerId,
-          stripeSubscriptionId,
-          renewsAt: currentPeriodEnd,
-          pausedUntil,
-        });
-      }
-
-      if (!user.membershipTier || user.membershipCancelledAt) {
-        const tierFromMetadata = metadata.membershipTier || '';
-        const lockedPrice = Number(metadata.membershipPriceCents || 0);
-        const tier = await membershipRepository.getMembershipTier(tierFromMetadata);
-        const fallbackTier = await membershipRepository.getAvailableMembershipTier();
-        const selectedTier = tier || fallbackTier;
-        if (!selectedTier) {
-          logger.warn('No membership tier available during Stripe checkout completion', { userId, eventId: event.id });
-        } else {
-          const effectivePrice = Number.isFinite(lockedPrice) && lockedPrice > 0 ? lockedPrice : selectedTier.priceCents;
-          await membershipRepository.assignUserMembership(userId, selectedTier.tierKey, effectivePrice);
-        }
-      }
-    }
-
-    // ── Create order + place manufacturer production order ─────────────
-    const formulaId = metadata.formulaId;
-    const formulaVersion = Number(metadata.formulaVersion || 0);
-    if (formulaId && formulaVersion > 0) {
-      // ── Idempotency guard: prevent duplicate orders from Stripe webhook retries ──
-      const existingOrder = await usersRepository.getOrderByStripeSessionId(session.id);
-      if (existingOrder) {
-        logger.warn('Duplicate checkout.session.completed webhook — order already exists', {
-          orderId: existingOrder.id,
-          stripeSessionId: session.id,
-          eventId: event.id,
-        });
-        return;
-      }
-
-      const formulaCents = Number(metadata.formulaChargedCents || metadata.formulaPriceCents || 0);
-      const mfrCostCents = Number(metadata.manufacturerCostCents || 0);
-      let quoteId = metadata.manufacturerQuoteId || null;
-      let quoteExpiresAt = metadata.manufacturerQuoteExpiresAt
-        ? new Date(metadata.manufacturerQuoteExpiresAt)
-        : null;
-
-      // ── Quote expiration check: re-quote if the original quote has expired ──
-      if (quoteId && quoteExpiresAt && quoteExpiresAt.getTime() < Date.now()) {
-        logger.warn('Manufacturer quote expired — re-quoting before placing order', {
-          quoteId,
-          quoteExpiresAt: quoteExpiresAt.toISOString(),
-          formulaId,
-        });
-
-        const formula = await formulasRepository.getFormula(formulaId);
-        if (formula) {
-          const freshQuote = await manufacturerPricingService.quoteFormula({
-            bases: (formula.bases as any[]) || [],
-            additions: (formula.additions as any[]) || [],
-            targetCapsules: (formula.targetCapsules as number) || 9,
-          }, (formula.targetCapsules as number) || 9);
-
-          if (freshQuote.available && freshQuote.quoteId) {
-            quoteId = freshQuote.quoteId;
-            quoteExpiresAt = freshQuote.quoteExpiresAt ? new Date(freshQuote.quoteExpiresAt) : null;
-            logger.info('Re-quote successful', { newQuoteId: quoteId, formulaId });
-          } else {
-            logger.error('Re-quote failed — order will proceed without manufacturer placement', {
-              formulaId,
-              reason: freshQuote.reason,
-            });
-            quoteId = null;
-            quoteExpiresAt = null;
-          }
-        } else {
-          logger.error('Formula not found for re-quote', { formulaId });
-          quoteId = null;
-          quoteExpiresAt = null;
-        }
-      }
-
-      // Create order record - use session total to capture both formula and membership
-      const order = await usersRepository.createOrder({
-        userId,
-        formulaId,
-        formulaVersion,
-        status: 'processing',
-        amountCents: session.amount_total ?? formulaCents,
-        manufacturerCostCents: mfrCostCents,
-        supplyWeeks: 8,
-        manufacturerQuoteId: quoteId,
-        manufacturerQuoteExpiresAt: quoteExpiresAt,
-        stripeSessionId: session.id,
-      });
-
-      logger.info('Order created from Stripe checkout', {
-        orderId: order.id,
-        userId,
-        formulaId,
-        formulaVersion,
-        chargedCents: formulaCents,
-        mfrCostCents,
-        quoteId,
-      });
-
-      // Update user's last order date
-      await usersRepository.updateUser(userId, {
-        lastOrderDate: new Date(),
-      });
-
-      // Place production order with Alive if we have a quote
-      if (quoteId) {
-        const mfrResult = await manufacturerPricingService.placeManufacturerOrder(quoteId, {
-          customerName: user.name,
-          email: user.email,
-          phone: user.phone || undefined,
-          billingLine1: user.addressLine1 || undefined,
-          billingCity: user.city || undefined,
-          billingZip: user.postalCode || undefined,
-          shippingLine1: user.addressLine1 || undefined,
-          shippingCity: user.city || undefined,
-          shippingZip: user.postalCode || undefined,
-        });
-        if (mfrResult.success) {
-          await usersRepository.updateOrder(order.id, {
-            manufacturerOrderId: mfrResult.orderId || null,
-            manufacturerOrderStatus: 'submitted',
-          });
-          logger.info('Manufacturer order placed successfully', {
-            orderId: order.id,
-            manufacturerOrderId: mfrResult.orderId,
-          });
-        } else {
-          logger.error('Failed to place manufacturer order — admin can retry via POST /api/admin/orders/:id/retry-manufacturer', {
-            orderId: order.id,
-            quoteId,
-            error: mfrResult.error,
-          });
-          await usersRepository.updateOrder(order.id, {
-            manufacturerOrderStatus: 'failed',
-          });
-        }
-      } else {
-        logger.warn('No manufacturer quote_id available — cannot place production order', {
-          orderId: order.id,
-          formulaId,
-        });
-      }
-    }
-  }
-
-  private async handleSubscriptionUpdated(event: Stripe.Event) {
-    const sub = event.data.object as Stripe.Subscription;
-    const stripeSubscriptionId = sub.id;
-    const stripeCustomerId = typeof sub.customer === 'string' ? sub.customer : null;
-
-    let user = await usersRepository.getUserByStripeSubscriptionId(stripeSubscriptionId);
-    if (!user && stripeCustomerId) {
-      user = await usersRepository.getUserByStripeCustomerId(stripeCustomerId);
-    }
-    if (!user) {
-      logger.warn('Stripe subscription update with unmapped user', { eventId: event.id, stripeSubscriptionId, stripeCustomerId });
-      return;
-    }
-
-    await usersRepository.updateUser(user.id, {
-      stripeCustomerId: stripeCustomerId || user.stripeCustomerId,
-      stripeSubscriptionId,
-    });
-
-    const plan = this.resolvePlan(sub.metadata?.plan).plan;
-    await this.upsertInternalSubscription(user.id, {
-      plan,
-      status: this.mapStripeStatus(sub.status),
-      stripeCustomerId,
-      stripeSubscriptionId,
-      renewsAt: this.getCurrentPeriodEnd(sub),
-      pausedUntil: sub.pause_collection?.resumes_at ? new Date(sub.pause_collection.resumes_at * 1000) : null,
-    });
-  }
-
-  private async handleSubscriptionDeleted(event: Stripe.Event) {
-    const sub = event.data.object as Stripe.Subscription;
-    const stripeSubscriptionId = sub.id;
-    const stripeCustomerId = typeof sub.customer === 'string' ? sub.customer : null;
-
-    let user = await usersRepository.getUserByStripeSubscriptionId(stripeSubscriptionId);
-    if (!user && stripeCustomerId) {
-      user = await usersRepository.getUserByStripeCustomerId(stripeCustomerId);
-    }
-
-    if (!user) {
-      logger.warn('Stripe subscription deleted with unmapped user', { eventId: event.id, stripeSubscriptionId, stripeCustomerId });
-      return;
-    }
-
-    await this.upsertInternalSubscription(user.id, {
-      plan: 'monthly',
-      status: 'cancelled',
-      stripeCustomerId,
-      stripeSubscriptionId,
-      renewsAt: null,
-      pausedUntil: null,
-    });
-
-    if (user.membershipTier && !user.membershipCancelledAt) {
-      await membershipRepository.cancelUserMembership(user.id);
-    }
-  }
-
-  private async handleInvoicePaid(event: Stripe.Event) {
-    const invoice = event.data.object as Stripe.Invoice;
-    const stripeSubscriptionId = typeof (invoice as any).subscription === 'string'
-      ? (invoice as any).subscription
-      : (invoice as any).subscription?.id || null;
-
-    if (!stripeSubscriptionId) {
-      return;
-    }
-
-    const stripe = this.getStripeClient();
-    const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-
-    const existing = await usersRepository.getSubscriptionByStripeSubscriptionId(stripeSubscriptionId);
-    if (existing) {
-      await usersRepository.updateSubscriptionByStripeSubscriptionId(stripeSubscriptionId, {
-        status: 'active',
-        renewsAt: this.getCurrentPeriodEnd(sub),
-      });
-    } else {
-      logger.warn('handleInvoicePaid: subscription not found for stripeSubscriptionId — invoice paid but no internal subscription record exists', {
-        stripeSubscriptionId,
-        eventId: event.id,
-      });
-    }
-  }
-
-  private async handleInvoicePaymentFailed(event: Stripe.Event) {
-    const invoice = event.data.object as Stripe.Invoice;
-    const stripeSubscriptionId = typeof (invoice as any).subscription === 'string'
-      ? (invoice as any).subscription
-      : (invoice as any).subscription?.id || null;
-
-    if (!stripeSubscriptionId) {
-      return;
-    }
-
-    const existing = await usersRepository.getSubscriptionByStripeSubscriptionId(stripeSubscriptionId);
-    if (existing) {
-      await usersRepository.updateSubscriptionByStripeSubscriptionId(stripeSubscriptionId, {
-        status: 'past_due',
-      });
-      logger.warn('handleInvoicePaymentFailed: invoice payment failed for subscription', {
-        stripeSubscriptionId,
-        eventId: event.id,
-        invoiceId: invoice.id,
-      });
-      // TODO: Integrate dunning email — notify user that payment failed and prompt them to update their payment method
-    } else {
-      logger.warn('handleInvoicePaymentFailed: subscription not found for stripeSubscriptionId', {
-        stripeSubscriptionId,
-        eventId: event.id,
-      });
-    }
-  }
-
-  async listBillingHistory(userId: string): Promise<BillingHistoryItem[]> {
-    const orders = await usersRepository.listOrdersByUser(userId);
-    const stripe = this.getStripeClient();
-
-    return Promise.all(orders.map(async (order) => {
-      let amountCents = typeof order.amountCents === 'number' ? order.amountCents : null;
-      let description = `Supplement Order - Formula v${order.formulaVersion}`;
-
-      // Sync with Stripe session for accuracy (especially for historical records)
-      if (order.stripeSessionId) {
-        try {
-          const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
-          if (session.amount_total !== null) {
-            amountCents = session.amount_total;
-            // Lazy sync: update DB if it's different and not null
-            if (order.amountCents !== amountCents) {
-              await usersRepository.updateOrder(order.id, { amountCents });
-            }
-          }
-
-          if (session.metadata?.includeMembership === '1') {
-            description += ' + Membership';
-          }
-        } catch (error) {
-          logger.error('Error syncing order amount with Stripe', { orderId: order.id, error });
-        }
-      }
-
-      return {
-        id: order.id,
-        date: order.placedAt,
-        description,
-        amountCents,
-        currency: 'USD',
-        status: order.status === 'cancelled'
-          ? 'failed'
-          : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered')
-            ? 'paid'
-            : 'pending',
-        invoiceId: order.id,
-        invoiceUrl: `/api/billing/invoices/${order.id}`,
-      };
-    }));
-  }
-
-  async getInvoice(userId: string, invoiceId: string): Promise<BillingInvoice | null> {
-    const order = await usersRepository.getOrder(invoiceId);
-    if (!order || order.userId !== userId) {
-      return null;
-    }
-
-    let totalCents = typeof order.amountCents === 'number' ? order.amountCents : null;
-    let lineItems = [
-      {
-        label: `Custom Formula v${order.formulaVersion}`,
-        formulaVersion: order.formulaVersion,
-        supplyMonths: order.supplyMonths ?? null,
-        amountCents: totalCents,
-      },
-    ];
-
-    if (order.stripeSessionId) {
-      try {
-        const stripe = this.getStripeClient();
-        const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
-
-        if (session.amount_total !== null) {
-          totalCents = session.amount_total;
-        }
-
-        const fbCents = session.metadata?.formulaChargedCents ? parseInt(session.metadata.formulaChargedCents) : null;
-        const mbCents = session.metadata?.membershipPriceCents ? parseInt(session.metadata.membershipPriceCents) : null;
-        const includeMembership = session.metadata?.includeMembership === '1';
-        const tierKey = session.metadata?.membershipTier;
-
-        if (includeMembership && mbCents) {
-          const tierName = tierKey ? (tierKey.charAt(0).toUpperCase() + tierKey.slice(1)) : 'Founding';
-          lineItems = [
-            {
-              label: `Custom Formula v${order.formulaVersion}`,
-              formulaVersion: order.formulaVersion,
-              supplyMonths: order.supplyMonths ?? null,
-              amountCents: fbCents ?? (totalCents ? totalCents - mbCents : null),
-            },
-            {
-              label: `${tierName} Member Subscription`,
-              formulaVersion: 0,
-              supplyMonths: 1,
-              amountCents: mbCents,
-            },
-          ];
-        } else if (lineItems[0]) {
-          lineItems[0].amountCents = totalCents;
-        }
-      } catch (error) {
-        logger.error('Error fetching Stripe session in getInvoice', { orderId: order.id, error });
-      }
-    }
-
-    return {
-      id: order.id,
-      userId,
-      orderId: order.id,
-      amountCents: totalCents,
-      currency: 'USD',
-      status: order.status === 'cancelled'
-        ? 'failed'
-        : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered')
-          ? 'paid'
-          : 'pending',
-      issuedAt: order.placedAt,
-      lineItems,
-    };
-  }
-
-  async getEquivalentStack(userId: string, formulaId: string): Promise<{
-    supplementsCount: number;
-    capsulesPerDay: number;
-    estimatedMonthlyCost: number | null;
-    coveragePct: number;
-    missingIngredients: string[];
-  }> {
-    if (!formulaId) {
-      throw new Error('FORMULA_ID_REQUIRED');
-    }
-
-    const formula = await formulasRepository.getFormula(formulaId);
-    if (!formula || formula.userId !== userId) {
-      throw new Error('FORMULA_NOT_FOUND_OR_ACCESS_DENIED');
-    }
-
-    const doseByIngredient = new Map<string, { name: string; doseMg: number }>();
-    const addIngredient = (name: unknown, amount: unknown) => {
-      const ingredientName = String(name || '').trim();
-      const doseMg = Number(amount || 0);
-      if (!ingredientName || !Number.isFinite(doseMg) || doseMg <= 0) return;
-
-      const key = this.normalizeIngredientKey(ingredientName);
-      const existing = doseByIngredient.get(key);
-      if (existing) {
-        existing.doseMg += doseMg;
-      } else {
-        doseByIngredient.set(key, { name: ingredientName, doseMg });
-      }
-    };
-
-    const bases = Array.isArray(formula.bases) ? (formula.bases as Array<any>) : [];
-    const additions = Array.isArray(formula.additions) ? (formula.additions as Array<any>) : [];
-    const addedBases = Array.isArray((formula.userCustomizations as any)?.addedBases)
-      ? ((formula.userCustomizations as any).addedBases as Array<any>)
-      : [];
-    const addedIndividuals = Array.isArray((formula.userCustomizations as any)?.addedIndividuals)
-      ? ((formula.userCustomizations as any).addedIndividuals as Array<any>)
-      : [];
-
-    [...bases, ...additions, ...addedBases, ...addedIndividuals].forEach((item) => {
-      addIngredient(item?.ingredient, item?.amount);
-    });
-
-    const supplementsCount = doseByIngredient.size;
-    if (supplementsCount === 0) {
-      return {
-        supplementsCount: 0,
-        capsulesPerDay: 0,
-        estimatedMonthlyCost: null,
-        coveragePct: 0,
-        missingIngredients: [],
-      };
-    }
-
-    const pricingRows = await db
-      .select()
-      .from(ingredientPricing)
-      .where(eq(ingredientPricing.isActive, true));
-
-    const pricingByKey = new Map(pricingRows.map((row) => [row.ingredientKey, row]));
-    const missingIngredients: string[] = [];
-
-    let capsulesPerDay = 0;
-    let estimatedMonthlyCostRaw = 0;
-
-    doseByIngredient.forEach(({ name, doseMg }, key) => {
-      const pricing = pricingByKey.get(key);
-      if (!pricing) {
-        missingIngredients.push(name);
-        return;
-      }
-
-      const capsuleMg = Math.max(1, pricing.typicalCapsuleMg || 1);
-      const bottleCapsules = Math.max(1, pricing.typicalBottleCapsules || 1);
-      const retailPrice = Math.max(0, pricing.typicalRetailPriceCents || 0) / 100;
-
-      const ingredientCapsulesPerDay = Math.ceil(doseMg / capsuleMg);
-      const ingredientMonthlyCost = (ingredientCapsulesPerDay * 30 / bottleCapsules) * retailPrice;
-
-      capsulesPerDay += ingredientCapsulesPerDay;
-      estimatedMonthlyCostRaw += ingredientMonthlyCost;
-    });
-
-    const coveragePct = Math.round(((supplementsCount - missingIngredients.length) / supplementsCount) * 100);
-    const estimatedMonthlyCost = coveragePct < 80 ? null : Math.round(estimatedMonthlyCostRaw);
-
-    return {
-      supplementsCount,
-      capsulesPerDay,
-      estimatedMonthlyCost,
-      coveragePct,
-      missingIngredients,
-    };
-  }
-
-  async createCheckoutSession(userId: string, payload: Record<string, any>, req?: Request): Promise<{ checkoutUrl: string; sessionId: string; expiresAt: string }> {
-    const stripe = this.getStripeClient();
-    const user = await usersRepository.getUser(userId);
-    if (!user) {
-      throw new Error('USER_NOT_FOUND');
-    }
-
-    // Get frontend URL dynamically from request or environment
-    const frontendUrl = req ? getBaseUrl(req) : (() => {
-      if (!process.env.FRONTEND_URL) {
-        throw new Error('FRONTEND_URL environment variable is required when no request context is available');
-      }
-      return process.env.FRONTEND_URL.replace(/\/$/, '');
-    })();
-
-    const includeMembership = payload?.includeMembership !== false;
-    const formulaId = typeof payload?.formulaId === 'string' ? payload.formulaId : undefined;
-    const { plan, intervalCount } = this.resolvePlan(payload?.plan);
-
+    // ── Resolve formula ──
     const formula = formulaId ? await formulasRepository.getFormula(formulaId) : null;
     if (formulaId && (!formula || formula.userId !== userId)) {
       throw new Error('FORMULA_NOT_FOUND_OR_ACCESS_DENIED');
     }
 
-    // SAFETY GATE: If formula has serious warnings, require acknowledgment before checkout
+    // ── Validation gates ──
     if (formula) {
       const safetyValidation = (formula as any).safetyValidation;
       if (safetyValidation?.requiresAcknowledgment && !formula.warningsAcknowledgedAt) {
         throw new Error('SAFETY_WARNINGS_NOT_ACKNOWLEDGED');
       }
+      if (formula.needsReformulation) {
+        throw new Error('FORMULA_NEEDS_REFORMULATION');
+      }
     }
 
-    // DISCONTINUED INGREDIENT GATE: Block checkout if formula needs reformulation
-    if (formula && formula.needsReformulation) {
-      throw new Error('FORMULA_NEEDS_REFORMULATION');
-    }
-
-    // MEDICAL DISCLOSURE GATE: Require medication_disclosure consent before checkout
     const medDisclosureConsent = await consentsRepository.getUserConsent(userId, 'medication_disclosure');
     if (!medDisclosureConsent || !medDisclosureConsent.granted) {
       throw new Error('MEDICAL_DISCLOSURE_NOT_ACKNOWLEDGED');
     }
 
+    // ── Quote formula ──
     let formulaAmountCents = 0;
     let manufacturerCostCents = 0;
     let manufacturerQuoteId: string | undefined;
@@ -723,196 +211,298 @@ class DatabaseBillingProvider implements BillingProvider {
       throw new Error('FORMULA_ID_REQUIRED');
     }
 
+    // ── Resolve membership tier ──
     let availableTier: Awaited<ReturnType<typeof membershipRepository.getAvailableMembershipTier>> | undefined;
     if (includeMembership) {
       if (user.membershipTier && !user.membershipCancelledAt) {
         throw new Error('ALREADY_ACTIVE_MEMBER');
       }
-
-      // Reactivation: if user had a previous tier + locked price, honor it
       if (user.membershipTier && user.membershipCancelledAt && user.membershipPriceCents) {
         const previousTier = await membershipRepository.getMembershipTier(user.membershipTier);
         if (previousTier && previousTier.isActive) {
-          // Give them back their original tier at their locked price
           availableTier = { ...previousTier, priceCents: user.membershipPriceCents };
         }
       }
-
-      // First-time signup or previous tier no longer available: pick next available
       if (!availableTier) {
         availableTier = await membershipRepository.getAvailableMembershipTier();
       }
-      if (!availableTier) {
-        throw new Error('NO_MEMBERSHIP_TIER_AVAILABLE');
-      }
+      if (!availableTier) throw new Error('NO_MEMBERSHIP_TIER_AVAILABLE');
     }
 
-    let customerId = user.stripeCustomerId || null;
-    if (customerId) {
-      try {
-        const existingCustomer = await stripe.customers.retrieve(customerId);
-        if ((existingCustomer as Stripe.DeletedCustomer).deleted) {
-          customerId = null;
-        }
-      } catch (error: any) {
-        // Common when local DB has a customer ID from a different Stripe mode/account.
-        if (error?.code === 'resource_missing' || error?.statusCode === 404) {
-          logger.warn('Stored Stripe customer not found; creating a new customer', {
-            userId: user.id,
-            stripeCustomerId: user.stripeCustomerId,
-            code: error?.code,
-          });
-          customerId = null;
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    if (!customerId) {
-      const customerPayload: Stripe.CustomerCreateParams = {
-        metadata: { userId: user.id },
-      };
-      if (typeof user.email === 'string' && user.email.trim().length > 0) {
-        customerPayload.email = user.email.trim();
-      }
-      if (typeof user.name === 'string' && user.name.trim().length > 0) {
-        customerPayload.name = user.name.trim();
-      }
-
-      const customer = await stripe.customers.create(customerPayload);
-      customerId = customer.id;
-      await usersRepository.updateUser(user.id, { stripeCustomerId: customerId });
-    }
-
-    const successUrl = typeof payload?.successUrl === 'string' && payload.successUrl.length > 0
-      ? payload.successUrl
-      : `${frontendUrl}/membership/success?session_id={CHECKOUT_SESSION_ID}&membership=${includeMembership ? '1' : '0'}`;
-    const cancelUrl = typeof payload?.cancelUrl === 'string' && payload.cancelUrl.length > 0
-      ? payload.cancelUrl
-      : `${frontendUrl}/dashboard/formula`;
-
-    // Apply 15% member discount to formula when user is signing up for membership
-    // OR already has an active membership
+    // ── Calculate totals ──
     const isActiveMember = !!(user.membershipTier && !user.membershipCancelledAt);
     const applyMemberDiscount = !!(formula && (includeMembership || isActiveMember));
     const formulaLineAmountCents = applyMemberDiscount
       ? Math.round(formulaAmountCents * 0.85)
       : formulaAmountCents;
 
-    const metadata: Record<string, string> = {
-      userId: user.id,
-      includeMembership: includeMembership ? '1' : '0',
-      plan,
-    };
+    const membershipAmountCents = availableTier ? availableTier.priceCents * intervalCount : 0;
+    const totalCents = formulaLineAmountCents + membershipAmountCents;
+    const totalDollars = (totalCents / 100).toFixed(2);
 
-    if (formula) {
-      metadata.formulaId = formula.id;
-      metadata.formulaVersion = String(formula.version);
-      metadata.formulaPriceCents = String(formulaAmountCents);
-      metadata.formulaChargedCents = String(formulaLineAmountCents);
-      metadata.manufacturerCostCents = String(manufacturerCostCents);
-      if (manufacturerQuoteId) {
-        metadata.manufacturerQuoteId = manufacturerQuoteId;
-      }
-      if (manufacturerQuoteExpiresAt) {
-        metadata.manufacturerQuoteExpiresAt = manufacturerQuoteExpiresAt;
-      }
-      if (applyMemberDiscount) {
-        metadata.memberDiscountApplied = '1';
-      }
-    }
+    // ── Build order description ──
+    const descParts: string[] = [];
+    if (formula) descParts.push(`Formula v${formula.version}`);
+    if (availableTier) descParts.push(`${availableTier.name} Membership`);
+    const orderdescription = `ONES: ${descParts.join(' + ')}`;
 
-    if (availableTier) {
-      metadata.membershipTier = availableTier.tierKey;
-      metadata.membershipPriceCents = String(availableTier.priceCents);
-    }
+    const shipping = payload.shippingAddress;
+    const billing = payload.billingAddress || shipping;
 
-    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
-
-    if (formula) {
-      lineItems.push({
-        price_data: {
-          currency: 'usd',
-          unit_amount: formulaLineAmountCents,
-          product_data: {
-            name: applyMemberDiscount
-              ? `Personalized Formula v${formula.version} (Member Price)`
-              : `Personalized Formula v${formula.version}`,
-          },
-        },
-        quantity: 1,
+    // ── Charge via EPD (sale + vault the card) ──
+    let epdResult: EpdTransactionResponse;
+    try {
+      epdResult = await epdGateway.sale({
+        amount: totalDollars,
+        payment_token: paymentToken,
+        customer_vault: 'add_customer',
+        stored_credential_indicator: 'stored',
+        initiated_by: 'customer',
+        orderid: `ones-${userId.slice(0, 8)}-${Date.now()}`,
+        orderdescription,
+        first_name: billing?.firstName || user.name?.split(' ')[0] || undefined,
+        last_name: billing?.lastName || user.name?.split(' ').slice(1).join(' ') || undefined,
+        email: user.email,
+        phone: user.phone || undefined,
+        address1: billing?.line1,
+        address2: billing?.line2,
+        city: billing?.city,
+        state: billing?.state,
+        zip: billing?.zip,
+        country: billing?.country || 'US',
+        shipping_firstname: shipping?.firstName,
+        shipping_lastname: shipping?.lastName,
+        shipping_address1: shipping?.line1,
+        shipping_address2: shipping?.line2,
+        shipping_city: shipping?.city,
+        shipping_state: shipping?.state,
+        shipping_zip: shipping?.zip,
+        shipping_country: shipping?.country || 'US',
+        customer_receipt: 'true',
       });
+    } catch (err) {
+      logger.error('EPD sale request failed', { userId, error: err });
+      throw new Error('PAYMENT_PROCESSING_ERROR');
     }
 
-    if (availableTier) {
-      lineItems.push({
-        price_data: {
-          currency: 'usd',
-          recurring: {
-            interval: 'month',
-            interval_count: intervalCount,
-          },
-          unit_amount: availableTier.priceCents * intervalCount,
-          product_data: {
-            name: `${availableTier.name} Membership`,
-          },
-        },
-        quantity: 1,
+    if (!isApproved(epdResult)) {
+      logger.warn('EPD payment declined', {
+        userId,
+        response: epdResult.response,
+        responsetext: epdResult.responsetext,
+        response_code: epdResult.response_code,
       });
+      throw new Error(`PAYMENT_DECLINED: ${epdResult.responsetext}`);
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: includeMembership ? 'subscription' : 'payment',
-      customer: customerId,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      metadata,
-      subscription_data: includeMembership
-        ? {
-          metadata,
-        }
-        : undefined,
-      line_items: lineItems,
-      client_reference_id: user.id,
-      allow_promotion_codes: true,
+    const vaultId = epdResult.customer_vault_id;
+    const transactionId = epdResult.transactionid;
+
+    // ── Save vault ID to user ──
+    await usersRepository.updateUser(userId, {
+      paymentVaultId: vaultId || user.paymentVaultId,
+      initialTransactionId: transactionId || user.initialTransactionId,
     });
 
-    if (!session.url || !session.expires_at) {
-      throw new Error('FAILED_TO_CREATE_CHECKOUT_SESSION');
+    // ── Save payment method reference ──
+    if (vaultId) {
+      try {
+        await usersRepository.createPaymentMethodRef({
+          userId,
+          paymentVaultId: vaultId,
+          brand: null,
+          last4: null,
+        });
+      } catch (err) {
+        logger.warn('Failed to save payment method ref', { userId, error: err });
+      }
     }
 
-    return {
-      checkoutUrl: session.url,
-      sessionId: session.id,
-      expiresAt: new Date(session.expires_at * 1000).toISOString(),
-    };
+    // ── Handle membership activation ──
+    let membershipActivated = false;
+    if (availableTier) {
+      await membershipRepository.assignUserMembership(userId, availableTier.tierKey, availableTier.priceCents);
+
+      const renewsAt = new Date();
+      renewsAt.setMonth(renewsAt.getMonth() + intervalCount);
+
+      await this.upsertInternalSubscription(userId, {
+        plan,
+        status: 'active',
+        paymentVaultId: vaultId,
+        renewsAt,
+        pausedUntil: null,
+      });
+      membershipActivated = true;
+    }
+
+    // ── Create order ──
+    let orderId: string | undefined;
+    if (formula) {
+      let consentSnapshot: any = null;
+      try {
+        const allConsents = await consentsRepository.getUserConsents(userId);
+        const activeConsents = allConsents.filter((c: any) => c.granted && !c.revokedAt);
+        const safetyValidation = (formula as any).safetyValidation;
+        consentSnapshot = {
+          activeConsents: activeConsents.map((c: any) => ({
+            consentType: c.consentType,
+            grantedAt: c.grantedAt.toISOString(),
+            consentVersion: c.consentVersion,
+          })),
+          formulaWarnings: safetyValidation?.warnings || [],
+          warningsAcknowledgedAt: formula.warningsAcknowledgedAt?.toISOString() || null,
+          disclaimerVersion: '1.0',
+          disclaimerText: 'Payment processed. Formula order placed.',
+          ipAddress: req?.ip || null,
+          userAgent: req?.headers['user-agent'] || null,
+          capturedAt: new Date().toISOString(),
+        };
+      } catch (err) {
+        logger.warn('Failed to build consent snapshot', { userId, error: err });
+      }
+
+      const order = await usersRepository.createOrder({
+        userId,
+        formulaId: formula.id,
+        formulaVersion: formula.version,
+        status: 'processing',
+        amountCents: totalCents,
+        manufacturerCostCents,
+        supplyWeeks: 8,
+        manufacturerQuoteId: manufacturerQuoteId || null,
+        manufacturerQuoteExpiresAt: manufacturerQuoteExpiresAt ? new Date(manufacturerQuoteExpiresAt) : null,
+        gatewayTransactionId: transactionId,
+        consentSnapshot,
+      });
+
+      orderId = order.id;
+      logger.info('Order created from EPD checkout', {
+        orderId, userId, formulaId: formula.id, formulaVersion: formula.version,
+        chargedCents: totalCents, mfrCostCents: manufacturerCostCents,
+        quoteId: manufacturerQuoteId, transactionId,
+      });
+
+      await usersRepository.updateUser(userId, { lastOrderDate: new Date() });
+
+      // ── Save shipping address ──
+      if (shipping) {
+        try {
+          await usersRepository.updateUser(userId, {
+            addressLine1: shipping.line1,
+            addressLine2: shipping.line2 || null,
+            city: shipping.city,
+            state: shipping.state,
+            postalCode: shipping.zip,
+            country: shipping.country || 'US',
+          });
+          const existingAddresses = await usersRepository.listAddressesByUser(userId, 'shipping');
+          if (existingAddresses.length > 0) {
+            await usersRepository.updateAddress(existingAddresses[0].id, {
+              line1: shipping.line1, line2: shipping.line2 || undefined,
+              city: shipping.city, state: shipping.state,
+              postalCode: shipping.zip, country: shipping.country || 'US',
+            });
+          } else {
+            await usersRepository.createAddress({
+              userId, type: 'shipping',
+              line1: shipping.line1, line2: shipping.line2 || undefined,
+              city: shipping.city, state: shipping.state || '',
+              postalCode: shipping.zip, country: shipping.country || 'US',
+            });
+          }
+        } catch (addrErr) {
+          logger.warn('Failed to save shipping address', { userId, error: addrErr });
+        }
+      }
+
+      // ── Place manufacturer production order ──
+      if (manufacturerQuoteId) {
+        let customerInfo: ManufacturerOrderCustomerInfo | undefined;
+        if (shipping) {
+          customerInfo = {
+            customerName: `${shipping.firstName} ${shipping.lastName}`.trim() || user.name || 'Customer',
+            email: user.email,
+            phone: user.phone || undefined,
+            billingAddress: {
+              line1: billing?.line1 || shipping.line1,
+              line2: billing?.line2 || undefined,
+              city: billing?.city || shipping.city,
+              state: billing?.state || undefined,
+              zip: billing?.zip || shipping.zip,
+              country: billing?.country || 'US',
+            },
+            shippingAddress: {
+              line1: shipping.line1, line2: shipping.line2 || undefined,
+              city: shipping.city, state: shipping.state || undefined,
+              zip: shipping.zip, country: shipping.country || 'US',
+            },
+          };
+        }
+
+        const mfrResult = await manufacturerPricingService.placeManufacturerOrder(manufacturerQuoteId, customerInfo);
+        if (mfrResult.success) {
+          await usersRepository.updateOrder(order.id, {
+            manufacturerOrderId: mfrResult.orderId || null,
+            manufacturerOrderStatus: 'submitted',
+          });
+          logger.info('Manufacturer order placed', { orderId: order.id, manufacturerOrderId: mfrResult.orderId });
+        } else {
+          logger.error('Failed to place manufacturer order', {
+            orderId: order.id, quoteId: manufacturerQuoteId, error: mfrResult.error,
+          });
+          await usersRepository.updateOrder(order.id, { manufacturerOrderStatus: 'failed' });
+        }
+      }
+    }
+
+    // ── Send order confirmation email ──
+    if (user.email) {
+      try {
+        const itemLines: string[] = [];
+        if (formula) {
+          const formulaLabel = formula.name || `Formula v${formula.version}`;
+          itemLines.push(`<li>${formulaLabel} — $${(formulaLineAmountCents / 100).toFixed(2)}</li>`);
+        }
+        if (availableTier) {
+          itemLines.push(`<li>${availableTier.name} Membership — $${(membershipAmountCents / 100).toFixed(2)}/mo</li>`);
+        }
+        const dashboardUrl = `${getFrontendUrl()}/dashboard/formula`;
+        await sendNotificationEmail({
+          to: user.email,
+          subject: `Your ONES Order is Confirmed${orderId ? ` (#${orderId.slice(0, 8)})` : ''}`,
+          title: 'Order Confirmed',
+          content: `<p>Thank you for your order!</p>
+            <ul>${itemLines.join('')}</ul>
+            <p><strong>Total charged:</strong> $${totalDollars}</p>
+            <p>Your custom formula will be manufactured and shipped within 5-7 business days. We'll send you tracking info when it ships.</p>`,
+          actionUrl: dashboardUrl,
+          actionText: 'View Your Formula',
+          type: 'order_update',
+        });
+      } catch (emailErr) {
+        logger.warn('Failed to send order confirmation email', { userId, orderId, error: emailErr });
+      }
+    }
+
+    return { success: true, orderId, transactionId, membershipActivated };
   }
 
-  async cancelSubscription(userId: string, subscriptionId: string): Promise<{ cancelledAt?: string; expiresAt?: string; status: 'cancelled' }> {
-    const stripe = this.getStripeClient();
+  // ── Subscription Management ──────────────────────────────────────────
+
+  async cancelSubscription(userId: string, _subscriptionId: string): Promise<{ cancelledAt?: string; expiresAt?: string; status: 'cancelled' }> {
     const user = await usersRepository.getUser(userId);
-    if (!user) {
-      throw new Error('USER_NOT_FOUND');
-    }
+    if (!user) throw new Error('USER_NOT_FOUND');
 
-    const stripeSubscriptionId = user.stripeSubscriptionId || subscriptionId;
-    if (!stripeSubscriptionId) {
-      throw new Error('SUBSCRIPTION_NOT_FOUND');
-    }
+    const subscription = await usersRepository.getSubscription(userId);
+    if (!subscription) throw new Error('SUBSCRIPTION_NOT_FOUND');
 
-    // Use cancel_at_period_end: true instead of immediate cancellation
-    const stripeSub = await stripe.subscriptions.update(stripeSubscriptionId, {
-      cancel_at_period_end: true
-    });
-
-    const expiresAt = this.getCurrentPeriodEnd(stripeSub);
+    const expiresAt = subscription.renewsAt;
 
     await this.upsertInternalSubscription(userId, {
-      plan: 'monthly',
+      plan: subscription.plan as any || 'monthly',
       status: 'cancelled',
-      stripeCustomerId: user.stripeCustomerId,
-      stripeSubscriptionId,
+      paymentVaultId: subscription.paymentVaultId,
       renewsAt: expiresAt,
       pausedUntil: null,
     });
@@ -928,111 +518,214 @@ class DatabaseBillingProvider implements BillingProvider {
     };
   }
 
-  async resumeSubscription(userId: string, subscriptionId: string): Promise<{ resumedAt: string; status: 'active' }> {
-    const stripe = this.getStripeClient();
+  async resumeSubscription(userId: string, _subscriptionId: string): Promise<{ resumedAt: string; status: 'active' }> {
     const user = await usersRepository.getUser(userId);
-    if (!user) {
-      throw new Error('USER_NOT_FOUND');
-    }
+    if (!user) throw new Error('USER_NOT_FOUND');
 
-    const stripeSubscriptionId = user.stripeSubscriptionId || subscriptionId;
-    if (!stripeSubscriptionId) {
-      throw new Error('SUBSCRIPTION_NOT_FOUND');
-    }
+    const subscription = await usersRepository.getSubscription(userId);
+    if (!subscription) throw new Error('SUBSCRIPTION_NOT_FOUND');
 
-    // Re-active in Stripe by unsetting cancel_at_period_end
-    const stripeSub = await stripe.subscriptions.update(stripeSubscriptionId, {
-      cancel_at_period_end: false
-    });
-
-    const renewsAt = this.getCurrentPeriodEnd(stripeSub);
+    const renewsAt = new Date();
+    renewsAt.setMonth(renewsAt.getMonth() + 1);
 
     await this.upsertInternalSubscription(userId, {
-      plan: 'monthly',
+      plan: subscription.plan as any || 'monthly',
       status: 'active',
-      stripeCustomerId: user.stripeCustomerId,
-      stripeSubscriptionId,
+      paymentVaultId: subscription.paymentVaultId,
       renewsAt,
       pausedUntil: null,
     });
 
-    // Also reactivate membership if it was cancelled
     if (user.membershipTier && user.membershipCancelledAt) {
       await db.update(users)
         .set({ membershipCancelledAt: null })
         .where(eq(users.id, userId));
     }
 
+    return { resumedAt: new Date().toISOString(), status: 'active' };
+  }
+
+  // ── Membership Renewal (called by scheduler) ─────────────────────────
+
+  async processMembershipRenewal(userId: string): Promise<{ success: boolean; error?: string }> {
+    const user = await usersRepository.getUser(userId);
+    if (!user) return { success: false, error: 'USER_NOT_FOUND' };
+
+    const subscription = await usersRepository.getSubscription(userId);
+    if (!subscription || subscription.status !== 'active') {
+      return { success: false, error: 'NO_ACTIVE_SUBSCRIPTION' };
+    }
+
+    const vaultId = user.paymentVaultId;
+    if (!vaultId) return { success: false, error: 'NO_PAYMENT_METHOD' };
+
+    const membershipPriceCents = user.membershipPriceCents || 900;
+    const amount = (membershipPriceCents / 100).toFixed(2);
+
+    try {
+      const result = await epdGateway.chargeVault({
+        customer_vault_id: vaultId,
+        amount,
+        orderid: `ones-membership-${userId.slice(0, 8)}-${Date.now()}`,
+        orderdescription: `ONES ${user.membershipTier || 'Founding'} Membership Renewal`,
+        stored_credential_indicator: 'used',
+        initiated_by: 'merchant',
+        initial_transaction_id: user.initialTransactionId || undefined,
+        billing_method: 'recurring',
+      });
+
+      if (!isApproved(result)) {
+        logger.warn('Membership renewal declined', {
+          userId, responsetext: result.responsetext, response_code: result.response_code,
+        });
+        await this.upsertInternalSubscription(userId, {
+          plan: subscription.plan as any || 'monthly',
+          status: 'past_due',
+          paymentVaultId: vaultId,
+          renewsAt: subscription.renewsAt,
+        });
+        return { success: false, error: `Payment declined: ${result.responsetext}` };
+      }
+
+      const newRenewsAt = new Date();
+      newRenewsAt.setMonth(newRenewsAt.getMonth() + 1);
+
+      await this.upsertInternalSubscription(userId, {
+        plan: subscription.plan as any || 'monthly',
+        status: 'active',
+        paymentVaultId: vaultId,
+        renewsAt: newRenewsAt,
+      });
+
+      logger.info('Membership renewed', { userId, transactionId: result.transactionid, amount });
+      return { success: true };
+    } catch (err) {
+      logger.error('Membership renewal error', { userId, error: err });
+      return { success: false, error: 'PAYMENT_PROCESSING_ERROR' };
+    }
+  }
+
+  // ── Billing History ──────────────────────────────────────────────────
+
+  async listBillingHistory(userId: string): Promise<BillingHistoryItem[]> {
+    const orders = await usersRepository.listOrdersByUser(userId);
+    return orders.map((order) => ({
+      id: order.id,
+      date: order.placedAt,
+      description: `Supplement Order - Formula v${order.formulaVersion}`,
+      amountCents: typeof order.amountCents === 'number' ? order.amountCents : null,
+      currency: 'USD' as const,
+      status: order.status === 'cancelled'
+        ? 'failed' as const
+        : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered')
+          ? 'paid' as const
+          : 'pending' as const,
+      invoiceId: order.id,
+      invoiceUrl: `/api/billing/invoices/${order.id}`,
+    }));
+  }
+
+  async getInvoice(userId: string, invoiceId: string): Promise<BillingInvoice | null> {
+    const order = await usersRepository.getOrder(invoiceId);
+    if (!order || order.userId !== userId) return null;
+
+    const totalCents = typeof order.amountCents === 'number' ? order.amountCents : null;
     return {
-      resumedAt: new Date().toISOString(),
-      status: 'active',
+      id: order.id,
+      userId,
+      orderId: order.id,
+      amountCents: totalCents,
+      currency: 'USD',
+      status: order.status === 'cancelled' ? 'failed'
+        : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') ? 'paid'
+        : 'pending',
+      issuedAt: order.placedAt,
+      lineItems: [{
+        label: `Custom Formula v${order.formulaVersion}`,
+        formulaVersion: order.formulaVersion,
+        supplyMonths: order.supplyMonths ?? null,
+        amountCents: totalCents,
+      }],
     };
   }
 
-  async handleStripeWebhook(signature: string | undefined, rawBody: Buffer): Promise<void> {
-    if (!this.stripeWebhookSecret) {
-      throw new Error('STRIPE_WEBHOOK_SECRET_NOT_CONFIGURED');
-    }
-    const stripe = this.getStripeClient();
+  // ── Equivalent Stack Calculator ──────────────────────────────────────
 
-    if (!signature) {
-      throw new Error('MISSING_STRIPE_SIGNATURE');
+  async getEquivalentStack(userId: string, formulaId: string): Promise<{
+    supplementsCount: number;
+    capsulesPerDay: number;
+    estimatedMonthlyCost: number | null;
+    coveragePct: number;
+    missingIngredients: string[];
+  }> {
+    if (!formulaId) throw new Error('FORMULA_ID_REQUIRED');
+
+    const formula = await formulasRepository.getFormula(formulaId);
+    if (!formula || formula.userId !== userId) throw new Error('FORMULA_NOT_FOUND_OR_ACCESS_DENIED');
+
+    const doseByIngredient = new Map<string, { name: string; doseMg: number }>();
+    const addIngredient = (name: unknown, amount: unknown) => {
+      const ingredientName = String(name || '').trim();
+      const doseMg = Number(amount || 0);
+      if (!ingredientName || !Number.isFinite(doseMg) || doseMg <= 0) return;
+      const key = this.normalizeIngredientKey(ingredientName);
+      const existing = doseByIngredient.get(key);
+      if (existing) existing.doseMg += doseMg;
+      else doseByIngredient.set(key, { name: ingredientName, doseMg });
+    };
+
+    const bases = Array.isArray(formula.bases) ? (formula.bases as any[]) : [];
+    const additions = Array.isArray(formula.additions) ? (formula.additions as any[]) : [];
+    const addedBases = Array.isArray((formula.userCustomizations as any)?.addedBases)
+      ? ((formula.userCustomizations as any).addedBases as any[]) : [];
+    const addedIndividuals = Array.isArray((formula.userCustomizations as any)?.addedIndividuals)
+      ? ((formula.userCustomizations as any).addedIndividuals as any[]) : [];
+
+    [...bases, ...additions, ...addedBases, ...addedIndividuals].forEach((item) => {
+      addIngredient(item?.ingredient, item?.amount);
+    });
+
+    const supplementsCount = doseByIngredient.size;
+    if (supplementsCount === 0) {
+      return { supplementsCount: 0, capsulesPerDay: 0, estimatedMonthlyCost: null, coveragePct: 0, missingIngredients: [] };
     }
 
-    const event = stripe.webhooks.constructEvent(rawBody, signature, this.stripeWebhookSecret);
+    const pricingRows = await db.select().from(ingredientPricing).where(eq(ingredientPricing.isActive, true));
+    const pricingByKey = new Map(pricingRows.map((row) => [row.ingredientKey, row]));
+    const missingIngredients: string[] = [];
+    let capsulesPerDay = 0;
+    let estimatedMonthlyCostRaw = 0;
 
-    switch (event.type) {
-      case 'checkout.session.completed':
-        await this.handleCheckoutCompleted(event);
-        break;
-      case 'customer.subscription.updated':
-        await this.handleSubscriptionUpdated(event);
-        break;
-      case 'customer.subscription.deleted':
-        await this.handleSubscriptionDeleted(event);
-        break;
-      case 'invoice.paid':
-        await this.handleInvoicePaid(event);
-        break;
-      case 'invoice.payment_failed':
-        await this.handleInvoicePaymentFailed(event);
-        break;
-      default:
-        logger.debug('Ignoring unsupported Stripe event', { eventType: event.type, eventId: event.id });
-    }
+    doseByIngredient.forEach(({ name, doseMg }, key) => {
+      const pricing = pricingByKey.get(key);
+      if (!pricing) { missingIngredients.push(name); return; }
+      const capsuleMg = Math.max(1, pricing.typicalCapsuleMg || 1);
+      const bottleCapsules = Math.max(1, pricing.typicalBottleCapsules || 1);
+      const retailPrice = Math.max(0, pricing.typicalRetailPriceCents || 0) / 100;
+      const ingredientCapsulesPerDay = Math.ceil(doseMg / capsuleMg);
+      const ingredientMonthlyCost = (ingredientCapsulesPerDay * 30 / bottleCapsules) * retailPrice;
+      capsulesPerDay += ingredientCapsulesPerDay;
+      estimatedMonthlyCostRaw += ingredientMonthlyCost;
+    });
+
+    const coveragePct = Math.round(((supplementsCount - missingIngredients.length) / supplementsCount) * 100);
+    const estimatedMonthlyCost = coveragePct < 80 ? null : Math.round(estimatedMonthlyCostRaw);
+    return { supplementsCount, capsulesPerDay, estimatedMonthlyCost, coveragePct, missingIngredients };
   }
 }
 
+// ── Public Facade ───────────────────────────────────────────────────────
+
 export class BillingService {
-  constructor(private readonly provider: BillingProvider = new DatabaseBillingProvider()) { }
+  constructor(private readonly provider: BillingProvider = new DatabaseBillingProvider()) {}
 
-  async listBillingHistory(userId: string) {
-    return this.provider.listBillingHistory(userId);
-  }
-
-  async getInvoice(userId: string, invoiceId: string) {
-    return this.provider.getInvoice(userId, invoiceId);
-  }
-
-  async getEquivalentStack(userId: string, formulaId: string) {
-    return this.provider.getEquivalentStack(userId, formulaId);
-  }
-
-  async createCheckoutSession(userId: string, payload: Record<string, any>, req?: Request) {
-    return this.provider.createCheckoutSession(userId, payload, req);
-  }
-
-  async cancelSubscription(userId: string, subscriptionId: string) {
-    return this.provider.cancelSubscription(userId, subscriptionId);
-  }
-
-  async resumeSubscription(userId: string, subscriptionId: string) {
-    return this.provider.resumeSubscription(userId, subscriptionId);
-  }
-
-  async handleStripeWebhook(signature: string | undefined, rawBody: Buffer) {
-    return this.provider.handleStripeWebhook(signature, rawBody);
-  }
+  listBillingHistory(userId: string) { return this.provider.listBillingHistory(userId); }
+  getInvoice(userId: string, invoiceId: string) { return this.provider.getInvoice(userId, invoiceId); }
+  getEquivalentStack(userId: string, formulaId: string) { return this.provider.getEquivalentStack(userId, formulaId); }
+  processCheckout(userId: string, payload: CheckoutPayload, req?: Request) { return this.provider.processCheckout(userId, payload, req); }
+  cancelSubscription(userId: string, subscriptionId: string) { return this.provider.cancelSubscription(userId, subscriptionId); }
+  resumeSubscription(userId: string, subscriptionId: string) { return this.provider.resumeSubscription(userId, subscriptionId); }
+  processMembershipRenewal(userId: string) { return this.provider.processMembershipRenewal(userId); }
 }
 
 export const billingService = new BillingService();
