@@ -73,6 +73,7 @@ declare global {
 // ── Constants ──────────────────────────────────────────────────────────
 
 const TOKENIZATION_KEY = import.meta.env.VITE_EPD_TOKENIZATION_KEY;
+console.log('hi', TOKENIZATION_KEY)
 const COLLECTJS_URL = 'https://secure.easypaydirectgateway.com/collect/v1/collectjs.js';
 
 const US_STATES = [
