@@ -111,6 +111,29 @@ export default function ProblemFlowSection() {
     setProgress(0);
   };
 
+  // ── 3D tilt handlers (desktop/hover devices only) ──
+  const canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches;
+
+  const handleTilt = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!canHover) return;
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateY = ((x - centerX) / centerX) * 8;
+    const rotateX = ((centerY - y) / centerY) * 8;
+    card.style.transform = `perspective(800px) rotateY(${rotateY}deg) rotateX(${rotateX}deg) scale(1.02)`;
+    card.style.transition = "transform 0.15s ease-out";
+  }, [canHover]);
+
+  const handleTiltReset = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!canHover) return;
+    e.currentTarget.style.transform = "perspective(800px) rotateY(0deg) rotateX(0deg) scale(1)";
+    e.currentTarget.style.transition = "transform 0.5s ease-out";
+  }, [canHover]);
+
   return (
     <section
       ref={sectionRef}
@@ -150,18 +173,33 @@ export default function ProblemFlowSection() {
               const delayMs = 400 + i * 100;
 
               return (
-                <button
+                <div
                   key={t.label}
-                  onClick={() => changeTile(i)}
-                  onMouseEnter={() => handleMouseEnter(i)}
-                  className={`relative rounded-2xl overflow-hidden focus:outline-none cursor-pointer transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  className={`relative transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
                     isActive ? "flex-[2.2]" : "flex-1"
                   } ${
                     revealed
                       ? "opacity-100 translate-y-0"
                       : "opacity-0 translate-y-10"
                   }`}
-                  style={{ transitionDelay: entranceDone ? "0ms" : revealed ? `${delayMs}ms` : "0ms" }}
+                  style={{
+                    transitionDelay: entranceDone ? "0ms" : revealed ? `${delayMs}ms` : "0ms",
+                    perspective: "800px",
+                  }}
+                >
+                <button
+                  onClick={() => changeTile(i)}
+                  onMouseEnter={() => handleMouseEnter(i)}
+                  onMouseMove={handleTilt}
+                  onMouseLeave={(e) => {
+                    handleTiltReset(e);
+                    handleMouseLeave();
+                  }}
+                  className="relative w-full h-full rounded-2xl overflow-hidden focus:outline-none cursor-pointer"
+                  style={{
+                    transformStyle: "preserve-3d",
+                    transition: "transform 0.15s ease-out",
+                  }}
                   aria-label={t.label}
                 >
                   {/* Photo */}
@@ -237,6 +275,7 @@ export default function ProblemFlowSection() {
                     />
                   </div>
                 </button>
+                </div>
               );
             })}
           </div>
@@ -248,10 +287,20 @@ export default function ProblemFlowSection() {
               const delayMs = 400 + i * 100;
 
               return (
-                <button
+                <div
                   key={t.label}
+                  className={`transition-all duration-500 ease-out ${
+                    revealed
+                      ? "opacity-100 translate-y-0"
+                      : "opacity-0 translate-y-10"
+                  }`}
+                  style={{
+                    transitionDelay: entranceDone ? "0ms" : revealed ? `${delayMs}ms` : "0ms",
+                  }}
+                >
+                <button
                   onClick={() => changeTile(i)}
-                  className={`group relative rounded-2xl overflow-hidden aspect-[3/4] focus:outline-none cursor-pointer transition-all duration-500 ease-out ${
+                  className={`group relative rounded-2xl overflow-hidden aspect-[3/4] w-full focus:outline-none cursor-pointer ${
                     isActive
                       ? "ring-2 shadow-xl z-10"
                       : "shadow-md"
@@ -261,14 +310,7 @@ export default function ProblemFlowSection() {
                       : isActive
                       ? "ring-[#054700]/20"
                       : ""
-                  } ${
-                    revealed
-                      ? "opacity-100 translate-y-0"
-                      : "opacity-0 translate-y-10"
                   }`}
-                  style={{
-                    transitionDelay: entranceDone ? "0ms" : revealed ? `${delayMs}ms` : "0ms",
-                  }}
                   aria-label={t.label}
                 >
                   <img
@@ -313,6 +355,7 @@ export default function ProblemFlowSection() {
                     />
                   </div>
                 </button>
+                </div>
               );
             })}
           </div>

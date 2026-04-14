@@ -28,9 +28,51 @@ const personas = [
   },
 ];
 
+// Typewriter hook — cycles through phrases with type/delete animation
+function useTypewriter(phrases: string[], typingSpeed = 70, deletingSpeed = 40, pauseDuration = 2200) {
+  const [text, setText] = useState("");
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [delay, setDelay] = useState(typingSpeed);
+
+  useEffect(() => {
+    const currentPhrase = phrases[phraseIndex];
+
+    const timeout = setTimeout(() => {
+      if (!isDeleting) {
+        const nextText = currentPhrase.slice(0, text.length + 1);
+        setText(nextText);
+
+        if (nextText === currentPhrase) {
+          setDelay(pauseDuration);
+          setIsDeleting(true);
+        } else {
+          setDelay(typingSpeed);
+        }
+      } else {
+        const nextText = currentPhrase.slice(0, text.length - 1);
+        setText(nextText);
+
+        if (nextText.length === 0) {
+          setIsDeleting(false);
+          setPhraseIndex((prev) => (prev + 1) % phrases.length);
+          setDelay(typingSpeed);
+        } else {
+          setDelay(deletingSpeed);
+        }
+      }
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [text, isDeleting, phraseIndex, phrases, typingSpeed, deletingSpeed, pauseDuration, delay]);
+
+  return text;
+}
+
 export default function HeroSectionV2() {
   const [activeTab, setActiveTab] = useState(0);
   const [activeBgVideo, setActiveBgVideo] = useState(0);
+  const typewriterText = useTypewriter(["your bloodwork", "your wearables", "your biology", "your lifestyle"]);
   const bgVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
@@ -70,6 +112,7 @@ export default function HeroSectionV2() {
       {/* ═══════════════════════════════════════════════════
           LEFT HALF — Copy on cream with pill outlines
           ═══════════════════════════════════════════════════ */}
+<<<<<<< HEAD
       <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-4 sm:px-6 md:px-10 lg:px-12 xl:px-16 2xl:px-20 py-8 sm:py-10 md:py-12 lg:py-16 overflow-hidden">
         {/* Decorative pill outlines with faint traveling glow */}
         <svg
@@ -131,6 +174,10 @@ export default function HeroSectionV2() {
         </svg>
 
         <div className="relative z-10 w-full max-w-xl xl:max-w-2xl space-y-6 sm:space-y-8 text-center lg:text-left mx-auto lg:mx-0">
+=======
+      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-8 md:px-16 lg:px-16 xl:px-20 py-10 lg:py-16">
+        <div className="relative z-10 max-w-xl space-y-8 text-center lg:text-left mx-auto lg:mx-0">
+>>>>>>> 0bc809e249e8a6b0269e57abf0cbb4d40d4aeb91
           {/* Pill labels */}
           <div className="inline-flex flex-wrap sm:flex-nowrap items-center justify-center lg:justify-start gap-x-4 gap-y-2 sm:gap-6 border border-[#c5c5c5] rounded-[24px] sm:rounded-full px-4 sm:px-6 py-2.5 sm:py-3 mx-auto lg:mx-0 max-w-full">
             <span className="flex items-center gap-2 text-xs sm:text-sm text-[#757575] font-light tracking-wide whitespace-nowrap">
@@ -148,10 +195,21 @@ export default function HeroSectionV2() {
           </div>
 
           {/* Headline */}
+<<<<<<< HEAD
           <h1 className="text-[clamp(2.1rem,7vw,3.75rem)] leading-[1.05] tracking-[-0.02em]">
+=======
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] leading-[1.24] tracking-[-0.02em]">
+>>>>>>> 0bc809e249e8a6b0269e57abf0cbb4d40d4aeb91
             <span className="block font-light text-[#054700]">One formula.</span>
-            <span className="block font-light text-[#054700]">Built for you.</span>
-            <span className="block font-light text-[#8a9a2c]">Always evolving.</span>
+            <span className="block font-light text-[#054700] whitespace-nowrap sm:whitespace-normal lg:whitespace-nowrap min-h-[1.25em]">Built from{" "}
+              <span className="relative inline-grid min-w-[14ch] align-baseline leading-[1.2]">
+                <span className="invisible col-start-1 row-start-1">your wearables</span>
+                <span className="text-gradient-green font-light col-start-1 row-start-1">{typewriterText}</span>
+              </span>
+            </span>
+            <span className="block font-light pb-1 text-gradient-green">
+              Always evolving.
+            </span>
           </h1>
 
           {/* Subhead */}
@@ -220,15 +278,12 @@ export default function HeroSectionV2() {
 
           <video
             key={"6d9efde5ac45418c979e43130ecc6e77"}
-            // ref={(el) => { bgVideoRefs.current[0] = el; }}
             src={"/6d9efde5ac45418c979e43130ecc6e77.mp4"}
             muted
-            // playsInline
+            playsInline
             autoPlay
             loop
             disablePictureInPicture
-            // controlsList="noplaybackrate nodownload"
-            // onEnded={handleBgVideoEnded}
             className={`absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-1000`}
           />
 

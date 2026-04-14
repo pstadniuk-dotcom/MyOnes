@@ -57,6 +57,7 @@ const ConversationsPage = lazy(() => import("@/pages/admin/ConversationsPage"));
 const OrdersManagementPage = lazy(() => import("@/pages/admin/OrdersManagementPage"));
 const AuditLogsPage = lazy(() => import("@/pages/admin/AuditLogsPage"));
 const AdminBlogPage = lazy(() => import("@/pages/admin/AdminBlogPage"));
+const AdminSeoPage = lazy(() => import("@/pages/admin/AdminSeoPage"));
 const RetailComparisonPricingPage = lazy(() => import("@/pages/admin/RetailComparisonPricingPage"));
 const MembershipAdminPage = lazy(() => import("@/pages/admin/MembershipAdminPage"));
 const ContentManagementPage = lazy(() => import("@/pages/admin/ContentManagementPage"));
@@ -284,6 +285,13 @@ function MainRouter() {
         <ProtectedAdminRoute>
           <AdminLayout>
             <Suspense fallback={<PageLoader />}><AdminBlogPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/seo">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><AdminSeoPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>

@@ -506,6 +506,7 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
     category: '',
     tone: 'informative',
     imageModel: '',
+    textModel: 'claude-sonnet-4-5',
   });
 
   const generateMutation = useMutation({
@@ -636,25 +637,46 @@ function GenerateView({ onBack, onGenerated }: GenerateViewProps) {
               <p className="text-xs text-gray-400">Used as H2 subheadings — drives long-tail ranking</p>
             </div>
 
-            <div className="space-y-2">
-              <Label>Featured Image Model</Label>
-              <Select
-                value={genForm.imageModel || '__default'}
-                onValueChange={v => setGenForm(f => ({ ...f, imageModel: v === '__default' ? '' : v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Auto (Nano Banana 2)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {BLOG_IMAGE_MODEL_OPTIONS.map(m => (
-                    <SelectItem key={m.value || '__default'} value={m.value || '__default'}>
-                      <span>{m.label}</span>
-                      <span className="ml-2 text-xs text-gray-400">{m.description}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-400">Which AI model generates the featured image</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Text Generation Model</Label>
+                <Select
+                  value={genForm.textModel}
+                  onValueChange={v => setGenForm(f => ({ ...f, textModel: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="claude-sonnet-4-5">Claude Sonnet 4.5 (recommended)</SelectItem>
+                    <SelectItem value="claude-sonnet-4-6">Claude Sonnet 4.6</SelectItem>
+                    <SelectItem value="claude-haiku-4-5">Claude Haiku 4.5 (faster, cheaper)</SelectItem>
+                    <SelectItem value="claude-haiku-4-6">Claude Haiku 4.6 (faster, cheaper)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-400">Sonnet is higher quality, Haiku is faster & cheaper</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Featured Image Model</Label>
+                <Select
+                  value={genForm.imageModel || '__default'}
+                  onValueChange={v => setGenForm(f => ({ ...f, imageModel: v === '__default' ? '' : v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Auto (Nano Banana 2)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BLOG_IMAGE_MODEL_OPTIONS.map(m => (
+                      <SelectItem key={m.value || '__default'} value={m.value || '__default'}>
+                        <span>{m.label}</span>
+                        <span className="ml-2 text-xs text-gray-400">{m.description}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-400">Which AI model generates the featured image</p>
+              </div>
             </div>
 
             <Button
@@ -1423,7 +1445,9 @@ function AutoGenSettingsView({ onBack }: { onBack: () => void }) {
                 className="w-32"
               />
               <p className="text-xs text-gray-400">
-                API cost estimate: ~${(settings.articlesPerDay * 0.30).toFixed(2)}/day · ~${(settings.articlesPerDay * 0.30 * 30).toFixed(0)}/month
+                API cost estimate: ~${(settings.articlesPerDay * 0.12).toFixed(2)}/day (Sonnet) · ~${(settings.articlesPerDay * 0.12 * 30).toFixed(0)}/month
+                <br/>
+                <span className="text-gray-500">(Haiku: ~${(settings.articlesPerDay * 0.03).toFixed(2)}/day · ~${(settings.articlesPerDay * 0.03 * 30).toFixed(0)}/month)</span>
               </p>
             </div>
 

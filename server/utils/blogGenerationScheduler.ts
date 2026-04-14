@@ -33,10 +33,10 @@ import fs from 'fs';
 import path from 'path';
 
 // ── Keyword enrichment — read from DB (populated by scripts/seed-keywords.cjs) ──
-type KwData = { volume: number; kd: number; cpc: number };
+export type KwData = { volume: number; kd: number; cpc: number };
 let _kwMap: Record<string, KwData> | null = null;
 
-async function getKwMap(): Promise<Record<string, KwData>> {
+export async function getKwMap(): Promise<Record<string, KwData>> {
   if (_kwMap) return _kwMap;
   try {
     const { rows } = await (db as any).$client.query(
@@ -63,7 +63,7 @@ async function getKwMap(): Promise<Record<string, KwData>> {
   return _kwMap!;
 }
 
-function enrichCluster(tc: TopicCluster, kwMap: Record<string, KwData>): TopicCluster & { priorityScore: number } {
+export function enrichCluster(tc: TopicCluster, kwMap: Record<string, KwData>): TopicCluster & { priorityScore: number } {
   const data   = kwMap[tc.primaryKeyword] ?? kwMap[tc.primaryKeyword.toLowerCase()];
   const volume = data?.volume ?? tc.volume ?? 0;
   const kd     = data?.kd     ?? tc.kd     ?? 50;
@@ -144,7 +144,18 @@ export async function runDailyBlogGeneration(overrideSettings?: Partial<BlogAuto
   const candidatePool = getUnusedTopics(existingTitles)
     .filter(tc => settings.tiers.includes(tc.tier));
 
+  // Load SEO strategy for priority tweaks (pinned/skipped/weights)
+  let seoStrategy: { tierWeights?: Record<string, number>; pinnedKeywords?: string[]; skippedKeywords?: string[]; minVolume?: number; maxKd?: number } = {};
+  try {
+    const stratRows = await db.select().from(appSettings).where(eq(appSettings.key, 'seo_content_strategy')).limit(1);
+    if (stratRows.length && stratRows[0].value) seoStrategy = stratRows[0].value as any;
+  } catch { /* no strategy saved yet — use defaults */ }
+
+  const skippedSet = new Set((seoStrategy.skippedKeywords ?? []).map(k => k.toLowerCase()));
+  const pinnedSet = new Set((seoStrategy.pinnedKeywords ?? []).map(k => k.toLowerCase()));
+
   log(`${candidatePool.length} unused topics available across tiers: ${settings.tiers.join(', ')}`);
+  if (skippedSet.size > 0) log(`SEO strategy: ${skippedSet.size} keywords skipped, ${pinnedSet.size} keywords pinned`);
 
   if (!candidatePool.length) {
     log('No unused topics remaining — run complete (no-op)');
@@ -152,12 +163,28 @@ export async function runDailyBlogGeneration(overrideSettings?: Partial<BlogAuto
   }
 
   // Enrich with keyword data and sort by priority score (volume / KD).
-  // Take a window of 3× the needed count, then shuffle within it for variety —
-  // so we always pick from the best opportunities but avoid total determinism.
+  // Apply SEO strategy: tier weights, min volume, max KD, pinned/skipped.
   const kwMap = await getKwMap();
   const enriched = candidatePool
-    .map(tc => enrichCluster(tc, kwMap))
-    .sort((a, b) => b.priorityScore - a.priorityScore);
+    .filter(tc => !skippedSet.has(tc.primaryKeyword.toLowerCase()))
+    .map(tc => {
+      const base = enrichCluster(tc, kwMap);
+      const tierWeight = seoStrategy.tierWeights?.[tc.tier] ?? 1;
+      const isPinned = pinnedSet.has(tc.primaryKeyword.toLowerCase());
+
+      // Apply strategy filters (pinned topics bypass filters)
+      if (!isPinned && seoStrategy.minVolume && (base.volume ?? 0) < seoStrategy.minVolume) return null;
+      if (!isPinned && seoStrategy.maxKd && (base.kd ?? 100) > seoStrategy.maxKd) return null;
+
+      const adjustedScore = isPinned
+        ? Number.MAX_SAFE_INTEGER
+        : Math.round(base.priorityScore * tierWeight);
+
+      return { ...base, priorityScore: adjustedScore };
+    })
+    .filter(Boolean) as Array<TopicCluster & { priorityScore: number }>
+    ;
+  enriched.sort((a, b) => b.priorityScore - a.priorityScore);
 
   const hasKwData = enriched.some(e => e.priorityScore > 0);
   if (!hasKwData) {
