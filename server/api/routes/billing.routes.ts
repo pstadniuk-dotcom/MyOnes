@@ -22,6 +22,7 @@ router.get('/equivalent-stack', requireAuth, billingController.getEquivalentStac
 router.post('/checkout', requireAuth, checkoutLimiter, billingController.processCheckout);
 router.post('/subscriptions/:subscriptionId/cancel', requireAuth, billingController.cancelSubscription);
 router.post('/subscriptions/:subscriptionId/resume', requireAuth, billingController.resumeSubscription);
+router.post('/orders/:orderId/cancel', requireAuth, billingController.cancelOrder);
 
 // Auto-ship routes
 router.get('/auto-ship', requireAuth, autoShipController.getStatus);

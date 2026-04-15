@@ -111,6 +111,7 @@ export interface BillingProvider {
     status: 'active';
   }>;
   processMembershipRenewal(userId: string): Promise<{ success: boolean; error?: string }>;
+  cancelOrder(userId: string, orderId: string): Promise<{ success: boolean; message: string }>;
 }
 
 class DatabaseBillingProvider implements BillingProvider {
@@ -605,6 +606,93 @@ class DatabaseBillingProvider implements BillingProvider {
     }
   }
 
+  // ── Order Cancellation ──────────────────────────────────────────────
+
+  async cancelOrder(userId: string, orderId: string): Promise<{ success: boolean; message: string }> {
+    const order = await usersRepository.getOrder(orderId);
+    if (!order) throw new Error('ORDER_NOT_FOUND');
+    if (order.userId !== userId) throw new Error('ACCESS_DENIED');
+
+    // Check if within 4 hours
+    const placedAt = new Date(order.placedAt);
+    const now = new Date();
+    const diffMs = now.getTime() - placedAt.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    if (diffHours > 4) {
+      return { success: false, message: 'Cancellation window (4 hours) has passed.' };
+    }
+
+    if (order.status === 'cancelled') {
+      return { success: false, message: 'Order is already cancelled.' };
+    }
+
+    // We only allow cancellation if it's still in processing/pending
+    // If it's already shipped, the 4h window check would usually fail anyway, but good to be explicit
+    if (order.status !== 'processing' && order.status !== 'pending') {
+      return { success: false, message: `Cannot cancel order in ${order.status} status.` };
+    }
+
+    // Update status to cancelled
+    await usersRepository.updateOrder(orderId, {
+      status: 'cancelled',
+      // updatedAt: new Date()
+    });
+
+    logger.info('Order cancelled by user within 4h window', { orderId, userId, diffHours });
+
+    // ── Payment Refund ──────────────────────────────────────────────────
+    if (order.gatewayTransactionId) {
+      try {
+        // We attempt a refund. In EPD, if the transaction is not yet settled, 
+        // a refund request often acts as a void or is queued.
+        const refundResult = await epdGateway.refund(
+          order.gatewayTransactionId, 
+          // If amountCents is present, we convert to string 'XX.XX'
+          order.amountCents ? (order.amountCents / 100).toFixed(2) : undefined
+        );
+
+        if (isApproved(refundResult)) {
+          logger.info('Order refund processed through EPD', { 
+            orderId, 
+            transactionId: order.gatewayTransactionId,
+            refundTransactionId: refundResult.transactionid 
+          });
+        } else {
+          // If refund fails (e.g. transaction too new), we log it for admin review
+          // Some gateways require a VOID if the transaction hasn't settled yet.
+          if (refundResult.responsetext?.toLowerCase().includes('void')) {
+             const voidResult = await epdGateway.voidTransaction(order.gatewayTransactionId);
+             if (isApproved(voidResult)) {
+                logger.info('Order voided (instead of refund) through EPD', { orderId, transactionId: order.gatewayTransactionId });
+             }
+          } else {
+            logger.warn('EPD refund not approved, manual intervention may be needed', { 
+              orderId, 
+              transactionId: order.gatewayTransactionId,
+              responsetext: refundResult.responsetext 
+            });
+          }
+        }
+      } catch (refundError) {
+        logger.error('Error initiating EPD refund', { orderId, error: refundError });
+      }
+    }
+
+    // If a manufacturer order was already placed, mark it for manual cancellation review
+    if (order.manufacturerOrderId) {
+      await usersRepository.updateOrder(orderId, {
+        manufacturerOrderStatus: 'failed' // Using 'failed' as a signal or we could add a new status
+      });
+      logger.warn('Order cancellation requested for order already sent to manufacturer', {
+        orderId,
+        manufacturerOrderId: order.manufacturerOrderId
+      });
+    }
+
+    return { success: true, message: 'Order cancelled and refund initiated.' };
+  }
+
   // ── Billing History ──────────────────────────────────────────────────
 
   async listBillingHistory(userId: string): Promise<BillingHistoryItem[]> {
@@ -616,7 +704,7 @@ class DatabaseBillingProvider implements BillingProvider {
       amountCents: typeof order.amountCents === 'number' ? order.amountCents : null,
       currency: 'USD' as const,
       status: order.status === 'cancelled'
-        ? 'failed' as const
+        ? 'refunded' as const
         : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered')
           ? 'paid' as const
           : 'pending' as const,
@@ -636,7 +724,7 @@ class DatabaseBillingProvider implements BillingProvider {
       orderId: order.id,
       amountCents: totalCents,
       currency: 'USD',
-      status: order.status === 'cancelled' ? 'failed'
+      status: order.status === 'cancelled' ? 'refunded'
         : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') ? 'paid'
         : 'pending',
       issuedAt: order.placedAt,
@@ -726,6 +814,7 @@ export class BillingService {
   cancelSubscription(userId: string, subscriptionId: string) { return this.provider.cancelSubscription(userId, subscriptionId); }
   resumeSubscription(userId: string, subscriptionId: string) { return this.provider.resumeSubscription(userId, subscriptionId); }
   processMembershipRenewal(userId: string) { return this.provider.processMembershipRenewal(userId); }
+  cancelOrder(userId: string, orderId: string) { return this.provider.cancelOrder(userId, orderId); }
 }
 
 export const billingService = new BillingService();
