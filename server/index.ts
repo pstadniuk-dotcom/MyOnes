@@ -48,8 +48,8 @@ app.disable('x-powered-by');
 const isDevMode = process.env.NODE_ENV !== 'production';
 const cspDirectives = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDevMode ? " 'unsafe-eval'" : ''} https://cdn.jsdelivr.net https://accounts.google.com/gsi/client https://connect.facebook.net https://secure.easypaydirectgateway.com`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
+  `script-src 'self' 'unsafe-inline'${isDevMode ? " 'unsafe-eval'" : ''} https://cdn.jsdelivr.net https://accounts.google.com/gsi/client https://connect.facebook.net https://maps.googleapis.com https://secure.easypaydirectgateway.com https://applepay.cdn-apple.com`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style https://secure.easypaydirectgateway.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: https: blob: https://platform-lookaside.fbsbx.com",
   "media-src 'self' data: blob: https://*.supabase.co https://supabase.co",
@@ -64,8 +64,10 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net","https://maps.googleapis.com", "https://secure.easypaydirectgateway.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style"],
+      scriptSrc: ["'self'", "'unsafe-inline'", ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net", "https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com"],
+      scriptSrcElem: ["'self'", "'unsafe-inline'", ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net", "https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
+      styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:", "https://platform-lookaside.fbsbx.com", "https://maps.googleapis.com"],
       objectSrc: [
