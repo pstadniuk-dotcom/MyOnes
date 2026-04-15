@@ -73,9 +73,8 @@ declare global {
 // ── Constants ──────────────────────────────────────────────────────────
 
 const TOKENIZATION_KEY = import.meta.env.VITE_EPD_TOKENIZATION_KEY;
-console.log("Using EPD Tokenization Key:", TOKENIZATION_KEY);
-const COLLECTJS_URL = `https://secure.easypaydirectgateway.com/collect/v1/collectjs.js?tokenizationkey=${TOKENIZATION_KEY}`
-
+const COLLECTJS_URL = `https://secure.easypaydirectgateway.com/token/Collect.js`;
+const PAYMENT_TOKEN_TIMEOUT_MS = 30000;
 const US_STATES = [
   'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
   'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
@@ -132,6 +131,19 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const configuredRef = useRef(false);
   const tokenCallbackRef = useRef<(token: string) => void>(() => {});
+  const paymentTimeoutRef = useRef<number | null>(null);
+
+  const clearPaymentTimeout = useCallback(() => {
+    if (paymentTimeoutRef.current !== null) {
+      window.clearTimeout(paymentTimeoutRef.current);
+      paymentTimeoutRef.current = null;
+    }
+  }, []);
+
+  const resetPaymentSubmission = useCallback(() => {
+    clearPaymentTimeout();
+    setSubmitting(false);
+  }, [clearPaymentTimeout]);
 
   // ── Pre-fill from user profile ─────────────────────────────────────
 
@@ -224,66 +236,86 @@ export default function CheckoutPage() {
 
   // ── Collect.js Loading ─────────────────────────────────────────────
 
-  // useEffect(() => {
-  //   console.log('Loading Collect.js with tokenization key')
-  //   if (!TOKENIZATION_KEY) {
-  //     setScriptError('Payment system not configured. Please contact support.');
-  //     return;
-  //   }
-  //   if (window.CollectJS) {
-  //     setScriptLoaded(true);
-  //     return;
-  //   }
-  //   const existing = document.querySelector(`script[src*="collectjs.js"]`);
-  //   if (existing) {
-  //     const existingKey = existing.getAttribute('data-tokenization-key');
-  //     if (existingKey === TOKENIZATION_KEY) {
-  //       existing.addEventListener('load', () => setScriptLoaded(true));
-  //       return;
-  //     } else {
-  //       // Remove the old script if key doesn't match
-  //       existing.remove();
-  //     }
-  //   }
-  //   const script = document.createElement('script');
-  //   script.src = COLLECTJS_URL;
-  //   script.setAttribute('data-tokenization-key', TOKENIZATION_KEY);
-  //   script.async = true;
-  //   script.onload = () => setScriptLoaded(true);
-  //   script.onerror = () => setScriptError('Failed to load payment form. Please refresh.');
-  //   document.head.appendChild(script);
-  // }, []);
+  useEffect(() => {
+    if (!TOKENIZATION_KEY) {
+      setScriptError('Payment system not configured. Please contact support.');
+      return;
+    }
+
+    if (window.CollectJS) {
+      setScriptLoaded(true);
+      return;
+    }
+
+    const scriptPrice = orderTotal > 0 ? orderTotal.toFixed(2) : '0.00';
+    const existing = document.querySelector(
+      `script[src*="collectjs.js"], script[src*="Collect.js"], script[src*="collect.js"]`,
+    );
+
+    if (existing) {
+      const existingKey = existing.getAttribute('data-tokenization-key');
+      if (existingKey === TOKENIZATION_KEY) {
+        existing.setAttribute('data-price', scriptPrice);
+        existing.addEventListener('load', () => setScriptLoaded(true));
+        existing.addEventListener('error', () => setScriptError('Failed to load payment form. Please refresh.'));
+        return;
+      } else {
+        existing.remove();
+        if (window.CollectJS) {
+          // Remove stale Collect.js instance if script key changed.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (window as any).CollectJS;
+        }
+      }
+    }
+
+    const script = document.createElement('script');
+    script.src = COLLECTJS_URL;
+    script.setAttribute('data-tokenization-key', TOKENIZATION_KEY);
+    script.setAttribute('data-variant', 'inline');
+    script.setAttribute('data-country', 'US');
+    script.setAttribute('data-currency', 'USD');
+    script.setAttribute('data-price', scriptPrice);
+    script.async = true;
+    script.onload = () => setScriptLoaded(true);
+    script.onerror = () => setScriptError('Failed to load payment form. Please refresh.');
+    document.head.appendChild(script);
+  }, [orderTotal]);
 
 
-useEffect(() => {
-  if (!TOKENIZATION_KEY) {
-    setScriptError('Payment system not configured. Please contact support.');
-    return;
-  }
+// useEffect(() => {
+//   if (!TOKENIZATION_KEY) {
+//     setScriptError('Payment system not configured. Please contact support.');
+//     return;
+//   }
 
-  if (window.CollectJS) {
-    setScriptLoaded(true);
-    return;
-  }
+//   if (window.CollectJS) {
+//     setScriptLoaded(true);
+//     return;
+//   }
 
-  const existing = document.querySelector(`script[src*="collectjs.js"]`);
-  if (existing) existing.remove(); // always remove and reload fresh
+//   const existing = document.querySelector(`script[src*="collectjs.js"]`);
+//   if (existing) existing.remove(); // always remove and reload fresh
 
-  const script = document.createElement('script');
-  script.src = `https://secure.easypaydirectgateway.com/collect/v1/collectjs.js?tokenizationkey=${TOKENIZATION_KEY}`;
-  script.async = true;
-  script.onload = () => setScriptLoaded(true);
-  script.onerror = () => setScriptError('Failed to load payment form. Please refresh.');
-  document.head.appendChild(script);
-}, []);
+//   const script = document.createElement('script');
+//   script.src = `https://secure.easypaydirectgateway.com/collect/v1/collectjs.js?tokenizationkey=${TOKENIZATION_KEY}`;
+//   script.async = true;
+//   script.onload = () => setScriptLoaded(true);
+//   script.onerror = () => setScriptError('Failed to load payment form. Please refresh.');
+//   document.head.appendChild(script);
+// }, []);
 
   useEffect(() => {
     if (!scriptLoaded || !window.CollectJS || configuredRef.current) return;
     configuredRef.current = true;
+
     window.CollectJS.configure({
       variant: 'inline',
       styleSniffer: true,
       googleFont: 'Inter:400,500,600',
+      price: orderTotal.toFixed(2),
+      currency: 'USD',
+      country: 'US',
       fields: {
         ccnumber: {
           selector: '#epd-ccnumber',
@@ -305,21 +337,34 @@ useEffect(() => {
       validationCallback: (_field: string, valid: boolean, message: string) => {
         setValidationError(valid ? null : (message || 'Please check your card details'));
       },
-      timeoutDuration: 10000,
+      timeoutDuration: PAYMENT_TOKEN_TIMEOUT_MS,
       timeoutCallback: () => {
-        setValidationError('Payment timed out. Please refresh.');
+        resetPaymentSubmission();
+        setValidationError('Payment request timed out. Please try again.');
+        toast({
+          title: 'Payment timed out',
+          description: 'We could not reach the payment gateway in time. Please try again.',
+          variant: 'destructive',
+        });
       },
       callback: (response: any) => {
+        clearPaymentTimeout();
         if (response.token) {
           setValidationError(null);
           tokenCallbackRef.current(response.token);
         } else {
+          resetPaymentSubmission();
           setValidationError('Failed to process card. Please try again.');
-          setSubmitting(false);
         }
       },
     });
-  }, [scriptLoaded]);
+  }, [scriptLoaded, orderTotal, clearPaymentTimeout, resetPaymentSubmission, toast]);
+
+  useEffect(() => {
+    return () => {
+      clearPaymentTimeout();
+    };
+  }, [clearPaymentTimeout]);
 
   // ── Checkout Mutation ──────────────────────────────────────────────
 
@@ -361,19 +406,21 @@ useEffect(() => {
       }>;
     },
     onSuccess: (data) => {
-      setSubmitting(false);
+      resetPaymentSubmission();
       const memberParam = (membershipUpsellAvailable && includeMembership) ? '1' : '0';
       navigate(`/membership/success?order_id=${data.orderId || ''}&membership=${memberParam}`);
     },
     onError: (error: any) => {
-      setSubmitting(false);
-      const msg = error?.message || 'Please try again.';
-      if (msg.includes('PAYMENT_DECLINED')) {
-        toast({ title: 'Payment Declined', description: msg.replace('PAYMENT_DECLINED: ', ''), variant: 'destructive' });
-      } else if (msg.includes('SAFETY_WARNINGS_NOT_ACKNOWLEDGED')) {
+      resetPaymentSubmission();
+      const errorCode = error?.code;
+      const rawMessage = error?.message || 'Please try again.';
+      const parsedMessage = rawMessage.replace(/^\d+:\s*/, '');
+      if (errorCode === 'PAYMENT_DECLINED' || rawMessage.includes('PAYMENT_DECLINED') || rawMessage.startsWith('402:')) {
+        toast({ title: 'Payment Declined', description: parsedMessage.replace('PAYMENT_DECLINED: ', ''), variant: 'destructive' });
+      } else if (errorCode === 'SAFETY_WARNINGS_NOT_ACKNOWLEDGED' || rawMessage.includes('SAFETY_WARNINGS_NOT_ACKNOWLEDGED')) {
         toast({ title: 'Safety Acknowledgment Required', description: 'Please go back and acknowledge the safety warnings.', variant: 'destructive' });
       } else {
-        toast({ title: 'Unable to process payment', description: msg, variant: 'destructive' });
+        toast({ title: 'Unable to process payment', description: parsedMessage, variant: 'destructive' });
       }
     },
   });
@@ -404,9 +451,14 @@ useEffect(() => {
       }
       setValidationError(null);
       setSubmitting(true);
+      clearPaymentTimeout();
+      paymentTimeoutRef.current = window.setTimeout(() => {
+        setValidationError('Payment request timed out. Please try again.');
+        setSubmitting(false);
+      }, PAYMENT_TOKEN_TIMEOUT_MS + 5000);
       window.CollectJS.startPaymentRequest();
     },
-    [submitting, firstName, lastName, line1, city, state, zip, email, billingSameAsShipping, billingFirstName, billingLastName, billingLine1, billingCity, billingState, billingZip, toast],
+    [submitting, firstName, lastName, line1, city, state, zip, email, billingSameAsShipping, billingFirstName, billingLastName, billingLine1, billingCity, billingState, billingZip, toast, clearPaymentTimeout],
   );
 
   // ── Redirect if no formula ─────────────────────────────────────────
