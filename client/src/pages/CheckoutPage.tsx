@@ -81,6 +81,7 @@ const US_STATES = [
   'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
   'VA','WA','WV','WI','WY','DC',
 ];
+const VALID_CAPSULE_COUNTS = [3, 6, 9, 12, 15] as const;
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -91,6 +92,10 @@ export default function CheckoutPage() {
   const search = useSearch();
   const params = new URLSearchParams(search);
   const formulaId = params.get('formulaId') || '';
+  const requestedCapsuleCount = Number(params.get('capsuleCount'));
+  const capsuleCount = VALID_CAPSULE_COUNTS.includes(requestedCapsuleCount as typeof VALID_CAPSULE_COUNTS[number])
+    ? requestedCapsuleCount
+    : 9;
   const membershipParam = params.get('membership');
   const autoshipParam = params.get('autoship');
 
@@ -175,10 +180,10 @@ export default function CheckoutPage() {
   // ── Data Fetching ──────────────────────────────────────────────────
 
   const { data: quoteData, isLoading: loadingQuote } = useQuery<FormulaQuotePayload>({
-    queryKey: ['/api/users/me/formula/quote', formulaId],
+    queryKey: ['/api/users/me/formula/quote', formulaId, capsuleCount],
     enabled: !!user && !!formulaId,
     queryFn: () =>
-      apiRequest('GET', `/api/users/me/formula/${formulaId}/quote?capsuleCount=6`)
+      apiRequest('GET', `/api/users/me/formula/${formulaId}/quote?capsuleCount=${capsuleCount}`)
         .then(res => res.json()),
   });
 
