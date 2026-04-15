@@ -305,12 +305,25 @@ export default function ConsultationPage() {
   const scrollLockTimeout = useRef<NodeJS.Timeout | null>(null);
   const streamingRafRef = useRef<number | null>(null);
   const streamingContentStarted = useRef(false);
+  const activeStreamAbortRef = useRef<AbortController | null>(null);
+  const activeStreamRequestIdRef = useRef(0);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   // Start new consultation session - defined early for use in effects
   const handleNewSession = useCallback(() => {
+    activeStreamRequestIdRef.current += 1;
+    activeStreamAbortRef.current?.abort();
+    activeStreamAbortRef.current = null;
+
+    if (streamingRafRef.current) {
+      cancelAnimationFrame(streamingRafRef.current);
+      streamingRafRef.current = null;
+    }
+
+    streamingContentStarted.current = false;
+
     const welcomeMessage: Message = {
       id: 'welcome-' + Date.now(),
       content: `Hello ${user?.name?.split(' ')[0] || 'there'}! I'm here to help you optimize your health. Let's get started with creating the perfect supplement formula for you.\n\nTo give you the best recommendations, I need to understand your complete health picture. Please share as much information as you can about yourself:\n\n• Your age, gender, height, and weight\n• Any medications you're currently taking\n• Health goals or concerns you have\n• Any specific symptoms or issues you're experiencing\n• Lifestyle factors (exercise, diet, sleep patterns)\n\nFeel free to click the microphone icon to speak with me, or simply type in the chat. This is just like a doctor's visit - the more you share, the better I can help you.`,
@@ -321,9 +334,17 @@ export default function ConsultationPage() {
     setMessages([welcomeMessage]);
     setCurrentSessionId(null);
     setIsNewSession(true);
+    setIsTyping(false);
+    setThinkingMessage(null);
+    setThinkingSteps([]);
+    setActiveStreamingMessageId(null);
+    setIsConnected(false);
     setUploadedFiles([]);
     setInputValue('');
     setShowSuggestions(false);
+    setSelectingCapsuleMessageId(null);
+    setEditingMessageId(null);
+    setEditingContent('');
     // Clear saved session when starting a new one
     localStorage.removeItem(SESSION_KEY);
 
@@ -1031,7 +1052,11 @@ export default function ConsultationPage() {
     resetScrollTracking(); // Force scroll to bottom when user sends a message
 
     const abortController = new AbortController();
+    const requestId = activeStreamRequestIdRef.current + 1;
+    activeStreamRequestIdRef.current = requestId;
+    activeStreamAbortRef.current = abortController;
     const timeoutId = setTimeout(() => abortController.abort(), 120000);
+    const isActiveRequest = () => activeStreamRequestIdRef.current === requestId;
 
     try {
       const requestBody = {
@@ -1093,7 +1118,16 @@ export default function ConsultationPage() {
       try {
         while (true) {
           const { done, value } = await reader.read();
+          if (!isActiveRequest()) {
+            await reader.cancel().catch(() => {});
+            break;
+          }
+
           if (done) {
+            if (!isActiveRequest()) {
+              break;
+            }
+
             if (!completed) {
               console.warn('Stream ended without completion signal');
               // Show accumulated content if stream ended early
@@ -1119,6 +1153,10 @@ export default function ConsultationPage() {
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               try {
+                if (!isActiveRequest()) {
+                  break;
+                }
+
                 const jsonStr = line.slice(6).trim();
                 if (jsonStr === '') continue;
 
@@ -1184,7 +1222,7 @@ export default function ConsultationPage() {
                     }
                   });
 
-                  if (data.sessionId && !currentSessionId) {
+                  if (data.sessionId && !currentSessionId && isActiveRequest()) {
                     setCurrentSessionId(data.sessionId);
                   }
                 } else if (data.type === 'health_data_updated') {
@@ -1277,6 +1315,10 @@ export default function ConsultationPage() {
           }
         }
       } catch (streamError) {
+        if (!isActiveRequest()) {
+          return;
+        }
+
         console.error('Streaming error:', streamError);
         setIsTyping(false);
         setActiveStreamingMessageId(null);
@@ -1289,6 +1331,11 @@ export default function ConsultationPage() {
       }
 
     } catch (error) {
+      const isAbort = error instanceof Error && error.name === 'AbortError';
+      if (isAbort || !isActiveRequest()) {
+        return;
+      }
+
       console.error('Error sending message:', error);
 
       if (error instanceof Error) {
@@ -1317,6 +1364,9 @@ export default function ConsultationPage() {
       setActiveStreamingMessageId(null);
     } finally {
       clearTimeout(timeoutId);
+      if (activeStreamRequestIdRef.current === requestId) {
+        activeStreamAbortRef.current = null;
+      }
     }
   }, [inputValue, currentSessionId, toast, user?.id, isRecording, startAnalysisPolling]);
 
