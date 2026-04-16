@@ -33,7 +33,7 @@ type BillingHistoryItem = {
   description: string;
   amountCents: number | null;
   currency: 'USD';
-  status: 'paid' | 'pending' | 'failed' | 'refunded';
+  status: 'paid' | 'pending' | 'failed' | 'refunded' | 'voided';
   invoiceId: string;
   invoiceUrl: string;
 };
@@ -44,7 +44,7 @@ type BillingInvoice = {
   orderId: string;
   amountCents: number | null;
   currency: 'USD';
-  status: 'paid' | 'pending' | 'failed' | 'refunded';
+  status: 'paid' | 'pending' | 'failed' | 'refunded' | 'voided';
   issuedAt: Date;
   lineItems: Array<{
     label: string;
@@ -237,14 +237,16 @@ class DatabaseBillingProvider implements BillingProvider {
       ? Math.round(formulaAmountCents * 0.85)
       : formulaAmountCents;
 
-    const membershipAmountCents = availableTier ? availableTier.priceCents * intervalCount : 0;
+    const membershipAmountCents = availableTier 
+      ? availableTier.priceCents * intervalCount 
+      : (isActiveMember ? (user.membershipPriceCents || 0) : 0);
     const totalCents = formulaLineAmountCents + membershipAmountCents;
     const totalDollars = (totalCents / 100).toFixed(2);
 
     // ── Build order description ──
     const descParts: string[] = [];
     if (formula) descParts.push(`Formula v${formula.version}`);
-    if (availableTier) descParts.push(`${availableTier.name} Membership`);
+    if (availableTier || isActiveMember) descParts.push(`${availableTier?.name || 'ONES'} Membership`);
     const orderdescription = `ONES: ${descParts.join(' + ')}`;
 
     const shipping = payload.shippingAddress;
@@ -375,6 +377,8 @@ class DatabaseBillingProvider implements BillingProvider {
         manufacturerQuoteExpiresAt: manufacturerQuoteExpiresAt ? new Date(manufacturerQuoteExpiresAt) : null,
         gatewayTransactionId: transactionId,
         consentSnapshot,
+        currency: 'USD',
+        paymentMode: 'card',
       });
 
       orderId = order.id;
@@ -651,26 +655,79 @@ class DatabaseBillingProvider implements BillingProvider {
           // If amountCents is present, we convert to string 'XX.XX'
           order.amountCents ? (order.amountCents / 100).toFixed(2) : undefined
         );
-
+console.log("refundResult>>>>>>>>>>>>>>>>>>>>>>>>>>>>123",refundResult)
         if (isApproved(refundResult)) {
           logger.info('Order refund processed through EPD', { 
             orderId, 
             transactionId: order.gatewayTransactionId,
             refundTransactionId: refundResult.transactionid 
           });
+
+          // Record successful refund in database
+          await usersRepository.createRefund({
+            userId,
+            orderId,
+            status: 'approved',
+            transactionId: refundResult.transactionid,
+            parentTransactionId: order.gatewayTransactionId || null,
+            amountCents: order.amountCents || 0,
+            currency: order.currency || 'USD',
+            gatewayResponse: refundResult,
+            reason: 'Order cancelled by user (4h window)',
+            modeOfFund: order.paymentMode || 'card'
+          });
         } else {
           // If refund fails (e.g. transaction too new), we log it for admin review
           // Some gateways require a VOID if the transaction hasn't settled yet.
           if (refundResult.responsetext?.toLowerCase().includes('void')) {
-             const voidResult = await epdGateway.voidTransaction(order.gatewayTransactionId);
+             const voidResult = await epdGateway.voidTransaction(order.gatewayTransactionId!);
              if (isApproved(voidResult)) {
                 logger.info('Order voided (instead of refund) through EPD', { orderId, transactionId: order.gatewayTransactionId });
+                
+                // Record void in database
+                await usersRepository.createRefund({
+                  userId,
+                  orderId,
+                  status: 'voided',
+                  transactionId: voidResult.transactionid,
+                  parentTransactionId: order.gatewayTransactionId || null,
+                  amountCents: order.amountCents || 0,
+                  currency: order.currency || 'USD',
+                  gatewayResponse: voidResult,
+                  reason: 'Order voided (instead of refund) within 4h window',
+                  modeOfFund: order.paymentMode || 'card'
+                });
+             } else {
+                // Record failed void attempt
+                await usersRepository.createRefund({
+                  userId,
+                  orderId,
+                  status: 'failed',
+                  parentTransactionId: order.gatewayTransactionId || null,
+                  amountCents: order.amountCents || 0,
+                  gatewayResponse: voidResult,
+                  reason: 'Void failed after refund failure',
+                  modeOfFund: 'card'
+                });
              }
           } else {
             logger.warn('EPD refund not approved, manual intervention may be needed', { 
               orderId, 
               transactionId: order.gatewayTransactionId,
               responsetext: refundResult.responsetext 
+            });
+
+            // Record failed refund attempt
+            await usersRepository.createRefund({
+              userId,
+              orderId,
+              status: 'declined',
+              parentTransactionId: order.gatewayTransactionId || null,
+              amountCents: order.amountCents || 0,
+              currency: order.currency || 'USD',
+              gatewayResponse: refundResult,
+              reason: `Refund declined: ${refundResult.responsetext}`,
+              modeOfFund: order.paymentMode || 'card'
             });
           }
         }
@@ -697,43 +754,83 @@ class DatabaseBillingProvider implements BillingProvider {
 
   async listBillingHistory(userId: string): Promise<BillingHistoryItem[]> {
     const orders = await usersRepository.listOrdersByUser(userId);
-    return orders.map((order) => ({
-      id: order.id,
-      date: order.placedAt,
-      description: `Supplement Order - Formula v${order.formulaVersion}`,
-      amountCents: typeof order.amountCents === 'number' ? order.amountCents : null,
-      currency: 'USD' as const,
-      status: order.status === 'cancelled'
-        ? 'refunded' as const
-        : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered')
-          ? 'paid' as const
-          : 'pending' as const,
-      invoiceId: order.id,
-      invoiceUrl: `/api/billing/invoices/${order.id}`,
-    }));
+    const refunds = await usersRepository.listRefundsByUser(userId);
+    
+    // Create a map of orderId -> refund for efficient lookup
+    const refundMap = new Map(refunds.map(r => [r.orderId, r]));
+
+    return orders.map((order) => {
+      const refund = refundMap.get(order.id);
+      
+      let status: BillingHistoryItem['status'] = 'pending';
+      let descriptionSuffix = '';
+
+      if (refund?.status === 'approved') {
+        status = 'refunded';
+        descriptionSuffix = ' (Refunded)';
+      } else if (refund?.status === 'voided' || order.status === 'cancelled') {
+        status = 'voided';
+        descriptionSuffix = ' (Voided)';
+      } else if (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') {
+        status = 'paid';
+      }
+
+      return {
+        id: order.id,
+        date: order.placedAt,
+        description: `Supplement Order - Formula v${order.formulaVersion}${descriptionSuffix}`,
+        amountCents: typeof order.amountCents === 'number' ? order.amountCents : null,
+        currency: 'USD' as const,
+        status,
+        invoiceId: order.id,
+        invoiceUrl: `/api/billing/invoices/${order.id}`,
+      };
+    });
   }
 
   async getInvoice(userId: string, invoiceId: string): Promise<BillingInvoice | null> {
     const order = await usersRepository.getOrder(invoiceId);
     if (!order || order.userId !== userId) return null;
 
+    const refunds = await usersRepository.listRefundsByOrder(invoiceId);
+    const approvedRefund = refunds.find(r => r.status === 'approved');
+    const voidedRefund = refunds.find(r => r.status === 'voided');
+
     const totalCents = typeof order.amountCents === 'number' ? order.amountCents : null;
+    
+    let status: BillingInvoice['status'] = 'pending';
+    if (approvedRefund) status = 'refunded';
+    else if (voidedRefund || order.status === 'cancelled') status = 'voided';
+    else if (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') status = 'paid';
+
     return {
       id: order.id,
       userId,
       orderId: order.id,
       amountCents: totalCents,
       currency: 'USD',
-      status: order.status === 'cancelled' ? 'refunded'
-        : (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') ? 'paid'
-        : 'pending',
+      status,
       issuedAt: order.placedAt,
-      lineItems: [{
-        label: `Custom Formula v${order.formulaVersion}`,
-        formulaVersion: order.formulaVersion,
-        supplyMonths: order.supplyMonths ?? null,
-        amountCents: totalCents,
-      }],
+      lineItems: [
+        {
+          label: `Custom Formula v${order.formulaVersion}`,
+          formulaVersion: order.formulaVersion,
+          supplyMonths: order.supplyMonths ?? null,
+          amountCents: totalCents,
+        },
+        ...(approvedRefund ? [{
+          label: 'Refund (Approved)',
+          formulaVersion: order.formulaVersion,
+          supplyMonths: null,
+          amountCents: -approvedRefund.amountCents,
+        }] : []),
+        ...(voidedRefund ? [{
+          label: 'Transaction Voided',
+          formulaVersion: order.formulaVersion,
+          supplyMonths: null,
+          amountCents: 0, // Voided means money was never settled
+        }] : [])
+      ],
     };
   }
 
