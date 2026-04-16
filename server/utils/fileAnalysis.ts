@@ -98,9 +98,9 @@ async function ocrPage(dataUrl: string, pageNum: number): Promise<string> {
           ]
         }
       ],
-      max_tokens: 4000
+      max_tokens: 8000
     }),
-    45_000,
+    60_000,
     `PDF page ${pageNum} OCR`
   );
   return response.choices[0]?.message?.content || '';
@@ -221,8 +221,7 @@ export async function extractTextFromImage(buffer: Buffer, mimeType: string): Pr
 
 /**
  * Analyzes extracted text and structures lab data using AI.
- * Uses gpt-4o with high token limit. If the response is truncated,
- * retries with gpt-4o at a higher token budget.
+ * Uses gpt-4.1 with high token limit (32K output).
  */
 export async function structureLabData(rawText: string): Promise<LabDataExtraction> {
   const systemPrompt = `You are an expert medical lab report analyzer. Extract structured data from lab reports and return it as JSON.
@@ -247,16 +246,27 @@ Extract the following top-level fields:
   - severity: "info", "moderate", or "urgent"
   - recommendation: One actionable sentence about what to do
 
-Extract EVERY marker — do not skip any test results. If a reference range is not provided, still include the marker with an empty referenceRange.
+Extract EVERY individual line item — do not skip, merge, or omit ANY test results. Common items that get missed:
+- Calculated ratios (A/G Ratio, BUN/Creatinine Ratio, Globulin, etc.)
+- BOTH percentage AND absolute counts for WBC differentials (e.g., Neutrophils % AND Neutrophils Absolute are TWO separate entries)
+- Qualitative results like "Non-Reactive", "Negative", blood type, Rh factor
+- Urinalysis entries (pH, Specific Gravity, Protein, Glucose, etc.)
+- eGFR variants (e.g., eGFR Non-African American AND eGFR African American are separate entries if both appear)
+- Sub-tests that appear indented or grouped under a panel header
+- If a reference range is not provided, still include the marker with an empty referenceRange
+- If a value is text (e.g., "Negative", "A+"), include it exactly as shown
+
+The TOTAL number of entries in extractedData should match the total number of individual test result rows in the lab report. Do NOT consolidate or deduplicate — if the report lists it, include it.
+- totalResultRowCount: Before building extractedData, count every individual test result row in the report and put that number here. This is used for QA — if extractedData.length !== totalResultRowCount, the extraction will be flagged for review.
 
 Return ONLY valid JSON without any markdown formatting.`;
 
   const userMessage = `Extract structured data from this lab report:\n\n${rawText}`;
 
-  // gpt-4o supports max 16384 completion tokens — retry with longer timeout if first attempt times out
+  // gpt-4.1 supports up to 32768 completion tokens — retry with longer timeout if first attempt fails
   const attempts: Array<{ maxTokens: number; timeout: number }> = [
-    { maxTokens: 16384, timeout: 240_000 },
-    { maxTokens: 16384, timeout: 300_000 },
+    { maxTokens: 32768, timeout: 240_000 },
+    { maxTokens: 32768, timeout: 300_000 },
   ];
 
   for (let i = 0; i < attempts.length; i++) {
@@ -265,7 +275,7 @@ Return ONLY valid JSON without any markdown formatting.`;
       logger.info(`Structuring lab data`, { attempt: i + 1, maxTokens });
       const response = await withTimeout(
         openai.chat.completions.create({
-          model: 'gpt-4o',
+          model: 'gpt-4.1',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMessage }
@@ -280,12 +290,20 @@ Return ONLY valid JSON without any markdown formatting.`;
 
       const finishReason = response.choices[0]?.finish_reason;
       const content = response.choices[0]?.message?.content;
+      const usage = response.usage;
+
+      logger.info('Structuring response received', {
+        finishReason,
+        promptTokens: usage?.prompt_tokens,
+        completionTokens: usage?.completion_tokens,
+        totalTokens: usage?.total_tokens,
+      });
 
       if (!content) {
         throw new Error('No response from AI');
       }
 
-      // If truncated, attempt partial parse (gpt-4o caps at 16384 output tokens)
+      // If truncated, attempt partial parse
       if (finishReason === 'length') {
         logger.warn('Response truncated at token limit, attempting partial parse');
       }
@@ -311,6 +329,66 @@ Return ONLY valid JSON without any markdown formatting.`;
       }
 
       logger.info(`Structured ${structured.extractedData.length} markers from lab data`);
+
+      // ── Self-reported count QA ──
+      const selfReportedCount = structured.totalResultRowCount;
+      if (selfReportedCount && selfReportedCount !== structured.extractedData.length) {
+        logger.warn('Extraction count mismatch — AI self-reported a different total', {
+          selfReportedCount,
+          actualExtracted: structured.extractedData.length,
+          delta: selfReportedCount - structured.extractedData.length,
+        });
+      }
+
+      // ── Reconciliation pass: check if the model missed any markers ──
+      // Use self-reported count or OCR line estimate to detect gaps
+      const resultLinePattern = /^[\s]*[A-Za-z][\w\s/()-]+\s+[\d.<>]+/gm;
+      const ocrResultLines = (rawText.match(resultLinePattern) || []).length;
+      const extractedCount = structured.extractedData.length;
+      const selfReportGap = selfReportedCount ? selfReportedCount - extractedCount : 0;
+
+      if (ocrResultLines > extractedCount + 2 || selfReportGap > 0) {
+        const reason = selfReportGap > 0
+          ? `AI self-reported ${selfReportedCount} but only extracted ${extractedCount}`
+          : `OCR has ~${ocrResultLines} result lines but only ${extractedCount} extracted`;
+        logger.info(`Reconciliation: ${reason}. Running targeted second pass.`);
+
+        const existingNames = structured.extractedData.map((d: any) => d.testName?.toLowerCase()).filter(Boolean);
+        try {
+          const reconcileResponse = await withTimeout(
+            openai.chat.completions.create({
+              model: 'gpt-4.1',
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are a lab report QA specialist. A prior extraction found ${extractedCount} markers. Review the raw text below and identify ANY test results that are missing from this list:\n${existingNames.join(', ')}\n\nReturn a JSON object: { "missingMarkers": [ { "testName": "...", "value": "...", "unit": "...", "referenceRange": "...", "status": "...", "category": "...", "clinicalNote": "" } ] }\nIf nothing is missing, return { "missingMarkers": [] }. Return ONLY valid JSON.`
+                },
+                { role: 'user', content: rawText }
+              ],
+              temperature: 0.1,
+              max_tokens: 8192,
+              response_format: { type: 'json_object' }
+            }),
+            120_000,
+            'Reconciliation pass'
+          );
+
+          const reconcileContent = reconcileResponse.choices[0]?.message?.content;
+          if (reconcileContent) {
+            const reconciled = JSON.parse(reconcileContent);
+            if (Array.isArray(reconciled.missingMarkers) && reconciled.missingMarkers.length > 0) {
+              logger.info(`Reconciliation found ${reconciled.missingMarkers.length} additional markers`);
+              structured.extractedData.push(...reconciled.missingMarkers);
+              logger.info(`Total markers after reconciliation: ${structured.extractedData.length}`);
+            } else {
+              logger.info('Reconciliation found no missing markers');
+            }
+          }
+        } catch (reconcileErr) {
+          logger.warn('Reconciliation pass failed, using initial extraction', { error: (reconcileErr as Error).message });
+        }
+      }
+
       return {
         ...structured,
         rawText

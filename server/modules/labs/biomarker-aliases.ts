@@ -430,6 +430,12 @@ const BIOMARKER_ALIASES: Record<string, string> = {
     'psa':                          'PSA',
     'prostate specific antigen':    'PSA',
     'psa total':                    'PSA',
+    'psa free':                     'PSA, Free',
+    'free psa':                     'PSA, Free',
+    'psa % free':                   'PSA, % Free',
+    'psa percent free':             'PSA, % Free',
+    '% free psa':                   'PSA, % Free',
+    'percent free psa':             'PSA, % Free',
 
     // ── Autoimmune ──
     'ana':                          'ANA',
@@ -457,10 +463,10 @@ export function resolveAlias(normalizedKey: string): string | null {
  * that can be used to merge markers across reports.
  */
 export function canonicalKey(rawName: string): string {
-    const key = rawName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const key = rawName.toLowerCase().replace(/[^a-z0-9%]+/g, ' ').trim();
     const alias = BIOMARKER_ALIASES[key];
     if (alias) {
-        return alias.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        return alias.toLowerCase().replace(/[^a-z0-9%]+/g, ' ').trim();
     }
     return key;
 }
@@ -470,6 +476,6 @@ export function canonicalKey(rawName: string): string {
  * Falls back to the original name if no alias is found.
  */
 export function canonicalName(rawName: string): string {
-    const key = rawName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const key = rawName.toLowerCase().replace(/[^a-z0-9%]+/g, ' ').trim();
     return BIOMARKER_ALIASES[key] ?? rawName;
 }

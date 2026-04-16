@@ -1745,6 +1745,14 @@ export class LabsService {
             reports: allReports.map(r => {
                 const ld = r.labReportData as any;
                 const extracted = Array.isArray(ld?.extractedData) ? ld.extractedData : [];
+                // Count unique canonical biomarkers (not raw extraction count)
+                const uniqueKeys = new Set<string>();
+                for (const m of extracted) {
+                    const name = m.testName || m.name || '';
+                    if (!name) continue;
+                    const key = canonicalKey(name);
+                    if (key) uniqueKeys.add(key);
+                }
                 return {
                     id: r.id,
                     fileName: r.originalFileName,
@@ -1752,7 +1760,7 @@ export class LabsService {
                     uploadedAt: String(r.uploadedAt),
                     testType: ld?.testType || null,
                     labName: ld?.labName || null,
-                    markerCount: extracted.length,
+                    markerCount: uniqueKeys.size,
                     status: ld?.analysisStatus || 'unknown',
                 };
             }),

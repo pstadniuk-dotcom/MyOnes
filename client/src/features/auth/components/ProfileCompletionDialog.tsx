@@ -8,7 +8,7 @@ import {
 import { Button } from '@/shared/components/ui/button';
 import { Progress } from '@/shared/components/ui/progress';
 import { Check, ChevronRight, Sparkles } from 'lucide-react';
-import { Link } from 'wouter';
+import { useLocation } from 'wouter';
 
 interface ChecklistItem {
   label: string;
@@ -34,6 +34,7 @@ export function ProfileCompletionDialog({
   profileCompleteness,
   checklist
 }: ProfileCompletionDialogProps) {
+  const [, navigate] = useLocation();
   const totalItems = checklist.reduce((sum, cat) => sum + cat.items.length, 0);
   const completedItems = checklist.reduce(
     (sum, cat) => sum + cat.items.filter(item => item.complete).length,
@@ -130,15 +131,15 @@ export function ProfileCompletionDialog({
                         <Button
                           variant="ghost"
                           size="sm"
-                          asChild
                           className="gap-1"
-                          onClick={() => onOpenChange(false)}
+                          onClick={() => {
+                            onOpenChange(false);
+                            navigate(item.route);
+                          }}
                           data-testid={`button-complete-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                         >
-                          <Link href={item.route}>
                             Add
                             <ChevronRight className="w-4 h-4" />
-                          </Link>
                         </Button>
                       )}
                     </div>

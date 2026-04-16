@@ -206,11 +206,11 @@ export function AddressAutocomplete(props: AddressAutocompleteProps) {
           } else {
             setInternalQuery(e.target.value);
           }
-          setIsOpen(true);
+          if (enabled) setIsOpen(true);
         }}
-        onFocus={() => setIsOpen(true)}
-        placeholder={enabled ? (props.placeholder ?? 'Start typing your address') : 'Address search is unavailable'}
-        disabled={!enabled}
+        onFocus={() => { if (enabled) setIsOpen(true); }}
+        placeholder={props.placeholder ?? 'Start typing your address'}
+        disabled={props.disabled}
         data-testid={props['data-testid']}
       />
 

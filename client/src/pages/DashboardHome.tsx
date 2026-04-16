@@ -264,7 +264,7 @@ export default function HomePage() {
                   </div>
                   {!isStep1Complete && (
                     <Button asChild variant="outline" size="sm" className="border-[#054700] text-[#054700] hover:bg-[#054700] hover:text-white rounded-full mt-0.5">
-                      <Link href="/dashboard/profile?tab=profile">Start</Link>
+                      <Link href="/dashboard/profile?tab=health">Start</Link>
                     </Button>
                   )}
                 </div>
@@ -325,7 +325,7 @@ export default function HomePage() {
               {!isStep1Complete ? (
                 <div className="flex flex-col sm:flex-row gap-3 pt-1">
                   <Button asChild className="gap-2 bg-[#054700] hover:bg-[#043d00] text-white rounded-full px-6" data-testid="button-complete-profile">
-                    <Link href="/dashboard/profile?tab=profile">
+                    <Link href="/dashboard/profile?tab=health">
                       <Sparkles className="w-4 h-4" />
                       Complete Health Profile
                     </Link>

@@ -176,7 +176,32 @@ export class FilesService {
                         await filesRepository.updateFileUpload(fileId, { analysisCompletedAt: new Date() } as any);
                         // Send lab results ready notification (skip if no biomarkers extracted)
                         try {
-                            const markerCount = labDataExtraction.extractedData?.length || 0;
+                            const { canonicalKey } = await import('../labs/biomarker-aliases');
+                            const uniqueKeys = new Set<string>();
+                            const keyToNames = new Map<string, string[]>();
+                            const rawCount = (labDataExtraction.extractedData || []).length;
+                            for (const m of labDataExtraction.extractedData || []) {
+                                const name = (m as any).testName || (m as any).name || '';
+                                if (!name) continue;
+                                const key = canonicalKey(name);
+                                if (key) {
+                                    uniqueKeys.add(key);
+                                    if (!keyToNames.has(key)) keyToNames.set(key, []);
+                                    keyToNames.get(key)!.push(name);
+                                }
+                            }
+                            // Log any merges so we can spot incorrect alias collisions
+                            const merges = [...keyToNames.entries()].filter(([, names]) => names.length > 1);
+                            if (merges.length > 0) {
+                                logger.info('Canonical dedup merged these markers:', {
+                                    rawCount,
+                                    dedupCount: uniqueKeys.size,
+                                    merges: merges.map(([key, names]) => `${key}: [${names.join(', ')}]`),
+                                });
+                            } else {
+                                logger.info('No canonical merges occurred', { rawCount, dedupCount: uniqueKeys.size });
+                            }
+                            const markerCount = uniqueKeys.size;
                             if (markerCount === 0) {
                                 logger.info('Skipping lab results notification — 0 biomarkers extracted', { userId, fileName });
                                 return;

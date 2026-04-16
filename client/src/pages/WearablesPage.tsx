@@ -40,7 +40,7 @@ import {
   LucideIcon,
 } from 'lucide-react';
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { METRIC_CATALOG, METRIC_MAP, DEFAULT_VISIBLE_METRICS, metricsByPillar, type MetricDefinition } from '@shared/metricCatalog';
+import { METRIC_CATALOG, METRIC_MAP, metricsByPillar, type MetricDefinition } from '@shared/metricCatalog';
 
 interface WearableConnection {
   id: string;
@@ -395,7 +395,7 @@ function CustomizeMetricsModal({
     }
   };
 
-  const handleReset = () => { setSelected([...DEFAULT_VISIBLE_METRICS]); };
+  const handleReset = () => { setSelected([...metricsWithData]); };
 
   const grouped = metricsByPillar();
 
@@ -667,14 +667,31 @@ export default function WearablesPage() {
   const errorConnections = connections.filter(connection => connection.status === 'error');
   const activeConnections = connections.filter(connection => connection.status === 'connected' || connection.status === 'error');
 
-  const savedPrefs = metricPrefsData?.metricPreferences;
-  const visibleMetricIds = useMemo(() => savedPrefs ?? DEFAULT_VISIBLE_METRICS, [savedPrefs]);
-
   // Build sparkline + detail rows dynamically for a given metric
   const buildSparkline = useCallback((metric: MetricDefinition): (number | null)[] => {
     const dataArr = histData?.data?.[metric.dataCategory] ?? [];
     return dataArr.map((row: any) => row[metric.sparkPath] ?? null);
   }, [histData]);
+
+  // Check if an individual metric has data available
+  const hasData = useCallback((metric: MetricDefinition): boolean => {
+    const spark = buildSparkline(metric);
+    if (spark.some(v => v != null)) return true;
+    const statVal = resolvePath(stats, metric.statPath);
+    return statVal != null;
+  }, [buildSparkline, stats]);
+
+  // Metrics with available data (for the customize modal)
+  const metricsWithData = useMemo(() => {
+    return METRIC_CATALOG.filter(m => hasData(m)).map(m => m.id);
+  }, [hasData]);
+
+  // Default: show ALL metrics that have data (opt-out model, not opt-in)
+  const savedPrefs = metricPrefsData?.metricPreferences;
+  const visibleMetricIds = useMemo(
+    () => savedPrefs ?? metricsWithData,
+    [savedPrefs, metricsWithData]
+  );
 
   const buildDetailRows = useCallback((metric: MetricDefinition): DetailRow[] => {
     const dataArr = histData?.data?.[metric.dataCategory] ?? [];
@@ -703,19 +720,6 @@ export default function WearablesPage() {
       .map(id => METRIC_MAP.get(id))
       .filter((m): m is MetricDefinition => m != null);
   }, [visibleMetricIds]);
-
-  // Check if an individual metric has data available
-  const hasData = useCallback((metric: MetricDefinition): boolean => {
-    const spark = buildSparkline(metric);
-    if (spark.some(v => v != null)) return true;
-    const statVal = resolvePath(stats, metric.statPath);
-    return statVal != null;
-  }, [buildSparkline, stats]);
-
-  // Metrics with available data (for the customize modal)
-  const metricsWithData = useMemo(() => {
-    return METRIC_CATALOG.filter(m => hasData(m)).map(m => m.id);
-  }, [hasData]);
 
   if (isLoading) {
     return (

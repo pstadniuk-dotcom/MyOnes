@@ -311,6 +311,54 @@ export default function ConsultationPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Fetch health profile to build a context-aware welcome message
+  const { data: healthProfileData } = useQuery<any>({
+    queryKey: ['/api/users/me/health-profile'],
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Build a smart welcome message based on what profile data exists
+  const buildWelcomeContent = useCallback(() => {
+    const firstName = user?.name?.split(' ')[0] || 'there';
+    const hp = healthProfileData;
+
+    // Check what we already know
+    const hasBasics = !!(hp?.age && hp?.sex);
+    const hasBody = !!(hp?.weightLbs && hp?.heightCm);
+    const hasMedications = !!(hp?.medications && Array.isArray(hp.medications) && hp.medications.length > 0);
+    const hasConditions = !!(hp?.conditions && Array.isArray(hp.conditions) && hp.conditions.length > 0);
+    const hasLifestyle = !!(hp?.sleepHoursPerNight || hp?.exerciseDaysPerWeek !== null || hp?.stressLevel);
+    const hasGoals = !!(hp?.healthGoals && hp.healthGoals.length > 0);
+
+    const filledCount = [hasBasics, hasBody, hasMedications, hasConditions, hasLifestyle, hasGoals].filter(Boolean).length;
+
+    // Rich profile — skip the intake questions
+    if (filledCount >= 4) {
+      const knownParts: string[] = [];
+      if (hasBasics) knownParts.push(`${hp.age}-year-old ${hp.sex}`);
+      if (hasGoals) knownParts.push(`goals: ${hp.healthGoals.slice(0, 3).join(', ')}`);
+
+      return `Hello ${firstName}! I've reviewed your health profile${knownParts.length ? ` — ${knownParts.join(', ')}` : ''} — and I'm ready to create your personalized supplement formula.\n\nBefore we begin, is there anything specific you'd like to focus on? For example:\n\n• Any new symptoms or health concerns\n• Changes to your medications or lifestyle\n• Specific goals like energy, sleep, or recovery\n\nOr just say "let's go" and I'll build your formula based on what I already know. Feel free to type or click the microphone icon to speak.`;
+    }
+
+    // Partial profile — acknowledge what we have, ask for the rest
+    if (filledCount >= 1) {
+      const missing: string[] = [];
+      if (!hasBasics) missing.push('Your age and gender');
+      if (!hasBody) missing.push('Weight and height');
+      if (!hasMedications) missing.push('Any medications you\'re currently taking');
+      if (!hasConditions) missing.push('Health conditions or concerns');
+      if (!hasLifestyle) missing.push('Lifestyle factors (sleep, exercise, stress)');
+      if (!hasGoals) missing.push('Your health goals');
+
+      return `Hello ${firstName}! I have some of your health information on file already. To create the best possible formula, I could still use a few more details:\n\n${missing.map(m => `• ${m}`).join('\n')}\n\nFeel free to share what you can, or just tell me your main health goals and we'll get started. You can type or click the microphone icon to speak.`;
+    }
+
+    // No profile — original full intake message
+    return `Hello ${firstName}! I'm here to help you optimize your health. Let's get started with creating the perfect supplement formula for you.\n\nTo give you the best recommendations, I need to understand your complete health picture. Please share as much information as you can about yourself:\n\n• Your age, gender, height, and weight\n• Any medications you're currently taking\n• Health goals or concerns you have\n• Any specific symptoms or issues you're experiencing\n• Lifestyle factors (exercise, diet, sleep patterns)\n\nFeel free to click the microphone icon to speak with me, or simply type in the chat. This is just like a doctor's visit - the more you share, the better I can help you.`;
+  }, [user?.name, healthProfileData]);
+
   // Start new consultation session - defined early for use in effects
   const handleNewSession = useCallback(() => {
     activeStreamRequestIdRef.current += 1;
@@ -326,7 +374,7 @@ export default function ConsultationPage() {
 
     const welcomeMessage: Message = {
       id: 'welcome-' + Date.now(),
-      content: `Hello ${user?.name?.split(' ')[0] || 'there'}! I'm here to help you optimize your health. Let's get started with creating the perfect supplement formula for you.\n\nTo give you the best recommendations, I need to understand your complete health picture. Please share as much information as you can about yourself:\n\n• Your age, gender, height, and weight\n• Any medications you're currently taking\n• Health goals or concerns you have\n• Any specific symptoms or issues you're experiencing\n• Lifestyle factors (exercise, diet, sleep patterns)\n\nFeel free to click the microphone icon to speak with me, or simply type in the chat. This is just like a doctor's visit - the more you share, the better I can help you.`,
+      content: buildWelcomeContent(),
       sender: 'ai',
       timestamp: new Date()
     };
@@ -353,7 +401,7 @@ export default function ConsultationPage() {
       description: "Ready to discuss your health goals with Ones.",
       variant: "default"
     });
-  }, [toast, user?.name]);
+  }, [toast, buildWelcomeContent]);
 
   // Warn user before leaving if they've sent messages in the conversation
   const userHasSentMessage = messages.some(m => m.sender === 'user');
@@ -443,8 +491,8 @@ export default function ConsultationPage() {
   const { data: historyData, isLoading: isLoadingHistory, error: historyError } = useQuery({
     queryKey: ['/api/chat/consultations/history', user?.id],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/chat/consultations/history');
-      const data = await response.json();
+      const response = apiRequest('GET', '/api/chat/consultations/history');
+      const data = await (await response).json();
       return data as { sessions: ChatSession[], messages: Record<string, Message[]> };
     },
     enabled: !!user?.id,
@@ -706,7 +754,7 @@ export default function ConsultationPage() {
 
     const welcomeMessage: Message = {
       id: 'welcome-' + Date.now(),
-      content: `Hello ${user?.name?.split(' ')[0] || 'there'}! I'm here to help you optimize your health. Let's get started with creating the perfect supplement formula for you.\n\nTo give you the best recommendations, I need to understand your complete health picture. Please share as much information as you can about yourself:\n\n• Your age, gender, height, and weight\n• Any medications you're currently taking\n• Health goals or concerns you have\n• Any specific symptoms or issues you're experiencing\n• Lifestyle factors (exercise, diet, sleep patterns)\n\nFeel free to click the microphone icon to speak with me, or simply type in the chat. This is just like a doctor's visit - the more you share, the better I can help you.`,
+      content: buildWelcomeContent(),
       sender: 'ai',
       timestamp: new Date()
     };
@@ -725,7 +773,7 @@ export default function ConsultationPage() {
         handleSendMessage(preservedMessage);
       }, 1000);
     }
-  }, [user?.name, isNewSession, messages.length, isLoadingHistory, historyData?.sessions]);
+  }, [buildWelcomeContent, isNewSession, messages.length, isLoadingHistory, historyData?.sessions]);
 
   // Check if user is near the bottom of the scroll container using scroll position math
   const isNearBottom = useCallback(() => {

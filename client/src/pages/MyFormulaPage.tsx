@@ -2044,6 +2044,17 @@ export default function MyFormulaPage() {
                       consentText: 'I have disclosed all medications, conditions, and allergies and will consult my physician before starting. Not medical advice; not evaluated by the FDA.',
                     });
                   }
+                  // Save new shipping address to profile so CheckoutPage can pre-fill it
+                  if (addressMode === 'new' && shippingAddress.line1.trim()) {
+                    await apiRequest('PATCH', '/api/users/me/profile', {
+                      addressLine1: shippingAddress.line1.trim(),
+                      addressLine2: shippingAddress.line2.trim() || null,
+                      city: shippingAddress.city.trim(),
+                      state: shippingAddress.state.trim(),
+                      postalCode: shippingAddress.zip.trim(),
+                      country: shippingAddress.country.trim() || 'US',
+                    });
+                  }
                   await purchaseSmsOptInMutation.mutateAsync();
                   // Navigate to full checkout page
                   const params = new URLSearchParams({

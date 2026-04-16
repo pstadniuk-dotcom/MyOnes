@@ -38,7 +38,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest, queryClient, getAuthHeaders } from '@/shared/lib/queryClient';
@@ -81,7 +81,10 @@ export default function ProfilePage() {
   const { user, isAuthenticated, refreshUser } = useAuth();
   const { toast } = useToast();
   const [location] = useLocation();
-  const searchParams = new URLSearchParams(location.split('?')[1] || '');
+  const searchString = useSearch();
+  // Also read directly from window.location.search for initial mount reliability
+  const effectiveSearch = searchString || window.location.search.substring(1);
+  const searchParams = new URLSearchParams(effectiveSearch);
   const initialTab = searchParams.get('tab') || 'profile';
   const initialSection = searchParams.get('section') || 'basic-info';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -93,14 +96,15 @@ export default function ProfilePage() {
 
   // Sync tab and section from URL when navigating from other pages
   useEffect(() => {
-    const params = new URLSearchParams(location.split('?')[1] || '');
+    const search = searchString || window.location.search.substring(1);
+    const params = new URLSearchParams(search);
     const tab = params.get('tab') || 'profile';
     const section = params.get('section');
     setActiveTab(tab);
     if (section) {
       setOpenSection(section);
     }
-  }, [location]);
+  }, [searchString]);
 
   // React Query for user data
   const { data: userData, isLoading: userLoading, error: userError } = useQuery<{ user: UserType }>({
@@ -331,7 +335,7 @@ export default function ProfilePage() {
     onSuccess: (_data, variables) => {
       const changedFields = getChangedHealthFields(variables);
       queryClient.invalidateQueries({ queryKey: ['/api/users/me/health-profile'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['/api', 'dashboard'] });
       toast({
         title: hasExistingHealthProfile ? "Health info updated" : "Health info saved",
         description: changedFields.length > 0
