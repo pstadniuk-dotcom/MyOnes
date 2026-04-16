@@ -2853,7 +2853,7 @@ console.log('hhhh', historyData)
                 {/* Left side - hints (desktop only) */}
                 <div className="hidden md:flex items-center gap-1 text-xs text-muted-foreground">
                   <FileText className="w-3 h-3" />
-                  <span>Upload files or type your question</span>
+                  <span>Upload files (Max 5MB) or type your question</span>
                   {draftSaved && inputValue.trim().length > 0 && (
                     <span className="flex items-center gap-1 ml-3 text-green-600">
                       <CheckCircle className="w-3 h-3" />
@@ -2862,8 +2862,10 @@ console.log('hhhh', historyData)
                   )}
                 </div>
 
-                {/* Spacer for mobile to push buttons right */}
-                <div className="md:hidden flex-1" />
+                {/* Mobile file size hint (pushes buttons right) */}
+                <div className="md:hidden flex-1 flex items-center justify-start text-[10px] text-muted-foreground/70">
+                  <span>Max 5MB</span>
+                </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
