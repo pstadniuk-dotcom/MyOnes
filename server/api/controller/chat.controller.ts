@@ -33,8 +33,11 @@ export class ChatController {
         let clientDisconnected = false;
         const clientIP = getClientIP(req);
 
+        let keepAliveInterval: NodeJS.Timeout | null = null;
+
         req.on('close', () => {
             clientDisconnected = true;
+            if (keepAliveInterval) clearInterval(keepAliveInterval);
             logger.info('Chat stream client disconnected; continuing server-side processing', {
                 userId: req.userId,
                 path: req.path
@@ -62,6 +65,7 @@ export class ChatController {
         };
 
         const endStream = () => {
+            if (keepAliveInterval) clearInterval(keepAliveInterval);
             if (!clientDisconnected && !res.destroyed && !res.writableEnded) {
                 res.end();
             }
@@ -110,6 +114,11 @@ export class ChatController {
 
             streamStarted = true;
             sendSSE({ type: 'connected', message: 'Stream established' });
+
+            // Send keep-alive pings every 15 seconds to prevent 502/504 errors on live gateways
+            keepAliveInterval = setInterval(() => {
+                sendSSE({ type: 'ping' });
+            }, 15000);
 
             let chatSession;
             if (sessionId) {
