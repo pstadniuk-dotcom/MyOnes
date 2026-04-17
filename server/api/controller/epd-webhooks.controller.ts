@@ -6,6 +6,7 @@ import { epdWebhooksService, type EpdWebhookEvent } from '../../modules/billing/
 export class EpdWebhooksController {
   async handleEpdWebhook(req: Request, res: Response) {
     try {
+     console.log("req.body-->>>>>webhook",req.body)
       const isProduction = process.env.NODE_ENV === 'production';
       const signingKey = process.env.EPD_WEBHOOK_SIGNING_KEY;
       const signatureHeader = req.headers['webhook-signature'] as string | undefined;

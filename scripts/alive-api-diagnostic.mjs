@@ -9,8 +9,22 @@ dotenv.config({ path: 'server/.env' });
 
 const API_KEY = process.env.ALIVE_API_KEY;
 const HEADER_NAME = process.env.ALIVE_API_HEADER_NAME || 'X-API-Key';
+const API_ORIGIN = process.env.ALIVE_API_ORIGIN;
 const INGREDIENTS_URL = process.env.ALIVE_API_INGREDIENTS_URL || 'https://dev.aliveinnovations.com/api/ingredients';
 const QUOTE_URL = process.env.ALIVE_API_GET_QUOTE_URL || 'https://dev.aliveinnovations.com/api/get-quote';
+
+function authHeaders(extra = {}) {
+  const headers = {
+    [HEADER_NAME]: API_KEY,
+    Accept: 'application/json',
+    ...extra,
+  };
+  if (API_ORIGIN) {
+    headers.Origin = API_ORIGIN;
+    headers.Referer = `${API_ORIGIN.replace(/\/$/, '')}/`;
+  }
+  return headers;
+}
 
 const QUOTE_DAYS = 56; // 8 weeks
 const MARGIN = 2.0;
@@ -78,7 +92,7 @@ console.log(`         ${QUOTE_URL}\n`);
 
 console.log('── Step 1: Fetching ingredient catalog ──────────────────');
 const catRes = await fetch(INGREDIENTS_URL, {
-  headers: { [HEADER_NAME]: API_KEY, Accept: 'application/json' },
+  headers: authHeaders(),
 });
 console.log(`Status: ${catRes.status} ${catRes.statusText}`);
 
@@ -163,11 +177,7 @@ console.log();
 
 const quoteRes = await fetch(QUOTE_URL, {
   method: 'POST',
-  headers: {
-    [HEADER_NAME]: API_KEY,
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  },
+  headers: authHeaders({ 'Content-Type': 'application/json' }),
   body: JSON.stringify(quotePayload),
 });
 

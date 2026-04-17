@@ -25,4 +25,11 @@ router.post('/junction', webhooksController.handleJunctionWebhook);
  */
 router.post('/epd', epdWebhooksController.handleEpdWebhook);
 
+// /**
+//  * @route   ALL /api/webhooks
+//  * @desc    Unified catch-all for emitted events
+//  * @access  Public
+//  */
+// router.post('/', webhooksController.handleUnifiedWebhook);
+
 export default router;

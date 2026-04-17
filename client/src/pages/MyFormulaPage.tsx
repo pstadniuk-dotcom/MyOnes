@@ -519,7 +519,7 @@ export default function MyFormulaPage() {
     enabled: !!user?.id && !!selectedFormula?.id,
     queryFn: () => apiRequest('GET', `/api/users/me/formula/${selectedFormula!.id}/quote?capsuleCount=${pricingCapsuleCount}`).then(res => res.json()),
   });
-
+console.log('quoteeeeeeeeeeeeeeeeeee', formulaQuoteData)
   const { data: currentMembershipTier } = useQuery<MembershipTierPayload | null>({
     queryKey: ['/api/membership/current-tier'],
     enabled: !!user?.id,
@@ -566,6 +566,10 @@ export default function MyFormulaPage() {
 
   const hasActiveMembership = !!myMembership?.hasMembership && !myMembership?.isCancelled;
   const membershipUpsellAvailable = !hasActiveMembership && !!currentMembershipTier;
+  const isQuoteExplicitlyUnavailable =
+    !!selectedFormula?.id &&
+    !isLoadingFormulaQuote &&
+    formulaQuoteData?.quote?.available === false;
   const oneTimeFormulaPrice = formulaQuoteData?.quote?.available ? (formulaQuoteData.quote.total ?? 0) : 0;
   const membershipMonthlyPrice = currentMembershipTier ? currentMembershipTier.priceCents / 100 : 0;
   // Always compute the 15% savings so we can show savings regardless of toggle state
@@ -2036,6 +2040,15 @@ export default function MyFormulaPage() {
               className="bg-primary hover:bg-primary/90"
               onClick={async () => {
                 try {
+                  if (isQuoteExplicitlyUnavailable) {
+                    toast({
+                      title: 'Pricing unavailable',
+                      description: formulaQuoteData?.quote?.reason || 'Formula pricing is currently unavailable. Please try again shortly.',
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
+
                   // Record medical disclosure consent before checkout
                   if (medDisclosureAcknowledged) {
                     await apiRequest('POST', '/api/consents/grant', {
@@ -2059,6 +2072,7 @@ export default function MyFormulaPage() {
                   // Navigate to full checkout page
                   const params = new URLSearchParams({
                     formulaId: selectedFormula!.id,
+                    capsuleCount: String(pricingCapsuleCount),
                     membership: (includeMembershipAtCheckout && membershipUpsellAvailable) ? '1' : '0',
                     autoship: enableAutoShip ? '1' : '0',
                   });
@@ -2246,7 +2260,7 @@ function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onO
   });
 
   const tileQuote = tileQuoteData?.quote;
-
+console.log(tileQuote, 'data of price');
   // Get all ingredient names for preview chips
   const allIngredientNames = [
     ...formula.bases.map(b => b.ingredient),
@@ -2358,7 +2372,7 @@ function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onO
             ) : tileQuote?.available ? (
               <>
                 <span className="text-sm font-semibold text-[#054700] tabular-nums">
-                  ${((tileQuote.total ?? 0) * 0.85).toFixed(0)}
+                  ${(tileQuote.total ?? 0).toFixed(0)}
                 </span>
                 <p className="text-[10px] text-[#5a6623]">8-week est</p>
               </>
@@ -3603,7 +3617,7 @@ function ActionsSection({ formula, onOrderClick, hasActiveMembership }: { formul
 
   const handleDownload = async () => {
     try {
-      console.log('Starting PDF download...');
+      console.log('Starting PDF download....');
       const pdfMake = (await import('pdfmake/build/pdfmake')).default;
       const pdfFonts = (await import('pdfmake/build/vfs_fonts')).default as any;
 

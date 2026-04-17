@@ -161,10 +161,15 @@ class ManufacturerPricingService {
     private readonly cacheMs = 15 * 60 * 1000;
 
     private buildAuthHeaders(): Record<string, string> {
-        return {
+        const headers: Record<string, string> = {
             [ALIVE_API_HEADER_NAME]: ALIVE_API_KEY,
             'Origin': ALIVE_API_ORIGIN,
         };
+        if (ALIVE_API_ORIGIN) {
+            headers.Origin = ALIVE_API_ORIGIN;
+            headers.Referer = `${ALIVE_API_ORIGIN.replace(/\/$/, "")}/`;
+        }
+        return headers;
     }
 
     private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
@@ -618,6 +623,7 @@ class ManufacturerPricingService {
             };
         }
     }
+
 }
 
 export const manufacturerPricingService = new ManufacturerPricingService();

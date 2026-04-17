@@ -20,10 +20,23 @@ import { z } from "zod";
 export const sexEnum = pgEnum('sex', ['male', 'female', 'other']);
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'paused', 'cancelled', 'past_due']);
 export const subscriptionPlanEnum = pgEnum('subscription_plan', ['monthly', 'quarterly', 'annual']);
-export const orderStatusEnum = pgEnum('order_status', ['pending', 'processing', 'shipped', 'delivered', 'cancelled']);
+export const orderStatusEnum = pgEnum('order_status', [
+  'pending', 
+  'pending_confirmation', 
+  'processing', 
+  'partial_settlement', 
+  'settlement_failed', 
+  'shipped', 
+  'delivered', 
+  'cancelled', 
+  'placed',
+  'completed'
+]);
 export const chatStatusEnum = pgEnum('chat_status', ['active', 'completed', 'archived']);
 export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant', 'system']);
 export const addressTypeEnum = pgEnum('address_type', ['shipping', 'billing']);
+export const payoutStatusEnum = pgEnum('payout_status', ['pending', 'processing', 'completed', 'failed']);
+export const recipientTypeEnum = pgEnum('recipient_type', ['admin', 'vendor']);
 export const fileTypeEnum = pgEnum('file_type', ['lab_report', 'medical_document', 'prescription', 'other']);
 export const auditActionEnum = pgEnum('audit_action', ['upload', 'view', 'download', 'delete', 'share', 'access_denied']);
 export const consentTypeEnum = pgEnum('consent_type', ['lab_data_processing', 'ai_analysis', 'data_retention', 'third_party_sharing', 'sms_accountability', 'medication_disclosure', 'tos_acceptance']);
@@ -52,6 +65,8 @@ export const adminActionEnum = pgEnum('admin_action', [
   'newsletter_subscriber_toggle',
   'bulk_delete_tickets', 'bulk_close_tickets', 'bulk_update_tickets',
 ]);
+
+export const refundStatusEnum = pgEnum('refund_status', ['pending', 'approved', 'declined', 'failed', 'voided']);
 
 // Users table - updated with name, email, phone, password
 export const users = pgTable("users", {
@@ -437,6 +452,8 @@ export const orders = pgTable("orders", {
   trackingUrl: text("tracking_url"),
   placedAt: timestamp("placed_at").defaultNow().notNull(),
   shippedAt: timestamp("shipped_at"),
+  currency: text("currency").default('USD').notNull(),
+  paymentMode: text("payment_mode").default('card').notNull(), // 'card', 'bank', etc.
 
   // ── Order-level consent & safety snapshot (legal non-repudiation) ──
   consentSnapshot: json("consent_snapshot").$type<{
@@ -467,12 +484,44 @@ export const orders = pgTable("orders", {
     /** Timestamp when this snapshot was captured */
     capturedAt: string;
   }>(),
+  shippingAddressSnapshot: json("shipping_address_snapshot").$type<{
+    firstName: string;
+    lastName: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  }>(),
 }, (table) => [
   index("orders_user_id_idx").on(table.userId),
   index("orders_status_idx").on(table.status),
   index("orders_placed_at_idx").on(table.placedAt),
   index("orders_gateway_transaction_idx").on(table.gatewayTransactionId),
 ]);
+
+export const payouts = pgTable("payouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  recipientType: recipientTypeEnum("recipient_type").notNull(),
+  recipientAccountId: text("recipient_account_id").notNull(), 
+  amountCents: integer("amount_cents").notNull(),
+  status: payoutStatusEnum("status").default('pending').notNull(),
+  epdPayoutRef: text("epd_payout_ref"),
+  attempts: integer("attempts").default(0).notNull(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("payouts_order_id_idx").on(table.orderId),
+  index("payouts_status_idx").on(table.status),
+]);
+
+export type Payout = typeof payouts.$inferSelect;
+export type InsertPayout = typeof payouts.$inferInsert;
+
 
 // Ingredient pricing reference for equivalent stack estimates
 export const ingredientPricing = pgTable("ingredient_pricing", {
@@ -2857,6 +2906,24 @@ export const ugcBrandAssets = pgTable("ugc_brand_assets", {
   index("ugc_brand_assets_campaign_idx").on(table.campaignId),
   index("ugc_brand_assets_type_idx").on(table.assetType),
 ]);
+export const refunds = pgTable("refunds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orderId: varchar("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  status: refundStatusEnum("status").default('pending').notNull(),
+  transactionId: text("transaction_id"),
+  parentTransactionId: text("parent_transaction_id"),
+  amountCents: integer("amount_cents").notNull(),
+  currency: text("currency").default('USD').notNull(),
+  reason: text("reason"),
+  gatewayResponse: json("gateway_response").$type<any>(),
+  modeOfFund: text("mode_of_fund").default('card').notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("refunds_user_id_idx").on(table.userId),
+  index("refunds_order_id_idx").on(table.orderId),
+  index("refunds_transaction_idx").on(table.transactionId),
+]);
 
 // Insert schemas
 export const insertUgcCampaignSchema = createInsertSchema(ugcCampaigns).omit({ id: true, createdAt: true, updatedAt: true });
@@ -2885,3 +2952,6 @@ export type UgcVideoScene = typeof ugcVideoScenes.$inferSelect;
 export type InsertUgcVideoScene = z.infer<typeof insertUgcVideoSceneSchema>;
 export type UgcBrandAsset = typeof ugcBrandAssets.$inferSelect;
 export type InsertUgcBrandAsset = z.infer<typeof insertUgcBrandAssetSchema>;
+
+export type Refund = typeof refunds.$inferSelect;
+export type InsertRefund = typeof refunds.$inferInsert;

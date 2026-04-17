@@ -97,6 +97,67 @@ export class WebhooksController {
             res.status(200).json({ received: true, error: 'Processing error' });
         }
     }
+
+    /**
+     * POST /api/webhooks/alive/order-status
+     * Handle Alive manufacturer order status updates
+     */
+    async handleAliveOrderStatusWebhook(req: Request, res: Response) {
+        try {
+            const isProduction = process.env.NODE_ENV === 'production';
+            const configuredSecret = process.env.ALIVE_WEBHOOK_SECRET;
+            const providedSecret =
+                (req.headers['x-alive-webhook-secret'] as string | undefined) ||
+                (req.headers['x-webhook-secret'] as string | undefined);
+
+            if (isProduction && !configuredSecret) {
+                logger.error('ALIVE_WEBHOOK_SECRET is missing in production; rejecting Alive webhook');
+                return res.status(503).json({ error: 'Webhook configuration unavailable' });
+            }
+
+            if (configuredSecret && providedSecret !== configuredSecret) {
+                logger.warn('Invalid Alive webhook secret header');
+                return res.status(401).json({ error: 'Invalid webhook secret' });
+            }
+
+            if (!configuredSecret && !isProduction) {
+                logger.warn('Alive webhook secret verification bypassed in non-production environment');
+            }
+
+            await webhooksService.handleAliveOrderStatusWebhook(req.body);
+            return res.status(200).json({ received: true });
+        } catch (error) {
+            logger.error('Error processing Alive order status webhook:', error);
+            return res.status(200).json({ received: true, error: 'Processing error' });
+        }
+    }
+
+    /**
+     * POST /webhook
+     * Unified catch-all webhook listener for events
+     */
+    async handleUnifiedWebhook(req: Request, res: Response) {
+        try {
+            console.log("req.body-->>>>>webhook",req.body)
+            logger.info('Unified webhook received', {
+                method: req.method,
+                headers: req.headers,
+                body: req.body,
+                query: req.query
+            });
+
+            // Respond immediately with 200 OK
+            return res.status(200).json({
+                status: 'success',
+                message: 'Webhook received',
+                timestamp: new Date().toISOString()
+            });
+        } catch (error) {
+            logger.error('Error in unified webhook listener:', error);
+            // Still return 200 to prevent retries for common errors during logging
+            res.status(200).json({ status: 'system_logged', received: true });
+        }
+    }
 }
 
 export const webhooksController = new WebhooksController();

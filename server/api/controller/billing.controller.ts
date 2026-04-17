@@ -169,6 +169,29 @@ export class BillingController {
       res.status(500).json({ error: 'Failed to resume subscription' });
     }
   }
+
+  async cancelOrder(req: Request, res: Response) {
+    try {
+      const userId = req.userId!;
+      const { orderId } = req.params;
+      const result = await billingService.cancelOrder(userId, orderId);
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.json(result);
+    } catch (error: any) {
+      if (error?.message === 'ORDER_NOT_FOUND') {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+      if (error?.message === 'ACCESS_DENIED') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      logger.error('Error cancelling order', { error });
+      res.status(500).json({ error: 'Failed to cancel order' });
+    }
+  }
 }
 
 export const billingController = new BillingController();
