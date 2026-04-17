@@ -17,6 +17,12 @@ import {
   Eye,
   DollarSign,
   RotateCcw,
+  AlertCircle,
+  AlertCircleIcon,
+  Ban,
+  AlertTriangle,
+  CreditCard,
+  FileText,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -55,7 +61,7 @@ interface Order {
   id: string;
   userId: string;
   formulaVersion: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded' | 'failed' | 'voided' | 'placed' | 'completed' | 'settlement_failed';
   amountCents: number | null;
   supplyMonths: number | null;
   trackingUrl: string | null;
@@ -83,7 +89,13 @@ const statusConfig = {
   processing: { icon: Package, color: 'bg-blue-100 text-blue-700', label: 'Processing' },
   shipped: { icon: Truck, color: 'bg-violet-100 text-violet-700', label: 'Shipped' },
   delivered: { icon: CheckCircle, color: 'bg-emerald-100 text-emerald-700', label: 'Delivered' },
-  cancelled: { icon: XCircle, color: 'bg-red-100 text-red-700', label: 'Cancelled' }
+  cancelled: { icon: XCircle, color: 'bg-red-100 text-red-700', label: 'Cancelled' },
+  refunded: { icon: RotateCcw, color: 'bg-orange-100 text-orange-700', label: 'Refunded' },
+  failed: { icon: AlertTriangle, color: 'bg-rose-100 text-rose-700', label: 'Failed' },
+  voided: { icon: Ban, color: 'bg-slate-100 text-slate-700', label: 'Voided' },
+  placed: { icon: FileText, color: 'bg-cyan-100 text-cyan-700', label: 'Placed' },
+  completed: { icon: CheckCircle, color: 'bg-emerald-100 text-emerald-700', label: 'Completed' },
+  settlement_failed: { icon: CreditCard, color: 'bg-red-100 text-red-700', label: 'Settlement Failed' }
 };
 
 function SortIcon({ field, current, dir }: { field: SortField; current: SortField | null; dir: SortDir }) {
@@ -336,7 +348,11 @@ export default function OrdersManagementPage() {
                       </TableRow>
                     ) : (
                       filteredOrders.map((order) => {
-                        const config = statusConfig[order.status];
+                        const config = statusConfig[order.status as keyof typeof statusConfig] || { 
+                          icon: AlertCircleIcon, 
+                          color: 'bg-gray-100 text-gray-700', 
+                          label: order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : 'Unknown'
+                        };
                         const StatusIcon = config.icon;
                         return (
                           <TableRow key={order.id}>
@@ -455,7 +471,11 @@ export default function OrdersManagementPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {(() => {
-                      const cfg = statusConfig[detailOrder.status];
+                        const cfg = statusConfig[detailOrder.status as keyof typeof statusConfig] || {
+                          icon: AlertCircleIcon,
+                          color: 'bg-gray-100 text-gray-700',
+                          label: detailOrder.status ? detailOrder.status.charAt(0).toUpperCase() + detailOrder.status.slice(1) : 'Unknown'
+                        };
                       const Icon = cfg.icon;
                       return (
                         <Badge className={cfg.color}>
