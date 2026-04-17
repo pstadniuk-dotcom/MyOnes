@@ -53,6 +53,8 @@ export const adminActionEnum = pgEnum('admin_action', [
   'bulk_delete_tickets', 'bulk_close_tickets', 'bulk_update_tickets',
 ]);
 
+export const refundStatusEnum = pgEnum('refund_status', ['pending', 'approved', 'declined', 'failed', 'voided']);
+
 // Users table - updated with name, email, phone, password
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -437,6 +439,8 @@ export const orders = pgTable("orders", {
   trackingUrl: text("tracking_url"),
   placedAt: timestamp("placed_at").defaultNow().notNull(),
   shippedAt: timestamp("shipped_at"),
+  currency: text("currency").default('USD').notNull(),
+  paymentMode: text("payment_mode").default('card').notNull(), // 'card', 'bank', etc.
 
   // ── Order-level consent & safety snapshot (legal non-repudiation) ──
   consentSnapshot: json("consent_snapshot").$type<{
@@ -2857,6 +2861,24 @@ export const ugcBrandAssets = pgTable("ugc_brand_assets", {
   index("ugc_brand_assets_campaign_idx").on(table.campaignId),
   index("ugc_brand_assets_type_idx").on(table.assetType),
 ]);
+export const refunds = pgTable("refunds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orderId: varchar("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  status: refundStatusEnum("status").default('pending').notNull(),
+  transactionId: text("transaction_id"),
+  parentTransactionId: text("parent_transaction_id"),
+  amountCents: integer("amount_cents").notNull(),
+  currency: text("currency").default('USD').notNull(),
+  reason: text("reason"),
+  gatewayResponse: json("gateway_response").$type<any>(),
+  modeOfFund: text("mode_of_fund").default('card').notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("refunds_user_id_idx").on(table.userId),
+  index("refunds_order_id_idx").on(table.orderId),
+  index("refunds_transaction_idx").on(table.transactionId),
+]);
 
 // Insert schemas
 export const insertUgcCampaignSchema = createInsertSchema(ugcCampaigns).omit({ id: true, createdAt: true, updatedAt: true });
@@ -2885,3 +2907,6 @@ export type UgcVideoScene = typeof ugcVideoScenes.$inferSelect;
 export type InsertUgcVideoScene = z.infer<typeof insertUgcVideoSceneSchema>;
 export type UgcBrandAsset = typeof ugcBrandAssets.$inferSelect;
 export type InsertUgcBrandAsset = z.infer<typeof insertUgcBrandAssetSchema>;
+
+export type Refund = typeof refunds.$inferSelect;
+export type InsertRefund = typeof refunds.$inferInsert;

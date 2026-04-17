@@ -8,7 +8,8 @@ import {
     type Order, type InsertOrder,
     type Address, type InsertAddress,
     type PaymentMethodRef, type InsertPaymentMethodRef,
-    type Formula
+    type Formula,
+    refunds, type Refund, type InsertRefund
 } from '@shared/schema';
 import { eq, and, desc, isNull, inArray, sql, lt, lte, gt, gte } from 'drizzle-orm';
 import { decryptField, encryptField } from 'server/infra/security/fieldEncryption';
@@ -657,6 +658,28 @@ export class UsersRepository {
         } catch (error) {
             logger.error('Error updating streak statuses', { error });
         }
+    }
+
+    // Refund operations
+    async createRefund(refund: InsertRefund): Promise<Refund> {
+        const [created] = await db.insert(refunds).values(refund).returning();
+        return created;
+    }
+
+    async listRefundsByOrder(orderId: string): Promise<Refund[]> {
+        return await db
+            .select()
+            .from(refunds)
+            .where(eq(refunds.orderId, orderId))
+            .orderBy(desc(refunds.createdAt));
+    }
+
+    async listRefundsByUser(userId: string): Promise<Refund[]> {
+        return await db
+            .select()
+            .from(refunds)
+            .where(eq(refunds.userId, userId))
+            .orderBy(desc(refunds.createdAt));
     }
 }
 
