@@ -65,9 +65,9 @@ export class FilesService {
 
     async uploadFile(userId: string, uploadedFile: any, auditInfo: any) {
         // Validate file constraints
-        const maxSizeBytes = 10 * 1024 * 1024; // 10MB limit
+        const maxSizeBytes = 5 * 1024 * 1024; // 5MB limit
         if (uploadedFile.size > maxSizeBytes) {
-            throw new Error(`File too large. Maximum size is 10MB.`);
+            throw new Error(`File too large. Maximum size is 5MB.`);
         }
 
         const allowedMimeTypes = [
@@ -273,9 +273,9 @@ export class FilesService {
         const fileUpload = await this.getFile(fileId, userId);
 
         // Validate file constraints
-        const maxSizeBytes = 10 * 1024 * 1024;
+        const maxSizeBytes = 5 * 1024 * 1024; // 5MB limit
         if (uploadedFile.size > maxSizeBytes) {
-            throw new Error(`File too large. Maximum size is 10MB.`);
+            throw new Error(`File too large. Maximum size is 5MB.`);
         }
 
         const oldObjectPath = fileUpload.objectPath;
