@@ -3,7 +3,11 @@ import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/hooks/use-toast";
-import { apiRequest, getAuthHeaders } from "@/shared/lib/queryClient";
+import {
+  apiRequest,
+  getAuthHeaders,
+  queryClient,
+} from "@/shared/lib/queryClient";
 import { buildApiUrl } from "@/shared/lib/api";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -22,6 +26,7 @@ import {
   Package,
   Truck,
   Star,
+  Repeat,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -298,15 +303,21 @@ export default function CheckoutPage() {
       return discountedPrice + membershipMonthlyPrice + shippingCost;
     }
     if (hasActiveMembership) {
-      // User requested: "we have to add the membership price in 450 right?"
-      // So we include the membership fee in the total even for active members.
-      return discountedPrice + activeMembershipPrice + shippingCost;
+      // Existing member: they get the discount but don't pay the membership fee again here
+      return discountedPrice + shippingCost;
     }
     return formulaPrice + shippingCost;
   })();
 
   const showDiscounted =
     hasActiveMembership || (includeMembership && membershipUpsellAvailable);
+
+  // Sync membership and autoship selection
+  useEffect(() => {
+    if (includeMembership && membershipUpsellAvailable) {
+      setEnableAutoShip(true);
+    }
+  }, [includeMembership, membershipUpsellAvailable]);
 
   // ── Collect.js Loading ─────────────────────────────────────────────
 
@@ -495,6 +506,13 @@ export default function CheckoutPage() {
       }>;
     },
     onSuccess: (data) => {
+      // Invalidate queries to ensure latest data is fetched when navigating
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me/orders"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/users/me/billing-history"],
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/membership/me"] });
+
       resetPaymentSubmission();
       const memberParam =
         membershipUpsellAvailable && includeMembership ? "1" : "0";
@@ -1316,8 +1334,7 @@ function OrderSummaryCard({
           </div>
         )}
 
-        {(hasActiveMembership ||
-          (includeMembership && membershipUpsellAvailable)) && (
+        {includeMembership && membershipUpsellAvailable && (
           <div className="flex justify-between">
             <span className="text-[#262626]/60">
               {tierName || "Membership"} (monthly)
@@ -1397,28 +1414,60 @@ function OrderSummaryCard({
         </>
       )}
 
-      {/* Auto-Ship Toggle */}
-      <div className="rounded-xl border border-black/[0.06] p-4">
-        <div className="flex items-start justify-between gap-3">
+      {/* Auto-Ship / Smart Re-Order Section */}
+      {showDiscounted ? (
+        <div className="flex items-start gap-3 rounded-xl border border-[#054700]/15 bg-[#054700]/[0.02] p-4 text-left">
+          <div className="mt-0.5 w-4 h-4 rounded-full bg-[#054700] flex items-center justify-center shrink-0">
+            <svg
+              className="w-2.5 h-2.5 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={3}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <Truck className="w-4 h-4 text-[#262626]/50" />
+              <Repeat className="w-4 h-4 text-[#054700]" />
               <span className="font-semibold text-sm text-[#262626]">
-                Auto-Ship
+                Smart Re-Order with AI Review
               </span>
             </div>
             <p className="text-xs text-[#262626]/50 leading-relaxed">
-              Automatically reorder every {quote?.weeks ?? 4} weeks. Cancel or
-              pause anytime.
+              Before your next refill, your AI practitioner reviews your body
+              data and recommends formula adjustments. You approve via text.
             </p>
           </div>
-          <Switch
-            checked={enableAutoShip}
-            onCheckedChange={onToggleAutoShip}
-            className="data-[state=checked]:bg-[#054700] flex-shrink-0 mt-0.5"
-          />
         </div>
-      </div>
+      ) : (
+        <div className="rounded-xl border border-black/[0.06] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 text-left">
+                <Truck className="w-4 h-4 text-[#262626]/50" />
+                <span className="font-semibold text-sm text-[#262626]">
+                  Auto-Ship
+                </span>
+              </div>
+              <p className="text-xs text-[#262626]/50 leading-relaxed text-left">
+                Automatically reorder every {quote?.weeks ?? 4} weeks. Cancel or
+                pause anytime.
+              </p>
+            </div>
+            <Switch
+              checked={enableAutoShip}
+              onCheckedChange={onToggleAutoShip}
+              className="data-[state=checked]:bg-[#054700] flex-shrink-0 mt-0.5"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -113,7 +113,13 @@ const getStatusIcon = (status: string) => {
     case "shipped":
       return <Truck className="w-4 h-4 text-blue-600" />;
     case "processing":
+    case "pending_3p":
+    case "placed":
       return <Clock className="w-4 h-4 text-yellow-600" />;
+    case "completed":
+      return <CheckCircle className="w-4 h-4 text-green-600" />;
+    case "pending_confirmation":
+      return <AlertCircle className="w-4 h-4 text-orange-600" />;
     default:
       return <Package className="w-4 h-4 text-muted-foreground" />;
   }
@@ -126,33 +132,43 @@ const getStatusColor = (status: string) => {
     case "shipped":
       return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
     case "processing":
+    case "pending_3p":
+    case "placed":
       return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+    case "completed":
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    case "pending_confirmation":
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
     default:
       return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
   }
 };
 
-const CancellationTimer = ({ placedAt }: { placedAt: string | Date }) => {
+const CancellationTimer = ({ 
+  placedAt,
+  children
+}: { 
+  placedAt: string | Date,
+  children?: React.ReactNode
+}) => {
   const [timeLeft, setTimeLeft] = useState<string>("");
 
   useEffect(() => {
     const calculateTimeLeft = () => {
       const placedDate = new Date(placedAt);
-      const expiryDate = new Date(placedDate.getTime() + 4 * 60 * 60 * 1000);
+      const expiryDate = new Date(placedDate.getTime() + 4 * 60 * 1000);
       const now = new Date();
       const diffMs = expiryDate.getTime() - now.getTime();
 
       if (diffMs <= 0) return "Expired";
 
-      const hours = Math.floor(diffMs / (1000 * 60 * 60));
-      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const minutes = Math.floor(diffMs / (1000 * 60));
       const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
 
-      const h = hours.toString().padStart(1, "0");
-      const m = minutes.toString().padStart(2, "0");
+      const m = minutes.toString().padStart(1, "0");
       const s = seconds.toString().padStart(2, "0");
 
-      return `${h}h ${m}m ${s}s left`;
+      return `${m}m ${s}s left`;
     };
 
     const initial = calculateTimeLeft();
@@ -164,8 +180,9 @@ const CancellationTimer = ({ placedAt }: { placedAt: string | Date }) => {
       setTimeLeft(text);
       if (text === "Expired") {
         clearInterval(interval);
-        // Refresh orders once timer expires to hide cancel button
+         // Refresh orders and billing once timer expires to hide cancel button and update status
         queryClient.invalidateQueries({ queryKey: ["/api/users/me/orders"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users/me/billing-history"] });
       }
     }, 1000);
 
@@ -173,11 +190,14 @@ const CancellationTimer = ({ placedAt }: { placedAt: string | Date }) => {
   }, [placedAt]);
 
   if (timeLeft === "Expired" || !timeLeft) return null;
-
+ 
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-600 rounded-lg border border-red-100 text-[10px] font-bold shadow-sm animate-pulse whitespace-nowrap min-w-[110px] justify-center tabular-nums">
-      <Clock className="w-3 h-3" />
-      <span className="font-mono">{timeLeft.toUpperCase()} TO CANCEL</span>
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-600 rounded-lg border border-red-100 text-[10px] font-bold shadow-sm animate-pulse whitespace-nowrap min-w-[110px] justify-center tabular-nums">
+        <Clock className="w-3 h-3" />
+        <span className="font-mono">{timeLeft.toUpperCase()} TO CANCEL</span>
+      </div>
+      {children}
     </div>
   );
 };
@@ -1011,28 +1031,26 @@ export default function OrdersPage() {
                                 </Button>
                               )}
 
-                            {["processing", "pending"].includes(order.status) &&
-                              new Date().getTime() -
-                                new Date(order.placedAt).getTime() <
-                                4 * 60 * 60 * 1000 && (
-                                <div className="flex flex-col items-end gap-2">
-                                  <CancellationTimer
-                                    placedAt={order.placedAt}
-                                  />
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setOrderToCancel(order.id);
-                                      setShowCancelOrderDialog(true);
-                                    }}
-                                    className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 w-full"
-                                  >
-                                    <XCircle className="w-4 h-4 mr-2" />
-                                    Cancel Order
-                                  </Button>
-                                </div>
-                              )}
+                            {[
+                              "processing",
+                              "pending",
+                              "pending_confirmation",
+                            ].includes(order.status) && (
+                              <CancellationTimer placedAt={order.placedAt}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setOrderToCancel(order.id);
+                                    setShowCancelOrderDialog(true);
+                                  }}
+                                  className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 w-full"
+                                >
+                                  <XCircle className="w-4 h-4 mr-2" />
+                                  Cancel Order
+                                </Button>
+                              </CancellationTimer>
+                            )}
                           </div>
                         </div>
                       </CardContent>
@@ -1396,7 +1414,7 @@ export default function OrdersPage() {
             <AlertDialogDescription className="text-[#52796F]">
               Are you sure you want to cancel this order? This action cannot be
               undone if the order has already entered final production. Note:
-              You can only cancel within 4 hours of placing the order.
+              You can only cancel within 4 minutes of placing the order.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

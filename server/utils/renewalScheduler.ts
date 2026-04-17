@@ -12,9 +12,9 @@
  */
 
 import cron from 'node-cron';
-import { eq, and, lte, isNotNull } from 'drizzle-orm';
+import { eq, and, lte, gte, isNotNull } from 'drizzle-orm';
 import { db } from '../infra/db/db';
-import { subscriptions, autoShipSubscriptions } from '@shared/schema';
+import { subscriptions, autoShipSubscriptions, users } from '@shared/schema';
 import { billingService } from '../modules/billing/billing.service';
 import { autoShipService } from '../modules/billing/autoship.service';
 import logger from '../infra/logging/logger';
@@ -81,6 +81,69 @@ async function processMembershipRenewals() {
 }
 
 // ──────────────────────────────────────────────────────────────
+// Membership Renewal Reminders (3 Days Before)
+// ──────────────────────────────────────────────────────────────
+
+// async function processMembershipReminders() {
+//   logger.info('[Renewal] Membership reminder job: starting');
+
+//   let sent = 0;
+//   try {
+//     const now = new Date();
+//     const threeDaysFromNowStart = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+//     const threeDaysFromNowEnd = new Date(threeDaysFromNowStart.getTime() + 24 * 60 * 60 * 1000);
+
+//     // Find active subscriptions renewing in exactly 3 days
+//     const upcoming = await db
+//       .select()
+//       .from(subscriptions)
+//       .where(
+//         and(
+//           eq(subscriptions.status, 'active'),
+//           isNotNull(subscriptions.renewsAt),
+//           lte(subscriptions.renewsAt, threeDaysFromNowEnd),
+//           gte(subscriptions.renewsAt, threeDaysFromNowStart),
+//         ),
+//       );
+
+//     logger.info(`[Renewal] Found ${upcoming.length} memberships renewing in 3 days`);
+
+//     for (const sub of upcoming) {
+//       try {
+//         const user = await db.query.users.findFirst({
+//           where: (users, { eq }) => eq(users.id, sub.userId)
+//         });
+
+//         if (user && user.email) {
+//           const { sendNotificationEmail } = await import('./emailService');
+//           const frontendUrl = process.env.VITE_FRONTEND_URL || 'https://ones.ai';
+
+//           await sendNotificationEmail(user.email, {
+//             subject: 'Your ONES Membership is renewing soon',
+//             title: 'Membership Renewal Reminder',
+//             content: `
+//               <p>Hi ${user.name?.split(' ')[0] || 'Member'},</p>
+//               <p>Just a friendly reminder that your active ONES membership is scheduled to renew in 3 days.</p>
+//               <p>No action is required from you. We will automatically charge your card on file so you can continue enjoying 15% off all supplement orders and access to your AI practitioner data.</p>
+//               <p>If you'd like to update your plan or manage your subscription, you can do so in your dashboard.</p>
+//             `,
+//             actionUrl: `${frontendUrl}/dashboard/settings`,
+//             actionText: 'Manage Subscription'
+//           });
+//           sent++;
+//         }
+//       } catch (err) {
+//         logger.error('[Renewal] Failed to send reminder email', { userId: sub.userId, error: err });
+//       }
+//     }
+//   } catch (err) {
+//     logger.error('[Renewal] Membership reminder job failed', { error: err });
+//   }
+
+//   logger.info('[Renewal] Membership reminder job complete', { sent });
+// }
+
+// ──────────────────────────────────────────────────────────────
 // Auto-Ship Renewals
 // ──────────────────────────────────────────────────────────────
 
@@ -142,6 +205,11 @@ export function startRenewalScheduler() {
   cron.schedule('0 9 * * *', async () => {
     await processMembershipRenewals();
   });
+
+  // // Membership renewal reminders — daily at 10am UTC (warns 3 days before renewal)
+  // cron.schedule('0 10 * * *', async () => {
+  //   await processMembershipReminders();
+  // });
 
   // Auto-ship renewals — daily at 11am UTC (after pre-renewal quote refresh at 8am)
   cron.schedule('0 11 * * *', async () => {

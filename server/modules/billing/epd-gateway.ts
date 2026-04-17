@@ -203,6 +203,26 @@ class EpdGateway {
   }
 
   /**
+   * Payout: Transfer funds from the merchant account to a 3rd party or admin account.
+   * This is a placeholder for the EPD Payout/Transfer API.
+   * Verify the exact implementation with your EPD account manager.
+   */
+  async payout(params: {
+    amount: string;
+    destination_account: string;
+    orderid?: string;
+    description?: string;
+  }): Promise<EpdTransactionResponse> {
+    return this.post(this.clean({
+      type: 'distribution',
+      amount: params.amount,
+      payee_id: params.destination_account,
+      orderid: params.orderid,
+      orderdescription: params.description,
+    }));
+  }
+
+  /**
    * Void: Cancel a transaction before settlement.
    */
   async voidTransaction(transactionId: string): Promise<EpdTransactionResponse> {

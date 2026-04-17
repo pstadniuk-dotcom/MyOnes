@@ -9,7 +9,8 @@ import {
     type Address, type InsertAddress,
     type PaymentMethodRef, type InsertPaymentMethodRef,
     type Formula,
-    refunds, type Refund, type InsertRefund
+    refunds, type Refund, type InsertRefund,
+    payouts, type Payout, type InsertPayout
 } from '@shared/schema';
 import { eq, and, desc, isNull, inArray, sql, lt, lte, gt, gte } from 'drizzle-orm';
 import { decryptField, encryptField } from 'server/infra/security/fieldEncryption';
@@ -349,15 +350,32 @@ export class UsersRepository {
             .orderBy(desc(orders.placedAt));
     }
 
-    async getOrderWithFormula(orderId: string): Promise<{ order: Order, formula: Formula | undefined } | undefined> {
+    async getOrderWithFormula(orderId: string): Promise<{ order: Order; formula: any } | undefined> {
         const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
-        if (!order) return undefined;
+        if (!order || !order.formulaId) return order ? { order, formula: null } : undefined;
+        const [formula] = await db.select().from(formulas).where(eq(formulas.id, order.formulaId));
+        return { order, formula };
+    }
 
-        const [formula] = await db
-            .select()
-            .from(formulas)
-            .where(and(eq(formulas.userId, order.userId), eq(formulas.version, order.formulaVersion)));
-        return { order, formula: formula || undefined };
+    /**
+     * Atomically transition an order from pending_confirmation to pending.
+     * Use this to prevent race conditions where two processes settle the same order.
+     */
+    async claimOrderForSettlement(orderId: string): Promise<Order | undefined> {
+        const [updated] = await db
+            .update(orders)
+            .set({ status: 'pending' })
+            .where(and(
+                eq(orders.id, orderId),
+                eq(orders.status, 'pending_confirmation')
+            ))
+            .returning();
+        return updated || undefined;
+    }
+
+    async createRefund(refund: InsertRefund): Promise<Refund> {
+        const [created] = await db.insert(refunds).values(refund).returning();
+        return created;
     }
 
     // Address operations
@@ -679,10 +697,6 @@ export class UsersRepository {
     }
 
     // Refund operations
-    async createRefund(refund: InsertRefund): Promise<Refund> {
-        const [created] = await db.insert(refunds).values(refund).returning();
-        return created;
-    }
 
     async listRefundsByOrder(orderId: string): Promise<Refund[]> {
         return await db
@@ -698,6 +712,42 @@ export class UsersRepository {
             .from(refunds)
             .where(eq(refunds.userId, userId))
             .orderBy(desc(refunds.createdAt));
+    }
+
+    // Payout operations
+    async createPayout(payout: InsertPayout): Promise<Payout> {
+        const [created] = await db.insert(payouts).values(payout).returning();
+        return created;
+    }
+
+    async updatePayout(id: string, updates: Partial<InsertPayout>): Promise<Payout | undefined> {
+        const [updated] = await db
+            .update(payouts)
+            .set({ ...updates, updatedAt: new Date() })
+            .where(eq(payouts.id, id))
+            .returning();
+        return updated || undefined;
+    }
+
+    async getPayoutsByOrder(orderId: string): Promise<Payout[]> {
+        return await db
+            .select()
+            .from(payouts)
+            .where(eq(payouts.orderId, orderId));
+    }
+
+    async getFailedPayouts(): Promise<Payout[]> {
+        return await db
+            .select()
+            .from(payouts)
+            .where(eq(payouts.status, 'failed'));
+    }
+
+    async getPendingRefunds(): Promise<Refund[]> {
+        return await db
+            .select()
+            .from(refunds)
+            .where(eq(refunds.status, 'pending'));
     }
 }
 

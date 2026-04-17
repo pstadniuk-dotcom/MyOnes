@@ -88,6 +88,19 @@ const statusConfig = {
   cancelled: { icon: XCircle, color: 'bg-red-100 text-red-700', label: 'Cancelled' }
 };
 
+const getStatusConfig = (status: string) => {
+  if (statusConfig[status as keyof typeof statusConfig]) {
+    return statusConfig[status as keyof typeof statusConfig];
+  }
+  // Map transitional statuses to their primary visual styles
+  if (status === 'placed') return statusConfig.processing;
+  if (status === 'pending_confirmation') return statusConfig.pending;
+  if (status === 'settlement_failed') return statusConfig.cancelled;
+  
+  // Default fallback
+  return statusConfig.pending;
+};
+
 function SortIcon({ field, current, dir }: { field: SortField; current: SortField | null; dir: SortDir }) {
   if (current !== field) return <ArrowUpDown className="h-3 w-3 ml-1 text-gray-300" />;
   return dir === 'asc'
@@ -438,7 +451,7 @@ export default function OrdersManagementPage() {
                       </TableRow>
                     ) : (
                       filteredOrders.map((order) => {
-                        const config = statusConfig[order.status];
+                        const config = getStatusConfig(order.status);
                         const StatusIcon = config.icon;
                         const isSelected = selectedIds.has(order.id);
                         return (
@@ -632,7 +645,7 @@ export default function OrdersManagementPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {(() => {
-                      const cfg = statusConfig[detailOrder.status];
+                      const cfg = getStatusConfig(detailOrder.status);
                       const Icon = cfg.icon;
                       return (
                         <Badge className={cfg.color}>
