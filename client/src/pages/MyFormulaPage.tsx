@@ -1015,6 +1015,7 @@ export default function MyFormulaPage() {
                           onOrder={() => handleOpenPricingForFormula(formula.id)}
                           getIndividualIngredientDetails={getIndividualIngredientDetails}
                           diffSummary={formulaDiffMap[formula.id]}
+                          hasActiveMembership={hasActiveMembership}
                         />
                       ))}
                     </div>
@@ -2166,9 +2167,10 @@ interface FormulaCardProps {
   onArchive: (formulaId: string) => void;
   isArchiving?: boolean;
   getIndividualIngredientDetails: (ingredientName: string) => { name: string; doseMg: number; category: string; description?: string; benefits?: string[] } | undefined;
+  hasActiveMembership: boolean;
 }
 
-function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onOpenPricing, onCustomize, onOrder, onRename, onArchive, isArchiving, getIndividualIngredientDetails }: FormulaCardProps) {
+function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onOpenPricing, onCustomize, onOrder, onRename, onArchive, isArchiving, getIndividualIngredientDetails, hasActiveMembership }: FormulaCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [expandedIndividualIngredients, setExpandedIndividualIngredients] = useState<Record<string, boolean>>({});
   const detailsBtnRef = useRef<HTMLButtonElement>(null);
@@ -2359,9 +2361,9 @@ function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onO
             ) : tileQuote?.available ? (
               <>
                 <span className="text-sm font-semibold text-[#054700] tabular-nums">
-                  ${(tileQuote.total ?? 0).toFixed(0)}
+                  ${(hasActiveMembership ? (tileQuote.total ?? 0) * 0.85 : (tileQuote.total ?? 0)).toFixed(0)}
                 </span>
-                <p className="text-[10px] text-[#5a6623]">8-week est</p>
+                <p className="text-[10px] text-[#5a6623]">{hasActiveMembership ? 'member' : '8-week est'}</p>
               </>
             ) : (
               <span className="text-[10px] text-[#5a6623]">See pricing</span>
