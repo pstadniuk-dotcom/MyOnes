@@ -20,7 +20,7 @@ import { z } from "zod";
 export const sexEnum = pgEnum('sex', ['male', 'female', 'other']);
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'paused', 'cancelled', 'past_due']);
 export const subscriptionPlanEnum = pgEnum('subscription_plan', ['monthly', 'quarterly', 'annual']);
-export const orderStatusEnum = pgEnum('order_status', ['pending', 'processing', 'shipped', 'delivered', 'cancelled']);
+export const orderStatusEnum = pgEnum('order_status', ['pending', 'pending_confirmation', 'processing', 'shipped', 'delivered', 'cancelled', 'placed', 'completed', 'partial_settlement', 'settlement_failed']);
 export const chatStatusEnum = pgEnum('chat_status', ['active', 'completed', 'archived']);
 export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant', 'system']);
 export const addressTypeEnum = pgEnum('address_type', ['shipping', 'billing']);
@@ -54,6 +54,8 @@ export const adminActionEnum = pgEnum('admin_action', [
 ]);
 
 export const refundStatusEnum = pgEnum('refund_status', ['pending', 'approved', 'declined', 'failed', 'voided']);
+export const payoutStatusEnum = pgEnum('payout_status', ['pending', 'processing', 'completed', 'failed']);
+export const recipientTypeEnum = pgEnum('recipient_type', ['admin', 'vendor']);
 
 // Users table - updated with name, email, phone, password
 export const users = pgTable("users", {
@@ -441,6 +443,16 @@ export const orders = pgTable("orders", {
   shippedAt: timestamp("shipped_at"),
   currency: text("currency").default('USD').notNull(),
   paymentMode: text("payment_mode").default('card').notNull(), // 'card', 'bank', etc.
+  shippingAddressSnapshot: json("shipping_address_snapshot").$type<{
+    firstName: string;
+    lastName: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    zip: string;
+    country?: string;
+  }>(),
 
   // ── Order-level consent & safety snapshot (legal non-repudiation) ──
   consentSnapshot: json("consent_snapshot").$type<{
@@ -2910,3 +2922,25 @@ export type InsertUgcBrandAsset = z.infer<typeof insertUgcBrandAssetSchema>;
 
 export type Refund = typeof refunds.$inferSelect;
 export type InsertRefund = typeof refunds.$inferInsert;
+
+// Payouts table - tracks fund distribution to admin/vendor after order settlement
+export const payouts = pgTable("payouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  recipientType: recipientTypeEnum("recipient_type").notNull(),
+  recipientAccountId: text("recipient_account_id").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  status: payoutStatusEnum("status").default('pending').notNull(),
+  epdPayoutRef: text("epd_payout_ref"),
+  attempts: integer("attempts").default(0).notNull(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("payouts_order_id_idx").on(table.orderId),
+  index("payouts_status_idx").on(table.status),
+]);
+
+export type Payout = typeof payouts.$inferSelect;
+export type InsertPayout = typeof payouts.$inferInsert;

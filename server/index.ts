@@ -18,6 +18,7 @@ import { startAutoShipScheduler } from "./utils/autoShipScheduler";
 import { startSmartReorderScheduler } from "./utils/smartReorderScheduler";
 import { startRenewalScheduler } from './utils/renewalScheduler';
 import { startIngredientCatalogSyncScheduler } from "./utils/ingredientCatalogSyncScheduler";
+import { startOrderSettlementScheduler } from "./utils/orderSettlementScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
 import { testEncryption } from "./infra/security/fieldEncryption";
@@ -64,8 +65,10 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net","https://maps.googleapis.com", "https://secure.easypaydirectgateway.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style"],
+      scriptSrc: ["'self'", "'unsafe-inline'", ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net","https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com"],
+      scriptSrcElem: ["'self'", "'unsafe-inline'", ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net", "https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
+      styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:", "https://platform-lookaside.fbsbx.com", "https://maps.googleapis.com"],
       objectSrc: [
@@ -330,6 +333,7 @@ app.get('/api/health', (_req, res) => {
         { name: 'BlogGeneration', start: startBlogGenerationScheduler },
         { name: 'PrAgent', start: startPrAgentScheduler },
         { name: 'IngredientCatalogSync', start: startIngredientCatalogSyncScheduler },
+        { name: 'OrderSettlement', start: startOrderSettlementScheduler },
       ];
 
       for (const { name, start } of schedulers) {

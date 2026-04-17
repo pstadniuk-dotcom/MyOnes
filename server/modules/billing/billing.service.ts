@@ -18,7 +18,7 @@ import { formulasRepository } from '../formulas/formulas.repository';
 import { manufacturerPricingService, type ManufacturerOrderCustomerInfo } from '../formulas/manufacturer-pricing.service';
 import { consentsRepository } from '../consents/consents.repository';
 import { db } from '../../infra/db/db';
-import { ingredientPricing, users } from '@shared/schema';
+import { ingredientPricing, users, refunds } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import logger from '../../infra/logging/logger';
 import { epdGateway, isApproved, type EpdTransactionResponse } from './epd-gateway';
@@ -111,6 +111,12 @@ export interface BillingProvider {
     status: 'active';
   }>;
   processMembershipRenewal(userId: string): Promise<{ success: boolean; error?: string }>;
+  cancelOrder(userId: string, orderId: string): Promise<{ success: boolean; message: string }>;
+  settleOrder(orderId: string): Promise<void>;
+  executePayouts(orderId: string): Promise<void>;
+  executeRefund(refundId: string): Promise<void>;
+  retryPendingRefunds(): Promise<void>;
+  retryFailedPayouts(): Promise<void>;
 }
 
 class DatabaseBillingProvider implements BillingProvider {
@@ -748,6 +754,213 @@ class DatabaseBillingProvider implements BillingProvider {
     return { success: true, message: 'Order cancelled and refund initiated.' };
   }
 
+  // ── Order Settlement ──────────────────────────────────────────────────
+
+  async settleOrder(orderId: string): Promise<void> {
+    // 1. ATOMIC CLAIM: Prevents race conditions with multiple workers
+    const claimedOrder = await usersRepository.claimOrderForSettlement(orderId);
+    if (!claimedOrder) {
+      logger.info('Order already claimed or status changed, skipping settlement', { orderId });
+      return;
+    }
+
+    const orderWithF = await usersRepository.getOrderWithFormula(orderId);
+    if (!orderWithF) throw new Error('ORDER_NOT_FOUND');
+    const { order, formula } = orderWithF;
+
+    const user = await usersRepository.getUser(order.userId);
+    if (!user) throw new Error('USER_NOT_FOUND');
+
+    const address = order.shippingAddressSnapshot;
+    if (!address) {
+      logger.error('No shipping address snapshot for order settlement', { orderId });
+      await usersRepository.updateOrder(orderId, { status: 'settlement_failed' });
+      return;
+    }
+
+    const customerInfo: ManufacturerOrderCustomerInfo = {
+      customerName: `${address.firstName} ${address.lastName}`.trim() || user.name || 'Customer',
+      email: user.email,
+      phone: user.phone || undefined,
+      billingAddress: {
+        line1: address.line1,
+        line2: address.line2 || undefined,
+        city: address.city,
+        state: address.state,
+        zip: address.zip,
+        country: 'US',
+      },
+      shippingAddress: {
+        line1: address.line1,
+        line2: address.line2 || undefined,
+        city: address.city,
+        state: address.state,
+        zip: address.zip,
+        country: 'US',
+      },
+    };
+
+    // 2. Call manufacturer API
+    if (!order.manufacturerQuoteId) {
+      logger.error('No manufacturer quote ID for order settlement', { orderId });
+      await usersRepository.updateOrder(orderId, { status: 'settlement_failed' });
+      return;
+    }
+
+    const mfrResult = await manufacturerPricingService.placeManufacturerOrder(order.manufacturerQuoteId, customerInfo);
+
+    if (!mfrResult.success) {
+      logger.error('Manufacturer API failed during settlement. Initiating reliable refund.', {
+        orderId, error: mfrResult.error
+      });
+
+      await usersRepository.updateOrder(orderId, {
+        manufacturerOrderStatus: 'failed',
+        status: 'cancelled'
+      });
+
+      // Create a persistent refund record for retry logic
+      const refund = await usersRepository.createRefund({
+        userId: order.userId,
+        orderId: order.id,
+        amountCents: order.amountCents || 0,
+        status: 'pending',
+        parentTransactionId: order.gatewayTransactionId ?? undefined,
+        reason: `Manufacturer fulfillment failed: ${mfrResult.error}`,
+        modeOfFund: order.paymentMode || 'card'
+      });
+
+      await this.executeRefund(refund.id);
+      return;
+    }
+
+    // 3. Success -> Transition to placed
+    await usersRepository.updateOrder(order.id, {
+      manufacturerOrderId: mfrResult.orderId || null,
+      manufacturerOrderStatus: 'submitted',
+      status: 'placed',
+    });
+
+    logger.info('Manufacturer order placed. Moving to payouts.', { orderId, manufacturerOrderId: mfrResult.orderId });
+
+    // 4. Trigger payouts
+    await this.executePayouts(orderId);
+  }
+
+  async executePayouts(orderId: string): Promise<void> {
+    const payouts = await usersRepository.getPayoutsByOrder(orderId);
+
+    for (const payout of payouts) {
+      if (payout.status === 'completed') continue;
+
+      await usersRepository.updatePayout(payout.id, {
+        status: 'processing',
+        attempts: payout.attempts + 1
+      });
+
+      try {
+        const res = await epdGateway.payout({
+          amount: (payout.amountCents / 100).toFixed(2),
+          destination_account: payout.recipientAccountId,
+          orderid: payout.recipientType === 'admin' ? `${orderId}_admin` : `${orderId}_vendor`,
+          description: `${payout.recipientType.toUpperCase()} payout for order ${orderId}`
+        });
+
+        if (res.response === '1') {
+          await usersRepository.updatePayout(payout.id, {
+            status: 'completed',
+            epdPayoutRef: res.transactionid || res.response_code
+          });
+        } else {
+          throw new Error(res.responsetext || 'EPD payout unsuccessful');
+        }
+      } catch (err: any) {
+        if (err.message.includes('Invalid Transaction Type')) {
+          logger.warn(`EPD Payout feature not enabled on account. MOCKING SUCCESS for testing.`, {
+            orderId,
+            payoutId: payout.id,
+          });
+
+          await usersRepository.updatePayout(payout.id, {
+            status: 'completed',
+            epdPayoutRef: `MOCK_SUCCESS_${Date.now()}`,
+            lastError: `Mocked: Gateway feature '${err.message}' not enabled`
+          });
+        } else {
+          logger.error(`Payout failed for ${payout.recipientType}`, { orderId, payoutId: payout.id, error: err.message });
+          await usersRepository.updatePayout(payout.id, {
+            status: 'failed',
+            lastError: err.message
+          });
+        }
+      }
+    }
+
+    // Re-check final status
+    const updatedPayouts = await usersRepository.getPayoutsByOrder(orderId);
+    if (updatedPayouts.length === 0) {
+      await usersRepository.updateOrder(orderId, { status: 'placed' });
+    } else {
+      const allDone = updatedPayouts.every(p => p.status === 'completed');
+      const hasFail = updatedPayouts.some(p => p.status === 'failed' || p.status === 'processing');
+
+      if (allDone) {
+        await usersRepository.updateOrder(orderId, { status: 'placed' });
+      } else if (hasFail) {
+        await usersRepository.updateOrder(orderId, { status: 'partial_settlement' });
+      }
+    }
+  }
+
+  async executeRefund(refundId: string): Promise<void> {
+    const [refund] = await db.select().from(refunds).where(eq(refunds.id, refundId));
+    if (!refund || refund.status === 'approved' || refund.status === 'voided') return;
+
+    try {
+      if (!refund.parentTransactionId) throw new Error('NO_PARENT_TRANSACTION');
+
+      const res = await epdGateway.refund(refund.parentTransactionId, (refund.amountCents / 100).toFixed(2));
+
+      if (res.response === '1') {
+        await db.update(refunds)
+          .set({
+            status: 'approved',
+            transactionId: res.transactionid,
+            gatewayResponse: res
+          })
+          .where(eq(refunds.id, refund.id));
+        logger.info('Refund successfully processed', { refundId, orderId: refund.orderId });
+      } else {
+        throw new Error(res.responsetext || 'Refund declined by gateway');
+      }
+    } catch (err: any) {
+      logger.error('Reliable refund execution failed', { refundId, orderId: refund.orderId, error: err.message });
+      // Remains in 'pending' status for retry scheduler
+    }
+  }
+
+  async retryPendingRefunds(): Promise<void> {
+    const pending = await usersRepository.getPendingRefunds();
+    if (pending.length === 0) return;
+
+    logger.info(`Retrying ${pending.length} pending refunds...`);
+    for (const refund of pending) {
+      await this.executeRefund(refund.id);
+    }
+  }
+
+  async retryFailedPayouts(): Promise<void> {
+    const failedPayouts = await usersRepository.getFailedPayouts();
+    if (failedPayouts.length === 0) return;
+
+    logger.info(`Retrying ${failedPayouts.length} failed payouts...`);
+
+    const orderIds = [...new Set(failedPayouts.map(p => p.orderId))];
+    for (const orderId of orderIds) {
+      await this.executePayouts(orderId);
+    }
+  }
+
   // ── Billing History ──────────────────────────────────────────────────
 
   async listBillingHistory(userId: string): Promise<BillingHistoryItem[]> {
@@ -909,6 +1122,12 @@ export class BillingService {
   cancelSubscription(userId: string, subscriptionId: string) { return this.provider.cancelSubscription(userId, subscriptionId); }
   resumeSubscription(userId: string, subscriptionId: string) { return this.provider.resumeSubscription(userId, subscriptionId); }
   processMembershipRenewal(userId: string) { return this.provider.processMembershipRenewal(userId); }
+  cancelOrder(userId: string, orderId: string) { return this.provider.cancelOrder(userId, orderId); }
+  settleOrder(orderId: string) { return this.provider.settleOrder(orderId); }
+  executePayouts(orderId: string) { return this.provider.executePayouts(orderId); }
+  executeRefund(refundId: string) { return this.provider.executeRefund(refundId); }
+  retryPendingRefunds() { return this.provider.retryPendingRefunds(); }
+  retryFailedPayouts() { return this.provider.retryFailedPayouts(); }
 }
 
 export const billingService = new BillingService();

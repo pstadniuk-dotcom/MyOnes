@@ -17,6 +17,9 @@
 
 import logger from '../../infra/logging/logger';
 import { sendNotificationEmail } from '../../utils/emailService';
+import { db } from '../../infra/db/db';
+import { orders, refunds } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 
 // ── Event Type Constants ───────────────────────────────────────────────
 
@@ -159,30 +162,46 @@ class EpdWebhooksService {
   private async handleTransactionSale(event: EpdWebhookEvent): Promise<void> {
     const { event_type, event_body } = event;
     const success = event_type === 'transaction.sale.success';
+    const transactionId = event_body.transaction_id;
 
-    if (success) {
-      logger.info('EPD: Sale confirmed', {
-        transaction_id: event_body.transaction_id,
+    if (success && transactionId) {
+      logger.info('EPD: Sale confirmed via webhook', {
+        transaction_id: transactionId,
         amount: event_body.action?.amount || event_body.amount,
         order_id: event_body.order_id,
         condition: event_body.condition,
       });
-      // Order is already created in processCheckout — this confirms settlement pending
-    } else {
-      logger.warn('EPD: Sale failed', {
-        transaction_id: event_body.transaction_id,
+
+      // Update order status to confirm payment is authorized
+      // We keep it in pending_confirmation as that's what the 4-hour scheduler looks for
+      await db.update(orders)
+        .set({ 
+          status: 'pending_confirmation' as any,
+          // If transaction_id changed (unlikely for sale.success), update it
+          gatewayTransactionId: transactionId 
+        })
+        .where(eq(orders.gatewayTransactionId, transactionId));
+
+    } else if (transactionId) {
+      logger.warn('EPD: Sale failed via webhook', {
+        transaction_id: transactionId,
         response_text: event_body.action?.response_text,
         order_id: event_body.order_id,
       });
 
+      // Mark order as failed if payment didn't go through
+      await db.update(orders)
+        .set({ status: 'settlement_failed' as any })
+        .where(eq(orders.gatewayTransactionId, transactionId));
+
       // Alert admin of failed transaction
       await this.alertAdmin(
         'Payment Failed Alert',
-        `<p>A payment has failed on EPD.</p>
-         <p><strong>Transaction:</strong> ${event_body.transaction_id}</p>
-         <p><strong>Order:</strong> ${event_body.order_id || 'N/A'}</p>
-         <p><strong>Customer:</strong> ${event_body.first_name} ${event_body.last_name} (${event_body.email})</p>
-         <p><strong>Amount:</strong> $${event_body.action?.amount || event_body.amount}</p>
+        `<p>A payment has failed on EPD (reported via webhook).</p>
+         <p><strong>Transaction:</strong> ${transactionId}</p>
+         <p><strong>Order ID (EPD):</strong> ${event_body.order_id || 'N/A'}</p>
+         <p><strong>Customer:</strong> ${event_body.first_name || ''} ${event_body.last_name || ''} (${event_body.email || 'N/A'})</p>
+         <p><strong>Amount:</strong> $${event_body.action?.amount || event_body.amount || 'N/A'}</p>
          <p><strong>Reason:</strong> ${event_body.action?.response_text || 'Unknown'}</p>`,
       );
     }
@@ -191,29 +210,82 @@ class EpdWebhooksService {
   private async handleTransactionRefund(event: EpdWebhookEvent): Promise<void> {
     const success = event.event_type === 'transaction.refund.success';
     const body = event.event_body;
+    const refundTransactionId = body.transaction_id as string | undefined;
+    const originalTransactionId = body.ponumber as string | undefined; // Reference to original transaction (parent_transaction_id)
 
-    logger.info('EPD: Refund event', {
+    logger.info('EPD: Refund event received', {
       success,
-      transaction_id: body.transaction_id,
-      amount: body.action?.amount,
+      refund_id: refundTransactionId,
+      original_id: originalTransactionId,
+      amount: body.action?.amount || body.requested_amount,
     });
 
-    if (!success) {
+    if (success && originalTransactionId) {
+      // Update the refund record in our DB to approved
+      // Matching by parentTransactionId (original sale) and status 'pending'
+      await db.update(refunds)
+        .set({ 
+          status: 'approved',
+          transactionId: refundTransactionId,
+          gatewayResponse: body
+        })
+        .where(and(
+          eq(refunds.parentTransactionId, originalTransactionId),
+          eq(refunds.status, 'pending')
+        ));
+
+      logger.info('Refund status updated to approved in DB', { originalTransactionId });
+
+    } else if (originalTransactionId) {
+      // Mark as failed if we have a match
+      await db.update(refunds)
+        .set({ 
+          status: 'failed' as any,
+          gatewayResponse: body
+        })
+        .where(and(
+          eq(refunds.parentTransactionId, originalTransactionId),
+          eq(refunds.status, 'pending')
+        ));
+
       await this.alertAdmin(
         'Refund Failed Alert',
-        `<p>A refund attempt failed on EPD.</p>
-         <p><strong>Transaction:</strong> ${body.transaction_id}</p>
-         <p><strong>Amount:</strong> $${body.action?.amount || 'N/A'}</p>
+        `<p>A refund attempt failed on EPD (reported via webhook).</p>
+         <p><strong>Refund Transaction:</strong> ${refundTransactionId || 'N/A'}</p>
+         <p><strong>Original Transaction:</strong> ${originalTransactionId}</p>
+         <p><strong>Amount:</strong> $${body.action?.amount || body.requested_amount || 'N/A'}</p>
          <p><strong>Reason:</strong> ${body.action?.response_text || 'Unknown'}</p>`,
       );
     }
   }
 
   private async handleTransactionVoid(event: EpdWebhookEvent): Promise<void> {
-    logger.info('EPD: Void event', {
-      success: event.event_type === 'transaction.void.success',
-      transaction_id: event.event_body.transaction_id,
+    const success = event.event_type === 'transaction.void.success';
+    const body = event.event_body;
+    const voidTransactionId = body.transaction_id as string | undefined;
+    const originalTransactionId = body.ponumber as string | undefined;
+
+    logger.info('EPD: Void event received', {
+      success,
+      void_id: voidTransactionId,
+      original_id: originalTransactionId
     });
+
+    if (success && originalTransactionId) {
+      // Voiding usually means we mark the refund as 'voided' or the order as 'cancelled'
+      // Find the pending refund and mark as voided
+      await db.update(refunds)
+        .set({ status: 'voided', gatewayResponse: body })
+        .where(and(
+          eq(refunds.parentTransactionId, originalTransactionId),
+          eq(refunds.status, 'pending')
+        ));
+      
+      // Also ensure order is marked as cancelled
+      await db.update(orders)
+        .set({ status: 'cancelled' as any })
+        .where(eq(orders.gatewayTransactionId, originalTransactionId));
+    }
   }
 
   // ── Settlement Events ──────────────────────────────────────────────

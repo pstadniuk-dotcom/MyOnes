@@ -2059,6 +2059,7 @@ export default function MyFormulaPage() {
                   // Navigate to full checkout page
                   const params = new URLSearchParams({
                     formulaId: selectedFormula!.id,
+                    capsuleCount: String(pricingCapsuleCount),
                     membership: (includeMembershipAtCheckout && membershipUpsellAvailable) ? '1' : '0',
                     autoship: enableAutoShip ? '1' : '0',
                   });
@@ -2358,7 +2359,7 @@ function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onO
             ) : tileQuote?.available ? (
               <>
                 <span className="text-sm font-semibold text-[#054700] tabular-nums">
-                  ${((tileQuote.total ?? 0) * 0.85).toFixed(0)}
+                  ${(tileQuote.total ?? 0).toFixed(0)}
                 </span>
                 <p className="text-[10px] text-[#5a6623]">8-week est</p>
               </>
