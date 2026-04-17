@@ -324,6 +324,10 @@ export default function ConsultationPage() {
     setUploadedFiles([]);
     setInputValue('');
     setShowSuggestions(false);
+    setIsTyping(false);
+    setThinkingMessage(null);
+    setThinkingSteps([]);
+    setActiveStreamingMessageId(null);
     // Clear saved session when starting a new one
     localStorage.removeItem(SESSION_KEY);
 
@@ -451,7 +455,7 @@ export default function ConsultationPage() {
       return lastSender === 'user' ? 2000 : false;
     }
   });
-
+console.log('hhhh', historyData)
   // Query wearable connections to show status indicator in chat header
   const { data: wearableConnections = [] } = useQuery<Array<{ id: string; provider: string; status: string }>>({
     queryKey: ['/api/wearables/connections'],
@@ -601,7 +605,7 @@ export default function ConsultationPage() {
       }
     }
   }, [historyData, messages.length, isNewSession, search, handleNewSession]);
-
+  
   // Keep current session in sync with server history updates.
   // This is critical when a user navigates away mid-response: the assistant reply
   // may finish in the background and should appear automatically on return.
@@ -1344,13 +1348,13 @@ export default function ConsultationPage() {
     try {
       for (const file of files) {
         // Validate file
-        const maxSize = 10 * 1024 * 1024; // 10MB
+        const maxSize = 5 * 1024 * 1024; // 5MB
         const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
 
         if (file.size > maxSize) {
           toast({
             title: "File Too Large",
-            description: `${file.name} exceeds the 10MB limit.`,
+            description: `${file.name} exceeds the 5MB limit.`,
             variant: "destructive"
           });
           continue;
@@ -2849,7 +2853,7 @@ export default function ConsultationPage() {
                 {/* Left side - hints (desktop only) */}
                 <div className="hidden md:flex items-center gap-1 text-xs text-muted-foreground">
                   <FileText className="w-3 h-3" />
-                  <span>Upload files or type your question</span>
+                  <span>Upload files (Max 5MB) or type your question</span>
                   {draftSaved && inputValue.trim().length > 0 && (
                     <span className="flex items-center gap-1 ml-3 text-green-600">
                       <CheckCircle className="w-3 h-3" />
@@ -2858,8 +2862,10 @@ export default function ConsultationPage() {
                   )}
                 </div>
 
-                {/* Spacer for mobile to push buttons right */}
-                <div className="md:hidden flex-1" />
+                {/* Mobile file size hint (pushes buttons right) */}
+                <div className="md:hidden flex-1 flex items-center justify-start text-[10px] text-muted-foreground/70">
+                  <span>Max 5MB</span>
+                </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
