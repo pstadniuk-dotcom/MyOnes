@@ -144,12 +144,12 @@ const getStatusColor = (status: string) => {
   }
 };
 
-const CancellationTimer = ({ 
+const CancellationTimer = ({
   placedAt,
-  children
-}: { 
-  placedAt: string | Date,
-  children?: React.ReactNode
+  children,
+}: {
+  placedAt: string | Date;
+  children?: React.ReactNode;
 }) => {
   const [timeLeft, setTimeLeft] = useState<string>("");
 
@@ -180,9 +180,11 @@ const CancellationTimer = ({
       setTimeLeft(text);
       if (text === "Expired") {
         clearInterval(interval);
-         // Refresh orders and billing once timer expires to hide cancel button and update status
+        // Refresh orders and billing once timer expires to hide cancel button and update status
         queryClient.invalidateQueries({ queryKey: ["/api/users/me/orders"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/users/me/billing-history"] });
+        queryClient.invalidateQueries({
+          queryKey: ["/api/users/me/billing-history"],
+        });
       }
     }, 1000);
 
@@ -190,7 +192,7 @@ const CancellationTimer = ({
   }, [placedAt]);
 
   if (timeLeft === "Expired" || !timeLeft) return null;
- 
+
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-600 rounded-lg border border-red-100 text-[10px] font-bold shadow-sm animate-pulse whitespace-nowrap min-w-[110px] justify-center tabular-nums">
@@ -282,7 +284,6 @@ export default function OrdersPage() {
     queryKey: ["/api/users/me/subscription"],
     enabled: !!user?.id,
   });
-
   const {
     data: orders,
     isLoading: isLoadingOrders,
@@ -777,9 +778,7 @@ export default function OrdersPage() {
                     <div className="text-2xl font-bold text-[#1B4332]">
                       {subscription?.membershipPriceCents
                         ? `$${(subscription.membershipPriceCents / 100).toFixed(2)}`
-                        : orders && orders.length > 0 && orders[0].amountCents
-                          ? `$${(orders[0].amountCents / 100).toFixed(2)}`
-                          : `$${subscription?.plan === "monthly" ? "89.99" : subscription?.plan === "quarterly" ? "239.99" : subscription?.plan === "annual" ? "899.99" : "0.00"}`}
+                        : `$${subscription?.plan === "monthly" ? "89.99" : subscription?.plan === "quarterly" ? "239.99" : subscription?.plan === "annual" ? "899.99" : "0.00"}`}
                     </div>
                   </CardContent>
                 </Card>
@@ -795,12 +794,7 @@ export default function OrdersPage() {
                     <div className="text-lg font-semibold text-[#1B4332]">
                       {subscription?.renewsAt
                         ? new Date(subscription.renewsAt).toLocaleDateString()
-                        : orders?.[0]?.placedAt
-                          ? new Date(
-                              new Date(orders[0].placedAt).getTime() +
-                                8 * 7 * 24 * 60 * 60 * 1000,
-                            ).toLocaleDateString()
-                          : "N/A"}
+                        : "N/A"}
                     </div>
                   </CardContent>
                 </Card>
@@ -814,9 +808,11 @@ export default function OrdersPage() {
                       </span>
                     </div>
                     <div className="text-lg font-semibold text-[#D4A574]">
-                      v
-                      {orders?.[0]?.formulaVersion ||
-                        (subscription ? "1" : "N/A")}
+                      {subscription?.status === "active" ? (
+                        <>v{orders?.[0]?.formulaVersion || "1"}</>
+                      ) : (
+                        "N/A"
+                      )}
                     </div>
                   </CardContent>
                 </Card>
