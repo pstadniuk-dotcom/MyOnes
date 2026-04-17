@@ -527,9 +527,11 @@ export const reorderService = {
           continue;
         }
 
-        // Apply member discount (15%)
-        const MEMBER_DISCOUNT = 0.85;
-        const priceCents = Math.round(quoteResult.quote.total * 100 * MEMBER_DISCOUNT);
+        // Apply member discount (15%) only if the user is an active member
+        const isActiveMember = !!(user.membershipTier && !user.membershipCancelledAt);
+        const discount = isActiveMember ? 0.85 : 1.0;
+        
+        const priceCents = Math.round(quoteResult.quote.total * 100 * discount);
         const chargeAmount = (priceCents / 100).toFixed(2);
 
         // Charge via EPD Customer Vault
@@ -545,17 +547,50 @@ export const reorderService = {
         });
 
         if (isApproved(result)) {
-          // Create order record
+          // Create order record in pending_confirmation for the 4-hour settlement window
+          const manufacturerCostCents = Math.round((quoteResult.quote.manufacturerCost || 0) * 100);
+          
           const order = await usersRepository.createOrder({
             userId: schedule.userId,
             formulaId: chargeFormulaId,
             formulaVersion: schedule.formulaVersion,
-            status: 'pending',
+            status: 'pending_confirmation',
             amountCents: priceCents,
+            manufacturerCostCents: manufacturerCostCents,
+            manufacturerQuoteId: quoteResult.quote.quoteId,
             supplyWeeks: SUPPLY_WEEKS,
             gatewayTransactionId: result.transactionid,
             autoShipSubscriptionId: schedule.id,
+            shippingAddressSnapshot: user.addressLine1 ? {
+              firstName: user.name?.split(' ')[0] || 'User',
+              lastName: user.name?.split(' ').slice(1).join(' ') || '',
+              line1: user.addressLine1,
+              line2: user.addressLine2 || undefined,
+              city: user.city || '',
+              state: user.state || '',
+              zip: user.postalCode || '',
+              country: user.country || 'US',
+            } : undefined
           });
+
+          // Initialize Payouts (Case 1: Non-Member or Case 3: Already Member)
+          const adminAccountId = process.env.EPD_ADMIN_ACCOUNT_ID;
+          const vendorAccountId = process.env.EPD_VENDOR_ACCOUNT_ID;
+
+          // Per instructions: "case 1... payment goes to vendor" and "case 3 ... payment goes to vendor"
+          if (vendorAccountId && priceCents > 0) {
+            await usersRepository.createPayout({
+              orderId: order.id,
+              userId: schedule.userId,
+              recipientType: 'vendor',
+              recipientAccountId: vendorAccountId,
+              amountCents: priceCents,
+              status: 'pending'
+            });
+          }
+
+          // Admin payout is 0 for reorders since they are already members
+          // We omit creating a 0-cent payout record.
 
           // Update schedule as charged
           await reorderRepository.updateSchedule(schedule.id, {

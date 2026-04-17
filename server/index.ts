@@ -18,6 +18,7 @@ import { startAutoShipScheduler } from "./utils/autoShipScheduler";
 import { startSmartReorderScheduler } from "./utils/smartReorderScheduler";
 import { startRenewalScheduler } from './utils/renewalScheduler';
 import { startIngredientCatalogSyncScheduler } from "./utils/ingredientCatalogSyncScheduler";
+import { startOrderSettlementScheduler } from "./utils/orderSettlementScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
 import { testEncryption } from "./infra/security/fieldEncryption";
@@ -332,6 +333,7 @@ app.get('/api/health', (_req, res) => {
         { name: 'BlogGeneration', start: startBlogGenerationScheduler },
         { name: 'PrAgent', start: startPrAgentScheduler },
         { name: 'IngredientCatalogSync', start: startIngredientCatalogSyncScheduler },
+        { name: 'OrderSettlement', start: startOrderSettlementScheduler },
       ];
 
       for (const { name, start } of schedulers) {
