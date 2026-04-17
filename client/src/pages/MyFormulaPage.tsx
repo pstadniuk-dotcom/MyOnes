@@ -2361,9 +2361,9 @@ function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onO
             ) : tileQuote?.available ? (
               <>
                 <span className="text-sm font-semibold text-[#054700] tabular-nums">
-                  ${(hasActiveMembership ? (tileQuote.total ?? 0) * 0.85 : (tileQuote.total ?? 0)).toFixed(0)}
+                  ${((tileQuote.total ?? 0) * 0.85).toFixed(0)}
                 </span>
-                <p className="text-[10px] text-[#5a6623]">{hasActiveMembership ? 'member' : '8-week est'}</p>
+                <p className="text-[10px] text-[#5a6623]">{hasActiveMembership ? 'member' : 'w/ membership'}</p>
               </>
             ) : (
               <span className="text-[10px] text-[#5a6623]">See pricing</span>
