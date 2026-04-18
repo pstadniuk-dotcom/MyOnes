@@ -113,7 +113,6 @@ const getStatusIcon = (status: string) => {
     case "shipped":
       return <Truck className="w-4 h-4 text-blue-600" />;
     case "processing":
-    case "pending_3p":
     case "placed":
       return <Clock className="w-4 h-4 text-yellow-600" />;
     case "completed":
@@ -132,7 +131,6 @@ const getStatusColor = (status: string) => {
     case "shipped":
       return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
     case "processing":
-    case "pending_3p":
     case "placed":
       return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
     case "completed":
