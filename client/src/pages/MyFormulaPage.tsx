@@ -1516,12 +1516,12 @@ export default function MyFormulaPage() {
                               <div>
                                 <div className="flex items-baseline gap-1.5">
                                   <span className="text-3xl font-black text-[#054700] tabular-nums">
-                                    {onesMonthly > 0 ? `$${onesMonthly}` : '—'}
+                                    {onesMonthly > 0 ? `$${onesMonthly.toFixed(2)}` : '—'}
                                   </span>
                                   <span className="text-xs text-[#5a6623]">/ month</span>
                                 </div>
                                 <div className="text-[10px] text-[#5a6623]/70 mt-0.5">
-                                  ${Math.round(effectiveOnesCost)} per {supplyWeeks}-week order
+                                  ${effectiveOnesCost.toFixed(2)} per {supplyWeeks}-week order
                                   {isMemberPricing && <span className="text-[#D4A574] font-medium ml-1">· Member price</span>}
                                 </div>
                               </div>
@@ -2361,7 +2361,7 @@ function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onO
             ) : tileQuote?.available ? (
               <>
                 <span className="text-sm font-semibold text-[#054700] tabular-nums">
-                  ${((tileQuote.total ?? 0) * 0.85).toFixed(0)}
+                  ${((tileQuote.total ?? 0) * 0.85).toFixed(2)}
                 </span>
                 <p className="text-[10px] text-[#5a6623]">{hasActiveMembership ? 'member' : 'w/ membership'}</p>
               </>

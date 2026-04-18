@@ -187,7 +187,9 @@ export class AutoShipService {
     // ── Calculate charge amount ──
     const isActiveMember = !!(user.membershipTier && !user.membershipCancelledAt);
     const rawCents = Math.round(quote.total * 100);
-    const chargeCents = isActiveMember ? Math.round(rawCents * MEMBER_DISCOUNT) : rawCents;
+    const shippingCents = Math.round((quote.shipping ?? 0) * 100);
+    const formulaCents = isActiveMember ? Math.round(rawCents * MEMBER_DISCOUNT) : rawCents;
+    const chargeCents = formulaCents + shippingCents;
     const chargeAmount = (chargeCents / 100).toFixed(2);
 
     // ── Charge via EPD Customer Vault ──
@@ -432,9 +434,10 @@ export class AutoShipService {
     }
 
     const rawCents = Math.round(quote.total * 100);
+    const shippingCents = Math.round((quote.shipping ?? 0) * 100);
     const isActiveMember = !!(user.membershipTier && !user.membershipCancelledAt);
     const applyDiscount = isActiveMember;
-    const newPriceCents = applyDiscount ? Math.round(rawCents * MEMBER_DISCOUNT) : rawCents;
+    const newPriceCents = (applyDiscount ? Math.round(rawCents * MEMBER_DISCOUNT) : rawCents) + shippingCents;
     const oldPriceCents = autoShip.priceCents;
 
     // Notify user of price change
