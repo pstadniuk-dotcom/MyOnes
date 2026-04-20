@@ -47,7 +47,8 @@ interface CollectJSCheckoutProps {
 }
 
 const TOKENIZATION_KEY = import.meta.env.VITE_EPD_TOKENIZATION_KEY;
-const COLLECTJS_URL = 'https://secure.easypaydirectgateway.com/collect/v1/collectjs.js';
+// const COLLECTJS_URL = 'https://secure.easypaydirectgateway.com/collect/v1/collectjs.js';
+const COLLECTJS_URL = `https://secure.easypaydirectgateway.com/token/Collect.js`;
 
 export default function CollectJSCheckout({
   onToken,
