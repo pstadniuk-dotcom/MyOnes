@@ -184,12 +184,13 @@ class DatabaseBillingProvider implements BillingProvider {
       if (formula.needsReformulation) {
         throw new Error('FORMULA_NEEDS_REFORMULATION');
       }
+
+      const medDisclosureConsent = await consentsRepository.getUserConsent(userId, 'medication_disclosure');
+      if (!medDisclosureConsent || !medDisclosureConsent.granted) {
+        throw new Error('MEDICAL_DISCLOSURE_NOT_ACKNOWLEDGED');
+      }
     }
 
-    const medDisclosureConsent = await consentsRepository.getUserConsent(userId, 'medication_disclosure');
-    if (!medDisclosureConsent || !medDisclosureConsent.granted) {
-      throw new Error('MEDICAL_DISCLOSURE_NOT_ACKNOWLEDGED');
-    }
 
     // ── Quote formula ──
     let formulaAmountCents = 0;
