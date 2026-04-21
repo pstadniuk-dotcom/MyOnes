@@ -53,6 +53,7 @@ import { apiRequest, queryClient, getAuthHeaders } from '@/shared/lib/queryClien
 import { buildApiUrl } from '@/shared/lib/api';
 import type { User as UserType, HealthProfile } from '@shared/schema';
 import { AddressAutocomplete } from '@/shared/components/address/AddressAutocomplete';
+import { SupplementLabelScanner } from '@/shared/components/health/SupplementLabelScanner';
 
 /**
  * Combined supplement vocabulary for typeahead: ONES proprietary supports +
@@ -1321,8 +1322,19 @@ export default function ProfilePage() {
                       </div>
 
                       <div>
-                        <Label htmlFor="currentSupplements">Current Vitamins & Supplements</Label>
-                        <p className="text-xs text-muted-foreground mb-2">What are you currently taking? Your ONES formula will be designed to replace these.</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <Label htmlFor="currentSupplements">Current Vitamins & Supplements</Label>
+                          <SupplementLabelScanner
+                            existing={healthData.currentSupplements}
+                            onConfirm={(items) => {
+                              setHealthData({
+                                ...healthData,
+                                currentSupplements: [...healthData.currentSupplements, ...items],
+                              });
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-2">What are you currently taking? Your ONES formula will be designed to replace these. Tap <span className="font-medium">Scan label</span> to import from a supplement bottle photo.</p>
                         {healthLoading ? (
                           <Skeleton className="h-20 w-full" />
                         ) : (

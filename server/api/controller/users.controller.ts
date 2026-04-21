@@ -4,6 +4,8 @@ import { chatRepository } from '../../modules/chat/chat.repository';
 import { insertHealthProfileSchema } from '@shared/schema';
 import logger from '../../infra/logging/logger';
 import { z } from 'zod';
+import { scanSupplementLabel } from '../../utils/fileAnalysis';
+import type { UploadedFile } from 'express-fileupload';
 
 export class UsersController {
     async getCurrentFormula(req: Request, res: Response) {
@@ -116,6 +118,53 @@ export class UsersController {
             }
             logger.error('Medication disclosure save error', { error });
             res.status(500).json({ error: 'Failed to save medication disclosure' });
+        }
+    }
+
+    /**
+     * Scan a photo of a supplement bottle's "Supplement Facts" panel and
+     * return a structured ingredient list. The client uses this to pre-fill
+     * the patient's current-supplements list (Natalie feedback #6).
+     *
+     * Body: multipart/form-data with field "image" (jpeg, png, webp, heic).
+     * Response: { productName, brand, servingSize, servingsPerContainer, ingredients[], notes }
+     */
+    async scanSupplementLabel(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+
+            if (!req.files || !req.files.image) {
+                return res.status(400).json({ error: 'No image uploaded. Send field "image".' });
+            }
+
+            // express-fileupload sets req.files.image as a single UploadedFile or array
+            const raw = Array.isArray(req.files.image) ? req.files.image[0] : (req.files.image as UploadedFile);
+            if (!raw || !raw.data || raw.data.length === 0) {
+                return res.status(400).json({ error: 'Uploaded file is empty.' });
+            }
+
+            // Basic validation: image MIME type, size cap 12MB
+            if (!raw.mimetype || !raw.mimetype.startsWith('image/')) {
+                return res.status(400).json({ error: 'File must be an image.' });
+            }
+            if (raw.size > 12 * 1024 * 1024) {
+                return res.status(400).json({ error: 'Image too large (max 12MB).' });
+            }
+
+            logger.info('Scanning supplement label', { userId, mime: raw.mimetype, size: raw.size });
+            const result = await scanSupplementLabel(raw.data, raw.mimetype);
+            logger.info('Supplement label scan complete', {
+                userId,
+                productName: result.productName,
+                ingredientCount: result.ingredients.length,
+            });
+
+            res.json(result);
+        } catch (error) {
+            logger.error('Supplement label scan error', {
+                error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+            });
+            res.status(500).json({ error: 'Failed to scan supplement label' });
         }
     }
 

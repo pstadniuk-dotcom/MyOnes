@@ -220,6 +220,108 @@ export async function extractTextFromImage(buffer: Buffer, mimeType: string): Pr
 }
 
 /**
+ * Scans a photo of a supplement bottle's "Supplement Facts" panel and returns
+ * a structured ingredient list. Designed to reduce patient lift when adding
+ * multivitamins or other multi-ingredient products to their health profile.
+ *
+ * Uses gpt-4.1 vision (proven OCR pipeline) and returns strict JSON.
+ */
+export interface ScannedSupplementIngredient {
+  name: string;
+  dose?: string; // e.g. "1000", "500-1000"
+  unit?: string; // e.g. "mg", "mcg", "iu", "billion CFU"
+  /** Optional %DV if printed on the label */
+  percentDailyValue?: string;
+}
+
+export interface ScannedSupplementLabel {
+  productName?: string;
+  brand?: string;
+  servingSize?: string; // e.g. "2 capsules"
+  servingsPerContainer?: string;
+  ingredients: ScannedSupplementIngredient[];
+  /** Free-text notes the model wants to surface (form, allergens, warnings) */
+  notes?: string;
+}
+
+export async function scanSupplementLabel(
+  buffer: Buffer,
+  mimeType: string,
+): Promise<ScannedSupplementLabel> {
+  const base64Image = buffer.toString('base64');
+  const dataUrl = `data:${mimeType};base64,${base64Image}`;
+
+  const systemPrompt = `You are an expert at reading "Supplement Facts" panels on dietary supplement bottles.
+
+Extract every active ingredient from the supplement facts panel in the photo. Return STRICT JSON only — no prose, no markdown.
+
+JSON shape:
+{
+  "productName": string | null,           // top-of-label product name (e.g. "Daily Multivitamin")
+  "brand": string | null,                 // manufacturer/brand if visible
+  "servingSize": string | null,           // e.g. "2 capsules", "1 scoop (10g)"
+  "servingsPerContainer": string | null,  // e.g. "30", "60"
+  "ingredients": [
+    {
+      "name": string,            // ingredient name as printed (e.g. "Vitamin D3 (as cholecalciferol)")
+      "dose": string | null,     // numeric dose per serving, no unit (e.g. "1000")
+      "unit": string | null,     // unit only (e.g. "mg", "mcg", "iu", "billion CFU")
+      "percentDailyValue": string | null  // %DV if printed (e.g. "125%")
+    }
+  ],
+  "notes": string | null  // any other useful info (form, allergens, warnings)
+}
+
+Rules:
+- ONLY extract from the Supplement Facts / Nutrition Facts panel — ignore marketing text on the front of the label.
+- If you cannot read the panel clearly, return {"ingredients": []} and put the reason in "notes".
+- Skip "Other Ingredients" (excipients like cellulose, magnesium stearate) — only return ACTIVE ingredients with doses.
+- For proprietary blends, list each named ingredient inside the blend if amounts are shown; otherwise list the blend name with its total.
+- Preserve the ingredient name as printed (do not auto-correct).
+- Return valid JSON. No code fences. No commentary.`;
+
+  const response = await withTimeout(
+    openai.chat.completions.create({
+      model: 'gpt-4.1',
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Extract the supplement facts panel from this photo as JSON.',
+            },
+            {
+              type: 'image_url',
+              image_url: { url: dataUrl, detail: 'high' },
+            },
+          ],
+        },
+      ],
+      max_tokens: 4000,
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    }),
+    60_000,
+    'Supplement label OCR',
+  );
+
+  const content = response.choices[0]?.message?.content || '{"ingredients":[]}';
+  try {
+    const parsed = JSON.parse(content) as ScannedSupplementLabel;
+    if (!Array.isArray(parsed.ingredients)) parsed.ingredients = [];
+    return parsed;
+  } catch (err) {
+    logger.warn('Supplement label JSON parse failed', { err, content });
+    return { ingredients: [], notes: 'Could not parse label. Please try a clearer photo.' };
+  }
+}
+
+/**
  * Analyzes extracted text and structures lab data using AI.
  * Uses gpt-5 (reasoning model) for better marker counting + structured JSON.
  * 32K completion-token budget; reconciliation pass also runs gpt-5.
