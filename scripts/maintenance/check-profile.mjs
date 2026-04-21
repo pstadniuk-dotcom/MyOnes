@@ -1,7 +1,8 @@
+import 'dotenv/config';
 import pg from 'pg';
 
 const pool = new pg.Pool({ 
-  connectionString: 'postgresql://postgres.aytzwtehxtvoejgcixdn:Weshinebright22!@aws-1-us-east-1.pooler.supabase.com:6543/postgres'
+  connectionString: process.env.DATABASE_URL
 });
 
 async function check() {

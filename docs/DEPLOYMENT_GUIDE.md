@@ -65,7 +65,7 @@ In Railway dashboard → Your Project → Variables, add:
 **Required:**
 ```
 DATABASE_URL=postgresql://postgres.PROJECT_REF:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?sslmode=require
-JWT_SECRET=a5f6f9ef65acd0b74b6bc0d81e0768e701e339a549aa730fec04532fa1e76134
+JWT_SECRET=your_jwt_secret_here_change_in_production
 NODE_ENV=production
 PORT=5000
 ```
@@ -86,10 +86,10 @@ TWILIO_FROM=+1...         # Your Twilio phone number
 
 **OAuth (Wearables):**
 ```
-OURA_CLIENT_ID=1dda21d4-1ac6-4e3f-b177-97750c0f7d4f
-OURA_CLIENT_SECRET=NJU6wrINp-8PojFves_kKw7FBWw5-ocOowjtlccqd00
-FITBIT_CLIENT_ID=23TPXB
-FITBIT_CLIENT_SECRET=0060b86f49357dd224c84501ff957f62
+OURA_CLIENT_ID=your_oura_client_id
+OURA_CLIENT_SECRET=your_oura_client_secret
+FITBIT_CLIENT_ID=your_fitbit_client_id
+FITBIT_CLIENT_SECRET=your_fitbit_client_secret
 SESSION_SECRET=your-session-secret-here-change-in-production
 ```
 
@@ -154,7 +154,7 @@ If you want to migrate existing data from Neon to Supabase:
 #### Option A: pg_dump (Recommended)
 ```bash
 # Dump from Neon
-pg_dump "postgresql://neondb_owner:npg_QAi9ZGyEvIs6@ep-curly-frog-a6aeyl2v.us-west-2.aws.neon.tech/neondb" > neon-backup.sql
+pg_dump "postgresql://neondb_owner:YOUR_NEON_PASSWORD_HERE@ep-curly-frog-a6aeyl2v.us-west-2.aws.neon.tech/neondb" > neon-backup.sql
 
 # Restore to Supabase
 psql "postgresql://postgres.PROJECT_REF:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres" < neon-backup.sql

@@ -274,7 +274,7 @@ class DatabaseBillingProvider implements BillingProvider {
     const descParts: string[] = [];
     if (formula) descParts.push(`Formula v${formula.version}`);
     if (availableTier) descParts.push(`${availableTier.name} Membership`);
-    else if (isActiveMember) descParts.push(`ONES Formula Order`);
+    else if (isActuallyActiveMember) descParts.push(`ONES Formula Order`);
     const orderdescription = `ONES: ${descParts.join(' + ')}`;
 
     const shipping = payload.shippingAddress;

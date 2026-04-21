@@ -14,7 +14,7 @@ command -v pg_dump >/dev/null 2>&1 || { echo "❌ pg_dump is required but not in
 command -v psql >/dev/null 2>&1 || { echo "❌ psql is required but not installed. Install PostgreSQL client tools."; exit 1; }
 
 # Source database (Neon)
-SOURCE_DB="postgresql://neondb_owner:npg_QAi9ZGyEvIs6@ep-curly-frog-a6aeyl2v.us-west-2.aws.neon.tech/neondb"
+SOURCE_DB="postgresql://neondb_owner:YOUR_NEON_PASSWORD@ep-curly-frog-a6aeyl2v.us-west-2.aws.neon.tech/neondb"
 
 # Target database (Supabase - get from .env)
 source ../server/.env

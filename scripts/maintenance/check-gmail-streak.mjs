@@ -4,7 +4,7 @@ import fs from 'fs';
 const { Pool } = pg;
 
 // PRODUCTION DATABASE (from Railway environment variables)
-const dbUrl = 'postgresql://postgres.aytzwtehxtvoejgcixdn:Weshinebright22!@aws-1-us-east-1.pooler.supabase.com:6543/postgres';
+const dbUrl = process.env.DATABASE_URL;
 console.log('Using PRODUCTION database (us-east-1)');
 const pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
 
