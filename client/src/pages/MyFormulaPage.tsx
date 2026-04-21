@@ -1,5 +1,4 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -2195,68 +2194,6 @@ interface FormulaCardProps {
 function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onOpenPricing, onCustomize, onOrder, onRename, onArchive, isArchiving, getIndividualIngredientDetails, hasActiveMembership }: FormulaCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [expandedIndividualIngredients, setExpandedIndividualIngredients] = useState<Record<string, boolean>>({});
-  const detailsBtnRef = useRef<HTMLButtonElement>(null);
-  const [overlayPos, setOverlayPos] = useState<{ top: number; left: number; width: number; maxH: number; direction: 'down' | 'up' } | null>(null);
-
-  useEffect(() => {
-    if (detailsOpen && detailsBtnRef.current) {
-      const rect = detailsBtnRef.current.getBoundingClientRect();
-      const gap = 4;
-      const maxOverlayH = Math.min(window.innerHeight * 0.6, 500);
-      const spaceBelow = window.innerHeight - rect.bottom - gap;
-      const spaceAbove = rect.top - gap;
-
-      if (spaceBelow >= Math.min(maxOverlayH, 200)) {
-        // Open downward
-        setOverlayPos({ top: rect.bottom + gap, left: rect.left, width: rect.width, maxH: Math.min(maxOverlayH, spaceBelow), direction: 'down' });
-      } else {
-        // Open upward
-        const h = Math.min(maxOverlayH, spaceAbove);
-        setOverlayPos({ top: rect.top - gap - h, left: rect.left, width: rect.width, maxH: h, direction: 'up' });
-      }
-    }
-  }, [detailsOpen]);
-
-  // Reposition on scroll/resize while open
-  useEffect(() => {
-    if (!detailsOpen) return;
-    const update = () => {
-      if (detailsBtnRef.current) {
-        const rect = detailsBtnRef.current.getBoundingClientRect();
-        const gap = 4;
-        const maxOverlayH = Math.min(window.innerHeight * 0.6, 500);
-        const spaceBelow = window.innerHeight - rect.bottom - gap;
-        const spaceAbove = rect.top - gap;
-
-        if (spaceBelow >= Math.min(maxOverlayH, 200)) {
-          setOverlayPos({ top: rect.bottom + gap, left: rect.left, width: rect.width, maxH: Math.min(maxOverlayH, spaceBelow), direction: 'down' });
-        } else {
-          const h = Math.min(maxOverlayH, spaceAbove);
-          setOverlayPos({ top: rect.top - gap - h, left: rect.left, width: rect.width, maxH: h, direction: 'up' });
-        }
-      }
-    };
-    window.addEventListener('scroll', update, true);
-    window.addEventListener('resize', update);
-    return () => {
-      window.removeEventListener('scroll', update, true);
-      window.removeEventListener('resize', update);
-    };
-  }, [detailsOpen]);
-
-  // Close overlay on outside click (no blocking backdrop)
-  useEffect(() => {
-    if (!detailsOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      const overlay = document.getElementById(`formula-details-${formula.id}`);
-      const btn = detailsBtnRef.current;
-      if (overlay && !overlay.contains(e.target as Node) && btn && !btn.contains(e.target as Node)) {
-        setDetailsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [detailsOpen, formula.id]);
 
   const userAddedCount = (formula.userCustomizations?.addedBases?.length || 0) + (formula.userCustomizations?.addedIndividuals?.length || 0);
   const totalIngredients = formula.bases.length + formula.additions.length + userAddedCount;
@@ -2397,34 +2334,35 @@ function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onO
         <div className="flex-1" />
 
         {/* View Details Toggle */}
-        <Button ref={detailsBtnRef} variant="outline" size="sm" className="w-full border-[#054700]/10 text-[#054700] hover:bg-[#054700]/5 rounded-lg" onClick={() => setDetailsOpen(!detailsOpen)}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full border-[#054700]/10 text-[#054700] hover:bg-[#054700]/5 rounded-lg"
+          onClick={() => setDetailsOpen(!detailsOpen)}
+          aria-expanded={detailsOpen}
+          aria-controls={`formula-details-${formula.id}`}
+        >
           {detailsOpen ? <ChevronUp className="w-3.5 h-3.5 mr-1.5" /> : <Eye className="w-3.5 h-3.5 mr-1.5" />}
           {detailsOpen ? 'Hide Details' : 'View Details'}
         </Button>
 
-        {/* Floating Details Overlay — rendered in portal to escape column stacking */}
-        {detailsOpen && overlayPos && createPortal(
-            <div
-              id={`formula-details-${formula.id}`}
-              className="fixed z-[9999]"
-              style={{ top: overlayPos.top, left: overlayPos.left, width: overlayPos.width }}
-            >
-              <div className="bg-background border border-border rounded-lg shadow-2xl overflow-y-auto" style={{ maxHeight: overlayPos.maxH }}>
-                <div className="sticky top-0 bg-background border-b px-4 py-3 flex items-center justify-between rounded-t-lg z-10">
-                  <div>
-                    <h3 className="font-semibold text-sm flex items-center gap-2">
-                      <FlaskConical className="w-4 h-4" />
-                      {formula.name || `Version ${formula.version}`}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {totalIngredients} ingredients · {formula.targetCapsules || calculateDosage(formula.totalMg).total} caps/day · {formula.totalMg}mg
-                    </p>
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 -mr-1" onClick={() => setDetailsOpen(false)}>
-                    <ChevronUp className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="p-4 space-y-5">
+        {/* Inline Details Expansion — grows card naturally within its column */}
+        <div
+          id={`formula-details-${formula.id}`}
+          className={`grid transition-all duration-300 ease-out ${detailsOpen ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0'}`}
+          aria-hidden={!detailsOpen}
+        >
+          <div className="overflow-hidden">
+            <div className="rounded-lg border border-[#054700]/10 bg-[#054700]/[0.02] overflow-hidden">
+              <div className="px-3.5 py-2.5 border-b border-[#054700]/10 bg-white/60">
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-[#5a6623]">
+                  Formula breakdown
+                </p>
+                <p className="text-xs text-[#054700]/80 mt-0.5">
+                  {totalIngredients} ingredients · {formula.targetCapsules || calculateDosage(formula.totalMg).total} caps/day · {formula.totalMg}mg
+                </p>
+              </div>
+              <div className="p-3.5 space-y-4">
                   {/* System Supports */}
                   {formula.bases.length > 0 && (
                     <div>
@@ -2550,11 +2488,10 @@ function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onO
                       </ul>
                     </div>
                   )}
-                </div>
               </div>
-            </div>,
-          document.body
-        )}
+            </div>
+          </div>
+        </div>
 
         {/* Action Buttons — Order is dominant */}
         <div className="flex gap-2">
