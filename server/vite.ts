@@ -73,15 +73,38 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      // Hashed asset files in /assets/ are immutable; cache aggressively
+      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    },
+  }));
 
   // fall through to index.html if the file doesn't exist
   // BUT only for non-API routes - API routes should 404 if not found
+  // AND not for static asset paths (e.g. stale /assets/*.js requests after redeploy)
+  // — serving HTML for a missing JS chunk causes MIME-type errors in the browser
   app.use("*", (req, res, next) => {
-    // Don't serve index.html for API routes - let them 404
-    if (req.originalUrl.startsWith('/api')) {
+    const url = req.originalUrl;
+
+    // API routes 404 instead of returning the SPA shell
+    if (url.startsWith('/api')) {
       return next();
     }
+
+    // Static asset requests (hashed chunks, css, images, fonts, etc.) must NOT
+    // fall through to index.html — return a real 404 so the browser doesn't
+    // try to parse HTML as a JS module.
+    if (
+      url.startsWith('/assets/') ||
+      /\.(?:js|mjs|css|map|json|ico|png|jpe?g|gif|svg|webp|avif|woff2?|ttf|eot|txt|xml|pdf|wasm)(?:\?.*)?$/i.test(url)
+    ) {
+      return res.status(404).type('text/plain').send('Not Found');
+    }
+
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
