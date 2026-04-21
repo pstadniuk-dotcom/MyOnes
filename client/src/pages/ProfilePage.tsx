@@ -220,6 +220,8 @@ export default function ProfilePage() {
         postalCode: userData.user.postalCode || '',
         country: userData.user.country || 'US',
       });
+      // Mark hydration complete so autosave doesn't fire on the initial server load
+      profileHydratedRef.current = true;
     }
   }, [userData]);
 
@@ -254,8 +256,83 @@ export default function ProfilePage() {
         allergies: healthProfile.allergies || [],
         currentSupplements: (healthProfile as any).currentSupplements || [],
       });
+      // Mark hydration complete so autosave doesn't fire on the initial server load
+      healthHydratedRef.current = true;
     }
   }, [healthProfile]);
+
+  // ── Silent autosave: debounced background save whenever the user edits anything.
+  // Per Pete: "anytime a user enters something it should be saved" — no toast, no indicator.
+  const healthHydratedRef = useRef(false);
+  const profileHydratedRef = useRef(false);
+  const healthAutosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const profileAutosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!healthHydratedRef.current) return;
+    if (healthAutosaveTimerRef.current) clearTimeout(healthAutosaveTimerRef.current);
+    healthAutosaveTimerRef.current = setTimeout(() => {
+      // Convert feet/inches to cm
+      let heightCm: number | null = null;
+      if (healthData.heightFeet || healthData.heightInches) {
+        const f = parseInt(healthData.heightFeet) || 0;
+        const i = parseInt(healthData.heightInches) || 0;
+        heightCm = Math.round(((f * 12) + i) * 2.54);
+      }
+      const payload = {
+        age: healthData.age ? parseInt(healthData.age) : null,
+        sex: healthData.sex || null,
+        weightLbs: healthData.weightLbs ? parseInt(healthData.weightLbs) : null,
+        heightCm,
+        bloodPressureSystolic: healthData.bloodPressureSystolic ? parseInt(healthData.bloodPressureSystolic) : null,
+        bloodPressureDiastolic: healthData.bloodPressureDiastolic ? parseInt(healthData.bloodPressureDiastolic) : null,
+        restingHeartRate: healthData.restingHeartRate ? parseInt(healthData.restingHeartRate) : null,
+        sleepHoursPerNight: healthData.sleepHoursPerNight ? parseInt(healthData.sleepHoursPerNight) : null,
+        exerciseDaysPerWeek: healthData.exerciseDaysPerWeek ? parseInt(healthData.exerciseDaysPerWeek) : null,
+        stressLevel: healthData.stressLevel ? parseInt(healthData.stressLevel) : null,
+        smokingStatus: healthData.smokingStatus || null,
+        alcoholDrinksPerWeek: healthData.alcoholDrinksPerWeek ? parseInt(healthData.alcoholDrinksPerWeek) : null,
+        conditions: healthData.conditions,
+        medications: healthData.medications,
+        allergies: healthData.allergies,
+        currentSupplements: healthData.currentSupplements,
+      };
+      apiRequest('POST', '/api/users/me/health-profile', payload)
+        .catch((err) => {
+          // Silent failure — user will see the error if they hit the explicit Save button.
+          console.warn('[health-profile autosave] failed:', err?.message || err);
+        });
+    }, 800);
+    return () => {
+      if (healthAutosaveTimerRef.current) clearTimeout(healthAutosaveTimerRef.current);
+    };
+  }, [healthData]);
+
+  useEffect(() => {
+    if (!profileHydratedRef.current) return;
+    if (profileAutosaveTimerRef.current) clearTimeout(profileAutosaveTimerRef.current);
+    profileAutosaveTimerRef.current = setTimeout(() => {
+      const phoneE164 = profile.phone ? toE164(profile.phone) : null;
+      // Skip phone autosave if user is mid-typing an invalid phone (don't blow away saved value)
+      const payload: Record<string, any> = {
+        name: profile.name || undefined,
+        addressLine1: profile.addressLine1 || null,
+        addressLine2: profile.addressLine2 || null,
+        city: profile.city || null,
+        state: profile.state || null,
+        postalCode: profile.postalCode || null,
+        country: profile.country || null,
+      };
+      if (!profile.phone || phoneE164) payload.phone = phoneE164;
+      apiRequest('PATCH', '/api/users/me/profile', payload)
+        .catch((err) => {
+          console.warn('[profile autosave] failed:', err?.message || err);
+        });
+    }, 800);
+    return () => {
+      if (profileAutosaveTimerRef.current) clearTimeout(profileAutosaveTimerRef.current);
+    };
+  }, [profile]);
 
   // Helper: detect which profile fields changed
   const getChangedProfileFields = (): string[] => {

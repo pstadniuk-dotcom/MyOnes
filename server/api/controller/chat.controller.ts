@@ -7,7 +7,6 @@ import { filesService } from '../../modules/files/files.service';
 import { formulasRepository } from '../../modules/formulas/formulas.repository';
 import { systemRepository } from '../../modules/system/system.repository';
 import { notificationsService } from '../../modules/notifications/notifications.service';
-import { sendNotificationEmail } from '../../utils/emailService';
 
 import { getClientIP, checkRateLimit } from '../middleware/middleware';
 import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
@@ -676,50 +675,25 @@ export class ChatController {
                             }
                           }
 
-                          // Send first-formula-created email + in-app notification
+                          // In-app notification only — formula emails were removed
+                          // (per user feedback: emailing on every formula iteration felt spammy).
+                          // Order confirmation emails still fire from the billing service after checkout.
                           try {
-                            const formulaUser = await usersRepository.getUser(userId);
-                            if (formulaUser) {
-                              const frontendUrl = process.env.FRONTEND_URL || 'https://ones.health';
-                              const ingredientCount = (savedFormula.bases?.length || 0) + (savedFormula.additions?.length || 0);
-
-                              await notificationsService.create({
-                                userId,
-                                type: 'formula_update',
-                                title: `Formula V${nextVersion} Created`,
-                                content: `Your AI practitioner created a personalized formula with ${ingredientCount} ingredients (${savedFormula.totalMg}mg total).`,
-                                formulaId: savedFormula.id,
-                                metadata: {
-                                  actionUrl: '/dashboard/formula',
-                                  icon: 'sparkles',
-                                  priority: 'high'
-                                }
-                              });
-
-                              if (await notificationsService.shouldSendEmail(userId, 'consultation')) {
-                                await sendNotificationEmail({
-                                to: formulaUser.email,
-                                subject: nextVersion === 1
-                                  ? 'Your first Ones formula is ready!'
-                                  : `Your Ones formula has been updated (V${nextVersion})`,
-                                title: nextVersion === 1 ? 'Your Formula Is Ready' : 'Formula Updated',
-                                type: 'formula_update',
-                                content: `
-                                  <p>Hi ${formulaUser.name?.split(' ')[0] || 'there'},</p>
-                                  <p>${nextVersion === 1
-                                    ? 'Your AI practitioner has designed your first personalized supplement formula!'
-                                    : `Your formula has been updated to version ${nextVersion}.`
-                                  }</p>
-                                  <p><strong>${ingredientCount} ingredients</strong> totalling <strong>${savedFormula.totalMg}mg</strong> across <strong>${savedFormula.targetCapsules} capsules</strong>.</p>
-                                  <p>Review your formula, check the ingredient breakdown, and order when you're ready.</p>
-                                `,
-                                actionUrl: `${frontendUrl}/dashboard/formula`,
-                                actionText: 'View Your Formula',
-                              });
+                            const ingredientCount = (savedFormula.bases?.length || 0) + (savedFormula.additions?.length || 0);
+                            await notificationsService.create({
+                              userId,
+                              type: 'formula_update',
+                              title: `Formula V${nextVersion} Created`,
+                              content: `Your AI practitioner created a personalized formula with ${ingredientCount} ingredients (${savedFormula.totalMg}mg total).`,
+                              formulaId: savedFormula.id,
+                              metadata: {
+                                actionUrl: '/dashboard/formula',
+                                icon: 'sparkles',
+                                priority: 'high'
                               }
-                            }
+                            });
                           } catch (notifErr) {
-                            logger.warn('Failed to send formula creation notification', { userId, error: notifErr });
+                            logger.warn('Failed to create formula in-app notification', { userId, error: notifErr });
                           }
 
                           logger.info(`Formula v${nextVersion} saved successfully for user ${userId}`, {
