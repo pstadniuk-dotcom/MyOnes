@@ -75,11 +75,28 @@ export class FilesRepository {
     }
 
     async updateFileUpload(id: string, updates: Partial<InsertFileUpload>): Promise<FileUpload | undefined> {
-        // Handle labReportData field properly
+        // Merge (don't replace) labReportData so each call adds/updates fields
+        // instead of clobbering progress/extracted data with a partial write.
+        let mergedLabReportData: any = undefined;
+        if (updates.labReportData !== undefined) {
+            const incoming = (updates.labReportData ?? {}) as any;
+            let existing: any = {};
+            try {
+                const [current] = await db.select({ labReportData: fileUploads.labReportData })
+                    .from(fileUploads).where(eq(fileUploads.id, id));
+                if (current?.labReportData && typeof current.labReportData === 'object') {
+                    existing = current.labReportData;
+                }
+            } catch (err) {
+                logger.warn('Failed to read existing labReportData before merge', { id, error: err });
+            }
+            mergedLabReportData = { ...existing, ...incoming };
+        }
+
         const safeUpdates: Partial<InsertFileUpload> = {
             ...updates,
-            ...(updates.labReportData !== undefined && {
-                labReportData: normalizeLabReportData(updates.labReportData)
+            ...(mergedLabReportData !== undefined && {
+                labReportData: normalizeLabReportData(mergedLabReportData)
             })
         };
 
@@ -286,6 +303,79 @@ export class FilesRepository {
         } catch (error) {
             logger.error('Error listing lab analyses by user', { error });
             return [];
+        }
+    }
+
+    /**
+     * Idempotently writes a lab_analyses row for a given file_upload.
+     * - One analysis per fileId (by convention; we update the latest if found).
+     * - Maps `extractedData` (testName/value/...) to schema's `extractedMarkers` (name/value/...).
+     * - Coerces `value` to number when possible (schema requires number).
+     * - Status defaults to 'completed' on success, 'error' on failure.
+     */
+    async upsertLabAnalysisForFile(input: {
+        fileId: string;
+        userId: string;
+        analysisStatus?: 'pending' | 'processing' | 'completed' | 'error';
+        extractedData?: Array<Record<string, any>> | undefined;
+        aiInsights?: any;
+        errorMessage?: string | null;
+    }): Promise<LabAnalysis | undefined> {
+        const status = input.analysisStatus || 'completed';
+
+        // Map extractedData to lab_analyses.extractedMarkers shape
+        const markers = Array.isArray(input.extractedData)
+            ? input.extractedData
+                .map((row: any) => {
+                    const name = row?.testName || row?.name || '';
+                    if (!name) return null;
+                    const rawVal = row?.value;
+                    const numVal = typeof rawVal === 'number'
+                        ? rawVal
+                        : (typeof rawVal === 'string' ? parseFloat(rawVal.replace(/,/g, '')) : NaN);
+                    const inferred = (() => {
+                        const s = String(row?.status || '').toLowerCase();
+                        if (s === 'high' || s === 'low' || s === 'normal' || s === 'critical') return s;
+                        return 'normal';
+                    })() as 'normal' | 'high' | 'low' | 'critical';
+                    return {
+                        name,
+                        value: Number.isFinite(numVal) ? numVal : 0,
+                        unit: row?.unit || '',
+                        referenceRange: row?.referenceRange || '',
+                        status: inferred,
+                    };
+                })
+                .filter(Boolean) as any[]
+            : [];
+
+        try {
+            const [existing] = await db.select({ id: labAnalyses.id })
+                .from(labAnalyses)
+                .where(eq(labAnalyses.fileId, input.fileId))
+                .orderBy(desc(labAnalyses.processedAt))
+                .limit(1);
+
+            if (existing) {
+                return await this.updateLabAnalysis(existing.id, {
+                    analysisStatus: status,
+                    extractedMarkers: markers,
+                    aiInsights: input.aiInsights ?? undefined,
+                    errorMessage: input.errorMessage ?? null,
+                } as any);
+            }
+
+            return await this.createLabAnalysis({
+                fileId: input.fileId,
+                userId: input.userId,
+                analysisStatus: status,
+                extractedMarkers: markers,
+                aiInsights: input.aiInsights ?? undefined,
+                errorMessage: input.errorMessage ?? null,
+            } as any);
+        } catch (err) {
+            logger.warn('upsertLabAnalysisForFile failed', { fileId: input.fileId, error: err });
+            return undefined;
         }
     }
 }

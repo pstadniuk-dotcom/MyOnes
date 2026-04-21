@@ -1140,7 +1140,7 @@ export class WearablesService {
 
         const mapAnalysisMarkers = (analysis: any) => (
             analysis?.extractedMarkers
-                ? (analysis.extractedMarkers as any[]).slice(0, 8).map((m: any) => ({
+                ? (analysis.extractedMarkers as any[]).map((m: any) => ({
                     name: m.name,
                     value: m.value,
                     unit: m.unit || '',
@@ -1165,7 +1165,7 @@ export class WearablesService {
 
         const mapReportMarkers = (report: any) => {
             const items = extractDataArray(report?.labReportData);
-            return items.slice(0, 8).map((marker: any) => ({
+            return items.map((marker: any) => ({
                 name: marker.testName || marker.name || 'Unknown Marker',
                 value: marker.value,
                 unit: marker.unit || '',

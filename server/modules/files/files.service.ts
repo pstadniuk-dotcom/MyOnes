@@ -99,6 +99,48 @@ export class FilesService {
         //     fileType = 'medical_document';
         // }
 
+        // Dedup: if the same user uploaded a file with the exact same name + size
+        // within the last 10 minutes, return that one instead of running OCR/AI again.
+        // (Catches the common "double-click upload" case Natalie hit.)
+        if (fileType === 'lab_report') {
+            try {
+                const recent = await filesRepository.listFileUploadsByUser(userId, 'lab_report', false);
+                const tenMinAgo = Date.now() - 10 * 60 * 1000;
+                const dup = recent.find(f =>
+                    f.originalFileName === uploadedFile.name &&
+                    f.fileSize === uploadedFile.size &&
+                    f.uploadedAt && new Date(f.uploadedAt).getTime() >= tenMinAgo
+                );
+                if (dup) {
+                    logger.info('Skipping duplicate lab upload', {
+                        userId,
+                        fileName: uploadedFile.name,
+                        existingFileId: dup.id,
+                    });
+                    this.logFileAudit(userId, dup.id, 'upload', dup.objectPath, true, 'Duplicate upload — returned existing file', auditInfo, {
+                        originalFileName: uploadedFile.name,
+                        fileType,
+                        fileSize: uploadedFile.size,
+                        mimeType: uploadedFile.mimetype,
+                        deduplicated: true,
+                    });
+                    return {
+                        id: dup.id,
+                        name: dup.originalFileName,
+                        url: dup.objectPath,
+                        type: dup.type,
+                        size: dup.fileSize,
+                        uploadedAt: dup.uploadedAt,
+                        hipaaCompliant: true,
+                        labData: null,
+                        deduplicated: true,
+                    };
+                }
+            } catch (err) {
+                logger.warn('Lab upload dedup check failed (continuing with normal upload)', { error: err });
+            }
+        }
+
         // Upload to storage
         const normalizedPath = await this.objectStorageService.uploadLabReportFile(
             userId,
@@ -160,6 +202,13 @@ export class FilesService {
                                 analysisStatus: 'completed',
                                 extractedData: labDataExtraction.extractedData || [],
                             }
+                        });
+                        // Mirror into lab_analyses so AI Brain / formula review can read structured markers.
+                        await filesRepository.upsertLabAnalysisForFile({
+                            fileId,
+                            userId,
+                            analysisStatus: 'completed',
+                            extractedData: labDataExtraction.extractedData || [],
                         });
                         // Fire-and-forget: generate marker insights in background
                         void labsService.generateAllMarkerInsights(labDataExtraction.extractedData || []).then(async (markerInsights) => {
@@ -244,6 +293,12 @@ export class FilesService {
                             labReportData: { analysisStatus: 'error' },
                             analysisCompletedAt: new Date(),
                         } as any);
+                        await filesRepository.upsertLabAnalysisForFile({
+                            fileId,
+                            userId,
+                            analysisStatus: 'error',
+                            errorMessage: error instanceof Error ? error.message : String(error),
+                        });
                     }
                 }
             })();
@@ -326,6 +381,12 @@ export class FilesService {
                                 extractedData: labDataExtraction.extractedData || [],
                             }
                         });
+                        await filesRepository.upsertLabAnalysisForFile({
+                            fileId,
+                            userId,
+                            analysisStatus: 'completed',
+                            extractedData: labDataExtraction.extractedData || [],
+                        });
                         logger.info(`✅ Lab report re-analysis completed: ${uploadedFile.name}`);
                         await filesRepository.updateFileUpload(fileId, { analysisCompletedAt: new Date() } as any);
                         // Fire-and-forget: generate marker insights in background
@@ -344,6 +405,12 @@ export class FilesService {
                         labReportData: { analysisStatus: 'error' },
                         analysisCompletedAt: new Date(),
                     } as any);
+                    await filesRepository.upsertLabAnalysisForFile({
+                        fileId,
+                        userId,
+                        analysisStatus: 'error',
+                        errorMessage: error instanceof Error ? error.message : String(error),
+                    });
                 }
             })();
         }
@@ -402,6 +469,13 @@ export class FilesService {
                 analysisStatus,
                 extractedData: newExtractedData,
             }
+        });
+
+        await filesRepository.upsertLabAnalysisForFile({
+            fileId,
+            userId,
+            analysisStatus,
+            extractedData: newExtractedData,
         });
 
         // Fire-and-forget: generate marker insights in background
@@ -471,6 +545,13 @@ export class FilesService {
                     analysisCompletedAt: new Date(),
                 } as any);
 
+                await filesRepository.upsertLabAnalysisForFile({
+                    fileId,
+                    userId,
+                    analysisStatus,
+                    extractedData: newExtractedData,
+                });
+
                 // Fire-and-forget: generate marker insights in background
                 void labsService.generateAllMarkerInsights(newExtractedData).then(async (markerInsights) => {
                     const currentData = (await filesRepository.getFileUpload(fileId))?.labReportData as any;
@@ -507,6 +588,12 @@ export class FilesService {
                     },
                     analysisCompletedAt: new Date(),
                 } as any);
+                await filesRepository.upsertLabAnalysisForFile({
+                    fileId,
+                    userId,
+                    analysisStatus: 'error',
+                    errorMessage: error instanceof Error ? error.message : String(error),
+                });
             }
         })();
 
