@@ -65,6 +65,42 @@ export function getAuthHeaders(): Record<string, string> {
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
+/**
+ * Default request timeout for client-side API calls. Without this, a hung
+ * request (slow DB query, dropped connection on Render) would leave React
+ * Query stuck in loading state indefinitely — which presents to the user
+ * as a "page won't load / timeout" bug (see Natalie Genkin feedback #4).
+ */
+export const DEFAULT_API_TIMEOUT_MS = 20_000;
+
+/**
+ * fetch() wrapper that aborts after `timeoutMs` and throws a clear error.
+ * Use this anywhere we don't want a request to hang forever.
+ */
+export async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs: number = DEFAULT_API_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const externalSignal = init.signal;
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted && (!externalSignal || !externalSignal.aborted)) {
+      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -76,7 +112,7 @@ export async function apiRequest(
     ...(data ? { "Content-Type": "application/json" } : {}),
   };
 
-  const res = await fetch(fullUrl, {
+  const res = await fetchWithTimeout(fullUrl, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
@@ -91,7 +127,7 @@ export async function apiRequest(
     const refreshed = await refreshPromise;
     if (refreshed) {
       // Retry original request with new token
-      const retryRes = await fetch(fullUrl, {
+      const retryRes = await fetchWithTimeout(fullUrl, {
         method,
         headers: {
           ...getAuthHeaders(),
@@ -125,7 +161,7 @@ export const getQueryFn: <T>(options: {
         credentials: "include",
         cache: 'no-store',
       };
-      let res = await fetch(buildApiUrl(endpoint), fetchOptions);
+      let res = await fetchWithTimeout(buildApiUrl(endpoint), fetchOptions);
 
       // On 401, try to refresh the token and retry once
       if (res.status === 401 && localStorage.getItem('refreshToken')) {
@@ -134,7 +170,7 @@ export const getQueryFn: <T>(options: {
         }
         const refreshed = await refreshPromise;
         if (refreshed) {
-          res = await fetch(buildApiUrl(endpoint), {
+          res = await fetchWithTimeout(buildApiUrl(endpoint), {
             ...fetchOptions,
             headers: {
               ...getAuthHeaders(),
@@ -160,7 +196,16 @@ export const queryClient = new QueryClient({
       refetchInterval: false,
       refetchOnWindowFocus: true,
       staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for 5 min
-      retry: 1,
+      retry: (failureCount, error) => {
+        // Don't retry session-expired errors
+        const msg = error instanceof Error ? error.message : '';
+        if (msg.includes('Session expired') || msg.startsWith('401:') || msg.startsWith('403:') || msg.startsWith('404:')) {
+          return false;
+        }
+        // Retry up to 2 times for network/timeout errors
+        return failureCount < 2;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
     },
     mutations: {
       retry: false,

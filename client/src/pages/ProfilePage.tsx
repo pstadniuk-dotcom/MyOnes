@@ -137,13 +137,13 @@ export default function ProfilePage() {
   }, [searchString]);
 
   // React Query for user data
-  const { data: userData, isLoading: userLoading, error: userError } = useQuery<{ user: UserType }>({
+  const { data: userData, isLoading: userLoading, error: userError, refetch: refetchUser } = useQuery<{ user: UserType }>({
     queryKey: ['/api/auth/me'],
     enabled: isAuthenticated,
   });
 
   // React Query for health profile
-  const { data: healthProfile, isLoading: healthLoading, error: healthError } = useQuery<HealthProfile>({
+  const { data: healthProfile, isLoading: healthLoading, error: healthError, refetch: refetchHealth } = useQuery<HealthProfile>({
     queryKey: ['/api/users/me/health-profile'],
     enabled: isAuthenticated,
   });
@@ -693,16 +693,35 @@ export default function ProfilePage() {
 
   // Show error state if critical data failed to load
   if (userError) {
+    const errMsg = userError instanceof Error ? userError.message : String(userError);
+    const isTimeout = errMsg.toLowerCase().includes('timed out') || errMsg.toLowerCase().includes('failed to fetch');
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="p-6">
+        <Card className="p-6 max-w-md">
           <div className="text-center space-y-3">
             <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
-            <h3 className="text-lg font-semibold">Failed to load profile</h3>
-            <p className="text-muted-foreground">Please refresh the page to try again.</p>
-            <Button onClick={() => window.location.reload()}>
-              Refresh Page
-            </Button>
+            <h3 className="text-lg font-semibold">
+              {isTimeout ? 'Profile is taking too long to load' : 'Failed to load profile'}
+            </h3>
+            <p className="text-muted-foreground text-sm">
+              {isTimeout
+                ? 'This usually clears up in a few seconds. Try again?'
+                : errMsg || 'Please try again.'}
+            </p>
+            <div className="flex gap-2 justify-center pt-2">
+              <Button
+                onClick={() => {
+                  refetchUser();
+                  refetchHealth();
+                }}
+                data-testid="button-retry-profile"
+              >
+                Try Again
+              </Button>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Refresh Page
+              </Button>
+            </div>
           </div>
         </Card>
       </div>
