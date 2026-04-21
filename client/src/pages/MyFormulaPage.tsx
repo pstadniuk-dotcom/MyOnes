@@ -1442,10 +1442,10 @@ export default function MyFormulaPage() {
                     const onesCapsules = pricingCapsuleCount;
                     const bottleCount = equivalentStackData.supplementsCount ?? 0;
                     const isMemberPricing = (includeMembershipAtCheckout && membershipUpsellAvailable) || hasActiveMembership;
+                    const onesIsCheaper = retailCost > 0 && onesMonthly > 0 && onesMonthly < retailCost;
 
-                    // Don't render the comparison when ONES costs more than retail
-                    // (can happen with very small/low-dose formulas) — avoid showing unfavorable optics
-                    if (retailCost <= 0 || onesMonthly <= 0 || onesMonthly >= retailCost) {
+                    // Hide entirely only when we have no usable retail data at all
+                    if (retailCost <= 0 || onesMonthly <= 0) {
                       return null;
                     }
 
@@ -1457,9 +1457,13 @@ export default function MyFormulaPage() {
                             <img src="/ones-logo-icon.svg" alt="Ones" className="w-5 h-5 brightness-0 invert" />
                             <span className="text-white font-semibold text-sm">Your formula vs. buying separately</span>
                           </div>
-                          {savingsMonthly !== null && savingsMonthly > 0 && (
+                          {onesIsCheaper && savingsMonthly !== null && savingsMonthly > 0 ? (
                             <span className="bg-[#D4A574] text-[#054700] font-bold text-[11px] px-2.5 py-1 rounded-full">
                               SAVE {savingsMonthly}%
+                            </span>
+                          ) : (
+                            <span className="bg-[#D4A574] text-[#054700] font-bold text-[11px] px-2.5 py-1 rounded-full">
+                              ALL-IN-ONE
                             </span>
                           )}
                         </div>
@@ -1551,13 +1555,21 @@ export default function MyFormulaPage() {
                           </div>
                         )}
 
-                        {/* Savings bar */}
-                        {savingsMonthly !== null && savingsMonthly > 0 && retailCost > 0 && onesMonthly > 0 && (
+                        {/* Value bar — savings when ONES is cheaper, convenience framing otherwise */}
+                        {onesIsCheaper ? (
                           <div className="bg-[#054700]/[0.04] border-t border-[#054700]/10 px-5 py-3 flex items-center gap-2">
                             <CheckCircle className="w-3.5 h-3.5 text-[#2D6A4F] flex-shrink-0" />
                             <span className="text-sm text-[#054700]">
                               <span className="font-semibold">You save ~${Math.round(retailCost - onesMonthly)}/mo</span>
                               {' '}compared to buying {bottleCount} separate supplements
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="bg-[#054700]/[0.04] border-t border-[#054700]/10 px-5 py-3 flex items-center gap-2">
+                            <CheckCircle className="w-3.5 h-3.5 text-[#2D6A4F] flex-shrink-0" />
+                            <span className="text-sm text-[#054700]">
+                              <span className="font-semibold">Same value, one formula</span>
+                              {' '}— replaces {bottleCount} bottles &amp; {retailCapsules} pills/day with {onesCapsules} personalized capsules
                             </span>
                           </div>
                         )}
