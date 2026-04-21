@@ -221,7 +221,8 @@ export async function extractTextFromImage(buffer: Buffer, mimeType: string): Pr
 
 /**
  * Analyzes extracted text and structures lab data using AI.
- * Uses gpt-4.1 with high token limit (32K output).
+ * Uses gpt-5 (reasoning model) for better marker counting + structured JSON.
+ * 32K completion-token budget; reconciliation pass also runs gpt-5.
  */
 export async function structureLabData(rawText: string): Promise<LabDataExtraction> {
   const systemPrompt = `You are an expert medical lab report analyzer. Extract structured data from lab reports and return it as JSON.
@@ -263,7 +264,7 @@ Return ONLY valid JSON without any markdown formatting.`;
 
   const userMessage = `Extract structured data from this lab report:\n\n${rawText}`;
 
-  // gpt-4.1 supports up to 32768 completion tokens — retry with longer timeout if first attempt fails
+  // gpt-5 reasoning model — uses max_completion_tokens; temperature param not supported (default = 1.0)
   const attempts: Array<{ maxTokens: number; timeout: number }> = [
     { maxTokens: 32768, timeout: 240_000 },
     { maxTokens: 32768, timeout: 300_000 },
@@ -275,13 +276,12 @@ Return ONLY valid JSON without any markdown formatting.`;
       logger.info(`Structuring lab data`, { attempt: i + 1, maxTokens });
       const response = await withTimeout(
         openai.chat.completions.create({
-          model: 'gpt-4.1',
+          model: 'gpt-5',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMessage }
           ],
-          temperature: 0.1,
-          max_tokens: maxTokens,
+          max_completion_tokens: maxTokens,
           response_format: { type: 'json_object' }
         }),
         timeout,
@@ -357,7 +357,7 @@ Return ONLY valid JSON without any markdown formatting.`;
         try {
           const reconcileResponse = await withTimeout(
             openai.chat.completions.create({
-              model: 'gpt-4.1',
+              model: 'gpt-5',
               messages: [
                 {
                   role: 'system',
@@ -365,8 +365,7 @@ Return ONLY valid JSON without any markdown formatting.`;
                 },
                 { role: 'user', content: rawText }
               ],
-              temperature: 0.1,
-              max_tokens: 8192,
+              max_completion_tokens: 8192,
               response_format: { type: 'json_object' }
             }),
             120_000,
