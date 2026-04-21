@@ -155,6 +155,32 @@ export class AdminController {
         }
     }
 
+    async bulkHardDeleteUsers(req: Request, res: Response) {
+        try {
+            const { userIds } = req.body ?? {};
+            if (!Array.isArray(userIds) || userIds.length === 0) {
+                return res.status(400).json({ error: 'userIds must be a non-empty array' });
+            }
+            if (userIds.length > 200) {
+                return res.status(400).json({ error: 'Cannot delete more than 200 users in a single request' });
+            }
+
+            const result = await adminService.bulkHardDeleteUsers(userIds, (req as any).userId);
+            await logAdminAction(req, 'user_delete', 'user', null, {
+                bulk: true,
+                hardDelete: true,
+                requested: result.requested,
+                deleted: result.deleted,
+                skippedCount: result.skipped.length,
+                userIds: userIds.slice(0, 200),
+            });
+            res.json({ success: true, ...result });
+        } catch (error: any) {
+            logger.error('Error bulk-deleting users', { error: error?.message });
+            res.status(500).json({ error: error?.message || 'Failed to delete users' });
+        }
+    }
+
     async updateUserAdminStatus(req: Request, res: Response) {
         try {
             const { isAdmin } = req.body;

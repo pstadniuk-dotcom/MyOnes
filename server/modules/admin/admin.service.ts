@@ -161,6 +161,57 @@ export class AdminService {
         });
     }
 
+    /**
+     * Permanently delete users from the database. Cascades to all user-owned
+     * rows via FK constraints (formulas, messages, orders, etc.).
+     *
+     * Skips:
+     *   - the requesting admin's own account
+     *   - any account where isAdmin = true (safety guard)
+     *   - any userId not found in the DB
+     *
+     * Returns counts so the UI can report what actually happened.
+     */
+    async bulkHardDeleteUsers(userIds: string[], adminId: string) {
+        const unique = Array.from(new Set(userIds.filter((id) => typeof id === 'string' && id.length > 0)));
+        if (unique.length === 0) {
+            return { requested: 0, deleted: 0, skipped: [] as Array<{ userId: string; reason: string }> };
+        }
+
+        const skipped: Array<{ userId: string; reason: string }> = [];
+        let deleted = 0;
+
+        for (const userId of unique) {
+            try {
+                const user = await adminRepository.getUserById(userId);
+                if (!user) {
+                    skipped.push({ userId, reason: 'not_found' });
+                    continue;
+                }
+                if (user.id === adminId) {
+                    skipped.push({ userId, reason: 'self' });
+                    continue;
+                }
+                if (user.isAdmin) {
+                    skipped.push({ userId, reason: 'admin_account' });
+                    continue;
+                }
+
+                const ok = await adminRepository.deleteUser(userId);
+                if (ok) {
+                    deleted += 1;
+                } else {
+                    skipped.push({ userId, reason: 'delete_failed' });
+                }
+            } catch (err: any) {
+                logger.error('Failed to hard-delete user', { userId, error: err?.message });
+                skipped.push({ userId, reason: 'error' });
+            }
+        }
+
+        return { requested: unique.length, deleted, skipped };
+    }
+
     async suspendUser(userId: string, adminId: string, reason?: string) {
         const user = await adminRepository.getUserById(userId);
         if (!user) throw new Error('User not found');

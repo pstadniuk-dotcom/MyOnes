@@ -26,7 +26,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/components/ui/table';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/shared/lib/queryClient';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useLocation } from 'wouter';
 import {
@@ -42,8 +43,20 @@ import {
   DollarSign,
   Ban,
   UserX,
+  Trash2,
+  Loader2,
   AlertCircle
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/shared/components/ui/alert-dialog';
 import { cn } from "@/shared/lib/utils";
 
 import { format } from 'date-fns';
@@ -156,11 +169,14 @@ export default function UserManagementPage() {
   const [location, setLocation] = useLocation();
   const searchParams = location.split('?')[1] || '';
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({ ...emptyFilters });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'date' | 'aiCost'>('date');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const limit = 20;
 
   // Get filter from URL query parameter
@@ -237,6 +253,83 @@ export default function UserManagementPage() {
   const users = data?.users || [];
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / limit);
+
+  // Reset selection when the user list changes (page change, filter change, etc.)
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [queryParams]);
+
+  // Users that are eligible to be selected (admins are excluded — backend rejects them anyway).
+  const selectableUsers = users.filter((u) => !u.isAdmin);
+  const allOnPageSelected =
+    selectableUsers.length > 0 && selectableUsers.every((u) => selectedIds.has(u.id));
+  const someOnPageSelected =
+    selectableUsers.some((u) => selectedIds.has(u.id)) && !allOnPageSelected;
+
+  const toggleOne = (userId: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(userId);
+      else next.delete(userId);
+      return next;
+    });
+  };
+
+  const toggleAllOnPage = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        for (const u of selectableUsers) next.add(u.id);
+      } else {
+        for (const u of selectableUsers) next.delete(u.id);
+      }
+      return next;
+    });
+  };
+
+  const bulkDelete = useMutation({
+    mutationFn: async (userIds: string[]) => {
+      const res = await apiRequest('POST', '/api/admin/users/bulk-delete', { userIds });
+      return (await res.json()) as {
+        success: boolean;
+        requested: number;
+        deleted: number;
+        skipped: Array<{ userId: string; reason: string }>;
+      };
+    },
+    onSuccess: (result) => {
+      const { deleted, skipped } = result;
+      if (deleted > 0 && skipped.length === 0) {
+        toast({
+          title: `Deleted ${deleted} user${deleted === 1 ? '' : 's'}`,
+          description: 'Accounts and all related data were permanently removed.',
+        });
+      } else if (deleted > 0 && skipped.length > 0) {
+        toast({
+          title: `Deleted ${deleted} user${deleted === 1 ? '' : 's'}`,
+          description: `${skipped.length} skipped (admin accounts or your own account cannot be deleted).`,
+        });
+      } else {
+        toast({
+          title: 'No users were deleted',
+          description: 'All selected accounts were skipped (admin accounts or your own account).',
+          variant: 'destructive',
+        });
+      }
+      setSelectedIds(new Set());
+      setConfirmDeleteOpen(false);
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/users?${queryParams}`] });
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0] ?? '').startsWith('/api/admin/users') });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Bulk delete failed',
+        description: err?.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const handleUserClick = (userId: string) => {
     setLocation(`/admin/users/${userId}`);
@@ -546,10 +639,59 @@ export default function UserManagementPage() {
               </div>
             ) : (
               <>
+                {/* Bulk action bar */}
+                {selectedIds.size > 0 && (
+                  <div
+                    className="flex items-center justify-between rounded-md border border-destructive/30 bg-destructive/5 px-4 py-2.5"
+                    data-testid="bulk-action-bar"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium" data-testid="bulk-selected-count">
+                        {selectedIds.size} selected
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-muted-foreground"
+                        onClick={() => setSelectedIds(new Set())}
+                        data-testid="button-clear-selection"
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => setConfirmDeleteOpen(true)}
+                      disabled={bulkDelete.isPending}
+                      data-testid="button-bulk-delete"
+                    >
+                      {bulkDelete.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                      Delete {selectedIds.size} user{selectedIds.size === 1 ? '' : 's'}
+                    </Button>
+                  </div>
+                )}
+
                 <div className="rounded-md border" data-testid="table-users">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={allOnPageSelected ? true : someOnPageSelected ? 'indeterminate' : false}
+                            onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
+                            aria-label="Select all users on this page"
+                            disabled={selectableUsers.length === 0}
+                            data-testid="checkbox-select-all"
+                          />
+                        </TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
@@ -575,10 +717,20 @@ export default function UserManagementPage() {
                           className={cn(
                             "hover-elevate transition-all",
                             user.deletedAt && "opacity-60 grayscale bg-muted/30",
-                            user.suspendedAt && !user.deletedAt && "bg-orange-50/30"
+                            user.suspendedAt && !user.deletedAt && "bg-orange-50/30",
+                            selectedIds.has(user.id) && "bg-destructive/5"
                           )}
                           data-testid={`row-user-${user.id}`}
                         >
+                          <TableCell className="w-10">
+                            <Checkbox
+                              checked={selectedIds.has(user.id)}
+                              onCheckedChange={(checked) => toggleOne(user.id, checked === true)}
+                              disabled={user.isAdmin}
+                              aria-label={`Select ${user.name}`}
+                              data-testid={`checkbox-user-${user.id}`}
+                            />
+                          </TableCell>
                           <TableCell data-testid={`cell-name-${user.id}`}>
                             {user.name}
                           </TableCell>
@@ -687,6 +839,47 @@ export default function UserManagementPage() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent data-testid="dialog-confirm-bulk-delete">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete {selectedIds.size} user{selectedIds.size === 1 ? '' : 's'}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will <strong>permanently delete</strong> the selected accounts from the database, along with all of
+              their formulas, conversations, orders, lab reports, wearable connections, and any other linked data.
+              This action cannot be undone.
+              {selectedIds.size > 0 && (
+                <>
+                  <br />
+                  <br />
+                  Admin accounts and your own account will be skipped automatically.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-bulk-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                bulkDelete.mutate(Array.from(selectedIds));
+              }}
+              disabled={bulkDelete.isPending}
+              data-testid="button-confirm-bulk-delete"
+            >
+              {bulkDelete.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                <>Delete permanently</>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

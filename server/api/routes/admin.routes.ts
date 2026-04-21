@@ -25,6 +25,7 @@ router.get('/users', requireAdmin, adminController.searchUsers);
 router.get('/users/:id/timeline', requireAdmin, adminController.getUserTimeline);
 router.get('/users/:id', requireAdmin, adminController.getUserDetails);
 router.delete('/users/:id', requireAdmin, adminController.deleteUser);
+router.post('/users/bulk-delete', requireAdmin, adminController.bulkHardDeleteUsers);
 router.patch('/users/:id/admin-status', requireAdmin, adminController.updateUserAdminStatus);
 router.patch('/users/:id/suspend', requireAdmin, adminController.suspendUser);
 router.patch('/users/:id/unsuspend', requireAdmin, adminController.unsuspendUser);
