@@ -51,6 +51,7 @@ export class UsersController {
                 conditions: z.array(z.string()).optional(),
                 medications: z.array(z.string()).optional(),
                 allergies: z.array(z.string()).optional(),
+                currentSupplements: z.array(z.string()).optional(),
             }).parse({
                 age: req.body.age,
                 sex: req.body.sex,
@@ -66,7 +67,8 @@ export class UsersController {
                 alcoholDrinksPerWeek: req.body.alcoholDrinksPerWeek,
                 conditions: req.body.conditions,
                 medications: req.body.medications,
-                allergies: req.body.allergies
+                allergies: req.body.allergies,
+                currentSupplements: req.body.currentSupplements,
             });
 
             logger.info('Health profile validated', { userId, validatedData: healthProfileUpdate });

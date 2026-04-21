@@ -1447,9 +1447,11 @@ export default function ProfilePage() {
                         healthData.conditions.length > 0 ||
                         healthData.medications.length > 0 ||
                         healthData.allergies.length > 0 ||
+                        healthData.currentSupplements.length > 0 ||
                         conditionInput.trim() ||
                         medicationInput.trim() ||
-                        allergyInput.trim();
+                        allergyInput.trim() ||
+                        supplementInput.trim();
 
                       if (!hasAnyData) {
                         toast({
@@ -1479,6 +1481,12 @@ export default function ProfilePage() {
                         setAllergyInput('');
                       }
 
+                      const currentSupplements = [...healthData.currentSupplements];
+                      if (supplementInput.trim() && !currentSupplements.includes(supplementInput.trim())) {
+                        currentSupplements.push(supplementInput.trim());
+                        setSupplementInput('');
+                      }
+
                       // Convert feet and inches to cm
                       let heightCm = null;
                       if (healthData.heightFeet || healthData.heightInches) {
@@ -1504,6 +1512,7 @@ export default function ProfilePage() {
                         conditions: currentConditions,
                         medications: currentMedications,
                         allergies: currentAllergies,
+                        currentSupplements: currentSupplements,
                       };
                       await updateHealthProfileMutation.mutateAsync(healthProfileData);
 
