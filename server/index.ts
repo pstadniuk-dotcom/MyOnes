@@ -105,7 +105,6 @@ app.use(helmet({
 // CORS middleware - SECURITY: Only allow explicit origins (no wildcard fallback)
 const isProduction = process.env.NODE_ENV === 'production';
 const allowedOriginsList = [
-  'https://my-ones.vercel.app',
   'https://ones.health',
   'https://www.ones.health',
   'https://myones.onrender.com',
@@ -113,12 +112,11 @@ const allowedOriginsList = [
   ...(!isProduction ? ['http://localhost:5000', 'http://localhost:5173', 'http://127.0.0.1:5000', 'http://127.0.0.1:5173'] : [])
 ];
 
-// Check if origin is allowed (includes Vercel preview deployments)
 function isAllowedOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
   if (allowedOriginsList.includes(origin)) return true;
-  // Allow all Vercel preview deployments for this project
-  if (origin.match(/^https:\/\/my-ones(-[a-z0-9]+)?(-pstadniuk-dotcoms-projects)?\.vercel\.app$/)) return true;
+  // Allow Render preview/PR deployments for this service
+  if (origin.match(/^https:\/\/myones(-[a-z0-9-]+)?\.onrender\.com$/)) return true;
   return false;
 }
 

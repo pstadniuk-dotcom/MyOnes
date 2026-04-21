@@ -24,11 +24,11 @@ export function ApiConfigError() {
             <div className="bg-white/50 p-4 rounded-lg space-y-2 text-sm">
               <p className="font-semibold">For Administrators:</p>
               <ol className="list-decimal list-inside space-y-1 ml-2">
-                <li>Go to your Vercel project settings</li>
-                <li>Navigate to <strong>Environment Variables</strong></li>
+                <li>Go to your Render service settings</li>
+                <li>Navigate to <strong>Environment</strong></li>
                 <li>Add or update: <code className="bg-gray-200 px-2 py-1 rounded text-xs">VITE_API_BASE</code></li>
-                <li>Set the value to your Railway backend URL (e.g., <code className="bg-gray-200 px-2 py-1 rounded text-xs">https://myones-production.up.railway.app</code>)</li>
-                <li>Redeploy the application</li>
+                <li>Set the value to your backend URL (e.g., <code className="bg-gray-200 px-2 py-1 rounded text-xs">https://ones.health</code>)</li>
+                <li>Redeploy the service</li>
               </ol>
             </div>
 
