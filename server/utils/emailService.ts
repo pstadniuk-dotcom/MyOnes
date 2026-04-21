@@ -189,3 +189,177 @@ export function getNotificationEmailContent(
     type
   };
 }
+
+// ── Internal admin notifications ──────────────────────────────────────
+
+/**
+ * Return the list of admin email addresses that should receive internal
+ * operational notifications (new orders, etc.). Configurable via the
+ * ADMIN_ORDER_NOTIFICATION_EMAILS env var (comma-separated).
+ * Defaults to pete@ones.health.
+ */
+function getAdminOrderNotificationRecipients(): string[] {
+  const raw = process.env.ADMIN_ORDER_NOTIFICATION_EMAILS?.trim();
+  if (!raw) return ['pete@ones.health'];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s));
+}
+
+export interface AdminOrderNotificationInput {
+  orderId: string;
+  orderSource: 'checkout' | 'autoship';
+  amountCents: number;
+  currency?: string;
+  manufacturerCostCents?: number | null;
+  transactionId?: string | null;
+  customer: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  };
+  formula?: {
+    id?: string | null;
+    name?: string | null;
+    version?: number | null;
+  } | null;
+  shippingAddress?: {
+    line1?: string | null;
+    line2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postalCode?: string | null;
+    country?: string | null;
+  } | null;
+  membershipTier?: string | null;
+}
+
+/**
+ * Send an internal notification to platform admins whenever a new order is
+ * created and payment has been captured. Non-fatal — errors are logged but
+ * never thrown back to the caller.
+ */
+export async function sendAdminOrderNotification(
+  input: AdminOrderNotificationInput,
+): Promise<void> {
+  const recipients = getAdminOrderNotificationRecipients();
+  if (recipients.length === 0) return;
+
+  if (!SENDGRID_API_KEY || !SENDGRID_FROM_EMAIL) {
+    logger.warn('Admin order notification skipped: SendGrid not configured');
+    return;
+  }
+
+  const currency = (input.currency || 'USD').toUpperCase();
+  const amount = `$${(input.amountCents / 100).toFixed(2)}`;
+  const mfrCost =
+    typeof input.manufacturerCostCents === 'number'
+      ? `$${(input.manufacturerCostCents / 100).toFixed(2)}`
+      : null;
+  const marginCents =
+    typeof input.manufacturerCostCents === 'number'
+      ? input.amountCents - input.manufacturerCostCents
+      : null;
+  const margin = marginCents !== null ? `$${(marginCents / 100).toFixed(2)}` : null;
+
+  const customerName = escapeHtml(input.customer.name || 'Unknown');
+  const customerEmail = input.customer.email ? escapeHtml(input.customer.email) : '—';
+  const customerPhone = input.customer.phone ? escapeHtml(input.customer.phone) : '—';
+  const formulaName = input.formula?.name
+    ? escapeHtml(input.formula.name)
+    : input.formula?.version
+    ? `Formula v${input.formula.version}`
+    : '—';
+  const sourceLabel =
+    input.orderSource === 'autoship' ? 'Auto-ship renewal' : 'New checkout';
+  const membership = input.membershipTier ? escapeHtml(input.membershipTier) : null;
+
+  const addr = input.shippingAddress;
+  const shipHtml = addr && addr.line1
+    ? [
+        escapeHtml(addr.line1),
+        addr.line2 ? escapeHtml(addr.line2) : null,
+        [addr.city, addr.state, addr.postalCode].filter(Boolean).map((s) => escapeHtml(String(s))).join(', '),
+        addr.country ? escapeHtml(addr.country) : null,
+      ]
+        .filter(Boolean)
+        .join('<br>')
+    : '—';
+
+  const adminOrderUrl = `${getFrontendUrl()}/admin/orders`;
+  const adminUserUrl = `${getFrontendUrl()}/admin/users/${input.customer.id}`;
+
+  const rows: Array<[string, string]> = [
+    ['Source', sourceLabel],
+    ['Order ID', escapeHtml(input.orderId)],
+    ['Amount', `<strong>${amount} ${currency}</strong>`],
+  ];
+  if (mfrCost) rows.push(['Manufacturer cost', mfrCost]);
+  if (margin) rows.push(['Gross margin', margin]);
+  if (input.transactionId) rows.push(['Transaction', escapeHtml(input.transactionId)]);
+  rows.push(['Customer', `${customerName} (<a href="${adminUserUrl}">view profile</a>)`]);
+  rows.push(['Email', customerEmail]);
+  rows.push(['Phone', customerPhone]);
+  rows.push(['Formula', formulaName]);
+  if (membership) rows.push(['Membership', membership]);
+  rows.push(['Ship to', shipHtml]);
+
+  const tableHtml = `
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      ${rows
+        .map(
+          ([label, value]) => `
+        <tr>
+          <td style="padding:6px 12px 6px 0;color:#6b7280;white-space:nowrap;vertical-align:top;">${label}</td>
+          <td style="padding:6px 0;color:#111827;vertical-align:top;">${value}</td>
+        </tr>`,
+        )
+        .join('')}
+    </table>
+  `;
+
+  const content = `
+    <p>A new order just processed on ones.health.</p>
+    ${tableHtml}
+  `;
+
+  const subject = `[ONES] ${sourceLabel} — ${amount} — ${input.customer.name || input.customer.email || 'customer'}`;
+
+  // Send to each admin recipient individually so SendGrid reports per-recipient.
+  // These are fire-and-forget; we never let email failures block order completion.
+  await Promise.all(
+    recipients.map(async (to) => {
+      try {
+        const msg = {
+          to,
+          from: { email: SENDGRID_FROM_EMAIL!, name: SENDGRID_FROM_NAME },
+          subject,
+          html: getEmailTemplate({
+            to,
+            subject,
+            title: sourceLabel,
+            content,
+            actionUrl: adminOrderUrl,
+            actionText: 'Open Admin Orders',
+            type: 'order_update',
+          }),
+        };
+        const [response] = await sgMail.send(msg);
+        logger.info('Admin order notification sent', {
+          to,
+          orderId: input.orderId,
+          statusCode: response.statusCode,
+        });
+      } catch (error: any) {
+        logger.error('Failed to send admin order notification', {
+          to,
+          orderId: input.orderId,
+          error: error?.message || error,
+          responseBody: error?.response?.body,
+        });
+      }
+    }),
+  );
+}

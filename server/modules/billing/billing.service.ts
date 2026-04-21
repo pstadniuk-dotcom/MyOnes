@@ -23,6 +23,7 @@ import { eq } from 'drizzle-orm';
 import logger from '../../infra/logging/logger';
 import { epdGateway, isApproved, type EpdTransactionResponse } from './epd-gateway';
 import { sendNotificationEmail } from '../../utils/emailService';
+import { sendAdminOrderNotification } from '../../utils/emailService';
 import { getFrontendUrl } from '../../utils/urlHelper';
 
 type InternalSubscriptionStatus = 'active' | 'paused' | 'cancelled' | 'past_due';
@@ -542,6 +543,42 @@ class DatabaseBillingProvider implements BillingProvider {
         });
       } catch (emailErr) {
         logger.warn('Failed to send order confirmation email', { userId, orderId, error: emailErr });
+      }
+    }
+
+    // ── Notify internal admins ──
+    if (orderId) {
+      try {
+        await sendAdminOrderNotification({
+          orderId,
+          orderSource: 'checkout',
+          amountCents: totalCents,
+          currency: 'USD',
+          manufacturerCostCents,
+          transactionId: transactionId || null,
+          customer: {
+            id: userId,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+          },
+          formula: formula
+            ? { id: formula.id, name: formula.name, version: formula.version }
+            : null,
+          shippingAddress: shipping
+            ? {
+                line1: shipping.line1,
+                line2: shipping.line2,
+                city: shipping.city,
+                state: shipping.state,
+                postalCode: shipping.zip,
+                country: shipping.country,
+              }
+            : null,
+          membershipTier: availableTier?.name || null,
+        });
+      } catch (adminEmailErr) {
+        logger.warn('Failed to send admin order notification', { userId, orderId, error: adminEmailErr });
       }
     }
 

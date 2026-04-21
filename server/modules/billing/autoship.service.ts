@@ -26,7 +26,7 @@ import { formulasRepository } from '../formulas/formulas.repository';
 import { consentsRepository } from '../consents/consents.repository';
 import { manufacturerPricingService, type ManufacturerOrderCustomerInfo } from '../formulas/manufacturer-pricing.service';
 import { notificationsService } from '../notifications/notifications.service';
-import { sendNotificationEmail } from '../../utils/emailService';
+import { sendNotificationEmail, sendAdminOrderNotification } from '../../utils/emailService';
 import { epdGateway, isApproved } from './epd-gateway';
 import logger from '../../infra/logging/logger';
 import type { AutoShipSubscription } from '@shared/schema';
@@ -367,6 +367,47 @@ export class AutoShipService {
       });
     } catch (err) {
       logger.warn('Failed to send auto-ship renewal notification', { userId: autoShip.userId, error: err });
+    }
+
+    // ── Internal admin notification ──
+    try {
+      const shippingAddresses = await usersRepository.listAddressesByUser(autoShip.userId, 'shipping');
+      const primaryShipping = shippingAddresses[0];
+      await sendAdminOrderNotification({
+        orderId: order.id,
+        orderSource: 'autoship',
+        amountCents: chargeCents,
+        currency: 'USD',
+        manufacturerCostCents: Math.round((quote.manufacturerCost ?? 0) * 100),
+        transactionId: transactionId || null,
+        customer: {
+          id: autoShip.userId,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+        },
+        formula: { id: formula.id, name: formula.name, version: formula.version },
+        shippingAddress: primaryShipping
+          ? {
+              line1: primaryShipping.line1,
+              line2: primaryShipping.line2,
+              city: primaryShipping.city,
+              state: primaryShipping.state,
+              postalCode: primaryShipping.postalCode,
+              country: primaryShipping.country,
+            }
+          : {
+              line1: user.addressLine1,
+              line2: user.addressLine2,
+              city: user.city,
+              state: user.state,
+              postalCode: user.postalCode,
+              country: user.country,
+            },
+        membershipTier: user.membershipTier || null,
+      });
+    } catch (adminEmailErr) {
+      logger.warn('Failed to send admin order notification (autoship)', { userId: autoShip.userId, orderId: order.id, error: adminEmailErr });
     }
 
     // ── Membership upgrade nudge for non-members ──
