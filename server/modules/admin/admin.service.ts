@@ -820,7 +820,7 @@ Return ONLY valid JSON.`;
     async getAiSettings() {
         return {
             provider: aiRuntimeSettings.provider || (process.env.AI_PROVIDER || 'openai'),
-            model: aiRuntimeSettings.model || process.env.AI_MODEL || ((process.env.AI_PROVIDER || 'openai').toLowerCase() === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o'),
+            model: aiRuntimeSettings.model || process.env.AI_MODEL || ((process.env.AI_PROVIDER || 'openai').toLowerCase() === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o'),
             source: aiRuntimeSettings.provider || aiRuntimeSettings.model ? 'override' : 'env',
             updatedAt: aiRuntimeSettings.updatedAt || null
         };
@@ -875,7 +875,7 @@ Return ONLY valid JSON.`;
 
     async testAiConnection(): Promise<{ ok: boolean; provider: string; model: string; sample?: string; error?: string }> {
         const provider = (aiRuntimeSettings.provider || process.env.AI_PROVIDER || 'openai') as 'openai' | 'anthropic';
-        const model = aiRuntimeSettings.model || (provider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o');
+        const model = aiRuntimeSettings.model || (provider === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o');
 
         try {
             if (provider === 'openai') {

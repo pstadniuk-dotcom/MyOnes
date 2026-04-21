@@ -5,6 +5,8 @@
  * pitch email. Each pitch is stored as a draft for human review.
  */
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
+import { jsonrepair } from 'jsonrepair';
 import logger from '../../../infra/logging/logger';
 import { agentRepository } from '../agent.repository';
 import { getPrAgentConfig } from '../agent-config';
@@ -15,6 +17,61 @@ import { scorePitchQuality } from '../tools/pitch-quality';
 import { trackTokens, finalizeRunCost } from '../tools/cost-tracker';
 import type { OutreachProspect, InsertOutreachPitch } from '@shared/schema';
 import { logPitchActivity } from '../../crm/crm-bridge';
+
+function isClaudeModel(model: string): boolean {
+  return model.startsWith('claude-');
+}
+
+async function callPitchAI(
+  model: string,
+  system: string,
+  user: string,
+  temperature: number,
+): Promise<{ content: string; promptTokens: number; completionTokens: number }> {
+  if (isClaudeModel(model) && process.env.ANTHROPIC_API_KEY) {
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const response = await anthropic.messages.create({
+      model,
+      max_tokens: 4000,
+      temperature,
+      system,
+      messages: [{ role: 'user', content: user }],
+    });
+    const text = response.content.find(c => c.type === 'text')?.text ?? '{}';
+    return {
+      content: text,
+      promptTokens: response.usage?.input_tokens || 0,
+      completionTokens: response.usage?.output_tokens || 0,
+    };
+  }
+  // Fallback to OpenAI
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const fallbackModel = isClaudeModel(model) ? 'gpt-4o' : model;
+  const response = await openai.chat.completions.create({
+    model: fallbackModel,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    temperature,
+    response_format: { type: 'json_object' },
+  });
+  return {
+    content: response.choices[0].message.content || '{}',
+    promptTokens: response.usage?.prompt_tokens || 0,
+    completionTokens: response.usage?.completion_tokens || 0,
+  };
+}
+
+function parseJsonSafe(raw: string): any {
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return {};
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    try { return JSON.parse(jsonrepair(jsonMatch[0])); } catch { return {}; }
+  }
+}
 
 export interface DraftPitchResult {
   pitchId: string;
@@ -35,8 +92,6 @@ export async function draftPitch(
   const config = await getPrAgentConfig();
   const profile = await getFounderProfile();
   const template = templateOverride || getTemplateForProspect(prospect.category, prospect.subType);
-
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   // Fetch live platform stats for dynamic social proof
   let platformStatsBlock = '';
@@ -77,12 +132,7 @@ ${template.exampleSubjectLines.map(s => `- ${s}`).join('\n')}
 `;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: config.model,
-      messages: [
-        {
-          role: 'system',
-          content: `${template.systemPrompt}
+    const systemPromptFull = `${template.systemPrompt}
 
 TONE: ${template.toneGuidance}
 
@@ -133,24 +183,19 @@ OUTPUT FORMAT: Return a JSON object with exactly two keys:
 {
   "subject": "The email subject line",
   "body": "The email body text (plain text, no HTML)"
-}`,
-        },
-        {
-          role: 'user',
-          content: `Draft a ${template.name.toLowerCase()} for this prospect:\n${contextBlock}`,
-        },
-      ],
-      temperature: config.temperature,
-      response_format: { type: 'json_object' },
-    });
+}`;
+
+    const response = await callPitchAI(
+      config.model,
+      systemPromptFull,
+      `Draft a ${template.name.toLowerCase()} for this prospect:\n${contextBlock}`,
+      config.temperature,
+    );
 
     // Track token usage for cost monitoring
-    if (response.usage) {
-      trackTokens(null, config.model, response.usage.prompt_tokens, response.usage.completion_tokens, 'draft_pitch');
-    }
+    trackTokens(null, config.model, response.promptTokens, response.completionTokens, 'draft_pitch');
 
-    const content = response.choices[0].message.content || '{}';
-    const parsed = JSON.parse(content);
+    const parsed = parseJsonSafe(response.content);
 
     const subject = parsed.subject || `${prospect.name} — ${template.name}`;
     const body = parsed.body || '';
@@ -212,8 +257,6 @@ export async function draftFollowUp(
     throw new Error(`Max follow-ups (${config.maxFollowUps}) reached for prospect ${prospect.id}`);
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
   // Fetch enriched contacts for personalization
   const contacts = await agentRepository.getContactsByProspectId(prospect.id);
   const primaryContact = contacts.find(c => c.isPrimary) || contacts[0];
@@ -230,12 +273,7 @@ export async function draftFollowUp(
   ].filter(Boolean).join('\n');
 
   try {
-    const response = await openai.chat.completions.create({
-      model: config.model,
-      messages: [
-        {
-          role: 'system',
-          content: `You are writing follow-up #${followUpNum} to a pitch that hasn't received a response.
+    const followUpSystem = `You are writing follow-up #${followUpNum} to a pitch that hasn't received a response.
 
 RULES:
 - NEVER be passive-aggressive ("just checking in", "making sure you saw my email")
@@ -254,19 +292,16 @@ ${prospectDetails}
 
 FOUNDER: ${profile.name}, ${profile.title} at ${profile.company}
 
-OUTPUT FORMAT: JSON with "subject" and "body" keys.`,
-        },
-        {
-          role: 'user',
-          content: `Write a brief, high-value follow-up email. Add something new — a stat, a timely angle, or a simplified ask. Personalize it to their recent coverage or topics if possible.`,
-        },
-      ],
-      temperature: config.temperature,
-      response_format: { type: 'json_object' },
-    });
+OUTPUT FORMAT: JSON with "subject" and "body" keys.`;
 
-    const content = response.choices[0].message.content || '{}';
-    const parsed = JSON.parse(content);
+    const response = await callPitchAI(
+      config.model,
+      followUpSystem,
+      `Write a brief, high-value follow-up email. Add something new — a stat, a timely angle, or a simplified ask. Personalize it to their recent coverage or topics if possible.`,
+      config.temperature,
+    );
+
+    const parsed = parseJsonSafe(response.content);
 
     const subject = parsed.subject || `Re: ${originalPitch.subject}`;
     const body = parsed.body || '';

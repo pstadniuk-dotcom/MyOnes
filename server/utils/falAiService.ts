@@ -37,7 +37,8 @@ export type VideoModelId =
   | 'fal-ai/kling-video/v2.1/master/image-to-video'
   | 'fal-ai/kling-video/v3/pro/image-to-video'
   | 'fal-ai/minimax-video/image-to-video'
-  | 'fal-ai/wan/v2.1/image-to-video';
+  | 'fal-ai/wan/v2.1/image-to-video'
+  | 'fal-ai/seedance/video';
 
 export type UpscaleModelId =
   | 'fal-ai/creative-upscaler';
@@ -194,6 +195,16 @@ export const VIDEO_MODELS: Record<VideoModelId, ModelInfo> = {
     category: 'video',
     bestFor: ['product-animations', 'lifestyle-clips'],
     costTier: 'medium',
+    supportsReferenceImages: false,
+    supportsNegativePrompt: true,
+  },
+  'fal-ai/seedance/video': {
+    id: 'fal-ai/seedance/video',
+    name: 'Seed Dance 2.0',
+    description: 'ByteDance latest — cinematic motion, superior human movement and expressions',
+    category: 'video',
+    bestFor: ['ugc-scenes', 'ads', 'product-demos', 'cinematic', 'human-motion'],
+    costTier: 'high',
     supportsReferenceImages: false,
     supportsNegativePrompt: true,
   },
@@ -401,15 +412,30 @@ export async function generateVideo(options: GenerateVideoOptions): Promise<Gene
 
   logger.info(`[fal-ai] Generating video with ${model?.name || modelId}: "${options.prompt.substring(0, 80)}..."`);
 
-  const result = await fal.subscribe(modelId, {
-    input: {
-      prompt: options.prompt,
-      image_url: options.startFrameImageUrl,
-      negative_prompt: options.negativePrompt || 'phone in hand, holding phone, blurry, out of focus, motion blur, low quality, deformed',
-      duration: options.durationSeconds === 10 ? '10' : '5',
-      cfg_scale: Math.min(options.cfgScale || 0.7, 1),
-    },
-  });
+  let result: any;
+
+  if (modelId === 'fal-ai/seedance/video') {
+    // Seed Dance 2.0 uses slightly different parameters
+    result = await fal.subscribe(modelId, {
+      input: {
+        prompt: options.prompt,
+        image_url: options.startFrameImageUrl,
+        negative_prompt: options.negativePrompt || 'phone in hand, holding phone, blurry, out of focus, motion blur, low quality, deformed',
+        duration: options.durationSeconds === 10 ? '10' : '5',
+        aspect_ratio: options.aspectRatio || '16:9',
+      },
+    });
+  } else {
+    result = await fal.subscribe(modelId, {
+      input: {
+        prompt: options.prompt,
+        image_url: options.startFrameImageUrl,
+        negative_prompt: options.negativePrompt || 'phone in hand, holding phone, blurry, out of focus, motion blur, low quality, deformed',
+        duration: options.durationSeconds === 10 ? '10' : '5',
+        cfg_scale: Math.min(options.cfgScale || 0.7, 1),
+      },
+    });
+  }
 
   const videoUrl = (result.data as any)?.video?.url;
   if (!videoUrl) throw new Error(`${model?.name || modelId} returned no video URL`);

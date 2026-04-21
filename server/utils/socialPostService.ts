@@ -119,7 +119,7 @@ async function callAi(system: string, user: string, maxTokens = 4000): Promise<s
   const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
   const hasOpenAI = !!process.env.OPENAI_API_KEY;
   const preferAnthropic = aiRuntimeSettings.provider === 'anthropic' || (!aiRuntimeSettings.provider && hasAnthropic);
-  const anthropicModel = (aiRuntimeSettings.provider === 'anthropic' && aiRuntimeSettings.model) || 'claude-sonnet-4-5';
+  const anthropicModel = (aiRuntimeSettings.provider === 'anthropic' && aiRuntimeSettings.model) || 'claude-sonnet-4-6';
   const openaiModel = (aiRuntimeSettings.provider === 'openai' && aiRuntimeSettings.model) || 'gpt-4o';
 
   async function tryAnthropic(): Promise<string> {

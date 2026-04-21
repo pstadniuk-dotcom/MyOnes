@@ -52,7 +52,7 @@ function getAIConfig(): { provider: 'openai' | 'anthropic'; model: string } {
   }
   // Fallback to environment
   if (process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY) {
-    return { provider: 'anthropic', model: 'claude-sonnet-4-5' };
+    return { provider: 'anthropic', model: 'claude-sonnet-4-6' };
   }
   return { provider: 'openai', model: 'gpt-4o-mini' };
 }

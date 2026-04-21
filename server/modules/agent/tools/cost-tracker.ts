@@ -1,5 +1,5 @@
 /**
- * Cost Tracker — Track OpenAI token usage and cost per agent run
+ * Cost Tracker — Track AI token usage and cost per agent run
  *
  * Populates the previously unused `tokensUsed` and `costUsd` columns
  * in the agent_runs table. Provides budget monitoring and alerts.
@@ -13,6 +13,10 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   'gpt-4o': { input: 2.50, output: 10.00 },
   'gpt-4o-mini': { input: 0.15, output: 0.60 },
   'gpt-4-turbo': { input: 10.00, output: 30.00 },
+  'o4-mini': { input: 1.10, output: 4.40 },
+  'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
+  'claude-opus-4-6': { input: 15.00, output: 75.00 },
+  'claude-haiku-4-6': { input: 0.80, output: 4.00 },
 };
 
 export interface TokenUsage {

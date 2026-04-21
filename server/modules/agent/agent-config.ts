@@ -118,7 +118,7 @@ const DEFAULT_CONFIG: PrAgentConfig = {
   followUpDays: 7,
   maxFollowUps: 2,
 
-  model: 'gpt-4o',
+  model: 'claude-sonnet-4-6',
   temperature: 0.7,
 
   gmailEnabled: false,

@@ -978,9 +978,9 @@ export default function MyFormulaPage() {
                       Restore an older formula to make it active again.
                     </p>
                   </div>
-                  <div className="flex flex-row gap-4 items-start">
+                  <div className="flex flex-row gap-4 items-start w-full">
                     {archivedColumns.map((col, colIdx) => (
-                      <div key={colIdx} className="flex-1 flex flex-col gap-4">
+                      <div key={colIdx} className="flex-1 min-w-0 flex flex-col gap-4">
                         {col.map((formula) => (
                           <ArchivedFormulaCard
                             key={formula.id}
@@ -994,9 +994,9 @@ export default function MyFormulaPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-row gap-4 items-start" data-testid="active-formulas-view">
+                <div className="flex flex-row gap-4 items-start w-full" data-testid="active-formulas-view">
                   {formulaColumns.map((col, colIdx) => (
-                    <div key={colIdx} className="flex-1 flex flex-col gap-4">
+                    <div key={colIdx} className="flex-1 min-w-0 flex flex-col gap-4">
                       {col.map((formula) => (
                         <FormulaCard
                           key={formula.id}

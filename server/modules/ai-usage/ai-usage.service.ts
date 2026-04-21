@@ -69,6 +69,7 @@ const FAL_PRICING_CENTS: Record<string, number> = {
   'fal-ai/kling-video/v3/pro/image-to-video':      75, // ~$0.75
   'fal-ai/minimax-video/image-to-video':            40, // ~$0.40
   'fal-ai/wan/v2.1/image-to-video':                 30, // ~$0.30
+  'fal-ai/seedance/video':                          60, // ~$0.60
   'fal-ai/sync-lipsync':             20,    // ~$0.20
   'fal-ai/creative-upscaler':         5,    // ~$0.05
   'fal-ai/bria/background/remove':     2,    // ~$0.02
