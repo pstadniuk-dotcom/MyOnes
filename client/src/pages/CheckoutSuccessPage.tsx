@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { CheckCircle, ArrowRight, MessageSquare } from 'lucide-react';
+import { CheckCircle, ArrowRight, MessageSquare, Truck } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -17,6 +17,7 @@ export default function CheckoutSuccessPage() {
     const timer = setTimeout(() => {
       qc.invalidateQueries({ queryKey: ['/api/auth/me'] });
       qc.invalidateQueries({ queryKey: ['/api/membership/tiers'] });
+      qc.invalidateQueries({ queryKey: ['/api/orders'] });
     }, 2000);
     return () => clearTimeout(timer);
   }, [qc]);
@@ -33,24 +34,24 @@ export default function CheckoutSuccessPage() {
 
         {/* Heading */}
         <h1 className="text-3xl font-light text-[#054700] mb-3">
-          Welcome to <span className="font-medium">Ones</span>
+          Thank you for your <span className="font-medium">order</span>
         </h1>
         <p className="text-[#5a6623] leading-relaxed">
-          {includesMembership
-            ? 'Your membership is confirmed. Your personalized formula and AI consultations are ready.'
-            : 'Your checkout is confirmed. Your personalized formula order is now in progress.'}
+          We'll keep you updated with shipping information by email. Because each
+          formula is custom-formulated and produced to order, please allow{' '}
+          <span className="font-medium text-[#054700]">7–10 business days</span> for
+          production before it ships.
+          {includesMembership && ' Your membership is now active.'}
         </p>
 
         {/* What's next */}
         <div className="mt-10 bg-white rounded-2xl p-6 text-left shadow-sm shadow-[#054700]/5">
-          <p className="text-xs font-medium text-[#D4A574] uppercase tracking-wider mb-4">What's next</p>
+          <p className="text-xs font-medium text-[#D4A574] uppercase tracking-wider mb-4">What happens next</p>
           <ul className="space-y-3">
             {[
-              includesMembership
-                ? 'Chat with your AI practitioner to build and refine your formula'
-                : 'Review your formula details and upcoming order status',
-              'Upload any lab results or connect wearables for deeper insights',
-              'Your formula ships once finalized',
+              'Our team reviews your personalized formula',
+              'We compound your supplements to order (typically 7–10 business days)',
+              "You'll receive a tracking email as soon as it ships",
             ].map((step, i) => (
               <li key={i} className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#054700] text-white text-xs flex items-center justify-center font-medium mt-0.5">
@@ -73,10 +74,11 @@ export default function CheckoutSuccessPage() {
         )}
 
         <Button
-          onClick={() => navigate('/dashboard/chat')}
+          onClick={() => navigate('/dashboard/orders')}
           className="mt-8 w-full bg-[#054700] hover:bg-[#043d00] text-white py-6 text-base rounded-full group"
         >
-          Start your consultation
+          <Truck className="mr-2 w-4 h-4" />
+          View order status
           <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
         </Button>
 

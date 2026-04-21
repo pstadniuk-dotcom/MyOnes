@@ -2055,6 +2055,16 @@ export default function MyFormulaPage() {
                       postalCode: shippingAddress.zip.trim(),
                       country: shippingAddress.country.trim() || 'US',
                     });
+                    queryClient.invalidateQueries({ queryKey: ['/api/users/me/profile'] });
+                    queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+                  }
+                  // Save phone to profile if user entered one and doesn't have it on file,
+                  // so CheckoutPage can pre-fill it (independent of SMS opt-in choice)
+                  if (!userPhone && checkoutPhone.trim()) {
+                    await apiRequest('PATCH', '/api/users/me/profile', {
+                      phone: checkoutPhone.trim(),
+                    });
+                    queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
                   }
                   await purchaseSmsOptInMutation.mutateAsync();
                   // Navigate to full checkout page

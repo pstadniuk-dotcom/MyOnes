@@ -219,16 +219,19 @@ export default function CheckoutPage() {
     setPhone(user.phone || "");
   }, [user]);
 
-  // Pre-fill address from user profile
+  // Pre-fill address + phone from user profile (the order modal saves entries
+  // here before navigating, so this is the single source of truth on checkout).
   useEffect(() => {
     if (!user) return;
     apiRequest("GET", "/api/users/me/profile")
       .then((res) => res.json())
       .then((profile: any) => {
         if (profile.addressLine1) setLine1(profile.addressLine1);
+        if (profile.addressLine2) setLine2(profile.addressLine2);
         if (profile.city) setCity(profile.city);
         if (profile.state) setState(profile.state);
         if (profile.postalCode) setZip(profile.postalCode);
+        if (profile.phone) setPhone(profile.phone);
       })
       .catch(() => {});
   }, [user]);
