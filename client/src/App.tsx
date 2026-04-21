@@ -1,5 +1,6 @@
 import { Switch, Route, Redirect } from "wouter";
-import { Suspense, lazy } from "react";
+import { Suspense } from "react";
+import { lazyWithRetry as lazy } from "@/shared/lib/lazyWithRetry";
 import { queryClient } from "@/shared/lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/shared/components/ui/toaster";
