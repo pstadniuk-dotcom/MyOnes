@@ -251,11 +251,26 @@ class DatabaseBillingProvider implements BillingProvider {
     // IMPORTANT: Only charge membership price if the user is explicitly joining/renewing
     // in this transaction (indicated by availableTier being set).
     // Do NOT charge existing active members the membership fee again here.
-    const membershipAmountCents = availableTier 
-      ? availableTier.priceCents * intervalCount 
-      : 0; 
+    const tierPriceCents = availableTier ? Number((availableTier as any).priceCents) : 0;
+    if (availableTier && (!Number.isFinite(tierPriceCents) || tierPriceCents < 0)) {
+      logger.error('Invalid membership tier priceCents', { userId, tierKey: (availableTier as any).tierKey, priceCents: (availableTier as any).priceCents });
+      throw new Error('CHECKOUT_TOTAL_INVALID');
+    }
+    const membershipAmountCents = availableTier
+      ? Math.round(tierPriceCents) * intervalCount
+      : 0;
       
     const totalCents = formulaLineAmountCents + membershipAmountCents + shippingAmountCents;
+    if (!Number.isFinite(totalCents) || totalCents <= 0) {
+      logger.error('Invalid checkout totalCents computed', {
+        userId,
+        formulaLineAmountCents,
+        membershipAmountCents,
+        shippingAmountCents,
+        totalCents,
+      });
+      throw new Error('CHECKOUT_TOTAL_INVALID');
+    }
     const totalDollars = (totalCents / 100).toFixed(2);
 
     logger.info('Checkout pricing breakdown', {
@@ -274,7 +289,7 @@ class DatabaseBillingProvider implements BillingProvider {
     const descParts: string[] = [];
     if (formula) descParts.push(`Formula v${formula.version}`);
     if (availableTier) descParts.push(`${availableTier.name} Membership`);
-    else if (isActiveMember) descParts.push(`ONES Formula Order`);
+    else if (isActuallyActiveMember) descParts.push(`ONES Formula Order`);
     const orderdescription = `ONES: ${descParts.join(' + ')}`;
 
     const shipping = payload.shippingAddress;
@@ -393,21 +408,33 @@ class DatabaseBillingProvider implements BillingProvider {
         logger.warn('Failed to build consent snapshot', { userId, error: err });
       }
 
-      const order = await usersRepository.createOrder({
-        userId,
-        formulaId: formula.id,
-        formulaVersion: formula.version,
-        status: 'processing',
-        amountCents: totalCents,
-        manufacturerCostCents,
-        supplyWeeks: 8,
-        manufacturerQuoteId: manufacturerQuoteId || null,
-        manufacturerQuoteExpiresAt: manufacturerQuoteExpiresAt ? new Date(manufacturerQuoteExpiresAt) : null,
-        gatewayTransactionId: transactionId,
-        consentSnapshot,
-        currency: 'USD',
-        paymentMode: 'card',
-      });
+      let order: Awaited<ReturnType<typeof usersRepository.createOrder>>;
+      try {
+        order = await usersRepository.createOrder({
+          userId,
+          formulaId: formula.id,
+          formulaVersion: formula.version,
+          status: 'processing',
+          amountCents: totalCents,
+          manufacturerCostCents,
+          supplyWeeks: 8,
+          manufacturerQuoteId: manufacturerQuoteId || null,
+          manufacturerQuoteExpiresAt: manufacturerQuoteExpiresAt ? new Date(manufacturerQuoteExpiresAt) : null,
+          gatewayTransactionId: transactionId,
+          consentSnapshot,
+          currency: 'USD',
+          paymentMode: 'card',
+        });
+      } catch (persistErr) {
+        logger.error('Failed to persist order after successful payment', {
+          userId,
+          formulaId: formula.id,
+          transactionId,
+          totalCents,
+          error: persistErr,
+        });
+        throw new Error('ORDER_PERSIST_FAILED');
+      }
 
       orderId = order.id;
       logger.info('Order created from EPD checkout', {

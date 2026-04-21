@@ -100,7 +100,7 @@ Only if you want to keep existing data:
    ```bash
    # Required
    DATABASE_URL=postgresql://postgres.xxxxx:[PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres?sslmode=require
-   JWT_SECRET=a5f6f9ef65acd0b74b6bc0d81e0768e701e339a549aa730fec04532fa1e76134
+   JWT_SECRET=your_jwt_secret_here_change_in_production
    SESSION_SECRET=wearable-oauth-secret-change-in-production
    NODE_ENV=production
    PORT=5000

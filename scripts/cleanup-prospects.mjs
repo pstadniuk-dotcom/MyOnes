@@ -1,3 +1,4 @@
+import 'dotenv/config';
 /**
  * Cleanup Script — Delete un-pitched prospects, research audience for pitched ones
  * 
@@ -9,7 +10,7 @@ import OpenAI from 'openai';
 
 const { Pool } = pg;
 const pool = new Pool({
-  connectionString: 'postgresql://postgres.frksbddeepdzlskvniqu:Weshinebright22!@aws-0-us-west-2.pooler.supabase.com:6543/postgres',
+  connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 

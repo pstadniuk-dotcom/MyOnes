@@ -1,9 +1,10 @@
+import 'dotenv/config';
 import pg from 'pg';
 const { Pool } = pg;
 
 // Production Supabase database (same as Railway)
 const pool = new Pool({ 
-  connectionString: 'postgresql://postgres.aytzwtehxtvoejgcixdn:Weshinebright22!@aws-1-us-east-1.pooler.supabase.com:6543/postgres'
+  connectionString: process.env.DATABASE_URL
 });
 
 const alterStatements = [

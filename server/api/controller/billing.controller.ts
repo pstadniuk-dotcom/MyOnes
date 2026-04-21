@@ -129,8 +129,28 @@ export class BillingController {
       if (error?.message === 'USER_NOT_FOUND') {
         return res.status(404).json({ error: 'User not found' });
       }
-      logger.error('Error processing checkout', { error });
-      res.status(500).json({ error: 'Failed to process checkout' });
+      if (error?.message === 'CHECKOUT_TOTAL_INVALID') {
+        return res.status(400).json({ error: 'Invalid checkout total. Please refresh and try again.' });
+      }
+      if (error?.message === 'ORDER_PERSIST_FAILED') {
+        return res.status(500).json({ error: 'Payment processed but order creation failed. Support has been notified.' });
+      }
+
+      const errMessage = typeof error?.message === 'string' ? error.message : undefined;
+      const errName = typeof error?.name === 'string' ? error.name : undefined;
+      logger.error('Error processing checkout', {
+        name: errName,
+        message: errMessage,
+        stack: typeof error?.stack === 'string' ? error.stack : undefined,
+        userId: req.userId,
+      });
+
+      const isProd = process.env.NODE_ENV === 'production';
+      return res.status(500).json({
+        error: 'Failed to process checkout',
+        code: 'CHECKOUT_FAILED',
+        ...(isProd ? {} : { details: errMessage || String(error) }),
+      });
     }
   }
 
