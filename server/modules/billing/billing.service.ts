@@ -199,6 +199,7 @@ class DatabaseBillingProvider implements BillingProvider {
     let manufacturerCostCents = 0;
     let manufacturerQuoteId: string | undefined;
     let manufacturerQuoteExpiresAt: string | undefined;
+    let shippingAmountCents = 0;
     if (formula) {
       const quote = await manufacturerPricingService.quoteFormula({
         bases: (formula.bases as any[]) || [],
@@ -211,6 +212,7 @@ class DatabaseBillingProvider implements BillingProvider {
       }
 
       formulaAmountCents = Math.round(quote.total * 100);
+      shippingAmountCents = Math.round((quote.shipping ?? 0) * 100);
       manufacturerCostCents = Math.round((quote.manufacturerCost ?? 0) * 100);
       manufacturerQuoteId = quote.quoteId;
       manufacturerQuoteExpiresAt = quote.quoteExpiresAt;
@@ -246,28 +248,33 @@ class DatabaseBillingProvider implements BillingProvider {
       ? Math.round(formulaAmountCents * 0.85)
       : formulaAmountCents;
 
+    // IMPORTANT: Only charge membership price if the user is explicitly joining/renewing
+    // in this transaction (indicated by availableTier being set).
+    // Do NOT charge existing active members the membership fee again here.
     const membershipAmountCents = availableTier 
       ? availableTier.priceCents * intervalCount 
-      : 0;
-    const totalCents = formulaLineAmountCents + membershipAmountCents;
+      : 0; 
+      
+    const totalCents = formulaLineAmountCents + membershipAmountCents + shippingAmountCents;
     const totalDollars = (totalCents / 100).toFixed(2);
 
-    logger.info('Checkout Pricing Breakdown', {
+    logger.info('Checkout pricing breakdown', {
       userId,
-      isActuallyActiveMember,
-      includeMembership,
-      subscriptionStatus: subscription?.status || 'none',
+      formulaId: formula?.id,
+      formulaAmountCents,
       applyMemberDiscount,
-      formulaAmountBeforeDiscount: formulaAmountCents,
       formulaLineAmountCents,
       membershipAmountCents,
+      shippingAmountCents,
       totalCents,
+      totalDollars
     });
 
     // ── Build order description ──
     const descParts: string[] = [];
     if (formula) descParts.push(`Formula v${formula.version}`);
-    if (availableTier || isActuallyActiveMember) descParts.push(`${availableTier?.name || 'ONES'} Membership`);
+    if (availableTier) descParts.push(`${availableTier.name} Membership`);
+    else if (isActiveMember) descParts.push(`ONES Formula Order`);
     const orderdescription = `ONES: ${descParts.join(' + ')}`;
 
     const shipping = payload.shippingAddress;

@@ -338,7 +338,7 @@ Please revise the article content accordingly.`;
     if (process.env.ANTHROPIC_API_KEY) {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5',
+        model: 'claude-sonnet-4-6',
         max_tokens: 8000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
@@ -441,7 +441,7 @@ IMPORTANT: Return only the JSON object, no preamble, no markdown fences.`;
     if (process.env.ANTHROPIC_API_KEY) {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const response = await anthropic.messages.create({
-        model: textModel || 'claude-sonnet-4-5',
+        model: textModel || 'claude-sonnet-4-6',
         max_tokens: 12000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],

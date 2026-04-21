@@ -10,7 +10,7 @@ export interface Message {
 }
 
 export interface ClassificationResult {
-  model: 'gpt-4' | 'gpt-4o' | 'o1-mini';
+  model: 'gpt-4o' | 'o4-mini';
   reason: string;
   thinkingMessage: string;
 }
@@ -54,60 +54,51 @@ export function classifyQuery(
   const hasMedicalKeyword = medicalKeywords.some(k => msg.includes(k));
   const hasSimpleKeyword = simpleKeywords.some(k => msg.includes(k));
   
-  // ALWAYS use o1-mini for formula creation/adjustment
+  // Use o4-mini for formula creation/adjustment (reasoning model for complex medical logic)
   if (hasFormulaKeyword || sessionContext.hasActiveFormula) {
-    logger.debug('MODEL ROUTER: Using o1-mini (formula-related)');
+    logger.debug('MODEL ROUTER: Using o4-mini (formula-related)');
     return {
-      model: 'o1-mini',
+      model: 'o4-mini',
       reason: 'Formula creation or adjustment requires validation and lab context',
       thinkingMessage: 'Analyzing your health data and researching personalized recommendations...'
     };
   }
-  
-  // ALWAYS use o1-mini for lab-related questions
+
+  // Use o4-mini for lab-related questions
   if (hasLabKeyword || sessionContext.hasLabReports) {
-    logger.debug('MODEL ROUTER: Using o1-mini (lab analysis)');
+    logger.debug('MODEL ROUTER: Using o4-mini (lab analysis)');
     return {
-      model: 'o1-mini',
+      model: 'o4-mini',
       reason: 'Lab analysis requires comprehensive medical knowledge',
       thinkingMessage: 'Reviewing your lab results and medical research...'
     };
   }
-  
-  // ALWAYS use o1-mini for complex medical consultations
+
+  // Use o4-mini for complex medical consultations
   if (hasMedicalKeyword && (messageLength > 200 || sessionContext.messageCount > 3)) {
-    logger.debug('MODEL ROUTER: Using o1-mini (complex medical consultation)');
+    logger.debug('MODEL ROUTER: Using o4-mini (complex medical consultation)');
     return {
-      model: 'o1-mini',
+      model: 'o4-mini',
       reason: 'Complex medical question requiring deep analysis',
       thinkingMessage: 'Conducting comprehensive health analysis...'
     };
   }
-  
-  // Use GPT-4o for simple, straightforward questions
-  if (hasSimpleKeyword && messageLength < 150 && !hasMedicalKeyword) {
-    logger.debug('MODEL ROUTER: Using gpt-4o (simple question)');
+
+  // Use GPT-4o for simple, straightforward questions and general conversation
+  if ((hasSimpleKeyword && messageLength < 150 && !hasMedicalKeyword) ||
+      (messageLength < 100 && sessionContext.messageCount < 5 && !hasMedicalKeyword)) {
+    logger.debug('MODEL ROUTER: Using gpt-4o (simple/conversational)');
     return {
       model: 'gpt-4o',
-      reason: 'Simple informational question',
+      reason: 'Simple informational or conversational question',
       thinkingMessage: 'Gathering information...'
     };
   }
-  
-  // Use GPT-4 for general conversation, short questions
-  if (messageLength < 100 && sessionContext.messageCount < 5 && !hasMedicalKeyword) {
-    logger.debug('MODEL ROUTER: Using gpt-4 (general conversation)');
-    return {
-      model: 'gpt-4',
-      reason: 'Brief conversational message',
-      thinkingMessage: 'Thinking...'
-    };
-  }
-  
-  // Default to o1-mini for safety (medical context)
-  logger.debug('MODEL ROUTER: Using o1-mini (default/safety)');
+
+  // Default to o4-mini for safety (medical context)
+  logger.debug('MODEL ROUTER: Using o4-mini (default/safety)');
   return {
-    model: 'o1-mini',
+    model: 'o4-mini',
     reason: 'Default to comprehensive analysis for safety',
     thinkingMessage: 'Analyzing your request thoroughly...'
   };

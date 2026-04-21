@@ -50,12 +50,12 @@ export function normalizeModel(provider: 'openai' | 'anthropic', model: string |
         if (/haiku-?4[\.-]?6/i.test(lower)) {
             return 'claude-haiku-4-6';
         }
-        // Map "claude 4.5" or "sonnet 4.5" variants
+        // Map "claude 4.5" or "sonnet 4.5" variants (legacy)
         if (/opus-?4[\.-]?5/i.test(lower)) {
             return 'claude-opus-4-5';
         }
         if (/claude-?4[\.-]?5(-sonnet)?(-latest)?/i.test(lower) || /sonnet-?4[\.-]?5/i.test(lower)) {
-            return 'claude-sonnet-4-5';
+            return 'claude-sonnet-4-6'; // Upgrade 4.5 requests to 4.6
         }
         if (/haiku-?4[\.-]?5/i.test(lower)) {
             return 'claude-haiku-4-5';
@@ -91,7 +91,7 @@ export async function initializeAiSettings() {
         const val = saved?.value as any;
         if (val && (val.provider || val.model)) {
             const provider = String(val.provider || process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'anthropic';
-            let model = String(val.model || (provider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o'));
+            let model = String(val.model || (provider === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o'));
             const normalized = normalizeModel(provider, model) || model;
             const allowed = ALLOWED_MODELS[provider] || [];
             if (!allowed.includes(normalized)) {

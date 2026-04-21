@@ -182,7 +182,7 @@ Return ONLY the JSON object.`;
 async function analyzeWithAnthropic(imageAssets: BrandAsset[]): Promise<string> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const model = (aiRuntimeSettings.provider === 'anthropic' && aiRuntimeSettings.model)
-    ? aiRuntimeSettings.model : 'claude-sonnet-4-5';
+    ? aiRuntimeSettings.model : 'claude-sonnet-4-6';
 
   const content: Anthropic.Messages.ContentBlockParam[] = [
     { type: 'text', text: `${ANALYSIS_PROMPT}\n\nI am providing ${imageAssets.length} brand reference images:` },

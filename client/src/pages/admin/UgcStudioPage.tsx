@@ -247,9 +247,10 @@ const UGC_IMAGE_MODEL_OPTIONS = [
 
 const UGC_VIDEO_MODEL_OPTIONS = [
   { value: '__default', label: 'Kling 2.1 Master', description: 'Current default, reliable' },
-  { value: 'fal-ai/kling-video/v3/pro/image-to-video', label: 'Kling 3.0 Pro', description: 'Latest, cinematic quality' },
-  { value: 'fal-ai/minimax-video/image-to-video', label: 'MiniMax Hailuo', description: 'Smooth motion' },
-  { value: 'fal-ai/wan/v2.1/image-to-video', label: 'WAN 2.1', description: 'Enhanced fidelity' },
+  { value: 'fal-ai/seedance/video', label: 'Seed Dance 2.0', description: 'Best human motion & expressions' },
+  { value: 'fal-ai/kling-video/v3/pro/image-to-video', label: 'Kling 3.0 Pro', description: 'Cinematic quality, native audio' },
+  { value: 'fal-ai/wan/v2.1/image-to-video', label: 'WAN 2.1', description: 'Smooth motion, great fidelity' },
+  { value: 'fal-ai/minimax-video/image-to-video', label: 'MiniMax Hailuo', description: 'High quality, smooth motion' },
 ];
 
 const PIPELINE_STAGES = ['Research', 'Hooks', 'Scripts', 'Characters', 'Video', 'Complete'];

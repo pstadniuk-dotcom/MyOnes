@@ -978,9 +978,9 @@ export default function MyFormulaPage() {
                       Restore an older formula to make it active again.
                     </p>
                   </div>
-                  <div className="flex flex-row gap-4 items-start">
+                  <div className="flex flex-row gap-4 items-start w-full">
                     {archivedColumns.map((col, colIdx) => (
-                      <div key={colIdx} className="flex-1 flex flex-col gap-4">
+                      <div key={colIdx} className="flex-1 min-w-0 flex flex-col gap-4">
                         {col.map((formula) => (
                           <ArchivedFormulaCard
                             key={formula.id}
@@ -994,9 +994,9 @@ export default function MyFormulaPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-row gap-4 items-start" data-testid="active-formulas-view">
+                <div className="flex flex-row gap-4 items-start w-full" data-testid="active-formulas-view">
                   {formulaColumns.map((col, colIdx) => (
-                    <div key={colIdx} className="flex-1 flex flex-col gap-4">
+                    <div key={colIdx} className="flex-1 min-w-0 flex flex-col gap-4">
                       {col.map((formula) => (
                         <FormulaCard
                           key={formula.id}
@@ -1516,12 +1516,12 @@ export default function MyFormulaPage() {
                               <div>
                                 <div className="flex items-baseline gap-1.5">
                                   <span className="text-3xl font-black text-[#054700] tabular-nums">
-                                    {onesMonthly > 0 ? `$${onesMonthly}` : '—'}
+                                    {onesMonthly > 0 ? `$${onesMonthly.toFixed(2)}` : '—'}
                                   </span>
                                   <span className="text-xs text-[#5a6623]">/ month</span>
                                 </div>
                                 <div className="text-[10px] text-[#5a6623]/70 mt-0.5">
-                                  ${Math.round(effectiveOnesCost)} per {supplyWeeks}-week order
+                                  ${effectiveOnesCost.toFixed(2)} per {supplyWeeks}-week order
                                   {isMemberPricing && <span className="text-[#D4A574] font-medium ml-1">· Member price</span>}
                                 </div>
                               </div>
@@ -2361,7 +2361,7 @@ function FormulaCard({ formula, isSelected, isNewest, diffSummary, onSelect, onO
             ) : tileQuote?.available ? (
               <>
                 <span className="text-sm font-semibold text-[#054700] tabular-nums">
-                  ${((tileQuote.total ?? 0) * 0.85).toFixed(0)}
+                  ${((tileQuote.total ?? 0) * 0.85).toFixed(2)}
                 </span>
                 <p className="text-[10px] text-[#5a6623]">{hasActiveMembership ? 'member' : 'w/ membership'}</p>
               </>

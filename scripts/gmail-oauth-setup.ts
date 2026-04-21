@@ -23,7 +23,8 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
   process.exit(1);
 }
 
-const REDIRECT_URI = 'http://localhost:3456/callback';
+// const REDIRECT_URI = 'http://localhost:3456/callback';
+const REDIRECT_URI = 'https://ones.health/callback';
 const SCOPES = ['https://mail.google.com/'];
 
 const oauth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
