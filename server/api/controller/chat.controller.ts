@@ -123,6 +123,9 @@ export class ChatController {
             let chatSession;
             if (sessionId) {
                 chatSession = await chatRepository.getChatSession(sessionId);
+                if (chatSession && chatSession.userId !== userId) {
+                    throw new Error('Session not found');
+                }
             }
             if (!chatSession) {
                 chatSession = await chatRepository.createChatSession({ userId, status: 'active' });
