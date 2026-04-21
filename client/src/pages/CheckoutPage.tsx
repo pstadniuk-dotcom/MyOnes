@@ -276,11 +276,33 @@ export default function CheckoutPage() {
     },
   });
 
+  const { data: subscription } = useQuery({
+    queryKey: ["/api/users/me/subscription"],
+    enabled: !!user,
+    queryFn: async () => {
+      const res = await fetch(buildApiUrl("/api/users/me/subscription"), {
+        method: "GET",
+        headers: { ...getAuthHeaders() },
+        credentials: "include",
+      });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error("Failed to load subscription");
+      return res.json();
+    },
+  });
+
+console.log('membership details', myMembership, subscription)
   // ── Pricing Calculations ───────────────────────────────────────────
 
+  const isSubscriptionCancelledOrPaused = 
+    subscription?.status === "cancelled" || subscription?.status === "paused";
+
   const hasActiveMembership =
-    !!myMembership?.hasMembership && !myMembership?.isCancelled;
-  const membershipUpsellAvailable = !hasActiveMembership && !!membershipTier;
+    !!myMembership?.hasMembership && 
+    !myMembership?.isCancelled && 
+    subscription?.status === "active";
+    
+  const membershipUpsellAvailable = !hasActiveMembership && !!membershipTier && !isSubscriptionCancelledOrPaused;
   const formulaPrice = quoteData?.quote?.available
     ? (quoteData.quote.total ?? 0)
     : 0;

@@ -161,6 +161,8 @@ class DatabaseBillingProvider implements BillingProvider {
   async processCheckout(userId: string, payload: CheckoutPayload, req?: Request): Promise<CheckoutResult> {
     const user = await usersRepository.getUser(userId);
     if (!user) throw new Error('USER_NOT_FOUND');
+    
+    const subscription = await usersRepository.getSubscription(userId);
 
     const includeMembership = payload.includeMembership !== false;
     const formulaId = typeof payload.formulaId === 'string' ? payload.formulaId : undefined;
@@ -218,10 +220,12 @@ class DatabaseBillingProvider implements BillingProvider {
       throw new Error('FORMULA_ID_REQUIRED');
     }
 
+    const isActuallyActiveMember = !!(user.membershipTier && !user.membershipCancelledAt && subscription?.status === 'active');
+
     // ── Resolve membership tier ──
     let availableTier: Awaited<ReturnType<typeof membershipRepository.getAvailableMembershipTier>> | undefined;
     if (includeMembership) {
-      if (user.membershipTier && !user.membershipCancelledAt) {
+      if (isActuallyActiveMember) {
         throw new Error('ALREADY_ACTIVE_MEMBER');
       }
       if (user.membershipTier && user.membershipCancelledAt && user.membershipPriceCents) {
@@ -237,22 +241,33 @@ class DatabaseBillingProvider implements BillingProvider {
     }
 
     // ── Calculate totals ──
-    const isActiveMember = !!(user.membershipTier && !user.membershipCancelledAt);
-    const applyMemberDiscount = !!(formula && (includeMembership || isActiveMember));
+    const applyMemberDiscount = !!(formula && (includeMembership || isActuallyActiveMember));
     const formulaLineAmountCents = applyMemberDiscount
       ? Math.round(formulaAmountCents * 0.85)
       : formulaAmountCents;
 
     const membershipAmountCents = availableTier 
       ? availableTier.priceCents * intervalCount 
-      : (isActiveMember ? (user.membershipPriceCents || 0) : 0);
+      : 0;
     const totalCents = formulaLineAmountCents + membershipAmountCents;
     const totalDollars = (totalCents / 100).toFixed(2);
+
+    logger.info('Checkout Pricing Breakdown', {
+      userId,
+      isActuallyActiveMember,
+      includeMembership,
+      subscriptionStatus: subscription?.status || 'none',
+      applyMemberDiscount,
+      formulaAmountBeforeDiscount: formulaAmountCents,
+      formulaLineAmountCents,
+      membershipAmountCents,
+      totalCents,
+    });
 
     // ── Build order description ──
     const descParts: string[] = [];
     if (formula) descParts.push(`Formula v${formula.version}`);
-    if (availableTier || isActiveMember) descParts.push(`${availableTier?.name || 'ONES'} Membership`);
+    if (availableTier || isActuallyActiveMember) descParts.push(`${availableTier?.name || 'ONES'} Membership`);
     const orderdescription = `ONES: ${descParts.join(' + ')}`;
 
     const shipping = payload.shippingAddress;
