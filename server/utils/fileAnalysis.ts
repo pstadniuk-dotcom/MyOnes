@@ -561,6 +561,38 @@ function salvageTruncatedJSON(content: string): any | null {
 }
 
 /**
+ * Heuristic detector for documents that ARE NOT actual lab results — i.e.
+ * lab requisitions / order forms uploaded by mistake. We use this when an
+ * analysis returns 0 markers so we can show the patient a clearer message
+ * than a generic "error" badge.
+ *
+ * Returns true when the OCR text strongly suggests a requisition.
+ */
+export function looksLikeLabRequisition(rawText: string | undefined): boolean {
+  if (!rawText) return false;
+  const t = rawText.toLowerCase();
+  // Must mention requisition/order semantics
+  const requisitionHint =
+    /\blab(oratory)?\s+(order|requisition)\b/.test(t) ||
+    /\brequisition\b/.test(t) ||
+    /\btest\s+order\b/.test(t) ||
+    /\bordered\s+tests?\b/.test(t) ||
+    /\bspecimen\s+collection\s+(date|kit|instructions)\b/.test(t) ||
+    /\bdraw\s+instructions\b/.test(t) ||
+    /\bordering\s+(physician|provider|clinician)\b/.test(t);
+
+  // And must NOT contain typical result indicators
+  const hasResults =
+    /\breference\s+(range|interval)\b/.test(t) ||
+    /\bresult\s*:/.test(t) ||
+    /\babnormal\s+flag\b/.test(t) ||
+    /\bout\s+of\s+range\b/.test(t) ||
+    /\b(mg\/dl|mmol\/l|ng\/ml|pg\/ml|iu\/l|miu\/l|u\/l|g\/dl|mcg\/dl|ng\/dl|pmol\/l)\b/.test(t);
+
+  return requisitionHint && !hasResults;
+}
+
+/**
  * Main function to analyze a file and extract lab data
  */
 export async function analyzeLabReport(

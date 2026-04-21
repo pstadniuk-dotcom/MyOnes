@@ -557,6 +557,13 @@ export const fileUploads = pgTable("file_uploads", {
     riskPatterns?: string[];
     extractedData?: Array<Record<string, any>> | Record<string, any>;
     markerInsights?: Record<string, any>;
+    /**
+     * Coarse classification of the document. 'results' is the normal case
+     * (a lab results PDF). 'requisition' = order form / requisition with no
+     * results (e.g. patient uploaded the order before the draw). Used to
+     * show clearer messaging when 0 markers are extracted.
+     */
+    documentKind?: 'results' | 'requisition' | 'unknown';
   }>(),
   // Soft delete for compliance (never actually delete PHI)
   deletedAt: timestamp("deleted_at"),

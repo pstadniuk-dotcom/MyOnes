@@ -1,6 +1,6 @@
 import { filesRepository } from './files.repository';
 import { ObjectStorageService } from '../../utils/objectStorage';
-import { analyzeLabReport } from '../../utils/fileAnalysis';
+import { analyzeLabReport, looksLikeLabRequisition } from '../../utils/fileAnalysis';
 import { labsService } from '../labs/labs.service';
 import { notificationsService } from '../notifications/notifications.service';
 import { usersRepository } from '../users/users.repository';
@@ -8,6 +8,41 @@ import { sendNotificationEmail } from '../../utils/emailService';
 import logger from '../../infra/logging/logger';
 import { type InsertFileUpload } from '@shared/schema';
 import { systemRepository } from '../system/system.repository';
+
+/**
+ * Classify a finished lab analysis into the right (analysisStatus, documentKind,
+ * progressDetail) tuple so the UI can show meaningful messaging.
+ *
+ * - markers > 0           → completed / results
+ * - 0 markers + requisition text → error  / requisition + clear "this is an order form" message
+ * - 0 markers otherwise   → error  / unknown + generic retry message
+ */
+function classifyAnalysisOutcome(
+    markerCount: number,
+    rawText?: string,
+): {
+    analysisStatus: 'completed' | 'error';
+    documentKind: 'results' | 'requisition' | 'unknown';
+    progressDetail?: string;
+} {
+    if (markerCount > 0) {
+        return { analysisStatus: 'completed', documentKind: 'results' };
+    }
+    if (looksLikeLabRequisition(rawText)) {
+        return {
+            analysisStatus: 'error',
+            documentKind: 'requisition',
+            progressDetail:
+                'This looks like a lab requisition (order form), not lab results. ' +
+                'Once your results PDF is available from the lab, upload that and we\'ll analyze it.',
+        };
+    }
+    return {
+        analysisStatus: 'error',
+        documentKind: 'unknown',
+        progressDetail: 'We couldn\'t extract any lab markers from this document. Try a clearer scan or a results PDF from the lab.',
+    };
+}
 
 export class FilesService {
     private objectStorageService: ObjectStorageService;
@@ -191,6 +226,11 @@ export class FilesService {
 
                     const labDataExtraction = await analyzeLabReport(normalizedPath, mimeType, userId, onProgress);
                     if (labDataExtraction && fileId) {
+                        const markers = labDataExtraction.extractedData || [];
+                        const outcome = classifyAnalysisOutcome(
+                            Array.isArray(markers) ? markers.length : 0,
+                            labDataExtraction.rawText,
+                        );
                         await filesRepository.updateFileUpload(fileId, {
                             labReportData: {
                                 testDate: labDataExtraction.testDate,
@@ -199,16 +239,18 @@ export class FilesService {
                                 physicianName: labDataExtraction.physicianName,
                                 overallAssessment: labDataExtraction.overallAssessment,
                                 riskPatterns: labDataExtraction.riskPatterns,
-                                analysisStatus: 'completed',
-                                extractedData: labDataExtraction.extractedData || [],
+                                analysisStatus: outcome.analysisStatus,
+                                documentKind: outcome.documentKind,
+                                progressDetail: outcome.progressDetail,
+                                extractedData: markers,
                             }
                         });
                         // Mirror into lab_analyses so AI Brain / formula review can read structured markers.
                         await filesRepository.upsertLabAnalysisForFile({
                             fileId,
                             userId,
-                            analysisStatus: 'completed',
-                            extractedData: labDataExtraction.extractedData || [],
+                            analysisStatus: outcome.analysisStatus,
+                            extractedData: markers,
                         });
                         // Fire-and-forget: generate marker insights in background
                         void labsService.generateAllMarkerInsights(labDataExtraction.extractedData || []).then(async (markerInsights) => {
@@ -369,6 +411,11 @@ export class FilesService {
                 try {
                     const labDataExtraction = await analyzeLabReport(normalizedPath, uploadedFile.mimetype, userId);
                     if (labDataExtraction) {
+                        const markers = labDataExtraction.extractedData || [];
+                        const outcome = classifyAnalysisOutcome(
+                            Array.isArray(markers) ? markers.length : 0,
+                            labDataExtraction.rawText,
+                        );
                         await filesRepository.updateFileUpload(fileId, {
                             labReportData: {
                                 testDate: labDataExtraction.testDate,
@@ -377,15 +424,17 @@ export class FilesService {
                                 physicianName: labDataExtraction.physicianName,
                                 overallAssessment: labDataExtraction.overallAssessment,
                                 riskPatterns: labDataExtraction.riskPatterns,
-                                analysisStatus: 'completed',
-                                extractedData: labDataExtraction.extractedData || [],
+                                analysisStatus: outcome.analysisStatus,
+                                documentKind: outcome.documentKind,
+                                progressDetail: outcome.progressDetail,
+                                extractedData: markers,
                             }
                         });
                         await filesRepository.upsertLabAnalysisForFile({
                             fileId,
                             userId,
-                            analysisStatus: 'completed',
-                            extractedData: labDataExtraction.extractedData || [],
+                            analysisStatus: outcome.analysisStatus,
+                            extractedData: markers,
                         });
                         logger.info(`✅ Lab report re-analysis completed: ${uploadedFile.name}`);
                         await filesRepository.updateFileUpload(fileId, { analysisCompletedAt: new Date() } as any);
@@ -456,7 +505,7 @@ export class FilesService {
         const hasNewMarkers = Array.isArray(labData.extractedData) && labData.extractedData.length > 0;
         const newExtractedData = hasNewMarkers ? labData.extractedData : (existingData.extractedData || []);
         const hasAnyMarkers = hasNewMarkers || (Array.isArray(existingData.extractedData) && existingData.extractedData.length > 0);
-        const analysisStatus = hasAnyMarkers ? 'completed' : 'error';
+        const outcome = classifyAnalysisOutcome(hasAnyMarkers ? 1 : 0, labData.rawText);
 
         await filesRepository.updateFileUpload(fileId, {
             labReportData: {
@@ -466,7 +515,9 @@ export class FilesService {
                 physicianName: labData.physicianName || existingData.physicianName,
                 overallAssessment: labData.overallAssessment || existingData.overallAssessment,
                 riskPatterns: labData.riskPatterns || existingData.riskPatterns,
-                analysisStatus,
+                analysisStatus: outcome.analysisStatus,
+                documentKind: outcome.documentKind,
+                progressDetail: outcome.progressDetail,
                 extractedData: newExtractedData,
             }
         });
@@ -474,7 +525,7 @@ export class FilesService {
         await filesRepository.upsertLabAnalysisForFile({
             fileId,
             userId,
-            analysisStatus,
+            analysisStatus: outcome.analysisStatus,
             extractedData: newExtractedData,
         });
 
@@ -529,7 +580,7 @@ export class FilesService {
                 const hasNewMarkers = Array.isArray(labData.extractedData) && labData.extractedData.length > 0;
                 const newExtractedData = hasNewMarkers ? labData.extractedData : (existingData.extractedData || []);
                 const hasAnyMarkers = hasNewMarkers || (Array.isArray(existingData.extractedData) && existingData.extractedData.length > 0);
-                const analysisStatus = hasAnyMarkers ? 'completed' : 'error';
+                const outcome = classifyAnalysisOutcome(hasAnyMarkers ? 1 : 0, labData.rawText);
 
                 await filesRepository.updateFileUpload(fileId, {
                     labReportData: {
@@ -539,7 +590,9 @@ export class FilesService {
                         physicianName: labData.physicianName || existingData.physicianName,
                         overallAssessment: labData.overallAssessment || existingData.overallAssessment,
                         riskPatterns: labData.riskPatterns || existingData.riskPatterns,
-                        analysisStatus,
+                        analysisStatus: outcome.analysisStatus,
+                        documentKind: outcome.documentKind,
+                        progressDetail: outcome.progressDetail,
                         extractedData: newExtractedData,
                     },
                     analysisCompletedAt: new Date(),
@@ -548,7 +601,7 @@ export class FilesService {
                 await filesRepository.upsertLabAnalysisForFile({
                     fileId,
                     userId,
-                    analysisStatus,
+                    analysisStatus: outcome.analysisStatus,
                     extractedData: newExtractedData,
                 });
 

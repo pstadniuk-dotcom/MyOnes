@@ -2066,6 +2066,9 @@ export default function LabReportsPage() {
                       const ld = report.labReportData as any;
                       const markerCount = Array.isArray(ld?.extractedData) ? ld.extractedData.length : 0;
                       const status = ld?.analysisStatus || 'unknown';
+                      const documentKind = ld?.documentKind;
+                      const progressDetail = ld?.progressDetail;
+                      const isRequisition = documentKind === 'requisition';
                       const testDate = ld?.testDate;
                       const labName = ld?.labName;
                       const isSelected = selectedFiles.has(report.id);
@@ -2092,6 +2095,9 @@ export default function LabReportsPage() {
                               {labName && <span>• {labName}</span>}
                               {markerCount > 0 && <span>• {markerCount} markers</span>}
                             </div>
+                            {isRequisition && progressDetail && (
+                              <p className="mt-1 text-xs text-amber-700">{progressDetail}</p>
+                            )}
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             {status === 'processing' || status === 'pending' ? (
@@ -2102,8 +2108,12 @@ export default function LabReportsPage() {
                               <Badge variant="outline" className="text-xs border-emerald-300 text-emerald-700 bg-emerald-50">
                                 <CheckCircle2 className="h-3 w-3 mr-1" />Analyzed
                               </Badge>
+                            ) : isRequisition ? (
+                              <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50" title={progressDetail || ''}>
+                                <AlertTriangle className="h-3 w-3 mr-1" />Order form
+                              </Badge>
                             ) : status === 'error' ? (
-                              <Badge variant="outline" className="text-xs border-red-300 text-red-700 bg-red-50">
+                              <Badge variant="outline" className="text-xs border-red-300 text-red-700 bg-red-50" title={progressDetail || ''}>
                                 <AlertTriangle className="h-3 w-3 mr-1" />Error
                               </Badge>
                             ) : (

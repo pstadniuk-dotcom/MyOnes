@@ -288,7 +288,20 @@ export class FilesRepository {
 
     async listLabAnalysesByUser(userId: string): Promise<LabAnalysis[]> {
         try {
-            const analyses = await db.select().from(labAnalyses).where(eq(labAnalyses.userId, userId)).orderBy(desc(labAnalyses.processedAt));
+            // Inner-join file_uploads so we exclude analyses whose source file
+            // has been soft-deleted. Without this, formula-review and
+            // optimize.service still see markers from deleted lab reports.
+            const rows = await db
+                .select({ analysis: labAnalyses })
+                .from(labAnalyses)
+                .innerJoin(fileUploads, eq(labAnalyses.fileId, fileUploads.id))
+                .where(and(
+                    eq(labAnalyses.userId, userId),
+                    isNull(fileUploads.deletedAt),
+                ))
+                .orderBy(desc(labAnalyses.processedAt));
+
+            const analyses = rows.map(r => r.analysis);
 
             // Decrypt each analysis
             return analyses.map(analysis => ({
