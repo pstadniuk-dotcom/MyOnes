@@ -11,6 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/shared/components/ui/separator';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/shared/components/ui/accordion';
+import { AutocompleteInput } from '@/shared/components/ui/autocomplete-input';
+import {
+  COMMON_MEDICATIONS,
+  COMMON_SUPPLEMENTS,
+  COMMON_ALLERGIES,
+  COMMON_CONDITIONS,
+} from '@shared/health-vocabulary';
+import { ALL_INGREDIENTS } from '@shared/ingredients';
 import {
   Dialog,
   DialogContent,
@@ -45,6 +53,27 @@ import { apiRequest, queryClient, getAuthHeaders } from '@/shared/lib/queryClien
 import { buildApiUrl } from '@/shared/lib/api';
 import type { User as UserType, HealthProfile } from '@shared/schema';
 import { AddressAutocomplete } from '@/shared/components/address/AddressAutocomplete';
+
+/**
+ * Combined supplement vocabulary for typeahead: ONES proprietary supports +
+ * individual ingredients from our catalog + common consumer supplement names.
+ * Deduplicated case-insensitively, stable order preserved.
+ */
+const SUPPLEMENT_VOCABULARY: string[] = (() => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of [
+    ...ALL_INGREDIENTS.map((i) => i.name),
+    ...COMMON_SUPPLEMENTS,
+  ]) {
+    const key = item.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(item);
+    }
+  }
+  return out;
+})();
 
 // Loading skeleton components
 function ProfileSkeleton() {
@@ -1169,22 +1198,19 @@ export default function ProfilePage() {
                                 </Badge>
                               ))}
                             </div>
-                            <Input
+                            <AutocompleteInput
                               id="conditions"
+                              testId="input-conditions"
                               value={conditionInput}
-                              onChange={(e) => setConditionInput(e.target.value)}
-                              placeholder="Add a health condition..."
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  const value = conditionInput.trim();
-                                  if (value && !healthData.conditions.includes(value)) {
-                                    setHealthData({ ...healthData, conditions: [...healthData.conditions, value] });
-                                    setConditionInput('');
-                                  }
+                              onChange={setConditionInput}
+                              onSelect={(value) => {
+                                if (!healthData.conditions.includes(value)) {
+                                  setHealthData({ ...healthData, conditions: [...healthData.conditions, value] });
                                 }
+                                setConditionInput('');
                               }}
-                              data-testid="input-conditions"
+                              options={COMMON_CONDITIONS}
+                              placeholder="Add a health condition..."
                             />
                           </>
                         )}
@@ -1212,22 +1238,19 @@ export default function ProfilePage() {
                                 </Badge>
                               ))}
                             </div>
-                            <Input
+                            <AutocompleteInput
                               id="medications"
+                              testId="input-medications"
                               value={medicationInput}
-                              onChange={(e) => setMedicationInput(e.target.value)}
-                              placeholder="Add a medication..."
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  const value = medicationInput.trim();
-                                  if (value && !healthData.medications.includes(value)) {
-                                    setHealthData({ ...healthData, medications: [...healthData.medications, value] });
-                                    setMedicationInput('');
-                                  }
+                              onChange={setMedicationInput}
+                              onSelect={(value) => {
+                                if (!healthData.medications.includes(value)) {
+                                  setHealthData({ ...healthData, medications: [...healthData.medications, value] });
                                 }
+                                setMedicationInput('');
                               }}
-                              data-testid="input-medications"
+                              options={COMMON_MEDICATIONS}
+                              placeholder="Add a medication..."
                             />
                             {/* Medication Safety Disclosure */}
                             <div className="mt-3">
@@ -1279,22 +1302,19 @@ export default function ProfilePage() {
                                 </Badge>
                               ))}
                             </div>
-                            <Input
+                            <AutocompleteInput
                               id="allergies"
+                              testId="input-allergies"
                               value={allergyInput}
-                              onChange={(e) => setAllergyInput(e.target.value)}
-                              placeholder="Add an allergy..."
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  const value = allergyInput.trim();
-                                  if (value && !healthData.allergies.includes(value)) {
-                                    setHealthData({ ...healthData, allergies: [...healthData.allergies, value] });
-                                    setAllergyInput('');
-                                  }
+                              onChange={setAllergyInput}
+                              onSelect={(value) => {
+                                if (!healthData.allergies.includes(value)) {
+                                  setHealthData({ ...healthData, allergies: [...healthData.allergies, value] });
                                 }
+                                setAllergyInput('');
                               }}
-                              data-testid="input-allergies"
+                              options={COMMON_ALLERGIES}
+                              placeholder="Add an allergy..."
                             />
                           </>
                         )}
@@ -1323,22 +1343,19 @@ export default function ProfilePage() {
                                 </Badge>
                               ))}
                             </div>
-                            <Input
+                            <AutocompleteInput
                               id="currentSupplements"
+                              testId="input-current-supplements"
                               value={supplementInput}
-                              onChange={(e) => setSupplementInput(e.target.value)}
-                              placeholder="e.g., Vitamin D 5000IU, Fish Oil, Magnesium..."
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  const value = supplementInput.trim();
-                                  if (value && !healthData.currentSupplements.includes(value)) {
-                                    setHealthData({ ...healthData, currentSupplements: [...healthData.currentSupplements, value] });
-                                    setSupplementInput('');
-                                  }
+                              onChange={setSupplementInput}
+                              onSelect={(value) => {
+                                if (!healthData.currentSupplements.includes(value)) {
+                                  setHealthData({ ...healthData, currentSupplements: [...healthData.currentSupplements, value] });
                                 }
+                                setSupplementInput('');
                               }}
-                              data-testid="input-current-supplements"
+                              options={SUPPLEMENT_VOCABULARY}
+                              placeholder="e.g., Vitamin D 5000IU, Fish Oil, Magnesium..."
                             />
                           </>
                         )}
