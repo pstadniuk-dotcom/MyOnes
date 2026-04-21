@@ -221,11 +221,13 @@ export default function CheckoutPage() {
 
   // Pre-fill address + phone from user profile (the order modal saves entries
   // here before navigating, so this is the single source of truth on checkout).
+  // Use /api/auth/me — there is no GET /api/users/me/profile endpoint, only PATCH.
   useEffect(() => {
     if (!user) return;
-    apiRequest("GET", "/api/users/me/profile")
+    apiRequest("GET", "/api/auth/me")
       .then((res) => res.json())
-      .then((profile: any) => {
+      .then((data: any) => {
+        const profile = data?.user ?? data ?? {};
         if (profile.addressLine1) setLine1(profile.addressLine1);
         if (profile.addressLine2) setLine2(profile.addressLine2);
         if (profile.city) setCity(profile.city);

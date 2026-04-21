@@ -1422,14 +1422,19 @@ export default function ConsultationPage() {
   }, [inputValue, currentSessionId, toast, user?.id, isRecording, startAnalysisPolling]);
 
   // Auto-send pending lab marker discussion message (from Labs page "Discuss with practitioner" link)
+  // Wait until the user is fully loaded before sending — otherwise the first
+  // /api/chat/stream request can fire without an auth token and surface a
+  // transient "Connection Error" toast, which then succeeds on retry.
   useEffect(() => {
     if (!pendingLabMessage) return;
+    if (!user?.id) return;
+    if (isTyping) return;
     const timer = setTimeout(() => {
       handleSendMessage(pendingLabMessage);
       setPendingLabMessage(null);
-    }, 1000);
+    }, 400);
     return () => clearTimeout(timer);
-  }, [pendingLabMessage, handleSendMessage]);
+  }, [pendingLabMessage, handleSendMessage, user?.id, isTyping]);
 
   // Enhanced file upload with object storage
   const handleFileUpload = useCallback(async () => {
