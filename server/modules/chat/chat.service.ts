@@ -123,6 +123,24 @@ function classifyTrendForMarker(
     return 'stable';
 }
 
+/**
+ * Resolve the chronological date of a lab report. Prefers the lab's own testDate
+ * (the date the blood draw / panel was actually performed) and falls back to the
+ * uploadedAt timestamp only when no testDate is available. This ensures reports
+ * are ordered by when the labs were taken, not by when the user uploaded them —
+ * critical when users batch-upload historical PDFs in arbitrary order.
+ */
+function resolveReportChronoDate(report: any): Date {
+    const testDateRaw = report?.labReportData?.testDate;
+    if (typeof testDateRaw === 'string' && testDateRaw.trim().length > 0) {
+        const parsed = new Date(testDateRaw);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed;
+        }
+    }
+    return report?.uploadedAt ? new Date(report.uploadedAt) : new Date(0);
+}
+
 function buildLabTrendSummary(sortedReports: any[]): string {
     if (sortedReports.length < 2) {
         return '';
@@ -131,7 +149,7 @@ function buildLabTrendSummary(sortedReports: any[]): string {
     const markerSeries = new Map<string, { displayName: string; points: TrendPoint[] }>();
 
     sortedReports.forEach((report) => {
-        const reportDate = report.uploadedAt ? new Date(report.uploadedAt) : new Date(0);
+        const reportDate = resolveReportChronoDate(report);
         const testDateLabel = report.labReportData?.testDate || reportDate.toISOString().split('T')[0];
         const markers = Array.isArray(report.labReportData?.extractedData)
             ? (report.labReportData.extractedData as ExtractedLabValue[])
@@ -482,7 +500,11 @@ export class ChatService {
                     // This prevents false "NO LAB DATA UPLOADED" prompts.
                     return hasExtractedMarkers && status !== 'error';
                 })
-                .sort((a, b) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime());
+                // Sort by the lab's actual testDate (most recent first), falling back to
+                // uploadedAt only when testDate is missing. Prevents the AI from treating
+                // batch-uploaded historical reports as "the latest" simply because they
+                // were uploaded last.
+                .sort((a, b) => resolveReportChronoDate(b).getTime() - resolveReportChronoDate(a).getTime());
 
             const labTrendSummary = buildLabTrendSummary(sortedReports);
 
@@ -490,7 +512,7 @@ export class ChatService {
                 const data = report.labReportData!;
                 const values = data.extractedData as any[];
                 const uploadDateStr = new Date(report.uploadedAt || '').toLocaleDateString();
-                const timelineLabel = index === 0 ? '🆕 LATEST REPORT' : `📅 Previous Report`;
+                const timelineLabel = index === 0 ? '🆕 LATEST REPORT (most recent test date)' : `📅 Previous Report`;
 
                 const tableRows = values.map((v: any) => `  • ${v.testName}: ${v.value} ${v.unit || ''} | Status: ${v.status || 'Normal'}`).join('\n');
                 return `${timelineLabel}\n📋 Test Date: ${data.testDate || 'unknown'}\n📤 Uploaded: ${uploadDateStr}\nBiomarkers:\n${tableRows}`;

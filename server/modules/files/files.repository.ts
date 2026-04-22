@@ -91,6 +91,23 @@ export class FilesRepository {
                 logger.warn('Failed to read existing labReportData before merge', { id, error: err });
             }
             mergedLabReportData = { ...existing, ...incoming };
+
+            // Guard against late/out-of-order progress callbacks reverting a
+            // terminal status. If the row is already marked completed/error,
+            // never let an incoming `processing`/`pending` write overwrite it.
+            // This prevents reports that finished analysis from getting stuck
+            // showing "Finalizing analysis..." forever (observed when many
+            // uploads run in parallel).
+            const existingStatus = String(existing?.analysisStatus || '').toLowerCase();
+            const incomingStatus = String(incoming?.analysisStatus || '').toLowerCase();
+            const isTerminal = existingStatus === 'completed' || existingStatus === 'error';
+            const isRegression = incomingStatus === 'processing' || incomingStatus === 'pending';
+            if (isTerminal && isRegression) {
+                mergedLabReportData.analysisStatus = existing.analysisStatus;
+                // Also drop transient progress fields so the UI stops showing them
+                delete mergedLabReportData.progressStep;
+                delete mergedLabReportData.progressDetail;
+            }
         }
 
         const safeUpdates: Partial<InsertFileUpload> = {

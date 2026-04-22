@@ -44,6 +44,21 @@ const PILLAR_SUGGESTED: Record<string, { slug: string; name: string; logo?: stri
     nutrition:[{ slug: 'cronometer', name: 'Cronometer' }],
 };
 
+/**
+ * Resolve the chronological date of a lab report. Prefers the lab's own
+ * testDate (the date the panel was actually drawn) and falls back to
+ * uploadedAt only when testDate is missing. This keeps "latest report" logic
+ * correct when a user batch-uploads historical PDFs out of order.
+ */
+function reportChronoTime(report: any): number {
+    const testDateRaw = report?.labReportData?.testDate;
+    if (typeof testDateRaw === 'string' && testDateRaw.trim().length > 0) {
+        const parsed = new Date(testDateRaw);
+        if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+    }
+    return new Date(report?.uploadedAt || 0).getTime();
+}
+
 export class WearablesService {
     private normalizeConnectProvider(provider?: string): string | undefined {
         const normalized = String(provider || '').trim().toLowerCase();
@@ -847,34 +862,73 @@ export class WearablesService {
                     workouts: workoutData.length,
                 },
             },
-            sleep: sleepData.map((s: any) => ({
-                date: s.calendar_date || s.calendarDate,
-                // SDK returns duration fields in seconds; duration_total_seconds is legacy snake_case, s.total/s.duration are camelCase SDK fields
-                totalMinutes: s.duration_total_seconds
-                    ? Math.round(s.duration_total_seconds / 60)
-                    : (s.total != null ? Math.round(s.total / 60) : s.duration != null ? Math.round(s.duration / 60) : null),
-                deepSleepMinutes: s.duration_deep_sleep_seconds
-                    ? Math.round(s.duration_deep_sleep_seconds / 60)
-                    : (s.deep != null ? Math.round(s.deep / 60) : null),
-                remSleepMinutes: s.duration_rem_sleep_seconds
-                    ? Math.round(s.duration_rem_sleep_seconds / 60)
-                    : (s.rem != null ? Math.round(s.rem / 60) : null),
-                lightSleepMinutes: s.duration_light_sleep_seconds
-                    ? Math.round(s.duration_light_sleep_seconds / 60)
-                    : (s.light != null ? Math.round(s.light / 60) : null),
-                awakeMinutes: s.duration_awake_seconds
-                    ? Math.round(s.duration_awake_seconds / 60)
-                    : (s.awake != null ? Math.round(s.awake / 60) : null),
-                efficiency: s.sleep_efficiency || s.efficiency,
-                score: s.sleep_score || s.score,
-                // SDK v2 uses camelCase: averageHrv (flat), not hrv.average
-                hrv: s.averageHrv || s.average_hrv || s.hrv?.average,
-                // SDK v2 uses hrLowest / hrResting (flat)
-                restingHR: s.hrResting || s.hrLowest || s.hr_lowest || s.heartRate?.min,
-                respiratoryRate: s.respiratoryRate || s.respiratory_rate,
-                readinessScore: s.readinessScore || s.readiness_score || s.readiness?.score || null,
-                source: s.source?.slug || 'unknown',
-            })),
+            sleep: (() => {
+                // Junction returns one row per sleep "session" — Oura in particular sends
+                // both the main night-of sleep AND any naps as separate sessions sharing
+                // the same calendar_date. If we pass each session through verbatim the
+                // dashboard shows multiple entries per day (e.g. "Apr 19  8h 23m / 0h 14m
+                // / 0h 1m") and the multi-day average is dragged down by 1-minute naps.
+                //
+                // Collapse to one row per calendar_date by keeping the longest session
+                // (the main sleep) and discarding short naps. We also accept the
+                // session if it explicitly identifies as the long sleep type.
+                const mapped = sleepData.map((s: any) => ({
+                    date: s.calendar_date || s.calendarDate,
+                    sessionType: s.type || s.sleep_type || null,
+                    // SDK returns duration fields in seconds; duration_total_seconds is legacy snake_case, s.total/s.duration are camelCase SDK fields
+                    totalMinutes: s.duration_total_seconds
+                        ? Math.round(s.duration_total_seconds / 60)
+                        : (s.total != null ? Math.round(s.total / 60) : s.duration != null ? Math.round(s.duration / 60) : null),
+                    deepSleepMinutes: s.duration_deep_sleep_seconds
+                        ? Math.round(s.duration_deep_sleep_seconds / 60)
+                        : (s.deep != null ? Math.round(s.deep / 60) : null),
+                    remSleepMinutes: s.duration_rem_sleep_seconds
+                        ? Math.round(s.duration_rem_sleep_seconds / 60)
+                        : (s.rem != null ? Math.round(s.rem / 60) : null),
+                    lightSleepMinutes: s.duration_light_sleep_seconds
+                        ? Math.round(s.duration_light_sleep_seconds / 60)
+                        : (s.light != null ? Math.round(s.light / 60) : null),
+                    awakeMinutes: s.duration_awake_seconds
+                        ? Math.round(s.duration_awake_seconds / 60)
+                        : (s.awake != null ? Math.round(s.awake / 60) : null),
+                    efficiency: s.sleep_efficiency || s.efficiency,
+                    score: s.sleep_score || s.score,
+                    // SDK v2 uses camelCase: averageHrv (flat), not hrv.average
+                    hrv: s.averageHrv || s.average_hrv || s.hrv?.average,
+                    // SDK v2 uses hrLowest / hrResting (flat)
+                    restingHR: s.hrResting || s.hrLowest || s.hr_lowest || s.heartRate?.min,
+                    respiratoryRate: s.respiratoryRate || s.respiratory_rate,
+                    readinessScore: s.readinessScore || s.readiness_score || s.readiness?.score || null,
+                    source: s.source?.slug || 'unknown',
+                }));
+
+                // Group by calendar date and keep the longest session per day.
+                // Oura's "long_sleep" is always preferred when present; otherwise we
+                // pick the session with the most total minutes (ties → first seen).
+                const byDate = new Map<string, typeof mapped[number]>();
+                for (const row of mapped) {
+                    if (!row.date) continue;
+                    const existing = byDate.get(row.date);
+                    if (!existing) {
+                        byDate.set(row.date, row);
+                        continue;
+                    }
+                    const existingIsLong = (existing.sessionType || '').toLowerCase() === 'long_sleep';
+                    const candidateIsLong = (row.sessionType || '').toLowerCase() === 'long_sleep';
+                    if (candidateIsLong && !existingIsLong) {
+                        byDate.set(row.date, row);
+                    } else if (candidateIsLong === existingIsLong) {
+                        if ((row.totalMinutes ?? 0) > (existing.totalMinutes ?? 0)) {
+                            byDate.set(row.date, row);
+                        }
+                    }
+                }
+
+                return Array.from(byDate.values())
+                    // Sort newest date first to match the rest of the historical data
+                    // arrays and keep the dashboard list in expected order.
+                    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+            })(),
             activity: activityData.map((a: any) => ({
                 date: a.calendar_date || a.calendarDate || a.date?.split('T')[0],
                 steps: a.steps,
@@ -1178,18 +1232,20 @@ export class WearablesService {
         const reportsWithData = (labReports as any[])
             .filter((report: any) => extractDataArray(report?.labReportData).length > 0)
             .sort((a: any, b: any) => {
-                // Prefer 'completed' status, then sort by date
+                // Prefer 'completed' status, then sort by the lab's actual test
+                // date (fallback to uploadedAt). Users can batch-upload old PDFs,
+                // so uploadedAt alone is unsafe for picking the "latest" report.
                 const statusA = a?.labReportData?.analysisStatus === 'completed' ? 0 : 1;
                 const statusB = b?.labReportData?.analysisStatus === 'completed' ? 0 : 1;
                 if (statusA !== statusB) return statusA - statusB;
-                return new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime();
+                return reportChronoTime(b) - reportChronoTime(a);
             });
 
         const completedReports = reportsWithData.length > 0
             ? reportsWithData
             : (labReports as any[])
                 .filter((report: any) => report?.labReportData?.analysisStatus === 'completed')
-                .sort((a: any, b: any) => new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime());
+                .sort((a: any, b: any) => reportChronoTime(b) - reportChronoTime(a));
 
         const latestLabReport = completedReports[0] || null;
         const previousLabReport = completedReports[1] || null;
@@ -1214,7 +1270,7 @@ export class WearablesService {
                 : '');
 
         const latestUploadedReport = (labReports as any[])
-            .sort((a: any, b: any) => new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime())[0] || null;
+            .sort((a: any, b: any) => reportChronoTime(b) - reportChronoTime(a))[0] || null;
 
         const labReportDate = latestLab?.processedAt
             ? new Date(latestLab.processedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -2068,7 +2124,7 @@ Generate 3-5 insights based on which data categories are available. Only create 
 
         const reportsWithData = labReports
             .filter((r: any) => extractData(r).length > 0 && r?.labReportData?.analysisStatus === 'completed')
-            .sort((a: any, b: any) => new Date(b?.uploadedAt || 0).getTime() - new Date(a?.uploadedAt || 0).getTime());
+            .sort((a: any, b: any) => reportChronoTime(b) - reportChronoTime(a));
 
         if (reportsWithData.length === 0) return result;
         result.hasLabs = true;
