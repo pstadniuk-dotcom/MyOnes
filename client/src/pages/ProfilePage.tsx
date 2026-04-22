@@ -266,7 +266,7 @@ export default function ProfilePage() {
         inches = Math.round(totalInches % 12).toString();
       }
 
-      setHealthData({
+      const hydrated = {
         age: healthProfile.age?.toString() || '',
         sex: healthProfile.sex || '',
         weightLbs: healthProfile.weightLbs?.toString() || '',
@@ -285,6 +285,29 @@ export default function ProfilePage() {
         medications: healthProfile.medications || [],
         allergies: healthProfile.allergies || [],
         currentSupplements: (healthProfile as any).currentSupplements || [],
+      };
+      // Merge any in-flight user edits (e.g. supplements added before hydration completed)
+      // with the hydrated server state. Without this, a user who opens the scanner and
+      // confirms items BEFORE the GET /health-profile response lands would have their
+      // additions wiped when hydration overwrites local state.
+      setHealthData((prev) => {
+        const merged = { ...hydrated };
+        // Preserve any list items the user added pre-hydration that aren't on the server yet.
+        const mergeList = (key: 'conditions' | 'medications' | 'allergies' | 'currentSupplements') => {
+          const serverItems = hydrated[key] as string[];
+          const localItems = (prev[key] as string[]) || [];
+          if (localItems.length === 0) return serverItems;
+          const seen = new Set(serverItems.map((s) => s.toLowerCase()));
+          const extras = localItems.filter((s) => !seen.has(s.toLowerCase()));
+          return extras.length > 0 ? [...serverItems, ...extras] : serverItems;
+        };
+        merged.conditions = mergeList('conditions');
+        merged.medications = mergeList('medications');
+        merged.allergies = mergeList('allergies');
+        merged.currentSupplements = mergeList('currentSupplements');
+        // Snapshot the post-merge state so autosave knows it's clean.
+        healthHydratedSnapshotRef.current = JSON.stringify(merged);
+        return merged;
       });
       // Mark hydration complete so autosave doesn't fire on the initial server load
       healthHydratedRef.current = true;
@@ -297,9 +320,14 @@ export default function ProfilePage() {
   const profileHydratedRef = useRef(false);
   const healthAutosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileAutosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Snapshot of the last server-confirmed healthData. We bail on autosave when
+  // healthData matches this snapshot so hydration cannot trigger a wipe-prone POST.
+  const healthHydratedSnapshotRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!healthHydratedRef.current) return;
+    // Skip if nothing actually changed since last hydration/save
+    if (healthHydratedSnapshotRef.current === JSON.stringify(healthData)) return;
     if (healthAutosaveTimerRef.current) clearTimeout(healthAutosaveTimerRef.current);
     healthAutosaveTimerRef.current = setTimeout(() => {
       // Convert feet/inches to cm
@@ -328,6 +356,10 @@ export default function ProfilePage() {
         currentSupplements: healthData.currentSupplements,
       };
       apiRequest('POST', '/api/users/me/health-profile', payload)
+        .then(() => {
+          // Mark this state as the new "clean" baseline so the dirty-check stays accurate.
+          healthHydratedSnapshotRef.current = JSON.stringify(healthData);
+        })
         .catch((err) => {
           // Silent failure — user will see the error if they hit the explicit Save button.
           console.warn('[health-profile autosave] failed:', err?.message || err);

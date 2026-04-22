@@ -888,8 +888,10 @@ export class ChatController {
                     }
 
                     // ── SECURITY: Prevent clearing safety-critical fields via AI
-                    // Empty arrays for medications/allergies/conditions could bypass safety checks
-                    const SAFETY_ARRAY_FIELDS = ['medications', 'allergies', 'conditions'] as const;
+                    // Empty arrays for medications/allergies/conditions could bypass safety checks.
+                    // currentSupplements is also protected — losing it silently has burned us
+                    // before (user reports "my supplements disappeared").
+                    const SAFETY_ARRAY_FIELDS = ['medications', 'allergies', 'conditions', 'currentSupplements'] as const;
                     for (const field of SAFETY_ARRAY_FIELDS) {
                         if (field in validatedHealthData) {
                             const val = validatedHealthData[field];
@@ -906,8 +908,8 @@ export class ChatController {
                         }
                     }
 
-                    // Validate non-safety array fields (healthGoals, currentSupplements)
-                    const NON_SAFETY_ARRAY_FIELDS = ['healthGoals', 'currentSupplements'] as const;
+                    // Validate non-safety array fields (healthGoals)
+                    const NON_SAFETY_ARRAY_FIELDS = ['healthGoals'] as const;
                     for (const field of NON_SAFETY_ARRAY_FIELDS) {
                         if (field in validatedHealthData && Array.isArray(validatedHealthData[field])) {
                             validatedHealthData[field] = validatedHealthData[field]
