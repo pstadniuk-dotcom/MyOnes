@@ -1,4 +1,5 @@
 import "./env";
+import "express-async-errors";
 // force reload
 import path from "path";
 import fs from "fs";
@@ -33,9 +34,15 @@ if (!testEncryption()) {
 // Catch unhandled errors so the server doesn't silently die
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught exception', { error: err.message, stack: err.stack });
+  // Ensure we exit so the process manager (Railway) can restart the instance
+  process.exit(1);
 });
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled rejection', { reason: String(reason) });
+  // For unhandled rejections, we might also want to exit in production
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
 });
 
 const app = express();
