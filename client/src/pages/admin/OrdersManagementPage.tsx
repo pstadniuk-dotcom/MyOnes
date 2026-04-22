@@ -63,6 +63,7 @@ interface Order {
   formulaVersion: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded' | 'failed' | 'voided' | 'placed' | 'completed' | 'settlement_failed';
   amountCents: number | null;
+  manufacturerCostCents: number | null;
   supplyMonths: number | null;
   trackingUrl: string | null;
   placedAt: string;
@@ -238,6 +239,21 @@ export default function OrdersManagementPage() {
 
   const totalPages = Math.ceil((data?.total || 0) / limit);
 
+  // ── Cost / margin helpers ──
+  const formatCents = (cents: number | null | undefined): string =>
+    cents == null ? '—' : `$${(cents / 100).toFixed(2)}`;
+
+  const grossMarginCents = (order: { amountCents: number | null; manufacturerCostCents: number | null }): number | null => {
+    if (order.amountCents == null || order.manufacturerCostCents == null) return null;
+    return order.amountCents - order.manufacturerCostCents;
+  };
+
+  const grossMarginPct = (order: { amountCents: number | null; manufacturerCostCents: number | null }): number | null => {
+    const margin = grossMarginCents(order);
+    if (margin == null || !order.amountCents) return null;
+    return (margin / order.amountCents) * 100;
+  };
+
   return (
     <div data-testid="page-orders-management">
       <div className="space-y-6">
@@ -328,6 +344,8 @@ export default function OrdersManagementPage() {
                           Amount <SortIcon field="amountCents" current={sortField} dir={sortDir} />
                         </button>
                       </TableHead>
+                      <TableHead>Cost</TableHead>
+                      <TableHead>Margin</TableHead>
                       <TableHead>Supply (Days)</TableHead>
                       <TableHead>
                         <button className="flex items-center hover:text-gray-900" onClick={() => handleSort('placedAt')}>
@@ -342,7 +360,7 @@ export default function OrdersManagementPage() {
                   <TableBody>
                     {filteredOrders.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                        <TableCell colSpan={11} className="text-center py-8 text-gray-500">
                           No orders found
                         </TableCell>
                       </TableRow>
@@ -376,6 +394,25 @@ export default function OrdersManagementPage() {
                             </TableCell>
                             <TableCell>
                               {order.amountCents ? `$${(order.amountCents / 100).toFixed(2)}` : '-'}
+                            </TableCell>
+                            <TableCell className="text-gray-600">
+                              {formatCents(order.manufacturerCostCents)}
+                            </TableCell>
+                            <TableCell>
+                              {(() => {
+                                const margin = grossMarginCents(order);
+                                const pct = grossMarginPct(order);
+                                if (margin == null) return <span className="text-gray-400">—</span>;
+                                const isNeg = margin < 0;
+                                return (
+                                  <span className={isNeg ? 'text-red-600' : 'text-emerald-700'}>
+                                    {formatCents(margin)}
+                                    {pct != null && (
+                                      <span className="ml-1 text-xs text-gray-500">({pct.toFixed(1)}%)</span>
+                                    )}
+                                  </span>
+                                );
+                              })()}
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline">
@@ -533,6 +570,49 @@ export default function OrdersManagementPage() {
                         <Badge variant="outline" className="ml-1 text-xs">{detailOrder.manufacturerOrderStatus}</Badge>
                       </div>
                     )}
+                  </div>
+                </section>
+
+                <Separator />
+
+                {/* Financials — internal only */}
+                <section>
+                  <h4 className="text-sm font-medium text-gray-500 mb-2">Financials <span className="text-xs font-normal text-gray-400">(internal)</span></h4>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                    <div>
+                      <span className="text-gray-500">Customer paid:</span>{' '}
+                      <span className="font-medium text-gray-900">{formatCents(detailOrder.amountCents)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Manufacturer cost:</span>{' '}
+                      <span className="text-gray-900">{formatCents(detailOrder.manufacturerCostCents)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Gross margin:</span>{' '}
+                      {(() => {
+                        const margin = grossMarginCents(detailOrder);
+                        if (margin == null) return <span className="text-gray-400">—</span>;
+                        const isNeg = margin < 0;
+                        return (
+                          <span className={`font-medium ${isNeg ? 'text-red-600' : 'text-emerald-700'}`}>
+                            {formatCents(margin)}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Margin %:</span>{' '}
+                      {(() => {
+                        const pct = grossMarginPct(detailOrder);
+                        if (pct == null) return <span className="text-gray-400">—</span>;
+                        const isNeg = pct < 0;
+                        return (
+                          <span className={`font-medium ${isNeg ? 'text-red-600' : 'text-emerald-700'}`}>
+                            {pct.toFixed(1)}%
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </section>
 
