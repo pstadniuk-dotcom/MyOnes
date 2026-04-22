@@ -8,14 +8,16 @@ import { Loader2 } from 'lucide-react';
 function GoogleAuthButton({
     isLoading,
     onToken,
+    ageConfirmed,
 }: {
     isLoading: boolean;
-    onToken: (token: string) => void;
+    onToken: (token: string, ageConfirmed?: boolean) => void;
+    ageConfirmed?: boolean;
 }) {
     const loginWithGoogle = useGoogleLogin({
         onSuccess: (tokenResponse) => {
             if (tokenResponse.access_token) {
-                onToken(tokenResponse.access_token);
+                onToken(tokenResponse.access_token, ageConfirmed);
             }
         },
         onError: () => console.error('Google Login Failed'),
@@ -49,7 +51,7 @@ function GoogleAuthButton({
     );
 }
 
-export function SocialAuthButtons() {
+export function SocialAuthButtons({ ageConfirmed }: { ageConfirmed?: boolean }) {
     const { googleLogin: authGoogleLogin, facebookLogin, isLoading } = useAuth();
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     const facebookAppId = import.meta.env.VITE_FACEBOOK_APP_ID;
@@ -72,6 +74,7 @@ export function SocialAuthButtons() {
                     <GoogleAuthButton
                         isLoading={isLoading}
                         onToken={authGoogleLogin}
+                        ageConfirmed={ageConfirmed}
                     />
                 )}
 
@@ -80,7 +83,7 @@ export function SocialAuthButtons() {
                         appId={facebookAppId}
                         onSuccess={(response) => {
                             if (response.accessToken) {
-                                facebookLogin(response.accessToken);
+                                facebookLogin(response.accessToken, ageConfirmed);
                             }
                         }}
                         onFail={(error) => {

@@ -24,8 +24,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   signup: (data: SignupData) => Promise<void>;
   login: (data: LoginData) => Promise<void>;
-  googleLogin: (token: string) => Promise<void>;
-  facebookLogin: (token: string) => Promise<void>;
+  googleLogin: (token: string, ageConfirmed?: boolean) => Promise<void>;
+  facebookLogin: (token: string, ageConfirmed?: boolean) => Promise<void>;
   verifyEmail: (token: string) => Promise<void>;
   resendVerification: () => Promise<void>;
   logout: () => void;
@@ -256,7 +256,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const googleLogin = async (googleToken: string) => {
+  const googleLogin = async (googleToken: string, ageConfirmed?: boolean) => {
     try {
       setIsLoading(true);
 
@@ -265,7 +265,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token: googleToken }),
+        body: JSON.stringify({ token: googleToken, ageConfirmed }),
       });
 
       const data = await response.json();
@@ -304,7 +304,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const facebookLogin = async (fbToken: string) => {
+  const facebookLogin = async (fbToken: string, ageConfirmed?: boolean) => {
     try {
       setIsLoading(true);
 
@@ -313,7 +313,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token: fbToken }),
+        body: JSON.stringify({ token: fbToken, ageConfirmed }),
       });
 
       const data = await response.json();

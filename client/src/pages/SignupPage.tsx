@@ -304,7 +304,7 @@ export default function SignupPage() {
             </Form>
 
             <div className="mt-6">
-              <SocialAuthButtons />
+              <SocialAuthButtons ageConfirmed={form.watch('ageConfirmed')} />
             </div>
           </CardContent>
         </Card>

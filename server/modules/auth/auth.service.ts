@@ -278,15 +278,45 @@ export class AuthService {
             let name: string | undefined;
             let googleId: string | undefined;
 
-            const ticket = await googleClient.verifyIdToken({
-                idToken: googleToken,
-                audience: process.env.GOOGLE_CLIENT_ID,
-            });
-            const payload = ticket.getPayload();
-            if (payload && payload.email) {
-                email = payload.email;
-                name = payload.name;
-                googleId = payload.sub;
+            try {
+                // 1. Try as ID Token first (JWT)
+                const ticket = await googleClient.verifyIdToken({
+                    idToken: googleToken,
+                    audience: process.env.GOOGLE_CLIENT_ID,
+                });
+                const payload = ticket.getPayload();
+                if (payload && payload.email) {
+                    email = payload.email;
+                    name = payload.name;
+                    googleId = payload.sub;
+                }
+            } catch (error) {
+                // 2. Fallback to Access Token verification with STRICT audience check (as required by audit)
+                logger.debug('ID Token verification failed, verifying as Access Token instead');
+                
+                const tokenInfoRes = await axios.get(`https://oauth2.googleapis.com/tokeninfo?access_token=${googleToken}`);
+                const tokenInfo = tokenInfoRes.data;
+
+                // CRITICAL: Verify that the token was issued for OUR app (Audience check)
+                if (tokenInfo.azp !== process.env.GOOGLE_CLIENT_ID) {
+                    logger.warn('Google Access Token verification failed: Client ID mismatch', {
+                        tokenClientId: tokenInfo.azp,
+                        expectedClientId: process.env.GOOGLE_CLIENT_ID
+                    });
+                    throw new Error('Invalid Google token: Issued for a different application');
+                }
+
+                // If audience is valid, get user info
+                const userInfoRes = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo`, {
+                    headers: { 'Authorization': `Bearer ${googleToken}` }
+                });
+                const data = userInfoRes.data;
+                
+                if (data && data.email) {
+                    email = data.email;
+                    name = data.name;
+                    googleId = data.sub;
+                }
             }
 
             if (!email || !googleId) {
