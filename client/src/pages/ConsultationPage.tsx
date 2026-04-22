@@ -2699,8 +2699,13 @@ export default function ConsultationPage() {
                         {/* Inline Capsule Selector */}
                         {(() => {
                           if (message.sender !== 'ai') return null;
-                          const isLatestMessage = index === filteredMessages.length - 1;
-                          if (!isLatestMessage) return null;
+                          // Show on the most-recent AI message (system "done" notifications
+                          // appended after may bump the AI message off the absolute end of
+                          // the list — don't let that hide the selector).
+                          const isLatestAiMessage = !filteredMessages
+                            .slice(index + 1)
+                            .some(m => m.sender === 'ai');
+                          if (!isLatestAiMessage) return null;
                           const capsuleRecommendation = message.capsuleRecommendation || deriveCapsuleRecommendationFromMessage(message.content);
                           if (!capsuleRecommendation || message.formula) return null;
 

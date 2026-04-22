@@ -750,9 +750,22 @@ console.log('membership details', myMembership, subscription)
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="you@email.com"
-                        className="bg-white border-black/10 focus:border-[#054700] focus:ring-[#054700]/20"
+                        className="bg-white border-black/10 focus:border-[#054700] focus:ring-[#054700]/20 disabled:opacity-100 disabled:cursor-not-allowed read-only:bg-black/[0.03] read-only:cursor-not-allowed"
                         required
+                        readOnly={!!user?.email}
+                        disabled={!!user?.email}
+                        aria-readonly={!!user?.email}
+                        title={user?.email ? "Email is linked to your account. Update it from your profile to change it." : undefined}
                       />
+                      {user?.email ? (
+                        <p className="mt-1 text-xs text-black/50">
+                          Linked to your account.{" "}
+                          <a href="/profile" className="underline hover:text-[#054700]">
+                            Update in profile
+                          </a>
+                          .
+                        </p>
+                      ) : null}
                     </FormField>
                     <FormField label="Phone">
                       <Input
