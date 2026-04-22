@@ -1,9 +1,11 @@
 import "./env";
+import "express-async-errors";
 // force reload
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import fileUpload from "express-fileupload";
 import session from "express-session";
@@ -32,41 +34,44 @@ if (!testEncryption()) {
 // Catch unhandled errors so the server doesn't silently die
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught exception', { error: err.message, stack: err.stack });
+  // Ensure we exit so the process manager (Railway) can restart the instance
+  process.exit(1);
 });
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled rejection', { reason: String(reason) });
+  // For unhandled rejections, we might also want to exit in production
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
 });
 
 const app = express();
+app.use(cookieParser());
 // Trust reverse proxy (needed for secure cookies and correct protocol detection in production)
 app.set('trust proxy', 1);
 // Hide Express server identity to prevent targeted attacks
 app.disable('x-powered-by');
 
-// Security headers via helmet — replaces manual header setting
-// 'unsafe-eval' only in development (needed for Vite HMR and React dev tools)
-// 'unsafe-inline' kept for inline styles from UI libraries
 const isDevMode = process.env.NODE_ENV !== 'production';
-const cspDirectives = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDevMode ? " 'unsafe-eval'" : ''} https://cdn.jsdelivr.net https://accounts.google.com/gsi/client https://connect.facebook.net https://secure.easypaydirectgateway.com`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
-  "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: https: blob: https://platform-lookaside.fbsbx.com",
-  "media-src 'self' data: blob: https://*.supabase.co https://supabase.co",
-  "connect-src 'self' https://api.openai.com https://api.anthropic.com https://accounts.google.com/gsi/ https://www.facebook.com https://web.facebook.com https://graph.facebook.com https://facebook.com wss: ws:",
-  "frame-src 'self' https://www.youtube.com https://youtube.com https://accounts.google.com/ https://www.facebook.com https://web.facebook.com",
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'"
-].join('; ');
+
+// Request ID and Nonce tracking — attach unique ID to each request for log correlation
+// Generate nonce for CSP. Must be before helmet.
+app.use((req, res, next) => {
+  const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
+  (req as any).requestId = requestId;
+  res.setHeader('X-Request-Id', requestId);
+
+  const nonce = crypto.randomBytes(16).toString('base64');
+  res.locals.cspNonce = nonce;
+  next();
+});
 
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net","https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com"],
-      scriptSrcElem: ["'self'", "'unsafe-inline'", ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net", "https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com"],
+      scriptSrc: ["'self'", (req, res) => `'nonce-${(res as Response).locals.cspNonce}'`, ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net","https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com"],
+      scriptSrcElem: ["'self'", (req, res) => `'nonce-${(res as Response).locals.cspNonce}'`, ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net", "https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
       styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
@@ -219,14 +224,6 @@ app.use(fileUpload({
   useTempFiles: false,
   tempFileDir: '/tmp/'
 }));
-
-// Request ID tracking — attach unique ID to each request for log correlation
-app.use((req, res, next) => {
-  const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
-  (req as any).requestId = requestId;
-  res.setHeader('X-Request-Id', requestId);
-  next();
-});
 
 app.use((req, res, next) => {
   const start = Date.now();

@@ -148,7 +148,7 @@ export default function LoginPage() {
             </Form>
 
             <div className="mt-6">
-              <SocialAuthButtons />
+              <SocialAuthButtons ageConfirmed={true} />
             </div>
           </CardContent>
         </Card>

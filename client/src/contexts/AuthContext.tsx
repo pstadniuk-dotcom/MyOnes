@@ -24,8 +24,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   signup: (data: SignupData) => Promise<void>;
   login: (data: LoginData) => Promise<void>;
-  googleLogin: (token: string) => Promise<void>;
-  facebookLogin: (token: string) => Promise<void>;
+  googleLogin: (token: string, ageConfirmed?: boolean) => Promise<void>;
+  facebookLogin: (token: string, ageConfirmed?: boolean) => Promise<void>;
   verifyEmail: (token: string) => Promise<void>;
   resendVerification: () => Promise<void>;
   logout: () => void;
@@ -52,7 +52,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setToken(null);
     setUser(null);
     localStorage.removeItem('authToken');
-    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
 
     // Clear React Query cache to prevent stale data on next login
@@ -176,7 +175,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem('authToken', data.token);
-      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any stale cached data from previous sessions
@@ -228,7 +226,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem('authToken', data.token);
-      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any stale cached data from previous sessions so fresh data is loaded
@@ -256,7 +253,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const googleLogin = async (googleToken: string) => {
+  const googleLogin = async (googleToken: string, ageConfirmed?: boolean) => {
     try {
       setIsLoading(true);
 
@@ -265,7 +262,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token: googleToken }),
+        body: JSON.stringify({ token: googleToken, ageConfirmed }),
       });
 
       const data = await response.json();
@@ -278,7 +275,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem('authToken', data.token);
-      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any stale cached data from previous sessions so fresh data is loaded
@@ -304,7 +300,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const facebookLogin = async (fbToken: string) => {
+  const facebookLogin = async (fbToken: string, ageConfirmed?: boolean) => {
     try {
       setIsLoading(true);
 
@@ -313,7 +309,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token: fbToken }),
+        body: JSON.stringify({ token: fbToken, ageConfirmed }),
       });
 
       const data = await response.json();
@@ -326,7 +322,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem('authToken', data.token);
-      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any stale cached data from previous sessions so fresh data is loaded
@@ -444,7 +439,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Clear localStorage
       localStorage.removeItem('authToken');
-      localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       localStorage.removeItem('consultation_draft');
       localStorage.removeItem('consultation_current_session');

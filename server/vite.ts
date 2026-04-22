@@ -6,6 +6,7 @@ import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
 import { nanoid } from "nanoid";
+import { logger } from "./infra/logging/logger";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,7 +56,15 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`,
       );
-      const page = await vite.transformIndexHtml(url, template);
+
+      let page = await vite.transformIndexHtml(url, template);
+      
+      // Inject nonce into ALL script tags (including those injected by vite)
+      const nonce = (res as any).locals.cspNonce;
+      if (nonce) {
+        page = page.replace(/<script(?![^>]*nonce=)/g, `<script nonce="${nonce}"`);
+      }
+
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
@@ -86,7 +95,7 @@ export function serveStatic(app: Express) {
   // BUT only for non-API routes - API routes should 404 if not found
   // AND not for static asset paths (e.g. stale /assets/*.js requests after redeploy)
   // — serving HTML for a missing JS chunk causes MIME-type errors in the browser
-  app.use("*", (req, res, next) => {
+  app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
 
     // API routes 404 instead of returning the SPA shell
@@ -105,6 +114,17 @@ export function serveStatic(app: Express) {
     }
 
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.sendFile(path.resolve(distPath, "index.html"));
+    try {
+      const indexPath = path.resolve(distPath, "index.html");
+      let template = await fs.promises.readFile(indexPath, "utf-8");
+      const nonce = (res as any).locals.cspNonce;
+      if (nonce) {
+        template = template.replace(/<script(?![^>]*nonce=)/g, `<script nonce="${nonce}"`);
+      }
+      res.status(200).set({ "Content-Type": "text/html" }).send(template);
+    } catch (e) {
+      logger.error('Failed to serve index.html', { error: e });
+      res.status(500).send('Internal Server Error');
+    }
   });
 }
