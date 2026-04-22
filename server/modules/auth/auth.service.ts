@@ -515,7 +515,7 @@ export class AuthService {
         }
     }
 
-    async resetPassword(token: string, password: any) {
+    async resetPassword(token: string, password: string) {
         if (!password || password.length < 8) {
             throw new Error('Password must be at least 8 characters');
         }
@@ -529,6 +529,8 @@ export class AuthService {
         const hashedPassword = await bcrypt.hash(password, 10);
         await usersRepository.updateUserPassword(resetToken.userId, hashedPassword);
         await authRepository.markPasswordResetTokenUsed(token);
+
+        return { userId: resetToken.userId };
     }
 }
 

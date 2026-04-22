@@ -34,22 +34,22 @@ export class RefreshTokenService {
    * Rotate a refresh token: validate old token, revoke it, issue new pair.
    * If a revoked token is reused, revoke the entire family (compromise detected).
    */
-  async rotateToken(rawToken: string, isAdmin: boolean): Promise<{ accessToken: string; refreshToken: string; userId: string } | null> {
+  async rotateToken(rawToken: string): Promise<{ accessToken: string; refreshToken: string; userId: string; isAdmin: boolean } | null> {
     const colonIdx = rawToken.indexOf(':');
     if (colonIdx === -1) return null;
 
     const family = rawToken.substring(0, colonIdx);
     const tokenValue = rawToken.substring(colonIdx + 1);
 
-    // Find the latest non-revoked token in this family
+    // Find the latest tokens in this family
     const tokens = await db.select()
       .from(refreshTokens)
-      .where(and(
-        eq(refreshTokens.family, family),
-      ))
+      .where(eq(refreshTokens.family, family))
       .orderBy(refreshTokens.createdAt);
 
     if (tokens.length === 0) return null;
+
+    const { usersRepository } = await import('../users/users.repository');
 
     // Find the token that matches
     for (const storedToken of tokens) {
@@ -76,6 +76,10 @@ export class RefreshTokenService {
         .set({ revokedAt: new Date() })
         .where(eq(refreshTokens.id, storedToken.id));
 
+      // Check admin status
+      const user = await usersRepository.getUser(storedToken.userId);
+      const isAdmin = user?.isAdmin || false;
+
       // Issue new token in same family
       const newRawToken = crypto.randomBytes(40).toString('hex');
       const newTokenHash = await bcrypt.hash(newRawToken, SALT_ROUNDS);
@@ -93,6 +97,7 @@ export class RefreshTokenService {
         accessToken,
         refreshToken: `${family}:${newRawToken}`,
         userId: storedToken.userId,
+        isAdmin
       };
     }
 

@@ -52,7 +52,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setToken(null);
     setUser(null);
     localStorage.removeItem('authToken');
-    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
 
     // Clear React Query cache to prevent stale data on next login
@@ -176,7 +175,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem('authToken', data.token);
-      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any stale cached data from previous sessions
@@ -228,7 +226,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem('authToken', data.token);
-      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any stale cached data from previous sessions so fresh data is loaded
@@ -278,7 +275,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem('authToken', data.token);
-      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any stale cached data from previous sessions so fresh data is loaded
@@ -326,7 +322,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem('authToken', data.token);
-      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any stale cached data from previous sessions so fresh data is loaded
@@ -444,7 +439,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Clear localStorage
       localStorage.removeItem('authToken');
-      localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       localStorage.removeItem('consultation_draft');
       localStorage.removeItem('consultation_current_session');

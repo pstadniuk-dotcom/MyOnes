@@ -17,25 +17,19 @@ let refreshPromise: Promise<boolean> | null = null;
  * Returns true if refresh succeeded, false otherwise.
  */
 async function tryRefreshToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem('refreshToken');
-  if (!refreshToken) return false;
-
   try {
     const res = await fetch(buildApiUrl('/api/auth/refresh'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
       credentials: 'include',
     });
 
     if (!res.ok) {
-      localStorage.removeItem('refreshToken');
       return false;
     }
 
     const data = await res.json();
     localStorage.setItem('authToken', data.token);
-    localStorage.setItem('refreshToken', data.refreshToken);
     return true;
   } catch {
     return false;
@@ -120,7 +114,7 @@ export async function apiRequest(
   });
 
   // On 401, try to refresh the token and retry once
-  if (res.status === 401 && localStorage.getItem('refreshToken')) {
+  if (res.status === 401) {
     if (!refreshPromise) {
       refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
     }
@@ -164,7 +158,7 @@ export const getQueryFn: <T>(options: {
       let res = await fetchWithTimeout(buildApiUrl(endpoint), fetchOptions);
 
       // On 401, try to refresh the token and retry once
-      if (res.status === 401 && localStorage.getItem('refreshToken')) {
+      if (res.status === 401) {
         if (!refreshPromise) {
           refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
         }

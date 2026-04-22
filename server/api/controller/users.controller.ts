@@ -378,6 +378,10 @@ export class UsersController {
             }
 
             await usersService.changePassword(userId, currentPassword, newPassword);
+            
+            const { refreshTokenService } = await import('../../modules/auth/refresh-token.service');
+            await refreshTokenService.revokeAllUserTokens(userId);
+            logger.info('Revoked all tokens after manual password change', { userId });
 
             res.json({ message: 'Password updated successfully' });
         } catch (error: any) {
