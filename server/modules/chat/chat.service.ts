@@ -468,14 +468,24 @@ export class ChatService {
 
     async getContext(userId: string) {
         const endDate = new Date().toISOString().split('T')[0];
-        const startDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-        logger.debug('[Chat:getContext] Fetching context', { userId, startDate, endDate });
+        // Pull a window long enough to show cycle-over-cycle progression. Each
+        // formula cycle is ~56 days, so default to 60 days. If the active
+        // formula is older than that, stretch the window up to 90 days so
+        // reorder/reformulation conversations have a full cycle of context.
+        // Hard floor of 14 days for users who just started.
+        const activeFormula = await formulasRepository.getCurrentFormulaByUser(userId);
+        const formulaAgeDays = activeFormula?.createdAt
+            ? Math.floor((Date.now() - new Date(activeFormula.createdAt).getTime()) / (24 * 60 * 60 * 1000))
+            : 0;
+        const lookbackDays = Math.min(90, Math.max(14, formulaAgeDays + 7, 60));
+        const startDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-        const [healthProfile, labReports, activeFormula, biometricResult] = await Promise.all([
+        logger.debug('[Chat:getContext] Fetching context', { userId, startDate, endDate, lookbackDays, formulaAgeDays });
+
+        const [healthProfile, labReports, biometricResult] = await Promise.all([
             usersRepository.getHealthProfile(userId).catch(() => null),
             filesRepository.getLabReportsByUser(userId),
-            formulasRepository.getCurrentFormulaByUser(userId),
             wearablesService.getBiometricData(userId, startDate, endDate).catch((err) => {
                 logger.error('[Chat] Failed to fetch biometric data', { userId, error: err?.message || err });
                 return { data: [] };
@@ -531,29 +541,33 @@ export class ChatService {
         if (biometricDays.length > 0) {
             const lines: string[] = [];
             lines.push(`Data source: Wearable device(s) via Junction`);
-            lines.push(`Period: ${startDate} to ${endDate} (${biometricDays.length} days with data)\n`);
+            lines.push(`Period: ${startDate} to ${endDate} (${biometricDays.length} days with data, ~${lookbackDays}-day window covering current formula cycle)\n`);
 
-            // Compute averages for summary
-            const sleepScores: number[] = [];
-            const sleepMinutes: number[] = [];
-            const deepSleepMins: number[] = [];
-            const remSleepMins: number[] = [];
-            const hrvValues: number[] = [];
-            const restingHRs: number[] = [];
-            const recoveryScores: number[] = [];
-            const stepCounts: number[] = [];
-            const spo2Values: number[] = [];
+            type Bucket = { sleepScores: number[]; sleepMinutes: number[]; deepSleepMins: number[]; remSleepMins: number[]; hrvValues: number[]; restingHRs: number[]; recoveryScores: number[]; readinessScores: number[]; stepCounts: number[]; spo2Values: number[]; respiratoryRates: number[]; };
+            const newBucket = (): Bucket => ({ sleepScores: [], sleepMinutes: [], deepSleepMins: [], remSleepMins: [], hrvValues: [], restingHRs: [], recoveryScores: [], readinessScores: [], stepCounts: [], spo2Values: [], respiratoryRates: [] });
+            const collect = (b: Bucket, day: any) => {
+                if (day.sleep?.score) b.sleepScores.push(day.sleep.score);
+                if (day.sleep?.totalMinutes) b.sleepMinutes.push(day.sleep.totalMinutes);
+                if (day.sleep?.deepSleepMinutes) b.deepSleepMins.push(day.sleep.deepSleepMinutes);
+                if (day.sleep?.remSleepMinutes) b.remSleepMins.push(day.sleep.remSleepMinutes);
+                if (day.heart?.hrvMs) b.hrvValues.push(day.heart.hrvMs);
+                if (day.heart?.restingRate) b.restingHRs.push(day.heart.restingRate);
+                if (day.heart?.recoveryScore) b.recoveryScores.push(day.heart.recoveryScore);
+                if (day.heart?.readinessScore) b.readinessScores.push(day.heart.readinessScore);
+                if (day.activity?.steps) b.stepCounts.push(day.activity.steps);
+                if (day.body?.spo2) b.spo2Values.push(day.body.spo2);
+                if (day.body?.respiratoryRate) b.respiratoryRates.push(day.body.respiratoryRate);
+            };
 
+            // Bucket the days into the full cycle window vs the most recent 14 days
+            // so the AI can compare "how things are trending now" vs "the cycle so far".
+            const cycle = newBucket();
+            const recent = newBucket();
+            const recentCutoffMs = Date.now() - 14 * 24 * 60 * 60 * 1000;
             for (const day of biometricDays) {
-                if (day.sleep?.score) sleepScores.push(day.sleep.score);
-                if (day.sleep?.totalMinutes) sleepMinutes.push(day.sleep.totalMinutes);
-                if (day.sleep?.deepSleepMinutes) deepSleepMins.push(day.sleep.deepSleepMinutes);
-                if (day.sleep?.remSleepMinutes) remSleepMins.push(day.sleep.remSleepMinutes);
-                if (day.heart?.hrvMs) hrvValues.push(day.heart.hrvMs);
-                if (day.heart?.restingRate) restingHRs.push(day.heart.restingRate);
-                if (day.heart?.recoveryScore) recoveryScores.push(day.heart.recoveryScore);
-                if (day.activity?.steps) stepCounts.push(day.activity.steps);
-                if (day.body?.spo2) spo2Values.push(day.body.spo2);
+                collect(cycle, day);
+                const dayMs = new Date(day.date).getTime();
+                if (!Number.isNaN(dayMs) && dayMs >= recentCutoffMs) collect(recent, day);
             }
 
             const avg = (arr: number[]) => arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
@@ -567,43 +581,58 @@ export class ChatService {
                 if (diff < -5) return 'declining ↓';
                 return 'stable →';
             };
+            const compare = (cycleAvg: number | null, recentAvg: number | null, unit = '') => {
+                if (cycleAvg == null || recentAvg == null) return '';
+                const delta = recentAvg - cycleAvg;
+                if (Math.abs(delta) < 1) return ` (last 14d ≈ cycle avg)`;
+                const sign = delta > 0 ? '+' : '';
+                return ` (last 14d: ${recentAvg}${unit}, ${sign}${delta} vs cycle avg)`;
+            };
 
-            lines.push(`📊 **14-Day Biometric Summary:**\n`);
+            lines.push(`📊 **${lookbackDays}-Day Cycle Biometric Summary** (compared to last 14 days):\n`);
 
             // Sleep metrics
-            if (sleepScores.length > 0 || sleepMinutes.length > 0) {
+            if (cycle.sleepScores.length > 0 || cycle.sleepMinutes.length > 0) {
                 lines.push(`**Sleep:**`);
-                if (sleepScores.length > 0) lines.push(`  • Average sleep score: ${avg(sleepScores)}/100 (trend: ${trend(sleepScores)})`);
-                if (sleepMinutes.length > 0) {
-                    const avgMins = avg(sleepMinutes)!;
-                    lines.push(`  • Average sleep duration: ${Math.floor(avgMins / 60)}h ${avgMins % 60}m (trend: ${trend(sleepMinutes)})`);
+                if (cycle.sleepScores.length > 0) {
+                    lines.push(`  • Cycle avg sleep score: ${avg(cycle.sleepScores)}/100 (cycle trend: ${trend(cycle.sleepScores)})${compare(avg(cycle.sleepScores), avg(recent.sleepScores))}`);
                 }
-                if (deepSleepMins.length > 0) lines.push(`  • Average deep sleep: ${avg(deepSleepMins)} min`);
-                if (remSleepMins.length > 0) lines.push(`  • Average REM sleep: ${avg(remSleepMins)} min`);
+                if (cycle.sleepMinutes.length > 0) {
+                    const avgMins = avg(cycle.sleepMinutes)!;
+                    const recentMins = avg(recent.sleepMinutes);
+                    const fmt = (m: number) => `${Math.floor(m / 60)}h ${m % 60}m`;
+                    let line = `  • Cycle avg sleep duration: ${fmt(avgMins)} (cycle trend: ${trend(cycle.sleepMinutes)})`;
+                    if (recentMins != null) line += ` (last 14d: ${fmt(recentMins)})`;
+                    lines.push(line);
+                }
+                if (cycle.deepSleepMins.length > 0) lines.push(`  • Cycle avg deep sleep: ${avg(cycle.deepSleepMins)} min${compare(avg(cycle.deepSleepMins), avg(recent.deepSleepMins), ' min')}`);
+                if (cycle.remSleepMins.length > 0) lines.push(`  • Cycle avg REM sleep: ${avg(cycle.remSleepMins)} min${compare(avg(cycle.remSleepMins), avg(recent.remSleepMins), ' min')}`);
             }
 
             // Heart / HRV metrics
-            if (hrvValues.length > 0 || restingHRs.length > 0) {
+            if (cycle.hrvValues.length > 0 || cycle.restingHRs.length > 0) {
                 lines.push(`\n**Heart & Recovery:**`);
-                if (hrvValues.length > 0) lines.push(`  • Average HRV: ${avg(hrvValues)}ms (trend: ${trend(hrvValues)})`);
-                if (restingHRs.length > 0) lines.push(`  • Average resting heart rate: ${avg(restingHRs)} bpm (trend: ${trend(restingHRs)})`);
-                if (recoveryScores.length > 0) lines.push(`  • Average recovery score: ${avg(recoveryScores)}% (trend: ${trend(recoveryScores)})`);
+                if (cycle.hrvValues.length > 0) lines.push(`  • Cycle avg HRV: ${avg(cycle.hrvValues)}ms (cycle trend: ${trend(cycle.hrvValues)})${compare(avg(cycle.hrvValues), avg(recent.hrvValues), 'ms')}`);
+                if (cycle.restingHRs.length > 0) lines.push(`  • Cycle avg resting heart rate: ${avg(cycle.restingHRs)} bpm (cycle trend: ${trend(cycle.restingHRs)})${compare(avg(cycle.restingHRs), avg(recent.restingHRs), ' bpm')}`);
+                if (cycle.recoveryScores.length > 0) lines.push(`  • Cycle avg recovery score: ${avg(cycle.recoveryScores)}% (cycle trend: ${trend(cycle.recoveryScores)})${compare(avg(cycle.recoveryScores), avg(recent.recoveryScores), '%')}`);
+                if (cycle.readinessScores.length > 0) lines.push(`  • Cycle avg readiness score: ${avg(cycle.readinessScores)}/100${compare(avg(cycle.readinessScores), avg(recent.readinessScores))}`);
+                if (cycle.respiratoryRates.length > 0) lines.push(`  • Cycle avg respiratory rate: ${avg(cycle.respiratoryRates)} brpm`);
             }
 
             // Activity metrics
-            if (stepCounts.length > 0) {
+            if (cycle.stepCounts.length > 0) {
                 lines.push(`\n**Activity:**`);
-                lines.push(`  • Average daily steps: ${avg(stepCounts)?.toLocaleString()} (trend: ${trend(stepCounts)})`);
+                lines.push(`  • Cycle avg daily steps: ${avg(cycle.stepCounts)?.toLocaleString()} (cycle trend: ${trend(cycle.stepCounts)})${compare(avg(cycle.stepCounts), avg(recent.stepCounts), ' steps')}`);
             }
 
             // SpO2
-            if (spo2Values.length > 0) {
+            if (cycle.spo2Values.length > 0) {
                 lines.push(`\n**Blood Oxygen:**`);
-                lines.push(`  • Average SpO2: ${avg(spo2Values)}%`);
+                lines.push(`  • Cycle avg SpO2: ${avg(cycle.spo2Values)}%`);
             }
 
-            // Recent daily data (last 5 days for context)
-            const recentDays = biometricDays.slice(-5);
+            // Recent daily data (last 7 days for granular context)
+            const recentDays = biometricDays.slice(-7);
             if (recentDays.length > 0) {
                 lines.push(`\n📅 **Recent Daily Data (most recent ${recentDays.length} days):**`);
                 for (const day of recentDays) {
