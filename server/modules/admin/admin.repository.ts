@@ -46,7 +46,7 @@ import {
     type B2bOutreach,
     type InsertB2bOutreach,
 } from '@shared/schema';
-import { eq, desc, asc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull, sum, not, ne } from 'drizzle-orm';
+import { eq, desc, asc, and, gte, lte, lt, gt, or, ilike, sql, count, inArray, isNotNull, isNull, sum, not, ne } from 'drizzle-orm';
 import { decryptToken } from '../../utils/tokenEncryption';
 import { decryptField } from '../../infra/security/fieldEncryption';
 
@@ -489,7 +489,7 @@ export class AdminRepository {
             if (advancedFilters?.hasLabResults === true) {
                 const withLabs = await db.selectDistinct({ userId: fileUploads.userId })
                     .from(fileUploads)
-                    .where(eq(fileUploads.type, 'lab_report'));
+                    .where(and(eq(fileUploads.type, 'lab_report'), isNull(fileUploads.deletedAt)));
                 const ids = withLabs.map(r => r.userId);
                 if (ids.length === 0) return { users: [], total: 0 };
                 candidateIds = intersect(candidateIds, ids);
@@ -497,7 +497,7 @@ export class AdminRepository {
             } else if (advancedFilters?.hasLabResults === false) {
                 const withLabs = await db.selectDistinct({ userId: fileUploads.userId })
                     .from(fileUploads)
-                    .where(eq(fileUploads.type, 'lab_report'));
+                    .where(and(eq(fileUploads.type, 'lab_report'), isNull(fileUploads.deletedAt)));
                 const labSet = new Set(withLabs.map(r => r.userId));
                 const allUsers = await db.select({ id: users.id }).from(users);
                 const noLabIds = allUsers.map(u => u.id).filter(id => !labSet.has(id));
@@ -705,7 +705,13 @@ export class AdminRepository {
             const userFormulas = await db.select().from(formulas).where(eq(formulas.userId, userId)).orderBy(desc(formulas.createdAt));
             const userOrders = await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.placedAt));
             const userChatSessions = await db.select().from(chatSessions).where(eq(chatSessions.userId, userId)).orderBy(desc(chatSessions.createdAt));
-            const userFileUploads = await db.select().from(fileUploads).where(eq(fileUploads.userId, userId)).orderBy(desc(fileUploads.uploadedAt));
+            // Exclude soft-deleted files so the admin timeline reflects what the
+            // patient actually sees in their lab tab. Soft-deleted rows remain in
+            // the DB for HIPAA retention but should not appear in the active list.
+            const userFileUploads = await db.select()
+                .from(fileUploads)
+                .where(and(eq(fileUploads.userId, userId), isNull(fileUploads.deletedAt)))
+                .orderBy(desc(fileUploads.uploadedAt));
             const userWearables = await db.select({
                 provider: wearableConnections.provider,
                 status: wearableConnections.status,
