@@ -296,18 +296,18 @@ export default function CheckoutPage() {
     },
   });
 
-console.log('membership details', myMembership, subscription)
   // ── Pricing Calculations ───────────────────────────────────────────
 
-  const isSubscriptionCancelledOrPaused = 
-    subscription?.status === "cancelled" || subscription?.status === "paused";
-
+  // Aligned with MyFormulaPage: a user counts as an active member only when the
+  // membership flag is set AND not cancelled. We intentionally do NOT require
+  // subscription.status === "active" here, and we do NOT block the upsell when
+  // the subscription is cancelled/paused — cancelled users must be able to
+  // re-join from checkout (the backend grandfathers their prior tier price and
+  // rejects double-enrollment via ALREADY_ACTIVE_MEMBER).
   const hasActiveMembership =
-    !!myMembership?.hasMembership && 
-    !myMembership?.isCancelled && 
-    subscription?.status === "active";
-    
-  const membershipUpsellAvailable = !hasActiveMembership && !!membershipTier && !isSubscriptionCancelledOrPaused;
+    !!myMembership?.hasMembership && !myMembership?.isCancelled;
+
+  const membershipUpsellAvailable = !hasActiveMembership && !!membershipTier;
   const formulaPrice = quoteData?.quote?.available
     ? (quoteData.quote.total ?? 0)
     : 0;
