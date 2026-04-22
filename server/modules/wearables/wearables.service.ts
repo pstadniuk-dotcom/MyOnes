@@ -574,8 +574,31 @@ export class WearablesService {
 
         const dataByDate = new Map<string, any>();
 
+        // Pre-collapse sleep sessions: Oura/Junction returns one row per session,
+        // so naps share the calendar_date with the main sleep. If we iterate them
+        // all in order, later sessions overwrite `entry.sleep` and a 1-minute nap
+        // ends up representing the whole night in the AI's context. Keep the
+        // longest session per date (preferring Oura's 'long_sleep' type) so the
+        // chat / formula engine reasons about the actual night of sleep.
+        const sleepByDate = new Map<string, any>();
+        for (const sleep of sleepData as any[]) {
+            const dateKey = sleep.calendarDate || sleep.calendar_date || sleep.date?.split('T')[0];
+            if (!dateKey) continue;
+            const totalMin = sleep.total != null ? Math.round(sleep.total / 60)
+                : (sleep.duration != null ? Math.round(sleep.duration / 60)
+                : (sleep.duration_total_seconds != null ? Math.round(sleep.duration_total_seconds / 60) : 0));
+            const sessionType = String(sleep.type || sleep.sleep_type || '').toLowerCase();
+            const existing = sleepByDate.get(dateKey);
+            if (!existing) { sleepByDate.set(dateKey, { sleep, totalMin, sessionType }); continue; }
+            const existingIsLong = existing.sessionType === 'long_sleep';
+            const candidateIsLong = sessionType === 'long_sleep';
+            if (candidateIsLong && !existingIsLong) sleepByDate.set(dateKey, { sleep, totalMin, sessionType });
+            else if (candidateIsLong === existingIsLong && totalMin > existing.totalMin) sleepByDate.set(dateKey, { sleep, totalMin, sessionType });
+        }
+        const dedupedSleep = Array.from(sleepByDate.values()).map(v => v.sleep);
+
         // Process sleep data
-        sleepData.forEach((sleep: any) => {
+        dedupedSleep.forEach((sleep: any) => {
             const dateKey = sleep.calendarDate || sleep.date?.split('T')[0];
             if (!dateKey) return;
 

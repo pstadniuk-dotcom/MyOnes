@@ -222,10 +222,36 @@ export class WebhooksService {
         const dataDate = data?.calendar_date ? new Date(data.calendar_date) : new Date();
         const provider = data?.source?.slug || 'junction';
 
+        // Junction emits one webhook per sleep session. Oura in particular sends
+        // the main night-of sleep plus any naps as separate events sharing the
+        // same calendar_date. Our biometric_data table is keyed by
+        // (user, date, provider) so the last webhook processed wins — which
+        // means a 1-minute nap can clobber a real 8h night in the DB. Skip
+        // non-main sessions so only the long sleep is persisted.
+        const sessionType = String(data?.type || data?.sleep_type || '').toLowerCase();
+        const totalMinutes = data?.duration_total_seconds
+            ? Math.round(data.duration_total_seconds / 60)
+            : (data?.total ? Math.round(data.total / 60) : 0);
+        const isNap = sessionType === 'early_nap' || sessionType === 'late_nap' || sessionType === 'nap' || sessionType === 'short_sleep';
+        // Treat anything under 3 hours as a nap for providers that don't
+        // report a session type (defensive fallback).
+        const looksLikeNap = sessionType === '' && totalMinutes > 0 && totalMinutes < 180;
+        if (isNap || looksLikeNap) {
+            logger.info('Skipping nap/short sleep webhook to preserve main sleep row', {
+                userId: user.id,
+                date: data?.calendar_date,
+                sessionType,
+                totalMinutes,
+            });
+            return;
+        }
+
         logger.info('Processing sleep data webhook', {
             userId: user.id,
             date: data?.calendar_date,
             score: data?.sleep_score,
+            sessionType,
+            totalMinutes,
         });
 
         await wearablesRepository.saveJunctionBiometricData({
