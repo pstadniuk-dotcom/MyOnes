@@ -272,35 +272,21 @@ export class AuthService {
         return { user, token: accessToken, refreshToken };
     }
 
-    async googleLogin(googleToken: string, ipAddress?: string | null, userAgent?: string | null) {
+    async googleLogin(googleToken: string, ageConfirmed?: boolean, ipAddress?: string | null, userAgent?: string | null) {
         try {
             let email: string | undefined;
             let name: string | undefined;
             let googleId: string | undefined;
 
-            try {
-                // Try as ID Token first (standard for Google-provided button)
-                const ticket = await googleClient.verifyIdToken({
-                    idToken: googleToken,
-                    audience: process.env.GOOGLE_CLIENT_ID,
-                });
-                const payload = ticket.getPayload();
-                if (payload && payload.email) {
-                    email = payload.email;
-                    name = payload.name;
-                    googleId = payload.sub;
-                }
-            } catch (error) {
-                // If ID Token verification fails, try as Access Token (standard for custom buttons)
-                logger.debug('ID Token verification failed, trying as Access Token', { error: error instanceof Error ? error.message : 'Unknown error' });
-                const { data } = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo`, {
-                    headers: { 'Authorization': `Bearer ${googleToken}` }
-                });
-                if (data && data.email) {
-                    email = data.email;
-                    name = data.name;
-                    googleId = data.sub;
-                }
+            const ticket = await googleClient.verifyIdToken({
+                idToken: googleToken,
+                audience: process.env.GOOGLE_CLIENT_ID,
+            });
+            const payload = ticket.getPayload();
+            if (payload && payload.email) {
+                email = payload.email;
+                name = payload.name;
+                googleId = payload.sub;
             }
 
             if (!email || !googleId) {
@@ -312,14 +298,18 @@ export class AuthService {
             let isNewUser = false;
 
             if (!user) {
-                // 2. Try to find user by email (to link account)
+                // 2. Try to find user by email
                 user = await usersRepository.getUserByEmail(email);
 
                 if (user) {
-                    // Update user with googleId
-                    await usersRepository.updateUser(user.id, { googleId, emailVerified: true });
+                    // Prevent auto-linking for security (Account Takeover protection)
+                    logger.warn('Account exists but social not linked — blocking auto-link', { email });
+                    throw new Error('An account with this email already exists. Please log in with your password to link your Google account in settings.');
                 } else {
                     // 3. Create new user
+                    if (!ageConfirmed) {
+                        throw new Error('You must confirm you are 18 or older to create an account');
+                    }
                     user = await usersRepository.createUser({
                         name: name || 'Google User',
                         email,
@@ -357,10 +347,31 @@ export class AuthService {
         }
     }
 
-    async facebookLogin(fbAccessToken: string, ipAddress?: string | null, userAgent?: string | null) {
+    async facebookLogin(fbAccessToken: string, ageConfirmed?: boolean, ipAddress?: string | null, userAgent?: string | null) {
         try {
             logger.debug('Attempting Facebook login with token...');
-            // Verify Facebook token and get user info
+
+            const fbAppId = process.env.VITE_FACEBOOK_APP_ID;
+            const fbAppSecret = process.env.FACEBOOK_APP_SECRET;
+
+            if (!fbAppId || !fbAppSecret) {
+                logger.error('Facebook App ID or Secret missing in environment');
+                throw new Error('Facebook authentication configuration error');
+            }
+
+            // 1. Verify Facebook token belongs to our app (Account Takeover protection)
+            const debugTokenUrl = `https://graph.facebook.com/debug_token?input_token=${fbAccessToken}&access_token=${fbAppId}|${fbAppSecret}`;
+            const debugResponse = await axios.get(debugTokenUrl);
+
+            if (debugResponse.data?.data?.app_id !== fbAppId) {
+                logger.warn('Facebook token validation failed: App ID mismatch', {
+                    tokenAppId: debugResponse.data?.data?.app_id,
+                    expectedAppId: fbAppId
+                });
+                throw new Error('Invalid Facebook token: Issued for a different application');
+            }
+
+            // 2. Get user info
             const { data } = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${fbAccessToken}`);
 
             logger.debug('Facebook response data', { data });
@@ -377,15 +388,18 @@ export class AuthService {
             let isNewUser = false;
 
             if (!user) {
-                // 2. Try to find user by email (to link account)
+                // 2. Try to find user by email
                 user = await usersRepository.getUserByEmail(email);
 
                 if (user) {
-                    // Update user with facebookId
-                    logger.info('Linking existing user to Facebook account', { userId: user.id, email });
-                    await usersRepository.updateUser(user.id, { facebookId, emailVerified: true });
+                    // Prevent auto-linking for security (Account Takeover protection)
+                    logger.warn('Account exists but social not linked — blocking auto-link', { email });
+                    throw new Error('An account with this email already exists. Please log in with your password to link your Facebook account in settings.');
                 } else {
                     // 3. Create new user
+                    if (!ageConfirmed) {
+                        throw new Error('You must confirm you are 18 or older to create an account');
+                    }
                     logger.info('Creating new user via Facebook', { email });
                     user = await usersRepository.createUser({
                         name: name || 'Facebook User',

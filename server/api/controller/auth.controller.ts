@@ -123,12 +123,12 @@ export class AuthController {
 
     async googleLogin(req: Request, res: Response) {
         try {
-            const { token: idToken } = req.body;
+            const { token: idToken, ageConfirmed } = req.body;
             if (!idToken) return res.status(400).json({ error: 'Google ID token is required' });
 
             const clientIP = getClientIP(req);
             const clientUserAgent = req.headers['user-agent'] || null;
-            const { user, token, refreshToken } = await authService.googleLogin(idToken, clientIP, clientUserAgent);
+            const { user, token, refreshToken } = await authService.googleLogin(idToken, ageConfirmed, clientIP, clientUserAgent);
 
             logger.info('Google login success', { userId: user.id });
             logAuthEvent(req, { userId: user.id, email: user.email, action: 'google_login', provider: 'google', success: true });
@@ -155,12 +155,12 @@ export class AuthController {
 
     async facebookLogin(req: Request, res: Response) {
         try {
-            const { token: accessToken } = req.body;
+            const { token: accessToken, ageConfirmed } = req.body;
             if (!accessToken) return res.status(400).json({ error: 'Facebook access token is required' });
 
             const clientIP = getClientIP(req);
             const clientUserAgent = req.headers['user-agent'] || null;
-            const { user, token, refreshToken } = await authService.facebookLogin(accessToken, clientIP, clientUserAgent);
+            const { user, token, refreshToken } = await authService.facebookLogin(accessToken, ageConfirmed, clientIP, clientUserAgent);
 
             logger.info('Facebook login success', { userId: user.id });
             logAuthEvent(req, { userId: user.id, email: user.email, action: 'facebook_login', provider: 'facebook', success: true });
