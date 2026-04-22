@@ -827,15 +827,41 @@ class DatabaseBillingProvider implements BillingProvider {
       }
     }
 
-    // If a manufacturer order was already placed, mark it for manual cancellation review
+    // If a manufacturer order was already placed, attempt to cancel it at Alive
     if (order.manufacturerOrderId) {
-      await usersRepository.updateOrder(orderId, {
-        manufacturerOrderStatus: 'failed' // Using 'failed' as a signal or we could add a new status
-      });
-      logger.warn('Order cancellation requested for order already sent to manufacturer', {
-        orderId,
-        manufacturerOrderId: order.manufacturerOrderId
-      });
+      try {
+        const cancelResult = await manufacturerPricingService.cancelManufacturerOrder(order.manufacturerOrderId);
+        if (cancelResult.success) {
+          await usersRepository.updateOrder(orderId, {
+            manufacturerOrderStatus: 'cancelled',
+          });
+          logger.info('Manufacturer order cancelled at Alive', {
+            orderId,
+            manufacturerOrderId: order.manufacturerOrderId,
+          });
+        } else {
+          // Cancel failed at Alive — refund still proceeds, but flag for ops follow-up
+          await usersRepository.updateOrder(orderId, {
+            manufacturerOrderStatus: 'cancellation_failed',
+          });
+          logger.error('[CRITICAL] Alive cancel failed - manual intervention required', {
+            orderId,
+            manufacturerOrderId: order.manufacturerOrderId,
+            tooLate: cancelResult.tooLate,
+            alreadyCancelled: cancelResult.alreadyCancelled,
+            error: cancelResult.error,
+          });
+        }
+      } catch (cancelErr) {
+        await usersRepository.updateOrder(orderId, {
+          manufacturerOrderStatus: 'cancellation_failed',
+        });
+        logger.error('[CRITICAL] Exception calling Alive cancel-order', {
+          orderId,
+          manufacturerOrderId: order.manufacturerOrderId,
+          error: cancelErr instanceof Error ? cancelErr.message : String(cancelErr),
+        });
+      }
     }
 
     return { success: true, message: 'Order cancelled and refund initiated.' };

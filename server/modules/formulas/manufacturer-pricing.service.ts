@@ -5,6 +5,7 @@ const ALIVE_API_INGREDIENTS_URL = process.env.ALIVE_API_INGREDIENTS_URL || `${AL
 const ALIVE_API_GET_QUOTE_URL = process.env.ALIVE_API_GET_QUOTE_URL || `${ALIVE_API_BASE_URL}/get-quote`;
 const ALIVE_API_MIX_PRODUCT_URL = process.env.ALIVE_API_MIX_PRODUCT_URL || `${ALIVE_API_BASE_URL}/mix-product`;
 const ALIVE_API_EXTERNAL_ORDER_URL = process.env.ALIVE_API_EXTERNAL_ORDER_URL || `${ALIVE_API_BASE_URL}/external-order`;
+const ALIVE_API_CANCEL_ORDER_URL = process.env.ALIVE_API_CANCEL_ORDER_URL || `${ALIVE_API_BASE_URL}/external-order/cancel`;
 const ALIVE_API_KEY = process.env.ALIVE_API_KEY || "";
 const ALIVE_API_ORIGIN = process.env.ALIVE_API_ORIGIN || "https://myones.onrender.com";
 
@@ -615,6 +616,89 @@ class ManufacturerPricingService {
                 error: error?.name === 'AbortError'
                     ? 'Manufacturer order request timed out.'
                     : `Manufacturer order failed: ${error?.message || 'unknown error'}`,
+            };
+        }
+    }
+
+    /**
+     * Cancel a previously placed external order at Alive.
+     * Used by the user-initiated 4-hour cancel window in billing.service.cancelOrder.
+     *
+     * Endpoint: POST /external-order/cancel
+     * Payload:  { external_order_id: string }
+     * Success:  { status: true, ... }
+     * Failure:  { status: false, errors?: {...} } or non-2xx response
+     */
+    async cancelManufacturerOrder(externalOrderId: string): Promise<{ success: boolean; alreadyCancelled?: boolean; tooLate?: boolean; error?: string; raw?: any }> {
+        if (!externalOrderId) {
+            return { success: false, error: 'externalOrderId is required' };
+        }
+
+        try {
+            const payload = { external_order_id: externalOrderId };
+            logger.info('Cancelling manufacturer order with Alive', { externalOrderId, url: ALIVE_API_CANCEL_ORDER_URL });
+
+            const response = await this.fetchWithTimeout(ALIVE_API_CANCEL_ORDER_URL, {
+                method: 'POST',
+                headers: {
+                    ...this.buildAuthHeaders(),
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const text = await response.text().catch(() => '');
+            let parsed: any = null;
+            try { parsed = text ? JSON.parse(text) : null; } catch { /* not json */ }
+
+            logger.info('Manufacturer cancel-order response', {
+                externalOrderId,
+                status: response.status,
+                body: parsed ?? text,
+            });
+
+            if (!response.ok) {
+                // Try to detect "too late to cancel" vs "already cancelled" vs "not found"
+                const errBlob = JSON.stringify(parsed ?? text ?? '').toLowerCase();
+                const tooLate = /too late|already (in )?(production|processing|shipped|fulfill)|cannot.*cancel|past.*window/.test(errBlob);
+                const alreadyCancelled = /already (cancel|void)/.test(errBlob);
+                return {
+                    success: false,
+                    tooLate,
+                    alreadyCancelled,
+                    error: `Alive cancel returned ${response.status}: ${text || '(no body)'}`,
+                    raw: parsed ?? text,
+                };
+            }
+
+            // Successful HTTP status — check Alive's status flag
+            const status = parsed?.status;
+            if (status === false) {
+                const errBlob = JSON.stringify(parsed?.errors ?? parsed ?? '').toLowerCase();
+                const tooLate = /too late|already (in )?(production|processing|shipped|fulfill)|cannot.*cancel|past.*window/.test(errBlob);
+                const alreadyCancelled = /already (cancel|void)/.test(errBlob);
+                return {
+                    success: false,
+                    tooLate,
+                    alreadyCancelled,
+                    error: `Alive cancel rejected: ${JSON.stringify(parsed?.errors ?? parsed)}`,
+                    raw: parsed,
+                };
+            }
+
+            return { success: true, raw: parsed };
+        } catch (error: any) {
+            logger.error('Failed to cancel manufacturer order', {
+                externalOrderId,
+                error: error?.message || error,
+                isAbort: error?.name === 'AbortError',
+            });
+            return {
+                success: false,
+                error: error?.name === 'AbortError'
+                    ? 'Manufacturer cancel request timed out.'
+                    : `Manufacturer cancel failed: ${error?.message || 'unknown error'}`,
             };
         }
     }
