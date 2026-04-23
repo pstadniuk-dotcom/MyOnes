@@ -34,16 +34,16 @@ export class EpdWebhooksController {
         return res.status(400).json({ error: 'Invalid webhook payload' });
       }
 
-      // Respond immediately — process async to avoid EPD timeout
-      res.status(200).json({ received: true });
-
-      // Process the event after responding
+      // Process synchronously BEFORE responding so errors propagate
+      // as non-200 and EPD will retry the event automatically.
       await epdWebhooksService.handleEvent(event);
+
+      return res.status(200).json({ received: true });
     } catch (error) {
       logger.error('Error processing EPD webhook', { error });
-      // Still return 200 to prevent EPD retries on handler errors
       if (!res.headersSent) {
-        res.status(200).json({ received: true, error: 'Processing error' });
+        // 500 tells EPD the event was not processed — it will retry
+        return res.status(500).json({ error: 'Processing error' });
       }
     }
   }

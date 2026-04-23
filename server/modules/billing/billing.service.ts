@@ -988,18 +988,20 @@ class DatabaseBillingProvider implements BillingProvider {
           throw new Error(res.responsetext || 'EPD payout unsuccessful');
         }
       } catch (err: any) {
-        if (err.message.includes('Invalid Transaction Type')) {
-          logger.warn(`EPD Payout feature not enabled on account. MOCKING SUCCESS for testing.`, {
+        if (err.message.includes('Invalid Transaction Type') && process.env.NODE_ENV !== 'production') {
+          // DEV / STAGING ONLY: EPD payout feature not enabled on test account — mock success so
+          // the rest of the settlement flow can be tested end-to-end.
+          logger.warn(`[DEV] EPD Payout feature not enabled — mocking success for non-prod environment`, {
             orderId,
             payoutId: payout.id,
           });
-
           await usersRepository.updatePayout(payout.id, {
             status: 'completed',
             epdPayoutRef: `MOCK_SUCCESS_${Date.now()}`,
             lastError: `Mocked: Gateway feature '${err.message}' not enabled`
           });
         } else {
+          // Production (or unknown error): mark failed so retry scheduler picks it up
           logger.error(`Payout failed for ${payout.recipientType}`, { orderId, payoutId: payout.id, error: err.message });
           await usersRepository.updatePayout(payout.id, {
             status: 'failed',
