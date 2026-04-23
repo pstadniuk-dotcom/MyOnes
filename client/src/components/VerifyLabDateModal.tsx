@@ -58,6 +58,9 @@ export function VerifyLabDateModal({ open, onClose, report }: Props) {
     const [mode, setMode] = useState<'confirm' | 'pick'>('confirm');
     const [pickValue, setPickValue] = useState<string>('');
     const [saving, setSaving] = useState(false);
+    const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+    const [previewError, setPreviewError] = useState<string | null>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
 
     // Reset state whenever modal opens for a different report
     useEffect(() => {
@@ -68,10 +71,44 @@ export function VerifyLabDateModal({ open, onClose, report }: Props) {
         }
     }, [open, report.id, report.testDate]);
 
-    const previewUrl = useMemo(
-        () => buildApiUrl(`/api/files/${report.id}/preview`),
-        [report.id]
-    );
+    // Fetch the file with auth and convert to a blob URL so the <iframe>/<img>
+    // can render it without sending an Authorization header. The /preview
+    // endpoint requires auth, which iframes cannot provide directly.
+    useEffect(() => {
+        if (!open) return;
+        let cancelled = false;
+        let createdUrl: string | null = null;
+        setPreviewLoading(true);
+        setPreviewError(null);
+        setPreviewBlobUrl(null);
+
+        const token = localStorage.getItem('authToken');
+        const url = buildApiUrl(`/api/files/${report.id}/preview`);
+
+        fetch(url, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            credentials: 'include',
+        })
+            .then(async (res) => {
+                if (!res.ok) throw new Error(`Preview failed (${res.status})`);
+                const blob = await res.blob();
+                if (cancelled) return;
+                createdUrl = URL.createObjectURL(blob);
+                setPreviewBlobUrl(createdUrl);
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                setPreviewError(err?.message || 'Could not load preview.');
+            })
+            .finally(() => {
+                if (!cancelled) setPreviewLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+            if (createdUrl) URL.revokeObjectURL(createdUrl);
+        };
+    }, [open, report.id]);
 
     const todayIso = useMemo(() => new Date().toISOString().split('T')[0], []);
     const dateLooksValid = /^\d{4}-\d{2}-\d{2}$/.test(pickValue) && pickValue <= todayIso;
@@ -135,15 +172,30 @@ export function VerifyLabDateModal({ open, onClose, report }: Props) {
                     {/* Preview */}
                     <div className="bg-[#ede8e2]/40 md:border-r border-b md:border-b-0 border-[#054700]/10 p-4 overflow-hidden flex flex-col">
                         <div className="flex-1 rounded-lg border border-[#054700]/10 bg-white overflow-hidden shadow-sm">
-                            {isPdf ? (
+                            {previewLoading ? (
+                                <div className="flex items-center justify-center h-full min-h-[440px] p-8 text-center text-[#5a6623] text-sm">
+                                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                                    Loading preview…
+                                </div>
+                            ) : previewError ? (
+                                <div className="flex items-center justify-center h-full min-h-[440px] p-8 text-center text-[#5a6623] text-sm">
+                                    <FileQuestion className="h-6 w-6 mr-2" />
+                                    {previewError}
+                                </div>
+                            ) : !previewBlobUrl ? (
+                                <div className="flex items-center justify-center h-full min-h-[440px] p-8 text-center text-[#5a6623] text-sm">
+                                    <FileQuestion className="h-6 w-6 mr-2" />
+                                    Preview unavailable.
+                                </div>
+                            ) : isPdf ? (
                                 <iframe
-                                    src={`${previewUrl}#toolbar=0&navpanes=0&view=FitH`}
+                                    src={`${previewBlobUrl}#toolbar=0&navpanes=0&view=FitH`}
                                     className="w-full h-full min-h-[440px]"
                                     title={`Preview of ${report.fileName}`}
                                 />
                             ) : isImage ? (
                                 <img
-                                    src={previewUrl}
+                                    src={previewBlobUrl}
                                     alt={report.fileName}
                                     className="w-full h-full object-contain"
                                 />
