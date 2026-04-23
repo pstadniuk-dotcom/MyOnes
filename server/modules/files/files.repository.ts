@@ -10,6 +10,9 @@ type LabReportDataShape = {
     testDate?: string;
     testDateSource?: string;
     testDateConfidence?: 'high' | 'medium' | 'low' | 'none';
+    testDateVerifiedAt?: string;
+    testDateVerifiedBy?: string;
+    priorTestDate?: string;
     testType?: string;
     labName?: string;
     physicianName?: string;
@@ -35,6 +38,9 @@ function normalizeLabReportData(data?: unknown): DbInsertFileUpload['labReportDa
     if (typeof payload.testDateConfidence === 'string' && ['high', 'medium', 'low', 'none'].includes(payload.testDateConfidence)) {
         normalized.testDateConfidence = payload.testDateConfidence as LabReportDataShape['testDateConfidence'];
     }
+    if (typeof payload.testDateVerifiedAt === 'string') normalized.testDateVerifiedAt = payload.testDateVerifiedAt;
+    if (typeof payload.testDateVerifiedBy === 'string') normalized.testDateVerifiedBy = payload.testDateVerifiedBy;
+    if (typeof payload.priorTestDate === 'string') normalized.priorTestDate = payload.priorTestDate;
     if (typeof payload.testType === 'string') normalized.testType = payload.testType;
     if (typeof payload.labName === 'string') normalized.labName = payload.labName;
     if (typeof payload.physicianName === 'string') normalized.physicianName = payload.physicianName;

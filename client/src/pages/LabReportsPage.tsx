@@ -22,6 +22,7 @@ import { queryClient, apiRequest, getAuthHeaders } from '@/shared/lib/queryClien
 import { buildApiUrl } from '@/shared/lib/api';
 import { useLocation } from 'wouter';
 import type { FileUpload, UserConsent } from '@shared/schema';
+import { VerifyLabDateModal, DateSourceChip } from '@/components/VerifyLabDateModal';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -178,6 +179,10 @@ interface BiomarkersDashboard {
     id: string;
     fileName: string;
     testDate: string | null;
+    testDateSource?: string | null;
+    testDateConfidence?: 'high' | 'medium' | 'low' | 'none' | null;
+    testDateVerifiedAt?: string | null;
+    priorTestDate?: string | null;
     uploadedAt: string;
     testType: string | null;
     labName: string | null;
@@ -840,6 +845,7 @@ export default function LabReportsPage() {
   const isUploading = uploads.size > 0;
   const uploadingFileName = uploads.size > 0 ? Array.from(uploads.values())[0]?.fileName : null;
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  const [verifyDateReport, setVerifyDateReport] = useState<FileUpload | null>(null);
   const [showManualEntryDialog, setShowManualEntryDialog] = useState(false);
   const [manualEntryText, setManualEntryText] = useState('');
   const [selectedTestType, setSelectedTestType] = useState<'blood_test'>('blood_test');
@@ -1516,6 +1522,49 @@ export default function LabReportsPage() {
               </div>
             )}
 
+            {/* ── Date-verification banner: reports whose date wasn't read reliably ── */}
+            {(() => {
+              const needingVerification = (dashboard?.reports || []).filter(r => {
+                if (r.status !== 'completed') return false;
+                if (r.testDateVerifiedAt) return false;
+                const src = (r.testDateSource || '').toLowerCase();
+                const conf = r.testDateConfidence;
+                return (
+                  src.includes('upload') ||
+                  src.includes('filename') ||
+                  src.includes('not found') ||
+                  conf === 'low' ||
+                  conf === 'none'
+                );
+              });
+              if (needingVerification.length === 0) return null;
+              const firstFile = (labReports || []).find(f => f.id === needingVerification[0].id);
+              return (
+                <div className="rounded-xl border-l-4 border-l-amber-400 border border-amber-200 bg-[#ede8e2]/60 p-4 flex items-start gap-3">
+                  <Info className="h-5 w-5 text-[#5a6623] flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[#054700]">
+                      {needingVerification.length === 1
+                        ? '1 report needs a quick date check'
+                        : `${needingVerification.length} reports need a quick date check`}
+                    </p>
+                    <p className="text-xs text-[#5a6623] mt-1 leading-relaxed">
+                      We couldn't confirm when {needingVerification.length === 1 ? 'this report was' : 'these reports were'} collected. Take a quick look and confirm the date so your trends and AI recommendations stay accurate.
+                    </p>
+                    {firstFile && (
+                      <Button
+                        onClick={() => setVerifyDateReport(firstFile)}
+                        size="sm"
+                        className="mt-3 bg-[#054700] hover:bg-[#054700]/90 text-white h-8 text-xs"
+                      >
+                        Review dates →
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* ── Summary Stat Cards ── */}
             {summary && summary.totalMarkers > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -2185,6 +2234,7 @@ export default function LabReportsPage() {
                       const testDate = ld?.testDate;
                       const labName = ld?.labName;
                       const isSelected = selectedFiles.has(report.id);
+                      const canVerifyDate = status === 'completed' && !isRequisition;
 
                       return (
                         <div
@@ -2202,9 +2252,17 @@ export default function LabReportsPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-[#054700] truncate">{report.originalFileName}</p>
-                            <div className="flex items-center gap-2 text-xs text-[#5a6623]">
+                            <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-[#5a6623]">
                               <span>{new Date(report.uploadedAt).toLocaleDateString()}</span>
                               {testDate && <span>• Test: {fmtDate(testDate)}</span>}
+                              {canVerifyDate && (
+                                <DateSourceChip
+                                  source={ld?.testDateSource}
+                                  confidence={ld?.testDateConfidence}
+                                  verifiedAt={ld?.testDateVerifiedAt}
+                                  onClick={() => setVerifyDateReport(report)}
+                                />
+                              )}
                               {labName && <span>• {labName}</span>}
                               {markerCount > 0 && <span>• {markerCount} markers</span>}
                             </div>
@@ -2582,6 +2640,22 @@ export default function LabReportsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Verify Collection Date Modal ── */}
+      {verifyDateReport && (
+        <VerifyLabDateModal
+          open={!!verifyDateReport}
+          onClose={() => setVerifyDateReport(null)}
+          report={{
+            id: verifyDateReport.id,
+            fileName: verifyDateReport.originalFileName,
+            mimeType: verifyDateReport.mimeType || '',
+            testDate: (verifyDateReport.labReportData as any)?.testDate ?? null,
+            testDateSource: (verifyDateReport.labReportData as any)?.testDateSource ?? null,
+            testDateConfidence: (verifyDateReport.labReportData as any)?.testDateConfidence ?? null,
+          }}
+        />
+      )}
     </div>
   );
 }

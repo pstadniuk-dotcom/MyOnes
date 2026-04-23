@@ -199,6 +199,38 @@ export class FilesController {
             res.status(500).json({ error: 'Failed to delete files' });
         }
     }
+
+    async verifyLabReportDate(req: Request, res: Response) {
+        try {
+            const { testDate } = req.body || {};
+            if (typeof testDate !== 'string' || !testDate) {
+                return res.status(400).json({ error: 'testDate is required (YYYY-MM-DD)' });
+            }
+            const result = await filesService.verifyLabReportDate(
+                req.params.fileId,
+                req.userId!,
+                testDate
+            );
+            res.json({ success: true, ...result });
+        } catch (error) {
+            logger.error('Verify date error:', error);
+            const message = error instanceof Error ? error.message : 'Failed to verify date';
+            if (message === 'File not found') {
+                res.status(404).json({ error: message });
+            } else if (message === 'Unauthorized') {
+                res.status(403).json({ error: message });
+            } else if (
+                message.startsWith('Invalid') ||
+                message.includes('cannot be in the future') ||
+                message.includes('too far in the past') ||
+                message.includes('Only lab reports')
+            ) {
+                res.status(400).json({ error: message });
+            } else {
+                res.status(500).json({ error: message });
+            }
+        }
+    }
 }
 
 export const filesController = new FilesController();

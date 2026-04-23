@@ -511,11 +511,16 @@ export class FilesService {
         const hasAnyMarkers = hasNewMarkers || (Array.isArray(existingData.extractedData) && existingData.extractedData.length > 0);
         const outcome = classifyAnalysisOutcome(hasAnyMarkers ? 1 : 0, labData.rawText);
 
+        // If user already verified the collection date, never overwrite it.
+        const dateIsLocked = Boolean(existingData.testDateVerifiedAt);
         await filesRepository.updateFileUpload(fileId, {
             labReportData: {
-                testDate: labData.testDate || existingData.testDate,
-                testDateSource: labData.testDateSource || existingData.testDateSource,
-                testDateConfidence: labData.testDateConfidence || existingData.testDateConfidence,
+                testDate: dateIsLocked ? existingData.testDate : (labData.testDate || existingData.testDate),
+                testDateSource: dateIsLocked ? existingData.testDateSource : (labData.testDateSource || existingData.testDateSource),
+                testDateConfidence: dateIsLocked ? existingData.testDateConfidence : (labData.testDateConfidence || existingData.testDateConfidence),
+                testDateVerifiedAt: existingData.testDateVerifiedAt,
+                testDateVerifiedBy: existingData.testDateVerifiedBy,
+                priorTestDate: existingData.priorTestDate,
                 testType: labData.testType || existingData.testType,
                 labName: labData.labName || existingData.labName,
                 physicianName: labData.physicianName || existingData.physicianName,
@@ -546,6 +551,62 @@ export class FilesService {
         }).catch(err => logger.warn(`Background insight generation failed:`, err));
 
         return labData;
+    }
+
+    /**
+     * Let the user confirm or correct the collection date for a lab report.
+     *
+     * Validates the supplied date (ISO YYYY-MM-DD, no future dates, not
+     * before 1970), stamps `testDateVerifiedAt` / `testDateVerifiedBy` so
+     * future re-analyses don't overwrite it, and preserves the prior AI
+     * guess under `priorTestDate` so we can offer an undo.
+     */
+    async verifyLabReportDate(
+        fileId: string,
+        userId: string,
+        newDate: string
+    ): Promise<{ testDate: string; testDateVerifiedAt: string }> {
+        const fileUpload = await filesRepository.getFileUpload(fileId);
+        if (!fileUpload) throw new Error('File not found');
+        if (fileUpload.userId !== userId) throw new Error('Unauthorized');
+        if (fileUpload.type !== 'lab_report') throw new Error('Only lab reports have a collection date');
+
+        if (typeof newDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+            throw new Error('Invalid date format — expected YYYY-MM-DD');
+        }
+        const parsed = new Date(newDate);
+        const ms = parsed.getTime();
+        if (Number.isNaN(ms)) throw new Error('Invalid date');
+        if (ms > Date.now() + 24 * 60 * 60 * 1000) {
+            throw new Error('Collection date cannot be in the future');
+        }
+        if (ms < new Date('1970-01-01').getTime()) {
+            throw new Error('Collection date is too far in the past');
+        }
+
+        const existing = (fileUpload.labReportData as any) || {};
+        const verifiedAt = new Date().toISOString();
+
+        await filesRepository.updateFileUpload(fileId, {
+            labReportData: {
+                ...existing,
+                testDate: newDate,
+                testDateSource: 'user-verified',
+                testDateConfidence: 'high',
+                testDateVerifiedAt: verifiedAt,
+                testDateVerifiedBy: userId,
+                priorTestDate: existing.priorTestDate || existing.testDate || undefined,
+            }
+        });
+
+        logger.info('Lab report collection date verified by user', {
+            fileId,
+            userId,
+            newDate,
+            priorDate: existing.testDate,
+        });
+
+        return { testDate: newDate, testDateVerifiedAt: verifiedAt };
     }
 
     async startReanalyzeFile(fileId: string, userId: string) {
@@ -588,11 +649,15 @@ export class FilesService {
                 const hasAnyMarkers = hasNewMarkers || (Array.isArray(existingData.extractedData) && existingData.extractedData.length > 0);
                 const outcome = classifyAnalysisOutcome(hasAnyMarkers ? 1 : 0, labData.rawText);
 
+                const dateIsLocked = Boolean(existingData.testDateVerifiedAt);
                 await filesRepository.updateFileUpload(fileId, {
                     labReportData: {
-                        testDate: labData.testDate || existingData.testDate,
-                        testDateSource: labData.testDateSource || existingData.testDateSource,
-                        testDateConfidence: labData.testDateConfidence || existingData.testDateConfidence,
+                        testDate: dateIsLocked ? existingData.testDate : (labData.testDate || existingData.testDate),
+                        testDateSource: dateIsLocked ? existingData.testDateSource : (labData.testDateSource || existingData.testDateSource),
+                        testDateConfidence: dateIsLocked ? existingData.testDateConfidence : (labData.testDateConfidence || existingData.testDateConfidence),
+                        testDateVerifiedAt: existingData.testDateVerifiedAt,
+                        testDateVerifiedBy: existingData.testDateVerifiedBy,
+                        priorTestDate: existingData.priorTestDate,
                         testType: labData.testType || existingData.testType,
                         labName: labData.labName || existingData.labName,
                         physicianName: labData.physicianName || existingData.physicianName,

@@ -555,6 +555,12 @@ export const fileUploads = pgTable("file_uploads", {
     testDateSource?: string;
     /** Confidence in the extracted testDate. */
     testDateConfidence?: 'high' | 'medium' | 'low' | 'none';
+    /** ISO timestamp when the user confirmed the testDate. Locks it against re-analysis overwrites. */
+    testDateVerifiedAt?: string;
+    /** User ID of whoever verified the testDate. */
+    testDateVerifiedBy?: string;
+    /** Previous testDate before user correction — enables one-click undo. */
+    priorTestDate?: string;
     testType?: string;
     labName?: string;
     physicianName?: string;

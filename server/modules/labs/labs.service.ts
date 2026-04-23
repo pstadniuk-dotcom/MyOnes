@@ -210,6 +210,10 @@ export interface BiomarkersDashboard {
         id: string;
         fileName: string;
         testDate: string | null;
+        testDateSource?: string | null;
+        testDateConfidence?: 'high' | 'medium' | 'low' | 'none' | null;
+        testDateVerifiedAt?: string | null;
+        priorTestDate?: string | null;
         uploadedAt: string;
         testType: string | null;
         labName: string | null;
@@ -1847,6 +1851,10 @@ export class LabsService {
                     id: r.id,
                     fileName: r.originalFileName,
                     testDate: reportDate,
+                    testDateSource: ld?.testDateSource ?? null,
+                    testDateConfidence: ld?.testDateConfidence ?? null,
+                    testDateVerifiedAt: ld?.testDateVerifiedAt ?? null,
+                    priorTestDate: ld?.priorTestDate ?? null,
                     uploadedAt: String(r.uploadedAt),
                     testType: ld?.testType || null,
                     labName: ld?.labName || null,
@@ -2008,6 +2016,10 @@ export class LabsService {
                     id: r.id,
                     fileName: r.originalFileName,
                     testDate: reportDate,
+                    testDateSource: ld?.testDateSource ?? null,
+                    testDateConfidence: ld?.testDateConfidence ?? null,
+                    testDateVerifiedAt: ld?.testDateVerifiedAt ?? null,
+                    priorTestDate: ld?.priorTestDate ?? null,
                     uploadedAt: String(r.uploadedAt),
                     testType: ld?.testType || null,
                     labName: ld?.labName || null,
