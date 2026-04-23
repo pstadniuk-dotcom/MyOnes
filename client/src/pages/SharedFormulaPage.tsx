@@ -17,19 +17,19 @@ import { SYSTEM_SUPPORT_DETAILS, findIngredientByName } from '@shared/ingredient
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 
 export default function SharedFormulaPage() {
-  const [, params] = useRoute('/shared/formula/:id');
-  const formulaId = params?.id;
+  const [, params] = useRoute('/shared/formula/:shareToken');
+  const shareToken = params?.shareToken;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['/api/formulas/shared', formulaId],
+    queryKey: ['/api/formulas/shared', shareToken],
     queryFn: async () => {
-      const response = await fetch(buildApiUrl(`/api/formulas/shared/${formulaId}`));
+      const response = await fetch(buildApiUrl(`/api/formulas/shared/${shareToken}`));
       if (!response.ok) {
         throw new Error('Formula not found');
       }
       return response.json();
     },
-    enabled: !!formulaId,
+    enabled: !!shareToken,
   });
 
   if (isLoading) {

@@ -339,6 +339,10 @@ export const formulas = pgTable("formulas", {
   needsReformulation: boolean("needs_reformulation").default(false).notNull(),
   discontinuedIngredients: json("discontinued_ingredients").$type<string[]>().default([]),
   discontinuedFlaggedAt: timestamp("discontinued_flagged_at"),
+
+  // Sharing functionality
+  isSharedPublicly: boolean("is_shared_publicly").default(false).notNull(),
+  shareToken: varchar("share_token", { length: 255 }).unique(),
 }, (table) => [
   index("formulas_user_id_idx").on(table.userId),
 ]);

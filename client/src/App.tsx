@@ -443,7 +443,7 @@ function MainRouter() {
       </Route>
 
       {/* Public Shared Formula View */}
-      <Route path="/shared/formula/:id" component={SharedFormulaPage} />
+      <Route path="/shared/formula/:shareToken" component={SharedFormulaPage} />
 
       <Route component={NotFound} />
     </Switch>

@@ -8,6 +8,7 @@ import { Separator } from '@/shared/components/ui/separator';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Switch } from '@/shared/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/shared/components/ui/alert-dialog';
@@ -75,6 +76,8 @@ interface Formula {
   needsReformulation?: boolean;
   discontinuedIngredients?: string[];
   discontinuedFlaggedAt?: string | null;
+  isSharedPublicly?: boolean;
+  shareToken?: string | null;
   changes?: {
     id: string;
     summary: string;
@@ -3560,8 +3563,60 @@ function FormulaComparison({ comparison }: { comparison: FormulaComparison }) {
 function ActionsSection({ formula, onOrderClick, hasActiveMembership }: { formula: Formula; onOrderClick: () => void; hasActiveMembership: boolean }) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareEmail, setShareEmail] = useState('');
+  const [shareSettings, setShareSettings] = useState({
+    isSharedPublicly: !!formula.isSharedPublicly,
+    shareToken: formula.shareToken ?? null,
+  });
+
+  useEffect(() => {
+    setShareSettings({
+      isSharedPublicly: !!formula.isSharedPublicly,
+      shareToken: formula.shareToken ?? null,
+    });
+  }, [formula.isSharedPublicly, formula.shareToken]);
+
+  const shareLink = shareSettings.shareToken
+    ? `${window.location.origin}/shared/formula/${shareSettings.shareToken}`
+    : '';
+
+  const toggleSharingMutation = useMutation({
+    mutationFn: async (isSharedPublicly: boolean) => {
+      const response = await apiRequest('PATCH', `/api/users/me/formula/${formula.id}/share`, { isSharedPublicly });
+      return response.json() as Promise<{
+        success: boolean;
+        isSharedPublicly: boolean;
+        shareToken: string | null;
+      }>;
+    },
+    onSuccess: async (result) => {
+      setShareSettings({
+        isSharedPublicly: result.isSharedPublicly,
+        shareToken: result.shareToken,
+      });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/current'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/users/me/formula/history'] }),
+      ]);
+
+      toast({
+        title: result.isSharedPublicly ? 'Sharing enabled' : 'Sharing disabled',
+        description: result.isSharedPublicly
+          ? 'Your formula now has a shareable link.'
+          : 'Your previous share link has been revoked.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Sharing update failed',
+        description: error?.message || 'Could not update sharing settings.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const handleDownload = async () => {
     try {
@@ -3624,7 +3679,15 @@ function ActionsSection({ formula, onOrderClick, hasActiveMembership }: { formul
   };
 
   const handleCopyLink = () => {
-    const shareLink = `${window.location.origin}/shared/formula/${formula.id}`;
+    if (!shareLink) {
+      toast({
+        title: 'Enable sharing first',
+        description: 'Turn on public sharing to generate a secure link.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     navigator.clipboard?.writeText(shareLink);
     toast({
       title: 'Link Copied',
@@ -3712,20 +3775,42 @@ function ActionsSection({ formula, onOrderClick, hasActiveMembership }: { formul
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="space-y-1">
+                  <Label htmlFor={`share-toggle-${formula.id}`}>Public share link</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Turn this on to generate a revocable link for this formula.
+                  </p>
+                </div>
+                <Switch
+                  id={`share-toggle-${formula.id}`}
+                  checked={shareSettings.isSharedPublicly}
+                  onCheckedChange={(checked) => toggleSharingMutation.mutate(checked)}
+                  disabled={toggleSharingMutation.isPending}
+                />
+              </div>
+
               <label className="text-sm font-medium">Share via Link</label>
               <div className="flex gap-2">
                 <Input
-                  value={`${window.location.origin}/shared/formula/${formula.id}`}
+                  value={shareLink || 'Enable sharing to generate a secure link'}
                   readOnly
                   className="flex-1"
                 />
-                <Button variant="outline" onClick={handleCopyLink} data-testid="button-copy-share-link">
+                <Button
+                  variant="outline"
+                  onClick={handleCopyLink}
+                  disabled={!shareSettings.isSharedPublicly || !shareLink}
+                  data-testid="button-copy-share-link"
+                >
                   <Copy className="w-4 h-4 mr-2" />
                   Copy
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Anyone with this link can view (but not edit) your formula
+                {shareSettings.isSharedPublicly
+                  ? 'Anyone with this link can view your formula. Turning sharing off revokes the current link.'
+                  : 'Sharing is off. No public link is active right now.'}
               </p>
             </div>
 
