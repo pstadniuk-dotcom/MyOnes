@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { eq, desc, and, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import { db } from "../../infra/db/db";
 import { logger } from '../../infra/logging/logger';
@@ -407,6 +408,55 @@ export class FormulasRepository {
         } catch (error) {
             logger.error('Error updating formula acknowledgment', { error });
             throw new Error('Failed to update formula acknowledgment');
+        }
+    }
+
+    async updateSharingOptions(formulaId: string, isSharedPublicly: boolean): Promise<Formula> {
+        try {
+            const [current] = await db
+                .select({ shareToken: formulas.shareToken })
+                .from(formulas)
+                .where(eq(formulas.id, formulaId));
+
+            if (!current) {
+                throw new Error('Formula not found');
+            }
+
+            const shareToken = isSharedPublicly
+                ? current.shareToken ?? randomBytes(24).toString('hex')
+                : null;
+
+            const [updated] = await db
+                .update(formulas)
+                .set({ isSharedPublicly, shareToken })
+                .where(eq(formulas.id, formulaId))
+                .returning();
+
+            if (!updated) {
+                throw new Error('Formula not found');
+            }
+            return updated;
+        } catch (error) {
+            logger.error('Error updating sharing options', { error });
+            throw new Error('Failed to update sharing options');
+        }
+    }
+
+    async getSharedFormulaByToken(shareToken: string): Promise<Formula | undefined> {
+        try {
+            const [formula] = await db
+                .select()
+                .from(formulas)
+                .where(
+                    and(
+                        eq(formulas.shareToken, shareToken),
+                        eq(formulas.isSharedPublicly, true)
+                    )
+                );
+            return formula || undefined;
+        } catch (error) {
+            logger.error('Error getting shared formula by token', { error });
+            return undefined;
         }
     }
 

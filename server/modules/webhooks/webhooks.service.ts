@@ -13,11 +13,11 @@ export class WebhooksService {
      * Handle Twilio SMS reply
      */
     async handleTwilioSms(phoneNumber: string, body: string) {
-        logger.info(`📩 Received SMS from ${phoneNumber}: ${body}`);
+        logger.info('📩 Received SMS', { phoneNumber, body });
 
         const user = await usersRepository.getUserByPhone(phoneNumber);
         if (!user) {
-            logger.warn(`❌ User not found for phone ${phoneNumber}`);
+            logger.warn('❌ User not found for phone', { phoneNumber });
             throw new Error('User not found');
         }
 

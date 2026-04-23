@@ -44,7 +44,7 @@ export class UsersController {
         try {
             const userId = req.userId!;
 
-            logger.info('Health profile save request', { userId, body: req.body });
+            logger.info('Health profile save request', { userId, fields: Object.keys(req.body) });
 
             // Validate request body with proper Zod schema
             const healthProfileUpdate = insertHealthProfileSchema.omit({ userId: true }).extend({
@@ -71,7 +71,7 @@ export class UsersController {
                 currentSupplements: req.body.currentSupplements,
             });
 
-            logger.info('Health profile validated', { userId, validatedData: healthProfileUpdate });
+            logger.info('Health profile validated', { userId, validatedFields: Object.keys(healthProfileUpdate) });
 
             const healthProfile = await usersService.saveHealthProfile(userId, healthProfileUpdate);
 

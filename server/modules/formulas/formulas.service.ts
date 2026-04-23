@@ -691,8 +691,8 @@ export class FormulasService {
         };
     }
 
-    async getSharedFormula(formulaId: string) {
-        const formula = await formulasRepository.getFormula(formulaId);
+    async getSharedFormula(shareToken: string) {
+        const formula = await formulasRepository.getSharedFormulaByToken(shareToken);
 
         if (!formula) {
             return null;
@@ -718,6 +718,21 @@ export class FormulasService {
             user: {
                 name: user?.name || 'Ones User',
             }
+        };
+    }
+
+    async toggleSharing(userId: string, formulaId: string, isSharedPublicly: boolean) {
+        const formula = await formulasRepository.getFormula(formulaId);
+
+        if (!formula || formula.userId !== userId) {
+            throw new Error('Formula not found or access denied');
+        }
+
+        const updatedFormula = await formulasRepository.updateSharingOptions(formulaId, isSharedPublicly);
+
+        return {
+            isSharedPublicly: updatedFormula.isSharedPublicly,
+            shareToken: updatedFormula.shareToken,
         };
     }
 

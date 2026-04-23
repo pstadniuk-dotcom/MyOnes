@@ -318,11 +318,11 @@ export class FormulasController {
 
     async getSharedFormula(req: Request, res: Response) {
         try {
-            const { formulaId } = req.params;
-            const result = await formulasService.getSharedFormula(formulaId);
+            const { shareToken } = req.params;
+            const result = await formulasService.getSharedFormula(shareToken);
 
             if (!result) {
-                return res.status(404).json({ error: 'Formula not found' });
+                return res.status(404).json({ error: 'Formula not found or not shared' });
             }
 
             res.json(result);
@@ -331,6 +331,31 @@ export class FormulasController {
             res.status(500).json({ error: 'Failed to fetch formula' });
         }
     }
+    async toggleSharing(req: Request, res: Response) {
+        try {
+            const userId = req.userId!;
+            const { formulaId } = req.params;
+            const { isSharedPublicly } = req.body;
+
+            if (typeof isSharedPublicly !== 'boolean') {
+                return res.status(400).json({ error: 'isSharedPublicly must be a boolean' });
+            }
+
+            const formula = await formulasService.toggleSharing(userId, formulaId, isSharedPublicly);
+            res.json({
+                success: true,
+                isSharedPublicly: formula.isSharedPublicly,
+                shareToken: formula.shareToken
+            });
+        } catch (error: any) {
+            logger.error('Error toggling formula sharing:', error);
+            if (error.message.includes('not found') || error.message.includes('access denied')) {
+                return res.status(404).json({ error: error.message });
+            }
+            res.status(500).json({ error: 'Failed to update sharing settings' });
+        }
+    }
+
     async getReviewStatus(req: Request, res: Response) {
         try {
             const userId = req.userId!;

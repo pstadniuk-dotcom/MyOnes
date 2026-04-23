@@ -70,7 +70,10 @@ router.post('/:formulaId/acknowledge-warnings', requireAuth, formulasController.
 // Get acknowledgment status for a formula
 router.get('/:formulaId/acknowledgment-status', requireAuth, formulasController.getAcknowledgmentStatus);
 
-// Public endpoint - Get shared formula by ID (no auth required)
-router.get('/shared/:formulaId', formulasController.getSharedFormula);
+// Public endpoint - Get shared formula by token (no auth required)
+router.get('/shared/:shareToken', formulasController.getSharedFormula);
+
+// Toggle formula sharing
+router.patch('/:formulaId/share', requireAuth, formulasController.toggleSharing);
 
 export default router;
