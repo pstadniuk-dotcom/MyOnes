@@ -1846,7 +1846,7 @@ export class LabsService {
                 return {
                     id: r.id,
                     fileName: r.originalFileName,
-                    testDate: ld?.testDate || null,
+                    testDate: reportDate,
                     uploadedAt: String(r.uploadedAt),
                     testType: ld?.testType || null,
                     labName: ld?.labName || null,
@@ -1912,10 +1912,69 @@ export class LabsService {
 
     // ── Private helpers ─────────────────────────────────────────────
 
+    /**
+     * Resolve the chronological date for a lab report.
+     *
+     * Priority:
+     *   1. AI-extracted testDate from inside the document
+     *   2. ISO date parsed from the filename (e.g. "Lab Results 2024-11-01 ...")
+     *   3. uploadedAt (last resort)
+     *
+     * We also sanity-check the AI-extracted testDate against the filename:
+     * if the two dates differ by more than 180 days AND the filename has a
+     * clean YYYY-MM-DD, we trust the filename. This protects against AI
+     * mis-extraction (e.g. grabbing a print date instead of the collection
+     * date) which otherwise causes 14-year-old labs to appear as "today".
+     */
     private getReportDate(report: FileUpload): string {
         const ld = report.labReportData as any;
-        if (ld?.testDate) return ld.testDate;
+        const extracted: string = (ld?.testDate || '').toString().trim();
+        const filenameDate = this.parseFilenameDate(report.originalFileName);
+
+        // 1. Both present → cross-check
+        if (extracted && filenameDate) {
+            const extractedMs = new Date(extracted).getTime();
+            const filenameMs = new Date(filenameDate).getTime();
+            if (!Number.isNaN(extractedMs) && !Number.isNaN(filenameMs)) {
+                const diffDays = Math.abs(extractedMs - filenameMs) / (24 * 60 * 60 * 1000);
+                if (diffDays > 180) {
+                    // AI almost certainly mis-extracted — trust the filename
+                    return filenameDate;
+                }
+            }
+            return extracted;
+        }
+
+        // 2. Only extracted present
+        if (extracted) return extracted;
+
+        // 3. Only filename present (covers Ian's 2024-11-01 file with empty testDate)
+        if (filenameDate) return filenameDate;
+
+        // 4. Last resort
         return new Date(report.uploadedAt).toISOString().split('T')[0];
+    }
+
+    /**
+     * Parse a YYYY-MM-DD date out of a filename like:
+     *   "Lab Results 2024-11-01 Carnivore.pdf"
+     *   "2025-05-14_panel.pdf"
+     * Returns null if no plausible date is found or the date is in the future
+     * or absurdly old.
+     */
+    private parseFilenameDate(name: string | null | undefined): string | null {
+        if (!name) return null;
+        const m = name.match(/(\d{4})[-_.](\d{2})[-_.](\d{2})/);
+        if (!m) return null;
+        const [, y, mo, d] = m;
+        const iso = `${y}-${mo}-${d}`;
+        const ms = new Date(iso).getTime();
+        if (Number.isNaN(ms)) return null;
+        const now = Date.now();
+        // Reject obvious garbage: future dates or pre-1980
+        if (ms > now + 24 * 60 * 60 * 1000) return null;
+        if (ms < new Date('1980-01-01').getTime()) return null;
+        return iso;
     }
 
     private normalizeStatus(raw: unknown): 'normal' | 'high' | 'low' | 'critical' {
@@ -1939,7 +1998,7 @@ export class LabsService {
                 return {
                     id: r.id,
                     fileName: r.originalFileName,
-                    testDate: ld?.testDate || null,
+                    testDate: reportDate,
                     uploadedAt: String(r.uploadedAt),
                     testType: ld?.testType || null,
                     labName: ld?.labName || null,

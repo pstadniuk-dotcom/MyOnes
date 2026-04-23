@@ -124,20 +124,47 @@ function classifyTrendForMarker(
 }
 
 /**
+ * Parse a YYYY-MM-DD date out of a filename like:
+ *   "Lab Results 2024-11-01 Carnivore.pdf"
+ * Returns null if no plausible date is found.
+ */
+function parseFilenameDate(name: string | null | undefined): string | null {
+    if (!name) return null;
+    const m = name.match(/(\d{4})[-_.](\d{2})[-_.](\d{2})/);
+    if (!m) return null;
+    const iso = `${m[1]}-${m[2]}-${m[3]}`;
+    const ms = new Date(iso).getTime();
+    if (Number.isNaN(ms)) return null;
+    if (ms > Date.now() + 24 * 60 * 60 * 1000) return null;
+    if (ms < new Date('1980-01-01').getTime()) return null;
+    return iso;
+}
+
+/**
  * Resolve the chronological date of a lab report. Prefers the lab's own testDate
- * (the date the blood draw / panel was actually performed) and falls back to the
- * uploadedAt timestamp only when no testDate is available. This ensures reports
- * are ordered by when the labs were taken, not by when the user uploaded them —
- * critical when users batch-upload historical PDFs in arbitrary order.
+ * (the date the blood draw / panel was actually performed). If testDate is
+ * missing OR differs from the filename date by more than 180 days (AI mis-extraction),
+ * falls back to the date parsed from the filename. uploadedAt is the last resort.
  */
 function resolveReportChronoDate(report: any): Date {
     const testDateRaw = report?.labReportData?.testDate;
+    const filenameDate = parseFilenameDate(report?.originalFileName);
+
+    let extractedIso: string | null = null;
     if (typeof testDateRaw === 'string' && testDateRaw.trim().length > 0) {
         const parsed = new Date(testDateRaw);
         if (!Number.isNaN(parsed.getTime())) {
-            return parsed;
+            extractedIso = testDateRaw.trim();
         }
     }
+
+    if (extractedIso && filenameDate) {
+        const diffDays = Math.abs(new Date(extractedIso).getTime() - new Date(filenameDate).getTime()) / (24 * 60 * 60 * 1000);
+        if (diffDays > 180) return new Date(filenameDate); // trust filename, AI mis-extracted
+        return new Date(extractedIso);
+    }
+    if (extractedIso) return new Date(extractedIso);
+    if (filenameDate) return new Date(filenameDate);
     return report?.uploadedAt ? new Date(report.uploadedAt) : new Date(0);
 }
 
@@ -549,7 +576,8 @@ export class ChatService {
                     : `📅 Previous Report${ageSuffix}`;
 
                 const tableRows = values.map((v: any) => `  • ${v.testName}: ${v.value} ${v.unit || ''} | Status: ${v.status || 'Normal'}`).join('\n');
-                return `${timelineLabel}\n📋 Test Date: ${data.testDate || 'unknown'}\n📤 Uploaded: ${uploadDateStr}\nBiomarkers:\n${tableRows}`;
+                const resolvedDateLabel = reportDate.toISOString().split('T')[0];
+                return `${timelineLabel}\n📋 Test Date: ${resolvedDateLabel}\n📤 Uploaded: ${uploadDateStr}\nBiomarkers:\n${tableRows}`;
             });
 
             if (processedReports.length > 0) {

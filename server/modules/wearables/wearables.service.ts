@@ -45,17 +45,46 @@ const PILLAR_SUGGESTED: Record<string, { slug: string; name: string; logo?: stri
 };
 
 /**
+ * Parse a YYYY-MM-DD date out of a filename like
+ * "Lab Results 2024-11-01 Carnivore.pdf". Returns null on no match.
+ */
+function parseFilenameDate(name: string | null | undefined): string | null {
+    if (!name) return null;
+    const m = name.match(/(\d{4})[-_.](\d{2})[-_.](\d{2})/);
+    if (!m) return null;
+    const iso = `${m[1]}-${m[2]}-${m[3]}`;
+    const ms = new Date(iso).getTime();
+    if (Number.isNaN(ms)) return null;
+    if (ms > Date.now() + 24 * 60 * 60 * 1000) return null;
+    if (ms < new Date('1980-01-01').getTime()) return null;
+    return iso;
+}
+
+/**
  * Resolve the chronological date of a lab report. Prefers the lab's own
- * testDate (the date the panel was actually drawn) and falls back to
- * uploadedAt only when testDate is missing. This keeps "latest report" logic
- * correct when a user batch-uploads historical PDFs out of order.
+ * testDate (the date the panel was actually drawn). Falls back to a date
+ * parsed from the filename when testDate is missing or wildly off (>180 days
+ * from filename) — protects against AI mis-extraction. uploadedAt is the
+ * last resort.
  */
 function reportChronoTime(report: any): number {
     const testDateRaw = report?.labReportData?.testDate;
+    const filenameDate = parseFilenameDate(report?.originalFileName);
+
+    let extractedMs: number | null = null;
     if (typeof testDateRaw === 'string' && testDateRaw.trim().length > 0) {
         const parsed = new Date(testDateRaw);
-        if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+        if (!Number.isNaN(parsed.getTime())) extractedMs = parsed.getTime();
     }
+
+    if (extractedMs !== null && filenameDate) {
+        const fnMs = new Date(filenameDate).getTime();
+        const diffDays = Math.abs(extractedMs - fnMs) / (24 * 60 * 60 * 1000);
+        if (diffDays > 180) return fnMs; // trust filename, AI mis-extracted
+        return extractedMs;
+    }
+    if (extractedMs !== null) return extractedMs;
+    if (filenameDate) return new Date(filenameDate).getTime();
     return new Date(report?.uploadedAt || 0).getTime();
 }
 
