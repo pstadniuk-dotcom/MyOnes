@@ -15,6 +15,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { logger } from '../infra/logging/logger';
 import { uploadBufferToSupabase } from './ugcService';
+import { downloadTrustedRemoteMedia } from './trustedRemoteMedia';
 
 // Point fluent-ffmpeg to the bundled static binary
 if (ffmpegStatic) {
@@ -25,8 +26,14 @@ if (ffmpegStatic) {
  * Get the duration of a media file in seconds.
  */
 export async function getMediaDuration(url: string): Promise<number> {
+  if (isLocalMediaPath(url)) {
+    return probeMediaDuration(url);
+  }
+
+  const tempPath = await downloadRemoteMediaToTemp(url, 'probe', 'bin');
   return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(url, (err, metadata) => {
+    ffmpeg.ffprobe(tempPath, async (err, metadata) => {
+      await fs.unlink(tempPath).catch(() => {});
       if (err) return reject(err);
       resolve(metadata.format.duration || 0);
     });
@@ -43,28 +50,37 @@ export async function extractLastFrame(videoUrl: string): Promise<string> {
   await fs.mkdir(workDir, { recursive: true });
 
   const outputPath = join(workDir, 'last_frame.png');
+  const inputPath = isLocalMediaPath(videoUrl)
+    ? videoUrl
+    : await downloadRemoteMediaToTemp(videoUrl, 'scene-src', 'mp4');
 
-  // First get duration
-  const duration = await getMediaDuration(videoUrl);
-  // Seek to 0.1s before the end to get the last meaningful frame
-  const seekTo = Math.max(0, duration - 0.1);
+  try {
+    // First get duration
+    const duration = await getMediaDuration(inputPath);
+    // Seek to 0.1s before the end to get the last meaningful frame
+    const seekTo = Math.max(0, duration - 0.1);
 
-  return new Promise((resolve, reject) => {
-    ffmpeg(videoUrl)
-      .seekInput(seekTo)
-      .frames(1)
-      .outputOptions(['-vf', 'scale=iw:ih'])
-      .output(outputPath)
-      .on('end', () => {
-        logger.info(`[ugc-assembly] Extracted last frame at ${seekTo}s -> ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        logger.error(`[ugc-assembly] Frame extraction failed: ${err.message}`);
-        reject(err);
-      })
-      .run();
-  });
+    return await new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .seekInput(seekTo)
+        .frames(1)
+        .outputOptions(['-vf', 'scale=iw:ih'])
+        .output(outputPath)
+        .on('end', () => {
+          logger.info(`[ugc-assembly] Extracted last frame at ${seekTo}s -> ${outputPath}`);
+          resolve(outputPath);
+        })
+        .on('error', (err) => {
+          logger.error(`[ugc-assembly] Frame extraction failed: ${err.message}`);
+          reject(err);
+        })
+        .run();
+    });
+  } finally {
+    if (!isLocalMediaPath(videoUrl)) {
+      await fs.unlink(inputPath).catch(() => {});
+    }
+  }
 }
 
 /**
@@ -83,10 +99,11 @@ export async function uploadFrame(framePath: string): Promise<string> {
  */
 async function downloadToTemp(url: string, prefix: string, ext: string): Promise<string> {
   const tempPath = join(tmpdir(), `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`);
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Failed to download ${url}: ${resp.status}`);
-  const buf = Buffer.from(await resp.arrayBuffer());
-  await fs.writeFile(tempPath, buf);
+  const { buffer } = await downloadTrustedRemoteMedia(url, {
+    maxBytes: 250 * 1024 * 1024,
+    timeoutMs: 20_000,
+  });
+  await fs.writeFile(tempPath, buffer);
   return tempPath;
 }
 
@@ -370,4 +387,26 @@ async function assemblWithCrossfade(
       .on('error', (err) => reject(err))
       .run();
   });
+}
+
+async function probeMediaDuration(inputPath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) return reject(err);
+      resolve(metadata.format.duration || 0);
+    });
+  });
+}
+
+async function downloadRemoteMediaToTemp(url: string, prefix: string, ext: string): Promise<string> {
+  return downloadToTemp(url, prefix, ext);
+}
+
+function isLocalMediaPath(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol.length === 0;
+  } catch {
+    return true;
+  }
 }
