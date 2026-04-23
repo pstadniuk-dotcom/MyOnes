@@ -15,8 +15,17 @@ import {
 } from '../../utils/falAiService';
 import { getBrandPromptPrefix } from '../../utils/brandAssetService';
 import { logger } from '../../infra/logging/logger';
+import {
+  assertTrustedRemoteMediaUrl,
+  downloadTrustedRemoteMedia,
+} from '../../utils/trustedRemoteMedia';
 
 const router = Router();
+
+function isRemoteMediaValidationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : '';
+  return /Invalid remote URL|Only https remote URLs are allowed|allowlisted|private or loopback|Unable to resolve remote host|max size|Too many redirects/i.test(message);
+}
 
 // ── Generate Image ──────────────────────────────────────────────────────────
 
@@ -32,6 +41,15 @@ router.post('/generate', requireAdmin, async (req, res) => {
     try {
       brandPrefix = await getBrandPromptPrefix();
     } catch { /* no brand profile yet */ }
+
+    if (Array.isArray(referenceImageUrls)) {
+      for (const referenceImageUrl of referenceImageUrls) {
+        if (typeof referenceImageUrl !== 'string') {
+          return res.status(400).json({ error: 'referenceImageUrls must contain only strings' });
+        }
+        await assertTrustedRemoteMediaUrl(referenceImageUrl);
+      }
+    }
 
     const fullPrompt = `${brandPrefix}${prompt}`;
     const selectedModel = modelId || 'fal-ai/flux-pro/v1.1';
@@ -63,7 +81,7 @@ router.post('/generate', requireAdmin, async (req, res) => {
     });
   } catch (err: any) {
     logger.error('[brand-studio] generate error', { error: err.message });
-    return res.status(500).json({ error: err.message || 'Failed to generate image' });
+    return res.status(isRemoteMediaValidationError(err) ? 400 : 500).json({ error: err.message || 'Failed to generate image' });
   }
 });
 
@@ -77,14 +95,15 @@ router.post('/save-generated', requireAdmin, async (req, res) => {
     }
 
     // Download the image and re-upload as a brand asset
-    const resp = await fetch(imageUrl);
-    if (!resp.ok) throw new Error(`Failed to download image: ${resp.status}`);
-    const buf = Buffer.from(await resp.arrayBuffer());
+    const { buffer } = await downloadTrustedRemoteMedia(imageUrl, {
+      maxBytes: 15 * 1024 * 1024,
+      timeoutMs: 10_000,
+    });
 
     // Use the brand asset service to properly register the asset
     const { uploadBrandAsset } = await import('../../utils/brandAssetService');
     const asset = await uploadBrandAsset(
-      buf,
+      buffer,
       `generated-${Date.now()}.jpg`,
       'image/jpeg',
       category || 'other',
@@ -94,7 +113,7 @@ router.post('/save-generated', requireAdmin, async (req, res) => {
     return res.json({ success: true, asset });
   } catch (err: any) {
     logger.error('[brand-studio] save-generated error', { error: err.message });
-    return res.status(500).json({ error: err.message || 'Failed to save asset' });
+    return res.status(isRemoteMediaValidationError(err) ? 400 : 500).json({ error: err.message || 'Failed to save asset' });
   }
 });
 
@@ -106,6 +125,8 @@ router.post('/upscale', requireAdmin, async (req, res) => {
     if (!imageUrl || typeof imageUrl !== 'string') {
       return res.status(400).json({ error: 'imageUrl is required' });
     }
+
+    await assertTrustedRemoteMediaUrl(imageUrl);
 
     const result = await upscaleImage({
       imageUrl,
@@ -123,7 +144,7 @@ router.post('/upscale', requireAdmin, async (req, res) => {
     return res.json({ success: true, imageUrl: permanentUrl, modelUsed: result.modelUsed });
   } catch (err: any) {
     logger.error('[brand-studio] upscale error', { error: err.message });
-    return res.status(500).json({ error: err.message || 'Failed to upscale image' });
+    return res.status(isRemoteMediaValidationError(err) ? 400 : 500).json({ error: err.message || 'Failed to upscale image' });
   }
 });
 
@@ -135,6 +156,8 @@ router.post('/remove-background', requireAdmin, async (req, res) => {
     if (!imageUrl || typeof imageUrl !== 'string') {
       return res.status(400).json({ error: 'imageUrl is required' });
     }
+
+    await assertTrustedRemoteMediaUrl(imageUrl);
 
     const result = await removeBackground(imageUrl);
 
@@ -148,7 +171,7 @@ router.post('/remove-background', requireAdmin, async (req, res) => {
     return res.json({ success: true, imageUrl: permanentUrl, modelUsed: result.modelUsed });
   } catch (err: any) {
     logger.error('[brand-studio] remove-background error', { error: err.message });
-    return res.status(500).json({ error: err.message || 'Failed to remove background' });
+    return res.status(isRemoteMediaValidationError(err) ? 400 : 500).json({ error: err.message || 'Failed to remove background' });
   }
 });
 
