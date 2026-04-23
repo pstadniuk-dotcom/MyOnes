@@ -54,6 +54,11 @@ app.disable('x-powered-by');
 
 const isDevMode = process.env.NODE_ENV !== 'production';
 
+function isLeaderInstance(): boolean {
+  const raw = process.env.LEADER_INSTANCE?.trim().toLowerCase();
+  return raw === 'true' || raw === '1' || raw === 'yes';
+}
+
 // Request ID and Nonce tracking — attach unique ID to each request for log correlation
 // Generate nonce for CSP. Must be before helmet.
 app.use((req, res, next) => {
@@ -318,25 +323,31 @@ app.get('/api/health', (_req, res) => {
         logger.warn('Failed to cleanup orphaned agent runs', { error: err });
       }
 
-      // Start all schedulers with error isolation — a failing scheduler must not prevent others from starting
-      const schedulers: Array<{ name: string; start: () => void }> = [
-        { name: 'SmsReminder', start: startSmsReminderScheduler },
-        { name: 'AutoOptimize', start: startAutoOptimizeScheduler },
-        { name: 'AutoShip', start: startAutoShipScheduler },
-        { name: 'SmartReorder', start: startSmartReorderScheduler },
-        { name: 'Renewal', start: startRenewalScheduler },
-        { name: 'BlogGeneration', start: startBlogGenerationScheduler },
-        { name: 'PrAgent', start: startPrAgentScheduler },
-        { name: 'IngredientCatalogSync', start: startIngredientCatalogSyncScheduler },
-        { name: 'OrderSettlement', start: startOrderSettlementScheduler },
-      ];
+      if (isLeaderInstance()) {
+        logger.info('LEADER_INSTANCE enabled on this instance; starting background schedulers');
 
-      for (const { name, start } of schedulers) {
-        try {
-          start();
-        } catch (err) {
-          logger.error(`Failed to start ${name} scheduler — it will NOT run until server restart`, { error: err });
+        // Start all schedulers with error isolation — a failing scheduler must not prevent others from starting
+        const schedulers: Array<{ name: string; start: () => void }> = [
+          { name: 'SmsReminder', start: startSmsReminderScheduler },
+          { name: 'AutoOptimize', start: startAutoOptimizeScheduler },
+          { name: 'AutoShip', start: startAutoShipScheduler },
+          { name: 'SmartReorder', start: startSmartReorderScheduler },
+          { name: 'Renewal', start: startRenewalScheduler },
+          { name: 'BlogGeneration', start: startBlogGenerationScheduler },
+          { name: 'PrAgent', start: startPrAgentScheduler },
+          { name: 'IngredientCatalogSync', start: startIngredientCatalogSyncScheduler },
+          { name: 'OrderSettlement', start: startOrderSettlementScheduler },
+        ];
+
+        for (const { name, start } of schedulers) {
+          try {
+            start();
+          } catch (err) {
+            logger.error(`Failed to start ${name} scheduler — it will NOT run until server restart`, { error: err });
+          }
         }
+      } else {
+        logger.info('LEADER_INSTANCE not enabled on this instance; skipping background schedulers');
       }
 
       // Note: Wearable data sync is now handled via Junction webhooks
