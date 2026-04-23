@@ -13,6 +13,30 @@ import winston from 'winston';
 
 const { combine, timestamp, printf, colorize, json } = winston.format;
 
+const redactPHI = winston.format((info) => {
+  const SENSITIVE_KEYS = new Set([
+    'phone', 'phoneNumber', 'body', 'medications', 'conditions', 'allergies',
+    'currentSupplements', 'weightLbs', 'heightCm', 'bloodPressureSystolic',
+    'bloodPressureDiastolic', 'restingHeartRate', 'password', 'newPassword',
+    'currentPassword'
+  ]);
+
+  const redact = (obj: any) => {
+    if (!obj || typeof obj !== 'object') return;
+    for (const key of Object.keys(obj)) {
+      if (SENSITIVE_KEYS.has(key) && typeof obj[key] !== 'undefined') {
+        obj[key] = '[REDACTED]';
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        redact(obj[key]);
+      }
+    }
+  };
+
+  // We clone to avoid mutating the original object across formats just in case, but mutating info is standard in winston.
+  redact(info);
+  return info;
+});
+
 // Custom format for development (readable)
 const devFormat = printf(({ level, message, timestamp, ...metadata }) => {
   let msg = `${timestamp} [${level}]: ${message}`;
@@ -34,6 +58,7 @@ const getLogLevel = (): string => {
 export const logger = winston.createLogger({
   level: getLogLevel(),
   format: combine(
+    redactPHI(),
     timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     process.env.NODE_ENV === 'production' ? json() : devFormat
   ),
@@ -42,6 +67,7 @@ export const logger = winston.createLogger({
     // Console transport - always active
     new winston.transports.Console({
       format: combine(
+        redactPHI(),
         colorize({ all: process.env.NODE_ENV !== 'production' }),
         timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
         process.env.NODE_ENV === 'production' ? json() : devFormat
