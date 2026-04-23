@@ -1916,7 +1916,8 @@ export class LabsService {
      * Resolve the chronological date for a lab report.
      *
      * Priority:
-     *   1. AI-extracted testDate from inside the document
+     *   1. AI-extracted testDate from inside the document (the specimen
+     *      collection date, validated against the filename)
      *   2. ISO date parsed from the filename (e.g. "Lab Results 2024-11-01 ...")
      *   3. uploadedAt (last resort)
      *
@@ -1925,34 +1926,42 @@ export class LabsService {
      * clean YYYY-MM-DD, we trust the filename. This protects against AI
      * mis-extraction (e.g. grabbing a print date instead of the collection
      * date) which otherwise causes 14-year-old labs to appear as "today".
+     *
+     * Future dates are rejected outright — a specimen cannot be drawn
+     * tomorrow. If extraction returns a future date we fall through to the
+     * filename then the upload date.
      */
     private getReportDate(report: FileUpload): string {
         const ld = report.labReportData as any;
         const extracted: string = (ld?.testDate || '').toString().trim();
         const filenameDate = this.parseFilenameDate(report.originalFileName);
+        const uploadedAtIso = new Date(report.uploadedAt).toISOString().split('T')[0];
+
+        const extractedMs = extracted ? new Date(extracted).getTime() : NaN;
+        const now = Date.now();
+        const extractedIsValid = Number.isFinite(extractedMs)
+            && extractedMs <= now + 24 * 60 * 60 * 1000
+            && extractedMs >= new Date('1970-01-01').getTime();
 
         // 1. Both present → cross-check
-        if (extracted && filenameDate) {
-            const extractedMs = new Date(extracted).getTime();
+        if (extractedIsValid && filenameDate) {
             const filenameMs = new Date(filenameDate).getTime();
-            if (!Number.isNaN(extractedMs) && !Number.isNaN(filenameMs)) {
-                const diffDays = Math.abs(extractedMs - filenameMs) / (24 * 60 * 60 * 1000);
-                if (diffDays > 180) {
-                    // AI almost certainly mis-extracted — trust the filename
-                    return filenameDate;
-                }
+            const diffDays = Math.abs(extractedMs - filenameMs) / (24 * 60 * 60 * 1000);
+            if (diffDays > 180) {
+                // AI almost certainly mis-extracted — trust the filename
+                return filenameDate;
             }
             return extracted;
         }
 
-        // 2. Only extracted present
-        if (extracted) return extracted;
+        // 2. Only extracted present + valid
+        if (extractedIsValid) return extracted;
 
-        // 3. Only filename present (covers Ian's 2024-11-01 file with empty testDate)
+        // 3. Only filename present (covers files with empty or invalid testDate)
         if (filenameDate) return filenameDate;
 
         // 4. Last resort
-        return new Date(report.uploadedAt).toISOString().split('T')[0];
+        return uploadedAtIso;
     }
 
     /**

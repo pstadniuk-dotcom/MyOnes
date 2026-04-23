@@ -234,6 +234,8 @@ export class FilesService {
                         await filesRepository.updateFileUpload(fileId, {
                             labReportData: {
                                 testDate: labDataExtraction.testDate,
+                                testDateSource: labDataExtraction.testDateSource,
+                                testDateConfidence: labDataExtraction.testDateConfidence,
                                 testType: labDataExtraction.testType,
                                 labName: labDataExtraction.labName,
                                 physicianName: labDataExtraction.physicianName,
@@ -419,6 +421,8 @@ export class FilesService {
                         await filesRepository.updateFileUpload(fileId, {
                             labReportData: {
                                 testDate: labDataExtraction.testDate,
+                                testDateSource: labDataExtraction.testDateSource,
+                                testDateConfidence: labDataExtraction.testDateConfidence,
                                 testType: labDataExtraction.testType,
                                 labName: labDataExtraction.labName,
                                 physicianName: labDataExtraction.physicianName,
@@ -510,6 +514,8 @@ export class FilesService {
         await filesRepository.updateFileUpload(fileId, {
             labReportData: {
                 testDate: labData.testDate || existingData.testDate,
+                testDateSource: labData.testDateSource || existingData.testDateSource,
+                testDateConfidence: labData.testDateConfidence || existingData.testDateConfidence,
                 testType: labData.testType || existingData.testType,
                 labName: labData.labName || existingData.labName,
                 physicianName: labData.physicianName || existingData.physicianName,
@@ -585,6 +591,8 @@ export class FilesService {
                 await filesRepository.updateFileUpload(fileId, {
                     labReportData: {
                         testDate: labData.testDate || existingData.testDate,
+                        testDateSource: labData.testDateSource || existingData.testDateSource,
+                        testDateConfidence: labData.testDateConfidence || existingData.testDateConfidence,
                         testType: labData.testType || existingData.testType,
                         labName: labData.labName || existingData.labName,
                         physicianName: labData.physicianName || existingData.physicianName,

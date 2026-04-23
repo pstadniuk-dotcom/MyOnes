@@ -551,6 +551,10 @@ export const fileUploads = pgTable("file_uploads", {
   // Lab report specific fields
   labReportData: json("lab_report_data").$type<{
     testDate?: string;
+    /** Where the testDate was sourced from (e.g. "Collection Date field", "filename", "NOT FOUND"). */
+    testDateSource?: string;
+    /** Confidence in the extracted testDate. */
+    testDateConfidence?: 'high' | 'medium' | 'low' | 'none';
     testType?: string;
     labName?: string;
     physicianName?: string;

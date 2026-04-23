@@ -17,6 +17,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 export interface LabDataExtraction {
   testDate?: string;
+  testDateSource?: string;
+  testDateConfidence?: 'high' | 'medium' | 'low' | 'none';
   testType?: string;
   labName?: string;
   physicianName?: string;
@@ -322,6 +324,81 @@ Rules:
 }
 
 /**
+ * Validate an AI-returned testDate string. Returns a normalized ISO date
+ * (YYYY-MM-DD) or null if the value is unusable.
+ *
+ * Guards against:
+ *  - empty string / null / whitespace
+ *  - future dates (specimen can't be drawn tomorrow)
+ *  - absurdly old dates (<1970; OCR artifacts like "19/07/0219")
+ *  - un-parseable strings
+ */
+function validateTestDate(raw: unknown): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+
+  const parsed = new Date(s);
+  const ms = parsed.getTime();
+  if (Number.isNaN(ms)) return null;
+
+  const now = Date.now();
+  // Allow up to 24h in the future to accommodate TZ skew at the boundary
+  if (ms > now + 24 * 60 * 60 * 1000) return null;
+  // Anything before 1970 is almost certainly an OCR/extraction error
+  if (ms < new Date('1970-01-01').getTime()) return null;
+
+  return parsed.toISOString().split('T')[0];
+}
+
+/**
+ * Targeted rescue pass: when the primary structured extraction didn't produce
+ * a valid testDate, run a focused, cheap call that looks ONLY for the specimen
+ * collection date. We send just the first ~6000 characters of the OCR text
+ * (which virtually always contains the header / patient / collection block).
+ */
+async function rescueCollectionDateFromText(rawText: string): Promise<{ date: string; source: string; confidence: 'high' | 'medium' | 'low' } | null> {
+  try {
+    const snippet = rawText.slice(0, 6000);
+    const system = `You are a lab report date-extraction specialist. Your ONLY job is to find the specimen collection date (the date the sample was drawn from the patient).
+
+Rules:
+- Prefer labels: "Collection Date", "Specimen Collected", "Date Collected", "Date Drawn", "Draw Date", "Date of Service", "Collected:".
+- NEVER return a "Report Date", "Print Date", "Released Date", or "Received Date".
+- If multiple collection dates appear, return the EARLIEST.
+- If you are not confident, return { "date": null, "source": "NOT FOUND", "confidence": "none" }.
+- Return ONLY JSON: { "date": "YYYY-MM-DD" | null, "source": "short description", "confidence": "high" | "medium" | "low" | "none" }.`;
+
+    const resp = await withTimeout(
+      openai.chat.completions.create({
+        model: 'gpt-4.1',
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: snippet },
+        ],
+        temperature: 0,
+        max_tokens: 200,
+        response_format: { type: 'json_object' },
+      }),
+      30_000,
+      'Collection-date rescue'
+    );
+
+    const content = resp.choices[0]?.message?.content;
+    if (!content) return null;
+    const parsed = JSON.parse(content);
+    const date = validateTestDate(parsed?.date);
+    if (!date) return null;
+    const confidence = ['high', 'medium', 'low'].includes(parsed?.confidence) ? parsed.confidence : 'medium';
+    const source = typeof parsed?.source === 'string' && parsed.source.trim() ? parsed.source.trim() : 'rescue pass';
+    return { date, source, confidence };
+  } catch (err) {
+    logger.warn('Collection-date rescue failed', { error: (err as Error).message });
+    return null;
+  }
+}
+
+/**
  * Analyzes extracted text and structures lab data using AI.
  * Uses gpt-5 (reasoning model) for better marker counting + structured JSON.
  * 32K completion-token budget; reconciliation pass also runs gpt-5.
@@ -330,7 +407,13 @@ export async function structureLabData(rawText: string): Promise<LabDataExtracti
   const systemPrompt = `You are an expert medical lab report analyzer. Extract structured data from lab reports and return it as JSON.
 
 Extract the following top-level fields:
-- testDate: Date of the test (ISO format YYYY-MM-DD if possible)
+- testDate: The **specimen collection date** (the date the blood/urine was actually drawn from the patient) in ISO format YYYY-MM-DD.
+  * Look for labels such as: "Collection Date", "Specimen Collected", "Date Collected", "Date Drawn", "Draw Date", "Date of Service", "Accessioned", "Collected:".
+  * DO NOT use the "Report Date", "Print Date", "Released Date", "Received Date", or "Reviewed Date" — these can be days/weeks AFTER the actual draw and will make the data look more recent than it is.
+  * If the document shows multiple collection dates (multi-panel report), use the EARLIEST collection date.
+  * If you are NOT confident, return null — do NOT guess.
+- testDateSource: A short string describing where you found the date, e.g. "Collection Date field on page 1", "Specimen Collected label", or "NOT FOUND" if null.
+- testDateConfidence: "high" (explicit collection date label), "medium" (unlabeled date near patient info), or "low" / "none".
 - testType: Type of test (e.g., "Complete Blood Count", "Comprehensive Metabolic Panel", "Lipid Panel")
 - labName: Name of the laboratory
 - physicianName: Ordering physician's name
@@ -490,18 +573,32 @@ Return ONLY valid JSON without any markdown formatting.`;
         }
       }
 
+      // ── testDate sanity check + rescue pass ──
+      // The AI occasionally returns an empty string, a future date, or a
+      // "Report Date" instead of the specimen collection date. Validate
+      // aggressively and run a focused rescue call if the primary pass
+      // produced nothing reliable.
+      structured.testDate = validateTestDate(structured.testDate);
+      if (!structured.testDate) {
+        const rescued = await rescueCollectionDateFromText(rawText);
+        if (rescued) {
+          logger.info('Collection-date rescue pass succeeded', { rescued });
+          structured.testDate = rescued.date;
+          structured.testDateSource = (structured.testDateSource && structured.testDateSource !== 'NOT FOUND')
+            ? structured.testDateSource
+            : rescued.source;
+          structured.testDateConfidence = rescued.confidence;
+        } else {
+          structured.testDateSource = structured.testDateSource || 'NOT FOUND';
+          structured.testDateConfidence = 'none';
+        }
+      }
+
       return {
         ...structured,
         rawText
       };
     } catch (error) {
-      if (i < attempts.length - 1) {
-        logger.warn(`Attempt ${i + 1} failed, retrying`, { error: (error as Error).message });
-        continue;
-      }
-      logger.error('All lab data structuring attempts failed', { error });
-      // Return with empty extractedData so callers can detect the failure
-      // instead of silently returning { rawText } which gets normalized away
       return { rawText, extractedData: [] };
     }
   }

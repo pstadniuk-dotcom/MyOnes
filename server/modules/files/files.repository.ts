@@ -8,6 +8,8 @@ type DbInsertFileUpload = typeof fileUploads.$inferInsert;
 
 type LabReportDataShape = {
     testDate?: string;
+    testDateSource?: string;
+    testDateConfidence?: 'high' | 'medium' | 'low' | 'none';
     testType?: string;
     labName?: string;
     physicianName?: string;
@@ -29,6 +31,10 @@ function normalizeLabReportData(data?: unknown): DbInsertFileUpload['labReportDa
     const normalized: LabReportDataShape = {};
 
     if (typeof payload.testDate === 'string') normalized.testDate = payload.testDate;
+    if (typeof payload.testDateSource === 'string') normalized.testDateSource = payload.testDateSource;
+    if (typeof payload.testDateConfidence === 'string' && ['high', 'medium', 'low', 'none'].includes(payload.testDateConfidence)) {
+        normalized.testDateConfidence = payload.testDateConfidence as LabReportDataShape['testDateConfidence'];
+    }
     if (typeof payload.testType === 'string') normalized.testType = payload.testType;
     if (typeof payload.labName === 'string') normalized.labName = payload.labName;
     if (typeof payload.physicianName === 'string') normalized.physicianName = payload.physicianName;
