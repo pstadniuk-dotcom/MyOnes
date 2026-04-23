@@ -17,6 +17,7 @@ import { validateFormulaSafety, safetyWarningsToStrings } from '../../modules/fo
 import { filterAIOutputClaims } from '../../modules/ai/claims-filter';
 import type { SafetyWarning } from '@shared/safety-types';
 import { recommendDailyProtocolCapsules } from '../../modules/chat/protocol-recommendation';
+import { normalizeImageForVision } from '../../utils/fileAnalysis';
 import OpenAI from 'openai';
 import logger from '../../infra/logging/logger';
 import { logAiUsage, estimateTokenCount } from '../../modules/ai-usage/ai-usage.service';
@@ -189,9 +190,11 @@ export class ChatController {
                         try {
                             const downloaded = await filesService.downloadFile(rec.id, userId);
                             if (downloaded?.buffer) {
+                                // Transcode AVIF/HEIC → JPEG so the vision API accepts the image
+                                const normalized = await normalizeImageForVision(downloaded.buffer, downloaded.mimeType);
                                 imageAttachments.push({
-                                    base64: downloaded.buffer.toString('base64'),
-                                    mimeType: downloaded.mimeType,
+                                    base64: normalized.buffer.toString('base64'),
+                                    mimeType: normalized.mimeType,
                                     fileName: rec.originalFileName || 'image'
                                 });
                             }

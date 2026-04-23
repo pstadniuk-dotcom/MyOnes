@@ -42,6 +42,40 @@ export interface LabDataExtraction {
 }
 
 /**
+ * OpenAI vision (and Anthropic vision) accepts PNG, JPEG, WEBP, and non-animated GIF.
+ * Phone uploads frequently arrive as AVIF (Android Chrome) or HEIC (iOS), which the
+ * vision APIs silently reject — the model returns empty results. We normalize every
+ * image through sharp: transcode to JPEG, apply EXIF orientation, cap at 2048px.
+ */
+const MAX_VISION_DIMENSION = 2048;
+
+export async function normalizeImageForVision(
+  buffer: Buffer,
+  mimeType: string,
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  try {
+    const { default: sharp } = await import('sharp');
+    const out = await sharp(buffer, { failOn: 'none' })
+      .rotate()
+      .resize({
+        width: MAX_VISION_DIMENSION,
+        height: MAX_VISION_DIMENSION,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 88, mozjpeg: true })
+      .toBuffer();
+    return { buffer: out, mimeType: 'image/jpeg' };
+  } catch (err) {
+    logger.warn('Image normalization failed, using original buffer', {
+      mimeType,
+      error: (err as Error)?.message,
+    });
+    return { buffer, mimeType };
+  }
+}
+
+/**
  * Validates file type using both MIME type and magic bytes.
  * Magic bytes provide a second layer of defense against spoofed Content-Type headers.
  */
@@ -183,9 +217,9 @@ export async function extractTextFromPDF(buffer: Buffer, onProgress?: AnalysisPr
  */
 export async function extractTextFromImage(buffer: Buffer, mimeType: string): Promise<string> {
   try {
-    // Convert buffer to base64
-    const base64Image = buffer.toString('base64');
-    const dataUrl = `data:${mimeType};base64,${base64Image}`;
+    const normalized = await normalizeImageForVision(buffer, mimeType);
+    const base64Image = normalized.buffer.toString('base64');
+    const dataUrl = `data:${normalized.mimeType};base64,${base64Image}`;
 
     const response = await withTimeout(
       openai.chat.completions.create({
@@ -250,8 +284,9 @@ export async function scanSupplementLabel(
   buffer: Buffer,
   mimeType: string,
 ): Promise<ScannedSupplementLabel> {
-  const base64Image = buffer.toString('base64');
-  const dataUrl = `data:${mimeType};base64,${base64Image}`;
+  const normalized = await normalizeImageForVision(buffer, mimeType);
+  const base64Image = normalized.buffer.toString('base64');
+  const dataUrl = `data:${normalized.mimeType};base64,${base64Image}`;
 
   const systemPrompt = `You are an expert at reading "Supplement Facts" panels on dietary supplement bottles.
 
