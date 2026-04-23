@@ -46,6 +46,8 @@ interface MarkerHistory {
   unit: string;
   status: 'normal' | 'high' | 'low' | 'critical';
   reportId: string;
+  daysOld?: number;
+  isStale?: boolean;
 }
 
 interface AggregatedBiomarker {
@@ -60,16 +62,22 @@ interface AggregatedBiomarker {
     status: 'normal' | 'high' | 'low' | 'critical';
     date: string;
     reportId: string;
+    daysOld?: number;
+    isStale?: boolean;
   };
   previous: {
     value: number | null;
     rawValue: string;
     status: 'normal' | 'high' | 'low' | 'critical';
     date: string;
+    daysOld?: number;
+    isStale?: boolean;
   } | null;
   delta: number | null;
   deltaAbsolute: number | null;
   trend: 'improving' | 'worsening' | 'stable' | 'new';
+  gapDaysFromPrevious?: number | null;
+  comparisonAcrossStaleGap?: boolean;
   clinicalDirection: string;
   history: MarkerHistory[];
   insight?: MarkerInsightData | null;
@@ -175,6 +183,8 @@ interface BiomarkersDashboard {
     labName: string | null;
     markerCount: number;
     status: string;
+    daysOld?: number;
+    isStale?: boolean;
   }>;
   comparison: {
     hasMultipleReports: boolean;
@@ -188,6 +198,16 @@ interface BiomarkersDashboard {
       trend: 'improving' | 'worsening' | 'stable';
       percentChange: number | null;
     }>;
+  };
+  staleness?: {
+    latestReportDate: string | null;
+    daysSinceLatest: number | null;
+    latestIsStale: boolean;
+    oldestReportDate: string | null;
+    hasOnlyStaleData: boolean;
+    hasMixedAgeData: boolean;
+    recommendNewLabs: boolean;
+    thresholdDays: number;
   };
   biologicalAge: BiologicalAge | null;
 }
@@ -264,7 +284,7 @@ const ACTION_LABEL: Record<FocusAction['type'], string> = {
 
 // ── Sparkline Component ────────────────────────────────────────────────
 
-function SparkLine({ values, status }: { values: (number | null)[]; status: string }) {
+function SparkLine({ values, status, dates }: { values: (number | null)[]; status: string; dates?: string[] }) {
   const valid = values.filter((v): v is number => v !== null);
   if (valid.length < 2) return null;
 
@@ -279,19 +299,58 @@ function SparkLine({ values, status }: { values: (number | null)[]; status: stri
     if (v === null) return null;
     const x = padding + (i / Math.max(values.length - 1, 1)) * (w - padding * 2);
     const y = h - padding - ((v - min) / range) * (h - padding * 2);
-    return { x, y };
-  }).filter(Boolean) as { x: number; y: number }[];
+    return { x, y, idx: i };
+  }).filter(Boolean) as { x: number; y: number; idx: number }[];
 
   if (points.length < 2) return null;
 
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-  const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${h} L ${points[0].x.toFixed(1)} ${h} Z`;
+  // Smart timeline grouping: if any two consecutive points are >24 months apart,
+  // break the line into segments so the user can see the data has a gap rather
+  // than implying a continuous trend across years.
+  const STALE_GAP_MS = 730 * 24 * 60 * 60 * 1000;
+  const segments: { x: number; y: number }[][] = [];
+  let current: { x: number; y: number }[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    if (current.length === 0) {
+      current.push({ x: p.x, y: p.y });
+      continue;
+    }
+    const prev = points[i - 1];
+    const prevDate = dates?.[prev.idx];
+    const currDate = dates?.[p.idx];
+    const gapMs = prevDate && currDate ? new Date(currDate).getTime() - new Date(prevDate).getTime() : 0;
+    if (gapMs > STALE_GAP_MS) {
+      segments.push(current);
+      current = [{ x: p.x, y: p.y }];
+    } else {
+      current.push({ x: p.x, y: p.y });
+    }
+  }
+  if (current.length > 0) segments.push(current);
+
   const strokeColor = status === 'normal' ? '#059669' : status === 'critical' ? '#dc2626' : status === 'high' ? '#d97706' : '#2563eb';
+  const buildPath = (seg: { x: number; y: number }[]) =>
+    seg.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+
+  // Render gap connectors as a dashed faded line so users see a visual break
+  const gapConnectors: Array<{ from: { x: number; y: number }; to: { x: number; y: number } }> = [];
+  for (let s = 1; s < segments.length; s++) {
+    const prevSeg = segments[s - 1];
+    const nextSeg = segments[s];
+    gapConnectors.push({ from: prevSeg[prevSeg.length - 1], to: nextSeg[0] });
+  }
 
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="flex-shrink-0">
-      <path d={areaD} fill={strokeColor} opacity="0.08" />
-      <path d={pathD} fill="none" stroke={strokeColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
+      {segments.map((seg, i) => (
+        seg.length >= 2 ? (
+          <path key={`seg-${i}`} d={buildPath(seg)} fill="none" stroke={strokeColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
+        ) : null
+      ))}
+      {gapConnectors.map((g, i) => (
+        <line key={`gap-${i}`} x1={g.from.x} y1={g.from.y} x2={g.to.x} y2={g.to.y} stroke="#94a3b8" strokeWidth="1" strokeDasharray="2 2" opacity="0.45" />
+      ))}
       {points.map((p, i) => (
         <circle key={i} cx={p.x} cy={p.y} r={i === points.length - 1 ? 2.5 : 1.5} fill={strokeColor} opacity={i === points.length - 1 ? 1 : 0.4} />
       ))}
@@ -1440,6 +1499,23 @@ export default function LabReportsPage() {
           </CardHeader>
           <CardContent className="p-4 sm:p-6 space-y-5 min-w-0 overflow-hidden">
 
+            {/* ── Stale-data warning banner ── */}
+            {dashboard?.staleness?.recommendNewLabs && dashboard.staleness.daysSinceLatest && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-amber-900">
+                    Your most recent labs are {dashboard.staleness.daysSinceLatest >= 365
+                      ? `${(dashboard.staleness.daysSinceLatest / 365).toFixed(1)} years old`
+                      : `${Math.round(dashboard.staleness.daysSinceLatest / 30)} months old`}
+                  </p>
+                  <p className="text-xs text-amber-800 mt-1">
+                    For accurate formula recommendations we suggest fresh bloodwork (within the last 24 months). Trends shown below are based on historical data and your AI practitioner will recommend confirming with current labs before significant adjustments.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* ── Summary Stat Cards ── */}
             {summary && summary.totalMarkers > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1754,9 +1830,16 @@ export default function LabReportsPage() {
                   <option value="all">All Reports</option>
                   {dashboard.reports
                     .filter(r => r.status === 'completed' && r.markerCount > 0)
+                    .slice()
+                    .sort((a, b) => {
+                      // Newest test date first; fall back to uploadedAt for ties
+                      const ad = new Date(a.testDate || a.uploadedAt).getTime();
+                      const bd = new Date(b.testDate || b.uploadedAt).getTime();
+                      return bd - ad;
+                    })
                     .map(r => (
                       <option key={r.id} value={r.id}>
-                        {r.fileName}{r.testDate ? ` (${fmtDate(r.testDate)})` : ''} — {r.markerCount} markers
+                        {r.fileName}{r.testDate ? ` (${fmtDate(r.testDate)})` : ''} — {r.markerCount} markers{r.isStale ? ' • historical' : ''}
                       </option>
                     ))}
                 </select>
@@ -1829,6 +1912,18 @@ export default function LabReportsPage() {
                   const trendCfg = TREND_CONFIG[marker.trend];
                   const TrendIcon = trendCfg.icon;
                   const isExpanded = expandedMarker === marker.key;
+                  // When the only previous value is years out of date, mute
+                  // the trend so users don't read a "+18% improvement" arrow
+                  // as a recent change. The data is still shown — just framed
+                  // as a historical baseline rather than an actionable trend.
+                  const isStaleCompare = !!marker.comparisonAcrossStaleGap;
+                  const trendIconColor = isStaleCompare ? 'text-slate-400' : trendCfg.color;
+                  const formatGap = (days: number | null | undefined) => {
+                    if (!days || days < 30) return '';
+                    if (days < 365) return `${Math.round(days / 30)}mo`;
+                    const years = days / 365;
+                    return years >= 2 ? `${Math.round(years)}y` : `${years.toFixed(1)}y`;
+                  };
 
                   return (
                     <div key={marker.key}>
@@ -1855,6 +1950,11 @@ export default function LabReportsPage() {
                             {marker.latest.unit && (
                               <span className="text-xs text-[#5a6623]">{marker.latest.unit}</span>
                             )}
+                            {marker.latest.isStale && (
+                              <span title={`Latest test is ${formatGap(marker.latest.daysOld)} old`} className="text-[10px] uppercase font-semibold tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                historical
+                              </span>
+                            )}
                           </div>
 
                           {/* Reference range */}
@@ -1869,11 +1969,11 @@ export default function LabReportsPage() {
                           </div>
 
                           {/* Trend */}
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5" title={isStaleCompare ? `Comparing to a value ~${formatGap(marker.gapDaysFromPrevious)} old — historical reference only` : undefined}>
                             {marker.history.length >= 2 && (
-                              <SparkLine values={marker.history.map(h => h.value)} status={marker.latest.status} />
+                              <SparkLine values={marker.history.map(h => h.value)} status={marker.latest.status} dates={marker.history.map(h => h.date)} />
                             )}
-                            <TrendIcon className={`h-3.5 w-3.5 flex-shrink-0 ${trendCfg.color}`} />
+                            <TrendIcon className={`h-3.5 w-3.5 flex-shrink-0 ${trendIconColor}`} />
                           </div>
                         </div>
 
@@ -1899,8 +1999,13 @@ export default function LabReportsPage() {
                             <span className={`text-sm font-semibold ${marker.latest.status !== 'normal' ? statusCfg.color : 'text-[#054700]'}`}>
                               {marker.latest.rawValue} {marker.latest.unit}
                             </span>
+                            {marker.latest.isStale && (
+                              <span className="text-[10px] uppercase font-semibold tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                historical
+                              </span>
+                            )}
                             <span className="text-xs text-[#5a6623]">{marker.latest.referenceRange || ''}</span>
-                            <TrendIcon className={`h-3.5 w-3.5 ml-auto ${trendCfg.color}`} />
+                            <TrendIcon className={`h-3.5 w-3.5 ml-auto ${trendIconColor}`} />
                           </div>
                         </div>
                       </button>
@@ -1913,17 +2018,25 @@ export default function LabReportsPage() {
                             <div className="flex items-center gap-4 flex-wrap">
                               <div className="text-xs text-[#5a6623]">
                                 Previous: <span className="font-medium text-[#054700]">{marker.previous.rawValue}</span>
-                                <span className="ml-1">({fmtDate(marker.previous.date)})</span>
+                                <span className="ml-1">({fmtDate(marker.previous.date)}{marker.previous.isStale ? ` • ${formatGap(marker.previous.daysOld)} old` : ''})</span>
                               </div>
-                              {marker.delta != null && (
-                                <span className={`text-xs font-semibold ${trendCfg.color}`}>
-                                  {marker.delta > 0 ? '+' : ''}{marker.delta.toFixed(1)}% change
+                              {isStaleCompare ? (
+                                <span className="text-xs font-medium text-slate-500 italic">
+                                  Historical reference only ({formatGap(marker.gapDaysFromPrevious)} gap) — no recent comparison
                                 </span>
+                              ) : (
+                                <>
+                                  {marker.delta != null && (
+                                    <span className={`text-xs font-semibold ${trendCfg.color}`}>
+                                      {marker.delta > 0 ? '+' : ''}{marker.delta.toFixed(1)}% change
+                                    </span>
+                                  )}
+                                  <span className={`text-xs font-medium ${trendCfg.color} flex items-center gap-1`}>
+                                    <TrendIcon className="h-3 w-3" />
+                                    {trendCfg.label}
+                                  </span>
+                                </>
                               )}
-                              <span className={`text-xs font-medium ${trendCfg.color} flex items-center gap-1`}>
-                                <TrendIcon className="h-3 w-3" />
-                                {trendCfg.label}
-                              </span>
                             </div>
                           )}
 

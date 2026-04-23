@@ -8,6 +8,38 @@ import { usersRepository } from '../users/users.repository';
 import { wearablesRepository } from '../wearables/wearables.repository';
 import { wearablesService } from '../wearables/wearables.service';
 
+// ── Constants ──────────────────────────────────────────────────────────
+
+/**
+ * Clinical-relevance window for lab data, in days.
+ *
+ * Most functional medicine and standard labs lose decision-grade relevance
+ * after roughly 24 months for nutrient status, hormones, and inflammation
+ * markers. Beyond this window we still keep the data visible (it's useful
+ * baseline context) but we DO NOT compare new values against it as if it
+ * were a recent comparison, and we instruct the AI to recommend fresh labs
+ * before making material formula adjustments.
+ */
+export const STALE_LAB_THRESHOLD_DAYS = 730; // ~24 months
+
+/**
+ * Gap between two samples (in days) that's wide enough to suppress the
+ * trend arrow / delta as misleading. If a marker has values from 2012 and
+ * 2026, treating that as a delta is technically true but clinically useless.
+ */
+export const STALE_GAP_THRESHOLD_DAYS = 730;
+
+function daysBetween(laterIso: string, earlierIso: string): number {
+    const a = new Date(laterIso).getTime();
+    const b = new Date(earlierIso).getTime();
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
+    return Math.max(0, Math.round((a - b) / (24 * 60 * 60 * 1000)));
+}
+
+function daysSinceNow(iso: string): number {
+    return daysBetween(new Date().toISOString(), iso);
+}
+
 // ── Types ──────────────────────────────────────────────────────────────
 
 export interface NormalizedMarker {
@@ -28,6 +60,8 @@ export interface MarkerHistory {
     unit: string;
     status: 'normal' | 'high' | 'low' | 'critical';
     reportId: string;
+    daysOld: number;     // days since this test was performed
+    isStale: boolean;    // true if test is older than the clinical-relevance window
 }
 
 export interface AggregatedBiomarker {
@@ -42,16 +76,32 @@ export interface AggregatedBiomarker {
         status: 'normal' | 'high' | 'low' | 'critical';
         date: string;
         reportId: string;
+        daysOld: number;
+        isStale: boolean;
     };
     previous: {
         value: number | null;
         rawValue: string;
         status: 'normal' | 'high' | 'low' | 'critical';
         date: string;
+        daysOld: number;
+        isStale: boolean;
     } | null;
     delta: number | null;               // percent change: ((latest - prev) / prev) * 100
     deltaAbsolute: number | null;       // absolute difference
     trend: 'improving' | 'worsening' | 'stable' | 'new';
+    /**
+     * Days between the latest sample and the previous sample.
+     * Used by the UI to render a visual break in the sparkline when there's
+     * a long gap (typically >24 months) between data points.
+     */
+    gapDaysFromPrevious: number | null;
+    /**
+     * True when delta/trend was computed across a stale boundary (i.e. the
+     * previous sample is too old to be a meaningful comparison). Frontend
+     * should mute the trend indicator and label it as 'historical reference'.
+     */
+    comparisonAcrossStaleGap: boolean;
     clinicalDirection: ClinicalDirection;
     history: MarkerHistory[];
     insight?: MarkerInsight | null;     // pre-generated AI insight (stored in DB at upload time)
@@ -165,6 +215,8 @@ export interface BiomarkersDashboard {
         labName: string | null;
         markerCount: number;
         status: string;
+        daysOld: number;
+        isStale: boolean;
     }>;
     comparison: {
         hasMultipleReports: boolean;
@@ -178,6 +230,21 @@ export interface BiomarkersDashboard {
             trend: 'improving' | 'worsening' | 'stable';
             percentChange: number | null;
         }>;
+    };
+    /**
+     * Whether the user's most recent lab data is fresh enough to drive
+     * formula adjustments. Surfaces the data-recency banner on the dashboard
+     * and gates the AI guardrail in chat.
+     */
+    staleness: {
+        latestReportDate: string | null;
+        daysSinceLatest: number | null;
+        latestIsStale: boolean;
+        oldestReportDate: string | null;
+        hasOnlyStaleData: boolean;        // every report > threshold
+        hasMixedAgeData: boolean;         // user has both fresh and stale reports
+        recommendNewLabs: boolean;        // top-level flag for AI/UI to act on
+        thresholdDays: number;
     };
     biologicalAge: BiologicalAge | null;
 }
@@ -1579,6 +1646,7 @@ export class LabsService {
                 const displayName = canonicalName(rawName);
 
                 const numVal = parseNumeric(m.value);
+                const histDaysOld = daysSinceNow(reportDate);
 
                 const entry: MarkerHistory = {
                     date: reportDate,
@@ -1587,6 +1655,8 @@ export class LabsService {
                     unit: m.unit || '',
                     status: this.normalizeStatus(m.status),
                     reportId: report.id,
+                    daysOld: histDaysOld,
+                    isStale: histDaysOld > STALE_LAB_THRESHOLD_DAYS,
                 };
 
                 if (!markerHistoryMap.has(key)) {
@@ -1640,14 +1710,26 @@ export class LabsService {
             let delta: number | null = null;
             let deltaAbsolute: number | null = null;
             let trend: 'improving' | 'worsening' | 'stable' | 'new' = 'new';
+            let gapDaysFromPrevious: number | null = null;
+            let comparisonAcrossStaleGap = false;
 
-            if (prevH && latestH.value != null && prevH.value != null && prevH.value !== 0) {
-                delta = ((latestH.value - prevH.value) / Math.abs(prevH.value)) * 100;
-                delta = Math.round(delta * 10) / 10;
-                deltaAbsolute = Math.round((latestH.value - prevH.value) * 100) / 100;
-                trend = computeTrend(delta, latestH.status, prevH.status, clinDir);
-            } else if (prevH) {
-                trend = computeTrend(null, latestH.status, prevH.status, clinDir);
+            if (prevH) {
+                gapDaysFromPrevious = daysBetween(latestH.date, prevH.date);
+                // If the previous reading is too old to compare meaningfully
+                // (e.g. 2012 ferritin vs 2026 ferritin), suppress the trend
+                // arrow. We still expose the previous value so the UI can
+                // render it as a 'historical baseline' rather than a delta.
+                if (gapDaysFromPrevious > STALE_GAP_THRESHOLD_DAYS && !latestH.isStale) {
+                    comparisonAcrossStaleGap = true;
+                    trend = 'new';
+                } else if (latestH.value != null && prevH.value != null && prevH.value !== 0) {
+                    delta = ((latestH.value - prevH.value) / Math.abs(prevH.value)) * 100;
+                    delta = Math.round(delta * 10) / 10;
+                    deltaAbsolute = Math.round((latestH.value - prevH.value) * 100) / 100;
+                    trend = computeTrend(delta, latestH.status, prevH.status, clinDir);
+                } else {
+                    trend = computeTrend(null, latestH.status, prevH.status, clinDir);
+                }
             }
 
             // Tally
@@ -1676,16 +1758,22 @@ export class LabsService {
                     status: latestH.status,
                     date: latestH.date,
                     reportId: latestH.reportId,
+                    daysOld: latestH.daysOld,
+                    isStale: latestH.isStale,
                 },
                 previous: prevH ? {
                     value: prevH.value,
                     rawValue: prevH.rawValue,
                     status: prevH.status,
                     date: prevH.date,
+                    daysOld: prevH.daysOld,
+                    isStale: prevH.isStale,
                 } : null,
                 delta,
                 deltaAbsolute,
                 trend,
+                gapDaysFromPrevious,
+                comparisonAcrossStaleGap,
                 clinicalDirection: clinDir,
                 history: histories,
                 insight: reportInsightsMap.get(latestH.reportId)?.[key] || null,
@@ -1753,6 +1841,8 @@ export class LabsService {
                     const key = canonicalKey(name);
                     if (key) uniqueKeys.add(key);
                 }
+                const reportDate = this.getReportDate(r);
+                const reportDaysOld = daysSinceNow(reportDate);
                 return {
                     id: r.id,
                     fileName: r.originalFileName,
@@ -1762,6 +1852,8 @@ export class LabsService {
                     labName: ld?.labName || null,
                     markerCount: uniqueKeys.size,
                     status: ld?.analysisStatus || 'unknown',
+                    daysOld: reportDaysOld,
+                    isStale: reportDaysOld > STALE_LAB_THRESHOLD_DAYS,
                 };
             }),
             comparison: {
@@ -1770,6 +1862,25 @@ export class LabsService {
                 previousReportDate: prevReport ? this.getReportDate(prevReport) : null,
                 changes,
             },
+            staleness: (() => {
+                const latestReportDate = this.getReportDate(latestReport);
+                const oldestReportDate = this.getReportDate(completedReports[0]);
+                const daysSinceLatest = daysSinceNow(latestReportDate);
+                const latestIsStale = daysSinceLatest > STALE_LAB_THRESHOLD_DAYS;
+                const allStale = completedReports.every(r => daysSinceNow(this.getReportDate(r)) > STALE_LAB_THRESHOLD_DAYS);
+                const anyFresh = completedReports.some(r => daysSinceNow(this.getReportDate(r)) <= STALE_LAB_THRESHOLD_DAYS);
+                const anyStale = completedReports.some(r => daysSinceNow(this.getReportDate(r)) > STALE_LAB_THRESHOLD_DAYS);
+                return {
+                    latestReportDate,
+                    daysSinceLatest,
+                    latestIsStale,
+                    oldestReportDate,
+                    hasOnlyStaleData: allStale,
+                    hasMixedAgeData: anyFresh && anyStale,
+                    recommendNewLabs: latestIsStale,
+                    thresholdDays: STALE_LAB_THRESHOLD_DAYS,
+                };
+            })(),
             biologicalAge,
         };
 
@@ -1823,6 +1934,8 @@ export class LabsService {
             summary: { totalMarkers: 0, normal: 0, high: 0, low: 0, critical: 0, improving: 0, worsening: 0, stable: 0, newMarkers: 0 },
             reports: allReports.map(r => {
                 const ld = r.labReportData as any;
+                const reportDate = this.getReportDate(r);
+                const reportDaysOld = daysSinceNow(reportDate);
                 return {
                     id: r.id,
                     fileName: r.originalFileName,
@@ -1832,9 +1945,21 @@ export class LabsService {
                     labName: ld?.labName || null,
                     markerCount: 0,
                     status: ld?.analysisStatus || 'unknown',
+                    daysOld: reportDaysOld,
+                    isStale: reportDaysOld > STALE_LAB_THRESHOLD_DAYS,
                 };
             }),
             comparison: { hasMultipleReports: false, latestReportDate: null, previousReportDate: null, changes: [] },
+            staleness: {
+                latestReportDate: null,
+                daysSinceLatest: null,
+                latestIsStale: false,
+                oldestReportDate: null,
+                hasOnlyStaleData: false,
+                hasMixedAgeData: false,
+                recommendNewLabs: false,
+                thresholdDays: STALE_LAB_THRESHOLD_DAYS,
+            },
             biologicalAge: null,
         };
     }

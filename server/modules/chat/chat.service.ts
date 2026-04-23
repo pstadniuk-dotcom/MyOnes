@@ -518,18 +518,42 @@ export class ChatService {
 
             const labTrendSummary = buildLabTrendSummary(sortedReports);
 
+            // Stale-data guardrail: if the user's most recent lab is more than
+            // 24 months old, prepend a strong instruction telling the AI not to
+            // make material formula adjustments based on historical data alone.
+            // This prevents the AI from confidently dosing off labs that may
+            // no longer reflect the user's current physiology.
+            const STALE_LAB_THRESHOLD_DAYS = 730;
+            const MS_PER_DAY = 24 * 60 * 60 * 1000;
+            const newestReportDate = sortedReports.length > 0 ? resolveReportChronoDate(sortedReports[0]) : null;
+            const daysSinceNewest = newestReportDate
+                ? Math.floor((Date.now() - newestReportDate.getTime()) / MS_PER_DAY)
+                : null;
+            const labsAreStale = daysSinceNewest !== null && daysSinceNewest > STALE_LAB_THRESHOLD_DAYS;
+            const stalenessWarning = labsAreStale
+                ? `⚠️ DATA RECENCY WARNING ⚠️\nThe user's most recent lab report is ${Math.round((daysSinceNewest as number) / 30)} months old (>${Math.round(STALE_LAB_THRESHOLD_DAYS / 30)} months). Treat all biomarker values below as HISTORICAL REFERENCE ONLY.\n- Do NOT make material formula adjustments based on these labs alone.\n- Strongly recommend the user upload fresh lab work before adjusting dosages.\n- If the user asks about a specific marker, acknowledge the data age and suggest re-testing.\n`
+                : '';
+
             const processedReports = sortedReports.map((report, index) => {
                 const data = report.labReportData!;
                 const values = data.extractedData as any[];
                 const uploadDateStr = new Date(report.uploadedAt || '').toLocaleDateString();
-                const timelineLabel = index === 0 ? '🆕 LATEST REPORT (most recent test date)' : `📅 Previous Report`;
+                const reportDate = resolveReportChronoDate(report);
+                const reportAgeDays = Math.floor((Date.now() - reportDate.getTime()) / MS_PER_DAY);
+                const isReportStale = reportAgeDays > STALE_LAB_THRESHOLD_DAYS;
+                const ageSuffix = isReportStale
+                    ? ` ⚠️ HISTORICAL — ${Math.round(reportAgeDays / 30)} months old`
+                    : '';
+                const timelineLabel = index === 0
+                    ? `🆕 LATEST REPORT (most recent test date)${ageSuffix}`
+                    : `📅 Previous Report${ageSuffix}`;
 
                 const tableRows = values.map((v: any) => `  • ${v.testName}: ${v.value} ${v.unit || ''} | Status: ${v.status || 'Normal'}`).join('\n');
                 return `${timelineLabel}\n📋 Test Date: ${data.testDate || 'unknown'}\n📤 Uploaded: ${uploadDateStr}\nBiomarkers:\n${tableRows}`;
             });
 
             if (processedReports.length > 0) {
-                labDataContext = [labTrendSummary, `=== 📊 LAB REPORTS ===\n\n${processedReports.join('\n\n')}`]
+                labDataContext = [stalenessWarning, labTrendSummary, `=== 📊 LAB REPORTS ===\n\n${processedReports.join('\n\n')}`]
                     .filter(Boolean)
                     .join('\n\n');
             }
