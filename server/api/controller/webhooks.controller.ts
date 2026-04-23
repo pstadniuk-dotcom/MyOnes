@@ -65,36 +65,46 @@ export class WebhooksController {
      */
     async handleJunctionWebhook(req: Request, res: Response) {
         try {
-            const isProduction = process.env.NODE_ENV === 'production';
-            const signature = req.headers['x-vital-webhook-signature'] as string;
-            const rawBody = JSON.stringify(req.body);
             const webhookSecret = process.env.JUNCTION_WEBHOOK_SECRET;
+            const signature = req.headers['x-vital-webhook-signature'] as string | undefined;
 
-            if (isProduction && !webhookSecret) {
-                logger.error('JUNCTION_WEBHOOK_SECRET is missing in production; rejecting Junction webhook');
+            // Fail-closed: require the secret in ALL environments.
+            // Allowing unsigned requests on staging/dev would make it an open
+            // PHI injection endpoint (wearable biometric data written to DB).
+            if (!webhookSecret) {
+                logger.error('JUNCTION_WEBHOOK_SECRET is not configured; rejecting Junction webhook');
                 return res.status(503).json({ error: 'Webhook configuration unavailable' });
             }
 
-            if (isProduction && !signature) {
-                logger.warn('Missing Junction webhook signature in production request');
+            if (!signature) {
+                logger.warn('Missing Junction webhook signature');
                 return res.status(401).json({ error: 'Missing signature' });
             }
 
-            if (webhookSecret && !webhooksService.verifyJunctionSignature(rawBody, signature, webhookSecret)) {
-                logger.warn('Invalid webhook signature');
-                return res.status(401).json({ error: 'Invalid signature' });
-            } else if (!webhookSecret && !isProduction) {
-                logger.warn('Junction webhook signature verification bypassed in non-production environment');
+            // Use req.rawBody (the original wire bytes) — NOT JSON.stringify(req.body).
+            // Re-serializing a parsed object can produce a different byte sequence
+            // (key order, whitespace, Unicode escapes) and will break HMAC verification.
+            const rawBody = (req as any).rawBody as string | undefined;
+            if (!rawBody) {
+                logger.error('Junction webhook: rawBody not available — ensure express is configured to capture raw body');
+                return res.status(500).json({ error: 'Server configuration error' });
             }
 
+            if (!webhooksService.verifyJunctionSignature(rawBody, signature, webhookSecret)) {
+                logger.warn('Invalid Junction webhook signature');
+                return res.status(401).json({ error: 'Invalid signature' });
+            }
+
+            // Process synchronously before responding so Junction retries on failure
             await webhooksService.handleJunctionEvent(req.body);
 
-            // Always return 200 to acknowledge receipt
-            res.status(200).json({ received: true });
+            return res.status(200).json({ received: true });
         } catch (error) {
             logger.error('Error processing Junction webhook:', error);
-            // Still return 200 to prevent retries for processing errors
-            res.status(200).json({ received: true, error: 'Processing error' });
+            // Return 500 so Junction knows the event was not processed and retries
+            if (!res.headersSent) {
+                return res.status(500).json({ error: 'Processing error' });
+            }
         }
     }
 }

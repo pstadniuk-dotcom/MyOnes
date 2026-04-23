@@ -110,12 +110,35 @@ export interface EpdWebhookEvent {
 // ── Event Handler ──────────────────────────────────────────────────────
 
 class EpdWebhooksService {
+  // ── Idempotency: (source, event_id) dedupe ────────────────────────
+  // Prevents duplicate processing when EPD retries an event.
+  // TTL of 24h covers EPD's maximum retry window.
+  private readonly _seenEventIds = new Map<string, number>(); // event_id -> processsedAt ms
+  private readonly _EVENT_TTL_MS = 24 * 60 * 60 * 1000;
+
+  private _isDuplicate(eventId: string): boolean {
+    const now = Date.now();
+    // Lazy-purge stale entries
+    for (const [id, ts] of this._seenEventIds) {
+      if (now - ts > this._EVENT_TTL_MS) this._seenEventIds.delete(id);
+    }
+    if (this._seenEventIds.has(eventId)) return true;
+    this._seenEventIds.set(eventId, now);
+    return false;
+  }
+
   /**
    * Route an incoming webhook event to the appropriate handler.
    */
   async handleEvent(event: EpdWebhookEvent): Promise<void> {
     const { event_type, event_id, event_body } = event;
     const isTest = event_body.features?.is_test_mode ?? false;
+
+    // Idempotency guard — skip replayed events
+    if (this._isDuplicate(event_id)) {
+      logger.warn('EPD webhook: duplicate event_id ignored', { event_id, event_type });
+      return;
+    }
 
     logger.info('EPD webhook received', {
       event_id,
