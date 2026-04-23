@@ -134,12 +134,7 @@ export class WebhooksService {
     /**
      * Verify Junction webhook signature
      */
-    verifyJunctionSignature(payload: string, signature: string, secret: string | undefined): boolean {
-        if (!secret) {
-            logger.warn('JUNCTION_WEBHOOK_SECRET not configured, skipping signature verification');
-            return true;
-        }
-
+    verifyJunctionSignature(payload: string, signature: string, secret: string): boolean {
         const expectedSignature = crypto
             .createHmac('sha256', secret)
             .update(payload)
