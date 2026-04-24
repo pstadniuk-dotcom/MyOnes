@@ -24,6 +24,8 @@ import { startOrderSettlementScheduler } from "./utils/orderSettlementScheduler"
 // Old wearable schedulers removed - Junction handles data sync via webhooks
 import { logger } from "./infra/logging/logger";
 import { testEncryption } from "./infra/security/fieldEncryption";
+import cron from "node-cron";
+import { pool } from "./infra/db/db";
 
 // Verify encryption key works before accepting traffic
 if (!testEncryption()) {
@@ -226,7 +228,7 @@ app.use(fileUpload({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   abortOnLimit: true,
   createParentPath: true,
-  useTempFiles: false,
+  useTempFiles: true,
   tempFileDir: '/tmp/'
 }));
 
@@ -372,10 +374,26 @@ app.get('/api/health', (_req, res) => {
     });
 
     // Graceful shutdown handler
-    const gracefulShutdown = (signal: string) => {
+    const gracefulShutdown = async (signal: string) => {
       logger.info(`Received ${signal}, shutting down gracefully...`);
-      server.close(() => {
+      
+      // Stop all background cron tasks so they don't fire during shutdown
+      const tasks = cron.getTasks();
+      for (const [key, task] of tasks.entries()) {
+        task.stop();
+      }
+      logger.info(`Stopped ${tasks.size} node-cron tasks`);
+
+      server.close(async () => {
         logger.info('HTTP server closed');
+        
+        try {
+          await pool.end();
+          logger.info('Database pool closed');
+        } catch (err) {
+          logger.error('Error closing database pool', { error: err });
+        }
+
         process.exit(0);
       });
       // Force exit after 10 seconds if connections aren't draining
