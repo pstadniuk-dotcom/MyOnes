@@ -74,7 +74,7 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "..", "dist", "public");
+  const distPath = path.resolve(process.cwd(), "dist", "public");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
@@ -85,8 +85,8 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath, {
     index: false,
     setHeaders: (res, filePath) => {
-      // Hashed asset files in /assets/ are immutable; cache aggressively
-      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      // Hashed asset files are immutable; cache aggressively
+      if (filePath.includes(path.join('dist', 'public', 'assets')) || filePath.includes(`${path.sep}assets${path.sep}`)) {
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       }
     },
@@ -118,10 +118,14 @@ export function serveStatic(app: Express) {
     try {
       const indexPath = path.resolve(distPath, "index.html");
       let template = await fs.promises.readFile(indexPath, "utf-8");
+      
       const nonce = (res as any).locals.cspNonce;
       if (nonce) {
+        // Hardening: Inject nonces into all script and style tags to ensure compatibility with strict CSP
         template = template.replace(/<script(?![^>]*nonce=)/g, `<script nonce="${nonce}"`);
+        template = template.replace(/<link rel="stylesheet"(?![^>]*nonce=)/g, `<link rel="stylesheet" nonce="${nonce}"`);
       }
+      
       res.status(200).set({ "Content-Type": "text/html" }).send(template);
     } catch (e) {
       logger.error('Failed to serve index.html', { error: e });

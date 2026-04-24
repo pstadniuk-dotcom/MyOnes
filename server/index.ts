@@ -79,8 +79,8 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", (req, res) => `'nonce-${(res as Response).locals.cspNonce}'`, ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net","https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com", "https://www.googletagmanager.com", "https://*.googletagmanager.com", "https://www.google-analytics.com", "https://*.google-analytics.com"],
       scriptSrcElem: ["'self'", (req, res) => `'nonce-${(res as Response).locals.cspNonce}'`, ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net", "https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com", "https://www.googletagmanager.com", "https://*.googletagmanager.com", "https://www.google-analytics.com", "https://*.google-analytics.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
-      styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", (req: any, res: any) => `'nonce-${res.locals.cspNonce}'`, "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
+      styleSrcElem: ["'self'", "'unsafe-inline'", (req: any, res: any) => `'nonce-${res.locals.cspNonce}'`, "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:", "https://platform-lookaside.fbsbx.com", "https://maps.googleapis.com"],
       objectSrc: [
@@ -125,7 +125,7 @@ const allowedOriginsList = [
 ];
 
 function isAllowedOrigin(origin: string | undefined): boolean {
-  if (!origin) return false;
+  if (!origin) return true; // Allow same-origin requests that don't send Origin header (e.g. from <link>)
   if (allowedOriginsList.includes(origin)) return true;
   // Allow Render preview/PR deployments for this service
   if (origin.match(/^https:\/\/myones(-[a-z0-9-]+)?\.onrender\.com$/)) return true;
@@ -281,9 +281,8 @@ app.get('/api/health', (_req, res) => {
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } else {
-      // Only serve static files if the build directory exists
-      // (skipped when frontend is deployed separately on Vercel)
-      const distPublicPath = path.resolve(import.meta.dirname ?? __dirname, "..", "dist", "public");
+      // Robust dist path detection (works in local dev and bundled production)
+      const distPublicPath = path.resolve(process.cwd(), "dist", "public");
       if (fs.existsSync(distPublicPath)) {
         serveStatic(app);
       } else {
