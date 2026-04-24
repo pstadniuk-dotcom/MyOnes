@@ -8,6 +8,7 @@ import { filesRepository } from '../files/files.repository';
 import { usersRepository } from '../users/users.repository';
 import { wearablesService } from '../wearables/wearables.service';
 import { DEFAULT_CLINICAL_DIRECTION, LAB_TREND_RULES, type ClinicalDirection } from './lab-trend-rules';
+import { canonicalKey } from '../labs/biomarker-aliases';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -168,7 +169,7 @@ function resolveReportChronoDate(report: any): Date {
     return report?.uploadedAt ? new Date(report.uploadedAt) : new Date(0);
 }
 
-function buildLabTrendSummary(sortedReports: any[]): string {
+function buildLabTrendSummary(sortedReports: any[], hiddenMarkerSet?: Set<string>): string {
     if (sortedReports.length < 2) {
         return '';
     }
@@ -184,6 +185,11 @@ function buildLabTrendSummary(sortedReports: any[]): string {
 
         markers.forEach((marker) => {
             if (!marker.testName) {
+                return;
+            }
+
+            // Skip markers the user has hidden from the AI.
+            if (hiddenMarkerSet && hiddenMarkerSet.size > 0 && hiddenMarkerSet.has(canonicalKey(marker.testName))) {
                 return;
             }
 
@@ -510,16 +516,23 @@ export class ChatService {
 
         logger.debug('[Chat:getContext] Fetching context', { userId, startDate, endDate, lookbackDays, formulaAgeDays });
 
-        const [healthProfile, labReports, biometricResult] = await Promise.all([
+        const [healthProfile, labReports, biometricResult, currentUser] = await Promise.all([
             usersRepository.getHealthProfile(userId).catch(() => null),
             filesRepository.getLabReportsByUser(userId),
             wearablesService.getBiometricData(userId, startDate, endDate).catch((err) => {
                 logger.error('[Chat] Failed to fetch biometric data', { userId, error: err?.message || err });
                 return { data: [] };
-            })
+            }),
+            usersRepository.getUser(userId).catch(() => undefined),
         ]);
 
-        logger.debug('[Chat:getContext] Biometric result', {
+        // Biomarker keys the user has chosen to hide from the AI. Values are already
+        // stored as canonicalKey(), but we normalize again defensively.
+        const hiddenMarkerSet = new Set<string>(
+            (Array.isArray(currentUser?.hiddenMarkers) ? (currentUser!.hiddenMarkers as string[]) : [])
+                .map(k => canonicalKey(k))
+                .filter(Boolean)
+        );        logger.debug('[Chat:getContext] Biometric result', {
             dataLength: biometricResult?.data?.length ?? 0,
             hasData: (biometricResult?.data?.length ?? 0) > 0,
         });
@@ -543,7 +556,7 @@ export class ChatService {
                 // were uploaded last.
                 .sort((a, b) => resolveReportChronoDate(b).getTime() - resolveReportChronoDate(a).getTime());
 
-            const labTrendSummary = buildLabTrendSummary(sortedReports);
+            const labTrendSummary = buildLabTrendSummary(sortedReports, hiddenMarkerSet);
 
             // Stale-data guardrail: if the user's most recent lab is more than
             // 24 months old, prepend a strong instruction telling the AI not to
@@ -563,7 +576,11 @@ export class ChatService {
 
             const processedReports = sortedReports.map((report, index) => {
                 const data = report.labReportData!;
-                const values = data.extractedData as any[];
+                const allValues = data.extractedData as any[];
+                // Filter out markers the user has hidden from the AI.
+                const values = hiddenMarkerSet.size > 0
+                    ? allValues.filter((v: any) => !hiddenMarkerSet.has(canonicalKey(v.testName || '')))
+                    : allValues;
                 const uploadDateStr = new Date(report.uploadedAt || '').toLocaleDateString();
                 const reportDate = resolveReportChronoDate(report);
                 const reportAgeDays = Math.floor((Date.now() - reportDate.getTime()) / MS_PER_DAY);

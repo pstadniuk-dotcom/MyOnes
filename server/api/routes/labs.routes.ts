@@ -18,4 +18,12 @@ router.get('/biomarkers', requireAuth, labsController.getBiomarkersDashboard);
  */
 router.post('/marker-insights', requireAuth, labsController.getMarkerInsights);
 
+/**
+ * Hidden-marker management — markers the user has chosen to exclude from
+ * the AI practitioner. The marker is still visible on the dashboard.
+ */
+router.get('/hidden-markers', requireAuth, labsController.getHiddenMarkers);
+router.post('/hidden-markers/hide', requireAuth, labsController.hideMarker);
+router.post('/hidden-markers/unhide', requireAuth, labsController.unhideMarker);
+
 export default router;

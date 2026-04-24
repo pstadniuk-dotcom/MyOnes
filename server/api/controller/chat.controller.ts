@@ -12,6 +12,7 @@ import { getClientIP, checkRateLimit } from '../middleware/middleware';
 import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
 import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builder';
 import { analyzeQueryIntent } from '../../utils/query-intent-analyzer';
+import { canonicalKey } from '../../modules/labs/biomarker-aliases';
 import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget, autoExpandFormula } from '../../modules/formulas/formula-service';
 import { validateFormulaSafety, safetyWarningsToStrings } from '../../modules/formulas/safety-validator';
 import { filterAIOutputClaims } from '../../modules/ai/claims-filter';
@@ -239,6 +240,18 @@ export class ChatController {
                 const fileSummaries: string[] = [];
                 let analysisStillRunning = false;
 
+                // Fetch the user's hidden-marker list so we strip them out of
+                // freshly-attached lab data before it reaches the AI.
+                const hiddenForAttached = await (async () => {
+                    try {
+                        const u = await usersRepository.getUser(userId);
+                        const raw: string[] = Array.isArray(u?.hiddenMarkers) ? (u!.hiddenMarkers as string[]) : [];
+                        return new Set<string>(raw.map(k => canonicalKey(k)).filter(Boolean));
+                    } catch {
+                        return new Set<string>();
+                    }
+                })();
+
                 for (const fid of attachedFileIds) {
                     const file = await filesRepository.getFileUpload(fid);
                     if (!file) continue;
@@ -247,10 +260,14 @@ export class ChatController {
                     const isImage = mime.startsWith('image/');
                     const status = String((file.labReportData as any)?.analysisStatus || 'unknown');
                     const extracted = (file.labReportData as any)?.extractedData;
-                    const markerCount = Array.isArray(extracted) ? extracted.length : 0;
+                    const allExtracted = Array.isArray(extracted) ? extracted : [];
+                    const visibleExtracted = hiddenForAttached.size > 0
+                        ? allExtracted.filter((v: any) => !hiddenForAttached.has(canonicalKey(v.testName || '')))
+                        : allExtracted;
+                    const markerCount = visibleExtracted.length;
 
                     if (status === 'completed' && markerCount > 0) {
-                        const markers = extracted.map((v: any) =>
+                        const markers = visibleExtracted.map((v: any) =>
                             `  • ${v.testName}: ${v.value} ${v.unit || ''} (${v.status || 'Normal'})`
                         ).join('\n');
                         fileSummaries.push(`📄 ${file.originalFileName}: ${markerCount} biomarkers extracted\n${markers}`);

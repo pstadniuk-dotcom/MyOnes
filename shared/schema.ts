@@ -130,6 +130,13 @@ export const users = pgTable("users", {
   // null = use defaults from shared/metricCatalog.ts
   metricPreferences: json("metric_preferences"),
 
+  // Biomarkers the user has chosen to hide from the AI practitioner.
+  // Stores an array of canonical marker keys (e.g. ["bilirubin direct", "alkaline phosphatase"]).
+  // The marker is still visible to the user on the Lab Reports dashboard, but is filtered
+  // out of the lab data injected into the AI chat prompt and formula generation context.
+  // null/[] = no markers hidden. Treat as string[] at runtime; validate with Array.isArray.
+  hiddenMarkers: json("hidden_markers"),
+
   // Attribution & UTM tracking (captured at signup)
   utmSource: text("utm_source"),
   utmMedium: text("utm_medium"),

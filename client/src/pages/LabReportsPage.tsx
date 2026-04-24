@@ -9,7 +9,7 @@ import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import {
-  FileText, Plus, Trash2, Loader2, Upload, ClipboardPaste, Eye, Edit2,
+  FileText, Plus, Trash2, Loader2, Upload, ClipboardPaste, Eye, EyeOff, Edit2,
   TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2, Activity,
   Heart, Beaker, ChevronDown, ChevronUp, Filter, Search, RefreshCw,
   Sparkles, Shield, ArrowUpRight, ArrowDownRight,
@@ -917,6 +917,43 @@ export default function LabReportsPage() {
     queryFn: () => apiRequest('GET', '/api/labs/biomarkers').then(r => r.json()),
     enabled: isAuthenticated && !!user?.id,
     staleTime: 30 * 1000,
+  });
+
+  // Markers the user has chosen to hide from the AI. Still visible here,
+  // just excluded from the lab data sent into chat + formula context.
+  const { data: hiddenMarkersData } = useQuery<{ hiddenMarkers: string[] }>({
+    queryKey: ['/api/labs/hidden-markers'],
+    queryFn: () => apiRequest('GET', '/api/labs/hidden-markers').then(r => r.json()),
+    enabled: isAuthenticated && !!user?.id,
+    staleTime: 60 * 1000,
+  });
+  const hiddenMarkerKeys = useMemo(
+    () => new Set(hiddenMarkersData?.hiddenMarkers || []),
+    [hiddenMarkersData?.hiddenMarkers]
+  );
+
+  const hideMarkerMutation = useMutation({
+    mutationFn: (markerKey: string) =>
+      apiRequest('POST', '/api/labs/hidden-markers/hide', { markerKey }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/labs/hidden-markers'] });
+      toast({ title: 'Hidden from AI', description: 'This marker will no longer be sent to your AI practitioner.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Could not hide marker. Please try again.', variant: 'destructive' });
+    },
+  });
+
+  const unhideMarkerMutation = useMutation({
+    mutationFn: (markerKey: string) =>
+      apiRequest('POST', '/api/labs/hidden-markers/unhide', { markerKey }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/labs/hidden-markers'] });
+      toast({ title: 'Visible to AI', description: 'Your AI practitioner can see this marker again.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Could not unhide marker. Please try again.', variant: 'destructive' });
+    },
   });
 
   const hasLabDataConsent = consentsError ? false : (consents?.some(
@@ -2015,6 +2052,12 @@ export default function LabReportsPage() {
                               <span className={`h-1.5 w-1.5 rounded-full ${statusCfg.dot}`} />
                               {statusCfg.label}
                             </span>
+                            {hiddenMarkerKeys.has(marker.key) && (
+                              <span className="ml-1 inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200" title="Hidden from AI practitioner">
+                                <EyeOff className="h-2.5 w-2.5" />
+                                AI hidden
+                              </span>
+                            )}
                           </div>
 
                           {/* Trend */}
@@ -2101,6 +2144,54 @@ export default function LabReportsPage() {
                               referenceRange: marker.latest.referenceRange,
                             }}
                           />
+
+                          {/* Hide-from-AI toggle */}
+                          {(() => {
+                            const isHidden = hiddenMarkerKeys.has(marker.key);
+                            const isPending = hideMarkerMutation.isPending || unhideMarkerMutation.isPending;
+                            return (
+                              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white/40 border border-[#5a6623]/10">
+                                <div className="flex items-start gap-2 min-w-0">
+                                  {isHidden ? (
+                                    <EyeOff className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                                  ) : (
+                                    <Eye className="h-4 w-4 text-[#5a6623] flex-shrink-0 mt-0.5" />
+                                  )}
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-medium text-[#054700]">
+                                      {isHidden ? 'Hidden from AI practitioner' : 'Visible to AI practitioner'}
+                                    </p>
+                                    <p className="text-[11px] text-[#5a6623] mt-0.5">
+                                      {isHidden
+                                        ? 'This marker will not be sent to the AI in chat or formula recommendations. It remains visible to you here.'
+                                        : 'Hide this marker if you do not want the AI to consider it when making recommendations.'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant={isHidden ? 'default' : 'outline'}
+                                  disabled={isPending}
+                                  onClick={() => {
+                                    if (isHidden) {
+                                      unhideMarkerMutation.mutate(marker.key);
+                                    } else {
+                                      hideMarkerMutation.mutate(marker.key);
+                                    }
+                                  }}
+                                  className="flex-shrink-0"
+                                >
+                                  {isPending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : isHidden ? (
+                                    'Unhide'
+                                  ) : (
+                                    'Hide'
+                                  )}
+                                </Button>
+                              </div>
+                            );
+                          })()}
 
                           {/* Sparkline + history table */}
                           {marker.history.length >= 2 && (
