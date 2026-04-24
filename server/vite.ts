@@ -83,6 +83,7 @@ export function serveStatic(app: Express) {
   }
 
   app.use(express.static(distPath, {
+    index: false,
     setHeaders: (res, filePath) => {
       // Hashed asset files in /assets/ are immutable; cache aggressively
       if (filePath.includes(`${path.sep}assets${path.sep}`)) {
