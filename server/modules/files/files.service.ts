@@ -129,17 +129,18 @@ export class FilesService {
 
         this.validateMagicBytes(uploadedFile, fileBuffer);
 
-        // Determine category
-        let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'other';
-        const labKeywords = ['lab', 'blood', 'test', 'cbc', 'panel', 'result', 'report', 'analysis', 'metabolic', 'lipid', 'thyroid', 'vitamin', 'serum', 'urine', 'specimen'];
-
-        if (labKeywords.some(keyword => fileName.includes(keyword))) {
-            fileType = 'lab_report';
-        } else if (fileName.includes('prescription') || fileName.includes('rx')) {
-            fileType = 'prescription';
-        } else if (allowedMimeTypes.slice(0, 4).includes(uploadedFile.mimetype)) {
-            fileType = 'medical_document';
-        }
+        // Determine category.
+        //
+        // IMPORTANT: The Lab Reports page is currently the ONLY upload entry point in
+        // the app. Filename-keyword classification (e.g. requiring words like "lab",
+        // "blood", "test") silently mis-classifies common naming patterns like dates
+        // ("2026.04.20.pdf") or initials, sending them to `medical_document` where
+        // the lab analysis pipeline never runs and they don't appear on the Lab
+        // Reports page. Default everything to `lab_report` so OCR + biomarker
+        // extraction always runs. Do NOT re-enable filename classification without
+        // also adding a separate upload entry point for non-lab medical docs.
+        // (Regression introduced by commit 14aa960 — fixed by commit pending.)
+        const fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'lab_report';
 
         // Dedup: if the same user uploaded a file with the exact same name + size
         // within the last 10 minutes, return that one instead of running OCR/AI again.
