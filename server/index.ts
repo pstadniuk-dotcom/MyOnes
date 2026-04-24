@@ -22,12 +22,14 @@ import { startRenewalScheduler } from './utils/renewalScheduler';
 import { startIngredientCatalogSyncScheduler } from "./utils/ingredientCatalogSyncScheduler";
 import { startOrderSettlementScheduler } from "./utils/orderSettlementScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
+import { fileURLToPath } from "url";
 import { logger } from "./infra/logging/logger";
 import { testEncryption } from "./infra/security/fieldEncryption";
 import cron from "node-cron";
 import { pool } from "./infra/db/db";
-
 // Verify encryption key works before accepting traffic
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 if (!testEncryption()) {
   logger.error('FATAL: Field encryption self-test failed. Check FIELD_ENCRYPTION_KEY.');
   process.exit(1);
@@ -79,8 +81,8 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", (req, res) => `'nonce-${(res as Response).locals.cspNonce}'`, ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net","https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com", "https://www.googletagmanager.com", "https://*.googletagmanager.com", "https://www.google-analytics.com", "https://*.google-analytics.com"],
       scriptSrcElem: ["'self'", (req, res) => `'nonce-${(res as Response).locals.cspNonce}'`, ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net", "https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com", "https://www.googletagmanager.com", "https://*.googletagmanager.com", "https://www.google-analytics.com", "https://*.google-analytics.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
-      styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", ...(isDevMode ? [] : [(req: any, res: any) => `'nonce-${res.locals.cspNonce}'`]), "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
+      styleSrcElem: ["'self'", "'unsafe-inline'", ...(isDevMode ? [] : [(req: any, res: any) => `'nonce-${res.locals.cspNonce}'`]), "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:", "https://platform-lookaside.fbsbx.com", "https://maps.googleapis.com"],
       objectSrc: [
@@ -125,7 +127,7 @@ const allowedOriginsList = [
 ];
 
 function isAllowedOrigin(origin: string | undefined): boolean {
-  if (!origin) return false;
+  if (!origin) return true; // Allow same-origin requests that don't send Origin header (e.g. from <link>)
   if (allowedOriginsList.includes(origin)) return true;
   // Allow Render preview/PR deployments for this service
   if (origin.match(/^https:\/\/myones(-[a-z0-9-]+)?\.onrender\.com$/)) return true;
@@ -135,8 +137,8 @@ function isAllowedOrigin(origin: string | undefined): boolean {
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  if (isAllowedOrigin(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin!);
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma');
@@ -147,9 +149,13 @@ app.use((req, res, next) => {
   // Handle preflight
   if (req.method === 'OPTIONS') {
     if (isAllowedOrigin(origin)) {
-      return res.sendStatus(200);
+      // Re-apply CORS headers for the OPTIONS response itself
+      if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma');
+      return res.sendStatus(204);
     }
-    // Don't explicitly reject - just don't set CORS headers
     return res.sendStatus(204);
   }
 
@@ -281,13 +287,15 @@ app.get('/api/health', (_req, res) => {
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } else {
-      // Only serve static files if the build directory exists
-      // (skipped when frontend is deployed separately on Vercel)
-      const distPublicPath = path.resolve(import.meta.dirname ?? __dirname, "..", "dist", "public");
+      // Robust dist path detection (works in local dev and bundled production)
+      const distPublicPath = fs.existsSync(path.resolve(__dirname, "public"))
+        ? path.resolve(__dirname, "public")
+        : path.resolve(__dirname, "..", "dist", "public");
+      
       if (fs.existsSync(distPublicPath)) {
-        serveStatic(app);
+        serveStatic(app, distPublicPath);
       } else {
-        log("Skipping static file serving (dist/public not found — frontend deployed separately)");
+        log(`Skipping static file serving (dist/public not found at ${distPublicPath} — frontend deployed separately)`);
       }
     }
 
@@ -407,7 +415,9 @@ app.get('/api/health', (_req, res) => {
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
   } catch (error) {
-    logger.error("FATAL SERVER ERROR", { error });
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : 'No stack trace available';
+    logger.error("FATAL SERVER ERROR", { message, stack, error });
     process.exit(1);
   }
 })();
