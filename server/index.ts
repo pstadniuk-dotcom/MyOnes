@@ -147,9 +147,13 @@ app.use((req, res, next) => {
   // Handle preflight
   if (req.method === 'OPTIONS') {
     if (isAllowedOrigin(origin)) {
-      return res.sendStatus(200);
+      // Re-apply CORS headers for the OPTIONS response itself
+      if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma');
+      return res.sendStatus(204);
     }
-    // Don't explicitly reject - just don't set CORS headers
     return res.sendStatus(204);
   }
 
@@ -282,7 +286,10 @@ app.get('/api/health', (_req, res) => {
       await setupVite(app, server);
     } else {
       // Robust dist path detection (works in local dev and bundled production)
-      const distPublicPath = path.resolve(process.cwd(), "dist", "public");
+      const distPublicPath = fs.existsSync(path.resolve(__dirname, "public"))
+        ? path.resolve(__dirname, "public")
+        : path.resolve(__dirname, "..", "dist", "public");
+      
       if (fs.existsSync(distPublicPath)) {
         serveStatic(app);
       } else {
