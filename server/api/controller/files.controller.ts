@@ -11,7 +11,7 @@ export class FilesController {
             };
             const result = await filesService.downloadFile(req.params.fileId, req.userId!, auditInfo);
             res.setHeader('Content-Type', result.mimeType);
-            res.setHeader('Content-Disposition', `inline; filename="${result.originalFileName}"`);
+            res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(result.originalFileName)}`);
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
@@ -37,7 +37,7 @@ export class FilesController {
             };
             const result = await filesService.downloadFile(req.params.fileId, req.userId!, auditInfo);
             res.setHeader('Content-Type', result.mimeType);
-            res.setHeader('Content-Disposition', `attachment; filename="${result.originalFileName}"`);
+            res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(result.originalFileName)}`);
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');

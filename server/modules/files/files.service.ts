@@ -121,6 +121,21 @@ export class FilesService {
             throw new Error('Invalid file extension.');
         }
 
+        // Magic byte verification to prevent spoofing
+        const hex = uploadedFile.data.toString('hex', 0, 8).toUpperCase();
+        let isValidMagic = false;
+        
+        if (uploadedFile.mimetype === 'application/pdf' && hex.startsWith('25504446')) isValidMagic = true;
+        else if (uploadedFile.mimetype.startsWith('image/jp') && hex.startsWith('FFD8FF')) isValidMagic = true;
+        else if (uploadedFile.mimetype === 'image/png' && hex.startsWith('89504E470D0A1A0A')) isValidMagic = true;
+        else if (uploadedFile.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' && hex.startsWith('504B0304')) isValidMagic = true;
+        else if (uploadedFile.mimetype === 'application/msword' && hex.startsWith('D0CF11E0A1B11AE1')) isValidMagic = true;
+        else if (uploadedFile.mimetype === 'text/plain') isValidMagic = true;
+
+        if (!isValidMagic) {
+            throw new Error('File content does not match its extension (possible spoofing).');
+        }
+
         // Determine category
         // let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'other';
         let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'lab_report';
