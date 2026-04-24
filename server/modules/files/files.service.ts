@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { filesRepository } from './files.repository';
 import { ObjectStorageService } from '../../utils/objectStorage';
 import { analyzeLabReport, looksLikeLabRequisition } from '../../utils/fileAnalysis';
@@ -122,32 +123,23 @@ export class FilesService {
         }
 
         // Magic byte verification to prevent spoofing
-        const hex = uploadedFile.data.toString('hex', 0, 8).toUpperCase();
-        let isValidMagic = false;
-        
-        if (uploadedFile.mimetype === 'application/pdf' && hex.startsWith('25504446')) isValidMagic = true;
-        else if (uploadedFile.mimetype.startsWith('image/jp') && hex.startsWith('FFD8FF')) isValidMagic = true;
-        else if (uploadedFile.mimetype === 'image/png' && hex.startsWith('89504E470D0A1A0A')) isValidMagic = true;
-        else if (uploadedFile.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' && hex.startsWith('504B0304')) isValidMagic = true;
-        else if (uploadedFile.mimetype === 'application/msword' && hex.startsWith('D0CF11E0A1B11AE1')) isValidMagic = true;
-        else if (uploadedFile.mimetype === 'text/plain') isValidMagic = true;
+        const fileBuffer = (uploadedFile.data && uploadedFile.data.length > 0)
+            ? uploadedFile.data
+            : (uploadedFile.tempFilePath ? fs.readFileSync(uploadedFile.tempFilePath) : Buffer.alloc(0));
 
-        if (!isValidMagic) {
-            throw new Error('File content does not match its extension (possible spoofing).');
-        }
+        this.validateMagicBytes(uploadedFile, fileBuffer);
 
         // Determine category
-        // let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'other';
-        let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'lab_report';
+        let fileType: 'lab_report' | 'medical_document' | 'prescription' | 'other' = 'other';
         const labKeywords = ['lab', 'blood', 'test', 'cbc', 'panel', 'result', 'report', 'analysis', 'metabolic', 'lipid', 'thyroid', 'vitamin', 'serum', 'urine', 'specimen'];
 
-        // if (labKeywords.some(keyword => fileName.includes(keyword))) {
-        //     fileType = 'lab_report';
-        // } else if (fileName.includes('prescription') || fileName.includes('rx')) {
-        //     fileType = 'prescription';
-        // } else if (allowedMimeTypes.slice(0, 4).includes(uploadedFile.mimetype)) {
-        //     fileType = 'medical_document';
-        // }
+        if (labKeywords.some(keyword => fileName.includes(keyword))) {
+            fileType = 'lab_report';
+        } else if (fileName.includes('prescription') || fileName.includes('rx')) {
+            fileType = 'prescription';
+        } else if (allowedMimeTypes.slice(0, 4).includes(uploadedFile.mimetype)) {
+            fileType = 'medical_document';
+        }
 
         // Dedup: if the same user uploaded a file with the exact same name + size
         // within the last 10 minutes, return that one instead of running OCR/AI again.
@@ -194,7 +186,7 @@ export class FilesService {
         // Upload to storage
         const normalizedPath = await this.objectStorageService.uploadLabReportFile(
             userId,
-            uploadedFile.data,
+            fileBuffer,
             uploadedFile.name,
             uploadedFile.mimetype
         );
@@ -395,9 +387,16 @@ export class FilesService {
         const oldObjectPath = fileUpload.objectPath;
 
         // Upload new content to storage - generate a new path to prevent CDN caching
+        const fileBuffer = (uploadedFile.data && uploadedFile.data.length > 0)
+            ? uploadedFile.data
+            : (uploadedFile.tempFilePath ? fs.readFileSync(uploadedFile.tempFilePath) : Buffer.alloc(0));
+
+        // Validate spoofing on update as well
+        this.validateMagicBytes(uploadedFile, fileBuffer);
+
         const normalizedPath = await this.objectStorageService.uploadLabReportFile(
             userId,
-            uploadedFile.data,
+            fileBuffer,
             uploadedFile.name,
             uploadedFile.mimetype
         );
@@ -794,8 +793,8 @@ export class FilesService {
     ): void {
         systemRepository.createAuditLog({
             userId,
-            fileId,
             action,
+            fileId,
             objectPath,
             success,
             errorMessage: errorMessage || null,
@@ -805,6 +804,41 @@ export class FilesService {
         }).catch((err) => {
             logger.error('Failed to write file audit log', { err, action, fileId, userId });
         });
+    }
+
+    private validateMagicBytes(uploadedFile: any, fileBuffer: Buffer): void {
+        // The PDF specification allows up to 1024 bytes of garbage before the %PDF- signature
+        const hex = fileBuffer.toString('hex', 0, 1024).toUpperCase();
+        let isValidMagic = false;
+
+        if (uploadedFile.mimetype === 'application/pdf') {
+            if (hex.includes('25504446')) isValidMagic = true;
+        } else if (uploadedFile.mimetype.startsWith('image/jp')) {
+            // JPEG SOI is FF D8. Next byte is usually FF (marker start).
+            if (hex.startsWith('FFD8FF')) isValidMagic = true;
+            // Also allow FFD8DB (DQT) and FFD8EE (COM) which are valid starts for some JPEGs
+            else if (hex.startsWith('FFD8DB') || hex.startsWith('FFD8EE')) isValidMagic = true;
+        } else if (uploadedFile.mimetype === 'image/png') {
+            if (hex.startsWith('89504E470D0A1A0A')) isValidMagic = true;
+        } else if (uploadedFile.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+            // DOCX is a ZIP container
+            if (hex.startsWith('504B0304')) isValidMagic = true;
+        } else if (uploadedFile.mimetype === 'application/msword') {
+            // Legacy DOC format
+            if (hex.startsWith('D0CF11E0A1B11AE1')) isValidMagic = true;
+        } else if (uploadedFile.mimetype === 'text/plain') {
+            // Plain text has no magic bytes we can reliably check without false negatives
+            isValidMagic = true;
+        } else {
+            // If it's another type that passed the mime check but we don't have magic bytes for it,
+            // we'll allow it for now but log a warning.
+            logger.warn(`No magic byte check for mimetype: ${uploadedFile.mimetype}`);
+            isValidMagic = true;
+        }
+
+        if (!isValidMagic) {
+            throw new Error('File content does not match its extension (possible spoofing).');
+        }
     }
 }
 
