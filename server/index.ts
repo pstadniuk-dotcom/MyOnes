@@ -291,9 +291,9 @@ app.get('/api/health', (_req, res) => {
         : path.resolve(__dirname, "..", "dist", "public");
       
       if (fs.existsSync(distPublicPath)) {
-        serveStatic(app);
+        serveStatic(app, distPublicPath);
       } else {
-        log("Skipping static file serving (dist/public not found — frontend deployed separately)");
+        log(`Skipping static file serving (dist/public not found at ${distPublicPath} — frontend deployed separately)`);
       }
     }
 
@@ -413,7 +413,9 @@ app.get('/api/health', (_req, res) => {
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
   } catch (error) {
-    logger.error("FATAL SERVER ERROR", { error });
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : 'No stack trace available';
+    logger.error("FATAL SERVER ERROR", { message, stack, error });
     process.exit(1);
   }
 })();
