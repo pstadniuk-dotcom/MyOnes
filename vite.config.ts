@@ -62,6 +62,9 @@ export default defineConfig({
       failOnError: true,
     }),
   ],
+  css: {
+    postcss: path.resolve(__dirname, "postcss.config.js"),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
