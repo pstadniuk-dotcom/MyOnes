@@ -9,6 +9,7 @@ import { eq, desc, and, sql, ilike, or, isNull } from 'drizzle-orm';
 import {
   ugcCampaigns, ugcResearch, ugcHooks, ugcScripts,
   ugcCharacters, ugcGeneratedImages, ugcVideoScenes, ugcBrandAssets,
+  insertUgcHookSchema, insertUgcCharacterSchema, insertUgcBrandAssetSchema
 } from '@shared/schema';
 import {
   generateProductResearch,
@@ -287,7 +288,8 @@ export class UgcController {
 
   async createHook(req: Request, res: Response) {
     try {
-      const [hook] = await db.insert(ugcHooks).values(req.body).returning();
+      const validData = insertUgcHookSchema.parse(req.body);
+      const [hook] = await db.insert(ugcHooks).values(validData as any).returning();
       res.json(hook);
     } catch (error) {
       logger.error('Error creating hook', { error });
@@ -297,7 +299,8 @@ export class UgcController {
 
   async updateHook(req: Request, res: Response) {
     try {
-      const [updated] = await db.update(ugcHooks).set(req.body).where(eq(ugcHooks.id, req.params.id)).returning();
+      const validData = insertUgcHookSchema.partial().parse(req.body);
+      const [updated] = await db.update(ugcHooks).set(validData as any).where(eq(ugcHooks.id, req.params.id)).returning();
       if (!updated) return res.status(404).json({ error: 'Hook not found' });
       res.json(updated);
     } catch (error) {
@@ -591,7 +594,8 @@ export class UgcController {
 
   async createCharacter(req: Request, res: Response) {
     try {
-      const [character] = await db.insert(ugcCharacters).values(req.body).returning();
+      const validData = insertUgcCharacterSchema.parse(req.body);
+      const [character] = await db.insert(ugcCharacters).values(validData as any).returning();
       res.json(character);
     } catch (error) {
       logger.error('Error creating character', { error });
@@ -982,7 +986,8 @@ export class UgcController {
 
   async createBrandAsset(req: Request, res: Response) {
     try {
-      const [asset] = await db.insert(ugcBrandAssets).values(req.body).returning();
+      const validData = insertUgcBrandAssetSchema.parse(req.body);
+      const [asset] = await db.insert(ugcBrandAssets).values(validData as any).returning();
       res.json(asset);
     } catch (error) {
       logger.error('Error creating brand asset', { error });

@@ -42,7 +42,7 @@ export function generateToken(userId: string, isAdmin: boolean = false): string 
  */
 export function verifyToken(token: string): { userId: string; isAdmin?: boolean } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; isAdmin?: boolean };
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string; isAdmin?: boolean };
     return decoded;
   } catch (error) {
     return null;
@@ -88,8 +88,6 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   // Support SSE ticket via query param (EventSource can't set headers)
   const queryTicket = req.query.ticket as string | undefined;
-  // Legacy: still accept token query param for backwards compat during migration
-  const queryToken = req.query.token as string | undefined;
 
   // 1. Try Bearer token from Authorization header
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -112,15 +110,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return next();
   }
 
-  // 3. Legacy: JWT in query param (deprecated — will be removed)
-  if (queryToken) {
-    const decoded = verifyToken(queryToken);
-    if (!decoded) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-    req.userId = decoded.userId;
-    return next();
-  }
+
 
   return res.status(401).json({ error: 'Authentication required' });
 }
