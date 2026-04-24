@@ -22,12 +22,14 @@ import { startRenewalScheduler } from './utils/renewalScheduler';
 import { startIngredientCatalogSyncScheduler } from "./utils/ingredientCatalogSyncScheduler";
 import { startOrderSettlementScheduler } from "./utils/orderSettlementScheduler";
 // Old wearable schedulers removed - Junction handles data sync via webhooks
+import { fileURLToPath } from "url";
 import { logger } from "./infra/logging/logger";
 import { testEncryption } from "./infra/security/fieldEncryption";
 import cron from "node-cron";
 import { pool } from "./infra/db/db";
-
 // Verify encryption key works before accepting traffic
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 if (!testEncryption()) {
   logger.error('FATAL: Field encryption self-test failed. Check FIELD_ENCRYPTION_KEY.');
   process.exit(1);
