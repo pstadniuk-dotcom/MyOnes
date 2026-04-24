@@ -34,7 +34,7 @@ describe('Authentication', () => {
     it('should generate token with admin flag', () => {
       const jwt = require('jsonwebtoken');
       const token = generateTestToken('admin-123', true);
-      const decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] }) as any;
       
       expect(decoded.userId).toBe('admin-123');
       expect(decoded.isAdmin).toBe(true);

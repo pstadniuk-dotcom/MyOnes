@@ -42,7 +42,7 @@ export function generateToken(userId: string, isAdmin: boolean = false): string 
  */
 export function verifyToken(token: string): { userId: string; isAdmin?: boolean } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; isAdmin?: boolean };
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string; isAdmin?: boolean };
     return decoded;
   } catch (error) {
     return null;
