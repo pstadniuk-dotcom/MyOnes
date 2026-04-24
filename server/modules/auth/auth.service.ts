@@ -389,13 +389,11 @@ export class AuthService {
                 throw new Error('Facebook authentication configuration error');
             }
 
-            // Get user info from Facebook Graph API.
-            // Graph API automatically rejects invalid/expired tokens with a 400.
-            // TODO: Once correct FACEBOOK_APP_SECRET is confirmed, re-enable appsecret_proof:
-            //   const proof = crypto.createHmac('sha256', fbAppSecret).update(fbAccessToken).digest('hex');
-            //   append &appsecret_proof=${proof} to the URL below for added server-side security.
+            // appsecret_proof = HMAC-SHA256(app_secret, access_token)
+            // Proves the request came from our server, not a token replay attack.
+            const appsecretProof = crypto.createHmac('sha256', fbAppSecret).update(fbAccessToken).digest('hex');
             const { data } = await axios.get(
-                `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${fbAccessToken}`
+                `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${fbAccessToken}&appsecret_proof=${appsecretProof}`
             );
 
             if (data?.error) {
