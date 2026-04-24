@@ -63,6 +63,8 @@ export async function setupVite(app: Express, server: Server) {
       const nonce = (res as any).locals.cspNonce;
       if (nonce) {
         page = page.replace(/<script(?![^>]*nonce=)/g, `<script nonce="${nonce}"`);
+        page = page.replace(/<style(?![^>]*nonce=)/g, `<style nonce="${nonce}"`);
+        page = page.replace(/<link rel="stylesheet"(?![^>]*nonce=)/g, `<link rel="stylesheet" nonce="${nonce}"`);
       }
 
       res.status(200).set({ "Content-Type": "text/html" }).end(page);

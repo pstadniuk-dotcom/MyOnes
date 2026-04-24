@@ -79,8 +79,8 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", (req, res) => `'nonce-${(res as Response).locals.cspNonce}'`, ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net","https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com", "https://www.googletagmanager.com", "https://*.googletagmanager.com", "https://www.google-analytics.com", "https://*.google-analytics.com"],
       scriptSrcElem: ["'self'", (req, res) => `'nonce-${(res as Response).locals.cspNonce}'`, ...(isDevMode ? ["'unsafe-eval'"] : []), "https://cdn.jsdelivr.net", "https://accounts.google.com/gsi/client", "https://connect.facebook.net", "https://maps.googleapis.com", "https://secure.easypaydirectgateway.com", "https://applepay.cdn-apple.com", "https://www.googletagmanager.com", "https://*.googletagmanager.com", "https://www.google-analytics.com", "https://*.google-analytics.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", (req: any, res: any) => `'nonce-${res.locals.cspNonce}'`, "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
-      styleSrcElem: ["'self'", "'unsafe-inline'", (req: any, res: any) => `'nonce-${res.locals.cspNonce}'`, "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", ...(isDevMode ? [] : [(req: any, res: any) => `'nonce-${res.locals.cspNonce}'`]), "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
+      styleSrcElem: ["'self'", "'unsafe-inline'", ...(isDevMode ? [] : [(req: any, res: any) => `'nonce-${res.locals.cspNonce}'`]), "https://fonts.googleapis.com", "https://accounts.google.com/gsi/style", "https://secure.easypaydirectgateway.com"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:", "https://platform-lookaside.fbsbx.com", "https://maps.googleapis.com"],
       objectSrc: [
@@ -135,8 +135,8 @@ function isAllowedOrigin(origin: string | undefined): boolean {
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  if (isAllowedOrigin(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin!);
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma');
