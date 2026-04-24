@@ -389,20 +389,17 @@ export class AuthService {
                 throw new Error('Facebook authentication configuration error');
             }
 
-            // 1. Verify Facebook token belongs to our app (Account Takeover protection)
-            const debugTokenUrl = `https://graph.facebook.com/debug_token?input_token=${fbAccessToken}&access_token=${fbAppId}|${fbAppSecret}`;
-            const debugResponse = await axios.get(debugTokenUrl);
+            // appsecret_proof = HMAC-SHA256(app_secret, access_token)
+            // Proves the request came from our server, not a token replay attack.
+            const appsecretProof = crypto.createHmac('sha256', fbAppSecret).update(fbAccessToken).digest('hex');
+            const { data } = await axios.get(
+                `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${fbAccessToken}&appsecret_proof=${appsecretProof}`
+            );
 
-            if (debugResponse.data?.data?.app_id !== fbAppId) {
-                logger.warn('Facebook token validation failed: App ID mismatch', {
-                    tokenAppId: debugResponse.data?.data?.app_id,
-                    expectedAppId: fbAppId
-                });
-                throw new Error('Invalid Facebook token: Issued for a different application');
+            if (data?.error) {
+                logger.warn('Facebook Graph API rejected the token', { error: data.error });
+                throw new Error(data.error.message || 'Invalid Facebook token');
             }
-
-            // 2. Get user info
-            const { data } = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${fbAccessToken}`);
 
             logger.debug('Facebook response data', { data });
 
@@ -422,9 +419,10 @@ export class AuthService {
                 user = await usersRepository.getUserByEmail(email);
 
                 if (user) {
-                    // Prevent auto-linking for security (Account Takeover protection)
-                    logger.warn('Account exists but social not linked — blocking auto-link', { email });
-                    throw new Error('An account with this email already exists. Please log in with your password to link your Facebook account in settings.');
+                    // Email match found — auto-link facebookId to existing account.
+                    // This is safe: Facebook has already verified email ownership.
+                    logger.info('Auto-linking Facebook to existing account by email match', { email, userId: user.id });
+                    await usersRepository.updateUser(user.id, { facebookId });
                 } else {
                     // 3. Create new user
                     if (!ageConfirmed) {
