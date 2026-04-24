@@ -245,7 +245,7 @@ export const reorderService = {
             detail: f.detail,
           })),
           recommendsChanges: false,
-          smsSummary: `Your formula is up for reorder. All metrics look stable. Reply APPROVE to keep your current formula, or DELAY to push back 2 weeks.`,
+          smsSummary: `Your formula is up for reorder. All metrics look stable. Reply with your unique code to keep your current formula, or DELAY to push back 2 weeks.`,
         };
       } else {
         aiDecision = parsed;
@@ -257,7 +257,7 @@ export const reorderService = {
         trendSummary: 'AI analysis temporarily unavailable. Defaulting to current formula.',
         findings: [],
         recommendsChanges: false,
-        smsSummary: `Your formula is up for reorder. Reply APPROVE to keep your current formula, or DELAY to push back 2 weeks.`,
+        smsSummary: `Your formula is up for reorder. Reply with your unique code to keep your current formula, or DELAY to push back 2 weeks.`,
       };
     }
 
@@ -296,7 +296,7 @@ export const reorderService = {
 
     const analysis = recommendation.analysisJson as AIReorderDecision;
     const smsBody = analysis?.smsSummary ||
-      'Your ONES formula is up for reorder. Reply APPROVE to keep your current formula, or DELAY to push back 2 weeks.';
+      'Your ONES formula is up for reorder. Reply with your unique code to keep your current formula, or DELAY to push back 2 weeks.';
 
     const gateMeta = { scheduleId: schedule.id, recommendationId: recommendation.id };
 
@@ -308,8 +308,9 @@ export const reorderService = {
           const twilio = await import('twilio');
           const twilioClient = twilio.default(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
+          const token = recommendation.id.substring(0, 6).toUpperCase();
           const message = await twilioClient.messages.create({
-            body: `ONES: ${smsBody}\n\nReply:\n• APPROVE - reorder with current formula\n• DELAY - push back 2 weeks`,
+            body: `ONES: ${smsBody}\n\nReply:\n• APPROVE ${token} - reorder with current formula\n• DELAY - push back 2 weeks`,
             from: process.env.TWILIO_PHONE_NUMBER,
             to: user.phone,
           });

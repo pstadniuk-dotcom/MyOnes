@@ -21,11 +21,13 @@ export class WebhooksService {
             throw new Error('User not found');
         }
 
-        const response = body.trim().toUpperCase();
+        const bodyTrimmed = body.trim().toUpperCase();
+        const responseParts = bodyTrimmed.split(/\s+/);
+        const command = responseParts[0];
 
         // ── Smart Re-Order replies (APPROVE / KEEP / DELAY) ─────────────
-        if (response === 'APPROVE' || response === 'KEEP' || response === 'DELAY') {
-            return this.handleReorderSmsReply(user.id, phoneNumber, response);
+        if (command === 'APPROVE' || command === 'KEEP' || command === 'DELAY') {
+            return this.handleReorderSmsReply(user.id, phoneNumber, bodyTrimmed);
         }
 
         const today = new Date();
@@ -33,14 +35,14 @@ export class WebhooksService {
         let nutritionCompleted = false;
         let workoutCompleted = false;
 
-        if (response === 'YES' || response === 'DONE') {
+        if (command === 'YES' || command === 'DONE') {
             nutritionCompleted = true;
             workoutCompleted = true;
-        } else if (response === 'NUTRITION') {
+        } else if (command === 'NUTRITION') {
             nutritionCompleted = true;
-        } else if (response === 'WORKOUT') {
+        } else if (command === 'WORKOUT') {
             workoutCompleted = true;
-        } else if (response === 'SKIP') {
+        } else if (command === 'SKIP') {
             // Log nothing, just acknowledge
         } else {
             // Unknown command
@@ -60,7 +62,7 @@ export class WebhooksService {
                 await optimizeRepository.updateDailyLog(existingLog.id, {
                     nutritionCompleted: nutritionCompleted || existingLog.nutritionCompleted,
                     workoutCompleted: workoutCompleted || existingLog.workoutCompleted,
-                    notes: existingLog.notes ? `${existingLog.notes}\nAuto-logged via SMS: ${response}` : `Auto-logged via SMS: ${response}`
+                    notes: existingLog.notes ? `${existingLog.notes}\nAuto-logged via SMS: ${command}` : `Auto-logged via SMS: ${command}`
                 });
             } else {
                 await optimizeRepository.createDailyLog({
@@ -73,12 +75,12 @@ export class WebhooksService {
                     energyLevel: null,
                     moodLevel: null,
                     sleepQuality: null,
-                    notes: `Auto-logged via SMS reply: ${response}`
+                    notes: `Auto-logged via SMS reply: ${command}`
                 });
             }
         }
 
-        const confirmMessage = response === 'SKIP'
+        const confirmMessage = command === 'SKIP'
             ? `No worries! Tomorrow's a fresh start 💪`
             : `✅ Logged! Keep up the great work 🔥`;
 
@@ -97,7 +99,20 @@ export class WebhooksService {
             return;
         }
 
-        switch (reply) {
+        const parts = reply.split(/\s+/);
+        const command = parts[0];
+        const token = parts[1];
+
+        const expectedToken = recommendation.id.substring(0, 6).toUpperCase();
+
+        if (command === 'APPROVE' || command === 'KEEP') {
+            if (token !== expectedToken) {
+                await sendRawSms(phoneNumber, `❌ Security code missing or incorrect. Please reply with "${command} ${expectedToken}" to confirm your charge.`);
+                return;
+            }
+        }
+
+        switch (command) {
             case 'APPROVE': {
                 await reorderService.handleApprove(recommendation);
                 await sendRawSms(phoneNumber,
