@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Moon, TestTube, HeartPulse, Activity, Leaf, Zap, ArrowRight } from "lucide-react";
 import { motion, useInView } from "framer-motion";
 import { useLocation } from "wouter";
@@ -428,6 +428,22 @@ export function OnesDifferenceSection() {
   const solutionRef = useRef<HTMLElement>(null);
   const solutionInView = useInView(solutionRef, { once: true, margin: "100px" });
   const [, navigate] = useLocation();
+  const mobileVideoRef = useRef<HTMLVideoElement>(null);
+  const [mobileVideoBlocked, setMobileVideoBlocked] = useState(false);
+
+  // Try to autoplay the mobile capsule video; if the browser blocks it (iOS Low Power Mode,
+  // Android data-saver, etc.) show a tap-to-play overlay so users still see something.
+  useEffect(() => {
+    const v = mobileVideoRef.current;
+    if (!v) return;
+    const tryPlay = () => {
+      const p = v.play();
+      if (p && typeof p.then === 'function') {
+        p.catch(() => setMobileVideoBlocked(true));
+      }
+    };
+    tryPlay();
+  }, []);
 
   return (
       <section ref={solutionRef} id="the-difference" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
@@ -472,18 +488,41 @@ export function OnesDifferenceSection() {
             {/* ── Mobile Layout ── */}
             <div className="md:hidden">
               <div className="flex justify-center mb-8">
-                <div className="relative w-full max-w-sm">
+                <div className="relative w-full max-w-sm aspect-square">
                   {/* Radial glow behind video */}
                   <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
                   <video
+                    ref={mobileVideoRef}
                     src="/capsule-formation.mp4"
                     autoPlay
                     loop
                     muted
                     playsInline
-                    preload="auto"
-                    className="relative w-full h-auto rounded-2xl shadow-xl"
+                    preload="metadata"
+                    onCanPlay={() => {
+                      const v = mobileVideoRef.current;
+                      if (v && v.paused) {
+                        v.play().catch(() => setMobileVideoBlocked(true));
+                      }
+                    }}
+                    className="absolute inset-0 w-full h-full object-cover rounded-2xl shadow-xl bg-[#054700]/5"
                   />
+                  {mobileVideoBlocked && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const v = mobileVideoRef.current;
+                        if (!v) return;
+                        v.play().then(() => setMobileVideoBlocked(false)).catch(() => {});
+                      }}
+                      aria-label="Play capsule formation video"
+                      className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#054700]/40"
+                    >
+                      <span className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
+                        <svg viewBox="0 0 24 24" className="w-7 h-7 ml-1 fill-[#054700]"><path d="M8 5v14l11-7z" /></svg>
+                      </span>
+                    </button>
+                  )}
                 </div>
               </div>
 
