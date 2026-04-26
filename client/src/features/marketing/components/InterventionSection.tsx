@@ -471,20 +471,21 @@ export function OnesDifferenceSection() {
           >
             {/* ── Mobile Layout ── */}
             <div className="md:hidden">
-              <motion.div variants={scaleIn} className="flex justify-center mb-8">
+              <div className="flex justify-center mb-8">
                 <div className="relative w-full max-w-sm">
                   {/* Radial glow behind video */}
-                  <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)]" />
+                  <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
                   <video
                     src="/capsule-formation.mp4"
                     autoPlay
                     loop
                     muted
                     playsInline
+                    preload="auto"
                     className="relative w-full h-auto rounded-2xl shadow-xl"
                   />
                 </div>
-              </motion.div>
+              </div>
 
               <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
                 {callouts.map((callout, i) => (

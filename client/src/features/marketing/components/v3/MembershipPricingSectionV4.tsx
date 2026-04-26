@@ -294,7 +294,7 @@ export default function MembershipPricingSectionV4() {
                 }`}>
                   ${tier.priceMonthly}/mo
                   {tier.active && spotsRemaining && (
-                    <span className="ml-1.5 text-white/70">&larr; You're here</span>
+                    <span className="ml-1.5 text-white/70 hidden sm:inline">&larr; You're here</span>
                   )}
                 </div>
                 {index < tiers.length - 1 && (

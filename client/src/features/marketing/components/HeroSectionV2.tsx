@@ -112,29 +112,29 @@ export default function HeroSectionV2() {
       {/* ═══════════════════════════════════════════════════
           LEFT HALF — Copy on cream with pill outlines
           ═══════════════════════════════════════════════════ */}
-      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-8 md:px-16 lg:px-16 xl:px-20 py-10 lg:py-16">
+      <div className="relative w-full lg:w-1/2 bg-[#ede8e2] flex flex-col justify-center px-5 sm:px-8 md:px-16 lg:px-16 xl:px-20 py-10 lg:py-16">
         <div className="relative z-10 max-w-xl space-y-8 text-center lg:text-left mx-auto lg:mx-0">
           {/* Pill labels */}
-          <div className="inline-flex items-center gap-8 border border-[#c5c5c5] rounded-full px-6 py-3 mx-auto lg:mx-0">
-            <span className="flex items-center gap-2 text-sm text-[#757575] font-light tracking-wide">
-              <span className="w-1.5 h-1.5 bg-[#5a6623] rounded-full" />
+          <div className="inline-flex items-center gap-3 sm:gap-8 border border-[#c5c5c5] rounded-full px-4 sm:px-6 py-2.5 sm:py-3 mx-auto lg:mx-0 max-w-full">
+            <span className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm text-[#757575] font-light tracking-wide whitespace-nowrap">
+              <span className="w-1.5 h-1.5 bg-[#5a6623] rounded-full flex-shrink-0" />
               Blood Data
             </span>
-            <span className="flex items-center gap-2 text-sm text-[#757575] font-light tracking-wide">
-              <span className="w-1.5 h-1.5 bg-[#5a6623] rounded-full" />
+            <span className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm text-[#757575] font-light tracking-wide whitespace-nowrap">
+              <span className="w-1.5 h-1.5 bg-[#5a6623] rounded-full flex-shrink-0" />
               Wearables
             </span>
-            <span className="flex items-center gap-2 text-sm text-[#757575] font-light tracking-wide">
-              <span className="w-1.5 h-1.5 bg-[#5a6623] rounded-full" />
+            <span className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm text-[#757575] font-light tracking-wide whitespace-nowrap">
+              <span className="w-1.5 h-1.5 bg-[#5a6623] rounded-full flex-shrink-0" />
               Your Capsule
             </span>
           </div>
 
           {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] leading-[1.24] tracking-[-0.02em]">
+          <h1 className="text-[2rem] sm:text-5xl md:text-6xl lg:text-[60px] leading-[1.24] tracking-[-0.02em]">
             <span className="block font-light text-[#054700]">One formula.</span>
-            <span className="block font-light text-[#054700] whitespace-nowrap sm:whitespace-normal lg:whitespace-nowrap min-h-[1.25em]">Built from{" "}
-              <span className="relative inline-grid min-w-[14ch] align-baseline leading-[1.2]">
+            <span className="block font-light text-[#054700] sm:whitespace-normal lg:whitespace-nowrap min-h-[1.25em]">Built from{" "}
+              <span className="relative inline-grid min-w-[10ch] sm:min-w-[14ch] align-baseline leading-[1.2]">
                 <span className="invisible col-start-1 row-start-1">your wearables</span>
                 <span className="text-gradient-green font-light col-start-1 row-start-1">{typewriterText}</span>
               </span>
@@ -190,7 +190,7 @@ export default function HeroSectionV2() {
       {/* ═══════════════════════════════════════════════════
           RIGHT HALF — Nature photo + frosted glass chat with video
           ═══════════════════════════════════════════════════ */}
-      <div className="flex relative w-full lg:w-1/2 min-h-[70vh] lg:min-h-[92vh] items-center justify-center">
+      <div className="flex relative w-full lg:w-1/2 min-h-[60vh] sm:min-h-[70vh] lg:min-h-[92vh] items-center justify-center px-4 sm:px-6 lg:px-0 py-10 lg:py-0">
         {/* Background video cycle */}
         {/* {heroVideos.map((src, idx) => (
           <video
