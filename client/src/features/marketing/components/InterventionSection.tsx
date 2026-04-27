@@ -432,48 +432,6 @@ export function OnesDifferenceSection() {
   const solutionRef = useRef<HTMLElement>(null);
   const solutionInView = useInView(solutionRef, { once: true, margin: "100px" });
   const [, navigate] = useLocation();
-  const mobileVideoRef = useRef<HTMLVideoElement>(null);
-  const [mobileVideoBlocked, setMobileVideoBlocked] = useState(false);
-
-  // Try to autoplay the mobile capsule video; if the browser blocks it (iOS Low Power Mode,
-  // Android data-saver, etc.) show a tap-to-play overlay so users still see something.
-  // React doesn't always set the HTML `muted` attribute correctly on initial render, which
-  // can cause iOS Safari to treat the autoplay as audible and block it — we fix that imperatively.
-  // We also gate every play() on `paused` so we never overlap the browser's own autoplay
-  // attempt (overlapping play() calls reject the first promise with AbortError, which used
-  // to spuriously flip blocked=true).
-  useEffect(() => {
-    const v = mobileVideoRef.current;
-    if (!v) return;
-    v.muted = true;
-    let cancelled = false;
-    const tryPlay = () => {
-      if (cancelled || !v.paused) return;
-      const p = v.play();
-      if (p && typeof p.then === 'function') {
-        p.then(() => { if (!cancelled) setMobileVideoBlocked(false); })
-         .catch((err) => {
-           if (cancelled) return;
-           // AbortError just means another play() (often the autoPlay attribute) won the race.
-           // Don't show the blocked overlay for that — only for genuine NotAllowedError etc.
-           if (err && err.name === 'AbortError') return;
-           setMobileVideoBlocked(true);
-         });
-      }
-    };
-    if (v.readyState >= 2) {
-      tryPlay();
-    } else {
-      v.addEventListener('loadeddata', tryPlay, { once: true });
-    }
-    const onVis = () => { if (!document.hidden && v.paused) tryPlay(); };
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      cancelled = true;
-      v.removeEventListener('loadeddata', tryPlay);
-      document.removeEventListener('visibilitychange', onVis);
-    };
-  }, []);
 
   return (
       <section ref={solutionRef} id="the-difference" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
@@ -522,7 +480,6 @@ export function OnesDifferenceSection() {
                   {/* Radial glow behind video */}
                   <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
                   <video
-                    ref={mobileVideoRef}
                     autoPlay
                     loop
                     muted
@@ -532,9 +489,8 @@ export function OnesDifferenceSection() {
                     disableRemotePlayback
                     controls={false}
                     controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
-                    x-webkit-airplay="deny"
                     style={{ aspectRatio: '1 / 1' }}
-                    className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover pointer-events-none select-none"
+                    className="relative w-full h-auto rounded-2xl shadow-xl object-cover pointer-events-none select-none"
                   >
                     <source src="/capsule-formation.mp4" type="video/mp4" />
                   </video>
