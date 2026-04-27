@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { Moon, TestTube, HeartPulse, Activity, Leaf, Zap, ArrowRight } from "lucide-react";
 import { motion, useInView } from "framer-motion";
 import { useLocation } from "wouter";
@@ -440,33 +440,31 @@ export function OnesDifferenceSection() {
   // We also gate every play() on `paused` so we never overlap the browser's own autoplay
   // attempt (overlapping play() calls reject the first promise with AbortError, which used
   // to spuriously flip blocked=true).
+  const tryPlay = useCallback(async () => {
+    const v = mobileVideoRef.current;
+    if (!v || !v.paused) return;
+    try {
+      await v.play();
+      setMobileVideoBlocked(false);
+    } catch (err: any) {
+      // AbortError is common and safe to ignore
+      if (err && err.name === 'AbortError') return;
+      
+      console.warn("Mobile video autoplay blocked:", err);
+      setMobileVideoBlocked(true);
+    }
+  }, []);
+
   useEffect(() => {
     const v = mobileVideoRef.current;
     if (!v) return;
 
-    // Ensure muted is set early and explicitly to help bypass autoplay blocks
+    // Ensure muted is set early and explicitly
     v.muted = true;
     v.defaultMuted = true;
 
-    let cancelled = false;
-
-    const tryPlay = async () => {
-      if (cancelled || !v.paused) return;
-      try {
-        await v.play();
-        if (!cancelled) setMobileVideoBlocked(false);
-      } catch (err: any) {
-        if (cancelled) return;
-        // AbortError is common and safe to ignore (e.g. another play() call interrupted this one)
-        if (err && err.name === 'AbortError') return;
-        
-        console.warn("Mobile video autoplay blocked:", err);
-        setMobileVideoBlocked(true);
-      }
-    };
-
-    // If already ready, try playing immediately
-    if (v.readyState >= 2) {
+    // If already ready (HAVE_FUTURE_DATA or better), try playing immediately
+    if (v.readyState >= 3) {
       tryPlay();
     }
 
@@ -483,11 +481,10 @@ export function OnesDifferenceSection() {
     document.addEventListener('visibilitychange', onVis);
 
     return () => {
-      cancelled = true;
       events.forEach(event => v.removeEventListener(event, tryPlay));
       document.removeEventListener('visibilitychange', onVis);
     };
-  }, []);
+  }, [tryPlay]);
 
   return (
       <section ref={solutionRef} id="the-difference" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
@@ -537,16 +534,18 @@ export function OnesDifferenceSection() {
                   <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
                   <video
                     ref={mobileVideoRef}
+                    src="/capsule-formation.mp4"
                     autoPlay
                     loop
                     muted
                     playsInline
                     preload="auto"
+                    onCanPlay={() => {
+                      if (mobileVideoRef.current?.paused) tryPlay();
+                    }}
                     style={{ aspectRatio: '1 / 1' }}
                     className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
-                  >
-                    <source src="/capsule-formation.mp4" type="video/mp4" />
-                  </video>
+                  />
                   {mobileVideoBlocked && (
                     <button
                       type="button"
@@ -554,8 +553,7 @@ export function OnesDifferenceSection() {
                         const v = mobileVideoRef.current;
                         if (!v) return;
                         v.muted = true;
-                        // Forcing a load() and then play() is the most reliable way to start a blocked video
-                        v.load();
+                        // Directly call play() after user gesture; load() can be counter-productive here
                         v.play()
                           .then(() => setMobileVideoBlocked(false))
                           .catch((err) => console.error("Manual play failed", err));
